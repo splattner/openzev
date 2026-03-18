@@ -1,0 +1,50 @@
+name: Container Build Check
+
+on:
+    pull_request:
+        branches: [main]
+    push:
+        branches: [main]
+
+permissions:
+    contents: read
+
+jobs:
+    build:
+        runs-on: ubuntu-latest
+        strategy:
+            fail-fast: false
+            matrix:
+                include:
+                    - image: backend
+                      context: .
+                      dockerfile: backend/Dockerfile
+                      build_args: ""
+                    - image: frontend
+                      context: .
+                      dockerfile: frontend/Dockerfile
+                      build_args: ""
+                    - image: fullstack
+                      context: .
+                      dockerfile: Dockerfile.fullstack
+                      build_args: VITE_API_BASE_URL=/api/v1
+
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
+
+            - name: Set up QEMU
+              uses: docker/setup-qemu-action@v3
+
+            - name: Set up Docker Buildx
+              uses: docker/setup-buildx-action@v3
+
+            - name: Build ${{ matrix.image }} image
+              uses: docker/build-push-action@v6
+              with:
+                  context: ${{ matrix.context }}
+                  file: ${{ matrix.dockerfile }}
+                  push: false
+                  build-args: ${{ matrix.build_args }}
+                  cache-from: type=gha
+                  cache-to: type=gha,mode=max
