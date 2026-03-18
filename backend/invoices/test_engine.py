@@ -1,0 +1,203 @@
+from datetime import date, datetime, timezone
+from decimal import Decimal
+
+from django.test import TestCase
+
+from accounts.models import User, UserRole
+from metering.models import MeterReading, ReadingDirection
+from tariffs.models import BillingMode, EnergyType, PeriodType, Tariff, TariffCategory, TariffPeriod
+from zev.models import MeteringPoint, MeteringPointType, Participant, Zev
+from .engine import generate_invoice
+
+
+class InvoiceEngineTests(TestCase):
+    def setUp(self):
+        self.owner = User.objects.create_user(
+            username="owner",
+            password="secret",
+            role=UserRole.ZEV_OWNER,
+        )
+        self.zev = Zev.objects.create(
+            name="OpenZEV Demo",
+            owner=self.owner,
+            zev_type="vzev",
+            invoice_prefix="INV",
+        )
+        self.participant = Participant.objects.create(
+            zev=self.zev,
+            first_name="Alice",
+            last_name="Muster",
+            email="alice@example.com",
+            valid_from=date(2026, 1, 1),
+        )
+        self.consumption_mp = MeteringPoint.objects.create(
+            zev=self.zev,
+            participant=self.participant,
+            meter_id="MP-C-1",
+            meter_type=MeteringPointType.CONSUMPTION,
+            valid_from=date(2026, 1, 1),
+        )
+        self.production_mp = MeteringPoint.objects.create(
+            zev=self.zev,
+            participant=self.participant,
+            meter_id="MP-P-1",
+            meter_type=MeteringPointType.PRODUCTION,
+            valid_from=date(2026, 1, 1),
+        )
+
+        for energy_type, price in [
+            (EnergyType.LOCAL, Decimal("0.15")),
+            (EnergyType.GRID, Decimal("0.25")),
+            (EnergyType.FEED_IN, Decimal("0.08")),
+        ]:
+            tariff = Tariff.objects.create(
+                zev=self.zev,
+                name=f"{energy_type} tariff",
+                category=TariffCategory.ENERGY,
+                billing_mode=BillingMode.ENERGY,
+                energy_type=energy_type,
+                valid_from=date(2026, 1, 1),
+            )
+            TariffPeriod.objects.create(
+                tariff=tariff,
+                period_type=PeriodType.FLAT,
+                price_chf_per_kwh=price,
+            )
+
+    def test_generate_invoice_prices_local_and_grid_energy(self):
+        MeterReading.objects.create(
+            metering_point=self.consumption_mp,
+            timestamp=datetime(2026, 1, 15, 0, 0, tzinfo=timezone.utc),
+            energy_kwh=Decimal("10.0"),
+            direction=ReadingDirection.IN,
+        )
+        MeterReading.objects.create(
+            metering_point=self.production_mp,
+            timestamp=datetime(2026, 1, 15, 0, 0, tzinfo=timezone.utc),
+            energy_kwh=Decimal("6.0"),
+            direction=ReadingDirection.OUT,
+        )
+
+        invoice = generate_invoice(self.participant, date(2026, 1, 1), date(2026, 1, 31))
+
+        self.assertEqual(invoice.total_local_kwh, Decimal("6.0000"))
+        self.assertEqual(invoice.total_grid_kwh, Decimal("4.0000"))
+        self.assertEqual(invoice.subtotal_chf, Decimal("1.42"))
+        self.assertEqual(invoice.total_chf, Decimal("1.42"))
+        self.assertEqual(invoice.items.count(), 3)
+
+    def test_generate_invoice_separates_categories_and_fixed_fees(self):
+        grid_tariff = Tariff.objects.create(
+            zev=self.zev,
+            name="Grid usage fee",
+            category=TariffCategory.GRID_FEES,
+            billing_mode=BillingMode.ENERGY,
+            energy_type=EnergyType.GRID,
+            valid_from=date(2026, 1, 1),
+        )
+        TariffPeriod.objects.create(
+            tariff=grid_tariff,
+            period_type=PeriodType.FLAT,
+            price_chf_per_kwh=Decimal("0.05"),
+        )
+        levy_tariff = Tariff.objects.create(
+            zev=self.zev,
+            name="Federal levy",
+            category=TariffCategory.LEVIES,
+            billing_mode=BillingMode.ENERGY,
+            energy_type=EnergyType.GRID,
+            valid_from=date(2026, 1, 1),
+        )
+        TariffPeriod.objects.create(
+            tariff=levy_tariff,
+            period_type=PeriodType.FLAT,
+            price_chf_per_kwh=Decimal("0.02"),
+        )
+        Tariff.objects.create(
+            zev=self.zev,
+            name="Metering basic fee",
+            category=TariffCategory.GRID_FEES,
+            billing_mode=BillingMode.MONTHLY_FEE,
+            fixed_price_chf=Decimal("12.00"),
+            valid_from=date(2026, 1, 1),
+        )
+        Tariff.objects.create(
+            zev=self.zev,
+            name="Annual admin fee",
+            category=TariffCategory.LEVIES,
+            billing_mode=BillingMode.YEARLY_FEE,
+            fixed_price_chf=Decimal("120.00"),
+            valid_from=date(2026, 1, 1),
+        )
+
+        MeterReading.objects.create(
+            metering_point=self.consumption_mp,
+            timestamp=datetime(2026, 1, 15, 0, 0, tzinfo=timezone.utc),
+            energy_kwh=Decimal("10.0"),
+            direction=ReadingDirection.IN,
+        )
+        MeterReading.objects.create(
+            metering_point=self.production_mp,
+            timestamp=datetime(2026, 1, 15, 0, 0, tzinfo=timezone.utc),
+            energy_kwh=Decimal("6.0"),
+            direction=ReadingDirection.OUT,
+        )
+
+        invoice = generate_invoice(self.participant, date(2026, 1, 15), date(2026, 1, 31))
+
+        self.assertEqual(invoice.subtotal_chf, Decimal("23.70"))
+        categories = {item.description: item.tariff_category for item in invoice.items.all()}
+        self.assertEqual(categories["Grid usage fee"], TariffCategory.GRID_FEES)
+        self.assertEqual(categories["Federal levy"], TariffCategory.LEVIES)
+
+        fixed_items = {item.description: item for item in invoice.items.filter(unit="month")}
+        self.assertEqual(fixed_items["Metering basic fee (1 month)"].total_chf, Decimal("12.00"))
+        self.assertEqual(fixed_items["Annual admin fee (1 monthly installment of annual fee)"].total_chf, Decimal("10.00"))
+
+    def test_fixed_fees_bill_each_touched_month_without_proration(self):
+        Tariff.objects.create(
+            zev=self.zev,
+            name="Monthly service fee",
+            category=TariffCategory.GRID_FEES,
+            billing_mode=BillingMode.MONTHLY_FEE,
+            fixed_price_chf=Decimal("12.00"),
+            valid_from=date(2026, 1, 1),
+        )
+        Tariff.objects.create(
+            zev=self.zev,
+            name="Annual platform fee",
+            category=TariffCategory.LEVIES,
+            billing_mode=BillingMode.YEARLY_FEE,
+            fixed_price_chf=Decimal("120.00"),
+            valid_from=date(2026, 1, 1),
+        )
+
+        invoice = generate_invoice(self.participant, date(2026, 1, 15), date(2026, 2, 14))
+
+        fixed_items = {item.description: item for item in invoice.items.filter(unit="month")}
+        self.assertEqual(fixed_items["Monthly service fee (2 months)"].total_chf, Decimal("24.00"))
+        self.assertEqual(fixed_items["Annual platform fee (2 monthly installments of annual fee)"].total_chf, Decimal("20.00"))
+
+    def test_per_metering_point_fees_bill_per_metering_point_month(self):
+        Tariff.objects.create(
+            zev=self.zev,
+            name="Metering operation fee",
+            category=TariffCategory.GRID_FEES,
+            billing_mode=BillingMode.PER_METERING_POINT_MONTHLY_FEE,
+            fixed_price_chf=Decimal("3.00"),
+            valid_from=date(2026, 1, 1),
+        )
+        Tariff.objects.create(
+            zev=self.zev,
+            name="Metering annual levy",
+            category=TariffCategory.LEVIES,
+            billing_mode=BillingMode.PER_METERING_POINT_YEARLY_FEE,
+            fixed_price_chf=Decimal("120.00"),
+            valid_from=date(2026, 1, 1),
+        )
+
+        invoice = generate_invoice(self.participant, date(2026, 1, 15), date(2026, 2, 14))
+
+        fixed_items = {item.description: item for item in invoice.items.filter(unit="month")}
+        self.assertEqual(fixed_items["Metering operation fee (4 metering-point months)"].total_chf, Decimal("12.00"))
+        self.assertEqual(fixed_items["Metering annual levy (4 monthly installments per metering point)"].total_chf, Decimal("40.00"))

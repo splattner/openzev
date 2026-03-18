@@ -9,7 +9,6 @@
     "dependencies"
   ],
   "timezone": "Europe/Zurich",
-  "rangeStrategy": "bump",
   "packageRules": [
     {
       "matchManagers": ["github-actions"],
@@ -31,6 +30,5 @@
   "lockFileMaintenance": {
     "enabled": true,
     "schedule": ["before 4am on monday"]
-  },
-  "schedule": ["before 5am on monday"]
+  }
 }
