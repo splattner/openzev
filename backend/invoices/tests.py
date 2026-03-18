@@ -1,0 +1,381 @@
+"""
+RBAC and workflow tests for the invoice endpoints.
+
+Tests that:
+- Admin can access and action all invoices.
+- ZEV owner can only access invoices for their own ZEVs.
+- Participant can only read their own invoices and cannot perform actions.
+- Invoice workflow transitions (approve → mark-sent → mark-paid and cancel) are guarded correctly.
+- Regenerating a locked invoice raises a 409.
+"""
+from datetime import date
+from decimal import Decimal
+
+from pathlib import Path
+
+from django.conf import settings
+from django.core import mail
+from django.core.files.base import ContentFile
+from django.test import TestCase
+from django.test.utils import override_settings
+from rest_framework.test import APIClient
+
+from accounts.models import AppSettings, User, UserRole
+from invoices.models import Invoice, InvoiceItem, InvoiceStatus
+from invoices.tasks import send_invoice_email_task
+from invoices.serializers import InvoiceSerializer
+from tariffs.models import TariffCategory
+from zev.models import Participant, Zev
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def make_user(username, role, password="pass1234"):
+    return User.objects.create_user(username=username, password=password, role=role)
+
+
+def make_zev(owner, name="Test ZEV"):
+    return Zev.objects.create(name=name, owner=owner, zev_type="vzev", invoice_prefix="T")
+
+
+def make_participant(zev, user=None, first="Jane", last="Doe"):
+    return Participant.objects.create(
+        zev=zev,
+        user=user,
+        first_name=first,
+        last_name=last,
+        email=f"{first.lower()}@example.com",
+        valid_from=date(2026, 1, 1),
+    )
+
+
+_counter = 0
+
+
+def make_invoice(zev, participant, inv_status=InvoiceStatus.DRAFT):
+    global _counter
+    _counter += 1
+    return Invoice.objects.create(
+        invoice_number=f"T-{_counter:05d}",
+        zev=zev,
+        participant=participant,
+        period_start=date(2026, 1, 1),
+        period_end=date(2026, 1, 31),
+        status=inv_status,
+        total_chf=Decimal("42.00"),
+    )
+
+
+def auth(client, user, password="pass1234"):
+    resp = client.post("/api/v1/auth/token/", {"username": user.username, "password": password})
+    client.credentials(HTTP_AUTHORIZATION=f"Bearer {resp.data['access']}")
+
+
+# ---------------------------------------------------------------------------
+# RBAC: list/read access
+# ---------------------------------------------------------------------------
+
+class InvoiceRBACTests(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.admin = make_user("rbac_admin", UserRole.ADMIN)
+        self.owner1 = make_user("rbac_owner1", UserRole.ZEV_OWNER)
+        self.owner2 = make_user("rbac_owner2", UserRole.ZEV_OWNER)
+        self.puser = make_user("rbac_participant", UserRole.PARTICIPANT)
+
+        self.zev1 = make_zev(self.owner1, "ZEV-1")
+        self.zev2 = make_zev(self.owner2, "ZEV-2")
+
+        self.p1 = make_participant(self.zev1, user=self.puser, first="Alice")
+        self.p2 = make_participant(self.zev2, first="Bob")
+
+        self.inv1 = make_invoice(self.zev1, self.p1)
+        self.inv2 = make_invoice(self.zev2, self.p2)
+
+    def _list(self):
+        resp = self.client.get("/api/v1/invoices/invoices/")
+        return resp.status_code, {str(inv["id"]) for inv in resp.data.get("results", [])}
+
+    def test_admin_sees_all_invoices(self):
+        auth(self.client, self.admin)
+        status_code, ids = self._list()
+        self.assertEqual(status_code, 200)
+        self.assertIn(str(self.inv1.pk), ids)
+        self.assertIn(str(self.inv2.pk), ids)
+
+    def test_owner1_sees_only_own_zev_invoices(self):
+        auth(self.client, self.owner1)
+        status_code, ids = self._list()
+        self.assertEqual(status_code, 200)
+        self.assertIn(str(self.inv1.pk), ids)
+        self.assertNotIn(str(self.inv2.pk), ids)
+
+    def test_participant_sees_only_own_invoices(self):
+        auth(self.client, self.puser)
+        status_code, ids = self._list()
+        self.assertEqual(status_code, 200)
+        self.assertIn(str(self.inv1.pk), ids)
+        self.assertNotIn(str(self.inv2.pk), ids)
+
+    def test_participant_cannot_approve(self):
+        auth(self.client, self.puser)
+        resp = self.client.post(f"/api/v1/invoices/invoices/{self.inv1.pk}/approve/")
+        self.assertEqual(resp.status_code, 403)
+
+    def test_participant_cannot_cancel(self):
+        auth(self.client, self.puser)
+        resp = self.client.post(f"/api/v1/invoices/invoices/{self.inv1.pk}/cancel/")
+        self.assertEqual(resp.status_code, 403)
+
+    def test_unauthenticated_is_rejected(self):
+        self.client.credentials()
+        resp = self.client.get("/api/v1/invoices/invoices/")
+        self.assertEqual(resp.status_code, 401)
+
+    def test_admin_can_read_pdf_template(self):
+        auth(self.client, self.admin)
+        resp = self.client.get("/api/v1/invoices/invoices/pdf-template/")
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn("content", resp.data)
+
+    def test_owner_cannot_read_pdf_template(self):
+        auth(self.client, self.owner1)
+        resp = self.client.get("/api/v1/invoices/invoices/pdf-template/")
+        self.assertEqual(resp.status_code, 403)
+
+    def test_admin_can_update_pdf_template(self):
+        auth(self.client, self.admin)
+        template_path = settings.BASE_DIR / "templates" / "invoices" / "invoice_pdf.html"
+        original = template_path.read_text(encoding="utf-8")
+        updated = original + "\n<!-- test marker -->\n"
+        try:
+            resp = self.client.patch(
+                "/api/v1/invoices/invoices/pdf-template/",
+                {"content": updated},
+                format="json",
+            )
+            self.assertEqual(resp.status_code, 200)
+            self.assertIn("detail", resp.data)
+            self.assertEqual(template_path.read_text(encoding="utf-8"), updated)
+        finally:
+            template_path.write_text(original, encoding="utf-8")
+
+    def test_admin_can_delete_paid_invoice(self):
+        inv = make_invoice(self.zev1, self.p1, InvoiceStatus.PAID)
+        auth(self.client, self.admin)
+
+        resp = self.client.delete(f"/api/v1/invoices/invoices/{inv.pk}/")
+
+        self.assertEqual(resp.status_code, 204)
+        self.assertFalse(Invoice.objects.filter(pk=inv.pk).exists())
+
+    def test_admin_can_delete_sent_invoice(self):
+        inv = make_invoice(self.zev1, self.p1, InvoiceStatus.SENT)
+        auth(self.client, self.admin)
+
+        resp = self.client.delete(f"/api/v1/invoices/invoices/{inv.pk}/")
+
+        self.assertEqual(resp.status_code, 204)
+        self.assertFalse(Invoice.objects.filter(pk=inv.pk).exists())
+
+    def test_owner_cannot_delete_paid_invoice(self):
+        inv = make_invoice(self.zev1, self.p1, InvoiceStatus.PAID)
+        auth(self.client, self.owner1)
+
+        resp = self.client.delete(f"/api/v1/invoices/invoices/{inv.pk}/")
+
+        self.assertEqual(resp.status_code, 400)
+        self.assertTrue(Invoice.objects.filter(pk=inv.pk).exists())
+
+
+# ---------------------------------------------------------------------------
+# Workflow: status transitions
+# ---------------------------------------------------------------------------
+
+class InvoiceWorkflowTests(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.owner = make_user("wf_owner", UserRole.ZEV_OWNER)
+        self.zev = make_zev(self.owner, "WF ZEV")
+        self.participant = make_participant(self.zev)
+        auth(self.client, self.owner)
+
+    def _action(self, invoice, action_url):
+        return self.client.post(f"/api/v1/invoices/invoices/{invoice.pk}/{action_url}/")
+
+    def test_approve_draft(self):
+        inv = make_invoice(self.zev, self.participant, InvoiceStatus.DRAFT)
+        resp = self._action(inv, "approve")
+        self.assertEqual(resp.status_code, 200)
+        inv.refresh_from_db()
+        self.assertEqual(inv.status, InvoiceStatus.APPROVED)
+
+    def test_approve_already_approved_fails(self):
+        inv = make_invoice(self.zev, self.participant, InvoiceStatus.APPROVED)
+        resp = self._action(inv, "approve")
+        self.assertEqual(resp.status_code, 400)
+
+    def test_mark_sent_from_approved(self):
+        inv = make_invoice(self.zev, self.participant, InvoiceStatus.APPROVED)
+        resp = self._action(inv, "mark-sent")
+        self.assertEqual(resp.status_code, 200)
+        inv.refresh_from_db()
+        self.assertEqual(inv.status, InvoiceStatus.SENT)
+        self.assertIsNotNone(inv.sent_at)
+
+    def test_mark_sent_from_draft_fails(self):
+        inv = make_invoice(self.zev, self.participant, InvoiceStatus.DRAFT)
+        resp = self._action(inv, "mark-sent")
+        self.assertEqual(resp.status_code, 400)
+
+    def test_mark_paid_from_sent(self):
+        inv = make_invoice(self.zev, self.participant, InvoiceStatus.SENT)
+        resp = self._action(inv, "mark-paid")
+        self.assertEqual(resp.status_code, 200)
+        inv.refresh_from_db()
+        self.assertEqual(inv.status, InvoiceStatus.PAID)
+
+    def test_mark_paid_from_draft_fails(self):
+        inv = make_invoice(self.zev, self.participant, InvoiceStatus.DRAFT)
+        resp = self._action(inv, "mark-paid")
+        self.assertEqual(resp.status_code, 400)
+
+    def test_cancel_draft(self):
+        inv = make_invoice(self.zev, self.participant, InvoiceStatus.DRAFT)
+        resp = self._action(inv, "cancel")
+        self.assertEqual(resp.status_code, 200)
+        inv.refresh_from_db()
+        self.assertEqual(inv.status, InvoiceStatus.CANCELLED)
+
+    def test_cancel_approved(self):
+        inv = make_invoice(self.zev, self.participant, InvoiceStatus.APPROVED)
+        resp = self._action(inv, "cancel")
+        self.assertEqual(resp.status_code, 200)
+        inv.refresh_from_db()
+        self.assertEqual(inv.status, InvoiceStatus.CANCELLED)
+
+    def test_cancel_sent(self):
+        inv = make_invoice(self.zev, self.participant, InvoiceStatus.SENT)
+        resp = self._action(inv, "cancel")
+        self.assertEqual(resp.status_code, 200)
+        inv.refresh_from_db()
+        self.assertEqual(inv.status, InvoiceStatus.CANCELLED)
+
+    def test_cancel_paid_fails(self):
+        inv = make_invoice(self.zev, self.participant, InvoiceStatus.PAID)
+        resp = self._action(inv, "cancel")
+        self.assertEqual(resp.status_code, 400)
+
+    def test_cancel_already_cancelled_fails(self):
+        inv = make_invoice(self.zev, self.participant, InvoiceStatus.CANCELLED)
+        resp = self._action(inv, "cancel")
+        self.assertEqual(resp.status_code, 400)
+
+
+# ---------------------------------------------------------------------------
+# Engine guard: regenerating locked invoices
+# ---------------------------------------------------------------------------
+
+class InvoiceEngineGuardTests(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.owner = make_user("guard_owner", UserRole.ZEV_OWNER)
+        self.zev = make_zev(self.owner, "GuardZEV")
+        self.participant = make_participant(self.zev)
+        auth(self.client, self.owner)
+
+    def _generate(self, participant_id):
+        return self.client.post("/api/v1/invoices/invoices/generate/", {
+            "participant_id": str(participant_id),
+            "period_start": "2026-01-01",
+            "period_end": "2026-01-31",
+        })
+
+    def test_regenerate_approved_invoice_returns_409(self):
+        make_invoice(self.zev, self.participant, InvoiceStatus.APPROVED)
+        resp = self._generate(self.participant.pk)
+        self.assertEqual(resp.status_code, 409)
+
+    def test_regenerate_paid_invoice_returns_409(self):
+        make_invoice(self.zev, self.participant, InvoiceStatus.PAID)
+        resp = self._generate(self.participant.pk)
+        self.assertEqual(resp.status_code, 409)
+
+    def test_regenerate_draft_invoice_succeeds(self):
+        make_invoice(self.zev, self.participant, InvoiceStatus.DRAFT)
+        resp = self._generate(self.participant.pk)
+        # Engine replaces draft; no 409 expected (may be 201 or other non-conflict)
+        self.assertNotEqual(resp.status_code, 409)
+
+    def test_regenerate_cancelled_invoice_succeeds(self):
+        make_invoice(self.zev, self.participant, InvoiceStatus.CANCELLED)
+        resp = self._generate(self.participant.pk)
+        self.assertNotEqual(resp.status_code, 409)
+
+
+@override_settings(
+    EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+    MEDIA_ROOT="/tmp/openzev_test_media",
+)
+class InvoiceEmailFormattingTests(TestCase):
+    def test_email_uses_configured_short_date_format(self):
+        owner = make_user("email_owner", UserRole.ZEV_OWNER)
+        zev = make_zev(owner, "Email ZEV")
+        participant = make_participant(zev, first="Ema", last="Il")
+        invoice = make_invoice(zev, participant, InvoiceStatus.APPROVED)
+        invoice.pdf_file.save("invoice_test.pdf", ContentFile(b"PDF"), save=True)
+
+        app_settings = AppSettings.load()
+        app_settings.date_format_short = AppSettings.SHORT_DATE_MM_SLASH_DD_SLASH_YYYY
+        app_settings.save(update_fields=["date_format_short"])
+
+        send_invoice_email_task.run(str(invoice.pk), "recipient@example.com")
+        invoice.refresh_from_db()
+
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn("01/01/2026 to 01/31/2026", mail.outbox[0].body)
+        self.assertEqual(invoice.status, InvoiceStatus.SENT)
+        self.assertIsNotNone(invoice.sent_at)
+
+    def test_email_uses_zev_custom_templates(self):
+        owner = make_user("email_tpl_owner", UserRole.ZEV_OWNER)
+        zev = make_zev(owner, "Template ZEV")
+        zev.email_subject_template = "[{zev_name}] Invoice {invoice_number}"
+        zev.email_body_template = "Hello {participant_name}, total {total_chf} CHF"
+        zev.save(update_fields=["email_subject_template", "email_body_template"])
+
+        participant = make_participant(zev, first="Tem", last="Plate")
+        invoice = make_invoice(zev, participant, InvoiceStatus.APPROVED)
+        invoice.pdf_file.save("invoice_test.pdf", ContentFile(b"PDF"), save=True)
+
+        send_invoice_email_task.run(str(invoice.pk), "recipient@example.com")
+
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].subject, f"[{zev.name}] Invoice {invoice.invoice_number}")
+        self.assertIn(f"Hello {participant.full_name}", mail.outbox[0].body)
+        self.assertIn("total", mail.outbox[0].body)
+
+
+class InvoiceDescriptionSerializationTests(TestCase):
+    def test_serializer_strips_period_suffix_for_legacy_item_descriptions(self):
+        owner = make_user("desc_owner", UserRole.ZEV_OWNER)
+        zev = make_zev(owner, "Description ZEV")
+        participant = make_participant(zev, first="Des", last="Crip")
+        invoice = make_invoice(zev, participant, InvoiceStatus.DRAFT)
+
+        InvoiceItem.objects.create(
+            invoice=invoice,
+            item_type=InvoiceItem.ItemType.GRID_ENERGY,
+            tariff_category=TariffCategory.GRID_FEES,
+            description="Grid usage fee 2026-01-01 – 2026-01-31",
+            quantity_kwh=Decimal("4.0000"),
+            unit="kWh",
+            unit_price_chf=Decimal("0.05000"),
+            total_chf=Decimal("0.20"),
+        )
+
+        serialized = InvoiceSerializer(invoice).data
+
+        self.assertEqual(serialized["items"][0]["description"], "Grid usage fee")

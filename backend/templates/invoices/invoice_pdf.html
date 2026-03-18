@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Invoice {{ invoice.invoice_number }}</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+            font-size: 11pt;
+            color: #222;
+        }
+
+        .page {
+            padding: 20mm 20mm 25mm;
+        }
+
+        /* Header */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 12mm;
+        }
+
+        .company-name {
+            font-size: 16pt;
+            font-weight: bold;
+            color: #2c5f2e;
+        }
+
+        .company-meta {
+            font-size: 9pt;
+            color: #555;
+            margin-top: 2mm;
+        }
+
+        /* Invoice title */
+        .invoice-title {
+            font-size: 18pt;
+            font-weight: bold;
+            margin-bottom: 6mm;
+        }
+
+        .invoice-meta {
+            display: flex;
+            gap: 20mm;
+            margin-bottom: 8mm;
+        }
+
+        .meta-block dt {
+            font-size: 8pt;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .meta-block dd {
+            font-size: 10pt;
+            font-weight: 600;
+        }
+
+        /* Address blocks */
+        .address-row {
+            display: flex;
+            gap: 20mm;
+            margin-bottom: 8mm;
+        }
+
+        .address-block {
+            flex: 1;
+        }
+
+        .address-block h3 {
+            font-size: 8pt;
+            color: #888;
+            text-transform: uppercase;
+            margin-bottom: 2mm;
+        }
+
+        /* Line items table */
+        .category-section {
+            margin-bottom: 6mm;
+        }
+
+        .category-title {
+            font-size: 11pt;
+            font-weight: bold;
+            color: #2c5f2e;
+            margin: 0 0 2mm;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 6mm;
+        }
+
+        thead th {
+            background: #2c5f2e;
+            color: #fff;
+            padding: 3mm 4mm;
+            text-align: left;
+            font-size: 9pt;
+        }
+
+        thead th.right {
+            text-align: right;
+        }
+
+        tbody tr:nth-child(even) {
+            background: #f7f7f7;
+        }
+
+        tbody td {
+            padding: 2.5mm 4mm;
+            font-size: 10pt;
+            border-bottom: 1px solid #eee;
+            vertical-align: top;
+        }
+
+        tbody td.right {
+            text-align: right;
+        }
+
+        .category-subtotal td {
+            font-weight: bold;
+            background: #eef6ef;
+        }
+
+        /* Totals */
+        .totals {
+            margin-left: auto;
+            width: 80mm;
+        }
+
+        .totals table {
+            margin: 0;
+        }
+
+        .totals td {
+            padding: 1.5mm 3mm;
+        }
+
+        .totals .subtotal td {
+            border-top: 1px solid #ccc;
+        }
+
+        .totals .grand-total td {
+            border-top: 2px solid #2c5f2e;
+            font-weight: bold;
+            font-size: 12pt;
+        }
+
+        /* Notes */
+        .notes {
+            margin-top: 8mm;
+            font-size: 9pt;
+            color: #555;
+            border-top: 1px solid #eee;
+            padding-top: 4mm;
+        }
+
+        /* Payment section */
+        .payment-section {
+            margin-top: 8mm;
+            padding: 4mm 6mm;
+            background: #f9f9f9;
+            border-left: 3px solid #2c5f2e;
+            font-size: 9pt;
+        }
+
+        .payment-section dt {
+            font-weight: bold;
+            color: #2c5f2e;
+        }
+
+        .payment-section dd {
+            margin-bottom: 2mm;
+        }
+
+        /* Detachable slip */
+        .slip-separator {
+            margin: 15mm 0 0 0;
+            border-top: 2px dashed #999;
+            padding-top: 10mm;
+            margin-top: 12mm;
+            font-size: 8pt;
+        }
+
+        .slip-header {
+            text-align: right;
+            font-weight: bold;
+            margin-bottom: 3mm;
+            color: #666;
+        }
+
+        .slip-content {
+            display: flex;
+            gap: 20mm;
+            justify-content: space-between;
+            font-size: 9pt;
+        }
+
+        .slip-block {
+            flex: 0 0 45%;
+        }
+
+        .slip-block strong {
+            display: block;
+            margin-bottom: 2mm;
+        }
+
+        .slip-info {
+            font-size: 8pt;
+            color: #666;
+            margin-top: 2mm;
+        }
+
+        .ocr-line {
+            font-family: "Courier New", monospace;
+            font-size: 8pt;
+            margin-top: 4mm;
+            letter-spacing: 1px;
+            word-break: break-all;
+            color: #333;
+            background: #fff;
+            border: 1px solid #ddd;
+            padding: 2mm;
+        }
+
+        /* QR-Rechnung section */
+        .qr-section {
+            margin-top: 10mm;
+            border-top: 2px dashed #aaa;
+            padding-top: 5mm;
+        }
+
+        .qr-section svg {
+            max-width: 100%;
+        }
+
+        /* Footer */
+        @page {
+            size: A4;
+            margin: 0;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="page">
+
+        <!-- ── Header ─────────────────────────── -->
+        <div class="header">
+            <div>
+                <div class="company-name">{{ zev.name }}</div>
+                <div class="company-meta">
+                    {{ zev.address_line1 }}{% if zev.address_line2 %}, {{ zev.address_line2 }}{% endif %}<br>
+                    {{ zev.postal_code }}{% if creditor_city %} {{ creditor_city }}{% endif %}<br>
+                    {% if zev.vat_number %}VAT: {{ zev.vat_number }}{% endif %}
+                </div>
+            </div>
+            <div style="text-align:right">
+                <div style="font-size:10pt; color:#888">Energy Invoice</div>
+            </div>
+        </div>
+
+        <!-- ── Invoice title & metadata ─────────── -->
+        <div class="invoice-title">Invoice {{ invoice.invoice_number }}</div>
+        <div class="invoice-meta">
+            <dl class="meta-block">
+                <dt>Invoice Date</dt>
+                <dd>{{ formatted_dates.invoice_date }}</dd>
+            </dl>
+            <dl class="meta-block">
+                <dt>Billing Period</dt>
+                <dd>{{ formatted_dates.period_start }} – {{ formatted_dates.period_end }}</dd>
+            </dl>
+            <dl class="meta-block">
+                <dt>Status</dt>
+                <dd>{{ invoice.get_status_display }}</dd>
+            </dl>
+            {% if invoice.due_date %}
+            <dl class="meta-block">
+                <dt>Due Date</dt>
+                <dd>{{ formatted_dates.due_date }}</dd>
+            </dl>
+            {% endif %}
+        </div>
+
+        <!-- ── Address blocks ─────────────────── -->
+        <div class="address-row">
+            <div class="address-block">
+                <h3>From</h3>
+                <strong>{{ zev.name }}</strong><br>
+                {{ zev.address_line1 }}<br>
+                {{ zev.postal_code }}{% if creditor_city %} {{ creditor_city }}{% endif %}
+            </div>
+            <div class="address-block">
+                <h3>To</h3>
+                <strong>{{ participant.full_name }}</strong><br>
+                {{ participant.address_line1 }}<br>
+                {{ participant.postal_code }} {{ participant.city }}
+            </div>
+        </div>
+
+        <!-- ── Line items ─────────────────────── -->
+        {% for group in grouped_items %}
+        <div class="category-section">
+            <div class="category-title">{{ group.label }}</div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Description</th>
+                        <th class="right">Qty</th>
+                        <th>Unit</th>
+                        <th class="right">Unit Price (CHF)</th>
+                        <th class="right">Amount (CHF)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in group.items %}
+                    <tr>
+                        <td>{{ item.description }}</td>
+                        <td class="right">{{ item.quantity_kwh|floatformat:2 }}</td>
+                        <td>{{ item.unit }}</td>
+                        <td class="right">{{ item.unit_price_chf|floatformat:5 }}</td>
+                        <td class="right">{{ item.total_chf|floatformat:2 }}</td>
+                    </tr>
+                    {% endfor %}
+                    <tr class="category-subtotal">
+                        <td colspan="4">{{ group.label }} subtotal</td>
+                        <td class="right">{{ group.subtotal|floatformat:2 }}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        {% endfor %}
+
+        <!-- ── Totals ─────────────────────────── -->
+        <div class="totals">
+            <table>
+                <tr class="subtotal">
+                    <td>Subtotal</td>
+                    <td style="text-align:right">CHF {{ invoice.subtotal_chf|floatformat:2 }}</td>
+                </tr>
+                {% if invoice.vat_rate > 0 %}
+                <tr>
+                    <td>VAT ({{ invoice.vat_rate|floatformat:1 }}%)</td>
+                    <td style="text-align:right">CHF {{ invoice.vat_chf|floatformat:2 }}</td>
+                </tr>
+                {% endif %}
+                <tr class="grand-total">
+                    <td>Total</td>
+                    <td style="text-align:right">CHF {{ invoice.total_chf|floatformat:2 }}</td>
+                </tr>
+            </table>
+        </div>
+
+        <!-- ── Notes ──────────────────────────── -->
+        {% if invoice.notes %}
+        <div class="notes">{{ invoice.notes }}</div>
+        {% endif %}
+
+        <!-- ── Payment Terms & Bank Details ──────────────────────────── -->
+        <div class="payment-section">
+            <dl>
+                <dt>Payment Terms:</dt>
+                <dd>Due within 30 days of invoice date</dd>
+
+                {% if zev.bank_iban %}
+                <dt style="margin-top: 3mm;">Bank Details:</dt>
+                <dd>{{ zev.name }}</dd>
+                <dd>IBAN: {{ zev.bank_iban }}</dd>
+                <dd>Currency: CHF</dd>
+                <dd class="slip-info">Reference: Invoice {{ invoice.invoice_number }}</dd>
+                {% endif %}
+            </dl>
+        </div>
+
+        <!-- ── Detachable Slip ─────────────────────────── -->
+        <div class="slip-separator">
+            <div class="slip-header">✂ PAYMENT SLIP (Keep for your records)</div>
+            <div class="slip-content">
+                <div class="slip-block">
+                    <strong>Invoice Details</strong>
+                    Invoice #: {{ invoice.invoice_number }}<br>
+                    Date: {{ formatted_dates.invoice_date }}<br>
+                    Period: {{ formatted_dates.period_start }} – {{ formatted_dates.period_end }}<br>
+                    <strong style="margin-top: 3mm;">Amount Due: CHF {{ invoice.total_chf|floatformat:2 }}</strong>
+                </div>
+                <div class="slip-block">
+                    <strong>Participant</strong>
+                    {{ participant.full_name }}<br>
+                    {{ participant.address_line1 }}<br>
+                    {{ participant.postal_code }} {{ participant.city }}<br>
+                    {% if participant.email %}Email: {{ participant.email }}<br>{% endif %}
+                </div>
+                <div class="slip-block">
+                    <strong>Remit Payment To</strong>
+                    {{ zev.name }}<br>
+                    {{ zev.address_line1 }}<br>
+                    {{ zev.postal_code }}{% if creditor_city %} {{ creditor_city }}{% endif %}<br>
+                    {% if zev.bank_iban %}<strong style="margin-top: 2mm; display: block;">IBAN: {{ zev.bank_iban
+                        }}</strong>{% endif %}
+                </div>
+            </div>
+            {% if zev.bank_iban %}
+            <div class="ocr-line" style="margin-top: 6mm;">
+                OCR/Reference: {{ invoice.invoice_number|upper }} {{ invoice.total_chf|stringformat:"05d" }}
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- ── QR-Rechnung ─────────────────────── -->
+        {% if qr_svg %}
+        <div class="qr-section">
+            {{ qr_svg|safe }}
+        </div>
+        {% endif %}
+
+    </div>
+</body>
+
+</html>
