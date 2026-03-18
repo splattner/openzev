@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import {
     Bar,
@@ -144,14 +144,14 @@ export function MeteringChartPage() {
     const hasOut = data.some((d) => d.out_kwh > 0)
 
     // Sync the selected MP to the URL
-    function handleMpChange(id: string) {
+    const handleMpChange = useCallback((id: string) => {
         setSelectedMpId(id)
         if (id) {
             setSearchParams({ metering_point: id }, { replace: true })
         } else {
             setSearchParams({}, { replace: true })
         }
-    }
+    }, [setSearchParams])
 
     const selectedMp = meteringPoints.find((m) => m.id === selectedMpId)
 
@@ -166,7 +166,7 @@ export function MeteringChartPage() {
         if (!stillVisible) {
             handleMpChange('')
         }
-    }, [isManagedScope, selectedZevId, selectedMpId, meteringPoints])
+    }, [isManagedScope, selectedZevId, selectedMpId, meteringPoints, handleMpChange])
 
     const bucketFormatters = {
         shortDate: (value: string) => formatShortDate(value, settings),
