@@ -1,6 +1,6 @@
 # OpenZEV
 
-Open source Swiss platform for operating and billing (v)ZEV energy communities.
+Open source platform for operating and billing (v)ZEV energy communities.
 
 OpenZEV gives operators one place to manage participants, metering points, tariffs, imports, and invoicing. It is built to support day-to-day operations from data import to payment tracking with role-based access for admins, owners, and participants.
 
@@ -26,7 +26,7 @@ OpenZEV gives operators one place to manage participants, metering points, tarif
 - Keep participant and metering point data organized
 - Use role-aware dashboards for operational visibility
 
-### Metering & Imports
+### Metering & ImportsConfiguration of ZEV details, billing preferences, and invoice email templates
 
 - Import metering data from CSV/Excel with configurable column mapping
 - Support SDAT-CH imports for utility-oriented workflows
@@ -235,17 +235,3 @@ npm run build
   - `ghcr.io/<owner>/openzev-fullstack`
 - Release image pipeline generates SBOMs, signs images with Cosign (keyless OIDC), attests SBOMs, and uploads SBOM files as release assets.
 - Renovate is configured to keep npm/pip/GitHub Action dependencies up to date.
-
-## Suggested Repository Additions
-
-For open-source readiness, consider adding:
-
-- `CONTRIBUTING.md` with dev workflow and PR guidelines
-- `CODE_OF_CONDUCT.md`
-- `SECURITY.md` with vulnerability reporting instructions
-
-## Roadmap (Short-Term)
-
-- Export/reporting improvements for invoices and metering
-- UI polish for smaller screens
-- Additional integrations for payment and notifications
