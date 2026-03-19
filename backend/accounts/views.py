@@ -2,7 +2,8 @@ from rest_framework import generics, status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
-from rest_framework.exceptions import PermissionDenied
+from rest_framework.exceptions import PermissionDenied, ValidationError
+from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView
 from .models import User, UserRole
@@ -10,8 +11,9 @@ from .serializers import (
     UserSerializer, UserCreateSerializer,
     ChangePasswordSerializer, CustomTokenObtainPairSerializer,
     AppSettingsSerializer,
+    VatRateSerializer,
 )
-from .models import AppSettings
+from .models import AppSettings, VatRate
 from .permissions import IsAdmin
 
 
@@ -57,6 +59,31 @@ class UserDetailView(generics.RetrieveUpdateDestroyAPIView):
         if instance.participations.exists():
             raise PermissionDenied("Linked participant accounts cannot be deleted.")
         instance.delete()
+
+
+class VatRateListCreateView(generics.ListCreateAPIView):
+    queryset = VatRate.objects.all().order_by("-valid_from", "-created_at")
+    permission_classes = [IsAdmin]
+
+    serializer_class = VatRateSerializer
+
+    def perform_create(self, serializer):
+        try:
+            serializer.save()
+        except DjangoValidationError as exc:
+            raise ValidationError(getattr(exc, "message_dict", {"non_field_errors": exc.messages}))
+
+
+class VatRateDetailView(generics.RetrieveUpdateDestroyAPIView):
+    queryset = VatRate.objects.all()
+    permission_classes = [IsAdmin]
+    serializer_class = VatRateSerializer
+
+    def perform_update(self, serializer):
+        try:
+            serializer.save()
+        except DjangoValidationError as exc:
+            raise ValidationError(getattr(exc, "message_dict", {"non_field_errors": exc.messages}))
 
 
 @api_view(["GET", "PATCH"])

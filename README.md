@@ -185,7 +185,9 @@ Negative fixed prices are represented as credit invoice items.
 - Energy quantities are stored at 4 decimals (`0.0001` kWh)
 - Unit prices for invoice items are represented at 5 decimals
 - Item totals and subtotal are rounded to CHF cents (`0.01`)
-- VAT rate is currently `8.1%` when the ZEV has a VAT number configured; otherwise `0%`
+- VAT is applied only when the ZEV has a VAT number configured
+- The VAT rate is selected from Admin VAT settings by validity range (`valid_from`/`valid_to`) using the invoice period end date
+- If no VAT rate is active for that date, VAT defaults to `0%`
 
 Final invoice total:
 

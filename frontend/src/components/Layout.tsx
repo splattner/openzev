@@ -248,6 +248,10 @@ export function Layout() {
                                                     <span className="nav-icon"><SettingsIcon /></span>
                                                     <span className="nav-label">Regional Settings</span>
                                                 </NavLink>
+                                                <NavLink to="/admin/settings/vat" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`} title="VAT Settings">
+                                                    <span className="nav-icon"><SettingsIcon /></span>
+                                                    <span className="nav-label">VAT Settings</span>
+                                                </NavLink>
                                                 <NavLink to="/admin/pdf-templates" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`} title={t('nav.adminPdfTemplates')}>
                                                     <span className="nav-icon"><PdfIcon /></span>
                                                     <span className="nav-label">{t('nav.adminPdfTemplates')}</span>

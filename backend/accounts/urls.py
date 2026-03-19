@@ -3,6 +3,7 @@ from rest_framework_simplejwt.views import TokenRefreshView
 from .views import (
     CustomTokenObtainPairView, UserListCreateView,
     UserDetailView, me, change_password, impersonate_participant, app_settings,
+    VatRateListCreateView, VatRateDetailView,
 )
 
 urlpatterns = [
@@ -14,4 +15,6 @@ urlpatterns = [
     path("me/", me, name="me"),
     path("me/change-password/", change_password, name="change-password"),
     path("app-settings/", app_settings, name="app-settings"),
+    path("vat-rates/", VatRateListCreateView.as_view(), name="vat-rate-list-create"),
+    path("vat-rates/<int:pk>/", VatRateDetailView.as_view(), name="vat-rate-detail"),
 ]
