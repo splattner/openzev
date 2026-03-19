@@ -21,7 +21,7 @@ from django.test import TestCase
 from django.test.utils import override_settings
 from rest_framework.test import APIClient
 
-from accounts.models import AppSettings, User, UserRole
+from accounts.models import AppSettings, User, UserRole, VatRate
 from invoices.models import Invoice, InvoiceItem, InvoiceStatus
 from invoices.engine import generate_invoice
 from invoices.tasks import send_invoice_email_task
@@ -574,6 +574,79 @@ class InvoiceMathEdgeCaseTests(TestCase):
         self.assertEqual(item.total_chf, Decimal("1.00"))
         self.assertEqual(invoice.subtotal_chf, Decimal("1.00"))
         self.assertEqual(invoice.total_chf, Decimal("1.00"))
+
+
+class InvoiceVatRateSelectionTests(TestCase):
+    def setUp(self):
+        self.owner = make_user("vat_owner", UserRole.ZEV_OWNER)
+        self.zev = make_zev(self.owner, "VAT ZEV")
+        self.participant = make_participant(self.zev, first="Vat", last="Case")
+
+        self.consumption_mp = MeteringPoint.objects.create(
+            zev=self.zev,
+            participant=self.participant,
+            meter_id="CH-VAT-CONS-1",
+            meter_type=MeteringPointType.CONSUMPTION,
+            valid_from=date(2026, 1, 1),
+        )
+
+        grid_tariff = Tariff.objects.create(
+            zev=self.zev,
+            name="Grid VAT",
+            category=TariffCategory.ENERGY,
+            billing_mode=BillingMode.ENERGY,
+            energy_type=EnergyType.GRID,
+            valid_from=date(2026, 1, 1),
+        )
+        TariffPeriod.objects.create(
+            tariff=grid_tariff,
+            period_type="flat",
+            price_chf_per_kwh=Decimal("1.00000"),
+        )
+
+        MeterReading.objects.create(
+            metering_point=self.consumption_mp,
+            timestamp=datetime(2026, 1, 15, 12, 0, tzinfo=timezone.utc),
+            energy_kwh=Decimal("10.0000"),
+            direction=ReadingDirection.IN,
+            resolution=ReadingResolution.FIFTEEN_MIN,
+        )
+        MeterReading.objects.create(
+            metering_point=self.consumption_mp,
+            timestamp=datetime(2026, 2, 15, 12, 0, tzinfo=timezone.utc),
+            energy_kwh=Decimal("10.0000"),
+            direction=ReadingDirection.IN,
+            resolution=ReadingResolution.FIFTEEN_MIN,
+        )
+
+    def test_uses_rate_active_at_period_end_when_vat_number_present(self):
+        self.zev.vat_number = "CHE-123.456.789"
+        self.zev.save(update_fields=["vat_number"])
+
+        VatRate.objects.create(rate=Decimal("0.0770"), valid_from=date(2024, 1, 1), valid_to=date(2026, 1, 31))
+        VatRate.objects.create(rate=Decimal("0.0810"), valid_from=date(2026, 2, 1), valid_to=None)
+
+        jan_invoice = generate_invoice(self.participant, date(2026, 1, 1), date(2026, 1, 31))
+        feb_invoice = generate_invoice(self.participant, date(2026, 2, 1), date(2026, 2, 28))
+
+        self.assertEqual(jan_invoice.subtotal_chf, Decimal("10.00"))
+        self.assertEqual(jan_invoice.vat_rate, Decimal("0.0770"))
+        self.assertEqual(jan_invoice.vat_chf, Decimal("0.77"))
+        self.assertEqual(jan_invoice.total_chf, Decimal("10.77"))
+
+        self.assertEqual(feb_invoice.subtotal_chf, Decimal("10.00"))
+        self.assertEqual(feb_invoice.vat_rate, Decimal("0.0810"))
+        self.assertEqual(feb_invoice.vat_chf, Decimal("0.81"))
+        self.assertEqual(feb_invoice.total_chf, Decimal("10.81"))
+
+    def test_vat_number_missing_results_in_zero_vat(self):
+        VatRate.objects.create(rate=Decimal("0.0810"), valid_from=date(2026, 1, 1), valid_to=None)
+
+        invoice = generate_invoice(self.participant, date(2026, 1, 1), date(2026, 1, 31))
+
+        self.assertEqual(invoice.vat_rate, Decimal("0"))
+        self.assertEqual(invoice.vat_chf, Decimal("0.00"))
+        self.assertEqual(invoice.total_chf, invoice.subtotal_chf)
 
 
 @override_settings(

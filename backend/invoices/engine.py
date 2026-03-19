@@ -15,6 +15,7 @@ from decimal import Decimal, ROUND_HALF_UP
 from django.db import models, transaction
 from django.utils import timezone
 
+from accounts.models import VatRate
 from zev.models import Zev, Participant, MeteringPoint, MeteringPointType
 from tariffs.models import BillingMode, EnergyType, PeriodType, Tariff, TariffCategory
 from metering.models import MeterReading, ReadingDirection
@@ -67,6 +68,13 @@ def _get_tariff_price(tariff: Tariff, ts: datetime) -> Decimal | None:
 
     # Fall back to first period
     return periods[0].price_chf_per_kwh
+
+
+def _resolve_vat_rate(zev: Zev, period_end: date) -> Decimal:
+    if not zev.vat_number:
+        return Decimal("0")
+    active_rate = VatRate.active_for_day(period_end)
+    return Decimal(active_rate.rate) if active_rate else Decimal("0")
 
 
 def _month_start(day: date) -> date:
@@ -408,7 +416,7 @@ def generate_invoice(participant: Participant, period_start: date, period_end: d
 
     subtotal = subtotal.quantize(Q, rounding=ROUND_HALF_UP)
 
-    vat_rate = Decimal("0.0810") if zev.vat_number else Decimal("0")  # Swiss VAT 8.1%
+    vat_rate = _resolve_vat_rate(zev, period_end)
     vat_chf = (subtotal * vat_rate).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
     total_chf = subtotal + vat_chf
 

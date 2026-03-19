@@ -28,6 +28,8 @@ import type {
     TariffPeriodInput,
     User,
     UserInput,
+    VatRate,
+    VatRateInput,
     Zev,
     ZevInput,
     ZevWizardInput,
@@ -123,6 +125,25 @@ export async function fetchAppSettings(): Promise<AppSettings> {
 export async function updateAppSettings(payload: AppSettingsInput): Promise<AppSettings> {
     const { data } = await api.patch<AppSettings>('/auth/app-settings/', payload)
     return data
+}
+
+export async function fetchVatRates(): Promise<PaginatedResponse<VatRate>> {
+    const { data } = await api.get<PaginatedResponse<VatRate>>('/auth/vat-rates/')
+    return data
+}
+
+export async function createVatRate(payload: VatRateInput): Promise<VatRate> {
+    const { data } = await api.post<VatRate>('/auth/vat-rates/', payload)
+    return data
+}
+
+export async function updateVatRate(id: number, payload: Partial<VatRateInput>): Promise<VatRate> {
+    const { data } = await api.patch<VatRate>(`/auth/vat-rates/${id}/`, payload)
+    return data
+}
+
+export async function deleteVatRate(id: number): Promise<void> {
+    await api.delete(`/auth/vat-rates/${id}/`)
 }
 
 export async function fetchUsers(): Promise<PaginatedResponse<User>> {

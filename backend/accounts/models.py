@@ -1,4 +1,8 @@
+from datetime import date
+
 from django.contrib.auth.models import AbstractUser
+from django.core.exceptions import ValidationError
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 
 
@@ -109,3 +113,50 @@ class AppSettings(models.Model):
 
     def __str__(self):
         return "Application settings"
+
+
+class VatRate(models.Model):
+    rate = models.DecimalField(
+        max_digits=5,
+        decimal_places=4,
+        validators=[MinValueValidator(0), MaxValueValidator(1)],
+        help_text="VAT rate as decimal fraction (e.g. 0.0810 for 8.10%).",
+    )
+    valid_from = models.DateField()
+    valid_to = models.DateField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-valid_from", "-created_at"]
+
+    def clean(self):
+        if self.valid_to and self.valid_to < self.valid_from:
+            raise ValidationError({"valid_to": "valid_to must be on or after valid_from."})
+
+        candidate_end = self.valid_to or date.max
+        overlap_exists = VatRate.objects.exclude(pk=self.pk).filter(
+            valid_from__lte=candidate_end,
+        ).filter(
+            models.Q(valid_to__isnull=True) | models.Q(valid_to__gte=self.valid_from),
+        ).exists()
+        if overlap_exists:
+            raise ValidationError(
+                "VAT rate ranges must not overlap. Adjust valid_from/valid_to so only one rate is active per day."
+            )
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    @classmethod
+    def active_for_day(cls, day: date):
+        return cls.objects.filter(
+            valid_from__lte=day,
+        ).filter(
+            models.Q(valid_to__isnull=True) | models.Q(valid_to__gte=day)
+        ).order_by("-valid_from", "-created_at").first()
+
+    def __str__(self):
+        valid_to = self.valid_to.isoformat() if self.valid_to else "open"
+        return f"VAT {self.rate} ({self.valid_from} - {valid_to})"

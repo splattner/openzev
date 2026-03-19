@@ -56,6 +56,21 @@ export interface AppSettingsInput {
     date_time_format?: DateTimeFormat
 }
 
+export interface VatRate {
+    id: number
+    rate: string
+    valid_from: string
+    valid_to?: string | null
+    created_at: string
+    updated_at: string
+}
+
+export interface VatRateInput {
+    rate: string
+    valid_from: string
+    valid_to?: string | null
+}
+
 export interface Zev {
     id: string
     name: string

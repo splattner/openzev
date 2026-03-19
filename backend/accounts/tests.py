@@ -1,7 +1,7 @@
 from django.test import TestCase
 from rest_framework.test import APIClient
 
-from .models import AppSettings, User, UserRole
+from .models import AppSettings, User, UserRole, VatRate
 from invoices.models import Invoice, InvoiceStatus
 from zev.models import MeteringPoint, MeteringPointType, Participant, Zev
 from datetime import date
@@ -206,6 +206,82 @@ class AppSettingsTests(TestCase):
 		)
 
 		self.assertEqual(resp.status_code, 403)
+
+
+class VatRateSettingsTests(TestCase):
+	def _auth(self, client, user, password="pass1234"):
+		resp = client.post("/api/v1/auth/token/", {"username": user.username, "password": password})
+		client.credentials(HTTP_AUTHORIZATION=f"Bearer {resp.data['access']}")
+
+	def setUp(self):
+		self.client = APIClient()
+		self.admin = User.objects.create_user(username="admin_vat", password="pass1234", role=UserRole.ADMIN)
+		self.owner = User.objects.create_user(username="owner_vat", password="pass1234", role=UserRole.ZEV_OWNER)
+
+	def test_admin_can_crud_vat_rates(self):
+		self._auth(self.client, self.admin)
+
+		create_resp = self.client.post(
+			"/api/v1/auth/vat-rates/",
+			{"rate": "0.0810", "valid_from": "2026-01-01", "valid_to": None},
+			format="json",
+		)
+		self.assertEqual(create_resp.status_code, 201)
+		rate_id = create_resp.data["id"]
+
+		list_resp = self.client.get("/api/v1/auth/vat-rates/")
+		self.assertEqual(list_resp.status_code, 200)
+		self.assertEqual(len(list_resp.data["results"]), 1)
+
+		patch_resp = self.client.patch(
+			f"/api/v1/auth/vat-rates/{rate_id}/",
+			{"rate": "0.0820"},
+			format="json",
+		)
+		self.assertEqual(patch_resp.status_code, 200)
+		self.assertEqual(patch_resp.data["rate"], "0.0820")
+
+		delete_resp = self.client.delete(f"/api/v1/auth/vat-rates/{rate_id}/")
+		self.assertEqual(delete_resp.status_code, 204)
+		self.assertFalse(VatRate.objects.filter(pk=rate_id).exists())
+
+	def test_non_admin_cannot_manage_vat_rates(self):
+		self._auth(self.client, self.owner)
+
+		list_resp = self.client.get("/api/v1/auth/vat-rates/")
+		self.assertEqual(list_resp.status_code, 403)
+
+		create_resp = self.client.post(
+			"/api/v1/auth/vat-rates/",
+			{"rate": "0.0810", "valid_from": "2026-01-01", "valid_to": None},
+			format="json",
+		)
+		self.assertEqual(create_resp.status_code, 403)
+
+	def test_vat_rate_ranges_cannot_overlap(self):
+		self._auth(self.client, self.admin)
+		VatRate.objects.create(rate="0.0770", valid_from=date(2024, 1, 1), valid_to=date(2025, 12, 31))
+
+		resp = self.client.post(
+			"/api/v1/auth/vat-rates/",
+			{"rate": "0.0810", "valid_from": "2025-12-01", "valid_to": "2026-12-31"},
+			format="json",
+		)
+
+		self.assertEqual(resp.status_code, 400)
+		self.assertIn("overlap", str(resp.data).lower())
+
+	def test_vat_rate_valid_to_must_be_after_valid_from(self):
+		self._auth(self.client, self.admin)
+
+		resp = self.client.post(
+			"/api/v1/auth/vat-rates/",
+			{"rate": "0.0810", "valid_from": "2026-02-01", "valid_to": "2026-01-01"},
+			format="json",
+		)
+
+		self.assertEqual(resp.status_code, 400)
+		self.assertIn("valid_to", resp.data)
 
 
 class RbacEndpointMatrixTests(TestCase):

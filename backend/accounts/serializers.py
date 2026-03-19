@@ -1,7 +1,7 @@
 from django.contrib.auth.password_validation import validate_password
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
-from .models import AppSettings, User, UserRole
+from .models import AppSettings, User, UserRole, VatRate
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -82,3 +82,16 @@ class AppSettingsSerializer(serializers.ModelSerializer):
         model = AppSettings
         fields = ["date_format_short", "date_format_long", "date_time_format", "updated_at"]
         read_only_fields = ["updated_at"]
+
+
+class VatRateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = VatRate
+        fields = ["id", "rate", "valid_from", "valid_to", "created_at", "updated_at"]
+        read_only_fields = ["id", "created_at", "updated_at"]
+
+
+class VatRateInputSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = VatRate
+        fields = ["rate", "valid_from", "valid_to"]
