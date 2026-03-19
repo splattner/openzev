@@ -36,16 +36,16 @@ jobs:
 
         steps:
             - name: Checkout
-              uses: actions/checkout@v4
+              uses: actions/checkout@v6
 
             - name: Set up QEMU
-              uses: docker/setup-qemu-action@v3
+              uses: docker/setup-qemu-action@v4
 
             - name: Set up Docker Buildx
-              uses: docker/setup-buildx-action@v3
+              uses: docker/setup-buildx-action@v4
 
             - name: Login to GHCR
-              uses: docker/login-action@v3
+              uses: docker/login-action@v4
               with:
                   registry: ${{ env.REGISTRY }}
                   username: ${{ github.actor }}
@@ -53,7 +53,7 @@ jobs:
 
             - name: Docker metadata
               id: meta
-              uses: docker/metadata-action@v5
+              uses: docker/metadata-action@v6
               with:
                   images: ${{ env.IMAGE_PREFIX }}-${{ matrix.image }}
                   tags: |
@@ -62,7 +62,7 @@ jobs:
 
             - name: Build and push image
               id: build
-              uses: docker/build-push-action@v6
+              uses: docker/build-push-action@v7
               with:
                   context: ${{ matrix.context }}
                   file: ${{ matrix.dockerfile }}
@@ -103,7 +103,7 @@ jobs:
                     "${{ steps.sbom.outputs.image_ref }}"
 
             - name: Upload SBOM artifact
-              uses: actions/upload-artifact@v4
+              uses: actions/upload-artifact@v7
               with:
                   name: sbom-${{ matrix.image }}
                   path: ${{ steps.sbom.outputs.sbom_file }}
@@ -116,7 +116,7 @@ jobs:
 
         steps:
             - name: Download SBOM artifacts
-              uses: actions/download-artifact@v4
+              uses: actions/download-artifact@v8
               with:
                   path: sbom-assets
 
