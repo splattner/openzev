@@ -8,6 +8,7 @@ Tests that:
 - Invoice workflow transitions (approve → mark-sent → mark-paid and cancel) are guarded correctly.
 - Regenerating a locked invoice raises a 409.
 """
+from datetime import datetime, timezone
 from datetime import date
 from decimal import Decimal
 
@@ -24,8 +25,9 @@ from accounts.models import AppSettings, User, UserRole
 from invoices.models import Invoice, InvoiceItem, InvoiceStatus
 from invoices.tasks import send_invoice_email_task
 from invoices.serializers import InvoiceSerializer
-from tariffs.models import TariffCategory
-from zev.models import Participant, Zev
+from metering.models import MeterReading, ReadingDirection, ReadingResolution
+from tariffs.models import BillingMode, EnergyType, Tariff, TariffCategory, TariffPeriod
+from zev.models import MeteringPoint, MeteringPointType, Participant, Zev
 
 
 # ---------------------------------------------------------------------------
@@ -313,6 +315,132 @@ class InvoiceEngineGuardTests(TestCase):
         make_invoice(self.zev, self.participant, InvoiceStatus.CANCELLED)
         resp = self._generate(self.participant.pk)
         self.assertNotEqual(resp.status_code, 409)
+
+
+class InvoiceBillingIntegrationTests(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.owner = make_user("billing_owner", UserRole.ZEV_OWNER)
+        self.zev = make_zev(self.owner, "Billing ZEV")
+        self.participant = make_participant(self.zev, first="Bill", last="Ing")
+
+        self.consumption_mp = MeteringPoint.objects.create(
+            zev=self.zev,
+            participant=self.participant,
+            meter_id="CH-BILL-CONS-1",
+            meter_type=MeteringPointType.CONSUMPTION,
+            valid_from=date(2026, 1, 1),
+        )
+        self.production_mp = MeteringPoint.objects.create(
+            zev=self.zev,
+            participant=self.participant,
+            meter_id="CH-BILL-PROD-1",
+            meter_type=MeteringPointType.PRODUCTION,
+            valid_from=date(2026, 1, 1),
+        )
+
+        local_tariff = Tariff.objects.create(
+            zev=self.zev,
+            name="Local Energy",
+            category=TariffCategory.ENERGY,
+            billing_mode=BillingMode.ENERGY,
+            energy_type=EnergyType.LOCAL,
+            valid_from=date(2026, 1, 1),
+        )
+        TariffPeriod.objects.create(
+            tariff=local_tariff,
+            period_type="flat",
+            price_chf_per_kwh=Decimal("0.10000"),
+        )
+
+        grid_tariff = Tariff.objects.create(
+            zev=self.zev,
+            name="Grid Energy",
+            category=TariffCategory.ENERGY,
+            billing_mode=BillingMode.ENERGY,
+            energy_type=EnergyType.GRID,
+            valid_from=date(2026, 1, 1),
+        )
+        TariffPeriod.objects.create(
+            tariff=grid_tariff,
+            period_type="flat",
+            price_chf_per_kwh=Decimal("0.30000"),
+        )
+
+        ts = datetime(2026, 1, 1, 0, 0, tzinfo=timezone.utc)
+        MeterReading.objects.create(
+            metering_point=self.consumption_mp,
+            timestamp=ts,
+            energy_kwh=Decimal("10.0000"),
+            direction=ReadingDirection.IN,
+            resolution=ReadingResolution.FIFTEEN_MIN,
+        )
+        MeterReading.objects.create(
+            metering_point=self.production_mp,
+            timestamp=ts,
+            energy_kwh=Decimal("6.0000"),
+            direction=ReadingDirection.OUT,
+            resolution=ReadingResolution.FIFTEEN_MIN,
+        )
+
+        auth(self.client, self.owner)
+
+    def test_end_to_end_billing_generation_workflow_and_dashboard_consistency(self):
+        generate_resp = self.client.post(
+            "/api/v1/invoices/invoices/generate/",
+            {
+                "participant_id": str(self.participant.id),
+                "period_start": "2026-01-01",
+                "period_end": "2026-01-31",
+            },
+        )
+        self.assertEqual(generate_resp.status_code, 201)
+
+        invoice_id = generate_resp.data["id"]
+        invoice = Invoice.objects.get(pk=invoice_id)
+
+        self.assertEqual(invoice.status, InvoiceStatus.DRAFT)
+        self.assertEqual(invoice.total_local_kwh, Decimal("6.0000"))
+        self.assertEqual(invoice.total_grid_kwh, Decimal("4.0000"))
+        self.assertEqual(invoice.subtotal_chf, Decimal("1.80"))
+        self.assertEqual(invoice.total_chf, Decimal("1.80"))
+
+        self.assertEqual(invoice.items.count(), 2)
+        self.assertEqual(
+            {item.description for item in invoice.items.all()},
+            {"Local Energy", "Grid Energy"},
+        )
+
+        approve_resp = self.client.post(f"/api/v1/invoices/invoices/{invoice_id}/approve/")
+        self.assertEqual(approve_resp.status_code, 200)
+
+        sent_resp = self.client.post(f"/api/v1/invoices/invoices/{invoice_id}/mark-sent/")
+        self.assertEqual(sent_resp.status_code, 200)
+
+        paid_resp = self.client.post(f"/api/v1/invoices/invoices/{invoice_id}/mark-paid/")
+        self.assertEqual(paid_resp.status_code, 200)
+
+        invoice.refresh_from_db()
+        self.assertEqual(invoice.status, InvoiceStatus.PAID)
+
+        dashboard_resp = self.client.get(
+            "/api/v1/metering/readings/dashboard-summary/",
+            {
+                "zev_id": str(self.zev.id),
+                "date_from": "2026-01-01",
+                "date_to": "2026-01-01",
+                "bucket": "day",
+            },
+        )
+        self.assertEqual(dashboard_resp.status_code, 200)
+        totals = dashboard_resp.data["totals"]
+        self.assertAlmostEqual(float(totals["consumed_kwh"]), 10.0, places=6)
+        self.assertAlmostEqual(float(totals["produced_kwh"]), 6.0, places=6)
+        self.assertAlmostEqual(float(totals["imported_kwh"]), 4.0, places=6)
+        self.assertAlmostEqual(float(totals["exported_kwh"]), 0.0, places=6)
+
+        self.assertEqual(invoice.total_local_kwh, Decimal("6.0000"))
+        self.assertEqual(invoice.total_grid_kwh, Decimal("4.0000"))
 
 
 @override_settings(
