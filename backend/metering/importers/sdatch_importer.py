@@ -48,8 +48,16 @@ def import_sdatch(file, zev, user):
         filename=filename,
     )
 
-    tree = etree.parse(file)
-    root = tree.getroot()
+    try:
+        tree = etree.parse(file)
+        root = tree.getroot()
+    except Exception as exc:
+        log.rows_total = 0
+        log.rows_imported = 0
+        log.rows_skipped = 0
+        log.errors = [{"error": f"Malformed SDAT-CH XML: {exc}"}]
+        log.save()
+        return log
 
     meter_lookup = {
         mp.meter_id: mp

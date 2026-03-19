@@ -23,6 +23,7 @@ from rest_framework.test import APIClient
 
 from accounts.models import AppSettings, User, UserRole
 from invoices.models import Invoice, InvoiceItem, InvoiceStatus
+from invoices.engine import generate_invoice
 from invoices.tasks import send_invoice_email_task
 from invoices.serializers import InvoiceSerializer
 from metering.models import MeterReading, ReadingDirection, ReadingResolution
@@ -441,6 +442,138 @@ class InvoiceBillingIntegrationTests(TestCase):
 
         self.assertEqual(invoice.total_local_kwh, Decimal("6.0000"))
         self.assertEqual(invoice.total_grid_kwh, Decimal("4.0000"))
+
+
+class InvoiceMathEdgeCaseTests(TestCase):
+    def setUp(self):
+        self.owner = make_user("math_owner", UserRole.ZEV_OWNER)
+        self.zev = make_zev(self.owner, "Math ZEV")
+        self.participant = make_participant(self.zev, first="Math", last="Case")
+
+        self.consumption_mp = MeteringPoint.objects.create(
+            zev=self.zev,
+            participant=self.participant,
+            meter_id="CH-MATH-CONS-1",
+            meter_type=MeteringPointType.CONSUMPTION,
+            valid_from=date(2026, 1, 1),
+        )
+
+    def test_monthly_fee_counts_intersecting_month_boundaries(self):
+        tariff = Tariff.objects.create(
+            zev=self.zev,
+            name="Ops Monthly",
+            category=TariffCategory.GRID_FEES,
+            billing_mode=BillingMode.MONTHLY_FEE,
+            fixed_price_chf=Decimal("5.00"),
+            valid_from=date(2026, 1, 1),
+        )
+
+        invoice = generate_invoice(self.participant, date(2026, 1, 15), date(2026, 2, 14))
+        item = invoice.items.get(description__startswith=tariff.name)
+
+        self.assertEqual(item.quantity_kwh, Decimal("2.0000"))
+        self.assertEqual(item.total_chf, Decimal("10.00"))
+        self.assertEqual(invoice.subtotal_chf, Decimal("10.00"))
+        self.assertEqual(invoice.total_chf, Decimal("10.00"))
+
+    def test_energy_tariff_applies_only_within_validity_window(self):
+        tariff = Tariff.objects.create(
+            zev=self.zev,
+            name="Grid Window",
+            category=TariffCategory.ENERGY,
+            billing_mode=BillingMode.ENERGY,
+            energy_type=EnergyType.GRID,
+            valid_from=date(2026, 1, 15),
+            valid_to=date(2026, 1, 31),
+        )
+        TariffPeriod.objects.create(
+            tariff=tariff,
+            period_type="flat",
+            price_chf_per_kwh=Decimal("0.20000"),
+        )
+
+        MeterReading.objects.create(
+            metering_point=self.consumption_mp,
+            timestamp=datetime(2026, 1, 10, 0, 0, tzinfo=timezone.utc),
+            energy_kwh=Decimal("5.0000"),
+            direction=ReadingDirection.IN,
+            resolution=ReadingResolution.FIFTEEN_MIN,
+        )
+        MeterReading.objects.create(
+            metering_point=self.consumption_mp,
+            timestamp=datetime(2026, 1, 20, 0, 0, tzinfo=timezone.utc),
+            energy_kwh=Decimal("5.0000"),
+            direction=ReadingDirection.IN,
+            resolution=ReadingResolution.FIFTEEN_MIN,
+        )
+
+        invoice = generate_invoice(self.participant, date(2026, 1, 1), date(2026, 1, 31))
+        item = invoice.items.get(description=tariff.name)
+
+        self.assertEqual(item.quantity_kwh, Decimal("5.0000"))
+        self.assertEqual(item.total_chf, Decimal("1.00"))
+        self.assertEqual(invoice.total_grid_kwh, Decimal("10.0000"))
+        self.assertEqual(invoice.subtotal_chf, Decimal("1.00"))
+
+    def test_zero_and_negative_fixed_fees_are_handled_consistently(self):
+        zero_fee = Tariff.objects.create(
+            zev=self.zev,
+            name="Zero Platform Fee",
+            category=TariffCategory.LEVIES,
+            billing_mode=BillingMode.MONTHLY_FEE,
+            fixed_price_chf=Decimal("0.00"),
+            valid_from=date(2026, 1, 1),
+        )
+        yearly_credit = Tariff.objects.create(
+            zev=self.zev,
+            name="Goodwill Credit",
+            category=TariffCategory.LEVIES,
+            billing_mode=BillingMode.YEARLY_FEE,
+            fixed_price_chf=Decimal("-120.00"),
+            valid_from=date(2026, 1, 1),
+        )
+
+        invoice = generate_invoice(self.participant, date(2026, 1, 1), date(2026, 1, 31))
+
+        zero_item = invoice.items.get(description__startswith=zero_fee.name)
+        credit_item = invoice.items.get(description__startswith=yearly_credit.name)
+
+        self.assertEqual(zero_item.total_chf, Decimal("0.00"))
+        self.assertEqual(credit_item.item_type, InvoiceItem.ItemType.CREDIT)
+        self.assertEqual(credit_item.total_chf, Decimal("-10.00"))
+        self.assertEqual(invoice.subtotal_chf, Decimal("-10.00"))
+        self.assertEqual(invoice.total_chf, Decimal("-10.00"))
+
+    def test_subtotal_rounds_to_chf_cent(self):
+        tariff = Tariff.objects.create(
+            zev=self.zev,
+            name="Rounding Grid",
+            category=TariffCategory.ENERGY,
+            billing_mode=BillingMode.ENERGY,
+            energy_type=EnergyType.GRID,
+            valid_from=date(2026, 1, 1),
+        )
+        TariffPeriod.objects.create(
+            tariff=tariff,
+            period_type="flat",
+            price_chf_per_kwh=Decimal("0.33333"),
+        )
+
+        MeterReading.objects.create(
+            metering_point=self.consumption_mp,
+            timestamp=datetime(2026, 1, 5, 0, 0, tzinfo=timezone.utc),
+            energy_kwh=Decimal("3.0000"),
+            direction=ReadingDirection.IN,
+            resolution=ReadingResolution.FIFTEEN_MIN,
+        )
+
+        invoice = generate_invoice(self.participant, date(2026, 1, 1), date(2026, 1, 31))
+        item = invoice.items.get(description=tariff.name)
+
+        self.assertEqual(item.unit_price_chf, Decimal("0.33333"))
+        self.assertEqual(item.total_chf, Decimal("1.00"))
+        self.assertEqual(invoice.subtotal_chf, Decimal("1.00"))
+        self.assertEqual(invoice.total_chf, Decimal("1.00"))
 
 
 @override_settings(

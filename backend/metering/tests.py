@@ -1,5 +1,6 @@
 from datetime import date, datetime, timezone
 from decimal import Decimal
+from django.core.files.uploadedfile import SimpleUploadedFile
 
 from django.test import TestCase
 from rest_framework.test import APIClient
@@ -186,3 +187,136 @@ class ParticipantImportRestrictionTests(TestCase):
 	def test_participant_cannot_upload_csv_import(self):
 		resp = self.client.post("/api/v1/metering/import/csv/")
 		self.assertEqual(resp.status_code, 403)
+
+
+class ImportParserRobustnessTests(TestCase):
+	def setUp(self):
+		self.client = APIClient()
+		self.owner = make_user("import_owner", UserRole.ZEV_OWNER)
+		auth(self.client, self.owner)
+
+		self.zev = Zev.objects.create(name="Import Robustness ZEV", owner=self.owner, zev_type="vzev", invoice_prefix="I")
+		self.participant = Participant.objects.create(
+			zev=self.zev,
+			first_name="Import",
+			last_name="Participant",
+			email="import.participant@example.com",
+			valid_from=date(2026, 1, 1),
+		)
+		self.metering_point = MeteringPoint.objects.create(
+			zev=self.zev,
+			participant=self.participant,
+			meter_id="CH-IMPORT-1",
+			meter_type=MeteringPointType.CONSUMPTION,
+			valid_from=date(2026, 1, 1),
+		)
+
+	def test_malformed_csv_payload_is_reported_without_crash(self):
+		csv_bytes = b"wrong_col1,wrong_col2\nfoo,bar\n"
+		upload = SimpleUploadedFile("bad.csv", csv_bytes, content_type="text/csv")
+
+		resp = self.client.post("/api/v1/metering/import/csv/", {"file": upload}, format="multipart")
+
+		self.assertEqual(resp.status_code, 201)
+		self.assertEqual(resp.data["rows_imported"], 0)
+		self.assertGreaterEqual(resp.data["rows_skipped"], 1)
+		self.assertTrue(resp.data["errors"])
+		self.assertEqual(MeterReading.objects.count(), 0)
+
+	def test_malformed_sdatch_payload_is_reported_without_crash(self):
+		xml_bytes = b"<MeteringData><broken></MeteringData"
+		upload = SimpleUploadedFile("broken.xml", xml_bytes, content_type="application/xml")
+
+		resp = self.client.post(
+			"/api/v1/metering/import/sdatch/",
+			{"file": upload, "zev_id": str(self.zev.id)},
+			format="multipart",
+		)
+
+		self.assertEqual(resp.status_code, 201)
+		self.assertEqual(resp.data["rows_imported"], 0)
+		self.assertTrue(resp.data["errors"])
+		self.assertIn("Malformed SDAT-CH XML", resp.data["errors"][0]["error"])
+
+	def test_csv_timezone_offset_is_normalized_to_utc(self):
+		csv_bytes = (
+			b"meter_id,timestamp,energy_kwh,direction\n"
+			b"CH-IMPORT-1,2026-01-01T02:00:00+02:00,1.5000,in\n"
+		)
+		upload = SimpleUploadedFile("tz.csv", csv_bytes, content_type="text/csv")
+
+		resp = self.client.post("/api/v1/metering/import/csv/", {"file": upload}, format="multipart")
+
+		self.assertEqual(resp.status_code, 201)
+		self.assertEqual(resp.data["rows_imported"], 1)
+		reading = MeterReading.objects.get(metering_point=self.metering_point)
+		self.assertEqual(reading.timestamp, datetime(2026, 1, 1, 0, 0, tzinfo=timezone.utc))
+
+	def test_duplicate_rows_are_skipped_and_reported(self):
+		csv_bytes = (
+			b"meter_id,timestamp,energy_kwh,direction\n"
+			b"CH-IMPORT-1,2026-01-02T00:00:00Z,2.0000,in\n"
+			b"CH-IMPORT-1,2026-01-02T00:00:00Z,2.0000,in\n"
+		)
+		upload = SimpleUploadedFile("dupe.csv", csv_bytes, content_type="text/csv")
+
+		resp = self.client.post("/api/v1/metering/import/csv/", {"file": upload}, format="multipart")
+
+		self.assertEqual(resp.status_code, 201)
+		self.assertEqual(resp.data["rows_imported"], 1)
+		self.assertEqual(resp.data["rows_skipped"], 1)
+		self.assertTrue(any("Duplicate reading" in err["error"] for err in resp.data["errors"]))
+		self.assertEqual(MeterReading.objects.filter(metering_point=self.metering_point).count(), 1)
+
+	def test_csv_import_is_idempotent_for_repeated_payload(self):
+		csv_bytes = (
+			b"meter_id,timestamp,energy_kwh,direction\n"
+			b"CH-IMPORT-1,2026-01-03T00:00:00Z,3.0000,in\n"
+		)
+
+		first_upload = SimpleUploadedFile("idempotent-first.csv", csv_bytes, content_type="text/csv")
+		first_resp = self.client.post("/api/v1/metering/import/csv/", {"file": first_upload}, format="multipart")
+		self.assertEqual(first_resp.status_code, 201)
+		self.assertEqual(first_resp.data["rows_imported"], 1)
+
+		second_upload = SimpleUploadedFile("idempotent-second.csv", csv_bytes, content_type="text/csv")
+		second_resp = self.client.post("/api/v1/metering/import/csv/", {"file": second_upload}, format="multipart")
+
+		self.assertEqual(second_resp.status_code, 201)
+		self.assertEqual(second_resp.data["rows_imported"], 0)
+		self.assertGreaterEqual(second_resp.data["rows_skipped"], 1)
+		self.assertEqual(MeterReading.objects.filter(metering_point=self.metering_point).count(), 1)
+
+	def test_csv_import_with_overwrite_existing_updates_value_without_new_row(self):
+		initial_csv = (
+			b"meter_id,timestamp,energy_kwh,direction\n"
+			b"CH-IMPORT-1,2026-01-04T00:00:00Z,1.0000,in\n"
+		)
+		updated_csv = (
+			b"meter_id,timestamp,energy_kwh,direction\n"
+			b"CH-IMPORT-1,2026-01-04T00:00:00Z,4.5000,in\n"
+		)
+
+		first_upload = SimpleUploadedFile("overwrite-first.csv", initial_csv, content_type="text/csv")
+		first_resp = self.client.post("/api/v1/metering/import/csv/", {"file": first_upload}, format="multipart")
+		self.assertEqual(first_resp.status_code, 201)
+		self.assertEqual(first_resp.data["rows_imported"], 1)
+
+		overwrite_upload = SimpleUploadedFile("overwrite-second.csv", updated_csv, content_type="text/csv")
+		overwrite_resp = self.client.post(
+			"/api/v1/metering/import/csv/",
+			{"file": overwrite_upload, "overwrite_existing": "true"},
+			format="multipart",
+		)
+
+		self.assertEqual(overwrite_resp.status_code, 201)
+		self.assertEqual(overwrite_resp.data["rows_imported"], 1)
+		self.assertTrue(any("Overwrote 1 existing readings." in err["error"] for err in overwrite_resp.data["errors"]))
+		self.assertEqual(MeterReading.objects.filter(metering_point=self.metering_point).count(), 1)
+
+		reading = MeterReading.objects.get(
+			metering_point=self.metering_point,
+			timestamp=datetime(2026, 1, 4, 0, 0, tzinfo=timezone.utc),
+			direction=ReadingDirection.IN,
+		)
+		self.assertEqual(reading.energy_kwh, Decimal("4.5000"))
