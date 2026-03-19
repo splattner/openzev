@@ -11,6 +11,7 @@ import type {
     ImportPreviewResult,
     ImportLog,
     Invoice,
+    InvoicePeriodOverview,
     MeteringDashboardSummary,
     MeteringPoint,
     MeteringPointAssignment,
@@ -28,6 +29,8 @@ import type {
     TariffPeriodInput,
     User,
     UserInput,
+    VatRate,
+    VatRateInput,
     Zev,
     ZevInput,
     ZevWizardInput,
@@ -123,6 +126,25 @@ export async function fetchAppSettings(): Promise<AppSettings> {
 export async function updateAppSettings(payload: AppSettingsInput): Promise<AppSettings> {
     const { data } = await api.patch<AppSettings>('/auth/app-settings/', payload)
     return data
+}
+
+export async function fetchVatRates(): Promise<PaginatedResponse<VatRate>> {
+    const { data } = await api.get<PaginatedResponse<VatRate>>('/auth/vat-rates/')
+    return data
+}
+
+export async function createVatRate(payload: VatRateInput): Promise<VatRate> {
+    const { data } = await api.post<VatRate>('/auth/vat-rates/', payload)
+    return data
+}
+
+export async function updateVatRate(id: number, payload: Partial<VatRateInput>): Promise<VatRate> {
+    const { data } = await api.patch<VatRate>(`/auth/vat-rates/${id}/`, payload)
+    return data
+}
+
+export async function deleteVatRate(id: number): Promise<void> {
+    await api.delete(`/auth/vat-rates/${id}/`)
 }
 
 export async function fetchUsers(): Promise<PaginatedResponse<User>> {
@@ -342,6 +364,15 @@ export async function generateInvoicesForZev(payload: {
     period_end: string
 }): Promise<Invoice[]> {
     const { data } = await api.post<Invoice[]>('/invoices/invoices/generate-all/', payload)
+    return data
+}
+
+export async function fetchInvoicePeriodOverview(params: {
+    zev_id: string
+    period_start: string
+    period_end: string
+}): Promise<InvoicePeriodOverview> {
+    const { data } = await api.get<InvoicePeriodOverview>('/invoices/invoices/period-overview/', { params })
     return data
 }
 

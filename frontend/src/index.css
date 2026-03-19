@@ -684,6 +684,18 @@ h3 {
   background: #f8fafc;
 }
 
+.button-danger,
+.button.danger {
+  background: #dc2626;
+  color: #ffffff;
+  border: 1px solid #b91c1c;
+}
+
+.button-danger:hover,
+.button.danger:hover {
+  background: #b91c1c;
+}
+
 .danger {
   background: #dc2626;
 }

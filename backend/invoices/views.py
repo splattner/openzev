@@ -1,3 +1,5 @@
+from datetime import date as date_type, datetime, timedelta, timezone as dt_timezone
+
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
@@ -6,7 +8,8 @@ from accounts.permissions import IsZevOwnerOrAdmin
 from django.db.models import Count, Q, Sum, F, DecimalField
 from django.conf import settings
 from pathlib import Path
-from zev.models import Zev, Participant
+from zev.models import Zev, Participant, MeteringPoint
+from metering.models import MeterReading
 from .models import Invoice, InvoiceStatus, EmailLog
 from .serializers import (
     InvoiceSerializer, GenerateInvoiceSerializer, GenerateZevInvoicesSerializer
@@ -92,6 +95,143 @@ class InvoiceViewSet(viewsets.ModelViewSet):
         return Response(
             InvoiceSerializer(invoices, many=True, context={"request": request}).data,
             status=status.HTTP_201_CREATED,
+        )
+
+    @action(detail=False, methods=["get"], url_path="period-overview", permission_classes=[IsAuthenticated, IsZevOwnerOrAdmin])
+    def period_overview(self, request):
+        """Return one row per participant for a ZEV/period with invoice + metering data readiness."""
+        zev_id = request.query_params.get("zev_id")
+        period_start_raw = request.query_params.get("period_start")
+        period_end_raw = request.query_params.get("period_end")
+
+        if not zev_id or not period_start_raw or not period_end_raw:
+            return Response(
+                {"error": "zev_id, period_start and period_end are required query parameters."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            period_start = date_type.fromisoformat(period_start_raw)
+            period_end = date_type.fromisoformat(period_end_raw)
+        except ValueError:
+            return Response({"error": "period_start/period_end must be YYYY-MM-DD."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if period_start > period_end:
+            return Response({"error": "period_start must be on or before period_end."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            zev = Zev.objects.get(pk=zev_id)
+        except Zev.DoesNotExist:
+            return Response({"error": "ZEV not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        if not request.user.is_admin and zev.owner_id != request.user.id:
+            return Response({"error": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
+
+        participants = list(
+            Participant.objects.filter(
+                zev=zev,
+                valid_from__lte=period_end,
+            ).filter(
+                Q(valid_to__isnull=True) | Q(valid_to__gte=period_start)
+            ).order_by("last_name", "first_name")
+        )
+
+        period_start_dt = datetime.combine(period_start, datetime.min.time(), tzinfo=dt_timezone.utc)
+        period_end_exclusive_dt = datetime.combine(period_end, datetime.min.time(), tzinfo=dt_timezone.utc) + timedelta(days=1)
+
+        invoice_map = {
+            invoice.participant_id: invoice
+            for invoice in Invoice.objects.filter(
+                zev=zev,
+                period_start=period_start,
+                period_end=period_end,
+            ).select_related("participant", "zev").order_by("-created_at")
+        }
+
+        rows = []
+        for participant in participants:
+            participant_effective_start = max(period_start, participant.valid_from)
+            participant_effective_end = min(
+                period_end,
+                participant.valid_to if participant.valid_to is not None else period_end,
+            )
+
+            participant_metering_points = list(
+                MeteringPoint.objects.filter(
+                    zev=zev,
+                    participant=participant,
+                    is_active=True,
+                    valid_from__lte=period_end,
+                ).filter(
+                    Q(valid_to__isnull=True) | Q(valid_to__gte=period_start)
+                )
+            )
+
+            readings_by_metering_point = {}
+            for metering_point_id, timestamp in MeterReading.objects.filter(
+                metering_point__in=participant_metering_points,
+                timestamp__gte=period_start_dt,
+                timestamp__lt=period_end_exclusive_dt,
+            ).values_list("metering_point_id", "timestamp"):
+                readings_by_metering_point.setdefault(metering_point_id, set()).add(timestamp.date())
+
+            missing_meter_ids = []
+            missing_meter_details = []
+            for mp in participant_metering_points:
+                mp_effective_start = max(participant_effective_start, mp.valid_from)
+                mp_effective_end = min(
+                    participant_effective_end,
+                    mp.valid_to if mp.valid_to is not None else participant_effective_end,
+                )
+
+                if mp_effective_start > mp_effective_end:
+                    continue
+
+                reading_days = readings_by_metering_point.get(mp.id, set())
+                cursor = mp_effective_start
+                missing_days = 0
+                while cursor <= mp_effective_end:
+                    if cursor not in reading_days:
+                        missing_days += 1
+                    cursor = cursor + timedelta(days=1)
+
+                if missing_days > 0:
+                    missing_meter_ids.append(mp.meter_id)
+                    missing_meter_details.append(
+                        {
+                            "meter_id": mp.meter_id,
+                            "missing_days": missing_days,
+                        }
+                    )
+
+            total_metering_points = len(participant_metering_points)
+            metering_points_with_data = total_metering_points - len(missing_meter_ids)
+            metering_data_complete = total_metering_points > 0 and metering_points_with_data == total_metering_points
+
+            invoice = invoice_map.get(participant.id)
+            rows.append(
+                {
+                    "participant_id": str(participant.id),
+                    "participant_name": participant.full_name,
+                    "participant_email": participant.email,
+                    "invoice": InvoiceSerializer(invoice, context={"request": request}).data if invoice else None,
+                    "metering_data_complete": metering_data_complete,
+                    "metering_points_total": total_metering_points,
+                    "metering_points_with_data": metering_points_with_data,
+                    "missing_meter_ids": missing_meter_ids,
+                    "missing_meter_details": missing_meter_details,
+                }
+            )
+
+        return Response(
+            {
+                "zev_id": str(zev.id),
+                "zev_name": zev.name,
+                "billing_interval": zev.billing_interval,
+                "period_start": period_start.isoformat(),
+                "period_end": period_end.isoformat(),
+                "rows": rows,
+            }
         )
 
     @action(detail=True, methods=["post"], url_path="generate-pdf",

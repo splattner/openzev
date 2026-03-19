@@ -56,6 +56,21 @@ export interface AppSettingsInput {
     date_time_format?: DateTimeFormat
 }
 
+export interface VatRate {
+    id: number
+    rate: string
+    valid_from: string
+    valid_to?: string | null
+    created_at: string
+    updated_at: string
+}
+
+export interface VatRateInput {
+    rate: string
+    valid_from: string
+    valid_to?: string | null
+}
+
 export interface Zev {
     id: string
     name: string
@@ -308,6 +323,30 @@ export interface Invoice {
     pdf_url?: string | null
     items?: InvoiceItem[]
     email_logs?: EmailLog[]
+}
+
+export interface InvoicePeriodParticipantRow {
+    participant_id: string
+    participant_name: string
+    participant_email?: string
+    invoice: Invoice | null
+    metering_data_complete: boolean
+    metering_points_total: number
+    metering_points_with_data: number
+    missing_meter_ids: string[]
+    missing_meter_details?: Array<{
+        meter_id: string
+        missing_days: number
+    }>
+}
+
+export interface InvoicePeriodOverview {
+    zev_id: string
+    zev_name: string
+    billing_interval: 'monthly' | 'quarterly' | 'semi_annual' | 'annual'
+    period_start: string
+    period_end: string
+    rows: InvoicePeriodParticipantRow[]
 }
 
 export interface InvoiceItem {

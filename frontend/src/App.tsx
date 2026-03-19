@@ -7,6 +7,7 @@ import { AdminDashboardPage } from './pages/AdminDashboardPage'
 import { AdminAccountsPage } from './pages/AdminAccountsPage'
 import { AdminPdfTemplatesPage } from './pages/AdminPdfTemplatesPage'
 import { AdminRegionalSettingsPage } from './pages/AdminRegionalSettingsPage'
+import { AdminVatSettingsPage } from './pages/AdminVatSettingsPage'
 import { DashboardPage } from './pages/DashboardPage'
 import { ImportsPage } from './pages/ImportsPage'
 import { InvoiceDetailPage } from './pages/InvoiceDetailPage'
@@ -50,6 +51,14 @@ function App() {
             element={
               <ProtectedRoute allowedRoles={['admin']}>
                 <AdminRegionalSettingsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="admin/settings/vat"
+            element={
+              <ProtectedRoute allowedRoles={['admin']}>
+                <AdminVatSettingsPage />
               </ProtectedRoute>
             }
           />
