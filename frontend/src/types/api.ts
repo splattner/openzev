@@ -383,6 +383,22 @@ export interface ChartDataPoint {
     out_kwh: number
 }
 
+export interface RawMeteringReading {
+    timestamp: string
+    direction: 'in' | 'out'
+    energy_kwh: number
+    resolution: string
+    import_source: string
+}
+
+export interface RawMeteringDailyRow {
+    date: string
+    in_kwh: number
+    out_kwh: number
+    readings_count: number
+    readings: RawMeteringReading[]
+}
+
 export interface DashboardStats {
     zevs: {
         total: number

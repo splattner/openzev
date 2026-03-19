@@ -4,6 +4,7 @@ import type {
     AppSettingsInput,
     AuthTokens,
     ChartDataPoint,
+    RawMeteringDailyRow,
     DashboardStats,
     EmailLog,
     ImpersonationTokens,
@@ -502,6 +503,21 @@ export async function fetchChartData(params: {
             date_from: params.dateFrom,
             date_to: params.dateTo,
             bucket: params.bucket ?? 'day',
+        },
+    })
+    return data
+}
+
+export async function fetchRawMeteringData(params: {
+    meteringPoint: string
+    dateFrom?: string
+    dateTo?: string
+}): Promise<RawMeteringDailyRow[]> {
+    const { data } = await api.get<RawMeteringDailyRow[]>('/metering/readings/raw-data/', {
+        params: {
+            metering_point: params.meteringPoint,
+            date_from: params.dateFrom,
+            date_to: params.dateTo,
         },
     })
     return data
