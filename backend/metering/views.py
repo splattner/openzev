@@ -1,3 +1,5 @@
+from datetime import date as date_type, datetime, timedelta, timezone as dt_timezone
+
 from django.db.models import Q, Sum
 from django.db.models.functions import TruncDay, TruncHour, TruncMonth
 from decimal import Decimal
@@ -54,9 +56,10 @@ class MeterReadingViewSet(viewsets.ModelViewSet):
 
         qs = self.get_queryset().filter(metering_point_id=mp_id)
         if date_from:
-            qs = qs.filter(timestamp__date__gte=date_from)
+            # Use explicit UTC bounds so Django doesn't shift the date into Europe/Zurich first.
+            qs = qs.filter(timestamp__gte=datetime.combine(date_type.fromisoformat(date_from), datetime.min.time(), tzinfo=dt_timezone.utc))
         if date_to:
-            qs = qs.filter(timestamp__date__lte=date_to)
+            qs = qs.filter(timestamp__lt=datetime.combine(date_type.fromisoformat(date_to), datetime.min.time(), tzinfo=dt_timezone.utc) + timedelta(days=1))
 
         rows = (
             qs.annotate(bucket=trunc_fn("timestamp"))
@@ -78,6 +81,54 @@ class MeterReadingViewSet(viewsets.ModelViewSet):
 
         return Response(sorted(pivot.values(), key=lambda x: x["bucket"]))
 
+    @action(detail=False, methods=["get"], url_path="raw-data", permission_classes=[IsAuthenticated])
+    def raw_data(self, request):
+        """Return raw metering readings grouped by day for one metering point."""
+        mp_id = request.query_params.get("metering_point")
+        if not mp_id:
+            return Response({"error": "metering_point query parameter is required."}, status=400)
+
+        date_from = request.query_params.get("date_from")
+        date_to = request.query_params.get("date_to")
+
+        qs = self.get_queryset().filter(metering_point_id=mp_id).order_by("timestamp")
+        if date_from:
+            # Use explicit UTC bounds — timestamp__date__ applies Europe/Zurich and would drop 23:xx UTC readings.
+            qs = qs.filter(timestamp__gte=datetime.combine(date_type.fromisoformat(date_from), datetime.min.time(), tzinfo=dt_timezone.utc))
+        if date_to:
+            qs = qs.filter(timestamp__lt=datetime.combine(date_type.fromisoformat(date_to), datetime.min.time(), tzinfo=dt_timezone.utc) + timedelta(days=1))
+
+        day_map = {}
+        for reading in qs:
+            day_key = reading.timestamp.date().isoformat()
+            if day_key not in day_map:
+                day_map[day_key] = {
+                    "date": day_key,
+                    "in_kwh": 0.0,
+                    "out_kwh": 0.0,
+                    "readings_count": 0,
+                    "readings": [],
+                }
+
+            energy = float(reading.energy_kwh)
+            day_map[day_key]["readings_count"] += 1
+            if reading.direction == "in":
+                day_map[day_key]["in_kwh"] += energy
+            elif reading.direction == "out":
+                day_map[day_key]["out_kwh"] += energy
+
+            day_map[day_key]["readings"].append(
+                {
+                    "timestamp": reading.timestamp.isoformat(),
+                    "direction": reading.direction,
+                    "energy_kwh": energy,
+                    "resolution": reading.resolution,
+                    "import_source": reading.import_source,
+                }
+            )
+
+        return Response(sorted(day_map.values(), key=lambda row: row["date"]))
+
     @action(detail=False, methods=["get"], url_path="dashboard-summary", permission_classes=[IsAuthenticated])
     def dashboard_summary(self, request):
         """Role-based metering dashboard summary for ZEV owners and participants."""
@@ -91,9 +142,9 @@ class MeterReadingViewSet(viewsets.ModelViewSet):
 
         qs = self.get_queryset()
         if date_from:
-            qs = qs.filter(timestamp__date__gte=date_from)
+            qs = qs.filter(timestamp__gte=datetime.combine(date_type.fromisoformat(date_from), datetime.min.time(), tzinfo=dt_timezone.utc))
         if date_to:
-            qs = qs.filter(timestamp__date__lte=date_to)
+            qs = qs.filter(timestamp__lt=datetime.combine(date_type.fromisoformat(date_to), datetime.min.time(), tzinfo=dt_timezone.utc) + timedelta(days=1))
 
         base = qs.annotate(bucket=trunc_fn("timestamp"))
 
@@ -354,9 +405,9 @@ class MeterReadingViewSet(viewsets.ModelViewSet):
         zev_ids = qs.values_list("metering_point__zev_id", flat=True).distinct()
         zev_qs = MeterReading.objects.filter(metering_point__zev_id__in=zev_ids)
         if date_from:
-            zev_qs = zev_qs.filter(timestamp__date__gte=date_from)
+            zev_qs = zev_qs.filter(timestamp__gte=datetime.combine(date_type.fromisoformat(date_from), datetime.min.time(), tzinfo=dt_timezone.utc))
         if date_to:
-            zev_qs = zev_qs.filter(timestamp__date__lte=date_to)
+            zev_qs = zev_qs.filter(timestamp__lt=datetime.combine(date_type.fromisoformat(date_to), datetime.min.time(), tzinfo=dt_timezone.utc) + timedelta(days=1))
 
         zev_rows = (
             zev_qs.annotate(bucket=trunc_fn("timestamp"))

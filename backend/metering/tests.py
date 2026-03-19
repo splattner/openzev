@@ -320,3 +320,89 @@ class ImportParserRobustnessTests(TestCase):
 			direction=ReadingDirection.IN,
 		)
 		self.assertEqual(reading.energy_kwh, Decimal("4.5000"))
+
+
+class MeteringRawDataEndpointTests(TestCase):
+	def setUp(self):
+		self.client = APIClient()
+		self.owner = make_user("rawdata_owner", UserRole.ZEV_OWNER)
+		self.participant_user = make_user("rawdata_participant", UserRole.PARTICIPANT)
+
+		self.zev = Zev.objects.create(name="RawData ZEV", owner=self.owner, zev_type="vzev", invoice_prefix="R")
+		self.participant = Participant.objects.create(
+			zev=self.zev,
+			user=self.participant_user,
+			first_name="Raw",
+			last_name="Data",
+			email="raw.data@example.com",
+			valid_from=date(2026, 1, 1),
+		)
+		self.metering_point = MeteringPoint.objects.create(
+			zev=self.zev,
+			participant=self.participant,
+			meter_id="CH-RAW-1",
+			meter_type=MeteringPointType.BIDIRECTIONAL,
+			valid_from=date(2026, 1, 1),
+		)
+
+		MeterReading.objects.create(
+			metering_point=self.metering_point,
+			timestamp=datetime(2026, 1, 1, 0, 0, tzinfo=timezone.utc),
+			energy_kwh=Decimal("1.2500"),
+			direction=ReadingDirection.IN,
+			resolution=ReadingResolution.FIFTEEN_MIN,
+		)
+		MeterReading.objects.create(
+			metering_point=self.metering_point,
+			timestamp=datetime(2026, 1, 1, 12, 0, tzinfo=timezone.utc),
+			energy_kwh=Decimal("0.7500"),
+			direction=ReadingDirection.OUT,
+			resolution=ReadingResolution.FIFTEEN_MIN,
+		)
+		MeterReading.objects.create(
+			metering_point=self.metering_point,
+			timestamp=datetime(2026, 1, 2, 0, 15, tzinfo=timezone.utc),
+			energy_kwh=Decimal("2.0000"),
+			direction=ReadingDirection.IN,
+			resolution=ReadingResolution.FIFTEEN_MIN,
+		)
+
+	def test_owner_gets_daily_grouped_raw_rows(self):
+		auth(self.client, self.owner)
+		resp = self.client.get(
+			"/api/v1/metering/readings/raw-data/",
+			{
+				"metering_point": str(self.metering_point.id),
+				"date_from": "2026-01-01",
+				"date_to": "2026-01-02",
+			},
+		)
+
+		self.assertEqual(resp.status_code, 200)
+		self.assertEqual(len(resp.data), 2)
+
+		first_day = resp.data[0]
+		self.assertEqual(first_day["date"], "2026-01-01")
+		self.assertEqual(first_day["readings_count"], 2)
+		self.assertAlmostEqual(float(first_day["in_kwh"]), 1.25, places=6)
+		self.assertAlmostEqual(float(first_day["out_kwh"]), 0.75, places=6)
+		self.assertEqual(len(first_day["readings"]), 2)
+
+		second_day = resp.data[1]
+		self.assertEqual(second_day["date"], "2026-01-02")
+		self.assertEqual(second_day["readings_count"], 1)
+		self.assertAlmostEqual(float(second_day["in_kwh"]), 2.0, places=6)
+		self.assertAlmostEqual(float(second_day["out_kwh"]), 0.0, places=6)
+
+	def test_participant_can_read_own_metering_point_raw_rows(self):
+		auth(self.client, self.participant_user)
+		resp = self.client.get(
+			"/api/v1/metering/readings/raw-data/",
+			{
+				"metering_point": str(self.metering_point.id),
+				"date_from": "2026-01-01",
+				"date_to": "2026-01-02",
+			},
+		)
+		self.assertEqual(resp.status_code, 200)
+		self.assertEqual(len(resp.data), 2)

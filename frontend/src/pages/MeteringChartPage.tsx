@@ -11,7 +11,7 @@ import {
     XAxis,
     YAxis,
 } from 'recharts'
-import { fetchChartData, fetchMeteringPoints, fetchZevs } from '../lib/api'
+import { fetchChartData, fetchMeteringPoints, fetchRawMeteringData, fetchZevs } from '../lib/api'
 import { DateRangeShortcutPicker } from '../components/DateRangeShortcutPicker'
 import { useAuth } from '../lib/auth'
 import { useManagedZev } from '../lib/managedZev'
@@ -20,9 +20,31 @@ import {
     todayIso,
 } from '../lib/dateRangePresets'
 import { formatDateTime, formatMonthYear, formatShortDate, useAppSettings } from '../lib/appSettings'
-import type { ChartDataPoint } from '../types/api'
+import type { ChartDataPoint, RawMeteringDailyRow, RawMeteringReading } from '../types/api'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
+
+function formatTimeOnly(ts: string): string {
+    const d = new Date(ts)
+    if (isNaN(d.getTime())) return ts
+    // Use UTC so display matches the imported CSV (importer stamps naive timestamps as UTC)
+    return `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`
+}
+
+function groupReadingsByHour(readings: RawMeteringReading[]): { hour: string; items: RawMeteringReading[] }[] {
+    const map = new Map<string, RawMeteringReading[]>()
+    for (const r of readings) {
+        const d = new Date(r.timestamp)
+        // Use UTC hours to stay consistent with how the importer stored the data
+        const hour = `${String(d.getUTCHours()).padStart(2, '0')}:00`
+        const bucket = map.get(hour) ?? []
+        bucket.push(r)
+        map.set(hour, bucket)
+    }
+    return Array.from(map.entries())
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([hour, items]) => ({ hour, items }))
+}
 
 function formatBucketLabel(
     bucket: string,
@@ -132,12 +154,20 @@ export function MeteringChartPage() {
         enabled: !!selectedMpId,
     })
 
+    const rawDataQuery = useQuery({
+        queryKey: ['raw-metering-data', selectedMpId, dateFrom, dateTo],
+        queryFn: () =>
+            fetchRawMeteringData({ meteringPoint: selectedMpId, dateFrom, dateTo }),
+        enabled: !!selectedMpId,
+    })
+
     const meteringPoints = (mpQuery.data?.results ?? []).filter(
         (meteringPoint) => !isManagedScope || !selectedZevId || meteringPoint.zev === selectedZevId,
     )
     const zevNameById = new Map((zevsQuery.data?.results ?? []).map((z) => [z.id, z.name]))
 
     const data: ChartDataPoint[] = chartQuery.data ?? []
+    const rawDailyRows: RawMeteringDailyRow[] = rawDataQuery.data ?? []
 
     const totalIn = data.reduce((sum, d) => sum + d.in_kwh, 0)
     const totalOut = data.reduce((sum, d) => sum + d.out_kwh, 0)
@@ -247,6 +277,9 @@ export function MeteringChartPage() {
             {selectedMpId && chartQuery.isError && (
                 <div className="card error-banner">Failed to load chart data.</div>
             )}
+            {selectedMpId && rawDataQuery.isError && (
+                <div className="card error-banner">Failed to load raw metering data table.</div>
+            )}
 
             {/* ── Results ───────────────────────────────────────────────────────── */}
             {selectedMpId && chartQuery.isSuccess && (
@@ -330,6 +363,78 @@ export function MeteringChartPage() {
                             </ResponsiveContainer>
                         </div>
                     )}
+
+                    <div className="table-card">
+                        <h3>Raw Data by Day</h3>
+                        <p className="muted" style={{ marginTop: 0 }}>
+                            One row per day in the selected period. Each row contains all raw readings for that day.
+                        </p>
+
+                        {rawDataQuery.isLoading ? (
+                            <div style={{ padding: '1rem 0' }}>Loading raw data table…</div>
+                        ) : rawDailyRows.length === 0 ? (
+                            <div style={{ padding: '1rem 0' }} className="muted">
+                                No raw metering readings found for the selected period.
+                            </div>
+                        ) : (
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Day</th>
+                                        <th>IN total (kWh)</th>
+                                        <th>OUT total (kWh)</th>
+                                        <th>Raw readings</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {rawDailyRows.map((dayRow) => (
+                                        <tr key={dayRow.date}>
+                                            <td>{formatShortDate(dayRow.date, settings)}</td>
+                                            <td>{dayRow.in_kwh.toFixed(4)}</td>
+                                            <td>{dayRow.out_kwh.toFixed(4)}</td>
+                                            <td style={{ padding: 0 }}>
+                                                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85em' }}>
+                                                    <thead>
+                                                        <tr>
+                                                            <th style={{ textAlign: 'left', padding: '0.2rem 0.5rem', color: 'var(--color-muted)' }}>Time</th>
+                                                            <th style={{ textAlign: 'left', padding: '0.2rem 0.5rem', color: 'var(--color-muted)' }}>Dir</th>
+                                                            <th style={{ textAlign: 'right', padding: '0.2rem 0.5rem', color: 'var(--color-muted)' }}>kWh</th>
+                                                        </tr>
+                                                    </thead>
+                                                    {groupReadingsByHour(dayRow.readings).map(({ hour, items }) => (
+                                                        <tbody key={hour}>
+                                                            <tr>
+                                                                <td
+                                                                    colSpan={3}
+                                                                    style={{
+                                                                        padding: '0.2rem 0.5rem',
+                                                                        fontWeight: 600,
+                                                                        fontSize: '0.8em',
+                                                                        color: 'var(--color-muted)',
+                                                                        borderTop: '1px solid var(--color-border, #e5e7eb)',
+                                                                        background: 'var(--color-surface-subtle, #f9fafb)',
+                                                                    }}
+                                                                >
+                                                                    {hour}&nbsp;–&nbsp;{String(Number(hour.split(':')[0]) + 1).padStart(2, '0')}:00
+                                                                </td>
+                                                            </tr>
+                                                            {items.map((r, i) => (
+                                                                <tr key={`${r.timestamp}-${r.direction}-${i}`}>
+                                                                    <td style={{ padding: '0.15rem 0.5rem', fontVariantNumeric: 'tabular-nums' }}>{formatTimeOnly(r.timestamp)}</td>
+                                                                    <td style={{ padding: '0.15rem 0.5rem' }}>{r.direction.toUpperCase()}</td>
+                                                                    <td style={{ padding: '0.15rem 0.5rem', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{r.energy_kwh.toFixed(4)}</td>
+                                                                </tr>
+                                                            ))}
+                                                        </tbody>
+                                                    ))}
+                                                </table>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        )}
+                    </div>
                 </>
             )}
         </div>
