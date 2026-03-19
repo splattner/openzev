@@ -37,7 +37,7 @@ services:
       - redis
 
   db:
-    image: postgres:17-alpine
+    image: postgres:18-alpine
     environment:
       POSTGRES_DB: openzev
       POSTGRES_USER: openzev
