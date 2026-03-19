@@ -133,6 +133,72 @@ To stop:
 docker compose -f docker-compose.fullstack.yml down
 ```
 
+## Prebuilt Container Images
+
+Prebuilt images are published to GitHub Container Registry (GHCR), the current image names are:
+
+- `ghcr.io/splattner/openzev-backend`
+- `ghcr.io/splattner/openzev-frontend`
+- `ghcr.io/splattner/openzev-fullstack`
+
+Available image variants:
+
+- `openzev-backend`: Django API application
+- `openzev-frontend`: static frontend served with Nginx
+- `openzev-fullstack`: frontend assets + backend in one container for simpler test deployments
+
+Available tags:
+
+- Release tags such as `v1.2.3`
+- `latest` for the newest published release
+- `main` for the newest build from the `main` branch
+- `main-<short-sha>` for a specific `main` branch commit build
+
+### Stability Note for `main` Images
+
+Images tagged `main` are intended for testing and preview deployments before a formal release.
+
+- They are rebuilt on every commit pushed to `main`
+- They may contain unfinished changes or breaking behavior
+- They should be considered unstable and not be treated like a versioned release artifact
+
+If you need reproducible deployments, prefer a release tag such as `v1.2.3` instead of `main`.
+
+### SBOMs and Signatures
+
+- Release images are published with signed container manifests and signed SBOM attestations
+- `main` branch images are also pushed, signed, and accompanied by generated SBOMs
+- Release SBOM files are attached to the GitHub release
+- `main` branch SBOM files are uploaded as workflow artifacts in the `Container Build Check` workflow run
+- SBOM verification is performed through the signed attestation bound to the image, not through a separate detached signature on the raw `.spdx.json` file
+
+### Verify an Image Signature
+
+Install `cosign` locally, then verify an image with GitHub OIDC keyless signatures:
+
+```bash
+cosign verify \
+  --certificate-identity-regexp "https://github.com/splattner/openzev/.github/workflows/.*" \
+  --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
+  ghcr.io/splattner/openzev-backend:main
+```
+
+For a release image, replace the tag with the release version, for example `:v1.2.3`.
+
+### Verify the SBOM Attestation
+
+You can verify the signed SBOM attestation attached to an image:
+
+```bash
+cosign verify-attestation \
+  --certificate-identity-regexp "https://github.com/splattner/openzev/.github/workflows/.*" \
+  --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
+  --type spdxjson \
+  ghcr.io/splattner/openzev-backend:main
+```
+
+To inspect the attested predicate after verification, add `| jq '.payload | @base64d | fromjson'` or download the generated `.spdx.json` artifact directly from the workflow or release.
+
 ## Local Development Setup
 
 ### 1) Backend
@@ -228,8 +294,9 @@ npm run build
 
 - Conventional Commit style is enforced for PR titles.
 - Release Please manages SemVer tagging and changelog generation.
-- Pull requests run lint/check/test and container build checks.
-- Published releases build and push container images to GitHub Container Registry:
+- Pull requests run lint/check/test and container build checks without pushing images.
+- Commits pushed to `main` build and publish preview images to GitHub Container Registry, generate SBOMs, and sign images plus SBOM attestations.
+- Published releases build and push versioned container images to GitHub Container Registry:
   - `ghcr.io/<owner>/openzev-backend`
   - `ghcr.io/<owner>/openzev-frontend`
   - `ghcr.io/<owner>/openzev-fullstack`

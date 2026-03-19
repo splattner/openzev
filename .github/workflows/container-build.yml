@@ -9,6 +9,7 @@ on:
 permissions:
     contents: read
     packages: write
+    id-token: write
 
 env:
     REGISTRY: ghcr.io
@@ -67,6 +68,7 @@ jobs:
                       type=sha,prefix=main-,format=short
 
             - name: Build ${{ matrix.image }} image
+              id: build
               uses: docker/build-push-action@v7
               with:
                   context: ${{ matrix.context }}
@@ -79,5 +81,50 @@ jobs:
                       OCI_VERSION=main
                       OCI_REVISION=${{ github.sha }}
                       OCI_CREATED=${{ steps.ts.outputs.created }}
+                  sbom: ${{ github.event_name == 'push' }}
+                  provenance: ${{ github.event_name == 'push' }}
                   cache-from: type=gha
                   cache-to: type=gha,mode=max
+
+            - name: Install cosign
+              if: github.event_name == 'push'
+              uses: sigstore/cosign-installer@v3
+
+            - name: Prepare SBOM metadata
+              id: sbom
+              if: github.event_name == 'push'
+              run: |
+                  SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
+                  IMAGE_REF="${{ env.IMAGE_PREFIX }}-${{ matrix.image }}@${{ steps.build.outputs.digest }}"
+                  SBOM_FILE="sbom-${{ matrix.image }}-main-${SHORT_SHA}.spdx.json"
+                  echo "image_ref=$IMAGE_REF" >> "$GITHUB_OUTPUT"
+                  echo "sbom_file=$SBOM_FILE" >> "$GITHUB_OUTPUT"
+
+            - name: Generate SBOM file (Trivy)
+              if: github.event_name == 'push'
+              uses: aquasecurity/trivy-action@0.35.0
+              with:
+                  scan-type: image
+                  image-ref: ${{ steps.sbom.outputs.image_ref }}
+                  format: spdx-json
+                  output: ${{ steps.sbom.outputs.sbom_file }}
+
+            - name: Sign image (keyless)
+              if: github.event_name == 'push'
+              run: cosign sign --yes "${{ steps.sbom.outputs.image_ref }}"
+
+            - name: Attest SBOM (keyless)
+              if: github.event_name == 'push'
+              run: |
+                  cosign attest --yes \
+                    --type spdxjson \
+                    --predicate "${{ steps.sbom.outputs.sbom_file }}" \
+                    "${{ steps.sbom.outputs.image_ref }}"
+
+            - name: Upload SBOM artifact
+              if: github.event_name == 'push'
+              uses: actions/upload-artifact@v7
+              with:
+                  name: sbom-${{ matrix.image }}-main
+                  path: ${{ steps.sbom.outputs.sbom_file }}
+                  if-no-files-found: error
