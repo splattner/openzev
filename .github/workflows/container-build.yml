@@ -39,12 +39,20 @@ jobs:
             - name: Set up Docker Buildx
               uses: docker/setup-buildx-action@v4
 
+            - name: Compute build timestamp
+              id: ts
+              run: echo "created=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
+
             - name: Build ${{ matrix.image }} image
               uses: docker/build-push-action@v7
               with:
                   context: ${{ matrix.context }}
                   file: ${{ matrix.dockerfile }}
                   push: false
-                  build-args: ${{ matrix.build_args }}
+                  build-args: |
+                      ${{ matrix.build_args }}
+                      OCI_VERSION=${{ github.ref_name }}
+                      OCI_REVISION=${{ github.sha }}
+                      OCI_CREATED=${{ steps.ts.outputs.created }}
                   cache-from: type=gha
                   cache-to: type=gha,mode=max
