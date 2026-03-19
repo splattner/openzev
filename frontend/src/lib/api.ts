@@ -11,6 +11,7 @@ import type {
     ImportPreviewResult,
     ImportLog,
     Invoice,
+    InvoicePeriodOverview,
     MeteringDashboardSummary,
     MeteringPoint,
     MeteringPointAssignment,
@@ -363,6 +364,15 @@ export async function generateInvoicesForZev(payload: {
     period_end: string
 }): Promise<Invoice[]> {
     const { data } = await api.post<Invoice[]>('/invoices/invoices/generate-all/', payload)
+    return data
+}
+
+export async function fetchInvoicePeriodOverview(params: {
+    zev_id: string
+    period_start: string
+    period_end: string
+}): Promise<InvoicePeriodOverview> {
+    const { data } = await api.get<InvoicePeriodOverview>('/invoices/invoices/period-overview/', { params })
     return data
 }
 

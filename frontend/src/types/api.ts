@@ -325,6 +325,30 @@ export interface Invoice {
     email_logs?: EmailLog[]
 }
 
+export interface InvoicePeriodParticipantRow {
+    participant_id: string
+    participant_name: string
+    participant_email?: string
+    invoice: Invoice | null
+    metering_data_complete: boolean
+    metering_points_total: number
+    metering_points_with_data: number
+    missing_meter_ids: string[]
+    missing_meter_details?: Array<{
+        meter_id: string
+        missing_days: number
+    }>
+}
+
+export interface InvoicePeriodOverview {
+    zev_id: string
+    zev_name: string
+    billing_interval: 'monthly' | 'quarterly' | 'semi_annual' | 'annual'
+    period_start: string
+    period_end: string
+    rows: InvoicePeriodParticipantRow[]
+}
+
 export interface InvoiceItem {
     id: string
     item_type: string
