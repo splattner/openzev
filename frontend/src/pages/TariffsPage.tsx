@@ -1,5 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useMemo, useState, type ChangeEvent, type FormEvent } from 'react'
+import dayjs from 'dayjs'
+import { DatePicker } from '@mui/x-date-pickers/DatePicker'
+import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs'
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider'
+import { ConfirmDialog, useConfirmDialog } from '../components/ConfirmDialog'
 import { FormModal } from '../components/FormModal'
 import {
     createTariff,
@@ -9,13 +14,12 @@ import {
     exportTariffs,
     fetchTariffPeriods,
     fetchTariffs,
-    fetchZevs,
     formatApiError,
     importTariffs,
     updateTariff,
     updateTariffPeriod,
 } from '../lib/api'
-import { formatShortDate, useAppSettings } from '../lib/appSettings'
+import { formatShortDate, toDayJsDateFormat, useAppSettings } from '../lib/appSettings'
 import { useAuth } from '../lib/auth'
 import { useManagedZev } from '../lib/managedZev'
 import { useToast } from '../lib/toast'
@@ -65,6 +69,7 @@ const energyTypeLabels: Record<NonNullable<Tariff['energy_type']>, string> = {
 export function TariffsPage() {
     const queryClient = useQueryClient()
     const { pushToast } = useToast()
+    const { dialog, confirm, handleConfirm, handleCancel, isLoading: dialogLoading } = useConfirmDialog()
     const { user } = useAuth()
     const { settings } = useAppSettings()
     const { selectedZevId } = useManagedZev()
@@ -72,7 +77,6 @@ export function TariffsPage() {
 
     const tariffsQuery = useQuery({ queryKey: ['tariffs'], queryFn: fetchTariffs })
     const periodsQuery = useQuery({ queryKey: ['tariff-periods'], queryFn: fetchTariffPeriods })
-    const zevsQuery = useQuery({ queryKey: ['zevs'], queryFn: fetchZevs })
 
     const [tariffForm, setTariffForm] = useState<TariffInput>(defaultTariffForm)
     const [periodForm, setPeriodForm] = useState<TariffPeriodInput>(defaultPeriodForm)
@@ -82,11 +86,6 @@ export function TariffsPage() {
     const [showPeriodModal, setShowPeriodModal] = useState(false)
     const [showExportModal, setShowExportModal] = useState(false)
     const [showImportModal, setShowImportModal] = useState(false)
-
-    const availableZevs = useMemo(
-        () => (zevsQuery.data?.results || []).filter((zev) => !isManagedScope || !selectedZevId || zev.id === selectedZevId),
-        [zevsQuery.data?.results, isManagedScope, selectedZevId],
-    )
 
     const tariffs = useMemo(
         () => (tariffsQuery.data?.results || []).filter((tariff) => !isManagedScope || !selectedZevId || tariff.zev === selectedZevId),
@@ -99,10 +98,6 @@ export function TariffsPage() {
         () => (periodsQuery.data?.results || []).filter((period) => allowedTariffIds.has(period.tariff)),
         [periodsQuery.data?.results, allowedTariffIds],
     )
-
-    const zevNameById = useMemo(() => {
-        return new Map((availableZevs || []).map((zev) => [zev.id, zev.name]))
-    }, [availableZevs])
 
     const tariffNameById = useMemo(() => {
         return new Map((tariffs || []).map((tariff) => [tariff.id, tariff.name]))
@@ -467,19 +462,25 @@ export function TariffsPage() {
                     )}
                     <label>
                         <span>Valid from</span>
-                        <input
-                            type="date"
-                            value={tariffForm.valid_from}
-                            onChange={(event) => setTariffForm((prev) => ({ ...prev, valid_from: event.target.value }))}
-                        />
+                        <LocalizationProvider dateAdapter={AdapterDayjs}>
+                            <DatePicker
+                                format={toDayJsDateFormat(settings.date_format_short)}
+                                value={tariffForm.valid_from ? dayjs(tariffForm.valid_from) : null}
+                                onChange={(val) => setTariffForm((prev) => ({ ...prev, valid_from: val ? val.format('YYYY-MM-DD') : '' }))}
+                                slotProps={{ textField: { size: 'small', fullWidth: true } }}
+                            />
+                        </LocalizationProvider>
                     </label>
                     <label>
                         <span>Valid to</span>
-                        <input
-                            type="date"
-                            value={tariffForm.valid_to ?? ''}
-                            onChange={(event) => setTariffForm((prev) => ({ ...prev, valid_to: event.target.value || null }))}
-                        />
+                        <LocalizationProvider dateAdapter={AdapterDayjs}>
+                            <DatePicker
+                                format={toDayJsDateFormat(settings.date_format_short)}
+                                value={tariffForm.valid_to ? dayjs(tariffForm.valid_to) : null}
+                                onChange={(val) => setTariffForm((prev) => ({ ...prev, valid_to: val ? val.format('YYYY-MM-DD') : null }))}
+                                slotProps={{ textField: { size: 'small', fullWidth: true } }}
+                            />
+                        </LocalizationProvider>
                     </label>
                     <label>
                         <span>Notes</span>
@@ -586,7 +587,6 @@ export function TariffsPage() {
                     <thead>
                         <tr>
                             <th>Name</th>
-                            <th>ZEV</th>
                             <th>Category</th>
                             <th>Billing mode</th>
                             <th>Pricing</th>
@@ -598,7 +598,6 @@ export function TariffsPage() {
                         {tariffs.length ? tariffs.map((tariff) => (
                             <tr key={tariff.id}>
                                 <td>{tariff.name}</td>
-                                <td>{zevNameById.get(tariff.zev) || tariff.zev}</td>
                                 <td>{categoryLabels[tariff.category]}</td>
                                 <td>{billingModeLabels[tariff.billing_mode]}</td>
                                 <td>
@@ -614,8 +613,14 @@ export function TariffsPage() {
                                     <button
                                         className="button danger"
                                         type="button"
-                                        disabled={deleteTariffMutation.isPending}
-                                        onClick={() => deleteTariffMutation.mutate(tariff.id)}
+                                        disabled={deleteTariffMutation.isPending || dialogLoading}
+                                        onClick={() => confirm({
+                                            title: 'Delete Tariff',
+                                            message: `Are you sure you want to delete tariff "${tariff.name}"? This action cannot be undone.`,
+                                            confirmText: 'Delete Tariff',
+                                            isDangerous: true,
+                                            onConfirm: () => deleteTariffMutation.mutate(tariff.id),
+                                        })}
                                     >
                                         Delete
                                     </button>
@@ -623,7 +628,7 @@ export function TariffsPage() {
                             </tr>
                         )) : (
                             <tr>
-                                <td colSpan={7}>No tariffs yet.</td>
+                                <td colSpan={6}>No tariffs yet.</td>
                             </tr>
                         )}
                     </tbody>
@@ -658,8 +663,14 @@ export function TariffsPage() {
                                     <button
                                         className="button danger"
                                         type="button"
-                                        disabled={deletePeriodMutation.isPending}
-                                        onClick={() => deletePeriodMutation.mutate(period.id)}
+                                        disabled={deletePeriodMutation.isPending || dialogLoading}
+                                        onClick={() => confirm({
+                                            title: 'Delete Tariff Period',
+                                            message: `Are you sure you want to delete this tariff period for "${tariffNameById.get(period.tariff) ?? period.tariff}"?`,
+                                            confirmText: 'Delete Tariff Period',
+                                            isDangerous: true,
+                                            onConfirm: () => deletePeriodMutation.mutate(period.id),
+                                        })}
                                     >
                                         Delete
                                     </button>
@@ -673,6 +684,10 @@ export function TariffsPage() {
                     </tbody>
                 </table>
             </div>
+
+            {dialog && (
+                <ConfirmDialog {...dialog} isLoading={dialogLoading} onConfirm={handleConfirm} onCancel={handleCancel} />
+            )}
         </div>
     )
 }
