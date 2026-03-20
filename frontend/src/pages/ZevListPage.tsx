@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useState, type FormEvent } from 'react'
+import { useRef, useState, type FormEvent } from 'react'
 import { ConfirmDialog, useConfirmDialog } from '../components/ConfirmDialog'
 import { ZevEmailTemplateFields } from '../components/ZevEmailTemplateFields'
 import { ZevGeneralSettingsFields } from '../components/ZevGeneralSettingsFields'
@@ -40,7 +40,7 @@ const defaultCreateForm = (): ZevWizardInput => ({
     ],
 })
 
-type WizardStep = 1 | 2 | 3 | 4
+type WizardStep = 1 | 2 | 3 | 4 | 5
 
 export function ZevListPage() {
     const { user } = useAuth()
@@ -68,7 +68,6 @@ export function ZevListPage() {
     const [showEditModal, setShowEditModal] = useState(false)
     const [showOwnerModal, setShowOwnerModal] = useState(false)
     const [showCreateModal, setShowCreateModal] = useState(false)
-    const [showSuccessModal, setShowSuccessModal] = useState(false)
     const [editError, setEditError] = useState<string | null>(null)
     const [ownerError, setOwnerError] = useState<string | null>(null)
     const [createError, setCreateError] = useState<string | null>(null)
@@ -79,17 +78,15 @@ export function ZevListPage() {
     const [editingMeteringPointData, setEditingMeteringPointData] = useState<OwnerMeteringPointInput | null>(null)
     const [ownerTargetZev, setOwnerTargetZev] = useState<Zev | null>(null)
     const [newOwnerId, setNewOwnerId] = useState<string>('')
+    const createSubmittedRef = useRef(false)
 
     const createMutation = useMutation({
         mutationFn: createZevWithOwner,
         onSuccess: (result) => {
-            setCreateForm(defaultCreateForm())
-            setWizardStep(1)
-            setShowCreateModal(false)
             setCreateError(null)
             setCreatedCredentials(result.owner)
             setCreatedZevName(result.zev.name)
-            setShowSuccessModal(true)
+            setWizardStep(5)
             void queryClient.invalidateQueries({ queryKey: ['zevs'] })
         },
         onError: (error) => setCreateError(formatApiError(error, 'Failed to create ZEV.')),
@@ -170,6 +167,13 @@ export function ZevListPage() {
         setWizardStep(1)
         setExpandedMeteringPointIndex(null)
         setEditingMeteringPointData(null)
+        setCreatedCredentials(null)
+        setCreatedZevName('')
+        setCopyFeedback(null)
+        createSubmittedRef.current = false
+        if (wizardStep === 5) {
+            setCreateForm(defaultCreateForm())
+        }
     }
 
     async function copyToClipboard(value: string, label: string) {
@@ -181,13 +185,6 @@ export function ZevListPage() {
             setCopyFeedback(`Could not copy ${label.toLowerCase()}.`)
             window.setTimeout(() => setCopyFeedback(null), 2000)
         }
-    }
-
-    function closeSuccessModal() {
-        setShowSuccessModal(false)
-        setCopyFeedback(null)
-        setCreatedCredentials(null)
-        setCreatedZevName('')
     }
 
     function submitEdit(event: FormEvent<HTMLFormElement>) {
@@ -225,17 +222,27 @@ export function ZevListPage() {
             return
         }
         setCreateError(null)
-        setWizardStep((previous) => (previous < 4 ? ((previous + 1) as WizardStep) : previous))
+        const nextStep = (wizardStep < 4 ? wizardStep + 1 : wizardStep) as WizardStep
+        setWizardStep(nextStep)
+        // Auto-open the first metering point for editing when entering step 3
+        if (nextStep === 3 && createForm.metering_points.length > 0 && expandedMeteringPointIndex === null) {
+            setEditingMeteringPointData({ ...createForm.metering_points[0] })
+            setExpandedMeteringPointIndex(0)
+        }
     }
 
     function goToPreviousStep() {
         setCreateError(null)
-        setWizardStep((previous) => (previous > 1 ? ((previous - 1) as WizardStep) : previous))
+        setWizardStep((previous) => (previous > 1 ? (previous - 1) as WizardStep : previous))
     }
 
     function submitCreate(event: FormEvent<HTMLFormElement>) {
         event.preventDefault()
-        if (wizardStep !== 4) return
+    }
+
+    function handleCreateZev() {
+        if (wizardStep !== 4 || createSubmittedRef.current || createMutation.isPending) return
+        createSubmittedRef.current = true
         createMutation.mutate(createForm)
     }
 
@@ -368,7 +375,7 @@ export function ZevListPage() {
                 )}
             </div>
 
-            <FormModal isOpen={showCreateModal} title={`Create ZEV · Step ${wizardStep} of 4`} onClose={closeCreateModal} maxWidth="960px">
+            <FormModal isOpen={showCreateModal} title={wizardStep === 5 ? 'ZEV created successfully' : `Create ZEV · Step ${wizardStep} of 4`} onClose={closeCreateModal} maxWidth="960px">
                 <form onSubmit={submitCreate} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                     {wizardStep === 1 && (
                         <>
@@ -587,66 +594,64 @@ export function ZevListPage() {
                             <p><strong>ZEV:</strong> {createForm.name} ({createForm.zev_type}) starting {formatShortDate(createForm.start_date, settings)}</p>
                             <p><strong>Owner:</strong> {createForm.owner.first_name} {createForm.owner.last_name} ({createForm.owner.email})</p>
                             <p><strong>Metering points:</strong> {createForm.metering_points.length}</p>
-                            <p className="muted" style={{ marginBottom: 0 }}>Creating will also create the owner participant and assign all listed metering points.</p>
+                            <p className="muted" style={{ marginBottom: 0 }}>Click "Create ZEV" to create the ZEV, the owner participant, and assign all listed metering points.</p>
+                        </div>
+                    )}
+
+                    {wizardStep === 5 && createdCredentials && (
+                        <div className="grid-span-full page-stack">
+                            <p style={{ margin: 0 }}>
+                                ZEV <strong>{createdZevName}</strong> was created successfully. Store these credentials now, the temporary password is shown only once.
+                            </p>
+
+                            <div className="card" style={{ padding: '1rem' }}>
+                                <p style={{ margin: '0 0 0.5rem' }}><strong>Username</strong></p>
+                                <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                                    <code>{createdCredentials.username}</code>
+                                    <button
+                                        className="button button-secondary"
+                                        type="button"
+                                        onClick={() => copyToClipboard(createdCredentials.username, 'Username')}
+                                    >
+                                        Copy username
+                                    </button>
+                                </div>
+
+                                <p style={{ margin: '1rem 0 0.5rem' }}><strong>Temporary password</strong></p>
+                                <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                                    <code>{createdCredentials.temporary_password}</code>
+                                    <button
+                                        className="button button-secondary"
+                                        type="button"
+                                        onClick={() => copyToClipboard(createdCredentials.temporary_password, 'Password')}
+                                    >
+                                        Copy password
+                                    </button>
+                                </div>
+                            </div>
+
+                            {copyFeedback && <div className="muted">{copyFeedback}</div>}
                         </div>
                     )}
 
                     {createError && <div className="error-banner grid-span-full">{createError}</div>}
 
                     <div className="actions-row actions-row-end actions-row-gap-lg grid-span-full mt-1">
-                        <button className="button button-secondary" type="button" onClick={closeCreateModal}>Cancel</button>
-                        {wizardStep > 1 && <button className="button button-secondary" type="button" onClick={goToPreviousStep}>Back</button>}
-                        {wizardStep < 4 ? (
-                            <button className="button button-primary" type="button" onClick={goToNextStep}>Next</button>
-                        ) : (
-                            <button className="button button-primary" type="submit" disabled={createMutation.isPending}>Create ZEV</button>
+                        {wizardStep < 5 && <button className="button button-secondary" type="button" onClick={closeCreateModal}>Cancel</button>}
+                        {wizardStep > 1 && wizardStep < 5 && <button className="button button-secondary" type="button" onClick={goToPreviousStep}>Back</button>}
+                        {wizardStep < 4 && (
+                            <button key="next" className="button button-primary" type="button" onClick={goToNextStep}>Next</button>
+                        )}
+                        {wizardStep === 4 && (
+                            <button key="create" className="button button-primary" type="button" onClick={handleCreateZev} disabled={createMutation.isPending}>
+                                {createMutation.isPending ? 'Creating…' : 'Create ZEV'}
+                            </button>
+                        )}
+                        {wizardStep === 5 && (
+                            <button key="done" className="button button-primary" type="button" onClick={closeCreateModal}>Done</button>
                         )}
                     </div>
                 </form>
-            </FormModal>
-
-            <FormModal isOpen={showSuccessModal && !!createdCredentials} title="Owner account created" onClose={closeSuccessModal} maxWidth="640px">
-                {createdCredentials && (
-                    <div className="page-stack">
-                        <p style={{ margin: 0 }}>
-                            ZEV <strong>{createdZevName}</strong> was created successfully. Store these credentials now, the temporary password is shown only once.
-                        </p>
-
-                        <div className="card" style={{ padding: '1rem' }}>
-                            <p style={{ margin: '0 0 0.5rem' }}><strong>Username</strong></p>
-                            <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                                <code>{createdCredentials.username}</code>
-                                <button
-                                    className="button button-secondary"
-                                    type="button"
-                                    onClick={() => copyToClipboard(createdCredentials.username, 'Username')}
-                                >
-                                    Copy username
-                                </button>
-                            </div>
-
-                            <p style={{ margin: '1rem 0 0.5rem' }}><strong>Temporary password</strong></p>
-                            <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                                <code>{createdCredentials.temporary_password}</code>
-                                <button
-                                    className="button button-secondary"
-                                    type="button"
-                                    onClick={() => copyToClipboard(createdCredentials.temporary_password, 'Password')}
-                                >
-                                    Copy password
-                                </button>
-                            </div>
-                        </div>
-
-                        {copyFeedback && <div className="muted">{copyFeedback}</div>}
-
-                        <div className="actions-row actions-row-end">
-                            <button className="button button-primary" type="button" onClick={closeSuccessModal}>
-                                Done
-                            </button>
-                        </div>
-                    </div>
-                )}
             </FormModal>
 
             <FormModal isOpen={showEditModal} title="Edit ZEV" onClose={closeEditModal} maxWidth="960px">

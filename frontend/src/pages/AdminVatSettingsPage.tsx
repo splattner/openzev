@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createVatRate, deleteVatRate, fetchVatRates, formatApiError, updateVatRate } from '../lib/api'
 import { formatShortDate, useAppSettings } from '../lib/appSettings'
 import { useToast } from '../lib/toast'
+import { ConfirmDialog, useConfirmDialog } from '../components/ConfirmDialog'
 import type { VatRateInput } from '../types/api'
 
 type VatRateFormState = {
@@ -21,6 +22,7 @@ export function AdminVatSettingsPage() {
     const queryClient = useQueryClient()
     const { pushToast } = useToast()
     const { settings } = useAppSettings()
+    const { dialog, confirm, handleConfirm, handleCancel, isLoading: dialogLoading } = useConfirmDialog()
     const [form, setForm] = useState<VatRateFormState>(defaultForm)
     const [editingId, setEditingId] = useState<number | null>(null)
 
@@ -183,11 +185,14 @@ export function AdminVatSettingsPage() {
                                             <button
                                                 className="button button-danger"
                                                 type="button"
-                                                disabled={deleteMutation.isPending}
-                                                onClick={() => {
-                                                    if (!window.confirm('Delete this VAT rate?')) return
-                                                    deleteMutation.mutate(rate.id)
-                                                }}
+                                                disabled={deleteMutation.isPending || dialogLoading}
+                                                onClick={() => confirm({
+                                                    title: 'Delete VAT rate',
+                                                    message: `Are you sure you want to delete the ${(Number(rate.rate) * 100).toFixed(2)}% VAT rate? This action cannot be undone.`,
+                                                    confirmText: 'Delete',
+                                                    isDangerous: true,
+                                                    onConfirm: () => deleteMutation.mutate(rate.id),
+                                                })}
                                             >
                                                 Delete
                                             </button>
@@ -199,6 +204,15 @@ export function AdminVatSettingsPage() {
                     </table>
                 )}
             </section>
+
+            {dialog && (
+                <ConfirmDialog
+                    {...dialog}
+                    isLoading={dialogLoading}
+                    onConfirm={handleConfirm}
+                    onCancel={handleCancel}
+                />
+            )}
         </div>
     )
 }
