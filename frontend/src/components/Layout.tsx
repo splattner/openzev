@@ -6,6 +6,7 @@ import { useAuth } from '../lib/auth'
 import { useManagedZev } from '../lib/managedZev'
 import { fetchUsers } from '../lib/api'
 import { LanguageSelector } from './LanguageSelector'
+import AppFooter from './AppFooter'
 
 export function Layout() {
     const { t } = useTranslation()
@@ -384,6 +385,7 @@ export function Layout() {
                     </div>
                 </header>
                 <Outlet />
+                <AppFooter />
             </main>
         </div>
     )
