@@ -161,6 +161,10 @@ class InvoiceViewSet(viewsets.ModelViewSet):
                 ).select_related("metering_point")
             )
 
+            # Skip participants with no active assignment in this period.
+            if not assignments:
+                continue
+
             # Fetch all readings for the involved metering points within the period, grouped by MP.
             assignment_mp_ids = [a.metering_point_id for a in assignments]
             readings_by_metering_point = {}

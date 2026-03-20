@@ -543,8 +543,8 @@ class InvoicePeriodOverviewTests(TestCase):
         with_data_row = rows_by_participant[self.p_with_data.full_name]
         self.assertTrue(with_data_row["metering_data_complete"])
 
-    def test_no_assignment_means_no_metering_required(self):
-        """A participant with no assignment in the period has no metering requirement (complete by absence)."""
+    def test_no_assignment_means_participant_excluded_from_overview(self):
+        """A participant with no assignment in the period is excluded from the overview entirely."""
         # Remove the assignment for p_with_data so they have no assignment this period.
         MeteringPointAssignment.objects.filter(metering_point=self.mp_with_data).delete()
 
@@ -554,12 +554,11 @@ class InvoicePeriodOverviewTests(TestCase):
             {"zev_id": str(self.zev.id), "period_start": "2026-01-01", "period_end": "2026-01-31"},
         )
         self.assertEqual(resp.status_code, 200)
-        rows_by_participant = {row["participant_name"]: row for row in resp.data["rows"]}
-        with_data_row = rows_by_participant[self.p_with_data.full_name]
-        # No assignments → total_metering_points == 0 → metering_data_complete is False
-        # (can't be complete if there are no meters at all)
-        self.assertFalse(with_data_row["metering_data_complete"])
-        self.assertEqual(with_data_row["metering_points_total"], 0)
+        participant_names = [row["participant_name"] for row in resp.data["rows"]]
+        # p_with_data has no assignment → excluded
+        self.assertNotIn(self.p_with_data.full_name, participant_names)
+        # p_missing_data still has an assignment → included
+        self.assertIn(self.p_missing_data.full_name, participant_names)
 
 
 class InvoiceMathEdgeCaseTests(TestCase):
