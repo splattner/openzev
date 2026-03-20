@@ -771,7 +771,13 @@ export function ZevListPage() {
                                             Set Owner
                                         </button>
                                     )}
-                                    <button className="button danger" type="button" disabled={deleteMutation.isPending} onClick={() => deleteMutation.mutate(zev.id)}>Delete</button>
+                                    <button className="button danger" type="button" disabled={deleteMutation.isPending || dialogLoading} onClick={() => confirm({
+                                        title: 'Delete ZEV',
+                                        message: `Are you sure you want to delete "${zev.name}"? This action cannot be undone and will remove all associated data.`,
+                                        confirmText: 'Delete ZEV',
+                                        isDangerous: true,
+                                        onConfirm: () => deleteMutation.mutate(zev.id),
+                                    })}>Delete</button>
                                 </td>
                             </tr>
                         )) : (

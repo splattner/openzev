@@ -53,7 +53,7 @@ const titleLabelByValue: Record<string, string> = {
 export function ParticipantsPage() {
     const queryClient = useQueryClient()
     const { pushToast } = useToast()
-    const { dialog, handleConfirm, handleCancel, isLoading: dialogLoading } = useConfirmDialog()
+    const { dialog, confirm, handleConfirm, handleCancel, isLoading: dialogLoading } = useConfirmDialog()
     const { user } = useAuth()
     const { settings } = useAppSettings()
     const { selectedZevId } = useManagedZev()
@@ -401,8 +401,14 @@ export function ParticipantsPage() {
                                             <button
                                                 className="button danger"
                                                 type="button"
-                                                disabled={deleteMutation.isPending}
-                                                onClick={() => deleteMutation.mutate(participant.id)}
+                                                disabled={deleteMutation.isPending || dialogLoading}
+                                                onClick={() => confirm({
+                                                    title: 'Delete Participant',
+                                                    message: `Are you sure you want to delete "${formatParticipantName(participant)}"? This action cannot be undone.`,
+                                                    confirmText: 'Delete Participant',
+                                                    isDangerous: true,
+                                                    onConfirm: () => deleteMutation.mutate(participant.id),
+                                                })}
                                             >
                                                 Delete
                                             </button>

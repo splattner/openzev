@@ -775,6 +775,7 @@ h3 {
   display: flex;
   gap: 0.5rem;
   flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .checkbox-row {
@@ -881,6 +882,7 @@ h3 {
 }
 
 @media (max-width: 640px) {
+
   .grid-2,
   .grid-3,
   .grid-4 {

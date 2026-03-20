@@ -5,6 +5,7 @@ import dayjs from 'dayjs'
 import { DatePicker } from '@mui/x-date-pickers/DatePicker'
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs'
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider'
+import { ConfirmDialog, useConfirmDialog } from '../components/ConfirmDialog'
 import { FormModal } from '../components/FormModal'
 import {
     createMeteringPoint,
@@ -49,6 +50,7 @@ const defaultAssignmentForm = (meteringPointId = ''): MeteringPointAssignmentInp
 export function MeteringPointsPage() {
     const queryClient = useQueryClient()
     const { pushToast } = useToast()
+    const { dialog, confirm, handleConfirm, handleCancel, isLoading: dialogLoading } = useConfirmDialog()
     const { user } = useAuth()
     const { settings } = useAppSettings()
     const { selectedZevId } = useManagedZev()
@@ -504,8 +506,14 @@ export function MeteringPointsPage() {
                                                 className="button danger"
                                                 type="button"
                                                 style={{ padding: '4px 10px', fontSize: '0.8rem' }}
-                                                disabled={deleteMpMutation.isPending}
-                                                onClick={() => deleteMpMutation.mutate(point.id)}
+                                                disabled={deleteMpMutation.isPending || dialogLoading}
+                                                onClick={() => confirm({
+                                                    title: 'Delete Metering Point',
+                                                    message: `Are you sure you want to delete metering point "${point.meter_id}"? This action cannot be undone.`,
+                                                    confirmText: 'Delete Metering Point',
+                                                    isDangerous: true,
+                                                    onConfirm: () => deleteMpMutation.mutate(point.id),
+                                                })}
                                             >
                                                 Delete
                                             </button>
@@ -557,8 +565,14 @@ export function MeteringPointsPage() {
                                                                 className="button danger"
                                                                 type="button"
                                                                 style={{ padding: '2px 8px', fontSize: '0.78rem' }}
-                                                                disabled={deleteAssignMutation.isPending}
-                                                                onClick={() => deleteAssignMutation.mutate(a.id)}
+                                                                disabled={deleteAssignMutation.isPending || dialogLoading}
+                                                                onClick={() => confirm({
+                                                                    title: 'Remove Assignment',
+                                                                    message: `Are you sure you want to remove the assignment for "${participantNameById.get(a.participant) ?? a.participant}"?`,
+                                                                    confirmText: 'Remove Assignment',
+                                                                    isDangerous: true,
+                                                                    onConfirm: () => deleteAssignMutation.mutate(a.id),
+                                                                })}
                                                             >
                                                                 Remove
                                                             </button>
@@ -581,6 +595,10 @@ export function MeteringPointsPage() {
                     })
                 )}
             </div>
+
+            {dialog && (
+                <ConfirmDialog {...dialog} isLoading={dialogLoading} onConfirm={handleConfirm} onCancel={handleCancel} />
+            )}
         </div>
     )
 }
