@@ -141,6 +141,19 @@ export interface ZevWizardInput extends Omit<ZevInput, 'owner'> {
     metering_points: OwnerMeteringPointInput[]
 }
 
+export interface RegisterInput {
+    username: string
+    email: string
+}
+
+export interface SelfSetupZevInput {
+    name: string
+    start_date: string
+    zev_type: 'zev' | 'vzev'
+    billing_interval: 'monthly' | 'quarterly' | 'semi_annual' | 'annual'
+    grid_operator?: string
+}
+
 export interface ZevWizardResult {
     zev: {
         id: string

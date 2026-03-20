@@ -221,3 +221,28 @@ def create_zev_with_owner_setup(*, zev_data: dict, owner_data: dict, metering_po
         'owner_participant_id': str(owner_participant.id),
         'metering_points': created_metering_points,
     }
+
+
+@transaction.atomic
+def create_zev_for_existing_owner(*, owner_user, zev_data: dict) -> dict:
+    """Create a ZEV + owner Participant for an already-authenticated self-registered user."""
+    from .models import Participant, Zev
+
+    zev = Zev.objects.create(owner=owner_user, **zev_data)
+    owner_participant = Participant.objects.create(
+        zev=zev,
+        user=owner_user,
+        first_name=owner_user.first_name,
+        last_name=owner_user.last_name,
+        email=owner_user.email,
+        phone=getattr(owner_user, 'phone', ''),
+        address_line1=getattr(owner_user, 'address_line1', ''),
+        address_line2=getattr(owner_user, 'address_line2', ''),
+        postal_code=getattr(owner_user, 'postal_code', ''),
+        city=getattr(owner_user, 'city', ''),
+        valid_from=zev.start_date,
+    )
+    return {
+        'zev': {'id': str(zev.id), 'name': zev.name},
+        'owner_participant_id': str(owner_participant.id),
+    }
