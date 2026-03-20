@@ -28,7 +28,7 @@ from invoices.tasks import send_invoice_email_task
 from invoices.serializers import InvoiceSerializer
 from metering.models import MeterReading, ReadingDirection, ReadingResolution
 from tariffs.models import BillingMode, EnergyType, Tariff, TariffCategory, TariffPeriod
-from zev.models import MeteringPoint, MeteringPointType, Participant, Zev
+from zev.models import MeteringPoint, MeteringPointAssignment, MeteringPointType, Participant, Zev
 
 
 # ---------------------------------------------------------------------------
@@ -430,6 +430,18 @@ class InvoicePeriodOverviewTests(TestCase):
             valid_from=date(2026, 1, 1),
         )
 
+        # Assignments define whose meter requires readings on which days.
+        MeteringPointAssignment.objects.create(
+            metering_point=self.mp_with_data,
+            participant=self.p_with_data,
+            valid_from=date(2026, 1, 1),
+        )
+        MeteringPointAssignment.objects.create(
+            metering_point=self.mp_missing_data,
+            participant=self.p_missing_data,
+            valid_from=date(2026, 1, 1),
+        )
+
         for day in range(1, 32):
             MeterReading.objects.create(
                 metering_point=self.mp_with_data,
@@ -508,6 +520,46 @@ class InvoicePeriodOverviewTests(TestCase):
         self.assertFalse(with_data_row["metering_data_complete"])
         self.assertEqual(with_data_row["missing_meter_ids"], ["CH-OVERVIEW-1"])
         self.assertEqual(with_data_row["missing_meter_details"], [{"meter_id": "CH-OVERVIEW-1", "missing_days": 1}])
+
+    def test_partial_period_assignment_only_requires_data_for_assigned_days(self):
+        """If an assignment covers only part of the period, only those days require readings."""
+        # Remove the full-period assignment for p_with_data and replace with a mid-month one.
+        MeteringPointAssignment.objects.filter(metering_point=self.mp_with_data).delete()
+        MeteringPointAssignment.objects.create(
+            metering_point=self.mp_with_data,
+            participant=self.p_with_data,
+            valid_from=date(2026, 1, 11),
+            valid_to=date(2026, 1, 20),
+        )
+        # Jan 1–31 readings exist; only Jan 11–20 (10 days) should be checked.
+        # All 10 assigned days have readings → complete.
+        auth(self.client, self.owner)
+        resp = self.client.get(
+            "/api/v1/invoices/invoices/period-overview/",
+            {"zev_id": str(self.zev.id), "period_start": "2026-01-01", "period_end": "2026-01-31"},
+        )
+        self.assertEqual(resp.status_code, 200)
+        rows_by_participant = {row["participant_name"]: row for row in resp.data["rows"]}
+        with_data_row = rows_by_participant[self.p_with_data.full_name]
+        self.assertTrue(with_data_row["metering_data_complete"])
+
+    def test_no_assignment_means_no_metering_required(self):
+        """A participant with no assignment in the period has no metering requirement (complete by absence)."""
+        # Remove the assignment for p_with_data so they have no assignment this period.
+        MeteringPointAssignment.objects.filter(metering_point=self.mp_with_data).delete()
+
+        auth(self.client, self.owner)
+        resp = self.client.get(
+            "/api/v1/invoices/invoices/period-overview/",
+            {"zev_id": str(self.zev.id), "period_start": "2026-01-01", "period_end": "2026-01-31"},
+        )
+        self.assertEqual(resp.status_code, 200)
+        rows_by_participant = {row["participant_name"]: row for row in resp.data["rows"]}
+        with_data_row = rows_by_participant[self.p_with_data.full_name]
+        # No assignments → total_metering_points == 0 → metering_data_complete is False
+        # (can't be complete if there are no meters at all)
+        self.assertFalse(with_data_row["metering_data_complete"])
+        self.assertEqual(with_data_row["metering_points_total"], 0)
 
 
 class InvoiceMathEdgeCaseTests(TestCase):

@@ -8,7 +8,7 @@ from accounts.permissions import IsZevOwnerOrAdmin
 from django.db.models import Count, Q, Sum, F, DecimalField
 from django.conf import settings
 from pathlib import Path
-from zev.models import Zev, Participant, MeteringPoint
+from zev.models import Zev, Participant, MeteringPoint, MeteringPointAssignment
 from metering.models import MeterReading
 from .models import Invoice, InvoiceStatus, EmailLog
 from .serializers import (
@@ -150,26 +150,22 @@ class InvoiceViewSet(viewsets.ModelViewSet):
 
         rows = []
         for participant in participants:
-            participant_effective_start = max(period_start, participant.valid_from)
-            participant_effective_end = min(
-                period_end,
-                participant.valid_to if participant.valid_to is not None else period_end,
-            )
-
-            participant_metering_points = list(
-                MeteringPoint.objects.filter(
-                    zev=zev,
+            # Find all metering point assignments for this participant that overlap the period.
+            # Each assignment's valid_from/valid_to defines the exact days where readings are required.
+            assignments = list(
+                MeteringPointAssignment.objects.filter(
                     participant=participant,
-                    is_active=True,
                     valid_from__lte=period_end,
                 ).filter(
                     Q(valid_to__isnull=True) | Q(valid_to__gte=period_start)
-                )
+                ).select_related("metering_point")
             )
 
+            # Fetch all readings for the involved metering points within the period, grouped by MP.
+            assignment_mp_ids = [a.metering_point_id for a in assignments]
             readings_by_metering_point = {}
             for metering_point_id, timestamp in MeterReading.objects.filter(
-                metering_point__in=participant_metering_points,
+                metering_point_id__in=assignment_mp_ids,
                 timestamp__gte=period_start_dt,
                 timestamp__lt=period_end_exclusive_dt,
             ).values_list("metering_point_id", "timestamp"):
@@ -177,20 +173,22 @@ class InvoiceViewSet(viewsets.ModelViewSet):
 
             missing_meter_ids = []
             missing_meter_details = []
-            for mp in participant_metering_points:
-                mp_effective_start = max(participant_effective_start, mp.valid_from)
-                mp_effective_end = min(
-                    participant_effective_end,
-                    mp.valid_to if mp.valid_to is not None else participant_effective_end,
+            for assignment in assignments:
+                mp = assignment.metering_point
+                # Effective required window: intersection of billing period and assignment validity.
+                effective_start = max(period_start, assignment.valid_from)
+                effective_end = min(
+                    period_end,
+                    assignment.valid_to if assignment.valid_to is not None else period_end,
                 )
 
-                if mp_effective_start > mp_effective_end:
+                if effective_start > effective_end:
                     continue
 
                 reading_days = readings_by_metering_point.get(mp.id, set())
-                cursor = mp_effective_start
+                cursor = effective_start
                 missing_days = 0
-                while cursor <= mp_effective_end:
+                while cursor <= effective_end:
                     if cursor not in reading_days:
                         missing_days += 1
                     cursor = cursor + timedelta(days=1)
@@ -204,7 +202,7 @@ class InvoiceViewSet(viewsets.ModelViewSet):
                         }
                     )
 
-            total_metering_points = len(participant_metering_points)
+            total_metering_points = len(assignments)
             metering_points_with_data = total_metering_points - len(missing_meter_ids)
             metering_data_complete = total_metering_points > 0 and metering_points_with_data == total_metering_points
 
