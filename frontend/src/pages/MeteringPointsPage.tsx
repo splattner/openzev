@@ -1,6 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useMemo, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
+import dayjs from 'dayjs'
+import { DatePicker } from '@mui/x-date-pickers/DatePicker'
+import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs'
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider'
 import { FormModal } from '../components/FormModal'
 import {
     createMeteringPoint,
@@ -14,7 +18,7 @@ import {
     updateMeteringPoint,
     updateMeteringPointAssignment,
 } from '../lib/api'
-import { formatShortDate, useAppSettings } from '../lib/appSettings'
+import { formatShortDate, toDayJsDateFormat, useAppSettings } from '../lib/appSettings'
 import { useAuth } from '../lib/auth'
 import { useManagedZev } from '../lib/managedZev'
 import { useToast } from '../lib/toast'
@@ -303,20 +307,25 @@ export function MeteringPointsPage() {
 
                     <label>
                         <span>Valid from *</span>
-                        <input
-                            type="date"
-                            value={mpForm.valid_from}
-                            onChange={(e) => setMpForm((prev) => ({ ...prev, valid_from: e.target.value }))}
-                            required
-                        />
+                        <LocalizationProvider dateAdapter={AdapterDayjs}>
+                            <DatePicker
+                                format={toDayJsDateFormat(settings.date_format_short)}
+                                value={mpForm.valid_from ? dayjs(mpForm.valid_from) : null}
+                                onChange={(v) => setMpForm((prev) => ({ ...prev, valid_from: v ? v.format('YYYY-MM-DD') : '' }))}
+                                slotProps={{ textField: { required: true, size: 'small' } }}
+                            />
+                        </LocalizationProvider>
                     </label>
                     <label>
                         <span>Valid to</span>
-                        <input
-                            type="date"
-                            value={mpForm.valid_to ?? ''}
-                            onChange={(e) => setMpForm((prev) => ({ ...prev, valid_to: e.target.value || null }))}
-                        />
+                        <LocalizationProvider dateAdapter={AdapterDayjs}>
+                            <DatePicker
+                                format={toDayJsDateFormat(settings.date_format_short)}
+                                value={mpForm.valid_to ? dayjs(mpForm.valid_to) : null}
+                                onChange={(v) => setMpForm((prev) => ({ ...prev, valid_to: v ? v.format('YYYY-MM-DD') : null }))}
+                                slotProps={{ textField: { size: 'small' } }}
+                            />
+                        </LocalizationProvider>
                     </label>
 
                     <label style={{ gridColumn: '1 / -1' }}>
@@ -371,20 +380,25 @@ export function MeteringPointsPage() {
 
                     <label>
                         <span>Valid from *</span>
-                        <input
-                            type="date"
-                            value={assignForm.valid_from}
-                            onChange={(e) => setAssignForm((prev) => ({ ...prev, valid_from: e.target.value }))}
-                            required
-                        />
+                        <LocalizationProvider dateAdapter={AdapterDayjs}>
+                            <DatePicker
+                                format={toDayJsDateFormat(settings.date_format_short)}
+                                value={assignForm.valid_from ? dayjs(assignForm.valid_from) : null}
+                                onChange={(v) => setAssignForm((prev) => ({ ...prev, valid_from: v ? v.format('YYYY-MM-DD') : '' }))}
+                                slotProps={{ textField: { required: true, size: 'small' } }}
+                            />
+                        </LocalizationProvider>
                     </label>
                     <label>
                         <span>Valid to</span>
-                        <input
-                            type="date"
-                            value={assignForm.valid_to ?? ''}
-                            onChange={(e) => setAssignForm((prev) => ({ ...prev, valid_to: e.target.value || null }))}
-                        />
+                        <LocalizationProvider dateAdapter={AdapterDayjs}>
+                            <DatePicker
+                                format={toDayJsDateFormat(settings.date_format_short)}
+                                value={assignForm.valid_to ? dayjs(assignForm.valid_to) : null}
+                                onChange={(v) => setAssignForm((prev) => ({ ...prev, valid_to: v ? v.format('YYYY-MM-DD') : null }))}
+                                slotProps={{ textField: { size: 'small' } }}
+                            />
+                        </LocalizationProvider>
                     </label>
 
                     <p className="muted" style={{ gridColumn: '1 / -1', margin: 0, fontSize: '0.82rem' }}>

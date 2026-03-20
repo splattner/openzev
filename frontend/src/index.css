@@ -568,8 +568,32 @@ th {
   gap: 1rem;
 }
 
+.grid-2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.grid-3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .grid-4 {
   grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.form-section {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.form-section-header {
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: #64748b;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid #e2e8f0;
 }
 
 .card,
@@ -833,6 +857,10 @@ h3 {
 }
 
 @media (max-width: 1100px) {
+  .grid-3 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .grid-4 {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -853,6 +881,8 @@ h3 {
 }
 
 @media (max-width: 640px) {
+  .grid-2,
+  .grid-3,
   .grid-4 {
     grid-template-columns: 1fr;
   }

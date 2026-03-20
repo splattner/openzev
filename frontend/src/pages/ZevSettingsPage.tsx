@@ -59,7 +59,7 @@ export function ZevSettingsPage() {
             </header>
 
             <section className="card page-stack">
-                <form className="inline-form grid grid-3" onSubmit={submit}>
+                <form className="page-stack" onSubmit={submit}>
                     <ZevGeneralSettingsFields
                         form={form}
                         onChange={(patch) => setForm((previous) => ({ ...previous, ...patch }))}
