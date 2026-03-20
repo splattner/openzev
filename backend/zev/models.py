@@ -210,6 +210,37 @@ class MeteringPointAssignment(models.Model):
         if self.valid_to and self.valid_to < self.valid_from:
             raise ValidationError("valid_to must be on or after valid_from.")
 
+        # Only one assignment per metering point.
+        existing = MeteringPointAssignment.objects.filter(metering_point=self.metering_point)
+        if self.pk:
+            existing = existing.exclude(pk=self.pk)
+        if existing.exists():
+            raise ValidationError("A metering point can only have one participant assignment.")
+
+        # Dates must fall within the metering point's validity window.
+        if self.valid_from < self.metering_point.valid_from:
+            raise ValidationError(
+                f"Assignment valid_from cannot be before the metering point's "
+                f"valid_from ({self.metering_point.valid_from})."
+            )
+        if self.valid_to and self.metering_point.valid_to and self.valid_to > self.metering_point.valid_to:
+            raise ValidationError(
+                f"Assignment valid_to cannot be after the metering point's "
+                f"valid_to ({self.metering_point.valid_to})."
+            )
+
+        # Dates must fall within the participant's validity window.
+        if self.valid_from < self.participant.valid_from:
+            raise ValidationError(
+                f"Assignment valid_from cannot be before the participant's "
+                f"valid_from ({self.participant.valid_from})."
+            )
+        if self.valid_to and self.participant.valid_to and self.valid_to > self.participant.valid_to:
+            raise ValidationError(
+                f"Assignment valid_to cannot be after the participant's "
+                f"valid_to ({self.participant.valid_to})."
+            )
+
     def __str__(self):
         valid_to = self.valid_to.isoformat() if self.valid_to else "open"
         return f"{self.metering_point.meter_id} → {self.participant.full_name} ({self.valid_from} - {valid_to})"

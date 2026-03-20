@@ -402,3 +402,180 @@ class ZevOwnerRoleSyncTests(TestCase):
 		self.owner.refresh_from_db()
 		self.assertEqual(self.participant_user.role, UserRole.ZEV_OWNER)
 		self.assertEqual(self.owner.role, UserRole.PARTICIPANT)
+
+
+class MeteringPointAssignmentValidationTests(TestCase):
+	"""Tests for metering point assignment validation rules."""
+
+	def setUp(self):
+		self.client = APIClient()
+		self.admin = make_user("admin_assign_val", UserRole.ADMIN)
+		self.zev = Zev.objects.create(
+			name="Validation ZEV",
+			owner=self.admin,
+			zev_type="vzev",
+			invoice_prefix="V",
+		)
+		# Participant valid 2026-03-01 → 2026-12-31
+		self.participant = Participant.objects.create(
+			zev=self.zev,
+			first_name="Val",
+			last_name="Participant",
+			email="val@example.com",
+			valid_from=date(2026, 3, 1),
+			valid_to=date(2026, 12, 31),
+		)
+		# Second participant for duplicate-assignment test
+		self.participant2 = Participant.objects.create(
+			zev=self.zev,
+			first_name="Second",
+			last_name="Participant",
+			email="second@example.com",
+			valid_from=date(2026, 1, 1),
+		)
+		# Metering point valid 2026-02-01 → 2026-11-30
+		self.mp = MeteringPoint.objects.create(
+			zev=self.zev,
+			meter_id="VAL-MP-1",
+			meter_type=MeteringPointType.CONSUMPTION,
+			valid_from=date(2026, 2, 1),
+			valid_to=date(2026, 11, 30),
+		)
+		auth(self.client, self.admin)
+
+	def _post_assignment(self, payload):
+		return self.client.post(
+			"/api/v1/zev/metering-point-assignments/",
+			payload,
+			format="json",
+		)
+
+	# ------------------------------------------------------------------ #
+	# Rule 1: only one assignment per metering point                       #
+	# ------------------------------------------------------------------ #
+
+	def test_first_assignment_is_accepted(self):
+		resp = self._post_assignment({
+			"metering_point": str(self.mp.id),
+			"participant": str(self.participant.id),
+			"valid_from": "2026-03-01",
+		})
+		self.assertEqual(resp.status_code, 201)
+
+	def test_second_assignment_to_same_metering_point_is_rejected(self):
+		MeteringPointAssignment.objects.create(
+			metering_point=self.mp,
+			participant=self.participant,
+			valid_from=date(2026, 3, 1),
+		)
+		resp = self._post_assignment({
+			"metering_point": str(self.mp.id),
+			"participant": str(self.participant2.id),
+			"valid_from": "2026-06-01",
+		})
+		self.assertEqual(resp.status_code, 400)
+		self.assertIn("one participant assignment", str(resp.data).lower())
+
+	# ------------------------------------------------------------------ #
+	# Rule 2 & 3: assignment dates within metering point validity          #
+	# ------------------------------------------------------------------ #
+
+	def test_assignment_valid_from_before_mp_valid_from_is_rejected(self):
+		resp = self._post_assignment({
+			"metering_point": str(self.mp.id),
+			"participant": str(self.participant2.id),
+			"valid_from": "2026-01-01",  # mp starts 2026-02-01
+		})
+		self.assertEqual(resp.status_code, 400)
+		self.assertIn("valid_from", resp.data)
+
+	def test_assignment_valid_from_equal_to_mp_valid_from_is_accepted(self):
+		resp = self._post_assignment({
+			"metering_point": str(self.mp.id),
+			"participant": str(self.participant2.id),
+			"valid_from": "2026-02-01",  # exactly mp.valid_from
+		})
+		self.assertEqual(resp.status_code, 201)
+
+	def test_assignment_valid_to_after_mp_valid_to_is_rejected(self):
+		resp = self._post_assignment({
+			"metering_point": str(self.mp.id),
+			"participant": str(self.participant2.id),
+			"valid_from": "2026-02-01",
+			"valid_to": "2026-12-31",  # mp ends 2026-11-30
+		})
+		self.assertEqual(resp.status_code, 400)
+		self.assertIn("valid_to", resp.data)
+
+	def test_assignment_valid_to_equal_to_mp_valid_to_is_accepted(self):
+		resp = self._post_assignment({
+			"metering_point": str(self.mp.id),
+			"participant": str(self.participant2.id),
+			"valid_from": "2026-02-01",
+			"valid_to": "2026-11-30",  # exactly mp.valid_to
+		})
+		self.assertEqual(resp.status_code, 201)
+
+	def test_assignment_open_end_when_mp_has_valid_to_is_accepted(self):
+		# valid_to not set on assignment → no upper-bound check against mp
+		resp = self._post_assignment({
+			"metering_point": str(self.mp.id),
+			"participant": str(self.participant2.id),
+			"valid_from": "2026-02-01",
+		})
+		self.assertEqual(resp.status_code, 201)
+
+	# ------------------------------------------------------------------ #
+	# Rule 4 & 5: assignment dates within participant validity             #
+	# ------------------------------------------------------------------ #
+
+	def test_assignment_valid_from_before_participant_valid_from_is_rejected(self):
+		# participant starts 2026-03-01; mp starts 2026-02-01
+		resp = self._post_assignment({
+			"metering_point": str(self.mp.id),
+			"participant": str(self.participant.id),
+			"valid_from": "2026-02-15",  # after mp start, but before participant start
+		})
+		self.assertEqual(resp.status_code, 400)
+		self.assertIn("valid_from", resp.data)
+
+	def test_assignment_valid_from_equal_to_participant_valid_from_is_accepted(self):
+		resp = self._post_assignment({
+			"metering_point": str(self.mp.id),
+			"participant": str(self.participant.id),
+			"valid_from": "2026-03-01",  # exactly participant.valid_from
+		})
+		self.assertEqual(resp.status_code, 201)
+
+	def test_assignment_valid_to_after_participant_valid_to_is_rejected(self):
+		# participant ends 2026-12-31; mp ends 2026-11-30
+		resp = self._post_assignment({
+			"metering_point": str(self.mp.id),
+			"participant": str(self.participant.id),
+			"valid_from": "2026-03-01",
+			"valid_to": "2027-01-31",  # after participant.valid_to
+		})
+		self.assertEqual(resp.status_code, 400)
+		self.assertIn("valid_to", resp.data)
+
+	def test_assignment_valid_to_equal_to_participant_valid_to_is_accepted(self):
+		resp = self._post_assignment({
+			"metering_point": str(self.mp.id),
+			"participant": str(self.participant.id),
+			"valid_from": "2026-03-01",
+			"valid_to": "2026-11-30",  # within both mp (ends 11-30) and participant (ends 12-31)
+		})
+		self.assertEqual(resp.status_code, 201)
+
+	def test_update_assignment_does_not_conflict_with_itself(self):
+		assignment = MeteringPointAssignment.objects.create(
+			metering_point=self.mp,
+			participant=self.participant,
+			valid_from=date(2026, 3, 1),
+		)
+		resp = self.client.patch(
+			f"/api/v1/zev/metering-point-assignments/{assignment.id}/",
+			{"valid_to": "2026-11-30"},
+			format="json",
+		)
+		self.assertEqual(resp.status_code, 200)

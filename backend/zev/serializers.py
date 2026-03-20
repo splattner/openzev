@@ -1,4 +1,3 @@
-from django.db.models import Q
 from rest_framework import serializers
 from .models import Zev, Participant, MeteringPoint, MeteringPointAssignment
 from accounts.models import UserRole
@@ -40,20 +39,56 @@ class MeteringPointAssignmentSerializer(serializers.ModelSerializer):
         if valid_to and valid_from and valid_to < valid_from:
             raise serializers.ValidationError({"valid_to": "valid_to must be on or after valid_from."})
 
-        if metering_point and valid_from:
-            overlap_filter = Q(valid_to__isnull=True) | Q(valid_to__gte=valid_from)
-            if valid_to is not None:
-                overlap_filter &= Q(valid_from__lte=valid_to)
-
-            overlapping = MeteringPointAssignment.objects.filter(
-                metering_point=metering_point,
-            ).filter(overlap_filter)
-
+        # Only one assignment per metering point is allowed.
+        if metering_point:
+            existing = MeteringPointAssignment.objects.filter(metering_point=metering_point)
             if self.instance:
-                overlapping = overlapping.exclude(pk=self.instance.pk)
-            if overlapping.exists():
+                existing = existing.exclude(pk=self.instance.pk)
+            if existing.exists():
                 raise serializers.ValidationError(
-                    "Assignment period overlaps with an existing assignment for this metering point."
+                    "A metering point can only have one participant assignment."
+                )
+
+        # Assignment dates must fall within the metering point's validity window.
+        if metering_point and valid_from:
+            if valid_from < metering_point.valid_from:
+                raise serializers.ValidationError(
+                    {
+                        "valid_from": (
+                            "Assignment valid_from cannot be before the metering point's "
+                            f"valid_from ({metering_point.valid_from})."
+                        )
+                    }
+                )
+            if valid_to and metering_point.valid_to and valid_to > metering_point.valid_to:
+                raise serializers.ValidationError(
+                    {
+                        "valid_to": (
+                            "Assignment valid_to cannot be after the metering point's "
+                            f"valid_to ({metering_point.valid_to})."
+                        )
+                    }
+                )
+
+        # Assignment dates must fall within the participant's validity window.
+        if participant and valid_from:
+            if valid_from < participant.valid_from:
+                raise serializers.ValidationError(
+                    {
+                        "valid_from": (
+                            "Assignment valid_from cannot be before the participant's "
+                            f"valid_from ({participant.valid_from})."
+                        )
+                    }
+                )
+            if valid_to and participant.valid_to and valid_to > participant.valid_to:
+                raise serializers.ValidationError(
+                    {
+                        "valid_to": (
+                            "Assignment valid_to cannot be after the participant's "
+                            f"valid_to ({participant.valid_to})."
+                        )
+                    }
                 )
 
         return attrs
