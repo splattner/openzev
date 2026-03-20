@@ -21,11 +21,17 @@ from .permissions import (
     ParticipantManagementPermission,
     ZevManagementPermission,
 )
-from .services import send_participant_invitation
+from .services import send_participant_invitation, create_zev_for_existing_owner
 
 
 class ZevViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated, ZevManagementPermission]
+
+    def get_permissions(self):
+        # self_setup is a POST by non-admins — skip ZevManagementPermission
+        if self.action == "self_setup":
+            return [IsAuthenticated()]
+        return super().get_permissions()
 
     def get_queryset(self):
         user = self.request.user
@@ -55,6 +61,21 @@ class ZevViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         result = serializer.save()
+        return Response(result, status=status.HTTP_201_CREATED)
+
+    @action(detail=False, methods=["post"], url_path="self-setup")
+    def self_setup(self, request):
+        """Create a ZEV for the authenticated self-registered zev_owner."""
+        user = request.user
+        if not user.is_zev_owner:
+            return Response({"detail": "Only ZEV owners can use this endpoint."}, status=status.HTTP_403_FORBIDDEN)
+        if Zev.objects.filter(owner=user).exists():
+            return Response({"detail": "You already have a ZEV."}, status=status.HTTP_400_BAD_REQUEST)
+
+        serializer = ZevSerializer(data=request.data, context=self.get_serializer_context())
+        serializer.is_valid(raise_exception=True)
+        zev_data = {k: v for k, v in serializer.validated_data.items() if k != 'owner'}
+        result = create_zev_for_existing_owner(owner_user=user, zev_data=zev_data)
         return Response(result, status=status.HTTP_201_CREATED)
 
 

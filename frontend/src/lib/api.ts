@@ -22,6 +22,8 @@ import type {
     ParticipantAccountCreateResult,
     ParticipantInput,
     PdfTemplateResponse,
+    RegisterInput,
+    SelfSetupZevInput,
     Tariff,
     TariffInput,
     TariffPreset,
@@ -176,6 +178,28 @@ export async function changePassword(oldPassword: string, newPassword: string): 
         old_password: oldPassword,
         new_password: newPassword,
     })
+    return data
+}
+
+export async function register(payload: RegisterInput): Promise<{ detail: string }> {
+    const { data } = await api.post<{ detail: string }>('/auth/register/', payload)
+    return data
+}
+
+export async function verifyEmail(token: string): Promise<AuthTokens> {
+    const { data } = await api.post<AuthTokens>('/auth/verify-email/', { token })
+    return data
+}
+
+export async function setInitialPassword(newPassword: string): Promise<AuthTokens> {
+    const { data } = await api.post<AuthTokens>('/auth/me/set-initial-password/', { new_password: newPassword })
+    return data
+}
+
+export async function createSelfSetupZev(
+    payload: SelfSetupZevInput,
+): Promise<{ zev: { id: string; name: string }; owner_participant_id: string }> {
+    const { data } = await api.post('/zev/zevs/self-setup/', payload)
     return data
 }
 

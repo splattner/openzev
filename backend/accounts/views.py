@@ -3,10 +3,16 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
 from rest_framework.exceptions import PermissionDenied, ValidationError
+import secrets
+from urllib.parse import urlencode
+from django.conf import settings
+from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
+from django.core.mail import EmailMessage
+from django.utils import timezone
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView
-from .models import User, UserRole
+from .models import User, UserRole, EmailVerificationToken
 from .serializers import (
     UserSerializer, UserCreateSerializer,
     ChangePasswordSerializer, CustomTokenObtainPairSerializer,
@@ -154,3 +160,124 @@ def impersonate_participant(request, user_id: int):
         },
         status=status.HTTP_200_OK,
     )
+
+
+@api_view(["POST"])
+@permission_classes([AllowAny])
+def register(request):
+    """Self-registration: create a pending zev_owner account and send a verification email."""
+    username = request.data.get("username", "").strip()
+    email = request.data.get("email", "").strip()
+
+    errors = {}
+    if not username:
+        errors["username"] = "Username is required."
+    if not email:
+        errors["email"] = "Email is required."
+    if errors:
+        return Response(errors, status=status.HTTP_400_BAD_REQUEST)
+
+    if User.objects.filter(username=username).exists():
+        return Response({"username": "This username is already taken."}, status=status.HTTP_400_BAD_REQUEST)
+    if User.objects.filter(email__iexact=email).exists():
+        return Response({"email": "An account with this email already exists."}, status=status.HTTP_400_BAD_REQUEST)
+
+    user = User.objects.create_user(
+        username=username,
+        email=email,
+        role=UserRole.ZEV_OWNER,
+        is_active=False,
+        must_change_password=True,
+    )
+    user.set_unusable_password()
+    user.save(update_fields=["password"])
+
+    token = EmailVerificationToken.objects.create(
+        user=user,
+        token=secrets.token_urlsafe(48),
+    )
+
+    frontend_url = settings.FRONTEND_URL.rstrip("/")
+    verify_url = f"{frontend_url}/verify-email?token={token.token}"
+
+    EmailMessage(
+        subject="Verify your OpenZEV account",
+        body=(
+            f"Hello {username},\n\n"
+            f"Thank you for registering with OpenZEV.\n"
+            f"Please verify your email address by clicking the link below:\n\n"
+            f"{verify_url}\n\n"
+            f"This link is valid for 24 hours.\n\n"
+            f"If you did not register for OpenZEV, please ignore this email.\n\n"
+            f"Best regards,\nOpenZEV"
+        ),
+        from_email=settings.DEFAULT_FROM_EMAIL,
+        to=[email],
+    ).send(fail_silently=False)
+
+    return Response({"detail": "Verification email sent. Please check your inbox."}, status=status.HTTP_201_CREATED)
+
+
+@api_view(["POST"])
+@permission_classes([AllowAny])
+def verify_email(request):
+    """Consume a one-time verification token and return JWT tokens to auto-login the user."""
+    token_value = request.data.get("token", "").strip()
+    if not token_value:
+        return Response({"detail": "Token is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        token = EmailVerificationToken.objects.select_related("user").get(token=token_value)
+    except EmailVerificationToken.DoesNotExist:
+        return Response({"detail": "Invalid or expired verification link."}, status=status.HTTP_400_BAD_REQUEST)
+
+    if not token.is_valid():
+        return Response(
+            {"detail": "This verification link has expired or already been used."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    token.consumed_at = timezone.now()
+    token.save(update_fields=["consumed_at"])
+
+    user = token.user
+    user.is_active = True
+    user.save(update_fields=["is_active"])
+
+    refresh = RefreshToken.for_user(user)
+    return Response({
+        "access": str(refresh.access_token),
+        "refresh": str(refresh),
+    })
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def set_initial_password(request):
+    """Set a password for a freshly verified account that has no usable password yet."""
+    new_password = request.data.get("new_password", "")
+    if not new_password:
+        return Response({"detail": "new_password is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+    user = request.user
+    if not (user.must_change_password or not user.has_usable_password()):
+        return Response(
+            {"detail": "Use the change-password endpoint instead."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    try:
+        validate_password(new_password, user=user)
+    except DjangoValidationError as exc:
+        return Response({"detail": exc.messages}, status=status.HTTP_400_BAD_REQUEST)
+
+    user.set_password(new_password)
+    user.must_change_password = False
+    user.save(update_fields=["password", "must_change_password"])
+
+    # Return fresh tokens so the frontend can stay logged in
+    refresh = RefreshToken.for_user(user)
+    return Response({
+        "access": str(refresh.access_token),
+        "refresh": str(refresh),
+    })

@@ -1,9 +1,10 @@
-from datetime import date
+from datetime import date, timedelta
 
 from django.contrib.auth.models import AbstractUser
 from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
+from django.utils import timezone
 
 
 class UserRole(models.TextChoices):
@@ -38,6 +39,26 @@ class User(AbstractUser):
 
     def __str__(self):
         return f"{self.get_full_name() or self.username} <{self.email}>"
+
+
+class EmailVerificationToken(models.Model):
+    """One-time email verification token for self-registered accounts."""
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='email_verification_tokens',
+    )
+    token = models.CharField(max_length=64, unique=True, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    consumed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def is_valid(self) -> bool:
+        if self.consumed_at:
+            return False
+        return timezone.now() < self.created_at + timedelta(hours=24)
 
 
 class AppSettings(models.Model):

@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { fetchMe, impersonateParticipant as impersonateParticipantRequest, login as loginRequest } from './api'
-import type { User } from '../types/api'
+import type { AuthTokens, User } from '../types/api'
 
 interface AuthContextValue {
     user: User | null
@@ -9,6 +9,7 @@ interface AuthContextValue {
     isImpersonating: boolean
     impersonator: User | null
     login: (username: string, password: string) => Promise<User>
+    storeTokens: (tokens: AuthTokens) => void
     refreshUser: () => Promise<User>
     startImpersonation: (participantUserId: number) => Promise<void>
     stopImpersonation: () => Promise<void>
@@ -76,6 +77,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 localStorage.removeItem(IMPERSONATOR_KEY)
                 setImpersonator(null)
                 return loadCurrentUser()
+            },
+            storeTokens(tokens: AuthTokens) {
+                localStorage.setItem(ACCESS_KEY, tokens.access)
+                localStorage.setItem(REFRESH_KEY, tokens.refresh)
             },
             refreshUser() {
                 return loadCurrentUser()

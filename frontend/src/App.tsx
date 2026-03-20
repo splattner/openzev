@@ -18,6 +18,7 @@ import { MeteringPointsPage } from './pages/MeteringPointsPage'
 import { NotFoundPage } from './pages/NotFoundPage'
 import { ParticipantsPage } from './pages/ParticipantsPage'
 import { TariffsPage } from './pages/TariffsPage'
+import { VerifyEmailPage } from './pages/VerifyEmailPage'
 import { ZevListPage } from './pages/ZevListPage'
 import { ZevSettingsPage } from './pages/ZevSettingsPage'
 
@@ -26,6 +27,7 @@ function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/verify-email" element={<VerifyEmailPage />} />
         <Route
           path="/"
           element={
