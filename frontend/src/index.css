@@ -893,3 +893,59 @@ h3 {
     overflow-x: auto;
   }
 }
+
+.app-footer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  color: #64748b;
+  font-size: 0.85rem;
+  padding: 0.75rem 0;
+}
+
+.app-footer.compact {
+  font-size: 0.8rem;
+  padding: 0.35rem 0;
+}
+
+.app-footer-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: inherit;
+}
+
+.app-footer-link svg {
+  display: block;
+  opacity: 0.85;
+}
+
+.app-footer-text {
+  font-weight: 600;
+}
+
+.app-footer-version {
+  color: #94a3b8;
+}
+
+/* Position footer inside login-shell at bottom center */
+.login-shell {
+  position: relative;
+}
+.login-shell > .app-footer {
+  position: absolute;
+  bottom: 1.25rem;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+/* Ensure footer sits below content in main layout */
+.content {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+.content > .app-footer {
+  margin-top: auto;
+}

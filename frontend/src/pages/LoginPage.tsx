@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react'
+import AppFooter from '../components/AppFooter'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '../lib/auth'
@@ -55,6 +56,7 @@ export function LoginPage() {
                     {loading ? t('common.loading') : t('auth.submit')}
                 </button>
             </form>
+            <AppFooter />
         </div>
     )
 }

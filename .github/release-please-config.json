@@ -3,7 +3,10 @@
   "packages": {
     ".": {
       "release-type": "simple",
-      "changelog-path": "CHANGELOG.md"
+      "changelog-path": "CHANGELOG.md",
+      "extra-files": [
+        "frontend/package.json"
+      ]
     }
   }
 }
