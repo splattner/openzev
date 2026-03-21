@@ -54,11 +54,6 @@ def sync_participant_user_fields(participant, user) -> None:
     user.email = participant.email
     user.first_name = participant.first_name
     user.last_name = participant.last_name
-    user.phone = participant.phone
-    user.address_line1 = participant.address_line1
-    user.address_line2 = participant.address_line2
-    user.postal_code = participant.postal_code
-    user.city = participant.city
 
 
 @transaction.atomic
@@ -72,11 +67,6 @@ def ensure_participant_account(participant):
                 'email',
                 'first_name',
                 'last_name',
-                'phone',
-                'address_line1',
-                'address_line2',
-                'postal_code',
-                'city',
             ]
         )
         return user, None
@@ -94,11 +84,6 @@ def ensure_participant_account(participant):
         email=participant.email,
         first_name=participant.first_name,
         last_name=participant.last_name,
-        phone=participant.phone,
-        address_line1=participant.address_line1,
-        address_line2=participant.address_line2,
-        postal_code=participant.postal_code,
-        city=participant.city,
         must_change_password=True,
     )
     participant.user = user
@@ -159,11 +144,6 @@ def create_zev_with_owner_setup(*, zev_data: dict, owner_data: dict, metering_po
         email=email,
         first_name=first_name,
         last_name=last_name,
-        phone=owner_data.get('phone', ''),
-        address_line1=owner_data.get('address_line1', ''),
-        address_line2=owner_data.get('address_line2', ''),
-        postal_code=owner_data.get('postal_code', ''),
-        city=owner_data.get('city', ''),
         must_change_password=True,
     )
 
@@ -235,11 +215,6 @@ def create_zev_for_existing_owner(*, owner_user, zev_data: dict) -> dict:
         first_name=owner_user.first_name,
         last_name=owner_user.last_name,
         email=owner_user.email,
-        phone=getattr(owner_user, 'phone', ''),
-        address_line1=getattr(owner_user, 'address_line1', ''),
-        address_line2=getattr(owner_user, 'address_line2', ''),
-        postal_code=getattr(owner_user, 'postal_code', ''),
-        city=getattr(owner_user, 'city', ''),
         valid_from=zev.start_date,
     )
     return {

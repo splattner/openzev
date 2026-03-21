@@ -115,13 +115,12 @@ def _build_qr_svg(invoice) -> str | None:
     if not iban:
         return None
 
-    creditor_city = _normalize_text(getattr(invoice.zev.owner, "city", ""))
-
+    owner_participant = invoice.zev.participants.filter(user=invoice.zev.owner).first()
     creditor = _build_qr_party(
-        name=invoice.zev.name,
-        line1=invoice.zev.address_line1,
-        postal_code=invoice.zev.postal_code,
-        city=creditor_city,
+        name=owner_participant.full_name if owner_participant else invoice.zev.name,
+        line1=owner_participant.address_line1 if owner_participant else "",
+        postal_code=owner_participant.postal_code if owner_participant else "",
+        city=owner_participant.city if owner_participant else "",
         role="creditor",
     )
     debtor = _build_qr_party(
@@ -161,13 +160,15 @@ def _build_template_context(invoice) -> dict:
     qr_svg = _build_qr_svg(invoice)
     items = list(invoice.items.all())
     app_settings = AppSettings.load()
-    creditor_city = _normalize_text(getattr(invoice.zev.owner, "city", ""))
+    owner_participant = invoice.zev.participants.filter(user=invoice.zev.owner).first()
+    creditor_city = _normalize_text(owner_participant.city if owner_participant else "")
 
     return {
         "invoice": invoice,
         "items": items,
         "grouped_items": _group_items_by_category(items, invoice.period_start, invoice.period_end),
         "zev": invoice.zev,
+        "owner_participant": owner_participant,
         "creditor_city": creditor_city,
         "participant": invoice.participant,
         "qr_svg": qr_svg,

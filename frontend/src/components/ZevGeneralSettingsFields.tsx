@@ -67,41 +67,6 @@ export function ZevGeneralSettingsFields({ form, onChange }: ZevGeneralSettingsF
                 </div>
             </div>
 
-            {/* Address */}
-            <div className="form-section">
-                <p className="form-section-header">Address</p>
-                <div className="inline-form grid grid-3">
-                    <label>
-                        <span>Address line 1</span>
-                        <input
-                            value={form.address_line1 ?? ''}
-                            onChange={(event) => onChange({ address_line1: event.target.value })}
-                        />
-                    </label>
-                    <label>
-                        <span>Address line 2</span>
-                        <input
-                            value={form.address_line2 ?? ''}
-                            onChange={(event) => onChange({ address_line2: event.target.value })}
-                        />
-                    </label>
-                    <label>
-                        <span>Postal code</span>
-                        <input
-                            value={form.postal_code ?? ''}
-                            onChange={(event) => onChange({ postal_code: event.target.value })}
-                        />
-                    </label>
-                    <label>
-                        <span>City</span>
-                        <input
-                            value={form.city ?? ''}
-                            onChange={(event) => onChange({ city: event.target.value })}
-                        />
-                    </label>
-                </div>
-            </div>
-
             {/* Grid Connection */}
             <div className="form-section">
                 <p className="form-section-header">Grid Connection</p>

@@ -262,9 +262,10 @@
             <div>
                 <div class="company-name">{{ zev.name }}</div>
                 <div class="company-meta">
-                    {{ zev.address_line1 }}{% if zev.address_line2 %}, {{ zev.address_line2 }}{% endif %}<br>
-                    {{ zev.postal_code }}{% if creditor_city %} {{ creditor_city }}{% endif %}<br>
-                    {% if zev.vat_number %}VAT: {{ zev.vat_number }}{% endif %}
+                    {% if owner_participant %}{{ owner_participant.full_name }}<br>
+                    {{ owner_participant.address_line1 }}{% if owner_participant.address_line2 %}, {{ owner_participant.address_line2 }}{% endif %}<br>
+                    {{ owner_participant.postal_code }}{% if owner_participant.city %} {{ owner_participant.city }}{% endif %}<br>
+                    {% endif %}{% if zev.vat_number %}VAT: {{ zev.vat_number }}{% endif %}
                 </div>
             </div>
             <div style="text-align:right">
@@ -299,9 +300,9 @@
         <div class="address-row">
             <div class="address-block">
                 <h3>From</h3>
-                <strong>{{ zev.name }}</strong><br>
-                {{ zev.address_line1 }}<br>
-                {{ zev.postal_code }}{% if creditor_city %} {{ creditor_city }}{% endif %}
+                <strong>{% if owner_participant %}{{ owner_participant.full_name }}{% else %}{{ zev.name }}{% endif %}</strong><br>
+                {% if owner_participant %}{{ owner_participant.address_line1 }}{% if owner_participant.address_line2 %}<br>{{ owner_participant.address_line2 }}{% endif %}<br>
+                {{ owner_participant.postal_code }}{% if owner_participant.city %} {{ owner_participant.city }}{% endif %}{% endif %}
             </div>
             <div class="address-block">
                 <h3>To</h3>
@@ -377,7 +378,7 @@
 
                 {% if zev.bank_iban %}
                 <dt style="margin-top: 3mm;">Bank Details:</dt>
-                <dd>{{ zev.name }}</dd>
+                <dd>{% if owner_participant %}{{ owner_participant.full_name }}{% else %}{{ zev.name }}{% endif %}</dd>
                 <dd>IBAN: {{ zev.bank_iban }}</dd>
                 <dd>Currency: CHF</dd>
                 <dd class="slip-info">Reference: Invoice {{ invoice.invoice_number }}</dd>
@@ -405,10 +406,10 @@
                 </div>
                 <div class="slip-block">
                     <strong>Remit Payment To</strong>
-                    {{ zev.name }}<br>
-                    {{ zev.address_line1 }}<br>
-                    {{ zev.postal_code }}{% if creditor_city %} {{ creditor_city }}{% endif %}<br>
-                    {% if zev.bank_iban %}<strong style="margin-top: 2mm; display: block;">IBAN: {{ zev.bank_iban
+                    {% if owner_participant %}{{ owner_participant.full_name }}{% else %}{{ zev.name }}{% endif %}<br>
+                    {% if owner_participant %}{{ owner_participant.address_line1 }}<br>
+                    {{ owner_participant.postal_code }}{% if owner_participant.city %} {{ owner_participant.city }}{% endif %}<br>
+                    {% endif %}{% if zev.bank_iban %}<strong style="margin-top: 2mm; display: block;">IBAN: {{ zev.bank_iban
                         }}</strong>{% endif %}
                 </div>
             </div>

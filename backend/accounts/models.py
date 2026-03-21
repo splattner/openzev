@@ -22,11 +22,6 @@ class User(AbstractUser):
         choices=UserRole.choices,
         default=UserRole.PARTICIPANT,
     )
-    phone = models.CharField(max_length=30, blank=True)
-    address_line1 = models.CharField(max_length=200, blank=True)
-    address_line2 = models.CharField(max_length=200, blank=True)
-    postal_code = models.CharField(max_length=10, blank=True)
-    city = models.CharField(max_length=100, blank=True)
     must_change_password = models.BooleanField(default=False)
 
     @property
