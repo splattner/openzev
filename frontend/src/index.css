@@ -667,6 +667,12 @@ h3 {
   color: #991b1b;
 }
 
+.badge-warning {
+  background: #fef9c3;
+  border-color: #fde047;
+  color: #854d0e;
+}
+
 .bullet-list {
   margin: 1rem 0 0;
   padding-left: 1.25rem;

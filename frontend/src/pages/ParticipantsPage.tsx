@@ -184,6 +184,15 @@ export function ParticipantsPage() {
         createMutation.mutate({ ...form, zev: zevForSubmit })
     }
 
+    function participantWarnings(participant: Participant): string[] {
+        const warnings: string[] = []
+        if (!participant.email) warnings.push('No email')
+        const hasAddress = !!(participant.address_line1 && participant.postal_code && participant.city)
+        if (!hasAddress) warnings.push('No address')
+        if (!participant.has_metering_point_assignment) warnings.push('No metering point')
+        return warnings
+    }
+
     if (isLoading) return <div className="card">Loading participants...</div>
     if (isError) return <div className="card error-banner">Failed to load participants.</div>
 
@@ -373,6 +382,13 @@ export function ParticipantsPage() {
                                                 <span className="badge badge-info" style={{ marginTop: '0.3rem' }}>
                                                     Owner
                                                 </span>
+                                            </div>
+                                        )}
+                                        {participantWarnings(participant).length > 0 && (
+                                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.25rem', marginTop: '0.3rem' }}>
+                                                {participantWarnings(participant).map((warning) => (
+                                                    <span key={warning} className="badge badge-warning">{warning}</span>
+                                                ))}
                                             </div>
                                         )}
                                     </td>
