@@ -18,11 +18,6 @@ export interface User {
     last_name: string
     role: UserRole
     must_change_password: boolean
-    phone?: string
-    address_line1?: string
-    address_line2?: string
-    postal_code?: string
-    city?: string
 }
 
 export interface UserInput {
@@ -31,11 +26,6 @@ export interface UserInput {
     first_name: string
     last_name: string
     role: UserRole
-    phone?: string
-    address_line1?: string
-    address_line2?: string
-    postal_code?: string
-    city?: string
     must_change_password?: boolean
 }
 
@@ -77,13 +67,9 @@ export interface Zev {
     start_date: string
     owner: number
     zev_type: 'zev' | 'vzev'
-    city?: string
     grid_operator: string
     grid_connection_point?: string
     billing_interval: string
-    address_line1?: string
-    address_line2?: string
-    postal_code?: string
     invoice_prefix?: string
     bank_iban?: string
     bank_name?: string
@@ -98,13 +84,9 @@ export interface ZevInput {
     start_date: string
     owner?: number
     zev_type: 'zev' | 'vzev'
-    city?: string
     grid_operator?: string
     grid_connection_point?: string
     billing_interval: 'monthly' | 'quarterly' | 'semi_annual' | 'annual'
-    address_line1?: string
-    address_line2?: string
-    postal_code?: string
     invoice_prefix?: string
     bank_iban?: string
     bank_name?: string

@@ -88,13 +88,6 @@ export function DashboardPage() {
                 <p className="muted">{t('dashboard.description')}</p>
             </header>
 
-            {user && !user.address_line1 && (
-                <div className="warning-banner">
-                    {t('dashboard.missingAddress')}{' '}
-                    <Link to="/account">{t('dashboard.missingAddressLink')}</Link>
-                </div>
-            )}
-
             {(user?.role === 'admin' || user?.role === 'zev_owner') && (
                 <section className="card">
                     <div className="inline-form grid grid-3">

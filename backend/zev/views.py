@@ -164,19 +164,9 @@ class ParticipantViewSet(viewsets.ModelViewSet):
             last_name=participant.last_name,
             email=(request.data.get("email") or participant.email or "").strip(),
         )
-        account.phone = participant.phone
-        account.address_line1 = participant.address_line1
-        account.address_line2 = participant.address_line2
-        account.postal_code = participant.postal_code
-        account.city = participant.city
         account.must_change_password = True
         account.save(
             update_fields=[
-                "phone",
-                "address_line1",
-                "address_line2",
-                "postal_code",
-                "city",
                 "must_change_password",
             ]
         )

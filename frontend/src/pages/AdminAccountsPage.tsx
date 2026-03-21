@@ -23,11 +23,6 @@ const defaultEditUserForm: UserInput = {
     first_name: '',
     last_name: '',
     role: 'participant',
-    phone: '',
-    address_line1: '',
-    address_line2: '',
-    postal_code: '',
-    city: '',
     must_change_password: false,
 }
 
@@ -168,11 +163,6 @@ export function AdminAccountsPage() {
             first_name: user.first_name || '',
             last_name: user.last_name || '',
             role: user.role,
-            phone: user.phone || '',
-            address_line1: user.address_line1 || '',
-            address_line2: user.address_line2 || '',
-            postal_code: user.postal_code || '',
-            city: user.city || '',
             must_change_password: user.must_change_password,
         })
         setEditUserError(null)
@@ -498,11 +488,6 @@ export function AdminAccountsPage() {
                             For safety, an admin cannot change the role of their own account.
                         </div>
                     )}
-                    <label>
-                        <span>Phone</span>
-                        <input value={editUserForm.phone ?? ''} onChange={(event) => setEditUserForm((previous) => ({ ...previous, phone: event.target.value }))} />
-                    </label>
-
                     {editUserError && <div className="error-banner" style={{ gridColumn: '1 / -1' }}>{editUserError}</div>}
 
                     <div style={{ gridColumn: '1 / -1', display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>

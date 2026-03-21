@@ -7,7 +7,7 @@ class CustomUserAdmin(UserAdmin):
     list_display = ("username", "email", "first_name", "last_name", "role", "is_active")
     list_filter = ("role", "is_active", "is_staff")
     fieldsets = UserAdmin.fieldsets + (
-        ("OpenZEV", {"fields": ("role", "phone", "address_line1", "address_line2", "postal_code", "city")}),
+        ("OpenZEV", {"fields": ("role", "must_change_password")}),
     )
     add_fieldsets = UserAdmin.add_fieldsets + (
         ("OpenZEV", {"fields": ("role", "email", "first_name", "last_name")}),

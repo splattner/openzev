@@ -18,11 +18,6 @@ export function AccountProfilePage() {
         email: user?.email || '',
         first_name: user?.first_name || '',
         last_name: user?.last_name || '',
-        phone: user?.phone || '',
-        address_line1: user?.address_line1 || '',
-        address_line2: user?.address_line2 || '',
-        postal_code: user?.postal_code || '',
-        city: user?.city || '',
     })
 
     // Password form state
@@ -37,11 +32,6 @@ export function AccountProfilePage() {
             email: user?.email || '',
             first_name: user?.first_name || '',
             last_name: user?.last_name || '',
-            phone: user?.phone || '',
-            address_line1: user?.address_line1 || '',
-            address_line2: user?.address_line2 || '',
-            postal_code: user?.postal_code || '',
-            city: user?.city || '',
         })
     }, [user])
 
@@ -172,56 +162,6 @@ export function AccountProfilePage() {
                                 value={profileForm.email}
                                 onChange={handleProfileChange}
                                 required
-                            />
-                        </div>
-
-                        <div className="form-group">
-                            <label>{t('account.phone')}</label>
-                            <input
-                                type="text"
-                                name="phone"
-                                value={profileForm.phone}
-                                onChange={handleProfileChange}
-                            />
-                        </div>
-
-                        <div className="form-group">
-                            <label>{t('account.addressLine1')}</label>
-                            <input
-                                type="text"
-                                name="address_line1"
-                                value={profileForm.address_line1}
-                                onChange={handleProfileChange}
-                            />
-                        </div>
-
-                        <div className="form-group">
-                            <label>{t('account.addressLine2')}</label>
-                            <input
-                                type="text"
-                                name="address_line2"
-                                value={profileForm.address_line2}
-                                onChange={handleProfileChange}
-                            />
-                        </div>
-
-                        <div className="form-group">
-                            <label>{t('account.postalCode')}</label>
-                            <input
-                                type="text"
-                                name="postal_code"
-                                value={profileForm.postal_code}
-                                onChange={handleProfileChange}
-                            />
-                        </div>
-
-                        <div className="form-group">
-                            <label>{t('account.city')}</label>
-                            <input
-                                type="text"
-                                name="city"
-                                value={profileForm.city}
-                                onChange={handleProfileChange}
                             />
                         </div>
 

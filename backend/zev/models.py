@@ -41,9 +41,6 @@ class Zev(models.Model):
     )
     grid_operator = models.CharField(max_length=200, blank=True, help_text="Name of the VNB (Verteilnetzbetreiber)")
     grid_connection_point = models.CharField(max_length=200, blank=True, help_text="Verknüpfungspunkt / EAN")
-    address_line1 = models.CharField(max_length=200, blank=True)
-    address_line2 = models.CharField(max_length=200, blank=True)
-    postal_code = models.CharField(max_length=10, blank=True)
     billing_interval = models.CharField(
         max_length=20, choices=BillingInterval.choices, default=BillingInterval.MONTHLY
     )

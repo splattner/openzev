@@ -18,7 +18,6 @@ class InvoicePdfQrTests(TestCase):
             username="pdf_owner",
             password="pass1234",
             role=UserRole.ZEV_OWNER,
-            city="Zuerich",
         )
         self.zev = Zev.objects.create(
             name="QR ZEV",
@@ -28,8 +27,17 @@ class InvoicePdfQrTests(TestCase):
             billing_interval="monthly",
             invoice_prefix="Q",
             bank_iban="CH9300762011623852957",
+        )
+        self.owner_participant = Participant.objects.create(
+            zev=self.zev,
+            user=self.owner,
+            first_name="Test",
+            last_name="Owner",
+            email="owner@example.com",
             address_line1="Bahnhofstrasse 1",
             postal_code="8001",
+            city="Zuerich",
+            valid_from=date(2026, 1, 1),
         )
         self.participant = Participant.objects.create(
             zev=self.zev,

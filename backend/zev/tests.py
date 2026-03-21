@@ -214,11 +214,9 @@ class ParticipantAccountLifecycleTests(TestCase):
 		self.assertTrue(resp.data["initial_password"])
 		self.assertTrue(participant.user.check_password(resp.data["initial_password"]))
 		self.assertTrue(participant.user.must_change_password)
-		self.assertEqual(participant.user.address_line1, "Main Street 1")
-		self.assertEqual(participant.user.city, "Zurich")
 		self.assertEqual(resp.data["title"], "ms")
 
-	def test_update_participant_syncs_contact_details_to_account(self):
+	def test_update_participant_saves_contact_details(self):
 		participant = Participant.objects.create(
 			zev=self.zev,
 			first_name="Nina",
@@ -242,9 +240,9 @@ class ParticipantAccountLifecycleTests(TestCase):
 
 		self.assertEqual(resp.status_code, 200)
 		participant.refresh_from_db()
-		self.assertEqual(participant.user.phone, "+41 79 111 11 11")
-		self.assertEqual(participant.user.address_line1, "Updated 2")
-		self.assertEqual(participant.user.city, "Bern")
+		self.assertEqual(participant.phone, "+41 79 111 11 11")
+		self.assertEqual(participant.address_line1, "Updated 2")
+		self.assertEqual(participant.city, "Bern")
 
 	def test_send_invitation_mail_resets_temporary_password(self):
 		resp_create = self.client.post(
