@@ -171,6 +171,8 @@ export interface Participant {
     notes?: string
     valid_from: string
     valid_to?: string | null
+    metering_points?: MeteringPoint[]
+    has_metering_point_assignment?: boolean
 }
 
 export interface ParticipantAccountCreateResult {

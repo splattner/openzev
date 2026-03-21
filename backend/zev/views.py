@@ -86,10 +86,10 @@ class ParticipantViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         user = self.request.user
         if user.is_admin:
-            return Participant.objects.all()
+            return Participant.objects.prefetch_related("metering_point_assignments")
         if user.is_zev_owner:
-            return Participant.objects.filter(zev__owner=user)
-        return Participant.objects.filter(user=user)
+            return Participant.objects.filter(zev__owner=user).prefetch_related("metering_point_assignments")
+        return Participant.objects.filter(user=user).prefetch_related("metering_point_assignments")
 
     @action(detail=True, methods=["post"], url_path="link-account")
     def link_account(self, request, pk=None):
@@ -239,6 +239,22 @@ class MeteringPointViewSet(viewsets.ModelViewSet):
 class MeteringPointAssignmentViewSet(viewsets.ModelViewSet):
     serializer_class = MeteringPointAssignmentSerializer
     permission_classes = [IsAuthenticated, MeteringPointAssignmentPermission]
+
+    def perform_destroy(self, instance):
+        metering_point_id = instance.metering_point_id
+        instance.delete()
+        # Re-sync the deprecated FK after the assignment is removed
+        open_assignment = (
+            MeteringPointAssignment.objects.filter(
+                metering_point_id=metering_point_id,
+                valid_to__isnull=True,
+            )
+            .order_by("-valid_from")
+            .first()
+        )
+        MeteringPoint.objects.filter(pk=metering_point_id).update(
+            participant=open_assignment.participant if open_assignment else None
+        )
 
     def get_queryset(self):
         user = self.request.user

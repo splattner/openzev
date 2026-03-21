@@ -122,9 +122,13 @@ class ParticipantSerializer(serializers.ModelSerializer):
     initial_password = serializers.SerializerMethodField()
     full_name = serializers.ReadOnlyField()
     metering_points = MeteringPointSerializer(many=True, read_only=True)
+    has_metering_point_assignment = serializers.SerializerMethodField()
 
     def get_initial_password(self, obj):
         return getattr(obj, "_initial_password", None)
+
+    def get_has_metering_point_assignment(self, obj):
+        return obj.metering_point_assignments.exists()
 
     def validate(self, attrs):
         if "user" in attrs:
@@ -174,6 +178,7 @@ class ParticipantSerializer(serializers.ModelSerializer):
             "valid_to",
             "notes",
             "metering_points",
+            "has_metering_point_assignment",
             "created_at",
             "updated_at",
         ]
@@ -184,6 +189,7 @@ class ParticipantSerializer(serializers.ModelSerializer):
             "initial_password",
             "full_name",
             "metering_points",
+            "has_metering_point_assignment",
             "created_at",
             "updated_at",
         ]
