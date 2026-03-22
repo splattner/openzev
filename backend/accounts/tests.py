@@ -117,13 +117,16 @@ class LinkedAccountSafetyTests(TestCase):
 
 		self._auth(self.client, self.admin)
 
-	def test_admin_cannot_edit_linked_account(self):
+	def test_admin_can_edit_linked_account(self):
 		resp = self.client.patch(
 			f"/api/v1/auth/users/{self.linked_account.id}/",
-			{"first_name": "Blocked"},
+			{"first_name": "Updated", "role": "zev_owner"},
 			format="json",
 		)
-		self.assertEqual(resp.status_code, 403)
+		self.assertEqual(resp.status_code, 200)
+		self.linked_account.refresh_from_db()
+		self.assertEqual(self.linked_account.first_name, "Updated")
+		self.assertEqual(self.linked_account.role, "zev_owner")
 
 	def test_admin_cannot_delete_linked_account(self):
 		resp = self.client.delete(f"/api/v1/auth/users/{self.linked_account.id}/")

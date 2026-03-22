@@ -317,6 +317,13 @@ export function AdminAccountsPage() {
                                                     </button>
                                                 )}
                                                 <button
+                                                    className="button button-primary"
+                                                    type="button"
+                                                    onClick={() => openEditUserModal(linkedAccount)}
+                                                >
+                                                    Edit
+                                                </button>
+                                                <button
                                                     className="button button-secondary"
                                                     type="button"
                                                     disabled={unlinkMutation.isPending || dialogLoading}

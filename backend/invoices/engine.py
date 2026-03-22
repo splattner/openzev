@@ -157,24 +157,72 @@ def _get_item_type(tariff: Tariff) -> str:
     return InvoiceItem.ItemType.LOCAL_ENERGY
 
 
-def _build_description(tariff: Tariff, period_start: date, period_end: date, quantity: Decimal) -> str:
+# Translations for billing mode description suffixes used in invoice line items.
+# Each language maps singular/plural forms for each billing mode.
+DESCRIPTION_TRANSLATIONS: dict[str, dict] = {
+    "de": {
+        "yearly_fee_sg": "monatliche Rate der Jahresgebühr",
+        "yearly_fee_pl": "monatliche Raten der Jahresgebühr",
+        "mp_yearly_sg": "monatliche Rate pro Messpunkt",
+        "mp_yearly_pl": "monatliche Raten pro Messpunkt",
+        "mp_monthly_sg": "Messpunkt-Monat",
+        "mp_monthly_pl": "Messpunkt-Monate",
+        "monthly_sg": "Monat",
+        "monthly_pl": "Monate",
+    },
+    "fr": {
+        "yearly_fee_sg": "mensualité de la redevance annuelle",
+        "yearly_fee_pl": "mensualités de la redevance annuelle",
+        "mp_yearly_sg": "mensualité par point de mesure",
+        "mp_yearly_pl": "mensualités par point de mesure",
+        "mp_monthly_sg": "mois-point de mesure",
+        "mp_monthly_pl": "mois-points de mesure",
+        "monthly_sg": "mois",
+        "monthly_pl": "mois",
+    },
+    "it": {
+        "yearly_fee_sg": "rata mensile della tariffa annuale",
+        "yearly_fee_pl": "rate mensili della tariffa annuale",
+        "mp_yearly_sg": "rata mensile per punto di misurazione",
+        "mp_yearly_pl": "rate mensili per punto di misurazione",
+        "mp_monthly_sg": "mese-punto di misurazione",
+        "mp_monthly_pl": "mesi-punto di misurazione",
+        "monthly_sg": "mese",
+        "monthly_pl": "mesi",
+    },
+    "en": {
+        "yearly_fee_sg": "monthly installment of annual fee",
+        "yearly_fee_pl": "monthly installments of annual fee",
+        "mp_yearly_sg": "monthly installment per metering point",
+        "mp_yearly_pl": "monthly installments per metering point",
+        "mp_monthly_sg": "metering-point month",
+        "mp_monthly_pl": "metering-point months",
+        "monthly_sg": "month",
+        "monthly_pl": "months",
+    },
+}
+
+
+def _build_description(tariff: Tariff, period_start: date, period_end: date, quantity: Decimal, lang: str = "de") -> str:
     if tariff.billing_mode == BillingMode.ENERGY:
         return tariff.name
 
+    t = DESCRIPTION_TRANSLATIONS.get(lang, DESCRIPTION_TRANSLATIONS["de"])
     months = int(quantity)
+
     if tariff.billing_mode == BillingMode.YEARLY_FEE:
-        suffix = "installment" if months == 1 else "installments"
-        return f"{tariff.name} ({months} monthly {suffix} of annual fee)"
+        suffix = t["yearly_fee_sg"] if months == 1 else t["yearly_fee_pl"]
+        return f"{tariff.name} ({months} {suffix})"
 
     if tariff.billing_mode == BillingMode.PER_METERING_POINT_YEARLY_FEE:
-        suffix = "installment" if months == 1 else "installments"
-        return f"{tariff.name} ({months} monthly {suffix} per metering point)"
+        suffix = t["mp_yearly_sg"] if months == 1 else t["mp_yearly_pl"]
+        return f"{tariff.name} ({months} {suffix})"
 
     if tariff.billing_mode == BillingMode.PER_METERING_POINT_MONTHLY_FEE:
-        suffix = "month" if months == 1 else "months"
-        return f"{tariff.name} ({months} metering-point {suffix})"
+        suffix = t["mp_monthly_sg"] if months == 1 else t["mp_monthly_pl"]
+        return f"{tariff.name} ({months} {suffix})"
 
-    suffix = "month" if months == 1 else "months"
+    suffix = t["monthly_sg"] if months == 1 else t["monthly_pl"]
     return f"{tariff.name} ({months} {suffix})"
 
 
@@ -446,7 +494,7 @@ def generate_invoice(participant: Participant, period_start: date, period_end: d
             invoice=invoice,
             item_type=_get_item_type(tariff),
             tariff_category=tariff.category,
-            description=_build_description(tariff, period_start, period_end, payload["quantity"]),
+            description=_build_description(tariff, period_start, period_end, payload["quantity"], lang=participant.zev.invoice_language or "de"),
             quantity_kwh=payload["quantity"],
             unit=payload["unit"],
             unit_price_chf=payload["unit_price"],

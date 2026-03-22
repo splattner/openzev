@@ -27,6 +27,13 @@ class ZevType(models.TextChoices):
     VZEV = "vzev", "vZEV (Virtueller Zusammenschluss zum Eigenverbrauch)"
 
 
+class InvoiceLanguage(models.TextChoices):
+    DE = "de", "Deutsch"
+    FR = "fr", "Français"
+    IT = "it", "Italiano"
+    EN = "en", "English"
+
+
 class Zev(models.Model):
     """Represents a ZEV or vZEV community."""
 
@@ -46,6 +53,12 @@ class Zev(models.Model):
     )
     invoice_prefix = models.CharField(max_length=10, default="INV", help_text="Prefix for invoice numbers")
     invoice_counter = models.PositiveIntegerField(default=1, help_text="Auto-incremented invoice number")
+    invoice_language = models.CharField(
+        max_length=2,
+        choices=InvoiceLanguage.choices,
+        default=InvoiceLanguage.DE,
+        help_text="Language used when generating invoice PDFs",
+    )
     bank_iban = models.CharField(max_length=34, blank=True, help_text="IBAN for QR-Rechnung")
     bank_name = models.CharField(max_length=200, blank=True)
     vat_number = models.CharField(max_length=50, blank=True)

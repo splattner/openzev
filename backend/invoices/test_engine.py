@@ -151,8 +151,8 @@ class InvoiceEngineTests(TestCase):
         self.assertEqual(categories["Federal levy"], TariffCategory.LEVIES)
 
         fixed_items = {item.description: item for item in invoice.items.filter(unit="month")}
-        self.assertEqual(fixed_items["Metering basic fee (1 month)"].total_chf, Decimal("12.00"))
-        self.assertEqual(fixed_items["Annual admin fee (1 monthly installment of annual fee)"].total_chf, Decimal("10.00"))
+        self.assertEqual(fixed_items["Metering basic fee (1 Monat)"].total_chf, Decimal("12.00"))
+        self.assertEqual(fixed_items["Annual admin fee (1 monatliche Rate der Jahresgeb\u00fchr)"].total_chf, Decimal("10.00"))
 
     def test_fixed_fees_bill_each_touched_month_without_proration(self):
         Tariff.objects.create(
@@ -175,8 +175,8 @@ class InvoiceEngineTests(TestCase):
         invoice = generate_invoice(self.participant, date(2026, 1, 15), date(2026, 2, 14))
 
         fixed_items = {item.description: item for item in invoice.items.filter(unit="month")}
-        self.assertEqual(fixed_items["Monthly service fee (2 months)"].total_chf, Decimal("24.00"))
-        self.assertEqual(fixed_items["Annual platform fee (2 monthly installments of annual fee)"].total_chf, Decimal("20.00"))
+        self.assertEqual(fixed_items["Monthly service fee (2 Monate)"].total_chf, Decimal("24.00"))
+        self.assertEqual(fixed_items["Annual platform fee (2 monatliche Raten der Jahresgeb\u00fchr)"].total_chf, Decimal("20.00"))
 
     def test_per_metering_point_fees_bill_per_metering_point_month(self):
         Tariff.objects.create(
@@ -199,5 +199,5 @@ class InvoiceEngineTests(TestCase):
         invoice = generate_invoice(self.participant, date(2026, 1, 15), date(2026, 2, 14))
 
         fixed_items = {item.description: item for item in invoice.items.filter(unit="month")}
-        self.assertEqual(fixed_items["Metering operation fee (4 metering-point months)"].total_chf, Decimal("12.00"))
-        self.assertEqual(fixed_items["Metering annual levy (4 monthly installments per metering point)"].total_chf, Decimal("40.00"))
+        self.assertEqual(fixed_items["Metering operation fee (4 Messpunkt-Monate)"].total_chf, Decimal("12.00"))
+        self.assertEqual(fixed_items["Metering annual levy (4 monatliche Raten pro Messpunkt)"].total_chf, Decimal("40.00"))

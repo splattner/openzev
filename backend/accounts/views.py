@@ -56,9 +56,6 @@ class UserDetailView(generics.RetrieveUpdateDestroyAPIView):
     permission_classes = [IsAdmin]
 
     def perform_update(self, serializer):
-        instance = self.get_object()
-        if instance.participations.exists():
-            raise PermissionDenied("Linked participant accounts cannot be edited here.")
         serializer.save()
 
     def perform_destroy(self, instance):
