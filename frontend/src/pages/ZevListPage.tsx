@@ -7,6 +7,7 @@ import { formatShortDate, useAppSettings } from '../lib/appSettings'
 import { useAuth } from '../lib/auth'
 import { FormModal } from '../components/FormModal'
 import { createZevWithOwner, deleteZev, fetchParticipants, fetchUsers, fetchZevs, formatApiError, updateZev } from '../lib/api'
+import { useTranslation } from 'react-i18next'
 import { getDefaultZevForm, mapZevToForm } from '../lib/zevForm'
 import type { OwnerMeteringPointInput, Zev, ZevInput, ZevWizardInput, ZevWizardResult } from '../types/api'
 
@@ -46,6 +47,7 @@ export function ZevListPage() {
     const { user } = useAuth()
     const { settings } = useAppSettings()
     const isAdmin = user?.role === 'admin'
+    const { t } = useTranslation()
     const queryClient = useQueryClient()
     const { dialog, confirm, handleConfirm, handleCancel, isLoading: dialogLoading } = useConfirmDialog()
 
@@ -258,9 +260,9 @@ export function ZevListPage() {
         const nextOwnerName = ownerNameById.get(nextOwnerNumericId) ?? `User ${newOwnerId}`
 
         confirm({
-            title: 'Transfer ownership?',
-            message: `Ownership of ${ownerTargetZev.name} will change from ${currentOwnerName} to ${nextOwnerName}. This affects owner permissions immediately.`,
-            confirmText: 'Transfer ownership',
+            title: t('pages.zevs.ownerModal.transferTitle'),
+            message: t('pages.zevs.ownerModal.transferMessage', { zev: ownerTargetZev.name, from: currentOwnerName, to: nextOwnerName }),
+            confirmText: t('pages.zevs.ownerModal.transferConfirm'),
             cancelText: 'Cancel',
             isDangerous: true,
             onConfirm: async () => {
@@ -361,54 +363,54 @@ export function ZevListPage() {
     return (
         <div className="page-stack">
             <header>
-                <h2>ZEVs</h2>
-                <p className="muted">Communities you can manage in OpenZEV.</p>
+                <h2>{t('pages.zevs.title')}</h2>
+                <p className="muted">{t('pages.zevs.description')}</p>
             </header>
 
             <div className="actions-row actions-row-gap-lg mb-1">
                 {isAdmin ? (
                     <button className="button button-primary" onClick={openCreateModal}>
-                        + New ZEV
+                        {t('pages.zevs.newZev')}
                     </button>
                 ) : (
-                    <p className="muted" style={{ margin: 0 }}>Only admins can create new ZEVs.</p>
+                    <p className="muted" style={{ margin: 0 }}>{t('pages.zevs.adminOnly')}</p>
                 )}
             </div>
 
-            <FormModal isOpen={showCreateModal} title={wizardStep === 5 ? 'ZEV created successfully' : `Create ZEV · Step ${wizardStep} of 4`} onClose={closeCreateModal} maxWidth="960px">
+            <FormModal isOpen={showCreateModal} title={wizardStep === 5 ? t('pages.zevs.wizard.titleDone') : t('pages.zevs.wizard.titleStep', { step: wizardStep })} onClose={closeCreateModal} maxWidth="960px">
                 <form onSubmit={submitCreate} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                     {wizardStep === 1 && (
                         <>
                             <div className="card grid-span-full" style={{ padding: '0.85rem 1rem' }}>
-                                <strong>Add (v)ZEV details</strong>
-                                <p className="muted" style={{ margin: '0.35rem 0 0' }}>Set the core data for this ZEV community.</p>
+                                <strong>{t('pages.zevs.wizard.step1Header')}</strong>
+                                <p className="muted" style={{ margin: '0.35rem 0 0' }}>{t('pages.zevs.wizard.step1Description')}</p>
                             </div>
                             <label>
-                                <span>Name</span>
+                                <span>{t('pages.zevs.form.name')}</span>
                                 <input value={createForm.name} onChange={(event) => setCreateForm((previous) => ({ ...previous, name: event.target.value }))} required />
                             </label>
                             <label>
-                                <span>Start date</span>
+                                <span>{t('pages.zevs.form.startDate')}</span>
                                 <input type="date" value={createForm.start_date} onChange={(event) => setCreateForm((previous) => ({ ...previous, start_date: event.target.value }))} required />
                             </label>
                             <label>
-                                <span>Type</span>
+                                <span>{t('pages.zevs.form.zevType')}</span>
                                 <select value={createForm.zev_type} onChange={(event) => setCreateForm((previous) => ({ ...previous, zev_type: event.target.value as ZevInput['zev_type'] }))}>
-                                    <option value="vzev">vZEV</option>
-                                    <option value="zev">ZEV</option>
+                                    <option value="vzev">{t('pages.zevs.zevTypes.vzev')}</option>
+                                    <option value="zev">{t('pages.zevs.zevTypes.zev')}</option>
                                 </select>
                             </label>
                             <label>
-                                <span>Billing interval</span>
+                                <span>{t('pages.zevs.form.billingInterval')}</span>
                                 <select value={createForm.billing_interval} onChange={(event) => setCreateForm((previous) => ({ ...previous, billing_interval: event.target.value as ZevInput['billing_interval'] }))}>
-                                    <option value="monthly">Monthly</option>
-                                    <option value="quarterly">Quarterly</option>
-                                    <option value="semi_annual">Semi-Annual</option>
-                                    <option value="annual">Annual</option>
+                                    <option value="monthly">{t('pages.zevs.billingIntervals.monthly')}</option>
+                                    <option value="quarterly">{t('pages.zevs.billingIntervals.quarterly')}</option>
+                                    <option value="semi_annual">{t('pages.zevs.billingIntervals.semi_annual')}</option>
+                                    <option value="annual">{t('pages.zevs.billingIntervals.annual')}</option>
                                 </select>
                             </label>
                             <label className="grid-span-full">
-                                <span>Grid operator</span>
+                                <span>{t('pages.zevs.form.gridOperator')}</span>
                                 <input value={createForm.grid_operator ?? ''} onChange={(event) => setCreateForm((previous) => ({ ...previous, grid_operator: event.target.value }))} />
                             </label>
                         </>
@@ -417,54 +419,54 @@ export function ZevListPage() {
                     {wizardStep === 2 && (
                         <>
                             <div className="card grid-span-full" style={{ padding: '0.85rem 1rem' }}>
-                                <strong>Add (v)ZEV owner</strong>
-                                <p className="muted" style={{ margin: '0.35rem 0 0' }}>Create the owner account; it will also be created as participant automatically.</p>
+                                <strong>{t('pages.zevs.wizard.step2Header')}</strong>
+                                <p className="muted" style={{ margin: '0.35rem 0 0' }}>{t('pages.zevs.wizard.step2Description')}</p>
                             </div>
                             <label>
-                                <span>Title</span>
+                                <span>{t('pages.zevs.form.title')}</span>
                                 <select value={createForm.owner.title ?? ''} onChange={(event) => setCreateForm((previous) => ({ ...previous, owner: { ...previous.owner, title: event.target.value as ZevWizardInput['owner']['title'] } }))}>
-                                    <option value="">None</option>
-                                    <option value="mr">Mr.</option>
-                                    <option value="mrs">Mrs.</option>
-                                    <option value="ms">Ms.</option>
-                                    <option value="dr">Dr.</option>
-                                    <option value="prof">Prof.</option>
+                                    <option value="">{t('pages.zevs.titles.none')}</option>
+                                    <option value="mr">{t('pages.zevs.titles.mr')}</option>
+                                    <option value="mrs">{t('pages.zevs.titles.mrs')}</option>
+                                    <option value="ms">{t('pages.zevs.titles.ms')}</option>
+                                    <option value="dr">{t('pages.zevs.titles.dr')}</option>
+                                    <option value="prof">{t('pages.zevs.titles.prof')}</option>
                                 </select>
                             </label>
                             <label>
-                                <span>Username (optional)</span>
+                                <span>{t('pages.zevs.form.usernameOptional')}</span>
                                 <input value={createForm.owner.username ?? ''} onChange={(event) => setCreateForm((previous) => ({ ...previous, owner: { ...previous.owner, username: event.target.value } }))} />
                             </label>
                             <label>
-                                <span>First name</span>
+                                <span>{t('pages.zevs.form.firstName')}</span>
                                 <input value={createForm.owner.first_name} onChange={(event) => setCreateForm((previous) => ({ ...previous, owner: { ...previous.owner, first_name: event.target.value } }))} required />
                             </label>
                             <label>
-                                <span>Last name</span>
+                                <span>{t('pages.zevs.form.lastName')}</span>
                                 <input value={createForm.owner.last_name} onChange={(event) => setCreateForm((previous) => ({ ...previous, owner: { ...previous.owner, last_name: event.target.value } }))} required />
                             </label>
                             <label>
-                                <span>Email</span>
+                                <span>{t('pages.zevs.form.email')}</span>
                                 <input type="email" value={createForm.owner.email} onChange={(event) => setCreateForm((previous) => ({ ...previous, owner: { ...previous.owner, email: event.target.value } }))} required />
                             </label>
                             <label>
-                                <span>Phone</span>
+                                <span>{t('pages.zevs.form.phone')}</span>
                                 <input value={createForm.owner.phone ?? ''} onChange={(event) => setCreateForm((previous) => ({ ...previous, owner: { ...previous.owner, phone: event.target.value } }))} />
                             </label>
                             <label>
-                                <span>Address line 1</span>
+                                <span>{t('pages.zevs.form.addressLine1')}</span>
                                 <input value={createForm.owner.address_line1 ?? ''} onChange={(event) => setCreateForm((previous) => ({ ...previous, owner: { ...previous.owner, address_line1: event.target.value } }))} />
                             </label>
                             <label>
-                                <span>Address line 2</span>
+                                <span>{t('pages.zevs.form.addressLine2')}</span>
                                 <input value={createForm.owner.address_line2 ?? ''} onChange={(event) => setCreateForm((previous) => ({ ...previous, owner: { ...previous.owner, address_line2: event.target.value } }))} />
                             </label>
                             <label>
-                                <span>Postal code</span>
+                                <span>{t('pages.zevs.form.postalCode')}</span>
                                 <input value={createForm.owner.postal_code ?? ''} onChange={(event) => setCreateForm((previous) => ({ ...previous, owner: { ...previous.owner, postal_code: event.target.value } }))} />
                             </label>
                             <label>
-                                <span>City</span>
+                                <span>{t('pages.zevs.form.city')}</span>
                                 <input value={createForm.owner.city ?? ''} onChange={(event) => setCreateForm((previous) => ({ ...previous, owner: { ...previous.owner, city: event.target.value } }))} />
                             </label>
                         </>
@@ -473,22 +475,22 @@ export function ZevListPage() {
                     {wizardStep === 3 && (
                         <div className="grid-span-full page-stack">
                             <div className="card" style={{ padding: '0.85rem 1rem' }}>
-                                <strong>Add metering points</strong>
-                                <p className="muted" style={{ margin: '0.35rem 0 0' }}>Add one or more metering points that belong to this ZEV owner.</p>
+                                <strong>{t('pages.zevs.wizard.step3Header')}</strong>
+                                <p className="muted" style={{ margin: '0.35rem 0 0' }}>{t('pages.zevs.wizard.step3Description')}</p>
                             </div>
 
                             <div>
-                                <button className="button button-secondary" type="button" onClick={addMeteringPoint}>+ Add Metering Point</button>
+                                <button className="button button-secondary" type="button" onClick={addMeteringPoint}>{t('pages.zevs.wizard.addMeteringPoint')}</button>
                             </div>
 
                             {expandedMeteringPointIndex !== null && editingMeteringPointData && (
                                 <div className="card" style={{ padding: '1rem', border: '1px solid var(--border-color)' }}>
                                     <h4 style={{ marginTop: 0, marginBottom: '1rem' }}>
-                                        {expandedMeteringPointIndex === -1 ? 'New Metering Point' : 'Edit Metering Point'}
+                                        {expandedMeteringPointIndex === -1 ? t('pages.zevs.wizard.newMeteringPointTitle') : t('pages.zevs.wizard.editMeteringPointTitle')}
                                     </h4>
                                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1rem', marginBottom: '1rem' }}>
                                         <label>
-                                            <span>Meter ID</span>
+                                            <span>{t('pages.zevs.form.meterId')}</span>
                                             <input
                                                 value={editingMeteringPointData.meter_id}
                                                 onChange={(event) => updateEditingMeteringPoint({ meter_id: event.target.value })}
@@ -496,18 +498,18 @@ export function ZevListPage() {
                                             />
                                         </label>
                                         <label>
-                                            <span>Type</span>
+                                            <span>{t('pages.zevs.form.meterType')}</span>
                                             <select
                                                 value={editingMeteringPointData.meter_type}
                                                 onChange={(event) => updateEditingMeteringPoint({ meter_type: event.target.value as OwnerMeteringPointInput['meter_type'] })}
                                             >
-                                                <option value="consumption">Consumption</option>
-                                                <option value="production">Production</option>
-                                                <option value="bidirectional">Bidirectional</option>
+                                                <option value="consumption">{t('pages.zevs.meterTypes.consumption')}</option>
+                                                <option value="production">{t('pages.zevs.meterTypes.production')}</option>
+                                                <option value="bidirectional">{t('pages.zevs.meterTypes.bidirectional')}</option>
                                             </select>
                                         </label>
                                         <label>
-                                            <span>Valid from</span>
+                                            <span>{t('pages.zevs.form.validFrom')}</span>
                                             <input
                                                 type="date"
                                                 value={editingMeteringPointData.valid_from ?? ''}
@@ -515,7 +517,7 @@ export function ZevListPage() {
                                             />
                                         </label>
                                         <label>
-                                            <span>Valid to</span>
+                                            <span>{t('pages.zevs.form.validTo')}</span>
                                             <input
                                                 type="date"
                                                 value={editingMeteringPointData.valid_to ?? ''}
@@ -523,7 +525,7 @@ export function ZevListPage() {
                                             />
                                         </label>
                                         <label className="grid-span-full">
-                                            <span>Location description</span>
+                                            <span>{t('pages.zevs.form.locationDescription')}</span>
                                             <input
                                                 value={editingMeteringPointData.location_description ?? ''}
                                                 onChange={(event) => updateEditingMeteringPoint({ location_description: event.target.value })}
@@ -532,9 +534,9 @@ export function ZevListPage() {
                                     </div>
                                     <div style={{ display: 'flex', gap: '0.75rem' }}>
                                         <button className="button button-primary" type="button" onClick={saveMeteringPoint}>
-                                            {expandedMeteringPointIndex === -1 ? 'Add' : 'Save'}
+                                            {expandedMeteringPointIndex === -1 ? t('pages.zevs.wizard.add') : t('pages.zevs.wizard.save')}
                                         </button>
-                                        <button className="button button-secondary" type="button" onClick={closeEditMeteringPoint}>Cancel</button>
+                                        <button className="button button-secondary" type="button" onClick={closeEditMeteringPoint}>{t('pages.tariffs.cancel')}</button>
                                     </div>
                                 </div>
                             )}
@@ -544,12 +546,12 @@ export function ZevListPage() {
                                     <table>
                                         <thead>
                                             <tr>
-                                                <th>Meter ID</th>
-                                                <th>Type</th>
-                                                <th>Valid from</th>
-                                                <th>Valid to</th>
-                                                <th>Location</th>
-                                                <th>Actions</th>
+                                                <th>{t('pages.zevs.meterCol.meterId')}</th>
+                                                <th>{t('pages.zevs.meterCol.type')}</th>
+                                                <th>{t('pages.zevs.meterCol.validFrom')}</th>
+                                                <th>{t('pages.zevs.meterCol.validTo')}</th>
+                                                <th>{t('pages.zevs.meterCol.location')}</th>
+                                                <th>{t('pages.zevs.meterCol.actions')}</th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -590,22 +592,22 @@ export function ZevListPage() {
 
                     {wizardStep === 4 && (
                         <div className="card grid-span-full">
-                            <h3 style={{ marginTop: 0 }}>Review</h3>
-                            <p><strong>ZEV:</strong> {createForm.name} ({createForm.zev_type}) starting {formatShortDate(createForm.start_date, settings)}</p>
-                            <p><strong>Owner:</strong> {createForm.owner.first_name} {createForm.owner.last_name} ({createForm.owner.email})</p>
-                            <p><strong>Metering points:</strong> {createForm.metering_points.length}</p>
-                            <p className="muted" style={{ marginBottom: 0 }}>Click "Create ZEV" to create the ZEV, the owner participant, and assign all listed metering points.</p>
+                            <h3 style={{ marginTop: 0 }}>{t('pages.zevs.wizard.review')}</h3>
+                            <p><strong>{t('pages.zevs.wizard.reviewZev')}</strong> {createForm.name} ({t(`pages.zevs.zevTypes.${createForm.zev_type}` as Parameters<typeof t>[0])}) starting {formatShortDate(createForm.start_date, settings)}</p>
+                            <p><strong>{t('pages.zevs.wizard.reviewOwner')}</strong> {createForm.owner.first_name} {createForm.owner.last_name} ({createForm.owner.email})</p>
+                            <p><strong>{t('pages.zevs.wizard.reviewMeteringPoints')}</strong> {createForm.metering_points.length}</p>
+                            <p className="muted" style={{ marginBottom: 0 }}>{t('pages.zevs.wizard.reviewHint')}</p>
                         </div>
                     )}
 
                     {wizardStep === 5 && createdCredentials && (
                         <div className="grid-span-full page-stack">
                             <p style={{ margin: 0 }}>
-                                ZEV <strong>{createdZevName}</strong> was created successfully. Store these credentials now, the temporary password is shown only once.
+                                {t('pages.zevs.wizard.createdIntro', { name: createdZevName })}
                             </p>
 
                             <div className="card" style={{ padding: '1rem' }}>
-                                <p style={{ margin: '0 0 0.5rem' }}><strong>Username</strong></p>
+                                <p style={{ margin: '0 0 0.5rem' }}><strong>{t('pages.zevs.wizard.usernameLabel')}</strong></p>
                                 <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
                                     <code>{createdCredentials.username}</code>
                                     <button
@@ -613,11 +615,11 @@ export function ZevListPage() {
                                         type="button"
                                         onClick={() => copyToClipboard(createdCredentials.username, 'Username')}
                                     >
-                                        Copy username
+                                        {t('pages.zevs.wizard.copyUsername')}
                                     </button>
                                 </div>
 
-                                <p style={{ margin: '1rem 0 0.5rem' }}><strong>Temporary password</strong></p>
+                                <p style={{ margin: '1rem 0 0.5rem' }}><strong>{t('pages.zevs.wizard.passwordLabel')}</strong></p>
                                 <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
                                     <code>{createdCredentials.temporary_password}</code>
                                     <button
@@ -625,7 +627,7 @@ export function ZevListPage() {
                                         type="button"
                                         onClick={() => copyToClipboard(createdCredentials.temporary_password, 'Password')}
                                     >
-                                        Copy password
+                                        {t('pages.zevs.wizard.copyPassword')}
                                     </button>
                                 </div>
                             </div>
@@ -637,24 +639,24 @@ export function ZevListPage() {
                     {createError && <div className="error-banner grid-span-full">{createError}</div>}
 
                     <div className="actions-row actions-row-end actions-row-gap-lg grid-span-full mt-1">
-                        {wizardStep < 5 && <button className="button button-secondary" type="button" onClick={closeCreateModal}>Cancel</button>}
-                        {wizardStep > 1 && wizardStep < 5 && <button className="button button-secondary" type="button" onClick={goToPreviousStep}>Back</button>}
+                        {wizardStep < 5 && <button className="button button-secondary" type="button" onClick={closeCreateModal}>{t('pages.tariffs.cancel')}</button>}
+                        {wizardStep > 1 && wizardStep < 5 && <button className="button button-secondary" type="button" onClick={goToPreviousStep}>{t('pages.zevs.wizard.back')}</button>}
                         {wizardStep < 4 && (
-                            <button key="next" className="button button-primary" type="button" onClick={goToNextStep}>Next</button>
+                            <button key="next" className="button button-primary" type="button" onClick={goToNextStep}>{t('pages.zevs.wizard.next')}</button>
                         )}
                         {wizardStep === 4 && (
                             <button key="create" className="button button-primary" type="button" onClick={handleCreateZev} disabled={createMutation.isPending}>
-                                {createMutation.isPending ? 'Creating…' : 'Create ZEV'}
+                                {createMutation.isPending ? t('pages.zevs.wizard.creating') : t('pages.zevs.wizard.createZev')}
                             </button>
                         )}
                         {wizardStep === 5 && (
-                            <button key="done" className="button button-primary" type="button" onClick={closeCreateModal}>Done</button>
+                            <button key="done" className="button button-primary" type="button" onClick={closeCreateModal}>{t('pages.zevs.wizard.done')}</button>
                         )}
                     </div>
                 </form>
             </FormModal>
 
-            <FormModal isOpen={showEditModal} title="Edit ZEV" onClose={closeEditModal} maxWidth="960px">
+            <FormModal isOpen={showEditModal} title={t('pages.zevs.editModalTitle')} onClose={closeEditModal} maxWidth="960px">
                 <form onSubmit={submitEdit} className="page-stack">
                     <section className="card page-stack">
                         <ZevGeneralSettingsFields
@@ -679,31 +681,31 @@ export function ZevListPage() {
                     {editError && <div className="error-banner">{editError}</div>}
 
                     <div className="actions-row actions-row-end actions-row-gap-lg">
-                        <button className="button button-secondary" type="button" onClick={closeEditModal}>Cancel</button>
-                        <button className="button button-primary" type="submit" disabled={updateMutation.isPending}>Save ZEV</button>
+                        <button className="button button-secondary" type="button" onClick={closeEditModal}>{t('pages.tariffs.cancel')}</button>
+                        <button className="button button-primary" type="submit" disabled={updateMutation.isPending}>{t('pages.zevs.saveZev')}</button>
                     </div>
                 </form>
             </FormModal>
 
-            <FormModal isOpen={showOwnerModal} title="Set new ZEV owner" onClose={closeOwnerModal} maxWidth="560px">
+            <FormModal isOpen={showOwnerModal} title={t('pages.zevs.ownerModal.title')} onClose={closeOwnerModal} maxWidth="560px">
                 <form onSubmit={submitOwnerAssignment} style={{ display: 'grid', gap: '1rem' }}>
                     <p style={{ margin: 0 }}>
-                        Select the owner for <strong>{ownerTargetZev?.name ?? '-'}</strong>.
+                        {t('pages.zevs.ownerModal.intro', { name: ownerTargetZev?.name ?? '-' })}
                     </p>
 
                     <label>
-                        <span>Owner</span>
+                        <span>{t('pages.zevs.ownerModal.ownerLabel')}</span>
                         <select value={newOwnerId} onChange={(event) => setNewOwnerId(event.target.value)} required>
-                            <option value="">Select owner</option>
+                            <option value="">{t('pages.zevs.ownerModal.selectOwner')}</option>
                             {ownerTargetZev && (
-                                <optgroup label="Current">
+                                <optgroup label={t('pages.zevs.ownerModal.currentGroup')}>
                                     <option value={String(ownerTargetZev.owner)} disabled>
                                         {currentOwnerLabel}
                                     </option>
                                 </optgroup>
                             )}
                             {eligibleOwnerCandidates.length > 0 && (
-                                <optgroup label="Eligible participants">
+                                <optgroup label={t('pages.zevs.ownerModal.eligibleGroup')}>
                                     {eligibleOwnerCandidates.map((candidate) => (
                                         <option key={candidate.userId} value={candidate.userId}>
                                             {candidate.label}{candidate.email ? ` (${candidate.email})` : ''}
@@ -715,19 +717,19 @@ export function ZevListPage() {
                     </label>
 
                     {eligibleOwnerCandidates.length === 0 && (
-                        <div className="muted">No eligible linked participant account available for this ZEV.</div>
+                        <div className="muted">{t('pages.zevs.ownerModal.noEligible')}</div>
                     )}
 
                     {ownerError && <div className="error-banner">{ownerError}</div>}
 
                     <div className="actions-row actions-row-end actions-row-gap-lg">
-                        <button className="button button-secondary" type="button" onClick={closeOwnerModal}>Cancel</button>
+                        <button className="button button-secondary" type="button" onClick={closeOwnerModal}>{t('pages.tariffs.cancel')}</button>
                         <button
                             className="button button-primary"
                             type="submit"
                             disabled={assignOwnerMutation.isPending || dialogLoading || !ownerTargetZev || String(ownerTargetZev.owner) === newOwnerId}
                         >
-                            Save owner
+                            {t('pages.zevs.ownerModal.saveOwner')}
                         </button>
                     </div>
                 </form>
@@ -746,12 +748,12 @@ export function ZevListPage() {
                 <table>
                     <thead>
                         <tr>
-                            <th>Name</th>
-                            <th>Owner</th>
-                            <th>Start date</th>
-                            <th>Grid operator</th>
-                            <th>Billing interval</th>
-                            <th>Actions</th>
+                            <th>{t('pages.zevs.col.name')}</th>
+                            <th>{t('pages.zevs.col.owner')}</th>
+                            <th>{t('pages.zevs.col.startDate')}</th>
+                            <th>{t('pages.zevs.col.gridOperator')}</th>
+                            <th>{t('pages.zevs.col.billingInterval')}</th>
+                            <th>{t('pages.zevs.col.actions')}</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -768,18 +770,18 @@ export function ZevListPage() {
                                 <td>{ownerNameById.get(zev.owner) ?? (user?.id === zev.owner ? user.username : zev.owner)}</td>
                                 <td>{formatShortDate(zev.start_date, settings)}</td>
                                 <td>{zev.grid_operator || '-'}</td>
-                                <td>{zev.billing_interval}</td>
+                                <td>{t(`pages.zevs.billingIntervals.${zev.billing_interval}` as Parameters<typeof t>[0], { defaultValue: zev.billing_interval })}</td>
                                 <td className="actions-cell">
                                     <button className="button button-primary" type="button" onClick={() => startEdit(zev)}>Edit</button>
                                     {isAdmin && (
                                         <button className="button button-secondary" type="button" onClick={() => openOwnerModal(zev)}>
-                                            Set Owner
+                                            {t('pages.zevs.setOwner')}
                                         </button>
                                     )}
                                     <button className="button danger" type="button" disabled={deleteMutation.isPending || dialogLoading} onClick={() => confirm({
-                                        title: 'Delete ZEV',
-                                        message: `Are you sure you want to delete "${zev.name}"? This action cannot be undone and will remove all associated data.`,
-                                        confirmText: 'Delete ZEV',
+                                        title: t('pages.zevs.deleteTitle'),
+                                        message: t('pages.zevs.deleteMessage', { name: zev.name }),
+                                        confirmText: t('pages.zevs.deleteConfirm'),
                                         isDangerous: true,
                                         onConfirm: () => deleteMutation.mutate(zev.id),
                                     })}>Delete</button>
@@ -787,7 +789,7 @@ export function ZevListPage() {
                             </tr>
                         )) : (
                             <tr>
-                                <td colSpan={6}>No ZEVs yet.</td>
+                                <td colSpan={6}>{t('pages.zevs.noZevs')}</td>
                             </tr>
                         )}
                     </tbody>
