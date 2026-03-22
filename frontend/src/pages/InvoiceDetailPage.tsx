@@ -1,15 +1,11 @@
 import { useQuery } from '@tanstack/react-query'
 import { Link, useParams } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { fetchInvoice } from '../lib/api'
 import { formatShortDate, useAppSettings } from '../lib/appSettings'
 
-const categoryLabels: Record<string, string> = {
-    energy: 'Energy',
-    grid_fees: 'Grid Fees',
-    levies: 'Levies',
-}
-
 export function InvoiceDetailPage() {
+    const { t } = useTranslation()
     const { invoiceId } = useParams<{ invoiceId: string }>()
     const { settings } = useAppSettings()
 
@@ -48,42 +44,43 @@ export function InvoiceDetailPage() {
                     </p>
                 </div>
                 <Link to="/invoices" className="button button-primary" style={{ textDecoration: 'none' }}>
-                    Back to Invoices
+                    {t('pages.invoiceDetail.backToInvoices')}
                 </Link>
             </header>
 
             <section className="grid grid-4">
-                <div className="card"><strong>Status</strong><div>{invoice.status}</div></div>
-                <div className="card"><strong>Total</strong><div>CHF {invoice.total_chf}</div></div>
-                <div className="card"><strong>Subtotal</strong><div>CHF {invoice.subtotal_chf ?? '-'}</div></div>
-                <div className="card"><strong>VAT</strong><div>CHF {invoice.vat_chf ?? '-'}</div></div>
+                <div className="card"><strong>{t('pages.invoiceDetail.status')}</strong><div>{invoice.status}</div></div>
+                <div className="card"><strong>{t('pages.invoiceDetail.total')}</strong><div>CHF {invoice.total_chf}</div></div>
+                <div className="card"><strong>{t('pages.invoiceDetail.subtotal')}</strong><div>CHF {invoice.subtotal_chf ?? '-'}</div></div>
+                <div className="card"><strong>{t('pages.invoiceDetail.vat')}</strong><div>CHF {invoice.vat_chf ?? '-'}</div></div>
             </section>
 
             <section className="card">
-                <h3 style={{ marginTop: 0 }}>Energy Totals</h3>
+                <h3 style={{ marginTop: 0 }}>{t('pages.invoiceDetail.energyTotals')}</h3>
                 <div className="inline-form grid grid-4">
-                    <div><strong>Local</strong><div>{invoice.total_local_kwh ?? '0'} kWh</div></div>
-                    <div><strong>Grid</strong><div>{invoice.total_grid_kwh ?? '0'} kWh</div></div>
-                    <div><strong>Feed-in</strong><div>{invoice.total_feed_in_kwh ?? '0'} kWh</div></div>
+                    <div><strong>{t('pages.invoiceDetail.local')}</strong><div>{invoice.total_local_kwh ?? '0'} kWh</div></div>
+                    <div><strong>{t('pages.invoiceDetail.grid')}</strong><div>{invoice.total_grid_kwh ?? '0'} kWh</div></div>
+                    <div><strong>{t('pages.invoiceDetail.feedIn')}</strong><div>{invoice.total_feed_in_kwh ?? '0'} kWh</div></div>
                 </div>
             </section>
 
             <section className="table-card">
-                <h3 style={{ marginTop: 0, padding: '1rem 1rem 0' }}>Line Items</h3>
+                <h3 style={{ marginTop: 0, padding: '1rem 1rem 0' }}>{t('pages.invoiceDetail.lineItems')}</h3>
                 {groupedItems.length ? groupedItems.map(([category, items]) => {
                     const subtotal = items.reduce((sum, item) => sum + Number(item.total_chf), 0)
+                    const categoryLabel = t(`pages.invoiceDetail.categories.${category}` as Parameters<typeof t>[0], { defaultValue: category })
                     return (
                         <div key={category} style={{ padding: '1rem' }}>
-                            <h4 style={{ margin: '0 0 0.75rem' }}>{categoryLabels[category] || category}</h4>
+                            <h4 style={{ margin: '0 0 0.75rem' }}>{categoryLabel}</h4>
                             <table>
                                 <thead>
                                     <tr>
-                                        <th>Type</th>
-                                        <th>Description</th>
-                                        <th>Quantity</th>
-                                        <th>Unit</th>
-                                        <th>Unit Price (CHF)</th>
-                                        <th>Total (CHF)</th>
+                                        <th>{t('pages.invoiceDetail.col.type')}</th>
+                                        <th>{t('pages.invoiceDetail.col.description')}</th>
+                                        <th>{t('pages.invoiceDetail.col.quantity')}</th>
+                                        <th>{t('pages.invoiceDetail.col.unit')}</th>
+                                        <th>{t('pages.invoiceDetail.col.unitPrice')}</th>
+                                        <th>{t('pages.invoiceDetail.col.total')}</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -98,7 +95,7 @@ export function InvoiceDetailPage() {
                                         </tr>
                                     ))}
                                     <tr>
-                                        <td colSpan={5}><strong>{categoryLabels[category] || category} subtotal</strong></td>
+                                        <td colSpan={5}><strong>{categoryLabel} subtotal</strong></td>
                                         <td><strong>{subtotal.toFixed(2)}</strong></td>
                                     </tr>
                                 </tbody>
@@ -106,7 +103,7 @@ export function InvoiceDetailPage() {
                         </div>
                     )
                 }) : (
-                    <div style={{ padding: '1rem' }}>No invoice items.</div>
+                    <div style={{ padding: '1rem' }}>{t('pages.invoiceDetail.noItems')}</div>
                 )}
             </section>
         </div>

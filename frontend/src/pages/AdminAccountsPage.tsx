@@ -13,6 +13,7 @@ import {
     unlinkParticipantAccount,
     updateUser,
 } from '../lib/api'
+import { useTranslation } from 'react-i18next'
 import { useAuth } from '../lib/auth'
 import { useToast } from '../lib/toast'
 import type { Participant, User, UserInput } from '../types/api'
@@ -30,6 +31,7 @@ export function AdminAccountsPage() {
     const queryClient = useQueryClient()
     const { user: currentUser, startImpersonation } = useAuth()
     const { pushToast } = useToast()
+    const { t } = useTranslation()
     const { dialog, confirm, handleConfirm, handleCancel, isLoading: dialogLoading } = useConfirmDialog()
 
     const usersQuery = useQuery({ queryKey: ['users'], queryFn: fetchUsers })
@@ -132,8 +134,7 @@ export function AdminAccountsPage() {
     })
 
     function roleLabel(role: User['role']) {
-        if (role === 'zev_owner') return 'ZEV Owner'
-        return role.charAt(0).toUpperCase() + role.slice(1)
+        return t(`pages.accounts.roles.${role}` as Parameters<typeof t>[0], { defaultValue: role })
     }
 
     function participantName(participant: Participant) {
@@ -235,21 +236,21 @@ export function AdminAccountsPage() {
     return (
         <div className="page-stack">
             <header>
-                <h2>Accounts & Participants</h2>
-                <p className="muted">Manage participant-account links and standalone user accounts.</p>
+                <h2>{t('pages.accounts.title')}</h2>
+                <p className="muted">{t('pages.accounts.description')}</p>
             </header>
 
             {credentialsNotice && (
                 <section className="card">
                     <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', alignItems: 'flex-start', flexWrap: 'wrap' }}>
                         <div>
-                            <h3 style={{ marginTop: 0, marginBottom: '0.5rem' }}>Created account credentials</h3>
+                            <h3 style={{ marginTop: 0, marginBottom: '0.5rem' }}>{t('pages.accounts.credentialsTitle')}</h3>
                             <p style={{ marginBottom: '0.35rem' }}><strong>{credentialsNotice.participantName}</strong></p>
-                            <p style={{ margin: '0.2rem 0' }}>Username: <strong>{credentialsNotice.username}</strong></p>
-                            <p style={{ margin: '0.2rem 0' }}>Temporary password: <strong>{credentialsNotice.password}</strong></p>
+                            <p style={{ margin: '0.2rem 0' }}>{t('pages.accounts.usernameLabel')} <strong>{credentialsNotice.username}</strong></p>
+                            <p style={{ margin: '0.2rem 0' }}>{t('pages.accounts.passwordLabel')} <strong>{credentialsNotice.password}</strong></p>
                         </div>
                         <button className="button button-secondary" type="button" onClick={() => setCredentialsNotice(null)}>
-                            Dismiss
+                            {t('pages.accounts.dismiss')}
                         </button>
                     </div>
                 </section>
@@ -259,11 +260,11 @@ export function AdminAccountsPage() {
                 <table>
                     <thead>
                         <tr>
-                            <th>Type</th>
-                            <th>Participant</th>
-                            <th>ZEV</th>
-                            <th>Account</th>
-                            <th>Actions</th>
+                            <th>{t('pages.accounts.col.type')}</th>
+                            <th>{t('pages.accounts.col.participant')}</th>
+                            <th>{t('pages.accounts.col.zev')}</th>
+                            <th>{t('pages.accounts.col.account')}</th>
+                            <th>{t('pages.accounts.col.actions')}</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -289,7 +290,7 @@ export function AdminAccountsPage() {
                                                 <div className="muted">{linkedAccount.email || '-'}</div>
                                             </>
                                         ) : (
-                                            <span className="muted">No linked account</span>
+                                            <span className="muted">{t('pages.accounts.noLinkedAccount')}</span>
                                         )}
                                     </td>
                                     <td className="actions-cell">
@@ -303,9 +304,9 @@ export function AdminAccountsPage() {
                                                         onClick={() => {
                                                             const name = participantName(participant)
                                                             confirm({
-                                                                title: 'Impersonate account?',
-                                                                message: `You will switch into ${name}'s account view until you stop impersonation.`,
-                                                                confirmText: 'Start impersonation',
+                                                                title: t('pages.accounts.impersonateTitle'),
+                                                                message: t('pages.accounts.impersonateMessage', { name }),
+                                                                confirmText: t('pages.accounts.impersonateConfirm'),
                                                                 cancelText: 'Cancel',
                                                                 onConfirm: async () => {
                                                                     await impersonationMutation.mutateAsync(linkedAccount.id)
@@ -313,7 +314,7 @@ export function AdminAccountsPage() {
                                                             })
                                                         }}
                                                     >
-                                                        Impersonate
+                                                        {t('pages.accounts.impersonate')}
                                                     </button>
                                                 )}
                                                 <button
@@ -330,9 +331,9 @@ export function AdminAccountsPage() {
                                                     onClick={() => {
                                                         const name = participantName(participant)
                                                         confirm({
-                                                            title: 'Unlink account?',
-                                                            message: `${linkedAccount.username} will be detached from ${name}.`,
-                                                            confirmText: 'Unlink',
+                                                            title: t('pages.accounts.unlinkTitle'),
+                                                            message: t('pages.accounts.unlinkMessage', { username: linkedAccount.username, name }),
+                                                            confirmText: t('pages.accounts.unlinkConfirm'),
                                                             cancelText: 'Cancel',
                                                             onConfirm: async () => {
                                                                 await unlinkMutation.mutateAsync(participant.id)
@@ -340,16 +341,16 @@ export function AdminAccountsPage() {
                                                         })
                                                     }}
                                                 >
-                                                    Unlink
+                                                    {t('pages.accounts.unlink')}
                                                 </button>
                                             </>
                                         ) : (
                                             <>
                                                 <button className="button button-secondary" type="button" onClick={() => openLinkModal(participant)} disabled={linkableAccounts.length === 0}>
-                                                    Link existing
+                                                    {t('pages.accounts.linkExisting')}
                                                 </button>
                                                 <button className="button button-primary" type="button" onClick={() => openCreateAccountModal(participant)}>
-                                                    Create account
+                                                    {t('pages.accounts.createAccount')}
                                                 </button>
                                             </>
                                         )}
@@ -401,25 +402,25 @@ export function AdminAccountsPage() {
 
                         {sortedParticipants.length === 0 && sortedUnlinkedAccounts.length === 0 && (
                             <tr>
-                                <td colSpan={5}>No participants or accounts found.</td>
+                                <td colSpan={5}>{t('pages.accounts.noAccountsParticipants')}</td>
                             </tr>
                         )}
                     </tbody>
                 </table>
             </div>
 
-            <FormModal isOpen={showLinkModal} title="Link account to participant" onClose={() => setShowLinkModal(false)} maxWidth="560px">
+            <FormModal isOpen={showLinkModal} title={t('pages.accounts.linkModal.title')} onClose={() => setShowLinkModal(false)} maxWidth="560px">
                 <form onSubmit={submitLinkAccount} style={{ display: 'grid', gap: '1rem' }}>
                     <p style={{ margin: 0 }}>
-                        Participant: <strong>{linkParticipant ? participantName(linkParticipant) : '-'}</strong>
+                        {t('pages.accounts.linkModal.participant')} <strong>{linkParticipant ? participantName(linkParticipant) : '-'}</strong>
                     </p>
                     <label>
-                        <span>Existing participant account</span>
+                        <span>{t('pages.accounts.linkModal.existingAccount')}</span>
                         <select value={selectedUserToLink} onChange={(event) => setSelectedUserToLink(event.target.value)} required>
-                            <option value="">Select account</option>
+                            <option value="">{t('pages.accounts.linkModal.selectAccount')}</option>
                             {linkableAccounts.map((account) => (
                                 <option key={account.id} value={account.id}>
-                                    {account.username} ({account.email || 'no email'})
+                                    {account.username} ({account.email || t('pages.accounts.linkModal.noEmail')})
                                 </option>
                             ))}
                         </select>
@@ -429,23 +430,23 @@ export function AdminAccountsPage() {
 
                     <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
                         <button className="button button-secondary" type="button" onClick={() => setShowLinkModal(false)}>Cancel</button>
-                        <button className="button button-primary" type="submit" disabled={linkMutation.isPending}>Link account</button>
+                        <button className="button button-primary" type="submit" disabled={linkMutation.isPending}>{t('pages.accounts.linkModal.linkButton')}</button>
                     </div>
                 </form>
             </FormModal>
 
-            <FormModal isOpen={showCreateAccountModal} title="Create account for participant" onClose={() => setShowCreateAccountModal(false)} maxWidth="560px">
+            <FormModal isOpen={showCreateAccountModal} title={t('pages.accounts.createModal.title')} onClose={() => setShowCreateAccountModal(false)} maxWidth="560px">
                 <form onSubmit={submitCreateAccount} style={{ display: 'grid', gap: '1rem' }}>
                     <p style={{ margin: 0 }}>
-                        Participant: <strong>{createAccountParticipant ? participantName(createAccountParticipant) : '-'}</strong>
+                        {t('pages.accounts.createModal.participant')} <strong>{createAccountParticipant ? participantName(createAccountParticipant) : '-'}</strong>
                     </p>
 
                     <label>
-                        <span>Username (optional)</span>
-                        <input value={newAccountUsername} onChange={(event) => setNewAccountUsername(event.target.value)} placeholder="Auto-generated if empty" />
+                        <span>{t('pages.accounts.createModal.username')}</span>
+                        <input value={newAccountUsername} onChange={(event) => setNewAccountUsername(event.target.value)} placeholder={t('pages.accounts.createModal.autoGenerated')} />
                     </label>
                     <label>
-                        <span>Email (optional)</span>
+                        <span>{t('pages.accounts.createModal.email')}</span>
                         <input type="email" value={newAccountEmail} onChange={(event) => setNewAccountEmail(event.target.value)} />
                     </label>
 
@@ -453,53 +454,53 @@ export function AdminAccountsPage() {
 
                     <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
                         <button className="button button-secondary" type="button" onClick={() => setShowCreateAccountModal(false)}>Cancel</button>
-                        <button className="button button-primary" type="submit" disabled={createAccountMutation.isPending}>Create & link</button>
+                        <button className="button button-primary" type="submit" disabled={createAccountMutation.isPending}>{t('pages.accounts.createModal.createButton')}</button>
                     </div>
                 </form>
             </FormModal>
 
-            <FormModal isOpen={showEditUserModal} title="Edit account" onClose={() => setShowEditUserModal(false)} maxWidth="760px">
+            <FormModal isOpen={showEditUserModal} title={t('pages.accounts.editModal.title')} onClose={() => setShowEditUserModal(false)} maxWidth="760px">
                 <form onSubmit={submitEditUser} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                     <label>
-                        <span>Username</span>
+                        <span>{t('pages.accounts.editModal.username')}</span>
                         <input value={editUserForm.username} onChange={(event) => setEditUserForm((previous) => ({ ...previous, username: event.target.value }))} required />
                     </label>
                     <label>
-                        <span>Email</span>
+                        <span>{t('pages.accounts.editModal.email')}</span>
                         <input type="email" value={editUserForm.email} onChange={(event) => setEditUserForm((previous) => ({ ...previous, email: event.target.value }))} required />
                     </label>
                     <label>
-                        <span>First name</span>
+                        <span>{t('pages.accounts.editModal.firstName')}</span>
                         <input value={editUserForm.first_name} onChange={(event) => setEditUserForm((previous) => ({ ...previous, first_name: event.target.value }))} required />
                     </label>
                     <label>
-                        <span>Last name</span>
+                        <span>{t('pages.accounts.editModal.lastName')}</span>
                         <input value={editUserForm.last_name} onChange={(event) => setEditUserForm((previous) => ({ ...previous, last_name: event.target.value }))} required />
                     </label>
                     <label>
-                        <span>Role</span>
+                        <span>{t('pages.accounts.editModal.role')}</span>
                         <select
                             value={editUserForm.role}
                             onChange={(event) => setEditUserForm((previous) => ({ ...previous, role: event.target.value as UserInput['role'] }))}
                             disabled={editingUserId === currentUser?.id && currentUser?.role === 'admin'}
                         >
-                            <option value="participant">Participant</option>
-                            <option value="guest">Guest</option>
-                            <option value="zev_owner">ZEV Owner</option>
-                            <option value="admin">Admin</option>
+                            <option value="participant">{t('pages.accounts.roles.participant')}</option>
+                            <option value="guest">{t('pages.accounts.roles.guest')}</option>
+                            <option value="zev_owner">{t('pages.accounts.roles.zev_owner')}</option>
+                            <option value="admin">{t('pages.accounts.roles.admin')}</option>
                         </select>
                     </label>
 
                     {editingUserId === currentUser?.id && currentUser?.role === 'admin' && (
                         <div className="muted" style={{ gridColumn: '1 / -1' }}>
-                            For safety, an admin cannot change the role of their own account.
+                            {t('pages.accounts.editModal.selfRoleNotice')}
                         </div>
                     )}
                     {editUserError && <div className="error-banner" style={{ gridColumn: '1 / -1' }}>{editUserError}</div>}
 
                     <div style={{ gridColumn: '1 / -1', display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
                         <button className="button button-secondary" type="button" onClick={() => setShowEditUserModal(false)}>Cancel</button>
-                        <button className="button button-primary" type="submit" disabled={updateUserMutation.isPending}>Save account</button>
+                        <button className="button button-primary" type="submit" disabled={updateUserMutation.isPending}>{t('pages.accounts.editModal.saveButton')}</button>
                     </div>
                 </form>
             </FormModal>

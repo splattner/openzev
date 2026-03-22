@@ -22,6 +22,7 @@ import {
 import { formatShortDate, toDayJsDateFormat, useAppSettings } from '../lib/appSettings'
 import { useAuth } from '../lib/auth'
 import { useManagedZev } from '../lib/managedZev'
+import { useTranslation } from 'react-i18next'
 import { useToast } from '../lib/toast'
 import type { Tariff, TariffInput, TariffPeriod, TariffPeriodInput, TariffPreset } from '../types/api'
 
@@ -46,26 +47,6 @@ const defaultPeriodForm: TariffPeriodInput = {
     weekdays: '',
 }
 
-const categoryLabels: Record<Tariff['category'], string> = {
-    energy: 'Energy',
-    grid_fees: 'Grid Fees',
-    levies: 'Levies',
-}
-
-const billingModeLabels: Record<Tariff['billing_mode'], string> = {
-    energy: 'By energy (kWh)',
-    monthly_fee: 'Monthly fee',
-    yearly_fee: 'Yearly fee split by month',
-    per_metering_point_monthly_fee: 'Per metering point monthly fee',
-    per_metering_point_yearly_fee: 'Per metering point yearly fee split by month',
-}
-
-const energyTypeLabels: Record<NonNullable<Tariff['energy_type']>, string> = {
-    local: 'Local',
-    grid: 'Grid',
-    feed_in: 'Feed-in',
-}
-
 export function TariffsPage() {
     const queryClient = useQueryClient()
     const { pushToast } = useToast()
@@ -73,6 +54,7 @@ export function TariffsPage() {
     const { user } = useAuth()
     const { settings } = useAppSettings()
     const { selectedZevId } = useManagedZev()
+    const { t } = useTranslation()
     const isManagedScope = user?.role === 'admin' || user?.role === 'zev_owner'
 
     const tariffsQuery = useQuery({ queryKey: ['tariffs'], queryFn: fetchTariffs })
@@ -333,33 +315,33 @@ export function TariffsPage() {
     return (
         <div className="page-stack">
             <header>
-                <h2>Tariffs</h2>
-                <p className="muted">Configure rates and time bands for billing calculations.</p>
+                <h2>{t('pages.tariffs.title')}</h2>
+                <p className="muted">{t('pages.tariffs.description')}</p>
             </header>
 
             <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
                 <button className="button button-primary" onClick={openCreateTariffModal}>
-                    + New Tariff
+                    {t('pages.tariffs.newTariff')}
                 </button>
                 <button className="button button-secondary" onClick={openExportModal}>
-                    Export JSON
+                    {t('pages.tariffs.exportJson')}
                 </button>
                 <button className="button button-secondary" onClick={openImportModal}>
-                    Import JSON
+                    {t('pages.tariffs.importJson')}
                 </button>
             </div>
 
             <FormModal
                 isOpen={showExportModal}
-                title="Export Tariffs JSON"
+                title={t('pages.tariffs.exportModalTitle')}
                 onClose={closeExportModal}
                 maxWidth="520px"
             >
                 <div style={{ display: 'grid', gap: '1rem' }}>
                     <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
-                        <button className="button button-secondary" type="button" onClick={closeExportModal}>Cancel</button>
+                        <button className="button button-secondary" type="button" onClick={closeExportModal}>{t('pages.tariffs.cancel')}</button>
                         <button className="button button-primary" type="button" onClick={handleExport} disabled={exportMutation.isPending}>
-                            Export
+                            {t('pages.tariffs.export')}
                         </button>
                     </div>
                 </div>
@@ -367,29 +349,29 @@ export function TariffsPage() {
 
             <FormModal
                 isOpen={showImportModal}
-                title="Import Tariffs JSON"
+                title={t('pages.tariffs.importModalTitle')}
                 onClose={closeImportModal}
                 maxWidth="520px"
             >
                 <div style={{ display: 'grid', gap: '1rem' }}>
                     <label>
-                        <span>JSON File</span>
+                        <span>{t('pages.tariffs.form.jsonFile')}</span>
                         <input type="file" accept="application/json,.json" onChange={handleImportFile} />
                     </label>
                     <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                        <button className="button button-secondary" type="button" onClick={closeImportModal}>Close</button>
+                        <button className="button button-secondary" type="button" onClick={closeImportModal}>{t('pages.tariffs.close')}</button>
                     </div>
                 </div>
             </FormModal>
 
             <FormModal
                 isOpen={showTariffModal}
-                title={editingTariffId ? 'Edit Tariff' : 'Create Tariff'}
+                title={editingTariffId ? t('pages.tariffs.editTitle') : t('pages.tariffs.createTitle')}
                 onClose={closeTariffModal}
             >
                 <form onSubmit={submitTariff} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                     <label>
-                        <span>Name</span>
+                        <span>{t('pages.tariffs.form.name')}</span>
                         <input
                             value={tariffForm.name}
                             onChange={(event) => setTariffForm((prev) => ({ ...prev, name: event.target.value }))}
@@ -397,18 +379,18 @@ export function TariffsPage() {
                         />
                     </label>
                     <label>
-                        <span>Category</span>
+                        <span>{t('pages.tariffs.form.category')}</span>
                         <select
                             value={tariffForm.category}
                             onChange={(event) => setTariffForm((prev) => ({ ...prev, category: event.target.value as TariffInput['category'] }))}
                         >
-                            <option value="energy">Energy</option>
-                            <option value="grid_fees">Grid Fees</option>
-                            <option value="levies">Levies</option>
+                            <option value="energy">{t('pages.tariffs.categories.energy')}</option>
+                            <option value="grid_fees">{t('pages.tariffs.categories.grid_fees')}</option>
+                            <option value="levies">{t('pages.tariffs.categories.levies')}</option>
                         </select>
                     </label>
                     <label>
-                        <span>Billing mode</span>
+                        <span>{t('pages.tariffs.form.billingMode')}</span>
                         <select
                             value={tariffForm.billing_mode}
                             onChange={(event) => {
@@ -421,35 +403,35 @@ export function TariffsPage() {
                                 }))
                             }}
                         >
-                            <option value="energy">By energy (kWh)</option>
-                            <option value="monthly_fee">Monthly fee</option>
-                            <option value="yearly_fee">Yearly fee split by month</option>
-                            <option value="per_metering_point_monthly_fee">Per metering point monthly fee</option>
-                            <option value="per_metering_point_yearly_fee">Per metering point yearly fee split by month</option>
+                            <option value="energy">{t('pages.tariffs.billingModes.energy')}</option>
+                            <option value="monthly_fee">{t('pages.tariffs.billingModes.monthly_fee')}</option>
+                            <option value="yearly_fee">{t('pages.tariffs.billingModes.yearly_fee')}</option>
+                            <option value="per_metering_point_monthly_fee">{t('pages.tariffs.billingModes.per_metering_point_monthly_fee')}</option>
+                            <option value="per_metering_point_yearly_fee">{t('pages.tariffs.billingModes.per_metering_point_yearly_fee')}</option>
                         </select>
                     </label>
                     {tariffForm.billing_mode === 'energy' ? (
                         <label>
-                            <span>Energy type</span>
+                            <span>{t('pages.tariffs.form.energyType')}</span>
                             <select
                                 value={tariffForm.energy_type ?? 'local'}
                                 onChange={(event) => setTariffForm((prev) => ({ ...prev, energy_type: event.target.value as TariffInput['energy_type'] }))}
                             >
-                                <option value="local">Local</option>
-                                <option value="grid">Grid</option>
-                                <option value="feed_in">Feed-in</option>
+                                <option value="local">{t('pages.tariffs.energyTypes.local')}</option>
+                                <option value="grid">{t('pages.tariffs.energyTypes.grid')}</option>
+                                <option value="feed_in">{t('pages.tariffs.energyTypes.feed_in')}</option>
                             </select>
                         </label>
                     ) : (
                         <label>
                             <span>
                                 {tariffForm.billing_mode === 'monthly_fee'
-                                    ? 'Monthly fee (CHF)'
+                                    ? t('pages.tariffs.form.monthlyFee')
                                     : tariffForm.billing_mode === 'yearly_fee'
-                                        ? 'Yearly fee (CHF)'
+                                        ? t('pages.tariffs.form.yearlyFee')
                                         : tariffForm.billing_mode === 'per_metering_point_monthly_fee'
-                                            ? 'Per metering point monthly fee (CHF)'
-                                            : 'Per metering point yearly fee (CHF)'}
+                                            ? t('pages.tariffs.form.mpMonthlyFee')
+                                            : t('pages.tariffs.form.mpYearlyFee')}
                             </span>
                             <input
                                 type="number"
@@ -461,7 +443,7 @@ export function TariffsPage() {
                         </label>
                     )}
                     <label>
-                        <span>Valid from</span>
+                        <span>{t('pages.tariffs.form.validFrom')}</span>
                         <LocalizationProvider dateAdapter={AdapterDayjs}>
                             <DatePicker
                                 format={toDayJsDateFormat(settings.date_format_short)}
@@ -472,7 +454,7 @@ export function TariffsPage() {
                         </LocalizationProvider>
                     </label>
                     <label>
-                        <span>Valid to</span>
+                        <span>{t('pages.tariffs.form.validTo')}</span>
                         <LocalizationProvider dateAdapter={AdapterDayjs}>
                             <DatePicker
                                 format={toDayJsDateFormat(settings.date_format_short)}
@@ -483,7 +465,7 @@ export function TariffsPage() {
                         </LocalizationProvider>
                     </label>
                     <label>
-                        <span>Notes</span>
+                        <span>{t('pages.tariffs.form.notes')}</span>
                         <input
                             value={tariffForm.notes ?? ''}
                             onChange={(event) => setTariffForm((prev) => ({ ...prev, notes: event.target.value }))}
@@ -494,7 +476,7 @@ export function TariffsPage() {
                             Cancel
                         </button>
                         <button className="button button-primary" type="submit" disabled={tariffMutation.isPending}>
-                            {editingTariffId ? 'Save Tariff' : 'Create Tariff'}
+                            {editingTariffId ? t('pages.tariffs.saveTariff') : t('pages.tariffs.createTariff')}
                         </button>
                     </div>
                 </form>
@@ -502,42 +484,42 @@ export function TariffsPage() {
 
             <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
                 <button className="button button-primary" onClick={openCreatePeriodModal}>
-                    + New Tariff Period
+                    {t('pages.tariffs.newPeriod')}
                 </button>
             </div>
 
             <FormModal
                 isOpen={showPeriodModal}
-                title={editingPeriodId ? 'Edit Tariff Period' : 'Create Tariff Period'}
+                title={editingPeriodId ? t('pages.tariffs.editPeriodTitle') : t('pages.tariffs.createPeriodTitle')}
                 onClose={closePeriodModal}
             >
                 <form onSubmit={submitPeriod} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                     <label>
-                        <span>Tariff</span>
+                        <span>{t('pages.tariffs.form.tariff')}</span>
                         <select
                             value={periodForm.tariff}
                             onChange={(event) => setPeriodForm((prev) => ({ ...prev, tariff: event.target.value }))}
                             required
                         >
-                            <option value="">Select tariff</option>
+                            <option value="">{t('pages.tariffs.form.selectTariff')}</option>
                             {energyTariffs.map((tariff) => (
                                 <option key={tariff.id} value={tariff.id}>{tariff.name}</option>
                             ))}
                         </select>
                     </label>
                     <label>
-                        <span>Period type</span>
+                        <span>{t('pages.tariffs.form.periodType')}</span>
                         <select
                             value={periodForm.period_type}
                             onChange={(event) => setPeriodForm((prev) => ({ ...prev, period_type: event.target.value as TariffPeriodInput['period_type'] }))}
                         >
-                            <option value="flat">Flat</option>
-                            <option value="high">High (HT)</option>
-                            <option value="low">Low (NT)</option>
+                            <option value="flat">{t('pages.tariffs.periodTypes.flat')}</option>
+                            <option value="high">{t('pages.tariffs.periodTypes.high')}</option>
+                            <option value="low">{t('pages.tariffs.periodTypes.low')}</option>
                         </select>
                     </label>
                     <label>
-                        <span>CHF/kWh</span>
+                        <span>{t('pages.tariffs.form.pricePerKwh')}</span>
                         <input
                             type="number"
                             step="0.00001"
@@ -547,7 +529,7 @@ export function TariffsPage() {
                         />
                     </label>
                     <label>
-                        <span>Time from</span>
+                        <span>{t('pages.tariffs.form.timeFrom')}</span>
                         <input
                             type="time"
                             value={periodForm.time_from ?? ''}
@@ -555,7 +537,7 @@ export function TariffsPage() {
                         />
                     </label>
                     <label>
-                        <span>Time to</span>
+                        <span>{t('pages.tariffs.form.timeTo')}</span>
                         <input
                             type="time"
                             value={periodForm.time_to ?? ''}
@@ -563,7 +545,7 @@ export function TariffsPage() {
                         />
                     </label>
                     <label>
-                        <span>Weekdays</span>
+                        <span>{t('pages.tariffs.form.weekdays')}</span>
                         <input
                             value={periodForm.weekdays ?? ''}
                             onChange={(event) => setPeriodForm((prev) => ({ ...prev, weekdays: event.target.value }))}
@@ -575,34 +557,34 @@ export function TariffsPage() {
                             Cancel
                         </button>
                         <button className="button button-primary" type="submit" disabled={periodMutation.isPending}>
-                            {editingPeriodId ? 'Save Tariff Period' : 'Create Tariff Period'}
+                            {editingPeriodId ? t('pages.tariffs.savePeriod') : t('pages.tariffs.createPeriod')}
                         </button>
                     </div>
                 </form>
             </FormModal>
 
             <div className="table-card">
-                <h3>Tariff List</h3>
+                <h3>{t('pages.tariffs.tariffList')}</h3>
                 <table>
                     <thead>
                         <tr>
-                            <th>Name</th>
-                            <th>Category</th>
-                            <th>Billing mode</th>
-                            <th>Pricing</th>
-                            <th>Validity</th>
-                            <th>Actions</th>
+                            <th>{t('pages.tariffs.col.name')}</th>
+                            <th>{t('pages.tariffs.col.category')}</th>
+                            <th>{t('pages.tariffs.col.billingMode')}</th>
+                            <th>{t('pages.tariffs.col.pricing')}</th>
+                            <th>{t('pages.tariffs.col.validity')}</th>
+                            <th>{t('pages.tariffs.col.actions')}</th>
                         </tr>
                     </thead>
                     <tbody>
                         {tariffs.length ? tariffs.map((tariff) => (
                             <tr key={tariff.id}>
                                 <td>{tariff.name}</td>
-                                <td>{categoryLabels[tariff.category]}</td>
-                                <td>{billingModeLabels[tariff.billing_mode]}</td>
+                                <td>{t(`pages.tariffs.categories.${tariff.category}` as Parameters<typeof t>[0])}</td>
+                                <td>{t(`pages.tariffs.billingModes.${tariff.billing_mode}` as Parameters<typeof t>[0])}</td>
                                 <td>
                                     {tariff.billing_mode === 'energy'
-                                        ? energyTypeLabels[(tariff.energy_type || 'local') as NonNullable<Tariff['energy_type']>]
+                                        ? t(`pages.tariffs.energyTypes.${tariff.energy_type || 'local'}` as Parameters<typeof t>[0])
                                         : `CHF ${tariff.fixed_price_chf || '0.00'}`}
                                 </td>
                                 <td>{formatShortDate(tariff.valid_from, settings)} → {tariff.valid_to ? formatShortDate(tariff.valid_to, settings) : '-'}</td>
@@ -615,9 +597,9 @@ export function TariffsPage() {
                                         type="button"
                                         disabled={deleteTariffMutation.isPending || dialogLoading}
                                         onClick={() => confirm({
-                                            title: 'Delete Tariff',
-                                            message: `Are you sure you want to delete tariff "${tariff.name}"? This action cannot be undone.`,
-                                            confirmText: 'Delete Tariff',
+                                            title: t('pages.tariffs.deleteTitle'),
+                                            message: t('pages.tariffs.deleteMessage', { name: tariff.name }),
+                                            confirmText: t('pages.tariffs.deleteConfirm'),
                                             isDangerous: true,
                                             onConfirm: () => deleteTariffMutation.mutate(tariff.id),
                                         })}
@@ -628,7 +610,7 @@ export function TariffsPage() {
                             </tr>
                         )) : (
                             <tr>
-                                <td colSpan={6}>No tariffs yet.</td>
+                                <td colSpan={6}>{t('pages.tariffs.noTariffs')}</td>
                             </tr>
                         )}
                     </tbody>
@@ -636,26 +618,26 @@ export function TariffsPage() {
             </div>
 
             <div className="table-card">
-                <h3>Tariff Periods</h3>
+                <h3>{t('pages.tariffs.tariffPeriods')}</h3>
                 <table>
                     <thead>
                         <tr>
-                            <th>Tariff</th>
-                            <th>Type</th>
-                            <th>CHF/kWh</th>
-                            <th>Time</th>
-                            <th>Weekdays</th>
-                            <th>Actions</th>
+                            <th>{t('pages.tariffs.periodCol.tariff')}</th>
+                            <th>{t('pages.tariffs.periodCol.type')}</th>
+                            <th>{t('pages.tariffs.periodCol.pricePerKwh')}</th>
+                            <th>{t('pages.tariffs.periodCol.time')}</th>
+                            <th>{t('pages.tariffs.periodCol.weekdays')}</th>
+                            <th>{t('pages.tariffs.periodCol.actions')}</th>
                         </tr>
                     </thead>
                     <tbody>
                         {periods.length ? periods.map((period) => (
                             <tr key={period.id}>
                                 <td>{tariffNameById.get(period.tariff) || period.tariff}</td>
-                                <td>{period.period_type}</td>
+                                <td>{t(`pages.tariffs.periodTypes.${period.period_type}` as Parameters<typeof t>[0], { defaultValue: period.period_type })}</td>
                                 <td>{period.price_chf_per_kwh}</td>
                                 <td>{period.time_from || '-'} → {period.time_to || '-'}</td>
-                                <td>{period.weekdays || 'all'}</td>
+                                <td>{period.weekdays || t('pages.tariffs.allWeekdays')}</td>
                                 <td className="actions-cell">
                                     <button className="button button-primary" type="button" onClick={() => startPeriodEdit(period)}>
                                         Edit
@@ -665,9 +647,9 @@ export function TariffsPage() {
                                         type="button"
                                         disabled={deletePeriodMutation.isPending || dialogLoading}
                                         onClick={() => confirm({
-                                            title: 'Delete Tariff Period',
-                                            message: `Are you sure you want to delete this tariff period for "${tariffNameById.get(period.tariff) ?? period.tariff}"?`,
-                                            confirmText: 'Delete Tariff Period',
+                                            title: t('pages.tariffs.deletePeriodTitle'),
+                                            message: t('pages.tariffs.deletePeriodMessage', { name: tariffNameById.get(period.tariff) ?? period.tariff }),
+                                            confirmText: t('pages.tariffs.deletePeriodConfirm'),
                                             isDangerous: true,
                                             onConfirm: () => deletePeriodMutation.mutate(period.id),
                                         })}
@@ -678,7 +660,7 @@ export function TariffsPage() {
                             </tr>
                         )) : (
                             <tr>
-                                <td colSpan={6}>No tariff periods yet.</td>
+                                <td colSpan={6}>{t('pages.tariffs.noPeriods')}</td>
                             </tr>
                         )}
                     </tbody>

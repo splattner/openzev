@@ -113,12 +113,12 @@ export function DashboardPage() {
                             }}
                         />
                         <label>
-                            <span>Participant</span>
+                            <span>{t('pages.dashboard.participant')}</span>
                             <select
                                 value={selectedParticipantId}
                                 onChange={(e) => setSelectedParticipantId(e.target.value)}
                             >
-                                <option value="">All participants</option>
+                                <option value="">{t('pages.dashboard.allParticipants')}</option>
                                 {summary?.role === 'zev_owner' && summary.participant_stats.map((participant) => (
                                     <option key={participant.participant_id} value={participant.participant_id}>
                                         {participant.participant_name || participant.participant_id}
@@ -127,11 +127,11 @@ export function DashboardPage() {
                             </select>
                         </label>
                         <label>
-                            <span>Resolution</span>
+                            <span>{t('pages.dashboard.resolution')}</span>
                             <select value={bucket} onChange={(e) => setBucket(e.target.value as 'day' | 'hour' | 'month')}>
-                                <option value="hour">Hourly</option>
-                                <option value="day">Daily</option>
-                                <option value="month">Monthly</option>
+                                <option value="hour">{t('pages.dashboard.hourly')}</option>
+                                <option value="day">{t('pages.dashboard.daily')}</option>
+                                <option value="month">{t('pages.dashboard.monthly')}</option>
                             </select>
                         </label>
                     </div>
@@ -150,11 +150,11 @@ export function DashboardPage() {
                             }}
                         />
                         <label>
-                            <span>Resolution</span>
+                            <span>{t('pages.dashboard.resolution')}</span>
                             <select value={bucket} onChange={(e) => setBucket(e.target.value as 'day' | 'hour' | 'month')}>
-                                <option value="hour">Hourly</option>
-                                <option value="day">Daily</option>
-                                <option value="month">Monthly</option>
+                                <option value="hour">{t('pages.dashboard.hourly')}</option>
+                                <option value="day">{t('pages.dashboard.daily')}</option>
+                                <option value="month">{t('pages.dashboard.monthly')}</option>
                             </select>
                         </label>
                     </div>
@@ -162,23 +162,23 @@ export function DashboardPage() {
             )}
 
             {isZevScopedRole && !selectedZevId && !managedZevLoading && (
-                <div className="card">No ZEV available for your account.</div>
+                <div className="card">{t('pages.dashboard.noZev')}</div>
             )}
 
             {isZevScopedRole && selectedZevId && !selectedZev && !managedZevLoading && managedZevs.length > 0 && (
-                <div className="card">Please select a ZEV from the global selector in the sidebar.</div>
+                <div className="card">{t('pages.dashboard.selectZev')}</div>
             )}
 
-            {summaryQuery.isLoading && <div className="card">Loading dashboard analytics…</div>}
-            {summaryQuery.isError && <div className="card error-banner">Failed to load metering analytics.</div>}
+            {summaryQuery.isLoading && <div className="card">{t('pages.dashboard.loadingAnalytics')}</div>}
+            {summaryQuery.isError && <div className="card error-banner">{t('pages.dashboard.failedAnalytics')}</div>}
 
             {summary && summary.role === 'zev_owner' && (
                 <>
                     <section className="grid grid-4">
-                        <StatCard label="Produced in ZEV" value={`${summary.totals.produced_kwh.toFixed(2)} kWh`} />
-                        <StatCard label="Consumed in ZEV" value={`${summary.totals.consumed_kwh.toFixed(2)} kWh`} />
-                        <StatCard label="Imported from Grid" value={`${summary.totals.imported_kwh.toFixed(2)} kWh`} />
-                        <StatCard label="Exported to Grid" value={`${summary.totals.exported_kwh.toFixed(2)} kWh`} />
+                        <StatCard label={t('pages.dashboard.stats.producedInZev')} value={`${summary.totals.produced_kwh.toFixed(2)} kWh`} />
+                        <StatCard label={t('pages.dashboard.stats.consumedInZev')} value={`${summary.totals.consumed_kwh.toFixed(2)} kWh`} />
+                        <StatCard label={t('pages.dashboard.stats.importedFromGrid')} value={`${summary.totals.imported_kwh.toFixed(2)} kWh`} />
+                        <StatCard label={t('pages.dashboard.stats.exportedToGrid')} value={`${summary.totals.exported_kwh.toFixed(2)} kWh`} />
                     </section>
 
                     {(() => {
@@ -189,14 +189,14 @@ export function DashboardPage() {
                         return (
                             <section className="grid grid-2">
                                 <StatCard
-                                    label="Self-consumption Rate"
+                                    label={t('pages.dashboard.stats.selfConsumptionRate')}
                                     value={`${selfConsumptionPct.toFixed(1)}%`}
-                                    hint={`${locallyUsed.toFixed(2)} kWh of ${totalProduced.toFixed(2)} kWh produced used locally`}
+                                    hint={t('pages.dashboard.hints.selfConsumption', { local: locallyUsed.toFixed(2), total: totalProduced.toFixed(2) })}
                                 />
                                 <StatCard
-                                    label="Export Ratio"
+                                    label={t('pages.dashboard.stats.exportRatio')}
                                     value={`${exportPct.toFixed(1)}%`}
-                                    hint={`${summary.totals.exported_kwh.toFixed(2)} kWh of ${totalProduced.toFixed(2)} kWh produced exported to grid`}
+                                    hint={t('pages.dashboard.hints.export', { exported: summary.totals.exported_kwh.toFixed(2), total: totalProduced.toFixed(2) })}
                                 />
                             </section>
                         )
@@ -204,16 +204,16 @@ export function DashboardPage() {
 
                     <section className="card">
                         <h3 style={{ marginTop: 0 }}>
-                            Energy Balance
+                            {t('pages.dashboard.energyBalance')}
                             {selectedZevName ? ` — ${selectedZevName}` : ''}
                             {selectedParticipantName ? ` — ${selectedParticipantName}` : ''}
                         </h3>
                         {ownerChartData.length === 0 ? (
-                            <p className="muted">No metering data for selected period.</p>
+                            <p className="muted">{t('pages.dashboard.noData')}</p>
                         ) : (
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
                                 <div>
-                                    <p style={{ margin: '0 0 0.5rem', fontWeight: 600, fontSize: '0.875rem', color: '#374151' }}>Consumption</p>
+                                    <p style={{ margin: '0 0 0.5rem', fontWeight: 600, fontSize: '0.875rem', color: '#374151' }}>{t('pages.dashboard.consumption')}</p>
                                     <ResponsiveContainer width="100%" height={300}>
                                         <BarChart data={ownerChartData} margin={{ top: 4, right: 4, bottom: 4, left: 0 }}>
                                             <CartesianGrid strokeDasharray="3 3" vertical={false} />
@@ -221,13 +221,13 @@ export function DashboardPage() {
                                             <YAxis tick={{ fontSize: 10 }} unit=" kWh" width={60} />
                                             <Tooltip formatter={(v) => `${Number(v).toFixed(2)} kWh`} />
                                             <Legend />
-                                            <Bar dataKey="locally_consumed" name="From ZEV" stackId="c" fill="#16a34a" />
-                                            <Bar dataKey="imported_kwh" name="From Grid" stackId="c" fill="#f59e0b" radius={[3, 3, 0, 0]} />
+                                            <Bar dataKey="locally_consumed" name={t('pages.dashboard.chart.fromZev')} stackId="c" fill="#16a34a" />
+                                            <Bar dataKey="imported_kwh" name={t('pages.dashboard.chart.fromGrid')} stackId="c" fill="#f59e0b" radius={[3, 3, 0, 0]} />
                                         </BarChart>
                                     </ResponsiveContainer>
                                 </div>
                                 <div>
-                                    <p style={{ margin: '0 0 0.5rem', fontWeight: 600, fontSize: '0.875rem', color: '#374151' }}>Production</p>
+                                    <p style={{ margin: '0 0 0.5rem', fontWeight: 600, fontSize: '0.875rem', color: '#374151' }}>{t('pages.dashboard.production')}</p>
                                     <ResponsiveContainer width="100%" height={300}>
                                         <ComposedChart data={ownerChartData} margin={{ top: 4, right: 50, bottom: 4, left: 0 }}>
                                             <CartesianGrid strokeDasharray="3 3" vertical={false} />
@@ -242,9 +242,9 @@ export function DashboardPage() {
                                                 }
                                             />
                                             <Legend />
-                                            <Bar yAxisId="kwh" dataKey="locally_produced" name="Used locally" stackId="p" fill="#16a34a" />
-                                            <Bar yAxisId="kwh" dataKey="exported_kwh" name="Exported" stackId="p" fill="#8b5cf6" radius={[3, 3, 0, 0]} />
-                                            <Line yAxisId="pct" type="monotone" dataKey="self_consumption_rate" name="Self-consumed %" stroke="#0ea5e9" dot={false} strokeWidth={2} connectNulls />
+                                            <Bar yAxisId="kwh" dataKey="locally_produced" name={t('pages.dashboard.chart.usedLocally')} stackId="p" fill="#16a34a" />
+                                            <Bar yAxisId="kwh" dataKey="exported_kwh" name={t('pages.dashboard.chart.exported')} stackId="p" fill="#8b5cf6" radius={[3, 3, 0, 0]} />
+                                            <Line yAxisId="pct" type="monotone" dataKey="self_consumption_rate" name={t('pages.dashboard.chart.selfConsumedPct')} stroke="#0ea5e9" dot={false} strokeWidth={2} connectNulls />
                                         </ComposedChart>
                                     </ResponsiveContainer>
                                 </div>
@@ -253,18 +253,18 @@ export function DashboardPage() {
                     </section>
 
                     <section className="card">
-                        <h3 style={{ marginTop: 0 }}>Per Participant</h3>
+                        <h3 style={{ marginTop: 0 }}>{t('pages.dashboard.perParticipant')}</h3>
                         {summary.participant_stats.length === 0 ? (
-                            <p className="muted">No participant-level data for selected period.</p>
+                            <p className="muted">{t('pages.dashboard.noParticipantData')}</p>
                         ) : (
                             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                                 <thead>
                                     <tr>
-                                        <th style={{ textAlign: 'left', padding: '0.5rem 0.6rem' }}>Participant</th>
-                                        <th style={{ textAlign: 'right', padding: '0.5rem 0.6rem' }}>Consumption</th>
-                                        <th style={{ textAlign: 'right', padding: '0.5rem 0.6rem' }}>Production/Export</th>
-                                        <th style={{ textAlign: 'right', padding: '0.5rem 0.6rem' }}>From ZEV</th>
-                                        <th style={{ textAlign: 'right', padding: '0.5rem 0.6rem' }}>From Grid</th>
+                                        <th style={{ textAlign: 'left', padding: '0.5rem 0.6rem' }}>{t('pages.dashboard.col.participant')}</th>
+                                        <th style={{ textAlign: 'right', padding: '0.5rem 0.6rem' }}>{t('pages.dashboard.col.consumption')}</th>
+                                        <th style={{ textAlign: 'right', padding: '0.5rem 0.6rem' }}>{t('pages.dashboard.col.productionExport')}</th>
+                                        <th style={{ textAlign: 'right', padding: '0.5rem 0.6rem' }}>{t('pages.dashboard.col.fromZev')}</th>
+                                        <th style={{ textAlign: 'right', padding: '0.5rem 0.6rem' }}>{t('pages.dashboard.col.fromGrid')}</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -306,15 +306,15 @@ export function DashboardPage() {
             {summary && summary.role === 'participant' && (
                 <>
                     <section style={{ display: 'grid', gap: '1rem', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
-                        <StatCard label="Consumed from ZEV" value={`${summary.totals.consumed_from_zev_kwh.toFixed(2)} kWh`} />
-                        <StatCard label="Imported from Grid" value={`${summary.totals.imported_from_grid_kwh.toFixed(2)} kWh`} />
-                        <StatCard label="Total Consumption" value={`${summary.totals.total_consumed_kwh.toFixed(2)} kWh`} />
+                        <StatCard label={t('pages.dashboard.participantStats.consumedFromZev')} value={`${summary.totals.consumed_from_zev_kwh.toFixed(2)} kWh`} />
+                        <StatCard label={t('pages.dashboard.participantStats.importedFromGrid')} value={`${summary.totals.imported_from_grid_kwh.toFixed(2)} kWh`} />
+                        <StatCard label={t('pages.dashboard.participantStats.totalConsumption')} value={`${summary.totals.total_consumed_kwh.toFixed(2)} kWh`} />
                     </section>
 
                     <section className="card" style={{ minHeight: 360 }}>
-                        <h3 style={{ marginTop: 0 }}>Consumption Split</h3>
+                        <h3 style={{ marginTop: 0 }}>{t('pages.dashboard.consumptionSplit')}</h3>
                         {participantTimeline.length === 0 ? (
-                            <p className="muted">No metering data for selected period.</p>
+                            <p className="muted">{t('pages.dashboard.noData')}</p>
                         ) : (
                             <ResponsiveContainer width="100%" height={320}>
                                 <BarChart data={participantTimeline} margin={{ top: 4, right: 4, bottom: 4, left: 0 }}>
@@ -323,29 +323,29 @@ export function DashboardPage() {
                                     <YAxis tick={{ fontSize: 11 }} unit=" kWh" width={60} />
                                     <Tooltip formatter={(v) => `${Number(v).toFixed(2)} kWh`} />
                                     <Legend />
-                                    <Bar dataKey="consumed_from_zev_kwh" name="From ZEV" stackId="c" fill="#16a34a" />
-                                    <Bar dataKey="imported_from_grid_kwh" name="From Grid" stackId="c" fill="#f59e0b" radius={[3, 3, 0, 0]} />
+                                    <Bar dataKey="consumed_from_zev_kwh" name={t('pages.dashboard.chart.fromZev')} stackId="c" fill="#16a34a" />
+                                    <Bar dataKey="imported_from_grid_kwh" name={t('pages.dashboard.chart.fromGrid')} stackId="c" fill="#f59e0b" radius={[3, 3, 0, 0]} />
                                 </BarChart>
                             </ResponsiveContainer>
                         )}
                     </section>
 
                     <section className="card">
-                        <h3 style={{ marginTop: 0 }}>Invoices</h3>
+                        <h3 style={{ marginTop: 0 }}>{t('pages.dashboard.invoicesSection')}</h3>
                         {participantInvoicesQuery.isLoading ? (
-                            <p className="muted">Loading invoices…</p>
+                            <p className="muted">{t('pages.dashboard.loadingInvoices')}</p>
                         ) : participantInvoicesQuery.isError ? (
-                            <p className="muted">Failed to load invoices.</p>
+                            <p className="muted">{t('pages.dashboard.failedInvoices')}</p>
                         ) : participantInvoicesWithPdf.length === 0 ? (
-                            <p className="muted">No invoices available.</p>
+                            <p className="muted">{t('pages.dashboard.noInvoices')}</p>
                         ) : (
                             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                                 <thead>
                                     <tr>
-                                        <th style={{ textAlign: 'left', padding: '0.5rem 0.6rem' }}>Invoice</th>
-                                        <th style={{ textAlign: 'left', padding: '0.5rem 0.6rem' }}>Period</th>
-                                        <th style={{ textAlign: 'right', padding: '0.5rem 0.6rem' }}>Total</th>
-                                        <th style={{ textAlign: 'left', padding: '0.5rem 0.6rem' }}>Actions</th>
+                                        <th style={{ textAlign: 'left', padding: '0.5rem 0.6rem' }}>{t('pages.dashboard.invoiceCol.invoice')}</th>
+                                        <th style={{ textAlign: 'left', padding: '0.5rem 0.6rem' }}>{t('pages.dashboard.invoiceCol.period')}</th>
+                                        <th style={{ textAlign: 'right', padding: '0.5rem 0.6rem' }}>{t('pages.dashboard.invoiceCol.total')}</th>
+                                        <th style={{ textAlign: 'left', padding: '0.5rem 0.6rem' }}>{t('pages.dashboard.invoiceCol.actions')}</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -361,7 +361,7 @@ export function DashboardPage() {
                                                         style={{ textDecoration: 'none' }}
                                                         to={`/invoices/${invoice.id}`}
                                                     >
-                                                        View details
+                                                        {t('pages.dashboard.viewDetails')}
                                                     </Link>
                                                     <a
                                                         href={invoice.pdf_url ?? undefined}

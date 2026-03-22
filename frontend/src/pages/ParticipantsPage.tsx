@@ -14,6 +14,7 @@ import {
 import { formatShortDate, useAppSettings } from '../lib/appSettings'
 import { useAuth } from '../lib/auth'
 import { useManagedZev } from '../lib/managedZev'
+import { useTranslation } from 'react-i18next'
 import { useToast } from '../lib/toast'
 import type { Participant, ParticipantInput } from '../types/api'
 
@@ -57,6 +58,7 @@ export function ParticipantsPage() {
     const { user } = useAuth()
     const { settings } = useAppSettings()
     const { selectedZevId } = useManagedZev()
+    const { t } = useTranslation()
     const isManagedScope = user?.role === 'admin' || user?.role === 'zev_owner'
     const { data, isLoading, isError } = useQuery({ queryKey: ['participants'], queryFn: fetchParticipants })
     const zevsQuery = useQuery({ queryKey: ['zevs'], queryFn: fetchZevs })
@@ -186,10 +188,10 @@ export function ParticipantsPage() {
 
     function participantWarnings(participant: Participant): string[] {
         const warnings: string[] = []
-        if (!participant.email) warnings.push('No email')
+        if (!participant.email) warnings.push(t('pages.participants.warnings.noEmail'))
         const hasAddress = !!(participant.address_line1 && participant.postal_code && participant.city)
-        if (!hasAddress) warnings.push('No address')
-        if (!participant.has_metering_point_assignment) warnings.push('No metering point')
+        if (!hasAddress) warnings.push(t('pages.participants.warnings.noAddress'))
+        if (!participant.has_metering_point_assignment) warnings.push(t('pages.participants.warnings.noMeteringPoint'))
         return warnings
     }
 
@@ -211,22 +213,22 @@ export function ParticipantsPage() {
     return (
         <div className="page-stack">
             <header>
-                <h2>Participants</h2>
-                <p className="muted">People or companies billed inside a ZEV or vZEV.</p>
+                <h2>{t('pages.participants.title')}</h2>
+                <p className="muted">{t('pages.participants.description')}</p>
             </header>
 
             {credentialsNotice && (
                 <section className="card">
                     <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', alignItems: 'flex-start', flexWrap: 'wrap' }}>
                         <div>
-                            <h3 style={{ marginTop: 0, marginBottom: '0.5rem' }}>Account credentials</h3>
+                            <h3 style={{ marginTop: 0, marginBottom: '0.5rem' }}>{t('pages.participants.credentialsTitle')}</h3>
                             <p className="muted" style={{ marginTop: 0 }}>{credentialsNotice.message}</p>
                             <p style={{ marginBottom: '0.35rem' }}><strong>{credentialsNotice.participantName}</strong></p>
-                            <p style={{ margin: '0.2rem 0' }}>Username: <strong>{credentialsNotice.username}</strong></p>
-                            <p style={{ margin: '0.2rem 0' }}>Temporary password: <strong>{credentialsNotice.password}</strong></p>
+                            <p style={{ margin: '0.2rem 0' }}>{t('pages.participants.usernameLabel')} <strong>{credentialsNotice.username}</strong></p>
+                            <p style={{ margin: '0.2rem 0' }}>{t('pages.participants.passwordLabel')} <strong>{credentialsNotice.password}</strong></p>
                         </div>
                         <button className="button button-secondary" type="button" onClick={() => setCredentialsNotice(null)}>
-                            Dismiss
+                            {t('pages.participants.dismiss')}
                         </button>
                     </div>
                 </section>
@@ -234,19 +236,19 @@ export function ParticipantsPage() {
 
             <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
                 <button className="button button-primary" onClick={openCreateModal}>
-                    + New Participant
+                    {t('pages.participants.newParticipant')}
                 </button>
             </div>
 
             <FormModal
                 isOpen={showModal}
-                title={editingId ? 'Edit Participant' : 'Create Participant'}
+                title={editingId ? t('pages.participants.editTitle') : t('pages.participants.createTitle')}
                 onClose={closeModal}
                 maxWidth="960px"
             >
                 <form onSubmit={submit} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                     <label>
-                        <span>Title</span>
+                        <span>{t('pages.participants.form.title')}</span>
                         <select
                             value={form.title ?? ''}
                             onChange={(event) => setForm((prev) => ({ ...prev, title: event.target.value as ParticipantInput['title'] }))}
@@ -259,7 +261,7 @@ export function ParticipantsPage() {
                         </select>
                     </label>
                     <label>
-                        <span>First name</span>
+                        <span>{t('pages.participants.form.firstName')}</span>
                         <input
                             value={form.first_name}
                             onChange={(event) => setForm((prev) => ({ ...prev, first_name: event.target.value }))}
@@ -267,7 +269,7 @@ export function ParticipantsPage() {
                         />
                     </label>
                     <label>
-                        <span>Last name</span>
+                        <span>{t('pages.participants.form.lastName')}</span>
                         <input
                             value={form.last_name}
                             onChange={(event) => setForm((prev) => ({ ...prev, last_name: event.target.value }))}
@@ -275,7 +277,7 @@ export function ParticipantsPage() {
                         />
                     </label>
                     <label>
-                        <span>Email</span>
+                        <span>{t('pages.participants.form.email')}</span>
                         <input
                             type="email"
                             value={form.email}
@@ -284,42 +286,42 @@ export function ParticipantsPage() {
                         />
                     </label>
                     <label>
-                        <span>Phone</span>
+                        <span>{t('pages.participants.form.phone')}</span>
                         <input
                             value={form.phone ?? ''}
                             onChange={(event) => setForm((prev) => ({ ...prev, phone: event.target.value }))}
                         />
                     </label>
                     <label style={{ gridColumn: '1 / -1' }}>
-                        <span>Address line 1</span>
+                        <span>{t('pages.participants.form.addressLine1')}</span>
                         <input
                             value={form.address_line1 ?? ''}
                             onChange={(event) => setForm((prev) => ({ ...prev, address_line1: event.target.value }))}
                         />
                     </label>
                     <label style={{ gridColumn: '1 / -1' }}>
-                        <span>Address line 2</span>
+                        <span>{t('pages.participants.form.addressLine2')}</span>
                         <input
                             value={form.address_line2 ?? ''}
                             onChange={(event) => setForm((prev) => ({ ...prev, address_line2: event.target.value }))}
                         />
                     </label>
                     <label>
-                        <span>Postal code</span>
+                        <span>{t('pages.participants.form.postalCode')}</span>
                         <input
                             value={form.postal_code ?? ''}
                             onChange={(event) => setForm((prev) => ({ ...prev, postal_code: event.target.value }))}
                         />
                     </label>
                     <label>
-                        <span>City</span>
+                        <span>{t('pages.participants.form.city')}</span>
                         <input
                             value={form.city ?? ''}
                             onChange={(event) => setForm((prev) => ({ ...prev, city: event.target.value }))}
                         />
                     </label>
                     <label>
-                        <span>Valid from</span>
+                        <span>{t('pages.participants.form.validFrom')}</span>
                         <input
                             type="date"
                             value={form.valid_from}
@@ -328,7 +330,7 @@ export function ParticipantsPage() {
                         />
                     </label>
                     <label>
-                        <span>Valid to</span>
+                        <span>{t('pages.participants.form.validTo')}</span>
                         <input
                             type="date"
                             value={form.valid_to ?? ''}
@@ -336,7 +338,7 @@ export function ParticipantsPage() {
                         />
                     </label>
                     <label style={{ gridColumn: '1 / -1' }}>
-                        <span>Notes</span>
+                        <span>{t('pages.participants.form.notes')}</span>
                         <textarea
                             value={form.notes ?? ''}
                             onChange={(event) => setForm((prev) => ({ ...prev, notes: event.target.value }))}
@@ -351,7 +353,7 @@ export function ParticipantsPage() {
                             Cancel
                         </button>
                         <button className="button button-primary" type="submit" disabled={createMutation.isPending || updateMutation.isPending}>
-                            {editingId ? 'Save Participant' : 'Create Participant'}
+                            {editingId ? t('pages.participants.saveParticipant') : t('pages.participants.createTitle')}
                         </button>
                     </div>
                 </form>
@@ -361,11 +363,11 @@ export function ParticipantsPage() {
                 <table>
                     <thead>
                         <tr>
-                            <th>Name</th>
-                            <th>Contact</th>
-                            <th>Address</th>
-                            <th>Valid from</th>
-                            <th>Valid to</th>
+                            <th>{t('pages.participants.col.name')}</th>
+                            <th>{t('pages.participants.col.contact')}</th>
+                            <th>{t('pages.participants.col.address')}</th>
+                            <th>{t('pages.participants.col.validFrom')}</th>
+                            <th>{t('pages.participants.col.validTo')}</th>
                             <th>Actions</th>
                         </tr>
                     </thead>
@@ -380,7 +382,7 @@ export function ParticipantsPage() {
                                         {ownerRow && (
                                             <div>
                                                 <span className="badge badge-info" style={{ marginTop: '0.3rem' }}>
-                                                    Owner
+                                                    {t('pages.participants.owner')}
                                                 </span>
                                             </div>
                                         )}
@@ -408,7 +410,7 @@ export function ParticipantsPage() {
                                             disabled={invitationMutation.isPending}
                                             onClick={() => invitationMutation.mutate(participant.id)}
                                         >
-                                            Send Invitation
+                                            {t('pages.participants.sendInvitation')}
                                         </button>
                                         <button className="button button-primary" type="button" onClick={() => startEdit(participant)}>
                                             Edit
@@ -419,9 +421,9 @@ export function ParticipantsPage() {
                                                 type="button"
                                                 disabled={deleteMutation.isPending || dialogLoading}
                                                 onClick={() => confirm({
-                                                    title: 'Delete Participant',
-                                                    message: `Are you sure you want to delete "${formatParticipantName(participant)}"? This action cannot be undone.`,
-                                                    confirmText: 'Delete Participant',
+                                                    title: t('pages.participants.deleteTitle'),
+                                                    message: t('pages.participants.deleteMessage', { name: formatParticipantName(participant) }),
+                                                    confirmText: t('pages.participants.deleteConfirm'),
                                                     isDangerous: true,
                                                     onConfirm: () => deleteMutation.mutate(participant.id),
                                                 })}
@@ -434,7 +436,7 @@ export function ParticipantsPage() {
                             )
                         }) : (
                             <tr>
-                                <td colSpan={6}>No participants yet.</td>
+                                <td colSpan={6}>{t('pages.participants.noParticipants')}</td>
                             </tr>
                         )}
                     </tbody>

@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import {
     approveInvoice,
     deleteInvoice,
@@ -80,6 +81,7 @@ function shiftBillingPeriod(startIso: string, interval: BillingInterval, directi
 
 export function InvoicesPage() {
     const EMAIL_STATUS_POLL_TIMEOUT_MS = 90_000
+    const { t } = useTranslation()
     const queryClient = useQueryClient()
     const { pushToast } = useToast()
     const { settings } = useAppSettings()
@@ -281,8 +283,8 @@ export function InvoicesPage() {
         return (
             <div className="page-stack">
                 <header>
-                    <h2>Invoices</h2>
-                    <p className="muted">Select a ZEV in the global selector to manage billing periods and invoices.</p>
+                    <h2>{t('pages.invoices.title')}</h2>
+                    <p className="muted">{t('pages.invoices.selectZev')}</p>
                 </header>
             </div>
         )
@@ -291,8 +293,8 @@ export function InvoicesPage() {
     return (
         <div className="page-stack">
             <header>
-                <h2>Invoices</h2>
-                <p className="muted">Period-based invoicing for the selected ZEV using its configured billing interval.</p>
+                <h2>{t('pages.invoices.title')}</h2>
+                <p className="muted">{t('pages.invoices.description')}</p>
             </header>
 
             <section className="card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem' }}>
@@ -302,7 +304,7 @@ export function InvoicesPage() {
                     onClick={() => setPeriod((prev) => shiftBillingPeriod(prev.period_start, interval, -1))}
                     disabled={!period.period_start}
                 >
-                    ← Previous period
+                    {t('pages.invoices.prevPeriod')}
                 </button>
                 <div style={{ textAlign: 'center' }}>
                     <div style={{ fontWeight: 700 }}>{selectedZev?.name}</div>
@@ -311,7 +313,7 @@ export function InvoicesPage() {
                             ? `${formatShortDate(period.period_start, settings)} → ${formatShortDate(period.period_end, settings)}`
                             : '—'}
                     </div>
-                    <div className="muted" style={{ fontSize: '0.85rem' }}>Billing interval: {interval.replace('_', ' ')}</div>
+                    <div className="muted" style={{ fontSize: '0.85rem' }}>{t('pages.invoices.billingInterval')} {interval.replace('_', ' ')}</div>
                 </div>
                 <button
                     className="button button-secondary"
@@ -319,27 +321,27 @@ export function InvoicesPage() {
                     onClick={() => setPeriod((prev) => shiftBillingPeriod(prev.period_start, interval, 1))}
                     disabled={!period.period_start}
                 >
-                    Next period →
+                    {t('pages.invoices.nextPeriod')}
                 </button>
             </section>
 
             {periodOverviewQuery.isLoading ? (
-                <div className="card">Loading period overview…</div>
+                <div className="card">{t('pages.invoices.loading')}</div>
             ) : periodOverviewQuery.isError ? (
-                <div className="card error-banner">Failed to load period overview.</div>
+                <div className="card error-banner">{t('pages.invoices.failed')}</div>
             ) : (
                 <div className="table-card">
                     <table>
                         <thead>
                             <tr>
-                                <th>Participant</th>
-                                <th>Metering data</th>
-                                <th>Invoice</th>
-                                <th>Status</th>
-                                <th>Email</th>
-                                <th>Total</th>
-                                <th>PDF</th>
-                                <th>Actions</th>
+                                <th>{t('pages.invoices.col.participant')}</th>
+                                <th>{t('pages.invoices.col.meteringData')}</th>
+                                <th>{t('pages.invoices.col.invoice')}</th>
+                                <th>{t('pages.invoices.col.status')}</th>
+                                <th>{t('pages.invoices.col.email')}</th>
+                                <th>{t('pages.invoices.col.total')}</th>
+                                <th>{t('pages.invoices.col.pdf')}</th>
+                                <th>{t('pages.invoices.col.actions')}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -354,12 +356,12 @@ export function InvoicesPage() {
                                         </td>
                                         <td>
                                             {row.metering_data_complete ? (
-                                                <span className="badge badge-success">Complete</span>
+                                                <span className="badge badge-success">{t('pages.invoices.metering.complete')}</span>
                                             ) : (
                                                 <>
-                                                    <span className="badge badge-danger">Missing</span>
+                                                    <span className="badge badge-danger">{t('pages.invoices.metering.missing')}</span>
                                                     <div className="muted" style={{ fontSize: '0.85rem' }}>
-                                                        {row.metering_points_with_data}/{row.metering_points_total} points with data
+                                                        {t('pages.invoices.metering.pointsWithData', { n: row.metering_points_with_data, total: row.metering_points_total })}
                                                     </div>
                                                     {row.missing_meter_ids.length > 0 && (
                                                         <div className="muted" style={{ fontSize: '0.8rem' }}>
@@ -375,12 +377,12 @@ export function InvoicesPage() {
                                                 </>
                                             )}
                                         </td>
-                                        <td>{invoice ? invoice.invoice_number : <span className="muted">Not created</span>}</td>
+                                        <td>{invoice ? invoice.invoice_number : <span className="muted">{t('pages.invoices.notCreated')}</span>}</td>
                                         <td>
                                             {invoice ? (
                                                 <span className={invoiceStatusBadgeClass(invoice.status)}>{humanizeStatus(invoice.status)}</span>
                                             ) : (
-                                                <span className="badge badge-neutral">Not created</span>
+                                                <span className="badge badge-neutral">{t('pages.invoices.notCreated')}</span>
                                             )}
                                         </td>
                                         <td>
@@ -400,13 +402,13 @@ export function InvoicesPage() {
                                                         </button>
                                                         {(invoice.email_logs?.filter((log) => log.status === 'failed').length ?? 0) > 0 && (
                                                             <span style={{ color: '#ef4444', marginLeft: '0.3rem', fontSize: '0.85rem', fontWeight: 'bold' }}>
-                                                                ({invoice.email_logs?.filter((log) => log.status === 'failed').length} failed)
+                                                                {t('pages.invoices.failedEmails', { n: invoice.email_logs?.filter((log) => log.status === 'failed').length })}
                                                             </span>
                                                         )}
                                                     </div>
                                                     {(invoice.email_logs?.length ?? 0) > 1 && (
                                                         <div className="muted" style={{ fontSize: '0.85rem' }}>
-                                                            {invoice.email_logs?.length} attempts
+                                                            {t('pages.invoices.attempts', { n: invoice.email_logs?.length })}
                                                         </div>
                                                     )}
                                                 </>
@@ -426,7 +428,7 @@ export function InvoicesPage() {
                                                             className="button button-primary"
                                                             style={{ textDecoration: 'none', padding: '0.3rem 0.5rem' }}
                                                         >
-                                                            Open PDF
+                                                            {t('pages.invoices.openPdf')}
                                                         </a>
                                                         <button
                                                             className="button"
@@ -434,7 +436,7 @@ export function InvoicesPage() {
                                                             disabled={pdfMutation.isPending}
                                                             onClick={() => pdfMutation.mutate(invoice.id)}
                                                         >
-                                                            Regenerate
+                                                            {t('pages.invoices.regenerate')}
                                                         </button>
                                                     </div>
                                                 ) : (
@@ -444,7 +446,7 @@ export function InvoicesPage() {
                                                         disabled={pdfMutation.isPending}
                                                         onClick={() => pdfMutation.mutate(invoice.id)}
                                                     >
-                                                        Generate PDF
+                                                        {t('pages.invoices.generatePdf')}
                                                     </button>
                                                 )
                                             ) : (
@@ -465,11 +467,11 @@ export function InvoicesPage() {
                                                         })
                                                     }
                                                 >
-                                                    {invoice ? 'Generate again' : 'Generate invoice'}
+                                                    {invoice ? t('pages.invoices.generateAgain') : t('pages.invoices.generateInvoice')}
                                                 </button>
                                                 {invoice && (
                                                     <Link className="button" style={{ textDecoration: 'none' }} to={`/invoices/${invoice.id}`}>
-                                                        Open details
+                                                        {t('pages.invoices.openDetails')}
                                                     </Link>
                                                 )}
                                                 {invoice && invoice.status === 'draft' && (
@@ -479,7 +481,7 @@ export function InvoicesPage() {
                                                         disabled={approveMutation.isPending}
                                                         onClick={() => approveMutation.mutate(invoice.id)}
                                                     >
-                                                        Approve
+                                                        {t('pages.invoices.approve')}
                                                     </button>
                                                 )}
                                                 {invoice && (invoice.status === 'draft' || invoice.status === 'cancelled' || user?.role === 'admin') && (
@@ -489,7 +491,7 @@ export function InvoicesPage() {
                                                         disabled={deleteMutation.isPending}
                                                         onClick={() => setDeleteModalInvoiceId(invoice.id)}
                                                     >
-                                                        Delete
+                                                        {t('pages.invoices.delete')}
                                                     </button>
                                                 )}
                                                 {invoice && (invoice.status === 'approved' || invoice.status === 'sent') && (
@@ -501,7 +503,7 @@ export function InvoicesPage() {
                                                             emailMutation.mutate(invoice.id)
                                                         }}
                                                     >
-                                                        {pollingInvoiceId === invoice.id ? 'Sending...' : invoice.status === 'sent' ? 'Resend Email' : 'Send Email'}
+                                                        {pollingInvoiceId === invoice.id ? t('pages.invoices.sending') : invoice.status === 'sent' ? t('pages.invoices.resendEmail') : t('pages.invoices.sendEmail')}
                                                     </button>
                                                 )}
                                                 {invoice && (invoice.status === 'approved' || invoice.status === 'sent') && (
@@ -511,7 +513,7 @@ export function InvoicesPage() {
                                                         disabled={markPaidMutation.isPending}
                                                         onClick={() => markPaidMutation.mutate(invoice.id)}
                                                     >
-                                                        Mark Paid
+                                                        {t('pages.invoices.markPaid')}
                                                     </button>
                                                 )}
                                             </div>
@@ -520,7 +522,7 @@ export function InvoicesPage() {
                                 )
                             }) : (
                                 <tr>
-                                    <td colSpan={8}>No participants found for this period.</td>
+                                    <td colSpan={8}>{t('pages.invoices.noParticipants')}</td>
                                 </tr>
                             )}
                         </tbody>
@@ -553,9 +555,9 @@ export function InvoicesPage() {
                         }}
                         onClick={(e) => e.stopPropagation()}
                     >
-                        <h2 style={{ margin: '0 0 1rem 0', color: '#dc2626' }}>Delete Invoice</h2>
+                        <h2 style={{ margin: '0 0 1rem 0', color: '#dc2626' }}>{t('pages.invoices.deleteModal.title')}</h2>
                         <p style={{ margin: '0 0 1.5rem 0', color: '#374151' }}>
-                            Are you sure you want to delete this invoice? This action cannot be undone.
+                            {t('pages.invoices.deleteModal.message')}
                         </p>
                         <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
                             <button
@@ -564,7 +566,7 @@ export function InvoicesPage() {
                                 disabled={deleteMutation.isPending}
                                 onClick={() => setDeleteModalInvoiceId(null)}
                             >
-                                Cancel
+                                {t('common.cancel')}
                             </button>
                             <button
                                 className="button button-danger"
@@ -576,7 +578,7 @@ export function InvoicesPage() {
                                     })
                                 }}
                             >
-                                {deleteMutation.isPending ? 'Deleting...' : 'Delete'}
+                                {deleteMutation.isPending ? t('pages.invoices.deleting') : t('pages.invoices.delete')}
                             </button>
                         </div>
                     </div>
