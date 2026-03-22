@@ -3,10 +3,12 @@ import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useQuery } from '@tanstack/react-query'
 import {
+    Bar,
+    BarChart,
     CartesianGrid,
+    ComposedChart,
     Legend,
     Line,
-    LineChart,
     ResponsiveContainer,
     Tooltip,
     XAxis,
@@ -67,6 +69,17 @@ export function DashboardPage() {
     const ownerTimeline = useMemo(
         () => (summary?.role === 'zev_owner' ? summary.timeline : []),
         [summary],
+    )
+    const ownerChartData = useMemo(
+        () => ownerTimeline.map((entry) => {
+            const locally_consumed = Math.max(0, entry.consumed_kwh - entry.imported_kwh)
+            const locally_produced = Math.max(0, entry.produced_kwh - entry.exported_kwh)
+            const self_consumption_rate = entry.produced_kwh > 0
+                ? parseFloat(((locally_produced / entry.produced_kwh) * 100).toFixed(1))
+                : null
+            return { ...entry, locally_consumed, locally_produced, self_consumption_rate }
+        }),
+        [ownerTimeline],
     )
     const participantTimeline = useMemo(
         () => (summary?.role === 'participant' ? summary.timeline : []),
@@ -168,28 +181,74 @@ export function DashboardPage() {
                         <StatCard label="Exported to Grid" value={`${summary.totals.exported_kwh.toFixed(2)} kWh`} />
                     </section>
 
-                    <section className="card" style={{ minHeight: 360 }}>
+                    {(() => {
+                        const totalProduced = summary.totals.produced_kwh
+                        const locallyUsed = Math.max(0, totalProduced - summary.totals.exported_kwh)
+                        const selfConsumptionPct = totalProduced > 0 ? (locallyUsed / totalProduced * 100) : 0
+                        const exportPct = totalProduced > 0 ? (summary.totals.exported_kwh / totalProduced * 100) : 0
+                        return (
+                            <section className="grid grid-2">
+                                <StatCard
+                                    label="Self-consumption Rate"
+                                    value={`${selfConsumptionPct.toFixed(1)}%`}
+                                    hint={`${locallyUsed.toFixed(2)} kWh of ${totalProduced.toFixed(2)} kWh produced used locally`}
+                                />
+                                <StatCard
+                                    label="Export Ratio"
+                                    value={`${exportPct.toFixed(1)}%`}
+                                    hint={`${summary.totals.exported_kwh.toFixed(2)} kWh of ${totalProduced.toFixed(2)} kWh produced exported to grid`}
+                                />
+                            </section>
+                        )
+                    })()}
+
+                    <section className="card">
                         <h3 style={{ marginTop: 0 }}>
                             Energy Balance
                             {selectedZevName ? ` — ${selectedZevName}` : ''}
                             {selectedParticipantName ? ` — ${selectedParticipantName}` : ''}
                         </h3>
-                        {ownerTimeline.length === 0 ? (
+                        {ownerChartData.length === 0 ? (
                             <p className="muted">No metering data for selected period.</p>
                         ) : (
-                            <ResponsiveContainer width="100%" height={320}>
-                                <LineChart data={ownerTimeline}>
-                                    <CartesianGrid strokeDasharray="3 3" />
-                                    <XAxis dataKey="bucket" tick={{ fontSize: 11 }} />
-                                    <YAxis tick={{ fontSize: 11 }} />
-                                    <Tooltip />
-                                    <Legend />
-                                    <Line type="monotone" dataKey="produced_kwh" name="Produced" stroke="#16a34a" strokeWidth={2} dot={false} />
-                                    <Line type="monotone" dataKey="consumed_kwh" name="Consumed" stroke="#0284c7" strokeWidth={2} dot={false} />
-                                    <Line type="monotone" dataKey="imported_kwh" name="Imported" stroke="#f59e0b" strokeWidth={2} dot={false} />
-                                    <Line type="monotone" dataKey="exported_kwh" name="Exported" stroke="#8b5cf6" strokeWidth={2} dot={false} />
-                                </LineChart>
-                            </ResponsiveContainer>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
+                                <div>
+                                    <p style={{ margin: '0 0 0.5rem', fontWeight: 600, fontSize: '0.875rem', color: '#374151' }}>Consumption</p>
+                                    <ResponsiveContainer width="100%" height={300}>
+                                        <BarChart data={ownerChartData} margin={{ top: 4, right: 4, bottom: 4, left: 0 }}>
+                                            <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                                            <XAxis dataKey="bucket" tick={{ fontSize: 10 }} />
+                                            <YAxis tick={{ fontSize: 10 }} unit=" kWh" width={60} />
+                                            <Tooltip formatter={(v) => `${Number(v).toFixed(2)} kWh`} />
+                                            <Legend />
+                                            <Bar dataKey="locally_consumed" name="From ZEV" stackId="c" fill="#16a34a" />
+                                            <Bar dataKey="imported_kwh" name="From Grid" stackId="c" fill="#f59e0b" radius={[3, 3, 0, 0]} />
+                                        </BarChart>
+                                    </ResponsiveContainer>
+                                </div>
+                                <div>
+                                    <p style={{ margin: '0 0 0.5rem', fontWeight: 600, fontSize: '0.875rem', color: '#374151' }}>Production</p>
+                                    <ResponsiveContainer width="100%" height={300}>
+                                        <ComposedChart data={ownerChartData} margin={{ top: 4, right: 50, bottom: 4, left: 0 }}>
+                                            <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                                            <XAxis dataKey="bucket" tick={{ fontSize: 10 }} />
+                                            <YAxis yAxisId="kwh" tick={{ fontSize: 10 }} unit=" kWh" width={60} />
+                                            <YAxis yAxisId="pct" orientation="right" tick={{ fontSize: 10 }} unit="%" width={44} domain={[0, 100]} />
+                                            <Tooltip
+                                                formatter={(v, name) =>
+                                                    name === 'Self-consumed %'
+                                                        ? [`${Number(v).toFixed(1)}%`, name]
+                                                        : [`${Number(v).toFixed(2)} kWh`, name]
+                                                }
+                                            />
+                                            <Legend />
+                                            <Bar yAxisId="kwh" dataKey="locally_produced" name="Used locally" stackId="p" fill="#16a34a" />
+                                            <Bar yAxisId="kwh" dataKey="exported_kwh" name="Exported" stackId="p" fill="#8b5cf6" radius={[3, 3, 0, 0]} />
+                                            <Line yAxisId="pct" type="monotone" dataKey="self_consumption_rate" name="Self-consumed %" stroke="#0ea5e9" dot={false} strokeWidth={2} connectNulls />
+                                        </ComposedChart>
+                                    </ResponsiveContainer>
+                                </div>
+                            </div>
                         )}
                     </section>
 
@@ -258,16 +317,15 @@ export function DashboardPage() {
                             <p className="muted">No metering data for selected period.</p>
                         ) : (
                             <ResponsiveContainer width="100%" height={320}>
-                                <LineChart data={participantTimeline}>
-                                    <CartesianGrid strokeDasharray="3 3" />
+                                <BarChart data={participantTimeline} margin={{ top: 4, right: 4, bottom: 4, left: 0 }}>
+                                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
                                     <XAxis dataKey="bucket" tick={{ fontSize: 11 }} />
-                                    <YAxis tick={{ fontSize: 11 }} />
-                                    <Tooltip />
+                                    <YAxis tick={{ fontSize: 11 }} unit=" kWh" width={60} />
+                                    <Tooltip formatter={(v) => `${Number(v).toFixed(2)} kWh`} />
                                     <Legend />
-                                    <Line type="monotone" dataKey="consumed_from_zev_kwh" name="From ZEV" stroke="#16a34a" strokeWidth={2} dot={false} />
-                                    <Line type="monotone" dataKey="imported_from_grid_kwh" name="From Grid" stroke="#f59e0b" strokeWidth={2} dot={false} />
-                                    <Line type="monotone" dataKey="total_consumed_kwh" name="Total" stroke="#0284c7" strokeWidth={2} dot={false} />
-                                </LineChart>
+                                    <Bar dataKey="consumed_from_zev_kwh" name="From ZEV" stackId="c" fill="#16a34a" />
+                                    <Bar dataKey="imported_from_grid_kwh" name="From Grid" stackId="c" fill="#f59e0b" radius={[3, 3, 0, 0]} />
+                                </BarChart>
                             </ResponsiveContainer>
                         )}
                     </section>

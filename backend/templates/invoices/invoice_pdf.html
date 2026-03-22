@@ -13,12 +13,12 @@
 
         body {
             font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
-            font-size: 11pt;
+            font-size: 10pt;
             color: #222;
         }
 
         .page {
-            padding: 20mm 20mm 25mm;
+            padding: 13mm 16mm 16mm;
         }
 
         /* Header */
@@ -26,51 +26,51 @@
             display: flex;
             justify-content: space-between;
             align-items: flex-start;
-            margin-bottom: 12mm;
+            margin-bottom: 6mm;
         }
 
         .company-name {
-            font-size: 16pt;
+            font-size: 13pt;
             font-weight: bold;
             color: #2c5f2e;
         }
 
         .company-meta {
-            font-size: 9pt;
+            font-size: 8pt;
             color: #555;
-            margin-top: 2mm;
+            margin-top: 1mm;
         }
 
         /* Invoice title */
         .invoice-title {
-            font-size: 18pt;
+            font-size: 14pt;
             font-weight: bold;
-            margin-bottom: 6mm;
+            margin-bottom: 3mm;
         }
 
         .invoice-meta {
             display: flex;
-            gap: 20mm;
-            margin-bottom: 8mm;
+            gap: 10mm;
+            margin-bottom: 4mm;
         }
 
         .meta-block dt {
-            font-size: 8pt;
+            font-size: 7pt;
             color: #888;
             text-transform: uppercase;
             letter-spacing: 0.05em;
         }
 
         .meta-block dd {
-            font-size: 10pt;
+            font-size: 9pt;
             font-weight: 600;
         }
 
         /* Address blocks */
         .address-row {
             display: flex;
-            gap: 20mm;
-            margin-bottom: 8mm;
+            gap: 10mm;
+            margin-bottom: 4mm;
         }
 
         .address-block {
@@ -78,36 +78,36 @@
         }
 
         .address-block h3 {
-            font-size: 8pt;
+            font-size: 7pt;
             color: #888;
             text-transform: uppercase;
-            margin-bottom: 2mm;
+            margin-bottom: 1mm;
         }
 
         /* Line items table */
         .category-section {
-            margin-bottom: 6mm;
+            margin-bottom: 3mm;
         }
 
         .category-title {
-            font-size: 11pt;
+            font-size: 9pt;
             font-weight: bold;
             color: #2c5f2e;
-            margin: 0 0 2mm;
+            margin: 0 0 1mm;
         }
 
         table {
             width: 100%;
             border-collapse: collapse;
-            margin-bottom: 6mm;
+            margin-bottom: 3mm;
         }
 
         thead th {
             background: #2c5f2e;
             color: #fff;
-            padding: 3mm 4mm;
+            padding: 2mm 3mm;
             text-align: left;
-            font-size: 9pt;
+            font-size: 8pt;
         }
 
         thead th.right {
@@ -119,8 +119,8 @@
         }
 
         tbody td {
-            padding: 2.5mm 4mm;
-            font-size: 10pt;
+            padding: 1.5mm 3mm;
+            font-size: 9pt;
             border-bottom: 1px solid #eee;
             vertical-align: top;
         }
@@ -137,7 +137,7 @@
         /* Totals */
         .totals {
             margin-left: auto;
-            width: 80mm;
+            width: 75mm;
         }
 
         .totals table {
@@ -145,7 +145,8 @@
         }
 
         .totals td {
-            padding: 1.5mm 3mm;
+            padding: 1mm 2mm;
+            font-size: 9pt;
         }
 
         .totals .subtotal td {
@@ -155,25 +156,47 @@
         .totals .grand-total td {
             border-top: 2px solid #2c5f2e;
             font-weight: bold;
-            font-size: 12pt;
+            font-size: 11pt;
         }
 
         /* Notes */
         .notes {
-            margin-top: 8mm;
-            font-size: 9pt;
+            margin-top: 4mm;
+            font-size: 8pt;
             color: #555;
             border-top: 1px solid #eee;
-            padding-top: 4mm;
+            padding-top: 2mm;
+        }
+
+        /* Energy chart section */
+        .chart-section {
+            margin-top: 4mm;
+            padding-top: 3mm;
+            border-top: 1px solid #eee;
+            page-break-before: always;
+        }
+
+        .chart-section h3 {
+            font-size: 9pt;
+            font-weight: bold;
+            color: #2c5f2e;
+            margin-bottom: 1mm;
+        }
+
+        .chart-section p {
+            font-size: 7pt;
+            color: #6b7280;
+            margin-bottom: 2mm;
         }
 
         /* Payment section */
         .payment-section {
-            margin-top: 8mm;
-            padding: 4mm 6mm;
+            margin-top: 4mm;
+            padding: 2.5mm 4mm;
             background: #f9f9f9;
             border-left: 3px solid #2c5f2e;
-            font-size: 9pt;
+            font-size: 8pt;
+            page-break-before: always;
         }
 
         .payment-section dt {
@@ -182,30 +205,29 @@
         }
 
         .payment-section dd {
-            margin-bottom: 2mm;
+            margin-bottom: 1mm;
         }
 
         /* Detachable slip */
         .slip-separator {
-            margin: 15mm 0 0 0;
+            margin: 6mm 0 0 0;
             border-top: 2px dashed #999;
-            padding-top: 10mm;
-            margin-top: 12mm;
+            padding-top: 5mm;
             font-size: 8pt;
         }
 
         .slip-header {
             text-align: right;
             font-weight: bold;
-            margin-bottom: 3mm;
+            margin-bottom: 2mm;
             color: #666;
         }
 
         .slip-content {
             display: flex;
-            gap: 20mm;
+            gap: 10mm;
             justify-content: space-between;
-            font-size: 9pt;
+            font-size: 8pt;
         }
 
         .slip-block {
@@ -214,32 +236,32 @@
 
         .slip-block strong {
             display: block;
-            margin-bottom: 2mm;
+            margin-bottom: 1mm;
         }
 
         .slip-info {
-            font-size: 8pt;
+            font-size: 7pt;
             color: #666;
-            margin-top: 2mm;
+            margin-top: 1mm;
         }
 
         .ocr-line {
             font-family: "Courier New", monospace;
-            font-size: 8pt;
-            margin-top: 4mm;
+            font-size: 7pt;
+            margin-top: 3mm;
             letter-spacing: 1px;
             word-break: break-all;
             color: #333;
             background: #fff;
             border: 1px solid #ddd;
-            padding: 2mm;
+            padding: 1.5mm;
         }
 
         /* QR-Rechnung section */
         .qr-section {
-            margin-top: 10mm;
+            margin-top: 6mm;
             border-top: 2px dashed #aaa;
-            padding-top: 5mm;
+            padding-top: 3mm;
         }
 
         .qr-section svg {
@@ -249,7 +271,13 @@
         /* Footer */
         @page {
             size: A4;
-            margin: 0;
+            margin: 0 0 10mm 0;
+
+            @bottom-center {
+                content: "{{ tr.page_label }} " counter(page) " {{ tr.page_of }} " counter(pages);
+                font-size: 8pt;
+                color: #6b7280;
+            }
         }
     </style>
 </head>
@@ -263,34 +291,36 @@
                 <div class="company-name">{{ zev.name }}</div>
                 <div class="company-meta">
                     {% if owner_participant %}{{ owner_participant.full_name }}<br>
-                    {{ owner_participant.address_line1 }}{% if owner_participant.address_line2 %}, {{ owner_participant.address_line2 }}{% endif %}<br>
-                    {{ owner_participant.postal_code }}{% if owner_participant.city %} {{ owner_participant.city }}{% endif %}<br>
+                    {{ owner_participant.address_line1 }}{% if owner_participant.address_line2 %}, {{
+                    owner_participant.address_line2 }}{% endif %}<br>
+                    {{ owner_participant.postal_code }}{% if owner_participant.city %} {{ owner_participant.city }}{%
+                    endif %}<br>
                     {% endif %}{% if zev.vat_number %}VAT: {{ zev.vat_number }}{% endif %}
                 </div>
             </div>
             <div style="text-align:right">
-                <div style="font-size:10pt; color:#888">Energy Invoice</div>
+                <div style="font-size:10pt; color:#888">{{ tr.invoice_label }}</div>
             </div>
         </div>
 
         <!-- ── Invoice title & metadata ─────────── -->
-        <div class="invoice-title">Invoice {{ invoice.invoice_number }}</div>
+        <div class="invoice-title">{{ tr.invoice_label }} {{ invoice.invoice_number }}</div>
         <div class="invoice-meta">
             <dl class="meta-block">
-                <dt>Invoice Date</dt>
+                <dt>{{ tr.invoice_date }}</dt>
                 <dd>{{ formatted_dates.invoice_date }}</dd>
             </dl>
             <dl class="meta-block">
-                <dt>Billing Period</dt>
+                <dt>{{ tr.billing_period }}</dt>
                 <dd>{{ formatted_dates.period_start }} – {{ formatted_dates.period_end }}</dd>
             </dl>
             <dl class="meta-block">
-                <dt>Status</dt>
+                <dt>{{ tr.status }}</dt>
                 <dd>{{ invoice.get_status_display }}</dd>
             </dl>
             {% if invoice.due_date %}
             <dl class="meta-block">
-                <dt>Due Date</dt>
+                <dt>{{ tr.due_date }}</dt>
                 <dd>{{ formatted_dates.due_date }}</dd>
             </dl>
             {% endif %}
@@ -299,13 +329,16 @@
         <!-- ── Address blocks ─────────────────── -->
         <div class="address-row">
             <div class="address-block">
-                <h3>From</h3>
-                <strong>{% if owner_participant %}{{ owner_participant.full_name }}{% else %}{{ zev.name }}{% endif %}</strong><br>
-                {% if owner_participant %}{{ owner_participant.address_line1 }}{% if owner_participant.address_line2 %}<br>{{ owner_participant.address_line2 }}{% endif %}<br>
-                {{ owner_participant.postal_code }}{% if owner_participant.city %} {{ owner_participant.city }}{% endif %}{% endif %}
+                <h3>{{ tr.from }}</h3>
+                <strong>{% if owner_participant %}{{ owner_participant.full_name }}{% else %}{{ zev.name }}{% endif
+                    %}</strong><br>
+                {% if owner_participant %}{{ owner_participant.address_line1 }}{% if owner_participant.address_line2
+                %}<br>{{ owner_participant.address_line2 }}{% endif %}<br>
+                {{ owner_participant.postal_code }}{% if owner_participant.city %} {{ owner_participant.city }}{% endif
+                %}{% endif %}
             </div>
             <div class="address-block">
-                <h3>To</h3>
+                <h3>{{ tr.to }}</h3>
                 <strong>{{ participant.full_name }}</strong><br>
                 {{ participant.address_line1 }}<br>
                 {{ participant.postal_code }} {{ participant.city }}
@@ -319,11 +352,11 @@
             <table>
                 <thead>
                     <tr>
-                        <th>Description</th>
-                        <th class="right">Qty</th>
-                        <th>Unit</th>
-                        <th class="right">Unit Price (CHF)</th>
-                        <th class="right">Amount (CHF)</th>
+                        <th>{{ tr.description }}</th>
+                        <th class="right">{{ tr.qty }}</th>
+                        <th>{{ tr.unit }}</th>
+                        <th class="right">{{ tr.unit_price }}</th>
+                        <th class="right">{{ tr.amount }}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -331,13 +364,13 @@
                     <tr>
                         <td>{{ item.description }}</td>
                         <td class="right">{{ item.quantity_kwh|floatformat:2 }}</td>
-                        <td>{{ item.unit }}</td>
+                        <td>{% if item.unit == "month" %}{{ tr.unit_month }}{% else %}{{ item.unit }}{% endif %}</td>
                         <td class="right">{{ item.unit_price_chf|floatformat:5 }}</td>
                         <td class="right">{{ item.total_chf|floatformat:2 }}</td>
                     </tr>
                     {% endfor %}
                     <tr class="category-subtotal">
-                        <td colspan="4">{{ group.label }} subtotal</td>
+                        <td colspan="4">{{ group.label }} {{ tr.subtotal }}</td>
                         <td class="right">{{ group.subtotal|floatformat:2 }}</td>
                     </tr>
                 </tbody>
@@ -349,17 +382,17 @@
         <div class="totals">
             <table>
                 <tr class="subtotal">
-                    <td>Subtotal</td>
+                    <td>{{ tr.subtotal }}</td>
                     <td style="text-align:right">CHF {{ invoice.subtotal_chf|floatformat:2 }}</td>
                 </tr>
                 {% if invoice.vat_rate > 0 %}
                 <tr>
-                    <td>VAT ({{ invoice.vat_rate|floatformat:1 }}%)</td>
+                    <td>{{ tr.vat }} ({{ invoice.vat_rate|floatformat:1 }}%)</td>
                     <td style="text-align:right">CHF {{ invoice.vat_chf|floatformat:2 }}</td>
                 </tr>
                 {% endif %}
                 <tr class="grand-total">
-                    <td>Total</td>
+                    <td>{{ tr.total }}</td>
                     <td style="text-align:right">CHF {{ invoice.total_chf|floatformat:2 }}</td>
                 </tr>
             </table>
@@ -370,52 +403,65 @@
         <div class="notes">{{ invoice.notes }}</div>
         {% endif %}
 
+        <!-- ── Energy Consumption Chart ─────────── -->
+        {% if energy_chart_svg %}
+        <div class="chart-section">
+            <h3>{{ tr.chart_title }}</h3>
+            <p>{{ tr.chart_description }}</p>
+            <div style="max-width: 520px;">
+                {{ energy_chart_svg|safe }}
+            </div>
+        </div>
+        {% endif %}
+
         <!-- ── Payment Terms & Bank Details ──────────────────────────── -->
         <div class="payment-section">
             <dl>
-                <dt>Payment Terms:</dt>
-                <dd>Due within 30 days of invoice date</dd>
+                <dt>{{ tr.payment_terms_label }}</dt>
+                <dd>{{ tr.payment_terms_text }}</dd>
 
                 {% if zev.bank_iban %}
-                <dt style="margin-top: 3mm;">Bank Details:</dt>
+                <dt style="margin-top: 2mm;">{{ tr.bank_details }}</dt>
                 <dd>{% if owner_participant %}{{ owner_participant.full_name }}{% else %}{{ zev.name }}{% endif %}</dd>
                 <dd>IBAN: {{ zev.bank_iban }}</dd>
-                <dd>Currency: CHF</dd>
-                <dd class="slip-info">Reference: Invoice {{ invoice.invoice_number }}</dd>
+                <dd>{{ tr.currency }}</dd>
+                <dd class="slip-info">{{ tr.reference_prefix }} {{ invoice.invoice_number }}</dd>
                 {% endif %}
             </dl>
         </div>
 
         <!-- ── Detachable Slip ─────────────────────────── -->
         <div class="slip-separator">
-            <div class="slip-header">✂ PAYMENT SLIP (Keep for your records)</div>
+            <div class="slip-header">{{ tr.slip_header }}</div>
             <div class="slip-content">
                 <div class="slip-block">
-                    <strong>Invoice Details</strong>
-                    Invoice #: {{ invoice.invoice_number }}<br>
-                    Date: {{ formatted_dates.invoice_date }}<br>
-                    Period: {{ formatted_dates.period_start }} – {{ formatted_dates.period_end }}<br>
-                    <strong style="margin-top: 3mm;">Amount Due: CHF {{ invoice.total_chf|floatformat:2 }}</strong>
+                    <strong>{{ tr.slip_invoice_details }}</strong>
+                    {{ tr.slip_invoice_nr }} {{ invoice.invoice_number }}<br>
+                    {{ tr.slip_date }} {{ formatted_dates.invoice_date }}<br>
+                    {{ tr.slip_period }} {{ formatted_dates.period_start }} – {{ formatted_dates.period_end }}<br>
+                    <strong style="margin-top: 3mm;">{{ tr.slip_amount_due }} {{ invoice.total_chf|floatformat:2
+                        }}</strong>
                 </div>
                 <div class="slip-block">
-                    <strong>Participant</strong>
+                    <strong>{{ tr.slip_participant }}</strong>
                     {{ participant.full_name }}<br>
                     {{ participant.address_line1 }}<br>
                     {{ participant.postal_code }} {{ participant.city }}<br>
-                    {% if participant.email %}Email: {{ participant.email }}<br>{% endif %}
+                    {% if participant.email %}{{ tr.slip_email }} {{ participant.email }}<br>{% endif %}
                 </div>
                 <div class="slip-block">
-                    <strong>Remit Payment To</strong>
+                    <strong>{{ tr.slip_remit_to }}</strong>
                     {% if owner_participant %}{{ owner_participant.full_name }}{% else %}{{ zev.name }}{% endif %}<br>
                     {% if owner_participant %}{{ owner_participant.address_line1 }}<br>
-                    {{ owner_participant.postal_code }}{% if owner_participant.city %} {{ owner_participant.city }}{% endif %}<br>
-                    {% endif %}{% if zev.bank_iban %}<strong style="margin-top: 2mm; display: block;">IBAN: {{ zev.bank_iban
-                        }}</strong>{% endif %}
+                    {{ owner_participant.postal_code }}{% if owner_participant.city %} {{ owner_participant.city }}{%
+                    endif %}<br>
+                    {% endif %}{% if zev.bank_iban %}<strong style="margin-top: 2mm; display: block;">IBAN: {{
+                        zev.bank_iban }}</strong>{% endif %}
                 </div>
             </div>
             {% if zev.bank_iban %}
             <div class="ocr-line" style="margin-top: 6mm;">
-                OCR/Reference: {{ invoice.invoice_number|upper }} {{ invoice.total_chf|stringformat:"05d" }}
+                {{ tr.slip_ocr }} {{ invoice.invoice_number|upper }} {{ invoice.total_chf|stringformat:"05d" }}
             </div>
             {% endif %}
         </div>

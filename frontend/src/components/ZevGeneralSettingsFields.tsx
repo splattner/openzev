@@ -64,6 +64,20 @@ export function ZevGeneralSettingsFields({ form, onChange }: ZevGeneralSettingsF
                             <option value="annual">Annual</option>
                         </select>
                     </label>
+                    <label>
+                        <span>Invoice language</span>
+                        <select
+                            value={form.invoice_language ?? 'de'}
+                            onChange={(event) =>
+                                onChange({ invoice_language: event.target.value as ZevInput['invoice_language'] })
+                            }
+                        >
+                            <option value="de">Deutsch</option>
+                            <option value="fr">Français</option>
+                            <option value="it">Italiano</option>
+                            <option value="en">English</option>
+                        </select>
+                    </label>
                 </div>
             </div>
 

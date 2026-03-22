@@ -71,6 +71,7 @@ export interface Zev {
     grid_connection_point?: string
     billing_interval: string
     invoice_prefix?: string
+    invoice_language?: 'de' | 'fr' | 'it' | 'en'
     bank_iban?: string
     bank_name?: string
     vat_number?: string
@@ -88,6 +89,7 @@ export interface ZevInput {
     grid_connection_point?: string
     billing_interval: 'monthly' | 'quarterly' | 'semi_annual' | 'annual'
     invoice_prefix?: string
+    invoice_language?: 'de' | 'fr' | 'it' | 'en'
     bank_iban?: string
     bank_name?: string
     vat_number?: string
