@@ -84,6 +84,17 @@ class Zev(models.Model):
             "{period_start}, {period_end}, {total_chf}."
         ),
     )
+    local_tariff_notes = models.TextField(
+        blank=True,
+        help_text=(
+            "Free-text conditions for the local ZEV tariff in following years. "
+            "Shown on the participation contract PDF."
+        ),
+    )
+    additional_contract_notes = models.TextField(
+        blank=True,
+        help_text="Additional agreements shown in the participation contract PDF.",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

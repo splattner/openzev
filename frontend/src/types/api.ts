@@ -78,6 +78,8 @@ export interface Zev {
     notes?: string
     email_subject_template?: string
     email_body_template?: string
+    local_tariff_notes?: string
+    additional_contract_notes?: string
 }
 
 export interface ZevInput {
@@ -96,6 +98,8 @@ export interface ZevInput {
     notes?: string
     email_subject_template?: string
     email_body_template?: string
+    local_tariff_notes?: string
+    additional_contract_notes?: string
 }
 
 export interface ZevOwnerInput {

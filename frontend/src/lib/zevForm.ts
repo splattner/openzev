@@ -16,6 +16,8 @@ export function getDefaultZevForm(): ZevInput {
         notes: '',
         email_subject_template: '',
         email_body_template: '',
+        local_tariff_notes: '',
+        additional_contract_notes: '',
     }
 }
 
@@ -36,5 +38,7 @@ export function mapZevToForm(zev: Zev): ZevInput {
         notes: zev.notes || '',
         email_subject_template: zev.email_subject_template ?? '',
         email_body_template: zev.email_body_template ?? '',
+        local_tariff_notes: zev.local_tariff_notes ?? '',
+        additional_contract_notes: zev.additional_contract_notes ?? '',
     }
 }

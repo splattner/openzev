@@ -5,6 +5,7 @@ import { FormModal } from '../components/FormModal'
 import {
     createParticipant,
     deleteParticipant,
+    downloadParticipantContractPdf,
     fetchParticipants,
     fetchZevs,
     formatApiError,
@@ -411,6 +412,16 @@ export function ParticipantsPage() {
                                             onClick={() => invitationMutation.mutate(participant.id)}
                                         >
                                             {t('pages.participants.sendInvitation')}
+                                        </button>
+                                        <button
+                                            className="button button-secondary"
+                                            type="button"
+                                            onClick={() => downloadParticipantContractPdf(
+                                                participant.id,
+                                                `contract_${participant.last_name}_${participant.first_name}.pdf`
+                                            ).catch(() => pushToast(t('pages.participants.contractDownloadError'), 'error'))}
+                                        >
+                                            {t('pages.participants.downloadContract')}
                                         </button>
                                         <button className="button button-primary" type="button" onClick={() => startEdit(participant)}>
                                             Edit

@@ -150,7 +150,7 @@ export const it = {
         passwordChangedSuccess: 'Password modificata con successo',
         passwordChangeRequired: 'Cambio password richiesto',
         passwordChangeRequiredDescription: 'Devi cambiare la password temporanea prima di accedere al resto dell’applicazione.',
-    },    pages: {
+    }, pages: {
         invoices: {
             title: 'Fatture',
             description: 'Gestisci i periodi di fatturazione e le fatture per il ZEV selezionato.',
@@ -211,6 +211,8 @@ export const it = {
             passwordLabel: 'Password temporanea:',
             owner: 'Proprietario',
             sendInvitation: 'Invia invito',
+            downloadContract: 'PDF contratto',
+            contractDownloadError: 'Impossibile scaricare il contratto.',
             noParticipants: 'Nessun partecipante ancora.',
             col: {
                 name: 'Nome',
@@ -662,4 +664,5 @@ export const it = {
             },
             viewDetails: 'Vedi dettagli',
         },
-    },} as const
+    },
+} as const

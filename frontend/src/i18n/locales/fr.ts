@@ -150,7 +150,7 @@ export const fr = {
         passwordChangedSuccess: 'Mot de passe modifié avec succès',
         passwordChangeRequired: 'Changement de mot de passe requis',
         passwordChangeRequiredDescription: 'Vous devez changer votre mot de passe temporaire avant d’accéder au reste de l’application.',
-    },    pages: {
+    }, pages: {
         invoices: {
             title: 'Factures',
             description: 'Gérer les périodes de facturation et les factures pour le ZEV sélectionné.',
@@ -211,6 +211,8 @@ export const fr = {
             passwordLabel: 'Mot de passe temporaire :',
             owner: 'Propriétaire',
             sendInvitation: "Envoyer l'invitation",
+            downloadContract: 'PDF contrat',
+            contractDownloadError: 'Impossible de télécharger le contrat.',
             noParticipants: 'Aucun participant pour le moment.',
             col: {
                 name: 'Nom',
@@ -662,4 +664,5 @@ export const fr = {
             },
             viewDetails: 'Voir les détails',
         },
-    },} as const
+    },
+} as const
