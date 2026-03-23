@@ -58,6 +58,7 @@ INVOICE_TRANSLATIONS: dict[str, dict[str, str]] = {
         "cat_energy": "Energie",
         "cat_grid_fees": "Netzgeb\u00fchren",
         "cat_levies": "Abgaben",
+        "cat_metering": "Messtarif",
         "unit_month": "Monat",
         "page_label": "Seite",
         "page_of": "von",
@@ -107,6 +108,7 @@ INVOICE_TRANSLATIONS: dict[str, dict[str, str]] = {
         "cat_energy": "\u00c9nergie",
         "cat_grid_fees": "Frais de r\u00e9seau",
         "cat_levies": "Taxes",
+        "cat_metering": "Tarif de comptage",
         "unit_month": "mois",
         "page_label": "Page",
         "page_of": "de",
@@ -156,6 +158,7 @@ INVOICE_TRANSLATIONS: dict[str, dict[str, str]] = {
         "cat_energy": "Energia",
         "cat_grid_fees": "Costi rete",
         "cat_levies": "Imposte",
+        "cat_metering": "Tariffa di misurazione",
         "unit_month": "mese",
         "page_label": "Pagina",
         "page_of": "di",
@@ -208,6 +211,7 @@ INVOICE_TRANSLATIONS: dict[str, dict[str, str]] = {
         "cat_energy": "Energy",
         "cat_grid_fees": "Grid Fees",
         "cat_levies": "Levies",
+        "cat_metering": "Metering Tariff",
         "savings_title": "Savings from Local Solar Energy",
         "savings_local_label": "Local ZEV Energy (actually billed)",
         "savings_grid_label": "Hypothetical grid cost (same kWh)",
@@ -279,11 +283,13 @@ def _group_items_by_category(items, period_start: date, period_end: date, tr: di
         TariffCategory.ENERGY: tr["cat_energy"],
         TariffCategory.GRID_FEES: tr["cat_grid_fees"],
         TariffCategory.LEVIES: tr["cat_levies"],
+        TariffCategory.METERING: tr["cat_metering"],
     }
     ordered_categories = [
         TariffCategory.ENERGY,
         TariffCategory.GRID_FEES,
         TariffCategory.LEVIES,
+        TariffCategory.METERING,
     ]
     grouped = []
     for category in ordered_categories:

@@ -249,7 +249,7 @@ export interface Tariff {
     id: string
     zev: string
     name: string
-    category: 'energy' | 'grid_fees' | 'levies'
+    category: 'energy' | 'grid_fees' | 'levies' | 'metering'
     billing_mode: TariffBillingMode
     energy_type?: 'local' | 'grid' | 'feed_in' | null
     fixed_price_chf?: string | null
@@ -262,7 +262,7 @@ export interface Tariff {
 export interface TariffInput {
     zev: string
     name: string
-    category: 'energy' | 'grid_fees' | 'levies'
+    category: 'energy' | 'grid_fees' | 'levies' | 'metering'
     billing_mode: TariffBillingMode
     energy_type?: 'local' | 'grid' | 'feed_in' | null
     fixed_price_chf?: string | null
@@ -301,7 +301,7 @@ export interface TariffPresetPeriod {
 
 export interface TariffPreset {
     name: string
-    category: 'energy' | 'grid_fees' | 'levies'
+    category: 'energy' | 'grid_fees' | 'levies' | 'metering'
     billing_mode: TariffBillingMode
     energy_type?: 'local' | 'grid' | 'feed_in' | null
     fixed_price_chf?: string | null
@@ -360,7 +360,7 @@ export interface InvoicePeriodOverview {
 export interface InvoiceItem {
     id: string
     item_type: string
-    tariff_category: 'energy' | 'grid_fees' | 'levies'
+    tariff_category: 'energy' | 'grid_fees' | 'levies' | 'metering'
     description: string
     quantity_kwh: string
     unit: string
