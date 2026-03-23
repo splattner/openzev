@@ -201,3 +201,77 @@ class InvoiceEngineTests(TestCase):
         fixed_items = {item.description: item for item in invoice.items.filter(unit="month")}
         self.assertEqual(fixed_items["Metering operation fee (4 Messpunkt-Monate)"].total_chf, Decimal("12.00"))
         self.assertEqual(fixed_items["Metering annual levy (4 monatliche Raten pro Messpunkt)"].total_chf, Decimal("40.00"))
+
+    def test_percentage_of_energy_billing_mode(self):
+        """
+        Percentage-of-energy tariff: effective price per kWh = sum of all GRID
+        ENERGY-mode tariffs × (percentage / 100), applied to the tariff's own
+        energy_type (here: LOCAL — the primary use-case).
+
+        Setup:
+          GRID energy tariffs (3 categories, all BillingMode.ENERGY):
+            energy category:   0.25 CHF/kWh  (from setUp)
+            grid_fees:          0.05 CHF/kWh
+            levies:             0.02 CHF/kWh
+          → grid base sum = 0.32 CHF/kWh
+
+          Percentage tariff: 50% of GRID base → effective = 0.16 CHF/kWh
+          Applied to: LOCAL energy (energy_type=LOCAL)
+
+          Readings: 10 kWh consumed, 6 kWh produced (same timestamp, sole participant)
+            → local = 6 kWh, grid = 4 kWh
+          → Percentage item total = 6 × 0.16 = 0.96 CHF
+        """
+        grid_fee = Tariff.objects.create(
+            zev=self.zev,
+            name="Grid fee",
+            category=TariffCategory.GRID_FEES,
+            billing_mode=BillingMode.ENERGY,
+            energy_type=EnergyType.GRID,
+            valid_from=date(2026, 1, 1),
+        )
+        TariffPeriod.objects.create(tariff=grid_fee, period_type=PeriodType.FLAT, price_chf_per_kwh=Decimal("0.05"))
+
+        levy = Tariff.objects.create(
+            zev=self.zev,
+            name="Federal levy",
+            category=TariffCategory.LEVIES,
+            billing_mode=BillingMode.ENERGY,
+            energy_type=EnergyType.GRID,
+            valid_from=date(2026, 1, 1),
+        )
+        TariffPeriod.objects.create(tariff=levy, period_type=PeriodType.FLAT, price_chf_per_kwh=Decimal("0.02"))
+
+        pct_tariff = Tariff.objects.create(
+            zev=self.zev,
+            name="Surcharge 50%",
+            category=TariffCategory.GRID_FEES,
+            billing_mode=BillingMode.PERCENTAGE_OF_ENERGY,
+            energy_type=EnergyType.LOCAL,  # applies to local kWh, priced as % of GRID base
+            percentage=Decimal("50.00"),
+            valid_from=date(2026, 1, 1),
+        )
+
+        MeterReading.objects.create(
+            metering_point=self.consumption_mp,
+            timestamp=datetime(2026, 1, 15, 0, 0, tzinfo=timezone.utc),
+            energy_kwh=Decimal("10.0"),
+            direction=ReadingDirection.IN,
+        )
+        MeterReading.objects.create(
+            metering_point=self.production_mp,
+            timestamp=datetime(2026, 1, 15, 0, 0, tzinfo=timezone.utc),
+            energy_kwh=Decimal("6.0"),
+            direction=ReadingDirection.OUT,
+        )
+
+        invoice = generate_invoice(self.participant, date(2026, 1, 1), date(2026, 1, 31))
+
+        # Find the percentage-of-energy line item
+        pct_item = invoice.items.get(description__startswith="Surcharge 50%")
+        self.assertEqual(pct_item.description, "Surcharge 50% (50% von CHF 0.32/kWh)")
+        self.assertEqual(pct_item.quantity_kwh, Decimal("6.0000"))  # local kWh
+        # grid base_sum = 0.25 + 0.05 + 0.02 = 0.32; effective = 0.32 × 0.50 = 0.16
+        # total = 6 × 0.16 = 0.96
+        self.assertEqual(pct_item.total_chf, Decimal("0.96"))
+        self.assertEqual(pct_item.unit, "kWh")

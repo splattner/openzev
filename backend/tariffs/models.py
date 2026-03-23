@@ -17,6 +17,7 @@ class TariffCategory(models.TextChoices):
 
 class BillingMode(models.TextChoices):
     ENERGY = "energy", "By energy"
+    PERCENTAGE_OF_ENERGY = "percentage_of_energy", "Percentage of energy tariffs"
     MONTHLY_FEE = "monthly_fee", "Monthly fee"
     YEARLY_FEE = "yearly_fee", "Yearly fee"
     PER_METERING_POINT_MONTHLY_FEE = "per_metering_point_monthly_fee", "Per metering point monthly fee"
@@ -39,6 +40,11 @@ class Tariff(models.Model):
     billing_mode = models.CharField(max_length=40, choices=BillingMode.choices, default=BillingMode.ENERGY)
     energy_type = models.CharField(max_length=20, choices=EnergyType.choices, null=True, blank=True)
     fixed_price_chf = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    percentage = models.DecimalField(
+        max_digits=5, decimal_places=2, null=True, blank=True,
+        help_text="Percentage of all energy tariffs (same energy type) used as the effective price. "
+                  "Only applicable for billing_mode=percentage_of_energy.",
+    )
     valid_from = models.DateField()
     valid_to = models.DateField(null=True, blank=True)
     notes = models.TextField(blank=True)

@@ -239,14 +239,17 @@ export interface MeteringPointAssignmentInput {
     valid_to?: string | null
 }
 
+export type TariffBillingMode = 'energy' | 'percentage_of_energy' | 'monthly_fee' | 'yearly_fee' | 'per_metering_point_monthly_fee' | 'per_metering_point_yearly_fee'
+
 export interface Tariff {
     id: string
     zev: string
     name: string
     category: 'energy' | 'grid_fees' | 'levies'
-    billing_mode: 'energy' | 'monthly_fee' | 'yearly_fee' | 'per_metering_point_monthly_fee' | 'per_metering_point_yearly_fee'
+    billing_mode: TariffBillingMode
     energy_type?: 'local' | 'grid' | 'feed_in' | null
     fixed_price_chf?: string | null
+    percentage?: string | null
     valid_from: string
     valid_to?: string | null
     notes?: string
@@ -256,9 +259,10 @@ export interface TariffInput {
     zev: string
     name: string
     category: 'energy' | 'grid_fees' | 'levies'
-    billing_mode: 'energy' | 'monthly_fee' | 'yearly_fee' | 'per_metering_point_monthly_fee' | 'per_metering_point_yearly_fee'
+    billing_mode: TariffBillingMode
     energy_type?: 'local' | 'grid' | 'feed_in' | null
     fixed_price_chf?: string | null
+    percentage?: string | null
     valid_from: string
     valid_to?: string | null
     notes?: string
@@ -294,9 +298,10 @@ export interface TariffPresetPeriod {
 export interface TariffPreset {
     name: string
     category: 'energy' | 'grid_fees' | 'levies'
-    billing_mode: 'energy' | 'monthly_fee' | 'yearly_fee' | 'per_metering_point_monthly_fee' | 'per_metering_point_yearly_fee'
+    billing_mode: TariffBillingMode
     energy_type?: 'local' | 'grid' | 'feed_in' | null
     fixed_price_chf?: string | null
+    percentage?: string | null
     valid_from: string
     valid_to?: string | null
     notes?: string

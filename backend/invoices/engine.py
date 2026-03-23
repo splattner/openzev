@@ -147,8 +147,11 @@ def _count_billable_metering_points_by_month(participant: Participant, tariff: T
     return total_metering_points
 
 
+_ENERGY_BILLING_MODES = {BillingMode.ENERGY, BillingMode.PERCENTAGE_OF_ENERGY}
+
+
 def _get_item_type(tariff: Tariff) -> str:
-    if tariff.billing_mode != BillingMode.ENERGY:
+    if tariff.billing_mode not in _ENERGY_BILLING_MODES:
         return InvoiceItem.ItemType.CREDIT if (tariff.fixed_price_chf or Decimal("0")) < 0 else InvoiceItem.ItemType.FEE
     if tariff.energy_type == EnergyType.FEED_IN:
         return InvoiceItem.ItemType.FEED_IN
@@ -169,6 +172,7 @@ DESCRIPTION_TRANSLATIONS: dict[str, dict] = {
         "mp_monthly_pl": "Messpunkt-Monate",
         "monthly_sg": "Monat",
         "monthly_pl": "Monate",
+        "pct_of": "von CHF",
     },
     "fr": {
         "yearly_fee_sg": "mensualité de la redevance annuelle",
@@ -179,6 +183,7 @@ DESCRIPTION_TRANSLATIONS: dict[str, dict] = {
         "mp_monthly_pl": "mois-points de mesure",
         "monthly_sg": "mois",
         "monthly_pl": "mois",
+        "pct_of": "de CHF",
     },
     "it": {
         "yearly_fee_sg": "rata mensile della tariffa annuale",
@@ -189,6 +194,7 @@ DESCRIPTION_TRANSLATIONS: dict[str, dict] = {
         "mp_monthly_pl": "mesi-punto di misurazione",
         "monthly_sg": "mese",
         "monthly_pl": "mesi",
+        "pct_of": "di CHF",
     },
     "en": {
         "yearly_fee_sg": "monthly installment of annual fee",
@@ -199,13 +205,31 @@ DESCRIPTION_TRANSLATIONS: dict[str, dict] = {
         "mp_monthly_pl": "metering-point months",
         "monthly_sg": "month",
         "monthly_pl": "months",
+        "pct_of": "of CHF",
     },
 }
 
 
-def _build_description(tariff: Tariff, period_start: date, period_end: date, quantity: Decimal, lang: str = "de") -> str:
+def _build_description(
+    tariff: Tariff,
+    period_start: date,
+    period_end: date,
+    quantity: Decimal,
+    lang: str = "de",
+    *,
+    base_rate: Decimal | None = None,
+) -> str:
     if tariff.billing_mode == BillingMode.ENERGY:
         return tariff.name
+    if tariff.billing_mode == BillingMode.PERCENTAGE_OF_ENERGY:
+        pct = tariff.percentage or Decimal("0")
+        # Format: remove trailing zeros (50.00 → 50, 33.50 → 33.5)
+        pct_str = f"{pct:f}".rstrip("0").rstrip(".")
+        if base_rate is not None:
+            t = DESCRIPTION_TRANSLATIONS.get(lang, DESCRIPTION_TRANSLATIONS["de"])
+            base_str = f"{base_rate:f}".rstrip("0").rstrip(".")
+            return f"{tariff.name} ({pct_str}% {t['pct_of']} {base_str}/kWh)"
+        return f"{tariff.name} ({pct_str}%)"
 
     t = DESCRIPTION_TRANSLATIONS.get(lang, DESCRIPTION_TRANSLATIONS["de"])
     months = int(quantity)
@@ -231,10 +255,11 @@ def _build_sort_order(tariff: Tariff) -> int:
     energy_rank = ENERGY_TYPE_SORT_ORDER.get(tariff.energy_type, 40)
     mode_rank = {
         BillingMode.ENERGY: 0,
-        BillingMode.MONTHLY_FEE: 1,
-        BillingMode.YEARLY_FEE: 2,
-        BillingMode.PER_METERING_POINT_MONTHLY_FEE: 3,
-        BillingMode.PER_METERING_POINT_YEARLY_FEE: 4,
+        BillingMode.PERCENTAGE_OF_ENERGY: 1,
+        BillingMode.MONTHLY_FEE: 2,
+        BillingMode.YEARLY_FEE: 3,
+        BillingMode.PER_METERING_POINT_MONTHLY_FEE: 4,
+        BillingMode.PER_METERING_POINT_YEARLY_FEE: 5,
     }.get(tariff.billing_mode, 9)
     return category_rank + energy_rank + mode_rank
 
@@ -339,7 +364,9 @@ def generate_invoice(participant: Participant, period_start: date, period_end: d
 
     item_accumulators: dict[str, dict[str, Decimal | str | Tariff]] = {}
 
-    def accumulate_item(*, tariff: Tariff, quantity: Decimal, total: Decimal, unit: str) -> None:
+    def accumulate_item(
+        *, tariff: Tariff, quantity: Decimal, total: Decimal, unit: str, base_total: Decimal | None = None
+    ) -> None:
         if quantity == 0 and total == 0:
             return
         key = str(tariff.id)
@@ -349,9 +376,12 @@ def generate_invoice(participant: Participant, period_start: date, period_end: d
                 "quantity": Decimal("0"),
                 "total": Decimal("0"),
                 "unit": unit,
+                "base_total": Decimal("0"),
             }
         item_accumulators[key]["quantity"] += quantity
         item_accumulators[key]["total"] += total
+        if base_total is not None:
+            item_accumulators[key]["base_total"] += base_total
 
     for reading in participant_readings.order_by("timestamp").iterator():
         ts = reading.timestamp
@@ -370,16 +400,29 @@ def generate_invoice(participant: Participant, period_start: date, period_end: d
         local_kwh_acc += r_local
         grid_kwh_acc += r_grid
 
+        # Compute GRID energy base sum once per timestamp.
+        # Percentage-of-energy tariffs price any energy type as a fraction of
+        # what a participant would normally pay for grid energy.
+        active_grid_energy_tariffs = [
+            t for t in tariffs_list
+            if t.billing_mode == BillingMode.ENERGY
+            and t.energy_type == EnergyType.GRID
+            and _tariff_is_active(t, ts.date())
+        ]
+        grid_base_price_sum = sum(
+            (_get_tariff_price(t, ts) or Decimal("0")) for t in active_grid_energy_tariffs
+        )
+
         for energy_type, quantity in ((EnergyType.LOCAL, r_local), (EnergyType.GRID, r_grid)):
             if quantity <= 0:
                 continue
-            active_tariffs = [
+            active_energy_tariffs = [
                 tariff for tariff in tariffs_list
                 if tariff.billing_mode == BillingMode.ENERGY
                 and tariff.energy_type == energy_type
                 and _tariff_is_active(tariff, ts.date())
             ]
-            for tariff in active_tariffs:
+            for tariff in active_energy_tariffs:
                 price = _get_tariff_price(tariff, ts) or Decimal("0")
                 accumulate_item(
                     tariff=tariff,
@@ -387,6 +430,24 @@ def generate_invoice(participant: Participant, period_start: date, period_end: d
                     total=quantity * price,
                     unit="kWh",
                 )
+
+            # Percentage-of-energy tariffs: base is always the GRID rate sum,
+            # applied to whichever energy_type the tariff is configured for.
+            for tariff in tariffs_list:
+                if (
+                    tariff.billing_mode == BillingMode.PERCENTAGE_OF_ENERGY
+                    and tariff.energy_type == energy_type
+                    and tariff.percentage
+                    and _tariff_is_active(tariff, ts.date())
+                ):
+                    effective_price = grid_base_price_sum * (tariff.percentage / Decimal("100"))
+                    accumulate_item(
+                        tariff=tariff,
+                        quantity=quantity,
+                        total=quantity * effective_price,
+                        unit="kWh",
+                        base_total=quantity * grid_base_price_sum,
+                    )
 
     for reading in feedin_readings.order_by("timestamp").iterator():
         active_tariffs = [
@@ -405,7 +466,7 @@ def generate_invoice(participant: Participant, period_start: date, period_end: d
             )
 
     for tariff in tariffs_list:
-        if tariff.billing_mode == BillingMode.ENERGY:
+        if tariff.billing_mode in _ENERGY_BILLING_MODES:
             continue
         month_count = _count_billable_months(tariff, period_start, period_end)
         if month_count <= 0:
@@ -454,12 +515,14 @@ def generate_invoice(participant: Participant, period_start: date, period_end: d
         else:
             unit_price = Decimal("0")
 
+        raw_base_total = accumulator.get("base_total", Decimal("0"))
         item_payloads.append({
             "tariff": tariff,
             "quantity": quantity.quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP),
             "unit": str(accumulator["unit"]),
             "unit_price": unit_price,
             "total": quantized_total,
+            "base_rate": (raw_base_total / quantity).quantize(Decimal("0.00001"), rounding=ROUND_HALF_UP) if quantity and raw_base_total else None,
         })
 
     subtotal = subtotal.quantize(Q, rounding=ROUND_HALF_UP)
@@ -490,11 +553,15 @@ def generate_invoice(participant: Participant, period_start: date, period_end: d
     items = []
     for payload in sorted(item_payloads, key=lambda entry: (_build_sort_order(entry["tariff"]), entry["tariff"].name.lower())):
         tariff = payload["tariff"]
+        lang = participant.zev.invoice_language or "de"
         items.append(InvoiceItem(
             invoice=invoice,
             item_type=_get_item_type(tariff),
             tariff_category=tariff.category,
-            description=_build_description(tariff, period_start, period_end, payload["quantity"], lang=participant.zev.invoice_language or "de"),
+            description=_build_description(
+                tariff, period_start, period_end, payload["quantity"], lang,
+                base_rate=payload.get("base_rate"),
+            ),
             quantity_kwh=payload["quantity"],
             unit=payload["unit"],
             unit_price_chf=payload["unit_price"],
