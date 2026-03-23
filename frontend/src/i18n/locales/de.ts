@@ -316,6 +316,7 @@ export const de = {
                 energy: 'Energie',
                 grid_fees: 'Netzgebühren',
                 levies: 'Abgaben',
+                metering: 'Messtarif',
             },
             billingModes: {
                 energy: 'Nach Energie (kWh)',
@@ -611,6 +612,7 @@ export const de = {
                 energy: 'Energie',
                 grid_fees: 'Netzgebühren',
                 levies: 'Abgaben',
+                metering: 'Messtarif',
             },
         },
         dashboard: {

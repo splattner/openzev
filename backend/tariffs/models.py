@@ -13,6 +13,7 @@ class TariffCategory(models.TextChoices):
     ENERGY = "energy", "Energy"
     GRID_FEES = "grid_fees", "Grid Fees"
     LEVIES = "levies", "Levies"
+    METERING = "metering", "Metering Tariff"
 
 
 class BillingMode(models.TextChoices):

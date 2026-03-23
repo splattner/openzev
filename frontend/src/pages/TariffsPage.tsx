@@ -397,6 +397,7 @@ export function TariffsPage() {
                             <option value="energy">{t('pages.tariffs.categories.energy')}</option>
                             <option value="grid_fees">{t('pages.tariffs.categories.grid_fees')}</option>
                             <option value="levies">{t('pages.tariffs.categories.levies')}</option>
+                            <option value="metering">{t('pages.tariffs.categories.metering')}</option>
                         </select>
                     </label>
                     <label>

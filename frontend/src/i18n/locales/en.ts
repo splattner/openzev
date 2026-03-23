@@ -316,6 +316,7 @@ export const en = {
                 energy: 'Energy',
                 grid_fees: 'Grid Fees',
                 levies: 'Levies',
+                metering: 'Metering Tariff',
             },
             billingModes: {
                 energy: 'By energy (kWh)',
@@ -612,6 +613,7 @@ export const en = {
                 energy: 'Energy',
                 grid_fees: 'Grid Fees',
                 levies: 'Levies',
+                metering: 'Metering Tariff',
             },
         },
         dashboard: {

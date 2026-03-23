@@ -305,6 +305,7 @@ export const it = {
                 energy: 'Energia',
                 grid_fees: 'Tasse di rete',
                 levies: 'Oneri',
+                metering: 'Tariffa di misurazione',
             },
             billingModes: {
                 energy: 'Per energia (kWh)',
@@ -601,6 +602,7 @@ export const it = {
                 energy: 'Energia',
                 grid_fees: 'Tasse di rete',
                 levies: 'Oneri',
+                metering: 'Tariffa di misurazione',
             },
         },
         dashboard: {

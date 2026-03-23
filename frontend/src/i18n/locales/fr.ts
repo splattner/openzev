@@ -305,6 +305,7 @@ export const fr = {
                 energy: 'Énergie',
                 grid_fees: 'Frais de réseau',
                 levies: 'Taxes',
+                metering: 'Tarif de comptage',
             },
             billingModes: {
                 energy: 'Par énergie (kWh)',
@@ -601,6 +602,7 @@ export const fr = {
                 energy: 'Énergie',
                 grid_fees: 'Frais de réseau',
                 levies: 'Taxes',
+                metering: 'Tarif de comptage',
             },
         },
         dashboard: {
