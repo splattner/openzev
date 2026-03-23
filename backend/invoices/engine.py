@@ -2,10 +2,10 @@
 Invoice calculation engine for OpenZEV.
 
 Algorithm:
-1. Collect participant IN readings and participant OUT feed-in readings in period.
+1. Collect participant IN readings and participant OUT production readings in period.
 2. For each timestamp, compute ZEV total consumption and production.
 3. Allocate local energy per timestamp (not only per-period) using participant share of that timestamp.
-4. Price local/grid/feed-in energy at each reading timestamp (HT/NT aware).
+4. Price local/grid energy consumption and producer compensation per timestamp (HT/NT aware).
 5. Build invoice totals and line items.
 """
 import logging
@@ -307,7 +307,7 @@ def generate_invoice(participant: Participant, period_start: date, period_end: d
     )
     total_participant_kwh = sum(r.energy_kwh for r in participant_readings) or Decimal("0")
 
-    # ─── 2. Collect participant feed-in (OUT) readings ────────────────────
+    # ─── 2. Collect participant production (OUT) readings ──────────────────
     production_mps = MeteringPoint.objects.filter(
         participant=participant,
         meter_type__in=[MeteringPointType.PRODUCTION, MeteringPointType.BIDIRECTIONAL],
@@ -318,8 +318,6 @@ def generate_invoice(participant: Participant, period_start: date, period_end: d
         timestamp__lt=end_dt,
         direction=ReadingDirection.OUT,
     )
-    total_feedin_kwh = sum(r.energy_kwh for r in feedin_readings) or Decimal("0")
-
     # ─── 3. Calculate ZEV total production/consumption by timestamp ───────
     all_production_mps = MeteringPoint.objects.filter(
         participant__zev=zev,
@@ -365,11 +363,17 @@ def generate_invoice(participant: Participant, period_start: date, period_end: d
     item_accumulators: dict[str, dict[str, Decimal | str | Tariff]] = {}
 
     def accumulate_item(
-        *, tariff: Tariff, quantity: Decimal, total: Decimal, unit: str, base_total: Decimal | None = None
+        *,
+        tariff: Tariff,
+        quantity: Decimal,
+        total: Decimal,
+        unit: str,
+        base_total: Decimal | None = None,
+        bucket: str = "default",
     ) -> None:
         if quantity == 0 and total == 0:
             return
-        key = str(tariff.id)
+        key = f"{tariff.id}:{bucket}"
         if key not in item_accumulators:
             item_accumulators[key] = {
                 "tariff": tariff,
@@ -449,21 +453,86 @@ def generate_invoice(participant: Participant, period_start: date, period_end: d
                         base_total=quantity * grid_base_price_sum,
                     )
 
+    exported_kwh_acc = Decimal("0")
+
     for reading in feedin_readings.order_by("timestamp").iterator():
-        active_tariffs = [
-            tariff for tariff in tariffs_list
-            if tariff.billing_mode == BillingMode.ENERGY
-            and tariff.energy_type == EnergyType.FEED_IN
-            and _tariff_is_active(tariff, reading.timestamp.date())
+        ts = reading.timestamp
+        produced_kwh = reading.energy_kwh
+
+        zev_production_at_ts = zev_production_by_ts.get(ts, Decimal("0"))
+        zev_consumption_at_ts = zev_consumption_by_ts.get(ts, Decimal("0"))
+        local_pool_at_ts = min(zev_production_at_ts, zev_consumption_at_ts)
+        export_pool_at_ts = max(zev_production_at_ts - zev_consumption_at_ts, Decimal("0"))
+
+        if zev_production_at_ts > 0:
+            producer_share = produced_kwh / zev_production_at_ts
+            local_sold_kwh = local_pool_at_ts * producer_share
+            exported_kwh = export_pool_at_ts * producer_share
+        else:
+            local_sold_kwh = Decimal("0")
+            exported_kwh = Decimal("0")
+
+        exported_kwh_acc += exported_kwh
+
+        active_grid_energy_tariffs = [
+            t for t in tariffs_list
+            if t.billing_mode == BillingMode.ENERGY
+            and t.energy_type == EnergyType.GRID
+            and _tariff_is_active(t, ts.date())
         ]
-        for tariff in active_tariffs:
-            price = _get_tariff_price(tariff, reading.timestamp) or Decimal("0")
-            accumulate_item(
-                tariff=tariff,
-                quantity=reading.energy_kwh,
-                total=-(reading.energy_kwh * price),
-                unit="kWh",
-            )
+        grid_base_price_sum = sum(
+            (_get_tariff_price(t, ts) or Decimal("0")) for t in active_grid_energy_tariffs
+        )
+
+        if local_sold_kwh > 0:
+            active_local_energy_tariffs = [
+                tariff for tariff in tariffs_list
+                if tariff.billing_mode == BillingMode.ENERGY
+                and tariff.energy_type == EnergyType.LOCAL
+                and _tariff_is_active(tariff, ts.date())
+            ]
+            for tariff in active_local_energy_tariffs:
+                price = _get_tariff_price(tariff, ts) or Decimal("0")
+                accumulate_item(
+                    tariff=tariff,
+                    quantity=local_sold_kwh,
+                    total=-(local_sold_kwh * price),
+                    unit="kWh",
+                    bucket="producer_credit",
+                )
+
+            for tariff in tariffs_list:
+                if (
+                    tariff.billing_mode == BillingMode.PERCENTAGE_OF_ENERGY
+                    and tariff.energy_type == EnergyType.LOCAL
+                    and tariff.percentage
+                    and _tariff_is_active(tariff, ts.date())
+                ):
+                    effective_price = grid_base_price_sum * (tariff.percentage / Decimal("100"))
+                    accumulate_item(
+                        tariff=tariff,
+                        quantity=local_sold_kwh,
+                        total=-(local_sold_kwh * effective_price),
+                        unit="kWh",
+                        base_total=(local_sold_kwh * grid_base_price_sum),
+                        bucket="producer_credit",
+                    )
+
+        if exported_kwh > 0:
+            active_feed_in_tariffs = [
+                tariff for tariff in tariffs_list
+                if tariff.billing_mode == BillingMode.ENERGY
+                and tariff.energy_type == EnergyType.FEED_IN
+                and _tariff_is_active(tariff, ts.date())
+            ]
+            for tariff in active_feed_in_tariffs:
+                price = _get_tariff_price(tariff, ts) or Decimal("0")
+                accumulate_item(
+                    tariff=tariff,
+                    quantity=exported_kwh,
+                    total=-(exported_kwh * price),
+                    unit="kWh",
+                )
 
     for tariff in tariffs_list:
         if tariff.billing_mode in _ENERGY_BILLING_MODES:
@@ -542,7 +611,7 @@ def generate_invoice(participant: Participant, period_start: date, period_end: d
         status=InvoiceStatus.DRAFT,
         total_local_kwh=local_kwh,
         total_grid_kwh=grid_kwh,
-        total_feed_in_kwh=total_feedin_kwh.quantize(Decimal("0.0001")),
+        total_feed_in_kwh=exported_kwh_acc.quantize(Decimal("0.0001")),
         subtotal_chf=subtotal,
         vat_rate=vat_rate,
         vat_chf=vat_chf,

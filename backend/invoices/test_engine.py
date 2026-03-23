@@ -82,8 +82,9 @@ class InvoiceEngineTests(TestCase):
 
         self.assertEqual(invoice.total_local_kwh, Decimal("6.0000"))
         self.assertEqual(invoice.total_grid_kwh, Decimal("4.0000"))
-        self.assertEqual(invoice.subtotal_chf, Decimal("1.42"))
-        self.assertEqual(invoice.total_chf, Decimal("1.42"))
+        self.assertEqual(invoice.total_feed_in_kwh, Decimal("0.0000"))
+        self.assertEqual(invoice.subtotal_chf, Decimal("1.00"))
+        self.assertEqual(invoice.total_chf, Decimal("1.00"))
         self.assertEqual(invoice.items.count(), 3)
 
     def test_generate_invoice_separates_categories_and_fixed_fees(self):
@@ -145,7 +146,7 @@ class InvoiceEngineTests(TestCase):
 
         invoice = generate_invoice(self.participant, date(2026, 1, 15), date(2026, 1, 31))
 
-        self.assertEqual(invoice.subtotal_chf, Decimal("23.70"))
+        self.assertEqual(invoice.subtotal_chf, Decimal("23.28"))
         categories = {item.description: item.tariff_category for item in invoice.items.all()}
         self.assertEqual(categories["Grid usage fee"], TariffCategory.GRID_FEES)
         self.assertEqual(categories["Federal levy"], TariffCategory.LEVIES)
@@ -267,11 +268,89 @@ class InvoiceEngineTests(TestCase):
 
         invoice = generate_invoice(self.participant, date(2026, 1, 1), date(2026, 1, 31))
 
-        # Find the percentage-of-energy line item
-        pct_item = invoice.items.get(description__startswith="Surcharge 50%")
-        self.assertEqual(pct_item.description, "Surcharge 50% (50% von CHF 0.32/kWh)")
-        self.assertEqual(pct_item.quantity_kwh, Decimal("6.0000"))  # local kWh
-        # grid base_sum = 0.25 + 0.05 + 0.02 = 0.32; effective = 0.32 × 0.50 = 0.16
-        # total = 6 × 0.16 = 0.96
-        self.assertEqual(pct_item.total_chf, Decimal("0.96"))
-        self.assertEqual(pct_item.unit, "kWh")
+        pct_items = invoice.items.filter(description__startswith="Surcharge 50%").order_by("total_chf")
+        self.assertEqual(pct_items.count(), 2)
+        self.assertEqual(pct_items.first().description, "Surcharge 50% (50% von CHF 0.32/kWh)")
+        self.assertEqual(sum((item.total_chf for item in pct_items), Decimal("0")), Decimal("0.00"))
+        self.assertEqual(sorted(item.total_chf for item in pct_items), [Decimal("-0.96"), Decimal("0.96")])
+        self.assertTrue(all(item.unit == "kWh" for item in pct_items))
+
+    def test_producer_gets_local_revenue_and_feed_in_only_for_export_share(self):
+        consumer = Participant.objects.create(
+            zev=self.zev,
+            first_name="Bob",
+            last_name="Consumer",
+            email="bob@example.com",
+            valid_from=date(2026, 1, 1),
+        )
+        consumer_mp = MeteringPoint.objects.create(
+            zev=self.zev,
+            participant=consumer,
+            meter_id="MP-C-2",
+            meter_type=MeteringPointType.CONSUMPTION,
+            valid_from=date(2026, 1, 1),
+        )
+
+        producer_2 = Participant.objects.create(
+            zev=self.zev,
+            first_name="Charlie",
+            last_name="Producer",
+            email="charlie@example.com",
+            valid_from=date(2026, 1, 1),
+        )
+        producer_2_mp = MeteringPoint.objects.create(
+            zev=self.zev,
+            participant=producer_2,
+            meter_id="MP-P-2",
+            meter_type=MeteringPointType.PRODUCTION,
+            valid_from=date(2026, 1, 1),
+        )
+
+        ts = datetime(2026, 1, 15, 0, 0, tzinfo=timezone.utc)
+        MeterReading.objects.create(
+            metering_point=self.production_mp,
+            timestamp=ts,
+            energy_kwh=Decimal("6.0"),
+            direction=ReadingDirection.OUT,
+        )
+        MeterReading.objects.create(
+            metering_point=producer_2_mp,
+            timestamp=ts,
+            energy_kwh=Decimal("4.0"),
+            direction=ReadingDirection.OUT,
+        )
+        MeterReading.objects.create(
+            metering_point=consumer_mp,
+            timestamp=ts,
+            energy_kwh=Decimal("5.0"),
+            direction=ReadingDirection.IN,
+        )
+
+        alice_invoice = generate_invoice(self.participant, date(2026, 1, 1), date(2026, 1, 31))
+        charlie_invoice = generate_invoice(producer_2, date(2026, 1, 1), date(2026, 1, 31))
+        bob_invoice = generate_invoice(consumer, date(2026, 1, 1), date(2026, 1, 31))
+
+        self.assertEqual(alice_invoice.total_feed_in_kwh, Decimal("3.0000"))
+        self.assertEqual(charlie_invoice.total_feed_in_kwh, Decimal("2.0000"))
+
+        alice_local_total = sum(
+            (item.total_chf for item in alice_invoice.items.filter(item_type="local_energy")), Decimal("0")
+        )
+        charlie_local_total = sum(
+            (item.total_chf for item in charlie_invoice.items.filter(item_type="local_energy")), Decimal("0")
+        )
+        bob_local_total = sum(
+            (item.total_chf for item in bob_invoice.items.filter(item_type="local_energy")), Decimal("0")
+        )
+        self.assertEqual(alice_local_total, Decimal("-0.45"))
+        self.assertEqual(charlie_local_total, Decimal("-0.30"))
+        self.assertEqual(bob_local_total, Decimal("0.75"))
+
+        alice_feed_in_total = sum(
+            (item.total_chf for item in alice_invoice.items.filter(item_type="feed_in")), Decimal("0")
+        )
+        charlie_feed_in_total = sum(
+            (item.total_chf for item in charlie_invoice.items.filter(item_type="feed_in")), Decimal("0")
+        )
+        self.assertEqual(alice_feed_in_total, Decimal("-0.24"))
+        self.assertEqual(charlie_feed_in_total, Decimal("-0.16"))
