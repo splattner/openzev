@@ -289,6 +289,7 @@ export const it = {
                 yearlyFee: 'Canone annuale (CHF)',
                 mpMonthlyFee: 'Canone mensile per punto di misura (CHF)',
                 mpYearlyFee: 'Canone annuale per punto di misura (CHF)',
+                percentage: 'Percentuale (%)',
                 tariff: 'Tariffa',
                 periodType: 'Tipo di periodo',
                 pricePerKwh: 'CHF/kWh',
@@ -305,6 +306,7 @@ export const it = {
             },
             billingModes: {
                 energy: 'Per energia (kWh)',
+                percentage_of_energy: 'Percentuale dei tariffe energetici',
                 monthly_fee: 'Canone mensile',
                 yearly_fee: 'Canone annuale ripartito per mese',
                 per_metering_point_monthly_fee: 'Canone mensile per punto di misura',

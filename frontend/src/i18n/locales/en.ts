@@ -300,6 +300,7 @@ export const en = {
                 yearlyFee: 'Yearly fee (CHF)',
                 mpMonthlyFee: 'Per metering point monthly fee (CHF)',
                 mpYearlyFee: 'Per metering point yearly fee (CHF)',
+                percentage: 'Percentage (%)',
                 tariff: 'Tariff',
                 periodType: 'Period type',
                 pricePerKwh: 'CHF/kWh',
@@ -316,6 +317,7 @@ export const en = {
             },
             billingModes: {
                 energy: 'By energy (kWh)',
+                percentage_of_energy: 'Percentage of energy tariffs',
                 monthly_fee: 'Monthly fee',
                 yearly_fee: 'Yearly fee split by month',
                 per_metering_point_monthly_fee: 'Per metering point monthly fee',

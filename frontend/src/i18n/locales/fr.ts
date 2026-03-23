@@ -289,6 +289,7 @@ export const fr = {
                 yearlyFee: 'Frais annuels (CHF)',
                 mpMonthlyFee: 'Frais mensuels par point de mesure (CHF)',
                 mpYearlyFee: 'Frais annuels par point de mesure (CHF)',
+                percentage: 'Pourcentage (%)',
                 tariff: 'Tarif',
                 periodType: 'Type de période',
                 pricePerKwh: 'CHF/kWh',
@@ -305,6 +306,7 @@ export const fr = {
             },
             billingModes: {
                 energy: 'Par énergie (kWh)',
+                percentage_of_energy: 'Pourcentage des tarifs énergétiques',
                 monthly_fee: 'Frais mensuels',
                 yearly_fee: 'Frais annuels répartis par mois',
                 per_metering_point_monthly_fee: 'Frais mensuels par point de mesure',

@@ -300,6 +300,7 @@ export const de = {
                 yearlyFee: 'Jahresgebühr (CHF)',
                 mpMonthlyFee: 'Monatliche Gebühr pro Zählpunkt (CHF)',
                 mpYearlyFee: 'Jahresgebühr pro Zählpunkt (CHF)',
+                percentage: 'Prozentsatz (%)',
                 tariff: 'Tarif',
                 periodType: 'Periodentyp',
                 pricePerKwh: 'CHF/kWh',

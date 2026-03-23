@@ -33,6 +33,7 @@ const defaultTariffForm: TariffInput = {
     billing_mode: 'energy',
     energy_type: 'local',
     fixed_price_chf: null,
+    percentage: null,
     valid_from: new Date().toISOString().slice(0, 10),
     valid_to: null,
     notes: '',
@@ -183,7 +184,15 @@ export function TariffsPage() {
             pushToast('Select an energy type for energy-based tariffs.', 'error')
             return
         }
-        if (tariffForm.billing_mode !== 'energy' && !tariffForm.fixed_price_chf) {
+        if (tariffForm.billing_mode === 'percentage_of_energy' && !tariffForm.energy_type) {
+            pushToast('Select an energy type for percentage tariffs.', 'error')
+            return
+        }
+        if (tariffForm.billing_mode === 'percentage_of_energy' && !tariffForm.percentage) {
+            pushToast('Enter a percentage value.', 'error')
+            return
+        }
+        if (!['energy', 'percentage_of_energy'].includes(tariffForm.billing_mode) && !tariffForm.fixed_price_chf) {
             pushToast('Enter a fixed fee amount.', 'error')
             return
         }
@@ -208,6 +217,7 @@ export function TariffsPage() {
             billing_mode: tariff.billing_mode,
             energy_type: tariff.energy_type || null,
             fixed_price_chf: tariff.fixed_price_chf || null,
+            percentage: tariff.percentage || null,
             valid_from: tariff.valid_from,
             valid_to: tariff.valid_to || null,
             notes: tariff.notes || '',
@@ -395,22 +405,25 @@ export function TariffsPage() {
                             value={tariffForm.billing_mode}
                             onChange={(event) => {
                                 const billingMode = event.target.value as TariffInput['billing_mode']
+                                const isEnergyMode = billingMode === 'energy' || billingMode === 'percentage_of_energy'
                                 setTariffForm((prev) => ({
                                     ...prev,
                                     billing_mode: billingMode,
-                                    energy_type: billingMode === 'energy' ? (prev.energy_type || 'local') : null,
-                                    fixed_price_chf: billingMode === 'energy' ? null : (prev.fixed_price_chf || ''),
+                                    energy_type: isEnergyMode ? (prev.energy_type || 'local') : null,
+                                    fixed_price_chf: isEnergyMode ? null : (prev.fixed_price_chf || ''),
+                                    percentage: billingMode === 'percentage_of_energy' ? (prev.percentage || '') : null,
                                 }))
                             }}
                         >
                             <option value="energy">{t('pages.tariffs.billingModes.energy')}</option>
+                            <option value="percentage_of_energy">{t('pages.tariffs.billingModes.percentage_of_energy')}</option>
                             <option value="monthly_fee">{t('pages.tariffs.billingModes.monthly_fee')}</option>
                             <option value="yearly_fee">{t('pages.tariffs.billingModes.yearly_fee')}</option>
                             <option value="per_metering_point_monthly_fee">{t('pages.tariffs.billingModes.per_metering_point_monthly_fee')}</option>
                             <option value="per_metering_point_yearly_fee">{t('pages.tariffs.billingModes.per_metering_point_yearly_fee')}</option>
                         </select>
                     </label>
-                    {tariffForm.billing_mode === 'energy' ? (
+                    {(tariffForm.billing_mode === 'energy' || tariffForm.billing_mode === 'percentage_of_energy') ? (
                         <label>
                             <span>{t('pages.tariffs.form.energyType')}</span>
                             <select
@@ -422,7 +435,21 @@ export function TariffsPage() {
                                 <option value="feed_in">{t('pages.tariffs.energyTypes.feed_in')}</option>
                             </select>
                         </label>
-                    ) : (
+                    ) : null}
+                    {tariffForm.billing_mode === 'percentage_of_energy' ? (
+                        <label>
+                            <span>{t('pages.tariffs.form.percentage')}</span>
+                            <input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                max="100"
+                                value={tariffForm.percentage ?? ''}
+                                onChange={(event) => setTariffForm((prev) => ({ ...prev, percentage: event.target.value || null }))}
+                                required
+                            />
+                        </label>
+                    ) : tariffForm.billing_mode !== 'energy' ? (
                         <label>
                             <span>
                                 {tariffForm.billing_mode === 'monthly_fee'
@@ -441,7 +468,7 @@ export function TariffsPage() {
                                 required
                             />
                         </label>
-                    )}
+                    ) : null}
                     <label>
                         <span>{t('pages.tariffs.form.validFrom')}</span>
                         <LocalizationProvider dateAdapter={AdapterDayjs}>
@@ -585,7 +612,9 @@ export function TariffsPage() {
                                 <td>
                                     {tariff.billing_mode === 'energy'
                                         ? t(`pages.tariffs.energyTypes.${tariff.energy_type || 'local'}` as Parameters<typeof t>[0])
-                                        : `CHF ${tariff.fixed_price_chf || '0.00'}`}
+                                        : tariff.billing_mode === 'percentage_of_energy'
+                                            ? `${tariff.percentage ?? '0'}% · ${t(`pages.tariffs.energyTypes.${tariff.energy_type || 'local'}` as Parameters<typeof t>[0])}`
+                                            : `CHF ${tariff.fixed_price_chf || '0.00'}`}
                                 </td>
                                 <td>{formatShortDate(tariff.valid_from, settings)} → {tariff.valid_to ? formatShortDate(tariff.valid_to, settings) : '-'}</td>
                                 <td className="actions-cell">
