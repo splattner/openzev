@@ -302,8 +302,7 @@
         <div class="header">
             <div>
                 <div class="zev-name">{{ zev.name }}</div>
-                <div class="zev-meta">{{ zev.get_zev_type_display }}{% if zev.grid_operator %} · {{ zev.grid_operator
-                    }}{% endif %}</div>
+                <div class="zev-meta">{{ zev.get_zev_type_display }}{% if zev.grid_operator %} · {{ zev.grid_operator }}{% endif %}</div>
             </div>
             <div class="contract-title-block">
                 <div class="contract-title">{{ tr.contract_title }}</div>
@@ -327,9 +326,7 @@
                 <div class="field-row">
                     <div class="field-label">{{ tr.field_address }}</div>
                     <div class="field-value">
-                        {{ participant.address_line1 }}{% if participant.address_line2 %}, {{ participant.address_line2
-                        }}{% endif %}{% if participant.postal_code or participant.city %}<br>{{ participant.postal_code
-                        }} {{ participant.city }}{% endif %}
+                        {{ participant.address_line1 }}{% if participant.address_line2 %}, {{ participant.address_line2 }}{% endif %}{% if participant.postal_code or participant.city %}<br>{{ participant.postal_code }} {{ participant.city }}{% endif %}
                     </div>
                 </div>
                 <div class="field-row">
@@ -350,8 +347,7 @@
                 <!-- Consumption metering points -->
                 {% for mp in consumption_mps %}
                 <div class="field-row">
-                    <div class="field-label">{{ tr.field_meter }}{% if forloop.counter > 1 %} ({{ forloop.counter }}){%
-                        endif %}</div>
+                    <div class="field-label">{{ tr.field_meter }}{% if forloop.counter > 1 %} ({{ forloop.counter }}){% endif %}</div>
                     <div class="meter-row">
                         <div class="meter-value">{{ mp.meter_id }}</div>
                     </div>
@@ -413,21 +409,16 @@
                 <div class="field-row">
                     <div class="field-label">{{ tr.field_address }}</div>
                     <div class="field-value">
-                        {{ owner_participant.address_line1 }}{% if owner_participant.address_line2 %}, {{
-                        owner_participant.address_line2 }}{% endif %}{% if owner_participant.postal_code or
-                        owner_participant.city %}<br>{{ owner_participant.postal_code }} {{ owner_participant.city }}{%
-                        endif %}
+                        {{ owner_participant.address_line1 }}{% if owner_participant.address_line2 %}, {{ owner_participant.address_line2 }}{% endif %}{% if owner_participant.postal_code or owner_participant.city %}<br>{{ owner_participant.postal_code }} {{ owner_participant.city }}{% endif %}
                     </div>
                 </div>
                 <div class="field-row">
                     <div class="field-label">{{ tr.field_phone }}</div>
-                    <div class="field-value{% if not owner_participant.phone %} empty{% endif %}">{{
-                        owner_participant.phone }}</div>
+                    <div class="field-value{% if not owner_participant.phone %} empty{% endif %}">{{ owner_participant.phone }}</div>
                 </div>
                 <div class="field-row">
                     <div class="field-label">{{ tr.field_email }}</div>
-                    <div class="field-value{% if not owner_participant.email %} empty{% endif %}">{{
-                        owner_participant.email }}</div>
+                    <div class="field-value{% if not owner_participant.email %} empty{% endif %}">{{ owner_participant.email }}</div>
                 </div>
                 {% else %}
                 <div class="field-row">
@@ -509,8 +500,7 @@
             <div class="field-label">{{ tr.local_tariff_note }}</div>
             <div class="freetext-box"
                 style="color: {% if local_tariff_notes %}#333{% else %}#bbb{% endif %}; font-style: {% if local_tariff_notes %}normal{% else %}italic{% endif %};">
-                {% if local_tariff_notes %}{{ local_tariff_notes }}{% else %}<span class="freetext-placeholder">{{
-                    tr.local_tariff_note_placeholder }}</span>{% endif %}
+                {% if local_tariff_notes %}{{ local_tariff_notes }}{% else %}<span class="freetext-placeholder">{{ tr.local_tariff_note_placeholder }}</span>{% endif %}
             </div>
         </div>
 
@@ -531,8 +521,7 @@
         <div class="agreement-row">
             <div class="agreement-label">{{ tr.vat_label }}:</div>
             <div class="agreement-value">
-                {% if zev.vat_number %}{{ tr.vat_required }} – {{ zev.vat_number }}{% else %}{{ tr.vat_not_required }}{%
-                endif %}
+                {% if zev.vat_number %}{{ tr.vat_required }} – {{ zev.vat_number }}{% else %}{{ tr.vat_not_required }}{% endif %}
             </div>
         </div>
 
