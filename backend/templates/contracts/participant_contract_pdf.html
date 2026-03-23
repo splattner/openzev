@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="{{ lang }}">
+
+<head>
+    <meta charset="UTF-8">
+    <title>{{ tr.contract_title }} – {{ participant.full_name }}</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+            font-size: 10pt;
+            color: #222;
+        }
+
+        .page {
+            padding: 14mm 16mm 16mm;
+        }
+
+        /* ── Header ─────────────────────────────────────────────────── */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 5mm;
+            padding-bottom: 3mm;
+            border-bottom: 2px solid #2c5f2e;
+        }
+
+        .zev-name {
+            font-size: 13pt;
+            font-weight: bold;
+            color: #2c5f2e;
+        }
+
+        .zev-meta {
+            font-size: 8pt;
+            color: #555;
+            margin-top: 1mm;
+        }
+
+        .contract-title-block {
+            text-align: right;
+        }
+
+        .contract-title {
+            font-size: 14pt;
+            font-weight: bold;
+            color: #2c5f2e;
+        }
+
+        .contract-date {
+            font-size: 8pt;
+            color: #666;
+            margin-top: 1mm;
+        }
+
+        /* ── Section headings ────────────────────────────────────────── */
+        .section-heading {
+            font-size: 11pt;
+            font-weight: bold;
+            color: #2c5f2e;
+            border-bottom: 1px solid #2c5f2e;
+            padding-bottom: 1mm;
+            margin-top: 6mm;
+            margin-bottom: 4mm;
+        }
+
+        .sub-heading {
+            font-size: 9pt;
+            font-weight: bold;
+            color: #444;
+            margin-bottom: 3mm;
+            margin-top: 1mm;
+        }
+
+        /* ── Two-column layout for parties ──────────────────────────── */
+        .parties-grid {
+            display: flex;
+            gap: 8mm;
+        }
+
+        .party-block {
+            flex: 1;
+        }
+
+        /* ── Field rows ──────────────────────────────────────────────── */
+        .field-row {
+            margin-bottom: 3mm;
+        }
+
+        .field-label {
+            font-size: 7.5pt;
+            color: #777;
+            margin-bottom: 0.5mm;
+        }
+
+        .field-value {
+            border-bottom: 1px solid #aaa;
+            min-height: 5mm;
+            padding: 0.5mm 1mm;
+            font-size: 9.5pt;
+            color: #111;
+        }
+
+        .field-value.empty {
+            color: #bbb;
+        }
+
+        /* Metering point box — CH prefix layout */
+        .meter-row {
+            display: flex;
+            align-items: flex-end;
+            gap: 2mm;
+        }
+
+        .meter-prefix {
+            font-size: 9.5pt;
+            font-weight: bold;
+            color: #555;
+            padding-bottom: 1mm;
+            white-space: nowrap;
+        }
+
+        .meter-value {
+            flex: 1;
+            border-bottom: 1px solid #aaa;
+            min-height: 5mm;
+            padding: 0.5mm 1mm;
+            font-size: 9.5pt;
+            font-family: monospace;
+        }
+
+        .field-hint {
+            font-size: 7pt;
+            color: #999;
+            margin-top: 0.5mm;
+            font-style: italic;
+        }
+
+        /* ── Subject text ────────────────────────────────────────────── */
+        .subject-text {
+            font-size: 9pt;
+            line-height: 1.5;
+            color: #333;
+            white-space: pre-line;
+        }
+
+        /* ── Agreements table ────────────────────────────────────────── */
+        .agreement-row {
+            display: flex;
+            align-items: baseline;
+            margin-bottom: 4mm;
+            gap: 4mm;
+        }
+
+        .agreement-label {
+            min-width: 52mm;
+            font-size: 8.5pt;
+            color: #555;
+            font-weight: bold;
+            flex-shrink: 0;
+        }
+
+        .agreement-value {
+            flex: 1;
+            border-bottom: 1px solid #aaa;
+            min-height: 5mm;
+            padding: 0.5mm 1mm;
+            font-size: 9.5pt;
+        }
+
+        .agreement-unit {
+            font-size: 8pt;
+            color: #777;
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+
+        /* Tariff display table */
+        .tariff-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 3mm;
+        }
+
+        .tariff-table th {
+            font-size: 7.5pt;
+            color: #888;
+            text-align: left;
+            font-weight: normal;
+            padding: 0 1mm 1mm;
+            border-bottom: 1px solid #ddd;
+        }
+
+        .tariff-table td {
+            font-size: 9.5pt;
+            padding: 1.5mm 1mm;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .tariff-table td.rate {
+            font-weight: bold;
+            text-align: right;
+        }
+
+        .tariff-empty {
+            border: 1px dashed #ccc;
+            padding: 3mm;
+            font-size: 8.5pt;
+            color: #bbb;
+            text-align: center;
+        }
+
+        /* Free-text box */
+        .freetext-box {
+            border: 1px solid #ccc;
+            min-height: 20mm;
+            padding: 2mm;
+            font-size: 9pt;
+            color: #bbb;
+            font-style: italic;
+        }
+
+        .freetext-placeholder {
+            font-size: 8pt;
+            color: #ccc;
+            font-style: italic;
+        }
+
+        /* ── Signature block ─────────────────────────────────────────── */
+        .sig-intro {
+            font-size: 8.5pt;
+            color: #555;
+            margin-bottom: 8mm;
+            line-height: 1.5;
+        }
+
+        .sig-grid {
+            display: flex;
+            gap: 12mm;
+        }
+
+        .sig-block {
+            flex: 1;
+        }
+
+        .sig-label {
+            font-size: 9pt;
+            font-weight: bold;
+            color: #2c5f2e;
+            margin-bottom: 10mm;
+        }
+
+        .sig-line {
+            border-bottom: 1px solid #888;
+            margin-bottom: 1mm;
+            min-height: 10mm;
+        }
+
+        .sig-line-label {
+            font-size: 7.5pt;
+            color: #999;
+            margin-bottom: 6mm;
+        }
+
+        /* ── Footer / page number ────────────────────────────────────── */
+        .page-footer {
+            position: fixed;
+            bottom: 8mm;
+            left: 16mm;
+            right: 16mm;
+            font-size: 7pt;
+            color: #aaa;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        @page {
+            size: A4;
+            margin: 0;
+        }
+
+        .page-break {
+            page-break-before: always;
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- ════════════════════════════════════════════════════════════════════ -->
+    <!-- PAGE 1                                                               -->
+    <!-- ════════════════════════════════════════════════════════════════════ -->
+    <div class="page">
+
+        <!-- Header -->
+        <div class="header">
+            <div>
+                <div class="zev-name">{{ zev.name }}</div>
+                <div class="zev-meta">{{ zev.get_zev_type_display }}{% if zev.grid_operator %} · {{ zev.grid_operator
+                    }}{% endif %}</div>
+            </div>
+            <div class="contract-title-block">
+                <div class="contract-title">{{ tr.contract_title }}</div>
+                <div class="contract-date">{{ tr.contract_date }}: {{ contract_date }}</div>
+            </div>
+        </div>
+
+        <!-- ── Vertragsparteien ─────────────────────────────────────────── -->
+        <div class="section-heading">{{ tr.parties_title }}</div>
+
+        <div class="parties-grid">
+
+            <!-- Participant -->
+            <div class="party-block">
+                <div class="sub-heading">{{ tr.participant_label }}</div>
+
+                <div class="field-row">
+                    <div class="field-label">{{ tr.field_name }}</div>
+                    <div class="field-value">{{ participant.full_name }}</div>
+                </div>
+                <div class="field-row">
+                    <div class="field-label">{{ tr.field_address }}</div>
+                    <div class="field-value">
+                        {{ participant.address_line1 }}{% if participant.address_line2 %}, {{ participant.address_line2
+                        }}{% endif %}{% if participant.postal_code or participant.city %}<br>{{ participant.postal_code
+                        }} {{ participant.city }}{% endif %}
+                    </div>
+                </div>
+                <div class="field-row">
+                    <div class="field-label">{{ tr.field_phone }}</div>
+                    <div class="field-value{% if not participant.phone %} empty{% endif %}">{{ participant.phone }}
+                    </div>
+                </div>
+                <div class="field-row">
+                    <div class="field-label">{{ tr.field_email }}</div>
+                    <div class="field-value{% if not participant.email %} empty{% endif %}">{{ participant.email }}
+                    </div>
+                </div>
+                <div class="field-row">
+                    <div class="field-label">{{ tr.field_building }}</div>
+                    <div class="field-value empty">&nbsp;</div>
+                </div>
+
+                <!-- Consumption metering points -->
+                {% for mp in consumption_mps %}
+                <div class="field-row">
+                    <div class="field-label">{{ tr.field_meter }}{% if forloop.counter > 1 %} ({{ forloop.counter }}){%
+                        endif %}</div>
+                    <div class="meter-row">
+                        <div class="meter-value">{{ mp.meter_id }}</div>
+                    </div>
+                    {% if mp.location_description %}
+                    <div class="field-hint">{{ mp.location_description }}</div>
+                    {% endif %}
+                </div>
+                {% empty %}
+                <div class="field-row">
+                    <div class="field-label">{{ tr.field_meter }}</div>
+                    <div class="meter-row">
+                        <span class="meter-prefix">CH</span>
+                        <div class="meter-value">&nbsp;</div>
+                    </div>
+                </div>
+                <div class="field-row">
+                    <div class="field-label">{{ tr.field_meter_second }}</div>
+                    <div class="meter-row">
+                        <span class="meter-prefix">CH</span>
+                        <div class="meter-value">&nbsp;</div>
+                    </div>
+                </div>
+                {% endfor %}
+
+                <!-- Production / PV metering points -->
+                {% for mp in production_mps %}
+                <div class="field-row">
+                    <div class="field-label">{{ tr.field_meter_pv }}{% if forloop.counter > 1 %} ({{ forloop.counter
+                        }}){% endif %}</div>
+                    <div class="meter-row">
+                        <div class="meter-value">{{ mp.meter_id }}</div>
+                    </div>
+                    {% if mp.location_description %}
+                    <div class="field-hint">{{ mp.location_description }}</div>
+                    {% endif %}
+                </div>
+                {% empty %}
+                <div class="field-row">
+                    <div class="field-label">{{ tr.field_meter_pv }}</div>
+                    <div class="meter-row">
+                        <span class="meter-prefix">CH</span>
+                        <div class="meter-value">&nbsp;</div>
+                    </div>
+                </div>
+                {% endfor %}
+
+                <div class="field-hint">{{ tr.meter_hint }}</div>
+            </div>
+
+            <!-- ZEV Owner / Manager -->
+            <div class="party-block">
+                <div class="sub-heading">{{ tr.owner_label }}</div>
+
+                {% if owner_participant %}
+                <div class="field-row">
+                    <div class="field-label">{{ tr.field_name }}</div>
+                    <div class="field-value">{{ owner_participant.full_name }}</div>
+                </div>
+                <div class="field-row">
+                    <div class="field-label">{{ tr.field_address }}</div>
+                    <div class="field-value">
+                        {{ owner_participant.address_line1 }}{% if owner_participant.address_line2 %}, {{
+                        owner_participant.address_line2 }}{% endif %}{% if owner_participant.postal_code or
+                        owner_participant.city %}<br>{{ owner_participant.postal_code }} {{ owner_participant.city }}{%
+                        endif %}
+                    </div>
+                </div>
+                <div class="field-row">
+                    <div class="field-label">{{ tr.field_phone }}</div>
+                    <div class="field-value{% if not owner_participant.phone %} empty{% endif %}">{{
+                        owner_participant.phone }}</div>
+                </div>
+                <div class="field-row">
+                    <div class="field-label">{{ tr.field_email }}</div>
+                    <div class="field-value{% if not owner_participant.email %} empty{% endif %}">{{
+                        owner_participant.email }}</div>
+                </div>
+                {% else %}
+                <div class="field-row">
+                    <div class="field-label">{{ tr.field_name }}</div>
+                    <div class="field-value">{{ zev.owner.get_full_name|default:zev.owner.username }}</div>
+                </div>
+                <div class="field-row">
+                    <div class="field-label">{{ tr.field_email }}</div>
+                    <div class="field-value{% if not zev.owner.email %} empty{% endif %}">{{ zev.owner.email }}</div>
+                </div>
+                <div class="field-row">
+                    <div class="field-label">{{ tr.field_address }}</div>
+                    <div class="field-value empty">&nbsp;</div>
+                </div>
+                <div class="field-row">
+                    <div class="field-label">{{ tr.field_phone }}</div>
+                    <div class="field-value empty">&nbsp;</div>
+                </div>
+                {% endif %}
+            </div>
+
+        </div><!-- /parties-grid -->
+
+        <!-- ── Vertragsgegenstand ─────────────────────────────────────────── -->
+        <div class="section-heading">{{ tr.subject_title }}</div>
+        <p class="subject-text">{{ tr.subject_text }}</p>
+
+    </div><!-- /page 1 -->
+
+    <!-- ════════════════════════════════════════════════════════════════════ -->
+    <!-- PAGE 2                                                               -->
+    <!-- ════════════════════════════════════════════════════════════════════ -->
+    <div class="page page-break">
+
+        <!-- Header (repeated) -->
+        <div class="header">
+            <div>
+                <div class="zev-name">{{ zev.name }}</div>
+                <div class="zev-meta">{{ zev.get_zev_type_display }}</div>
+            </div>
+            <div class="contract-title-block">
+                <div class="contract-title">{{ tr.contract_title }}</div>
+                <div class="contract-date">{{ tr.contract_date }}: {{ contract_date }}</div>
+            </div>
+        </div>
+
+        <!-- ── Vereinbarungen ─────────────────────────────────────────────── -->
+        <div class="section-heading">{{ tr.agreements_title }}</div>
+
+        <!-- Local tariff -->
+        <div class="field-row" style="margin-bottom: 4mm;">
+            <div class="field-label">{{ tr.local_tariff_label }} ({{ tr.local_tariff_unit }})</div>
+            {% if local_tariff_rows %}
+            <table class="tariff-table">
+                <thead>
+                    <tr>
+                        <th style="width: 40%">{{ tr.tariff_col_name }}</th>
+                        <th style="width: 25%; text-align: right;">{{ tr.tariff_col_price }}</th>
+                        <th style="width: 35%">{{ tr.tariff_col_calc }}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in local_tariff_rows %}
+                    <tr>
+                        <td>{{ row.name }}</td>
+                        <td class="rate">{{ row.rate_rp }}</td>
+                        <td style="font-size: 8pt; color: #666;">{{ row.rate_description }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div class="tariff-empty">{{ tr.tariff_none }}</div>
+            {% endif %}
+        </div>
+
+        <!-- Local tariff future conditions -->
+        <div class="field-row" style="margin-bottom: 6mm;">
+            <div class="field-label">{{ tr.local_tariff_note }}</div>
+            <div class="freetext-box"
+                style="color: {% if local_tariff_notes %}#333{% else %}#bbb{% endif %}; font-style: {% if local_tariff_notes %}normal{% else %}italic{% endif %};">
+                {% if local_tariff_notes %}{{ local_tariff_notes }}{% else %}<span class="freetext-placeholder">{{
+                    tr.local_tariff_note_placeholder }}</span>{% endif %}
+            </div>
+        </div>
+
+        <!-- Billing interval -->
+        <div class="agreement-row">
+            <div class="agreement-label">{{ tr.billing_interval_label }}:</div>
+            <div class="agreement-value">{{ billing_interval_display }}</div>
+        </div>
+
+        <!-- Payment terms -->
+        <div class="agreement-row">
+            <div class="agreement-label">{{ tr.payment_terms_label }}:</div>
+            <div class="agreement-value">30</div>
+            <div class="agreement-unit">{{ tr.payment_terms_unit }}</div>
+        </div>
+
+        <!-- VAT -->
+        <div class="agreement-row">
+            <div class="agreement-label">{{ tr.vat_label }}:</div>
+            <div class="agreement-value">
+                {% if zev.vat_number %}{{ tr.vat_required }} – {{ zev.vat_number }}{% else %}{{ tr.vat_not_required }}{%
+                endif %}
+            </div>
+        </div>
+
+        <!-- Additional agreements -->
+        <div class="field-row" style="margin-bottom: 8mm;">
+            <div class="field-label">{{ tr.additional_label }}:</div>
+            <div class="freetext-box"
+                style="min-height: 25mm; color: {% if additional_contract_notes %}#333{% else %}#bbb{% endif %}; font-style: {% if additional_contract_notes %}normal{% else %}italic{% endif %};">
+                {% if additional_contract_notes %}{{ additional_contract_notes }}{% else %}<span
+                    class="freetext-placeholder">{{ tr.additional_placeholder }}</span>{% endif %}
+            </div>
+        </div>
+
+        <!-- ── Signatures ─────────────────────────────────────────────────── -->
+        <div class="section-heading">{{ tr.signatures_title }}</div>
+        <p class="sig-intro">{{ tr.sig_intro }}</p>
+
+        <div class="sig-grid">
+            <!-- Participant -->
+            <div class="sig-block">
+                <div class="sig-label">{{ tr.sig_participant }}</div>
+                <div class="sig-line"></div>
+                <div class="sig-line-label">{{ tr.sig_place_date }}</div>
+                <div class="sig-line"></div>
+                <div class="sig-line-label">{{ tr.sig_name }}</div>
+                <div class="sig-line"></div>
+                <div class="sig-line-label">{{ tr.sig_signature }}</div>
+            </div>
+            <!-- ZEV Manager -->
+            <div class="sig-block">
+                <div class="sig-label">{{ tr.sig_owner }}</div>
+                <div class="sig-line"></div>
+                <div class="sig-line-label">{{ tr.sig_place_date }}</div>
+                <div class="sig-line"></div>
+                <div class="sig-line-label">{{ tr.sig_name }}</div>
+                <div class="sig-line"></div>
+                <div class="sig-line-label">{{ tr.sig_signature }}</div>
+            </div>
+        </div>
+
+    </div><!-- /page 2 -->
+
+</body>
+
+</html>

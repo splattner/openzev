@@ -61,6 +61,12 @@ INVOICE_TRANSLATIONS: dict[str, dict[str, str]] = {
         "unit_month": "Monat",
         "page_label": "Seite",
         "page_of": "von",
+        "savings_title": "Ersparnisse durch lokale Solarenergie",
+        "savings_local_label": "Lokale ZEV-Energie (tats\u00e4chlich verrechnet)",
+        "savings_grid_label": "Hypothetische Netzkosten (gleiche kWh)",
+        "savings_saved_label": "Ersparnisse",
+        "hourly_chart_title": "Durchschnittliches Tagesverbrauchsprofil (24 h)",
+        "hourly_chart_description": "Durchschnittlicher st\u00fcndlicher Energiebezug \u00fcber die Abrechnungsperiode \u2014 aufgeteilt in lokale ZEV-Energie und Netzbezug.",
     },
     "fr": {
         "invoice_label": "Facture",
@@ -104,6 +110,12 @@ INVOICE_TRANSLATIONS: dict[str, dict[str, str]] = {
         "unit_month": "mois",
         "page_label": "Page",
         "page_of": "de",
+        "savings_title": "\u00c9conomies gr\u00e2ce \u00e0 l\u2019\u00e9nergie solaire locale",
+        "savings_local_label": "\u00c9nergie locale ZEV (effectivement factur\u00e9e)",
+        "savings_grid_label": "Co\u00fbt r\u00e9seau hypoth\u00e9tique (m\u00eames kWh)",
+        "savings_saved_label": "\u00c9conomies",
+        "hourly_chart_title": "Profil de consommation journali\u00e8re moyen (24 h)",
+        "hourly_chart_description": "Consommation \u00e9nerg\u00e9tique horaire moyenne sur la p\u00e9riode de facturation \u2014 r\u00e9partie en \u00e9nergie locale ZEV et importation r\u00e9seau.",
     },
     "it": {
         "invoice_label": "Fattura",
@@ -147,6 +159,12 @@ INVOICE_TRANSLATIONS: dict[str, dict[str, str]] = {
         "unit_month": "mese",
         "page_label": "Pagina",
         "page_of": "di",
+        "savings_title": "Risparmi grazie all\u2019energia solare locale",
+        "savings_local_label": "Energia locale ZEV (effettivamente fatturata)",
+        "savings_grid_label": "Costo rete ipotetico (stesso kWh)",
+        "savings_saved_label": "Risparmi",
+        "hourly_chart_title": "Profilo di consumo giornaliero medio (24 h)",
+        "hourly_chart_description": "Consumo energetico orario medio nel periodo di fatturazione \u2014 suddiviso in energia locale ZEV e importazione dalla rete.",
     },
     "en": {
         "invoice_label": "Invoice",
@@ -190,6 +208,12 @@ INVOICE_TRANSLATIONS: dict[str, dict[str, str]] = {
         "cat_energy": "Energy",
         "cat_grid_fees": "Grid Fees",
         "cat_levies": "Levies",
+        "savings_title": "Savings from Local Solar Energy",
+        "savings_local_label": "Local ZEV Energy (actually billed)",
+        "savings_grid_label": "Hypothetical grid cost (same kWh)",
+        "savings_saved_label": "Savings",
+        "hourly_chart_title": "Average Daily Consumption Profile (24 h)",
+        "hourly_chart_description": "Average hourly energy draw over the billing period \u2014 split between local ZEV energy and grid import.",
     },
 }
 
@@ -284,6 +308,50 @@ def _group_items_by_category(items, period_start: date, period_end: date, tr: di
             "subtotal": sum(item.total_chf for item in category_items),
         })
     return grouped
+
+
+def _build_savings_data(invoice, tr: dict) -> dict | None:
+    """Compute how much the participant saved by consuming local ZEV energy vs grid.
+
+    Returns a dict with display-ready strings, or None if savings cannot be computed
+    (e.g. no local energy, no grid energy, or local rate >= grid rate).
+    """
+    from .models import InvoiceItem
+
+    local_kwh = float(invoice.total_local_kwh)
+    grid_kwh = float(invoice.total_grid_kwh)
+
+    if local_kwh <= 0 or grid_kwh <= 0:
+        return None
+
+    items = list(invoice.items.all())
+    local_items = [i for i in items if i.item_type == InvoiceItem.ItemType.LOCAL_ENERGY]
+    grid_items = [i for i in items if i.item_type == InvoiceItem.ItemType.GRID_ENERGY]
+
+    local_chf = sum(float(i.total_chf) for i in local_items)
+    grid_chf = sum(float(i.total_chf) for i in grid_items)
+
+    if local_chf <= 0 or grid_chf <= 0:
+        return None
+
+    avg_local_rp = local_chf / local_kwh * 100
+    avg_grid_rp = grid_chf / grid_kwh * 100
+
+    if avg_local_rp >= avg_grid_rp:
+        return None  # no savings (local tariff not cheaper than grid)
+
+    hypothetical_chf = local_kwh * avg_grid_rp / 100
+    saved_chf = hypothetical_chf - local_chf
+
+    return {
+        "local_kwh": f"{local_kwh:.2f}",
+        "local_chf": f"{local_chf:.2f}",
+        "local_rp": f"{avg_local_rp:.2f}",
+        "grid_rp": f"{avg_grid_rp:.2f}",
+        "saved_rp": f"{avg_grid_rp - avg_local_rp:.2f}",
+        "hypothetical_chf": f"{hypothetical_chf:.2f}",
+        "saved_chf": f"{saved_chf:.2f}",
+    }
 
 
 def _build_energy_chart_svg(invoice, tr: dict) -> str | None:
@@ -444,6 +512,200 @@ def _build_energy_chart_svg(invoice, tr: dict) -> str | None:
     return '\n'.join(svg)
 
 
+def _build_hourly_profile_chart_svg(invoice, tr: dict) -> str | None:
+    """Generate an SVG grouped bar chart showing the average hourly energy profile
+    (local ZEV vs grid) over the invoice period.
+
+    Returns None when sub-daily metering data is not available or all values are zero.
+    """
+    import datetime as _dt
+    from django.db import models as _dj
+    from metering.models import MeterReading, ReadingDirection, ReadingResolution
+    from zev.models import MeteringPoint as _MP, MeteringPointType as _MPT
+
+    ps = invoice.period_start
+    pe = invoice.period_end
+    participant = invoice.participant
+    zev = invoice.zev
+
+    start_dt = _dt.datetime.combine(ps, _dt.time.min).replace(tzinfo=_dt.timezone.utc)
+    end_dt = _dt.datetime.combine(pe, _dt.time.max).replace(tzinfo=_dt.timezone.utc) + _dt.timedelta(seconds=1)
+
+    # ── Participant consumption readings ────────────────────────────────────
+    consumption_mps = _MP.objects.filter(
+        participant=participant,
+        meter_type__in=[_MPT.CONSUMPTION, _MPT.BIDIRECTIONAL],
+    )
+    participant_readings = list(
+        MeterReading.objects.filter(
+            metering_point__in=consumption_mps,
+            timestamp__gte=start_dt,
+            timestamp__lt=end_dt,
+            direction=ReadingDirection.IN,
+        ).order_by("timestamp")
+    )
+    if not participant_readings:
+        return None
+
+    # Only show chart when sub-daily data is present
+    resolutions = {r.resolution for r in participant_readings}
+    if resolutions == {ReadingResolution.DAILY}:
+        return None
+
+    # ── ZEV-level production and consumption by timestamp ───────────────────
+    all_prod_mps = _MP.objects.filter(
+        participant__zev=zev,
+        meter_type__in=[_MPT.PRODUCTION, _MPT.BIDIRECTIONAL],
+    )
+    zev_prod_by_ts = {
+        row["timestamp"]: float(row["total_kwh"] or 0)
+        for row in MeterReading.objects.filter(
+            metering_point__in=all_prod_mps,
+            timestamp__gte=start_dt,
+            timestamp__lt=end_dt,
+            direction=ReadingDirection.OUT,
+        ).values("timestamp").annotate(total_kwh=_dj.Sum("energy_kwh"))
+    }
+    all_cons_mps = _MP.objects.filter(
+        participant__zev=zev,
+        meter_type__in=[_MPT.CONSUMPTION, _MPT.BIDIRECTIONAL],
+    )
+    zev_cons_by_ts = {
+        row["timestamp"]: float(row["total_kwh"] or 0)
+        for row in MeterReading.objects.filter(
+            metering_point__in=all_cons_mps,
+            timestamp__gte=start_dt,
+            timestamp__lt=end_dt,
+            direction=ReadingDirection.IN,
+        ).values("timestamp").annotate(total_kwh=_dj.Sum("energy_kwh"))
+    }
+
+    # ── Accumulate local/grid per UTC hour-of-day ───────────────────────────
+    hourly_local = [0.0] * 24
+    hourly_grid = [0.0] * 24
+
+    for reading in participant_readings:
+        ts = reading.timestamp
+        hour = ts.hour
+        p_kwh = float(reading.energy_kwh)
+        zev_cons = zev_cons_by_ts.get(ts, 0.0)
+        zev_prod = zev_prod_by_ts.get(ts, 0.0)
+        local_pool = min(zev_prod, zev_cons)
+
+        if zev_cons > 0 and local_pool > 0:
+            r_local = min(p_kwh, local_pool * p_kwh / zev_cons)
+        else:
+            r_local = 0.0
+        r_grid = max(p_kwh - r_local, 0.0)
+
+        hourly_local[hour] += r_local
+        hourly_grid[hour] += r_grid
+
+    total_days = (pe - ps).days + 1
+    hourly_local = [v / total_days for v in hourly_local]
+    hourly_grid = [v / total_days for v in hourly_grid]
+
+    max_val = max((l + g) for l, g in zip(hourly_local, hourly_grid))
+    if max_val == 0:
+        return None
+
+    # ── SVG geometry ────────────────────────────────────────────────────────
+    W, H = 520, 210
+    ML, MR, MT, MB = 46, 12, 15, 46
+    cw = W - ML - MR
+    ch = H - MT - MB
+
+    group_w = cw / 24
+    bar_w = max(6.0, group_w * 0.72)
+
+    def s(v: float) -> float:
+        return ch * v / max_val
+
+    svg: list[str] = []
+    svg.append(
+        f'<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{H}"'
+        f' viewBox="0 0 {W} {H}">'
+    )
+
+    # Y-axis grid lines & labels (5 steps)
+    for i in range(5):
+        frac = i / 4
+        gy = MT + ch - ch * frac
+        val = max_val * frac
+        svg.append(
+            f'<line x1="{ML}" y1="{gy:.1f}" x2="{ML + cw}" y2="{gy:.1f}"'
+            f' stroke="#e5e7eb" stroke-width="1"/>'
+        )
+        svg.append(
+            f'<text x="{ML - 4}" y="{gy + 3:.1f}" text-anchor="end"'
+            f' font-size="7" fill="#6b7280">{val:.2f}</text>'
+        )
+
+    # Rotated Y-axis unit label
+    mid_y = MT + ch // 2
+    svg.append(
+        f'<text transform="rotate(-90 9 {mid_y})" x="9" y="{mid_y}"'
+        f' text-anchor="middle" font-size="7" fill="#6b7280">kWh</text>'
+    )
+
+    # X-axis baseline
+    svg.append(
+        f'<line x1="{ML}" y1="{MT + ch}" x2="{ML + cw}" y2="{MT + ch}"'
+        f' stroke="#9ca3af" stroke-width="1"/>'
+    )
+
+    # ── Stacked bars per hour ───────────────────────────────────────────────
+    for hour in range(24):
+        local = hourly_local[hour]
+        grid = hourly_grid[hour]
+        cx = ML + group_w * hour + group_w / 2
+        bx = cx - bar_w / 2
+        hl = s(local)
+        hg = s(grid)
+        total_h = hl + hg
+
+        # Local segment (green, bottom)
+        yl = MT + ch - hl
+        if hl > 0:
+            svg.append(
+                f'<rect x="{bx:.1f}" y="{yl:.1f}" width="{bar_w:.1f}"'
+                f' height="{hl:.1f}" fill="#16a34a"/>'
+            )
+
+        # Grid segment (amber, top), rounded top corners
+        yg = MT + ch - total_h
+        if hg > 0:
+            svg.append(
+                f'<rect x="{bx:.1f}" y="{yg:.1f}" width="{bar_w:.1f}"'
+                f' height="{hg:.1f}" fill="#f59e0b" rx="2" ry="2"/>'
+            )
+            # Square off bottom corners of amber segment
+            overlap = min(3.0, hg)
+            svg.append(
+                f'<rect x="{bx:.1f}" y="{yg + hg - overlap:.1f}" width="{bar_w:.1f}"'
+                f' height="{overlap:.1f}" fill="#f59e0b"/>'
+            )
+
+        # Hour label every 3 hours
+        if hour % 3 == 0:
+            svg.append(
+                f'<text x="{cx:.1f}" y="{MT + ch + 11:.1f}" text-anchor="middle"'
+                f' font-size="7" fill="#374151">{hour:02d}:00</text>'
+            )
+
+    # ── Legend ─────────────────────────────────────────────────────────────
+    ly = MT + ch + 26
+    svg.append(f'<rect x="{ML}" y="{ly}" width="9" height="8" fill="#16a34a" rx="1"/>')
+    svg.append(
+        f'<text x="{ML + 12}" y="{ly + 7}" font-size="8" fill="#374151">{tr["chart_from_zev"]}</text>'
+    )
+    svg.append(f'<rect x="{ML + 155}" y="{ly}" width="9" height="8" fill="#f59e0b" rx="1"/>')
+    svg.append(f'<text x="{ML + 167}" y="{ly + 7}" font-size="8" fill="#374151">{tr["chart_from_grid"]}</text>')
+
+    svg.append('</svg>')
+    return '\n'.join(svg)
+
+
 def _build_qr_svg(invoice) -> str | None:
     """Generate the Swiss QR-Rechnung SVG if IBAN and required addresses are configured."""
     iban = _normalize_text(invoice.zev.bank_iban).replace(" ", "")
@@ -510,6 +772,8 @@ def _build_template_context(invoice) -> dict:
         "participant": invoice.participant,
         "qr_svg": qr_svg,
         "energy_chart_svg": _build_energy_chart_svg(invoice, tr),
+        "hourly_profile_chart_svg": _build_hourly_profile_chart_svg(invoice, tr),
+        "savings_data": _build_savings_data(invoice, tr),
         "tr": tr,
         "formatted_dates": {
             "invoice_date": _format_date_value(invoice.created_at, app_settings.date_format_short),

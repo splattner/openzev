@@ -296,6 +296,18 @@ export async function createParticipantAccount(participantId: string, payload: {
     return data
 }
 
+export async function downloadParticipantContractPdf(participantId: string, filename: string): Promise<void> {
+    const response = await api.get(`/zev/participants/${participantId}/contract-pdf/`, { responseType: 'blob' })
+    const url = URL.createObjectURL(response.data as Blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+}
+
 export async function createTariff(payload: TariffInput): Promise<Tariff> {
     const { data } = await api.post<Tariff>('/tariffs/tariffs/', payload)
     return data

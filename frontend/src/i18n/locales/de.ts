@@ -222,6 +222,8 @@ export const de = {
             passwordLabel: 'Temporäres Passwort:',
             owner: 'Eigentümer',
             sendInvitation: 'Einladung senden',
+            downloadContract: 'Vertrag PDF',
+            contractDownloadError: 'Vertrag konnte nicht heruntergeladen werden.',
             noParticipants: 'Noch keine Teilnehmer.',
             col: {
                 name: 'Name',

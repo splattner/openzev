@@ -148,6 +148,32 @@ export function ZevGeneralSettingsFields({ form, onChange }: ZevGeneralSettingsF
                     />
                 </label>
             </div>
+
+            {/* Local tariff notes (contract PDF) */}
+            <div className="form-section">
+                <p className="form-section-header">Local tariff notes (contract PDF)</p>
+                <label>
+                    <textarea
+                        value={form.local_tariff_notes ?? ''}
+                        onChange={(event) => onChange({ local_tariff_notes: event.target.value })}
+                        rows={4}
+                        placeholder="e.g. The local tariff is set annually to 65&#37; of the total grid price, at least the net energy cost."
+                    />
+                </label>
+            </div>
+
+            {/* Additional contract notes (contract PDF) */}
+            <div className="form-section">
+                <p className="form-section-header">Additional contract notes (contract PDF)</p>
+                <label>
+                    <textarea
+                        value={form.additional_contract_notes ?? ''}
+                        onChange={(event) => onChange({ additional_contract_notes: event.target.value })}
+                        rows={4}
+                        placeholder="e.g. Invoices are sent by e-mail."
+                    />
+                </label>
+            </div>
         </div>
     )
 }

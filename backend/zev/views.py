@@ -1,4 +1,5 @@
 from django.db.models import Q
+from django.http import HttpResponse
 from django.utils.crypto import get_random_string
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
@@ -90,6 +91,21 @@ class ParticipantViewSet(viewsets.ModelViewSet):
         if user.is_zev_owner:
             return Participant.objects.filter(zev__owner=user).prefetch_related("metering_point_assignments")
         return Participant.objects.filter(user=user).prefetch_related("metering_point_assignments")
+
+    @action(detail=True, methods=["get"], url_path="contract-pdf",
+            permission_classes=[IsAuthenticated])
+    def contract_pdf(self, request, pk=None):
+        """Generate and stream a participation contract PDF for this participant."""
+        from invoices.contract_pdf import generate_contract_pdf
+        participant = self.get_object()
+        if not request.user.is_admin and not request.user.is_zev_owner:
+            if participant.user != request.user:
+                return Response({"detail": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
+        pdf_bytes = generate_contract_pdf(participant)
+        filename = f"contract_{participant.last_name}_{participant.first_name}.pdf"
+        response = HttpResponse(pdf_bytes, content_type="application/pdf")
+        response["Content-Disposition"] = f'attachment; filename="{filename}"'
+        return response
 
     @action(detail=True, methods=["post"], url_path="link-account")
     def link_account(self, request, pk=None):

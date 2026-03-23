@@ -222,6 +222,8 @@ export const en = {
             passwordLabel: 'Temporary password:',
             owner: 'Owner',
             sendInvitation: 'Send Invitation',
+            downloadContract: 'Contract PDF',
+            contractDownloadError: 'Could not download the contract.',
             noParticipants: 'No participants yet.',
             col: {
                 name: 'Name',
