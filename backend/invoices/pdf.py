@@ -68,6 +68,7 @@ INVOICE_TRANSLATIONS: dict[str, dict[str, str]] = {
         "savings_saved_label": "Ersparnisse",
         "hourly_chart_title": "Durchschnittliches Tagesverbrauchsprofil (24 h)",
         "hourly_chart_description": "Durchschnittlicher st\u00fcndlicher Energiebezug \u00fcber die Abrechnungsperiode \u2014 aufgeteilt in lokale ZEV-Energie und Netzbezug.",
+        "feed_in_hint": "Hinweis: Die Verg\u00fctung f\u00fcr lokale Energie wird anteilig an Produzenten verteilt. Der Einspeisetarif gilt nur f\u00fcr tats\u00e4chlich ins Netz exportierte Energie.",
     },
     "fr": {
         "invoice_label": "Facture",
@@ -118,6 +119,7 @@ INVOICE_TRANSLATIONS: dict[str, dict[str, str]] = {
         "savings_saved_label": "\u00c9conomies",
         "hourly_chart_title": "Profil de consommation journali\u00e8re moyen (24 h)",
         "hourly_chart_description": "Consommation \u00e9nerg\u00e9tique horaire moyenne sur la p\u00e9riode de facturation \u2014 r\u00e9partie en \u00e9nergie locale ZEV et importation r\u00e9seau.",
+        "feed_in_hint": "Remarque : la r\u00e9mun\u00e9ration de l\u2019\u00e9nergie locale est r\u00e9partie proportionnellement entre les producteurs. Le tarif d\u2019injection s\u2019applique uniquement \u00e0 l\u2019\u00e9nergie effectivement export\u00e9e vers le r\u00e9seau.",
     },
     "it": {
         "invoice_label": "Fattura",
@@ -168,6 +170,7 @@ INVOICE_TRANSLATIONS: dict[str, dict[str, str]] = {
         "savings_saved_label": "Risparmi",
         "hourly_chart_title": "Profilo di consumo giornaliero medio (24 h)",
         "hourly_chart_description": "Consumo energetico orario medio nel periodo di fatturazione \u2014 suddiviso in energia locale ZEV e importazione dalla rete.",
+        "feed_in_hint": "Nota: il compenso per l\u2019energia locale \u00e8 ripartito proporzionalmente tra i produttori. La tariffa di immissione si applica solo all\u2019energia effettivamente esportata in rete.",
     },
     "en": {
         "invoice_label": "Invoice",
@@ -218,6 +221,7 @@ INVOICE_TRANSLATIONS: dict[str, dict[str, str]] = {
         "savings_saved_label": "Savings",
         "hourly_chart_title": "Average Daily Consumption Profile (24 h)",
         "hourly_chart_description": "Average hourly energy draw over the billing period \u2014 split between local ZEV energy and grid import.",
+        "feed_in_hint": "Note: Local energy revenue is distributed to producers proportionally. Feed-in tariff is applied only to energy actually exported to the grid.",
     },
 }
 

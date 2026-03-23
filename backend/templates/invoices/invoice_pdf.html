@@ -1,4 +1,3 @@
-/* prettier-ignore-start */
 <!DOCTYPE html>
 <html lang="en">
 
@@ -463,8 +462,11 @@
         </div>
 
         <!-- ── Notes ──────────────────────────── -->
-        {% if invoice.notes %}
-        <div class="notes">{{ invoice.notes }}</div>
+        {% if invoice.notes or tr.feed_in_hint %}
+        <div class="notes">
+            {% if invoice.notes %}<div>{{ invoice.notes }}</div>{% endif %}
+            <div>{{ tr.feed_in_hint }}</div>
+        </div>
         {% endif %}
 
         <!-- ── Energy Consumption Chart ─────────── -->
