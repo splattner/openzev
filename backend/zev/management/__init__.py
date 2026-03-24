@@ -136,7 +136,6 @@ class Command(BaseCommand):
                         participant=p,
                         meter_id=f"{meter_base}-{kind}",
                         meter_type=mp_type,
-                        valid_from=date(2026, 1, 1),
                         is_active=True,
                     )
                     if verbosity >= 1:

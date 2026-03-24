@@ -1,4 +1,6 @@
 from rest_framework import serializers
+from django.db import models
+from django.utils import timezone
 from .models import Zev, Participant, MeteringPoint, MeteringPointAssignment
 from accounts.models import UserRole
 from .services import create_zev_with_owner_setup, ensure_participant_account
@@ -39,35 +41,17 @@ class MeteringPointAssignmentSerializer(serializers.ModelSerializer):
         if valid_to and valid_from and valid_to < valid_from:
             raise serializers.ValidationError({"valid_to": "valid_to must be on or after valid_from."})
 
-        # Only one assignment per metering point is allowed.
+        # Only one active assignment window per metering point is allowed.
         if metering_point:
             existing = MeteringPointAssignment.objects.filter(metering_point=metering_point)
             if self.instance:
                 existing = existing.exclude(pk=self.instance.pk)
-            if existing.exists():
+            overlap_exists = existing.filter(valid_from__lte=(valid_to or timezone.datetime.max.date())).filter(
+                models.Q(valid_to__isnull=True) | models.Q(valid_to__gte=valid_from)
+            ).exists()
+            if overlap_exists:
                 raise serializers.ValidationError(
-                    "A metering point can only have one participant assignment."
-                )
-
-        # Assignment dates must fall within the metering point's validity window.
-        if metering_point and valid_from:
-            if valid_from < metering_point.valid_from:
-                raise serializers.ValidationError(
-                    {
-                        "valid_from": (
-                            "Assignment valid_from cannot be before the metering point's "
-                            f"valid_from ({metering_point.valid_from})."
-                        )
-                    }
-                )
-            if valid_to and metering_point.valid_to and valid_to > metering_point.valid_to:
-                raise serializers.ValidationError(
-                    {
-                        "valid_to": (
-                            "Assignment valid_to cannot be after the metering point's "
-                            f"valid_to ({metering_point.valid_to})."
-                        )
-                    }
+                    "A metering point can only have one active assignment at a time."
                 )
 
         # Assignment dates must fall within the participant's validity window.
@@ -94,16 +78,18 @@ class MeteringPointAssignmentSerializer(serializers.ModelSerializer):
         return attrs
 
     def _sync_current_participant(self, metering_point_id: int) -> None:
-        open_assignment = (
+        today = timezone.localdate()
+        current_assignment = (
             MeteringPointAssignment.objects.filter(
                 metering_point_id=metering_point_id,
-                valid_to__isnull=True,
+                valid_from__lte=today,
             )
+            .filter(models.Q(valid_to__isnull=True) | models.Q(valid_to__gte=today))
             .order_by("-valid_from")
             .first()
         )
         MeteringPoint.objects.filter(pk=metering_point_id).update(
-            participant=open_assignment.participant if open_assignment else None
+            participant=current_assignment.participant if current_assignment else None
         )
 
     def create(self, validated_data):
@@ -270,16 +256,7 @@ class OwnerMeteringPointInputSerializer(serializers.Serializer):
     meter_id = serializers.CharField(max_length=100)
     meter_type = serializers.ChoiceField(choices=MeteringPoint._meta.get_field('meter_type').choices)
     is_active = serializers.BooleanField(required=False, default=True)
-    valid_from = serializers.DateField(required=False)
-    valid_to = serializers.DateField(required=False, allow_null=True)
     location_description = serializers.CharField(required=False, allow_blank=True, max_length=200)
-
-    def validate(self, attrs):
-        valid_from = attrs.get('valid_from')
-        valid_to = attrs.get('valid_to')
-        if valid_from and valid_to and valid_to < valid_from:
-            raise serializers.ValidationError({'valid_to': 'valid_to must be on or after valid_from.'})
-        return attrs
 
 
 class ZevCreateWithOwnerSerializer(serializers.Serializer):

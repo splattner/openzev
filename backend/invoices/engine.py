@@ -16,7 +16,7 @@ from django.db import models, transaction
 from django.utils import timezone
 
 from accounts.models import VatRate
-from zev.models import Zev, Participant, MeteringPoint, MeteringPointType
+from zev.models import Zev, Participant, MeteringPoint, MeteringPointType, MeteringPointAssignment
 from tariffs.models import BillingMode, EnergyType, PeriodType, Tariff, TariffCategory
 from metering.models import MeterReading, ReadingDirection
 from .models import Invoice, InvoiceItem, InvoiceStatus
@@ -107,12 +107,12 @@ def _count_billable_months(tariff: Tariff, period_start: date, period_end: date)
 
 
 def _month_has_active_participant_metering_points(participant: Participant, month_first_day: date, month_last_day: date) -> bool:
-    return MeteringPoint.objects.filter(
+    return MeteringPointAssignment.objects.filter(
         participant=participant,
-        is_active=True,
         valid_from__lte=month_last_day,
     ).filter(
-        models.Q(valid_to__isnull=True) | models.Q(valid_to__gte=month_first_day)
+        models.Q(valid_to__isnull=True) | models.Q(valid_to__gte=month_first_day),
+        metering_point__is_active=True,
     ).exists()
 
 
@@ -133,13 +133,13 @@ def _count_billable_metering_points_by_month(participant: Participant, tariff: T
         month_start = max(month_first_day, overlap_start)
         month_end = min(month_last_day, overlap_end)
         if month_start <= month_end and _month_has_active_participant_metering_points(participant, month_first_day, month_last_day):
-            month_points = MeteringPoint.objects.filter(
+            month_points = MeteringPointAssignment.objects.filter(
                 participant=participant,
-                is_active=True,
                 valid_from__lte=month_end,
             ).filter(
-                models.Q(valid_to__isnull=True) | models.Q(valid_to__gte=month_start)
-            ).count()
+                models.Q(valid_to__isnull=True) | models.Q(valid_to__gte=month_start),
+                metering_point__is_active=True,
+            ).values("metering_point_id").distinct().count()
             total_metering_points += month_points
 
         cursor = next_month

@@ -34,8 +34,6 @@ const defaultCreateForm = (): ZevWizardInput => ({
             meter_id: '',
             meter_type: 'consumption',
             is_active: true,
-            valid_from: new Date().toISOString().slice(0, 10),
-            valid_to: null,
             location_description: '',
         },
     ],
@@ -276,8 +274,6 @@ export function ZevListPage() {
             meter_id: '',
             meter_type: 'consumption',
             is_active: true,
-            valid_from: createForm.start_date,
-            valid_to: null,
             location_description: '',
         }
         setEditingMeteringPointData(newPoint)
@@ -508,22 +504,6 @@ export function ZevListPage() {
                                                 <option value="bidirectional">{t('pages.zevs.meterTypes.bidirectional')}</option>
                                             </select>
                                         </label>
-                                        <label>
-                                            <span>{t('pages.zevs.form.validFrom')}</span>
-                                            <input
-                                                type="date"
-                                                value={editingMeteringPointData.valid_from ?? ''}
-                                                onChange={(event) => updateEditingMeteringPoint({ valid_from: event.target.value })}
-                                            />
-                                        </label>
-                                        <label>
-                                            <span>{t('pages.zevs.form.validTo')}</span>
-                                            <input
-                                                type="date"
-                                                value={editingMeteringPointData.valid_to ?? ''}
-                                                onChange={(event) => updateEditingMeteringPoint({ valid_to: event.target.value || null })}
-                                            />
-                                        </label>
                                         <label className="grid-span-full">
                                             <span>{t('pages.zevs.form.locationDescription')}</span>
                                             <input
@@ -548,8 +528,6 @@ export function ZevListPage() {
                                             <tr>
                                                 <th>{t('pages.zevs.meterCol.meterId')}</th>
                                                 <th>{t('pages.zevs.meterCol.type')}</th>
-                                                <th>{t('pages.zevs.meterCol.validFrom')}</th>
-                                                <th>{t('pages.zevs.meterCol.validTo')}</th>
                                                 <th>{t('pages.zevs.meterCol.location')}</th>
                                                 <th>{t('pages.zevs.meterCol.actions')}</th>
                                             </tr>
@@ -559,8 +537,6 @@ export function ZevListPage() {
                                                 <tr key={`${index}-${meteringPoint.meter_id}`}>
                                                     <td>{meteringPoint.meter_id}</td>
                                                     <td>{meteringPoint.meter_type}</td>
-                                                    <td>{formatShortDate(meteringPoint.valid_from, settings)}</td>
-                                                    <td>{meteringPoint.valid_to ? formatShortDate(meteringPoint.valid_to, settings) : '-'}</td>
                                                     <td>{meteringPoint.location_description || '-'}</td>
                                                     <td>
                                                         <div style={{ display: 'flex', gap: '0.5rem' }}>

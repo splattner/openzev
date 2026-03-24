@@ -182,8 +182,6 @@ class MeteringPoint(models.Model):
         max_length=20, choices=MeteringPointType.choices, default=MeteringPointType.CONSUMPTION
     )
     is_active = models.BooleanField(default=True)
-    valid_from = models.DateField()
-    valid_to = models.DateField(null=True, blank=True)
     location_description = models.CharField(max_length=200, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -231,24 +229,15 @@ class MeteringPointAssignment(models.Model):
         if self.valid_to and self.valid_to < self.valid_from:
             raise ValidationError("valid_to must be on or after valid_from.")
 
-        # Only one assignment per metering point.
+        # Do not allow overlapping assignments for a metering point.
         existing = MeteringPointAssignment.objects.filter(metering_point=self.metering_point)
         if self.pk:
             existing = existing.exclude(pk=self.pk)
-        if existing.exists():
-            raise ValidationError("A metering point can only have one participant assignment.")
-
-        # Dates must fall within the metering point's validity window.
-        if self.valid_from < self.metering_point.valid_from:
-            raise ValidationError(
-                f"Assignment valid_from cannot be before the metering point's "
-                f"valid_from ({self.metering_point.valid_from})."
-            )
-        if self.valid_to and self.metering_point.valid_to and self.valid_to > self.metering_point.valid_to:
-            raise ValidationError(
-                f"Assignment valid_to cannot be after the metering point's "
-                f"valid_to ({self.metering_point.valid_to})."
-            )
+        overlap_exists = existing.filter(valid_from__lte=(self.valid_to or timezone.datetime.max.date())).filter(
+            models.Q(valid_to__isnull=True) | models.Q(valid_to__gte=self.valid_from)
+        ).exists()
+        if overlap_exists:
+            raise ValidationError("A metering point can only have one active assignment at a time.")
 
         # Dates must fall within the participant's validity window.
         if self.valid_from < self.participant.valid_from:

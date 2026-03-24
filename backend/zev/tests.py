@@ -43,7 +43,6 @@ class ParticipantEndpointRestrictionTests(TestCase):
 			participant=self.participant,
 			meter_id="MP-1",
 			meter_type=MeteringPointType.CONSUMPTION,
-			valid_from=date(2026, 1, 1),
 		)
 		self.assignment = MeteringPointAssignment.objects.create(
 			metering_point=self.metering_point,
@@ -75,7 +74,6 @@ class ParticipantEndpointRestrictionTests(TestCase):
 				"meter_id": "MP-2",
 				"meter_type": MeteringPointType.CONSUMPTION,
 				"is_active": True,
-				"valid_from": "2026-01-01",
 			},
 			format="json",
 		)
@@ -143,12 +141,10 @@ class ZevCreationWizardTests(TestCase):
 					{
 						"meter_id": "CH0000000000000000000000000000001",
 						"meter_type": "consumption",
-						"valid_from": "2026-03-01",
 					},
 					{
 						"meter_id": "CH0000000000000000000000000000002",
 						"meter_type": "production",
-						"valid_from": "2026-03-01",
 					},
 				],
 			},
@@ -431,13 +427,10 @@ class MeteringPointAssignmentValidationTests(TestCase):
 			email="second@example.com",
 			valid_from=date(2026, 1, 1),
 		)
-		# Metering point valid 2026-02-01 → 2026-11-30
 		self.mp = MeteringPoint.objects.create(
 			zev=self.zev,
 			meter_id="VAL-MP-1",
 			meter_type=MeteringPointType.CONSUMPTION,
-			valid_from=date(2026, 2, 1),
-			valid_to=date(2026, 11, 30),
 		)
 		auth(self.client, self.admin)
 
@@ -449,7 +442,7 @@ class MeteringPointAssignmentValidationTests(TestCase):
 		)
 
 	# ------------------------------------------------------------------ #
-	# Rule 1: only one assignment per metering point                       #
+	# Rule 1: only one active assignment per metering point                #
 	# ------------------------------------------------------------------ #
 
 	def test_first_assignment_is_accepted(self):
@@ -460,7 +453,7 @@ class MeteringPointAssignmentValidationTests(TestCase):
 		})
 		self.assertEqual(resp.status_code, 201)
 
-	def test_second_assignment_to_same_metering_point_is_rejected(self):
+	def test_second_overlapping_assignment_to_same_metering_point_is_rejected(self):
 		MeteringPointAssignment.objects.create(
 			metering_point=self.mp,
 			participant=self.participant,
@@ -472,67 +465,51 @@ class MeteringPointAssignmentValidationTests(TestCase):
 			"valid_from": "2026-06-01",
 		})
 		self.assertEqual(resp.status_code, 400)
-		self.assertIn("one participant assignment", str(resp.data).lower())
+		self.assertIn("one active assignment", str(resp.data).lower())
 
 	# ------------------------------------------------------------------ #
-	# Rule 2 & 3: assignment dates within metering point validity          #
+	# Rule 2: historical non-overlapping assignments are allowed           #
 	# ------------------------------------------------------------------ #
 
-	def test_assignment_valid_from_before_mp_valid_from_is_rejected(self):
+	def test_non_overlapping_historical_assignment_is_accepted(self):
+		MeteringPointAssignment.objects.create(
+			metering_point=self.mp,
+			participant=self.participant,
+			valid_from=date(2026, 3, 1),
+			valid_to=date(2026, 5, 31),
+		)
 		resp = self._post_assignment({
 			"metering_point": str(self.mp.id),
 			"participant": str(self.participant2.id),
-			"valid_from": "2026-01-01",  # mp starts 2026-02-01
+			"valid_from": "2026-06-01",
+			"valid_to": "2026-10-31",
+		})
+		self.assertEqual(resp.status_code, 201)
+
+	def test_open_assignment_blocks_future_overlapping_assignment(self):
+		MeteringPointAssignment.objects.create(
+			metering_point=self.mp,
+			participant=self.participant,
+			valid_from=date(2026, 3, 1),
+		)
+		resp = self._post_assignment({
+			"metering_point": str(self.mp.id),
+			"participant": str(self.participant2.id),
+			"valid_from": "2026-08-01",
 		})
 		self.assertEqual(resp.status_code, 400)
-		self.assertIn("valid_from", resp.data)
-
-	def test_assignment_valid_from_equal_to_mp_valid_from_is_accepted(self):
-		resp = self._post_assignment({
-			"metering_point": str(self.mp.id),
-			"participant": str(self.participant2.id),
-			"valid_from": "2026-02-01",  # exactly mp.valid_from
-		})
-		self.assertEqual(resp.status_code, 201)
-
-	def test_assignment_valid_to_after_mp_valid_to_is_rejected(self):
-		resp = self._post_assignment({
-			"metering_point": str(self.mp.id),
-			"participant": str(self.participant2.id),
-			"valid_from": "2026-02-01",
-			"valid_to": "2026-12-31",  # mp ends 2026-11-30
-		})
-		self.assertEqual(resp.status_code, 400)
-		self.assertIn("valid_to", resp.data)
-
-	def test_assignment_valid_to_equal_to_mp_valid_to_is_accepted(self):
-		resp = self._post_assignment({
-			"metering_point": str(self.mp.id),
-			"participant": str(self.participant2.id),
-			"valid_from": "2026-02-01",
-			"valid_to": "2026-11-30",  # exactly mp.valid_to
-		})
-		self.assertEqual(resp.status_code, 201)
-
-	def test_assignment_open_end_when_mp_has_valid_to_is_accepted(self):
-		# valid_to not set on assignment → no upper-bound check against mp
-		resp = self._post_assignment({
-			"metering_point": str(self.mp.id),
-			"participant": str(self.participant2.id),
-			"valid_from": "2026-02-01",
-		})
-		self.assertEqual(resp.status_code, 201)
+		self.assertIn("one active assignment", str(resp.data).lower())
 
 	# ------------------------------------------------------------------ #
 	# Rule 4 & 5: assignment dates within participant validity             #
 	# ------------------------------------------------------------------ #
 
 	def test_assignment_valid_from_before_participant_valid_from_is_rejected(self):
-		# participant starts 2026-03-01; mp starts 2026-02-01
+		# participant starts 2026-03-01
 		resp = self._post_assignment({
 			"metering_point": str(self.mp.id),
 			"participant": str(self.participant.id),
-			"valid_from": "2026-02-15",  # after mp start, but before participant start
+			"valid_from": "2026-02-15",
 		})
 		self.assertEqual(resp.status_code, 400)
 		self.assertIn("valid_from", resp.data)
@@ -546,12 +523,12 @@ class MeteringPointAssignmentValidationTests(TestCase):
 		self.assertEqual(resp.status_code, 201)
 
 	def test_assignment_valid_to_after_participant_valid_to_is_rejected(self):
-		# participant ends 2026-12-31; mp ends 2026-11-30
+		# participant ends 2026-12-31
 		resp = self._post_assignment({
 			"metering_point": str(self.mp.id),
 			"participant": str(self.participant.id),
 			"valid_from": "2026-03-01",
-			"valid_to": "2027-01-31",  # after participant.valid_to
+			"valid_to": "2027-01-31",
 		})
 		self.assertEqual(resp.status_code, 400)
 		self.assertIn("valid_to", resp.data)
@@ -561,7 +538,7 @@ class MeteringPointAssignmentValidationTests(TestCase):
 			"metering_point": str(self.mp.id),
 			"participant": str(self.participant.id),
 			"valid_from": "2026-03-01",
-			"valid_to": "2026-11-30",  # within both mp (ends 11-30) and participant (ends 12-31)
+			"valid_to": "2026-12-31",
 		})
 		self.assertEqual(resp.status_code, 201)
 
@@ -573,7 +550,7 @@ class MeteringPointAssignmentValidationTests(TestCase):
 		)
 		resp = self.client.patch(
 			f"/api/v1/zev/metering-point-assignments/{assignment.id}/",
-			{"valid_to": "2026-11-30"},
+			{"valid_to": "2026-09-30"},
 			format="json",
 		)
 		self.assertEqual(resp.status_code, 200)

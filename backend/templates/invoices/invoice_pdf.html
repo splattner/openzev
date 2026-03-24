@@ -462,10 +462,9 @@
         </div>
 
         <!-- ── Notes ──────────────────────────── -->
-        {% if invoice.notes or tr.feed_in_hint %}
+        {% if invoice.notes %}
         <div class="notes">
             {% if invoice.notes %}<div>{{ invoice.notes }}</div>{% endif %}
-            <div>{{ tr.feed_in_hint }}</div>
         </div>
         {% endif %}
 
