@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { useCallback, useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import {
     Bar,
     BarChart,
@@ -11,7 +12,7 @@ import {
     XAxis,
     YAxis,
 } from 'recharts'
-import { fetchChartData, fetchMeteringPoints, fetchRawMeteringData, fetchZevs } from '../lib/api'
+import { fetchChartData, fetchMeteringPoints, fetchRawMeteringData, fetchZevs, api, formatApiError } from '../lib/api'
 import { DateRangeShortcutPicker } from '../components/DateRangeShortcutPicker'
 import { useAuth } from '../lib/auth'
 import { useManagedZev } from '../lib/managedZev'
@@ -20,7 +21,7 @@ import {
     todayIso,
 } from '../lib/dateRangePresets'
 import { formatDateTime, formatMonthYear, formatShortDate, useAppSettings } from '../lib/appSettings'
-import type { ChartDataPoint, RawMeteringDailyRow, RawMeteringReading } from '../types/api'
+import type { ChartDataPoint, RawMeteringDailyRow, RawMeteringReading, DataQualityStatusResponse } from '../types/api'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -132,10 +133,14 @@ function CustomTooltip({
 
 export function MeteringChartPage() {
     const [searchParams, setSearchParams] = useSearchParams()
+    const { t } = useTranslation()
     const { user } = useAuth()
     const { settings } = useAppSettings()
     const { selectedZevId } = useManagedZev()
     const isManagedScope = user?.role === 'admin' || user?.role === 'zev_owner'
+
+    // Tab state
+    const [activeTab, setActiveTab] = useState<'chart' | 'quality'>('chart')
 
     // Controlled state
     const [selectedMpId, setSelectedMpId] = useState<string>(searchParams.get('metering_point') ?? '')
@@ -159,6 +164,22 @@ export function MeteringChartPage() {
         queryFn: () =>
             fetchRawMeteringData({ meteringPoint: selectedMpId, dateFrom, dateTo }),
         enabled: !!selectedMpId,
+    })
+
+    const qualityQuery = useQuery({
+        queryKey: ['metering-data-quality', dateFrom, dateTo, selectedZevId],
+        queryFn: async () => {
+            const params = new URLSearchParams({
+                date_from: dateFrom,
+                date_to: dateTo,
+                ...(selectedZevId && isManagedScope ? { zev_id: selectedZevId } : {}),
+            })
+            const { data } = await api.get<DataQualityStatusResponse>(
+                `/metering/readings/data-quality-status/?${params}`
+            )
+            return data
+        },
+        enabled: true,
     })
 
     const meteringPoints = (mpQuery.data?.results ?? []).filter(
@@ -210,8 +231,42 @@ export function MeteringChartPage() {
         <div className="page-stack">
             <header>
                 <h2>Metering Data</h2>
-                <p className="muted">Visualize energy readings per metering point.</p>
+                <p className="muted">Visualize energy readings and monitor data quality per metering point.</p>
             </header>
+
+            {/* ── Tabs ──────────────────────────────────────────────────────────── */}
+            <div style={{ display: 'flex', gap: '1rem', borderBottom: '1px solid var(--color-border, #e5e7eb)', marginBottom: '1.5rem' }}>
+                <button
+                    onClick={() => setActiveTab('chart')}
+                    style={{
+                        background: activeTab === 'chart' ? 'transparent' : 'transparent',
+                        color: activeTab === 'chart' ? 'var(--color-text, #000)' : 'var(--color-text-muted, #888)',
+                        borderBottom: activeTab === 'chart' ? '2px solid var(--color-primary, #0066cc)' : 'none',
+                        padding: '0.75rem 1rem',
+                        fontSize: '1rem',
+                        fontWeight: activeTab === 'chart' ? 600 : 400,
+                        cursor: 'pointer',
+                        border: 'none',
+                    }}
+                >
+                    {t('nav.meteringData')}
+                </button>
+                <button
+                    onClick={() => setActiveTab('quality')}
+                    style={{
+                        background: activeTab === 'quality' ? 'transparent' : 'transparent',
+                        color: activeTab === 'quality' ? 'var(--color-text, #000)' : 'var(--color-text-muted, #888)',
+                        borderBottom: activeTab === 'quality' ? '2px solid var(--color-primary, #0066cc)' : 'none',
+                        padding: '0.75rem 1rem',
+                        fontSize: '1rem',
+                        fontWeight: activeTab === 'quality' ? 600 : 400,
+                        cursor: 'pointer',
+                        border: 'none',
+                    }}
+                >
+                    {t('nav.meteringDataQuality')}
+                </button>
+            </div>
 
             {/* ── Controls ──────────────────────────────────────────────────────── */}
             <div
@@ -223,218 +278,388 @@ export function MeteringChartPage() {
                     alignItems: 'end',
                 }}
             >
-                <label>
-                    <span>Metering Point *</span>
-                    <select
-                        value={selectedMpId}
-                        onChange={(e) => handleMpChange(e.target.value)}
-                    >
-                        <option value="">Select metering point…</option>
-                        {meteringPoints.map((mp) => (
-                            <option key={mp.id} value={mp.id}>
-                                {mp.meter_id}
-                                {zevNameById.has(mp.zev) ? ` (${zevNameById.get(mp.zev)})` : ''}
-                            </option>
-                        ))}
-                    </select>
-                </label>
+                {activeTab === 'chart' && (
+                    <>
+                        <label>
+                            <span>Metering Point *</span>
+                            <select
+                                value={selectedMpId}
+                                onChange={(e) => handleMpChange(e.target.value)}
+                            >
+                                <option value="">Select metering point…</option>
+                                {meteringPoints.map((mp) => (
+                                    <option key={mp.id} value={mp.id}>
+                                        {mp.meter_id}
+                                        {zevNameById.has(mp.zev) ? ` (${zevNameById.get(mp.zev)})` : ''}
+                                    </option>
+                                ))}
+                            </select>
+                        </label>
 
-                <DateRangeShortcutPicker
-                    from={dateFrom}
-                    to={dateTo}
-                    onChange={({ from, to }) => {
-                        setDateFrom(from)
-                        setDateTo(to)
-                    }}
-                />
+                        <DateRangeShortcutPicker
+                            from={dateFrom}
+                            to={dateTo}
+                            onChange={({ from, to }) => {
+                                setDateFrom(from)
+                                setDateTo(to)
+                            }}
+                        />
 
-                <label>
-                    <span>Resolution</span>
-                    <select
-                        value={bucket}
-                        onChange={(e) => setBucket(e.target.value as 'day' | 'hour' | 'month')}
-                    >
-                        <option value="hour">Hourly</option>
-                        <option value="day">Daily</option>
-                        <option value="month">Monthly</option>
-                    </select>
-                </label>
+                        <label>
+                            <span>Resolution</span>
+                            <select
+                                value={bucket}
+                                onChange={(e) => setBucket(e.target.value as 'day' | 'hour' | 'month')}
+                            >
+                                <option value="hour">Hourly</option>
+                                <option value="day">Daily</option>
+                                <option value="month">Monthly</option>
+                            </select>
+                        </label>
+                    </>
+                )}
+
+                {activeTab === 'quality' && (
+                    <>
+                        <label>
+                            <span>{t('meteringDataQuality.meterId')} (optional)</span>
+                            <select
+                                value={selectedMpId}
+                                onChange={(e) => handleMpChange(e.target.value)}
+                            >
+                                <option value="">All metering points…</option>
+                                {meteringPoints.map((mp) => (
+                                    <option key={mp.id} value={mp.id}>
+                                        {mp.meter_id}
+                                        {zevNameById.has(mp.zev) ? ` (${zevNameById.get(mp.zev)})` : ''}
+                                    </option>
+                                ))}
+                            </select>
+                        </label>
+
+                        <DateRangeShortcutPicker
+                            from={dateFrom}
+                            to={dateTo}
+                            onChange={({ from, to }) => {
+                                setDateFrom(from)
+                                setDateTo(to)
+                            }}
+                        />
+                    </>
+                )}
             </div>
 
-            {/* ── No selection placeholder ──────────────────────────────────────── */}
-            {!selectedMpId && (
-                <div className="card" style={{ textAlign: 'center', padding: '3rem 1rem', color: 'var(--color-text-muted, #888)' }}>
-                    Select a metering point above to view its energy readings.
-                </div>
-            )}
-
-            {/* ── Loading / error ───────────────────────────────────────────────── */}
-            {selectedMpId && chartQuery.isLoading && (
-                <div className="card" style={{ textAlign: 'center', padding: '2rem' }}>
-                    Loading chart data…
-                </div>
-            )}
-            {selectedMpId && chartQuery.isError && (
-                <div className="card error-banner">Failed to load chart data.</div>
-            )}
-            {selectedMpId && rawDataQuery.isError && (
-                <div className="card error-banner">Failed to load raw metering data table.</div>
-            )}
-
-            {/* ── Results ───────────────────────────────────────────────────────── */}
-            {selectedMpId && chartQuery.isSuccess && (
+            {/* ── Chart Tab ─────────────────────────────────────────────────────── */}
+            {activeTab === 'chart' && (
                 <>
-                    {/* Summary stats */}
-                    <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
-                        {selectedMp && (
-                            <StatBadge
-                                label="Meter ID"
-                                value={selectedMp.meter_id}
-                                color="var(--color-text, #222)"
-                            />
-                        )}
-                        <StatBadge
-                            label="Total Consumption (IN)"
-                            value={`${totalIn.toFixed(2)} kWh`}
-                            color="#059669"
-                        />
-                        {hasOut && (
-                            <StatBadge
-                                label="Total Feed-in (OUT)"
-                                value={`${totalOut.toFixed(2)} kWh`}
-                                color="#0284c7"
-                            />
-                        )}
-                        <StatBadge
-                            label="Data points"
-                            value={String(data.length)}
-                            color="var(--color-text-muted, #888)"
-                        />
-                    </div>
-
-                    {data.length === 0 ? (
-                        <div className="card" style={{ textAlign: 'center', padding: '2rem', color: 'var(--color-text-muted, #888)' }}>
-                            No readings found for the selected period and metering point.
-                        </div>
-                    ) : (
-                        <div className="card" style={{ padding: '1.5rem' }}>
-                            <ResponsiveContainer width="100%" height={380}>
-                                <BarChart
-                                    data={data}
-                                    margin={{ top: 8, right: 16, left: 0, bottom: 8 }}
-                                    barCategoryGap="20%"
-                                >
-                                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                                    <XAxis
-                                        dataKey="bucket"
-                                        tickFormatter={tickFormatter}
-                                        tick={{ fontSize: 11 }}
-                                        tickLine={false}
-                                        interval="preserveStartEnd"
-                                    />
-                                    <YAxis
-                                        unit=" kWh"
-                                        tick={{ fontSize: 11 }}
-                                        tickLine={false}
-                                        axisLine={false}
-                                        width={72}
-                                    />
-                                    <Tooltip
-                                        content={<CustomTooltip resolution={bucket} formatters={bucketFormatters} />}
-                                    />
-                                    <Legend />
-                                    <Bar
-                                        dataKey="in_kwh"
-                                        name="Consumption (IN)"
-                                        fill="#059669"
-                                        radius={[3, 3, 0, 0]}
-                                        maxBarSize={48}
-                                    />
-                                    {hasOut && (
-                                        <Bar
-                                            dataKey="out_kwh"
-                                            name="Feed-in (OUT)"
-                                            fill="#0284c7"
-                                            radius={[3, 3, 0, 0]}
-                                            maxBarSize={48}
-                                        />
-                                    )}
-                                </BarChart>
-                            </ResponsiveContainer>
+                    {/* ── No selection placeholder ──────────────────────────────────────── */}
+                    {!selectedMpId && (
+                        <div className="card" style={{ textAlign: 'center', padding: '3rem 1rem', color: 'var(--color-text-muted, #888)' }}>
+                            Select a metering point above to view its energy readings.
                         </div>
                     )}
 
-                    <div className="table-card">
-                        <h3>Raw Data by Day</h3>
-                        <p className="muted" style={{ marginTop: 0 }}>
-                            One row per day in the selected period. Each row contains all raw readings for that day.
-                        </p>
+                    {/* ── Loading / error ───────────────────────────────────────────────── */}
+                    {selectedMpId && chartQuery.isLoading && (
+                        <div className="card" style={{ textAlign: 'center', padding: '2rem' }}>
+                            Loading chart data…
+                        </div>
+                    )}
+                    {selectedMpId && chartQuery.isError && (
+                        <div className="card error-banner">Failed to load chart data.</div>
+                    )}
+                    {selectedMpId && rawDataQuery.isError && (
+                        <div className="card error-banner">Failed to load raw metering data table.</div>
+                    )}
 
-                        {rawDataQuery.isLoading ? (
-                            <div style={{ padding: '1rem 0' }}>Loading raw data table…</div>
-                        ) : rawDailyRows.length === 0 ? (
-                            <div style={{ padding: '1rem 0' }} className="muted">
-                                No raw metering readings found for the selected period.
+                    {/* ── Results ───────────────────────────────────────────────────────── */}
+                    {selectedMpId && chartQuery.isSuccess && (
+                        <>
+                            {/* Summary stats */}
+                            <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+                                {selectedMp && (
+                                    <StatBadge
+                                        label="Meter ID"
+                                        value={selectedMp.meter_id}
+                                        color="var(--color-text, #222)"
+                                    />
+                                )}
+                                <StatBadge
+                                    label="Total Consumption (IN)"
+                                    value={`${totalIn.toFixed(2)} kWh`}
+                                    color="#059669"
+                                />
+                                {hasOut && (
+                                    <StatBadge
+                                        label="Total Feed-in (OUT)"
+                                        value={`${totalOut.toFixed(2)} kWh`}
+                                        color="#0284c7"
+                                    />
+                                )}
+                                <StatBadge
+                                    label="Data points"
+                                    value={String(data.length)}
+                                    color="var(--color-text-muted, #888)"
+                                />
                             </div>
-                        ) : (
-                            <table>
-                                <thead>
-                                    <tr>
-                                        <th>Day</th>
-                                        <th>IN total (kWh)</th>
-                                        <th>OUT total (kWh)</th>
-                                        <th>Raw readings</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {rawDailyRows.map((dayRow) => (
-                                        <tr key={dayRow.date}>
-                                            <td>{formatShortDate(dayRow.date, settings)}</td>
-                                            <td>{dayRow.in_kwh.toFixed(4)}</td>
-                                            <td>{dayRow.out_kwh.toFixed(4)}</td>
-                                            <td style={{ padding: 0 }}>
-                                                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85em' }}>
-                                                    <thead>
-                                                        <tr>
-                                                            <th style={{ textAlign: 'left', padding: '0.2rem 0.5rem', color: 'var(--color-muted)' }}>Time</th>
-                                                            <th style={{ textAlign: 'left', padding: '0.2rem 0.5rem', color: 'var(--color-muted)' }}>Dir</th>
-                                                            <th style={{ textAlign: 'right', padding: '0.2rem 0.5rem', color: 'var(--color-muted)' }}>kWh</th>
-                                                        </tr>
-                                                    </thead>
-                                                    {groupReadingsByHour(dayRow.readings).map(({ hour, items }) => (
-                                                        <tbody key={hour}>
-                                                            <tr>
-                                                                <td
-                                                                    colSpan={3}
-                                                                    style={{
-                                                                        padding: '0.2rem 0.5rem',
-                                                                        fontWeight: 600,
-                                                                        fontSize: '0.8em',
-                                                                        color: 'var(--color-muted)',
-                                                                        borderTop: '1px solid var(--color-border, #e5e7eb)',
-                                                                        background: 'var(--color-surface-subtle, #f9fafb)',
-                                                                    }}
-                                                                >
-                                                                    {hour}&nbsp;–&nbsp;{String(Number(hour.split(':')[0]) + 1).padStart(2, '0')}:00
-                                                                </td>
-                                                            </tr>
-                                                            {items.map((r, i) => (
-                                                                <tr key={`${r.timestamp}-${r.direction}-${i}`}>
-                                                                    <td style={{ padding: '0.15rem 0.5rem', fontVariantNumeric: 'tabular-nums' }}>{formatTimeOnly(r.timestamp)}</td>
-                                                                    <td style={{ padding: '0.15rem 0.5rem' }}>{r.direction.toUpperCase()}</td>
-                                                                    <td style={{ padding: '0.15rem 0.5rem', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{r.energy_kwh.toFixed(4)}</td>
+
+                            {data.length === 0 ? (
+                                <div className="card" style={{ textAlign: 'center', padding: '2rem', color: 'var(--color-text-muted, #888)' }}>
+                                    No readings found for the selected period and metering point.
+                                </div>
+                            ) : (
+                                <div className="card" style={{ padding: '1.5rem' }}>
+                                    <ResponsiveContainer width="100%" height={380}>
+                                        <BarChart
+                                            data={data}
+                                            margin={{ top: 8, right: 16, left: 0, bottom: 8 }}
+                                            barCategoryGap="20%"
+                                        >
+                                            <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                                            <XAxis
+                                                dataKey="bucket"
+                                                tickFormatter={tickFormatter}
+                                                tick={{ fontSize: 11 }}
+                                                tickLine={false}
+                                                interval="preserveStartEnd"
+                                            />
+                                            <YAxis
+                                                unit=" kWh"
+                                                tick={{ fontSize: 11 }}
+                                                tickLine={false}
+                                                axisLine={false}
+                                                width={72}
+                                            />
+                                            <Tooltip
+                                                content={<CustomTooltip resolution={bucket} formatters={bucketFormatters} />}
+                                            />
+                                            <Legend />
+                                            <Bar
+                                                dataKey="in_kwh"
+                                                name="Consumption (IN)"
+                                                fill="#059669"
+                                                radius={[3, 3, 0, 0]}
+                                                maxBarSize={48}
+                                            />
+                                            {hasOut && (
+                                                <Bar
+                                                    dataKey="out_kwh"
+                                                    name="Feed-in (OUT)"
+                                                    fill="#0284c7"
+                                                    radius={[3, 3, 0, 0]}
+                                                    maxBarSize={48}
+                                                />
+                                            )}
+                                        </BarChart>
+                                    </ResponsiveContainer>
+                                </div>
+                            )}
+
+                            <div className="table-card">
+                                <h3>Raw Data by Day</h3>
+                                <p className="muted" style={{ marginTop: 0 }}>
+                                    One row per day in the selected period. Each row contains all raw readings for that day.
+                                </p>
+
+                                {rawDataQuery.isLoading ? (
+                                    <div style={{ padding: '1rem 0' }}>Loading raw data table…</div>
+                                ) : rawDailyRows.length === 0 ? (
+                                    <div style={{ padding: '1rem 0' }} className="muted">
+                                        No raw metering readings found for the selected period.
+                                    </div>
+                                ) : (
+                                    <table>
+                                        <thead>
+                                            <tr>
+                                                <th>Day</th>
+                                                <th>IN total (kWh)</th>
+                                                <th>OUT total (kWh)</th>
+                                                <th>Raw readings</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {rawDailyRows.map((dayRow) => (
+                                                <tr key={dayRow.date}>
+                                                    <td>{formatShortDate(dayRow.date, settings)}</td>
+                                                    <td>{dayRow.in_kwh.toFixed(4)}</td>
+                                                    <td>{dayRow.out_kwh.toFixed(4)}</td>
+                                                    <td style={{ padding: 0 }}>
+                                                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85em' }}>
+                                                            <thead>
+                                                                <tr>
+                                                                    <th style={{ textAlign: 'left', padding: '0.2rem 0.5rem', color: 'var(--color-muted)' }}>Time</th>
+                                                                    <th style={{ textAlign: 'left', padding: '0.2rem 0.5rem', color: 'var(--color-muted)' }}>Dir</th>
+                                                                    <th style={{ textAlign: 'right', padding: '0.2rem 0.5rem', color: 'var(--color-muted)' }}>kWh</th>
                                                                 </tr>
+                                                            </thead>
+                                                            {groupReadingsByHour(dayRow.readings).map(({ hour, items }) => (
+                                                                <tbody key={hour}>
+                                                                    <tr>
+                                                                        <td
+                                                                            colSpan={3}
+                                                                            style={{
+                                                                                padding: '0.2rem 0.5rem',
+                                                                                fontWeight: 600,
+                                                                                fontSize: '0.8em',
+                                                                                color: 'var(--color-muted)',
+                                                                                borderTop: '1px solid var(--color-border, #e5e7eb)',
+                                                                                background: 'var(--color-surface-subtle, #f9fafb)',
+                                                                            }}
+                                                                        >
+                                                                            {hour}&nbsp;–&nbsp;{String(Number(hour.split(':')[0]) + 1).padStart(2, '0')}:00
+                                                                        </td>
+                                                                    </tr>
+                                                                    {items.map((r, i) => (
+                                                                        <tr key={`${r.timestamp}-${r.direction}-${i}`}>
+                                                                            <td style={{ padding: '0.15rem 0.5rem', fontVariantNumeric: 'tabular-nums' }}>{formatTimeOnly(r.timestamp)}</td>
+                                                                            <td style={{ padding: '0.15rem 0.5rem' }}>{r.direction.toUpperCase()}</td>
+                                                                            <td style={{ padding: '0.15rem 0.5rem', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{r.energy_kwh.toFixed(4)}</td>
+                                                                        </tr>
+                                                                    ))}
+                                                                </tbody>
                                                             ))}
-                                                        </tbody>
-                                                    ))}
-                                                </table>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        )}
-                    </div>
+                                                        </table>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                )}
+                            </div>
+                        </>
+                    )}
+                </>
+            )}
+
+            {/* ── Data Quality Tab ──────────────────────────────────────────────── */}
+            {activeTab === 'quality' && (
+                <>
+                    {qualityQuery.isLoading && (
+                        <div className="card" style={{ textAlign: 'center', padding: '2rem' }}>
+                            {t('common.loading')}
+                        </div>
+                    )}
+                    {qualityQuery.isError && (
+                        <div className="card error-banner">{formatApiError(qualityQuery.error as any)}</div>
+                    )}
+                    {qualityQuery.isSuccess && qualityQuery.data && (
+                        <>
+                            {qualityQuery.data.metering_points.length === 0 ? (
+                                <div className="card" style={{ textAlign: 'center', padding: '2rem', color: 'var(--color-text-muted, #888)' }}>
+                                    {t('meteringDataQuality.noData')}
+                                </div>
+                            ) : (
+                                <>
+                                    {/* Summary cards */}
+                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
+                                        <div style={{ background: '#dcfce7', border: '1px solid #86efac', borderRadius: '8px', padding: '1rem', textAlign: 'center' }}>
+                                            <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#166534' }}>
+                                                {qualityQuery.data.metering_points.filter((mp) => mp.severity === 'green').length}
+                                            </div>
+                                            <div style={{ fontSize: '0.875rem', color: '#34d399' }}>{t('meteringDataQuality.severityGreen')}</div>
+                                        </div>
+                                        <div style={{ background: '#fef3c7', border: '1px solid #fcd34d', borderRadius: '8px', padding: '1rem', textAlign: 'center' }}>
+                                            <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#854d0e' }}>
+                                                {qualityQuery.data.metering_points.filter((mp) => mp.severity === 'yellow').length}
+                                            </div>
+                                            <div style={{ fontSize: '0.875rem', color: '#f59e0b' }}>{t('meteringDataQuality.severityYellow')}</div>
+                                        </div>
+                                        <div style={{ background: '#fee2e2', border: '1px solid #fca5a5', borderRadius: '8px', padding: '1rem', textAlign: 'center' }}>
+                                            <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#7f1d1d' }}>
+                                                {qualityQuery.data.metering_points.filter((mp) => mp.severity === 'red').length}
+                                            </div>
+                                            <div style={{ fontSize: '0.875rem', color: '#ef4444' }}>{t('meteringDataQuality.severityRed')}</div>
+                                        </div>
+                                    </div>
+
+                                    {/* Quality table */}
+                                    <div className="table-card">
+                                        <table>
+                                            <thead>
+                                                <tr>
+                                                    <th>{t('meteringDataQuality.meterId')}</th>
+                                                    <th>{t('meteringDataQuality.participant')}</th>
+                                                    <th>{t('meteringDataQuality.dataCompleteness')}</th>
+                                                    <th>{t('meteringDataQuality.status')}</th>
+                                                    <th>{t('meteringDataQuality.gaps')}</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {qualityQuery.data.metering_points.map((mp) => (
+                                                    <tr key={mp.id}>
+                                                        <td style={{ fontFamily: 'monospace', fontSize: '0.9em' }}>{mp.meter_id}</td>
+                                                        <td>{mp.participant_name}</td>
+                                                        <td>
+                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                                                <div style={{ width: '80px', height: '20px', background: '#f0f0f0', borderRadius: '4px', overflow: 'hidden' }}>
+                                                                    <div
+                                                                        style={{
+                                                                            height: '100%',
+                                                                            background:
+                                                                                mp.severity === 'green' ? '#10b981' :
+                                                                                mp.severity === 'yellow' ? '#f59e0b' :
+                                                                                '#ef4444',
+                                                                            width: `${mp.data_completeness}%`,
+                                                                        }}
+                                                                    />
+                                                                </div>
+                                                                <span style={{ fontSize: '0.875rem', fontWeight: 'bold' }}>{mp.data_completeness}%</span>
+                                                            </div>
+                                                        </td>
+                                                        <td>
+                                                            <span
+                                                                style={{
+                                                                    display: 'inline-block',
+                                                                    padding: '0.25rem 0.75rem',
+                                                                    borderRadius: '4px',
+                                                                    fontSize: '0.875rem',
+                                                                    fontWeight: 'bold',
+                                                                    background:
+                                                                        mp.severity === 'green' ? '#dcfce7' :
+                                                                        mp.severity === 'yellow' ? '#fef3c7' :
+                                                                        '#fee2e2',
+                                                                    color:
+                                                                        mp.severity === 'green' ? '#166534' :
+                                                                        mp.severity === 'yellow' ? '#854d0e' :
+                                                                        '#7f1d1d',
+                                                                }}
+                                                            >
+                                                                {t(`meteringDataQuality.severity${mp.severity.charAt(0).toUpperCase() + mp.severity.slice(1)}`)}
+                                                            </span>
+                                                        </td>
+                                                        <td style={{ fontSize: '0.875rem' }}>
+                                                            {mp.gaps.length === 0 ? (
+                                                                <span style={{ color: '#10b981' }}>{t('meteringDataQuality.noGaps')}</span>
+                                                            ) : (
+                                                                <div>
+                                                                    {mp.gaps.slice(0, 1).map((gap, idx) => (
+                                                                        <div key={idx} style={{ color: '#666' }}>
+                                                                            {gap.start_date === gap.end_date ? (
+                                                                                <>{gap.start_date}</>
+                                                                            ) : (
+                                                                                <>
+                                                                                    {gap.start_date} → {gap.end_date}
+                                                                                </>
+                                                                            )}
+                                                                        </div>
+                                                                    ))}
+                                                                    {mp.gaps.length > 1 && (
+                                                                        <div style={{ color: '#999', fontSize: '0.8em' }}>
+                                                                            +{mp.gaps.length - 1} {t('meteringDataQuality.moreGaps')}
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            )}
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </>
+                            )}
+                        </>
+                    )}
                 </>
             )}
         </div>

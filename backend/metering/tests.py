@@ -401,3 +401,99 @@ class MeteringRawDataEndpointTests(TestCase):
 		)
 		self.assertEqual(resp.status_code, 200)
 		self.assertEqual(len(resp.data), 2)
+
+class DataQualityStatusTests(TestCase):
+	def setUp(self):
+		self.client = APIClient()
+		self.owner = make_user("dq_owner", UserRole.ZEV_OWNER)
+		self.participant_user = make_user("dq_participant", UserRole.PARTICIPANT)
+
+		self.zev = Zev.objects.create(name="DQ ZEV", owner=self.owner, zev_type="vzev", invoice_prefix="DQ")
+		self.participant = Participant.objects.create(
+			zev=self.zev,
+			user=self.participant_user,
+			first_name="Bob",
+			last_name="Monitor",
+			email="bob@example.com",
+			valid_from=date(2026, 1, 1),
+		)
+
+		self.metering_point = MeteringPoint.objects.create(
+			zev=self.zev,
+			meter_id="CH-DQ-001",
+			meter_type=MeteringPointType.CONSUMPTION,
+		)
+
+		# Create assignment (metering point validity replaced by assignment)
+		from zev.models import MeteringPointAssignment
+		MeteringPointAssignment.objects.create(
+			metering_point=self.metering_point,
+			participant=self.participant,
+			valid_from=date(2026, 1, 1),
+		)
+
+	def test_owner_can_check_data_quality_status(self):
+		"""ZEV owner can view data quality status for their ZEV."""
+		auth(self.client, self.owner)
+
+		# Add readings on days 2 and 5 (gap on days 3-4)
+		MeterReading.objects.create(
+			metering_point=self.metering_point,
+			timestamp=datetime(2026, 1, 2, 12, 0, tzinfo=timezone.utc),
+			energy_kwh=Decimal("10.5"),
+			direction=ReadingDirection.IN,
+			resolution=ReadingResolution.DAILY,
+		)
+		MeterReading.objects.create(
+			metering_point=self.metering_point,
+			timestamp=datetime(2026, 1, 5, 12, 0, tzinfo=timezone.utc),
+			energy_kwh=Decimal("15.2"),
+			direction=ReadingDirection.IN,
+			resolution=ReadingResolution.DAILY,
+		)
+
+		# Query for Jan 1-7
+		resp = self.client.get(
+			"/api/v1/metering/readings/data-quality-status/",
+			{"date_from": "2026-01-01", "date_to": "2026-01-07"},
+		)
+
+		self.assertEqual(resp.status_code, 200)
+		self.assertEqual(len(resp.data["metering_points"]), 1)
+		
+		mp_status = resp.data["metering_points"][0]
+		self.assertEqual(mp_status["meter_id"], "CH-DQ-001")
+		self.assertEqual(mp_status["data_completeness"], 28)  # 2 of 7 days
+		self.assertEqual(mp_status["severity"], "red")
+		self.assertEqual(len(mp_status["gaps"]), 3)  # 3 gaps: [1], [3-4], [6-7]
+		self.assertIn(date(2026, 1, 3), [date.fromisoformat(g["start_date"]) for g in mp_status["gaps"]])
+
+	def test_participant_can_check_own_metering_point_quality(self):
+		"""Participant can view data quality for own readings."""
+		auth(self.client, self.participant_user)
+
+		# Add reading on day 2 only
+		MeterReading.objects.create(
+			metering_point=self.metering_point,
+			timestamp=datetime(2026, 1, 2, 12, 0, tzinfo=timezone.utc),
+			energy_kwh=Decimal("20.0"),
+			direction=ReadingDirection.IN,
+			resolution=ReadingResolution.DAILY,
+		)
+
+		resp = self.client.get(
+			"/api/v1/metering/readings/data-quality-status/",
+			{"date_from": "2026-01-01", "date_to": "2026-01-05"},
+		)
+
+		self.assertEqual(resp.status_code, 200)
+		self.assertGreater(len(resp.data["metering_points"]), 0)
+
+	def test_default_date_range_is_30_days(self):
+		"""Without date parameters, defaults to 30 days."""
+		auth(self.client, self.owner)
+
+		resp = self.client.get("/api/v1/metering/readings/data-quality-status/")
+		self.assertEqual(resp.status_code, 200)
+		self.assertIn("date_from", resp.data)
+		self.assertIn("date_to", resp.data)

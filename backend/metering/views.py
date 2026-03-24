@@ -478,6 +478,113 @@ class MeterReadingViewSet(viewsets.ModelViewSet):
             "timeline": timeline,
         })
 
+    @action(detail=False, methods=["get"], url_path="data-quality-status", permission_classes=[IsAuthenticated])
+    def data_quality_status(self, request):
+        """
+        Detect missing daily readings per metering point over a date range.
+
+        Query params:
+          date_from  – YYYY-MM-DD (default: 30 days ago)
+          date_to    – YYYY-MM-DD (default: today)
+          zev_id     – UUID (optional, for filtering)
+
+        Returns array of metering points with gaps and data completeness.
+        """
+        # Parse dates (default to last 30 days)
+        date_from_str = request.query_params.get("date_from")
+        date_to_str = request.query_params.get("date_to")
+        zev_id = request.query_params.get("zev_id")
+
+        today = date_type.today()
+        date_from = date_type.fromisoformat(date_from_str) if date_from_str else today - timedelta(days=30)
+        date_to = date_type.fromisoformat(date_to_str) if date_to_str else today
+
+        # Get metering points based on user role
+        qs = self.get_queryset()
+        if zev_id:
+            qs = qs.filter(metering_point__zev_id=zev_id)
+        
+        # Group by metering point
+        mp_ids = qs.values_list("metering_point_id", flat=True).distinct()
+        from zev.models import MeteringPoint
+        metering_points = MeteringPoint.objects.filter(id__in=mp_ids)
+
+        result = []
+        for mp in metering_points:
+            # Get all readings for this metering point in date range
+            readings = (
+                MeterReading.objects
+                .filter(metering_point=mp)
+                .filter(timestamp__gte=datetime.combine(date_from, datetime.min.time(), tzinfo=dt_timezone.utc))
+                .filter(timestamp__lt=datetime.combine(date_to, datetime.min.time(), tzinfo=dt_timezone.utc) + timedelta(days=1))
+                .values_list("timestamp", flat=True)
+            )
+
+            # Extract unique days with data
+            days_with_data = set()
+            for ts in readings:
+                days_with_data.add(ts.date())
+
+            # Generate all expected days
+            all_days = set()
+            current = date_from
+            while current <= date_to:
+                all_days.add(current)
+                current = current + timedelta(days=1)
+
+            # Find gaps (consecutive missing days)
+            missing_days = sorted(all_days - days_with_data)
+            gaps = []
+            if missing_days:
+                gap_start = missing_days[0]
+                gap_end = missing_days[0]
+                for day in missing_days[1:]:
+                    if day == gap_end + timedelta(days=1):
+                        gap_end = day
+                    else:
+                        gaps.append({
+                            "start_date": gap_start.isoformat(),
+                            "end_date": gap_end.isoformat(),
+                            "duration_days": (gap_end - gap_start).days + 1,
+                        })
+                        gap_start = day
+                        gap_end = day
+                gaps.append({
+                    "start_date": gap_start.isoformat(),
+                    "end_date": gap_end.isoformat(),
+                    "duration_days": (gap_end - gap_start).days + 1,
+                })
+
+            # Calculate severity and completeness
+            data_completeness = int(100 * len(days_with_data) / len(all_days)) if all_days else 0
+            if data_completeness == 100:
+                severity = "green"
+            elif data_completeness >= 50:
+                severity = "yellow"
+            else:
+                severity = "red"
+
+            # Get participant name
+            participant = mp.assignments.filter(valid_to__isnull=True).first()
+            participant_name = participant.participant.full_name if participant else "Unassigned"
+
+            result.append({
+                "id": str(mp.id),
+                "meter_id": mp.meter_id,
+                "participant_name": participant_name,
+                "severity": severity,
+                "data_completeness": data_completeness,
+                "days_with_data": len(days_with_data),
+                "total_days": len(all_days),
+                "gaps": gaps,
+            })
+
+        return Response({
+            "date_from": date_from.isoformat(),
+            "date_to": date_to.isoformat(),
+            "metering_points": result,
+        })
+
 
 class ImportLogViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = ImportLogSerializer
