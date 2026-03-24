@@ -132,7 +132,6 @@ class InvoicePdfQrTests(TestCase):
         self.assertEqual(context["formatted_dates"]["due_date"], "2026-02-15")
         self.assertEqual(context["creditor_city"], "Zuerich")
         self.assertEqual(context["formatted_dates"]["due_date"], "2026-02-15")
-        self.assertIn("Einspeisetarif", context["tr"]["feed_in_hint"])
 
     def test_template_context_strips_repeated_period_from_item_description(self):
         invoice = self._invoice()

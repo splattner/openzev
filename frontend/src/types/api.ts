@@ -119,8 +119,6 @@ export interface OwnerMeteringPointInput {
     meter_id: string
     meter_type: 'consumption' | 'production' | 'bidirectional'
     is_active?: boolean
-    valid_from?: string
-    valid_to?: string | null
     location_description?: string
 }
 
@@ -210,8 +208,6 @@ export interface MeteringPoint {
     meter_id: string
     meter_type: 'consumption' | 'production' | 'bidirectional'
     is_active: boolean
-    valid_from: string
-    valid_to?: string | null
     location_description?: string
 }
 
@@ -221,8 +217,6 @@ export interface MeteringPointInput {
     meter_id: string
     meter_type: 'consumption' | 'production' | 'bidirectional'
     is_active: boolean
-    valid_from: string
-    valid_to?: string | null
     location_description?: string
 }
 

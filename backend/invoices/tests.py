@@ -330,14 +330,12 @@ class InvoiceBillingIntegrationTests(TestCase):
             participant=self.participant,
             meter_id="CH-BILL-CONS-1",
             meter_type=MeteringPointType.CONSUMPTION,
-            valid_from=date(2026, 1, 1),
         )
         self.production_mp = MeteringPoint.objects.create(
             zev=self.zev,
             participant=self.participant,
             meter_id="CH-BILL-PROD-1",
             meter_type=MeteringPointType.PRODUCTION,
-            valid_from=date(2026, 1, 1),
         )
 
         local_tariff = Tariff.objects.create(
@@ -420,14 +418,12 @@ class InvoicePeriodOverviewTests(TestCase):
             participant=self.p_with_data,
             meter_id="CH-OVERVIEW-1",
             meter_type=MeteringPointType.CONSUMPTION,
-            valid_from=date(2026, 1, 1),
         )
         self.mp_missing_data = MeteringPoint.objects.create(
             zev=self.zev,
             participant=self.p_missing_data,
             meter_id="CH-OVERVIEW-2",
             meter_type=MeteringPointType.CONSUMPTION,
-            valid_from=date(2026, 1, 1),
         )
 
         # Assignments define whose meter requires readings on which days.
@@ -572,7 +568,6 @@ class InvoiceMathEdgeCaseTests(TestCase):
             participant=self.participant,
             meter_id="CH-MATH-CONS-1",
             meter_type=MeteringPointType.CONSUMPTION,
-            valid_from=date(2026, 1, 1),
         )
 
     def test_monthly_fee_counts_intersecting_month_boundaries(self):
@@ -704,7 +699,6 @@ class InvoiceVatRateSelectionTests(TestCase):
             participant=self.participant,
             meter_id="CH-VAT-CONS-1",
             meter_type=MeteringPointType.CONSUMPTION,
-            valid_from=date(2026, 1, 1),
         )
 
         grid_tariff = Tariff.objects.create(

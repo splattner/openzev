@@ -314,7 +314,6 @@ class RbacEndpointMatrixTests(TestCase):
 			participant=self.participant,
 			meter_id="RBAC-MP-1",
 			meter_type=MeteringPointType.CONSUMPTION,
-			valid_from=date(2026, 1, 1),
 		)
 
 		for role, user in {

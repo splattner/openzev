@@ -6,7 +6,7 @@ from django.test import TestCase
 from accounts.models import User, UserRole
 from metering.models import MeterReading, ReadingDirection
 from tariffs.models import BillingMode, EnergyType, PeriodType, Tariff, TariffCategory, TariffPeriod
-from zev.models import MeteringPoint, MeteringPointType, Participant, Zev
+from zev.models import MeteringPoint, MeteringPointAssignment, MeteringPointType, Participant, Zev
 from .engine import generate_invoice
 
 
@@ -35,13 +35,21 @@ class InvoiceEngineTests(TestCase):
             participant=self.participant,
             meter_id="MP-C-1",
             meter_type=MeteringPointType.CONSUMPTION,
-            valid_from=date(2026, 1, 1),
         )
         self.production_mp = MeteringPoint.objects.create(
             zev=self.zev,
             participant=self.participant,
             meter_id="MP-P-1",
             meter_type=MeteringPointType.PRODUCTION,
+        )
+        MeteringPointAssignment.objects.create(
+            metering_point=self.consumption_mp,
+            participant=self.participant,
+            valid_from=date(2026, 1, 1),
+        )
+        MeteringPointAssignment.objects.create(
+            metering_point=self.production_mp,
+            participant=self.participant,
             valid_from=date(2026, 1, 1),
         )
 
@@ -288,7 +296,6 @@ class InvoiceEngineTests(TestCase):
             participant=consumer,
             meter_id="MP-C-2",
             meter_type=MeteringPointType.CONSUMPTION,
-            valid_from=date(2026, 1, 1),
         )
 
         producer_2 = Participant.objects.create(
@@ -303,7 +310,6 @@ class InvoiceEngineTests(TestCase):
             participant=producer_2,
             meter_id="MP-P-2",
             meter_type=MeteringPointType.PRODUCTION,
-            valid_from=date(2026, 1, 1),
         )
 
         ts = datetime(2026, 1, 15, 0, 0, tzinfo=timezone.utc)

@@ -171,15 +171,12 @@ def create_zev_with_owner_setup(*, zev_data: dict, owner_data: dict, metering_po
             meter_id=metering_point_data['meter_id'],
             meter_type=metering_point_data['meter_type'],
             is_active=metering_point_data.get('is_active', True),
-            valid_from=metering_point_data.get('valid_from') or zev.start_date,
-            valid_to=metering_point_data.get('valid_to'),
             location_description=metering_point_data.get('location_description', ''),
         )
         MeteringPointAssignment.objects.create(
             metering_point=metering_point,
             participant=owner_participant,
-            valid_from=metering_point.valid_from,
-            valid_to=metering_point.valid_to,
+            valid_from=zev.start_date,
         )
         created_metering_points.append(
             {

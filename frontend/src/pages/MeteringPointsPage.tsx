@@ -34,8 +34,6 @@ const defaultMpForm = (): MeteringPointInput => ({
     meter_id: '',
     meter_type: 'consumption',
     is_active: true,
-    valid_from: new Date().toISOString().slice(0, 10),
-    valid_to: null,
     location_description: '',
 })
 
@@ -156,8 +154,6 @@ export function MeteringPointsPage() {
             meter_id: point.meter_id,
             meter_type: point.meter_type,
             is_active: point.is_active,
-            valid_from: point.valid_from,
-            valid_to: point.valid_to ?? null,
             location_description: point.location_description ?? '',
         })
         setShowMpModal(true)
@@ -307,29 +303,6 @@ export function MeteringPointsPage() {
                             <option value="true">Yes</option>
                             <option value="false">No</option>
                         </select>
-                    </label>
-
-                    <label>
-                        <span>{t('pages.meteringPoints.form.validFrom')}</span>
-                        <LocalizationProvider dateAdapter={AdapterDayjs}>
-                            <DatePicker
-                                format={toDayJsDateFormat(settings.date_format_short)}
-                                value={mpForm.valid_from ? dayjs(mpForm.valid_from) : null}
-                                onChange={(v) => setMpForm((prev) => ({ ...prev, valid_from: v ? v.format('YYYY-MM-DD') : '' }))}
-                                slotProps={{ textField: { required: true, size: 'small' } }}
-                            />
-                        </LocalizationProvider>
-                    </label>
-                    <label>
-                        <span>{t('pages.meteringPoints.form.validTo')}</span>
-                        <LocalizationProvider dateAdapter={AdapterDayjs}>
-                            <DatePicker
-                                format={toDayJsDateFormat(settings.date_format_short)}
-                                value={mpForm.valid_to ? dayjs(mpForm.valid_to) : null}
-                                onChange={(v) => setMpForm((prev) => ({ ...prev, valid_to: v ? v.format('YYYY-MM-DD') : null }))}
-                                slotProps={{ textField: { size: 'small' } }}
-                            />
-                        </LocalizationProvider>
                     </label>
 
                     <label style={{ gridColumn: '1 / -1' }}>

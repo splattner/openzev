@@ -40,14 +40,12 @@ class DashboardSummaryAlignmentTests(TestCase):
 			participant=self.participant,
 			meter_id="CH-CONS-1",
 			meter_type=MeteringPointType.CONSUMPTION,
-			valid_from=date(2026, 1, 1),
 		)
 		self.production_mp = MeteringPoint.objects.create(
 			zev=self.zev,
 			participant=self.participant,
 			meter_id="CH-PROD-1",
 			meter_type=MeteringPointType.PRODUCTION,
-			valid_from=date(2026, 1, 1),
 		)
 
 		MeterReading.objects.create(
@@ -128,7 +126,6 @@ class DashboardSummaryAlignmentTests(TestCase):
 			participant=second_participant,
 			meter_id="CH-CONS-2",
 			meter_type=MeteringPointType.CONSUMPTION,
-			valid_from=date(2026, 1, 1),
 		)
 
 		MeterReading.objects.create(
@@ -208,7 +205,6 @@ class ImportParserRobustnessTests(TestCase):
 			participant=self.participant,
 			meter_id="CH-IMPORT-1",
 			meter_type=MeteringPointType.CONSUMPTION,
-			valid_from=date(2026, 1, 1),
 		)
 
 	def test_malformed_csv_payload_is_reported_without_crash(self):
@@ -342,7 +338,6 @@ class MeteringRawDataEndpointTests(TestCase):
 			participant=self.participant,
 			meter_id="CH-RAW-1",
 			meter_type=MeteringPointType.BIDIRECTIONAL,
-			valid_from=date(2026, 1, 1),
 		)
 
 		MeterReading.objects.create(
