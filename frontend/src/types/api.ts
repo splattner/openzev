@@ -237,6 +237,31 @@ export interface MeteringPointAssignmentInput {
     valid_to?: string | null
 }
 
+export type DataQualitySeverity = 'green' | 'yellow' | 'red'
+
+export interface MeteringPointGap {
+    start_date: string
+    end_date: string
+    duration_days: number
+}
+
+export interface MeteringPointDataQuality {
+    id: string
+    meter_id: string
+    participant_name: string
+    severity: DataQualitySeverity
+    data_completeness: number
+    days_with_data: number
+    total_days: number
+    gaps: MeteringPointGap[]
+}
+
+export interface DataQualityStatusResponse {
+    date_from: string
+    date_to: string
+    metering_points: MeteringPointDataQuality[]
+}
+
 export type TariffBillingMode = 'energy' | 'percentage_of_energy' | 'monthly_fee' | 'yearly_fee' | 'per_metering_point_monthly_fee' | 'per_metering_point_yearly_fee'
 
 export interface Tariff {
