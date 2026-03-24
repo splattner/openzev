@@ -46,6 +46,46 @@ From `frontend/`:
 - When changing API behavior, update backend tests and frontend consumers together.
 - For invoice workflow changes, verify both backend permissions/workflow rules and frontend action visibility.
 
+## Spec-Driven Development
+
+For larger or risky changes, consult or create specs and ADRs:
+
+- **Specs** (`docs/specs/`) document feature changes and should be created for:
+  - API behavior or response shape changes
+  - Billing or tariff calculation logic changes
+  - Invoice workflow state changes
+  - Data model or migration changes
+  - Async job, retry, or delivery guarantees
+  - Security, auditability, or role/ZEV-scope changes
+
+- **ADRs** (`docs/adr/`) document architecture decisions and should be created for:
+  - High-impact decisions affecting multiple systems
+  - Important decisions future maintainers should understand
+  - Decisions worth revisiting during refactors
+
+- **Baseline specs** describe the current implementation at field-level detail (models, API endpoints, serializers, frontend components, TypeScript types, test counts). They should be updated when those features change:
+  - `2026-03-community-and-access.md` — users, roles, auth, JWT, permissions, ZEV scoping
+  - `2026-03-metering-point-management.md` — participants, metering points, assignments
+  - `2026-03-metering-import-and-quality.md` — SDAT/Excel/CSV import, data quality
+  - `2026-03-tariffs-and-billing-engine.md` — tariffs, billing modes, invoice generation
+  - `2026-03-invoice-lifecycle-and-communication.md` — invoice workflow, email, PDF rendering
+  - `2026-03-admin-governance-and-settings.md` — AppSettings, VAT, admin dashboard, ZEV config
+
+- When you create or modify a spec, link it in your PR using `.github/PULL_REQUEST_TEMPLATE.md`.
+
+### Spec maintenance rules
+
+When making code changes, follow these rules to keep specs accurate:
+
+1. **Before coding:** Read the relevant baseline spec(s) to understand documented behavior.
+2. **After coding:** If your change modifies behavior described in a baseline spec, update the affected sections of that spec in the same commit/PR.
+3. **What to update:** Only the sections that changed — don't rewrite unrelated parts. Common updates include: adding/removing model fields, changing API endpoints or permissions, adding tests, modifying frontend components.
+4. **Validation:** After updating a spec, verify every claim in the changed sections against the actual code. Check field names, types, defaults, permission classes, endpoint paths, serializer fields, test method names, and test counts.
+5. **New features:** If a new feature doesn't fit any existing baseline spec, create a new spec using `docs/specs/TEMPLATE.md`. Use the same implementation-grade detail level as the baseline specs.
+6. **Quality bar:** A spec is correct when someone could re-implement the described feature from the spec alone, without reading existing code.
+
+For detailed guidance, see `docs/specs/README.md` and `docs/adr/README.md`.
+
 ## Invoicing Notes
 
 - Invoice overview page is period-based and uses the selected global ZEV.
