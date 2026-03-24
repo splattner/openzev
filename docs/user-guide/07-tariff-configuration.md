@@ -15,6 +15,8 @@ Tariffs are **activity-based**:
 - **Grid energy tariff** — Energy imported from external grid
 - **Feed-in tariff** — Credits for participant production fed back
 
+![Tariffs page](screenshots/07-tariffs.png)
+
 ## Creating a Tariff
 
 **ZEV Owners** create tariffs in **Tariffs**.

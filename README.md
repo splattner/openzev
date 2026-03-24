@@ -11,7 +11,7 @@ OpenZEV gives operators one place to manage participants, metering points, tarif
 - Built for personal use and self-hosting tinkerers who enjoy running their own stack.
 - Shipped as-is, with no warranty (yes, even when it looks great in the dashboard).
 - Please double-check your data and billing outputs: we do not take responsibility for incorrect imports, calculations, invoices, or invoicing workflows.
-- 100% vibe coded.
+- 100% vibe coded. Yes, even specs, adrs, user-guide documentation. So keep that in mind, it might be too much, not enought, no correct. There most surly are a lot of areas that could be improved in this developpment. In the end, currently its just a hobby project experimenting with AI but still with the goal to accualy use the system for my private ZEV management.
 
 ## Product Overview
 

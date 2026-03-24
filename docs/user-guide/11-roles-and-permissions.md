@@ -38,6 +38,8 @@ Accessible via **Admin Dashboard**:
 - Email delivery metrics
 - Recent alerts and issues
 
+![Admin dashboard](screenshots/10-admin-dashboard.png)
+
 ### Who Should Be Admin?
 
 - Platform owner or operator
@@ -128,6 +130,8 @@ A ZEV Owner is **scoped** to one or more ZEVs:
 **Only Admins** can assign roles to other users.
 
 ### Create a New User
+
+![Admin accounts page](screenshots/11-admin-accounts.png)
 
 1. Go to **Admin → Accounts**
 2. Click **Create New Account**

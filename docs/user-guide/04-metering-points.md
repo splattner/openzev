@@ -12,6 +12,8 @@ A **metering point** is a physical or logical energy meter:
 
 A single participant can own multiple metering points (e.g., PV on roof + home consumption).
 
+![Metering points page](screenshots/04-metering-points.png)
+
 ## Metering Point Types
 
 OpenZEV supports three metering point types:
@@ -67,6 +69,8 @@ Assignment validity affects:
 - Which participant is associated with the meter at a given date
 - Whether imported readings can be attributed for billing
 - Invoicing — only active assignment windows in the billing period are used
+
+![Assign participant modal](screenshots/04b-metering-points-assign.png)
 
 ### Example Validity Scenarios
 

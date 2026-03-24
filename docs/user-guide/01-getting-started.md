@@ -76,6 +76,8 @@ docker compose exec backend python manage.py seed_demo
 2. Login with admin credentials (or ZEV owner to manage a community)
 3. You'll see the main dashboard
 
+![Login page](screenshots/01-login.png)
+
 ### 2. Explore as Admin
 
 If logged in as admin:
@@ -92,12 +94,16 @@ If logged in as a ZEV owner:
 - Go to **Tariffs** to configure energy pricing
 - Go to **Invoices** to generate and manage billing
 
+![Dashboard](screenshots/02-dashboard.png)
+
 ### 4. View as Participant
 
 Login as a participant (alice or bob):
 - **Dashboard** shows your energy consumption/production overview
 - **Metering Data** shows your consumption charts
 - **Invoices** lists your personal invoices (read-only)
+
+![Account profile](screenshots/16-account-profile.png)
 
 ## API Access
 

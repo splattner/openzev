@@ -6,6 +6,8 @@ This guide covers analyzing metering data through charts and data quality views.
 
 OpenZEV provides real-time charts of consumption and production.
 
+![Metering data charts](screenshots/05-metering-data.png)
+
 ### Accessing Metering Charts
 
 Navigate to **Metering Data** to see charts.

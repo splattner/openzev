@@ -10,6 +10,8 @@ A **participant** is a member of a ZEV community:
 - Receives invoices based on their energy allocation
 - Can view their own data and invoices in the portal
 
+![Participants page](screenshots/03-participants.png)
+
 ## Adding a Participant
 
 **ZEV Owners** add new participants in **Participants**.

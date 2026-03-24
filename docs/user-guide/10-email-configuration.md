@@ -7,9 +7,50 @@ This guide covers setting up and managing email notifications for invoices.
 OpenZEV sends emails asynchronously for reliable delivery:
 
 - **Invoice notifications:** When invoices are sent to participants
-- **Delivery tracking:** System logs all sends and failures
-- **Retry behavior:** Failed sends are retried automatically
+- **Delivery tracking:** System logs all sends and failures via `EmailLog`
+- **Retry behavior:** Failed sends are retried automatically (up to 3 times)
 - **Customization:** Email subject and body can be tailored per ZEV
+
+## SMTP Configuration (Environment Variables)
+
+Email delivery is configured entirely through environment variables in your `.env` file (or Docker environment). There is no admin UI for SMTP settings.
+
+### Required Variables
+
+| Variable | Purpose | Example |
+| --- | --- | --- |
+| `EMAIL_BACKEND` | Django email backend class | `django.core.mail.backends.smtp.EmailBackend` |
+| `EMAIL_HOST` | SMTP server hostname | `smtp.gmail.com` |
+| `EMAIL_PORT` | SMTP server port | `587` |
+| `EMAIL_USE_TLS` | Enable TLS encryption | `True` |
+| `EMAIL_HOST_USER` | SMTP authentication username | `your-email@gmail.com` |
+| `EMAIL_HOST_PASSWORD` | SMTP authentication password or app token | `app-specific-password` |
+| `DEFAULT_FROM_EMAIL` | Sender address for all outgoing emails | `openzev@example.com` |
+
+### Development vs. Production
+
+| Environment | `EMAIL_BACKEND` value | Effect |
+| --- | --- | --- |
+| Development | `django.core.mail.backends.console.EmailBackend` | Prints emails to console/logs (no actual delivery) |
+| Production | `django.core.mail.backends.smtp.EmailBackend` | Sends emails via configured SMTP server |
+
+Example `.env` for production:
+
+```dotenv
+EMAIL_BACKEND=django.core.mail.backends.smtp.EmailBackend
+EMAIL_HOST=smtp.gmail.com
+EMAIL_PORT=587
+EMAIL_USE_TLS=True
+EMAIL_HOST_USER=your-email@gmail.com
+EMAIL_HOST_PASSWORD=your-app-password
+DEFAULT_FROM_EMAIL=openzev@example.com
+```
+
+After changing email settings, restart the backend and Celery worker:
+
+```bash
+docker compose restart backend worker
+```
 
 ## Email Templates
 
@@ -17,225 +58,158 @@ OpenZEV sends emails asynchronously for reliable delivery:
 
 ### Template Fields
 
-| Field | Purpose | Example |
+| Field | Purpose | Default |
 | --- | --- | --- |
-| **Subject** | Email subject line | Invoice for {zev_name} - {invoice_period} |
-| **Body** | Email message | Dear {participant_name}, your invoice is attached. |
-| **Signature** | Footer/sign-off | Best regards, ZEV Operations Team |
+| **Subject** | Email subject line | `Invoice {invoice_number} – {zev_name}` |
+| **Body** | Email message body | See default template below |
 
 ### Template Variables
 
 Use placeholders to personalize emails:
 
-| Placeholder | Replaced With |
-| --- | --- |
-| `{participant_name}` | Recipient first and last name |
-| `{participant_email}` | Recipient email address |
-| `{zev_name}` | ZEV community name |
-| `{invoice_period}` | Billing period (e.g., "January 2026") |
-| `{invoice_total}` | Invoice total in CHF |
-| `{invoice_link}` | Link to view invoice in portal (participant self-service) |
+| Placeholder | Replaced With | Example |
+| --- | --- | --- |
+| `{invoice_number}` | Invoice number | `INV-2026-001` |
+| `{zev_name}` | ZEV community name | `Solar Cooperative` |
+| `{participant_name}` | Participant full name | `Alice Mueller` |
+| `{period_start}` | Billing period start date (formatted per regional settings) | `01.01.2026` |
+| `{period_end}` | Billing period end date (formatted per regional settings) | `31.01.2026` |
+| `{total_chf}` | Invoice total in CHF | `123.45` |
 
-### Example Template
+### Default Template
 
 **Subject:**
 ```
-Invoice for {zev_name} — {invoice_period}
+Invoice {invoice_number} – {zev_name}
 ```
 
 **Body:**
 ```
 Dear {participant_name},
 
-Your invoice for {invoice_period} is attached.
+Please find your energy invoice for the period {period_start} to {period_end} attached.
 
-Invoice Total: CHF {invoice_total}
+Total: CHF {total_chf}
 
-You can also view your invoice anytime in your participant portal:
-{invoice_link}
-
-If you have questions, please contact us.
-
-Best regards,
-ZEV Operations Team
-Contact: contact@zev.local
+Kind regards,
+{zev_name}
 ```
+
+If a template contains an invalid placeholder (typo or unsupported variable), the system logs a warning and falls back to the default template above.
 
 ## Sending Invoices
 
 When you [send approved invoices](09-invoice-management.md#sending-invoices):
 
-1. OpenZEV generates PDF
-2. Email is created using your template
-3. Email is queued for delivery (via Celery worker)
-4. Invoice status changes to `Sent`
+1. OpenZEV generates the PDF (if not already generated)
+2. Email is created using the ZEV's template (or the default)
+3. A Celery task is queued for asynchronous delivery
+4. The PDF is attached as `invoice_<number>.pdf`
+5. On success, invoice status changes to `Sent` and `sent_at` is recorded
 
 ### Delivery Process
 
 Behind the scenes:
 
-1. **Email task queued** (status: `Pending`)
-2. **Background worker processes** task
-3. **Email sent** to participant email address (status: `Sent`)
-4. **Tracker records** delivery timestamp and status
+1. **Email task queued** — `EmailLog` created with status `pending`
+2. **Celery worker processes** the task
+3. **Email sent** via configured SMTP — `EmailLog` status becomes `sent`, `sent_at` recorded
+4. **Invoice updated** — status transitions from `Approved` to `Sent`
 
-If email fails (bounced, rejected):
-- **Status: `Failed`**
-- **Retry scheduled** (default: up to 3 retries)
-- **You are notified** to resend manually
+If email fails:
+- **EmailLog status:** `failed`, error message recorded
+- **Automatic retry:** Celery retries after ~60 seconds, up to 3 attempts total
+- **After 3 failures:** Task stops retrying; use manual retry from the UI
 
 ## Email Delivery Status
 
-Each invoice shows **Email Status**:
+Each invoice tracks email delivery via `EmailLog` entries:
 
 | Status | Meaning | Action |
 | --- | --- | --- |
-| **Pending** | Not yet sent | Wait a few seconds, refresh page |
-| **Sent** | Delivered to email service | Complete |
-| **Failed** | Delivery error | Resend or verify email address |
-| **Bounced** | Recipient rejected | Check participant email in [Participants](03-participant-management.md) |
+| **pending** | Queued, not yet processed | Wait a few seconds, refresh page |
+| **sent** | Successfully delivered to SMTP server | Complete |
+| **failed** | Delivery error occurred | Check error, retry or fix recipient email |
 
 ### Email History
 
-Click **Email History** on an invoice to see:
+On the invoice list, click the **email status indicator** to open the **Email History** modal. This shows all email attempts for that invoice:
 
-```
-Email History
-
-Sent: 2026-02-15 14:35 UTC
-To: alice@example.local
-Status: Sent
-Subject: Invoice for Solar Cooperative — January 2026
-```
-
-If multiple sends:
-
-```
-Attempt 1: 2026-02-15 14:35 — Failed (network timeout)
-Attempt 2: 2026-02-15 15:05 — Failed (mailbox full)
-Attempt 3: 2026-02-15 15:35 — Sent ✓
-```
+- **Recipient** email address
+- **Subject** line
+- **Status** with color indicator (amber/green/red)
+- **Timestamp** of each attempt
+- **Error message** (for failed attempts)
+- **Retry button** — for failed emails, click to queue a new delivery attempt
 
 ## Handling Email Failures
 
-### Email Bounced or Not Received
+### Email Failed or Not Received
 
-**Step 1: Verify recipient email**
+**Step 1: Check email history**
+1. Open invoice list
+2. Click the email status indicator for the invoice
+3. Review the error message in the Email History modal
+
+**Step 2: Verify recipient email**
 1. Go to [Participants](03-participant-management.md)
 2. Find participant
 3. Check email address is correct
 4. Correct if needed
 
-**Step 2: Resend invoice**
-1. Open invoice
-2. Click **Resend**
-3. System retries delivery
-4. Check email history after a few seconds
+**Step 3: Retry delivery**
+1. Open Email History modal for the invoice
+2. Click **Retry** on the failed email log entry
+3. A new delivery attempt is queued
+4. Check status after a few seconds
 
-**Step 3: Manual delivery (if retries fail)**
-1. Export invoice as PDF from OpenZEV
-2. Send to participant manually (email or download link)
-3. Note in invoice comments: "Manually delivered on [date]"
+**Step 4: Manual delivery (if retries fail)**
+1. Download the invoice PDF from OpenZEV
+2. Send to participant manually via your own email
+3. Mark the invoice as sent using the **Mark Sent** action
 
-### Mailbox Issues
+### Common Issues
 
-If many participants have email failures:
+| Problem | Likely Cause | Fix |
+| --- | --- | --- |
+| All emails stuck on `pending` | Celery worker not running | `docker compose restart worker` |
+| All emails failing | SMTP misconfigured or credentials wrong | Check `.env` email variables, restart backend + worker |
+| Emails failing for specific participant | Invalid email address | Update email in [Participants](03-participant-management.md) |
+| Emails failing for a whole domain | Provider blocking/rate-limiting | Contact provider, check SPF/DKIM/DMARC records |
 
-- Check with your email provider (office 365, Gmail, etc.)
-- Verify SMTP settings in Admin configuration
-- Ensure no firewall/network blocks outgoing mail
+## Retry Behavior
 
-### Disable Email Notifications (for testing)
+Failed emails are automatically retried by Celery:
 
-To test invoice generation without sending emails:
+- **Max retries:** 3 attempts total
+- **Retry delay:** ~60 seconds between attempts
+- **After 3 failures:** Task stops; use manual retry from Email History modal
 
-1. Go to **Admin → Email Settings**
-2. Toggle **Send Invoice Emails:** OFF
-3. Generate and send invoices—they'll be marked sent without sending emails
-4. Turn back ON before production use
+You can also manually retry at any time via the Email History modal without waiting for automatic retries.
 
 ## Archiving and Compliance
 
 Email delivery logs are kept for compliance and audit:
 
-- All email sends (successful and failed) are recorded
-- Timestamps and delivery status preserved
-- Linked to invoice for traceability
-
-**Data Retention:** Follow your local data protection laws for email log retention (typically 90 days—1 year).
-
-## Retry Behavior
-
-Failed emails are automatically retried:
-
-- **Retry 1:** ~30 minutes after failure
-- **Retry 2:** ~2 hours later
-- **Retry 3:** ~24 hours later
-- **After 3 retries:** Marked as `Failed`, requires manual action
-
-You can manually resend anytime without waiting for automatic retries.
-
-## Advanced: Direct SMTP Configuration
-
-If you use a custom email provider:
-
-1. Go to **Admin → Email Settings**
-2. Configure SMTP:
-   - **SMTP Host:** (e.g., `smtp.gmail.com`)
-   - **SMTP Port:** (e.g., `587` for TLS)
-   - **Username:** Your email account
-   - **Password:** Account password or app-specific token
-
-3. Click **Test SMTP Connection**
-4. Save
-
-OpenZEV will use your SMTP for all invoice emails.
-
-## Troubleshooting
-
-### "Email Status: Pending" (stuck for hours)
-
-**Cause:** Background worker not running
-
-**Fix:**
-1. Check that Celery worker is running: `docker compose logs worker`
-2. Restart if needed: `docker compose restart worker`
-
-### "Cannot send invoice email" (error message)
-
-**Causes:**
-- Participant email invalid or empty
-- SMTP not configured
-- Network/firewall blocks outgoing mail
-
-**Fix:**
-1. Verify participant email ([Participants](03-participant-management.md))
-2. Check SMTP settings ([Admin Email Settings](#advanced-direct-smtp-configuration))
-3. Test network connection to mail server
-
-### Many failed sends on specific domain
-
-**Cause:** Email provider blocking/rate-limiting
-
-**Solution:**
-- Contact email provider to whitelist your SMTP server
-- Ask participants to check spam folder and add sender to contacts
-- Consider domain reputation (SPF, DKIM, DMARC records)
+- All email attempts (successful and failed) are recorded in `EmailLog`
+- Timestamps, recipients, subjects, and error messages preserved
+- Linked to invoices via foreign key for traceability
+- Logs are ordered by most recent first
 
 ## Best Practices
 
-**Personalize templates:** Use {participant_name} for human touch
+**Personalize templates:** Use `{participant_name}` and `{zev_name}` for a personal touch.
 
-**Test templates:** Send a test email before production use
+**Test with console backend:** During setup, use `EMAIL_BACKEND=django.core.mail.backends.console.EmailBackend` to verify email content in logs before enabling real SMTP delivery.
 
-**Monitor delivery:** Check **Email History** regularly for failures
+**Monitor delivery:** Check Email History regularly for persistent failures.
 
-**Archive invoices:** Keep backup of sent invoices outside email system
+**Use app-specific passwords:** For Gmail and similar providers, generate an app-specific password instead of using your main account password.
 
-**Update contact info:** Keep ZEV contact information current in signature
+**Keep contact info current:** Ensure participant email addresses are up to date in [Participants](03-participant-management.md).
 
 ## Next Steps
 
 - **Send invoices:** [Invoice Management](09-invoice-management.md#sending-invoices)
-- **Track payments:** Payment notification workflow depends on your ZEV process
-- **Admin setup:** [ZEV Setup](02-zev-setup.md)
+- **Manage participants:** [Participant Management](03-participant-management.md)
+- **ZEV setup:** [ZEV Setup](02-zev-setup.md)

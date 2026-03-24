@@ -16,6 +16,8 @@ All imports use a **preview-first validation** approach:
 3. Confirm import
 4. System writes and shows protocol
 
+![Imports page](screenshots/09-imports.png)
+
 ## CSV/Excel Import
 
 ### File Format

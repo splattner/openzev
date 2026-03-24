@@ -8,297 +8,214 @@ Invoices progress through a controlled workflow:
 
 ```
 Draft → Approved → Sent → Paid
-          ↓
-        Cancelled
 ```
 
-Each state has specific actions and permissions.
+- **Draft** — just generated, can be reviewed, approved, deleted, or regenerated.
+- **Approved** — locked for review; can be emailed, marked paid, or deleted.
+- **Sent** — email was sent to the participant; can be resent or marked paid.
+- **Paid** — fully settled; no further actions.
+- **Cancelled** — removed from the active workflow; can be deleted. The backend supports cancellation, but there is currently no cancel button in the UI.
 
-## Creating/Generating Invoices
+## Period-Based Invoice View
 
-**ZEV Owners** generate invoices in **Invoices**.
+The **Invoices** page shows one billing period at a time. There are no status filters — you navigate between periods instead.
 
-### Generate New Invoices
+### Period Navigation
 
-1. Click **Generate Invoices**
-2. Select **Billing Period:**
-   - Start date (e.g., 2026-01-01)
-   - End date (e.g., 2026-01-31)
-   - Pre-filled presets: This month, Last month, This quarter, etc.
+The toolbar at the top of the page displays:
 
-3. Click **Preview**
-   - Shows all participants in period
-   - Highlights data quality issues (missing meters, incomplete readings)
-   - Shows estimated line items (not finalized yet)
+- The **ZEV name** and the **period date range** (e.g. `01.01.2026 → 31.01.2026`).
+- The ZEV's **billing interval** (`monthly`, `quarterly`, `semi_annual`, or `annual`).
+- **← Prev Period** and **Next Period →** buttons to step through periods.
 
-4. Click **Generate**
-   - System calculates energy allocation and applies tariffs
-   - Creates draft invoices for all participants with readings in period
-   - Takes you to invoices list
+The period is automatically set based on the selected ZEV's billing interval.
 
-### Invoice Status After Generation
+![Invoice period overview](screenshots/08-invoices.png)
 
-- **Status:** `Draft` (not yet approved)
-- **Can edit:** Yes (change tariffs, correct errors before approval)
-- **Can send:** No (must approve first)
-- **Can pay:** No
+### Period Overview Table
 
-## Reviewing Draft Invoices
+Each row in the table represents one **participant** who had active metering-point assignments during the period. Columns:
 
-Before approval, review each invoice:
+| Column | Description |
+|---|---|
+| **Participant** | Name and email address. |
+| **Metering Data** | Green "complete" badge if all assigned metering points have daily readings for the full period. Red "missing" badge otherwise, with a count of points with data vs. total and a list of missing meter IDs with the number of missing days each. |
+| **Invoice** | The invoice number, or "Not created" if no invoice exists yet. |
+| **Status** | Badge showing the invoice status (`Draft`, `Approved`, `Sent`, `Paid`, `Cancelled`), or a neutral "Not created" badge. |
+| **Email** | Latest email delivery status badge (`pending`, `sent`, `failed`). A small button shows the sent/total count (e.g. `1/2`) and opens the **Email Logs** modal. If any emails failed, a red count is shown. Multiple attempts are indicated. |
+| **Total** | Invoice total in CHF. |
+| **PDF** | **Generate PDF** button (or **Open PDF** + **Regenerate** if a PDF already exists). |
+| **Actions** | Per-invoice action buttons (see below). |
 
-1. Go to **Invoices**
-2. Filter by status: **Draft**
-3. Click on an invoice to view details
+### Empty State
 
-### Invoice Details View
+If no participants with active assignments exist for the period, the page shows links to:
 
-Shows:
-- **Participant:** Name and email
-- **Billing Period:** Start/end dates
-- **Line Items:** Each tariff/charge applied
-  - Energy reading (kWh)
-  - Unit price
-  - Total CHF
-- **Subtotal** (before VAT)
-- **VAT** (if applicable)
-- **Total** (CHF)
-- **Data Quality:** Warnings if incomplete metering
+- **Participants** — to add or check participant records.
+- **Metering Points** — to check metering-point assignments.
+- **Tariffs** — to configure pricing.
 
-### Editing a Draft Invoice
+## Generating Invoices
 
-If you find an error (wrong tariff, data quality issue), you can:
+Invoice generation happens **per participant** from the period overview table.
 
-1. Open draft invoice
-2. Click **Edit**
-3. Update line item prices (if tariff was corrected)
-4. Regenerate allocation (if metering data was re-imported)
-5. Click **Save**
+1. Navigate to the desired billing period.
+2. Review the **Metering Data** column — ensure data is complete for the participants you want to invoice.
+3. Click **Generate Invoice** in the **Actions** column for the participant.
 
-> **Careful:** Only edit if you're sure of the correction. Document changes for audit trail.
+The system calculates energy allocation and applies tariffs, creating a **Draft** invoice.
 
-### Exporting Draft Invoices
+### Regenerating an Existing Invoice
 
-Before approval, export for review:
-- **CSV** — All line items and totals
-- **PDF** — Single invoice preview
+If an invoice already exists for a participant in the current period, the button label changes to **Generate Again**. Clicking it replaces the existing invoice with a freshly calculated one. Use this after correcting metering data or tariff configuration.
 
-Use this to verify calculations or share with finance team.
+> **Tip:** You can generate invoices even when metering data is incomplete, but totals may be inaccurate. It is best to resolve missing data first.
+
+## Reviewing Invoices
+
+Click **Open Details** in the Actions column to view a read-only invoice detail page.
+
+### Invoice Detail Page
+
+![Invoice detail page](screenshots/08b-invoice-detail.png)
+
+The detail page shows:
+
+- **Status card** — current invoice status as a badge.
+- **Total CHF** — the final invoiced amount.
+- **Subtotal CHF** — amount before VAT.
+- **VAT CHF** — the VAT portion.
+
+**Energy totals:**
+
+| Metric | Description |
+|---|---|
+| Local kWh | Energy consumed from local (solar) production. |
+| Grid kWh | Energy drawn from the external grid. |
+| Feed-in kWh | Energy fed back into the grid. |
+
+**Line items table** — grouped by **tariff category** (e.g. Energy, Fee). Each line shows:
+
+- Type (e.g. Local Energy, Grid Energy, Feed-in Credit, Fee)
+- Description
+- Quantity (kWh)
+- Unit
+- Unit price (CHF)
+- Total (CHF)
+
+A subtotal is shown at the end of each tariff category group.
+
+> **Note:** Invoices cannot be edited directly. If a correction is needed, fix the underlying data (metering readings or tariff prices) and use **Generate Again** to recreate the invoice.
 
 ## Approving Invoices
 
-Once satisfied with draft invoices, approve them:
+Approval locks an invoice and signals that it has been reviewed.
 
-1. Go to **Invoices**
-2. Filter by status: **Draft**
-3. Select invoices (or **Select All**)
-4. Click **Approve Selected**
-5. Confirm in dialog
+1. Find the draft invoice in the period overview.
+2. Click **Approve** in the Actions column.
 
-After approval:
-- **Status changes to:** `Approved`
-- **Cannot edit** line items (locked)
-- **Can send** to participants
-- All changes must create a new invoice version
+The status changes from `Draft` to `Approved`. Only draft invoices can be approved.
 
-> **Approval is governance:** Approval marks "we reviewed this and it's correct."
+## Generating and Managing PDFs
 
-## Sending Invoices
+PDF generation is a separate step from invoice creation.
 
-Once approved, send to participants:
+- **Generate PDF** — creates the PDF for an invoice that does not yet have one.
+- **Regenerate** — replaces an existing PDF (e.g. after the HTML template was updated).
+- **Open PDF** — opens the generated PDF in a new browser tab.
 
-1. Go to **Invoices**
-2. Filter by status: **Approved**
-3. Select invoices to send
-4. Click **Send**
-5. Confirm in dialog
+These buttons appear in the **PDF** column of the period overview table for any invoice that exists.
 
-### What Happens on Send
+## Sending Invoices by Email
 
-- **Status changes to:** `Sent`
-- **Email notification** sent to participant (includes PDF attachment)
-- **Timestamp recorded:** When invoice was sent
-- **Delivery status** tracked
+Once an invoice is approved, you can email it to the participant.
 
-### Email Template
+1. Click **Send Email** in the Actions column (visible for `Approved` or `Sent` invoices).
+2. The system queues the email via Celery and begins polling for delivery status.
+3. While polling, the button shows **Sending…** and is disabled.
+4. The **Email** column updates automatically when the email is delivered or fails.
 
-Participants receive email with:
-- **Subject:** From your [email template](02-zev-setup.md#email-templates)
-- **Body:** Custom message saying invoice is attached
-- **Attachment:** Invoice PDF
+For invoices already in `Sent` status, the button label changes to **Resend Email**, allowing you to send additional copies.
 
-You can customize subject/body in **ZEV Settings → Email Templates**.
+### Email Polling
 
-## Invoice Status Tracking
+After sending, the page polls the server every 2 seconds (up to 30 seconds) to check for email delivery updates. A 90-second overall timeout prevents indefinite polling.
 
-### Sent Invoices
+### Email Logs Modal
 
-Once `Sent`, track delivery:
+Click the sent/total counter button (e.g. `1/2`) in the **Email** column to open the **Email Logs** modal. This shows:
 
-1. Open invoice
-2. View **Email History** section:
-   - Send timestamp
-   - Delivery status (delivered, bounced, etc.)
-   - Retry attempts (if sent failed)
+- Each email attempt with recipient, status (`pending`, `sent`, `failed`), and timestamp.
+- A **Retry** button next to any failed email log entry, which re-queues that specific email.
 
 ### Email Delivery Failures
 
-If **Email Status = Failed**:
+If an email fails:
 
-**Possible causes:**
-- Participant email is invalid/blocked
-- Network issue during send
-- Email service error
+1. Open the Email Logs modal to see the error.
+2. Verify the participant's email address in [Participants](03-participant-management.md).
+3. Click **Retry** on the failed log entry to re-queue it.
+4. If email continues to fail, review the [Email Configuration](10-email-configuration.md) environment variables.
 
-**Recovery options:**
-1. Verify participant email is correct (check [Participants](03-participant-management.md))
-2. Click **Resend** on the invoice
-3. Contact participant with PDF manually if email continues to fail
+Email sending is handled asynchronously by Celery with automatic retries (up to 3 attempts with 60-second delays). See [Email Configuration](10-email-configuration.md) for details.
 
-## Payment Tracking
+## Marking Invoices as Paid
 
-### Marking as Paid
+When a participant has paid:
 
-When participant pays:
+1. Click **Mark Paid** in the Actions column (visible for `Approved` and `Sent` invoices).
 
-1. Open invoice (status `Sent`)
-2. Click **Mark as Paid**
-3. Optionally enter:
-   - **Payment Date** (when received)
-   - **Payment Method** (e.g., bank transfer, cash)
-4. Click **Confirm**
+The status changes to `Paid`. There is no additional confirmation dialog or payment-detail input — it is a single-click action.
 
-**Status changes to:** `Paid`
+## Deleting Invoices
 
-### Tracking Partial Payments
+Invoices can be deleted to clean up incorrect or test data.
 
-If participant pays in installments:
-1. Create one `Paid` invoice for the full invoice (captures it was sent)
-2. Add notes with payment schedule
-3. Or contact support for installment tracking features
+1. Click **Delete** in the Actions column.
+2. Confirm in the deletion dialog.
 
-## Cancelling Invoices
+**Delete visibility rules:**
 
-If an invoice is wrong and needs to be regenerated:
+- **Draft** or **Cancelled** invoices — the delete button is visible for all ZEV owners.
+- **Any status** — admins always see the delete button.
 
-1. Open invoice (status `Approved` or `Sent`)
-2. Click **Cancel**
-3. Confirm in dialog
-
-**Result:**
-- Status changes to: `Cancelled`
-- Invoice remains in history (for audit)
-- You can regenerate a corrected invoice
-
-> **When to cancel:** Error in tariff, metering data re-imported, or participant dispute.
-
-## Regenerating Invoices
-
-If metering data changes after invoice is sent:
-
-1. Re-import corrected metering data (see [Metering Import](05-metering-import.md))
-2. Go to **Invoices**
-3. Filter for invoices needing regeneration
-4. Click **Regenerate**
-5. Select period and participants
-6. Review and re-approve
-7. Send updated invoice (system may note "Updated revision")
-
-> **Locking:** Sent/Paid invoices cannot be directly edited—always regenerate/cancel to create corrected version.
-
-## Bulk Invoice Actions
-
-### Approve Multiple Invoices
-
-1. Go to **Invoices**
-2. Filter by **Draft**
-3. Click checkbox for "Select All" or individual invoices
-4. Click **Approve Selected**
-5. Confirm
-
-### Send Multiple Invoices
-
-1. Go to **Invoices**
-2. Filter by **Approved**
-3. Select invoices
-4. Click **Send Selected**
-5. Confirm
-
-### Export Invoice Report
-
-Export all invoices in a period:
-
-1. Go to **Invoices**
-2. Set date range filters
-3. Click **Export → CSV** or **Export → PDF**
-4. System generates report with all line items and totals
-
-## Invoice PDF Generation
-
-OpenZEV automatically generates professional invoices:
-
-- **Format:** Swiss-compliant (QR bill, ISO 20022 format)
-- **Content:**
-  - ZEV name and address
-  - Participant name and address (from profile)
-  - Billing period
-  - Detailed line items
-  - Subtotal and VAT
-  - QR code for payment (if configured)
-  - Contact information
-
-**Template:** Can be customized in **Admin → PDF Templates**.
+Deletion is permanent; the invoice is removed from the database.
 
 ## Troubleshooting
 
-### "Cannot generate invoices" / "No participants with data"
+### No participants appear in the period overview
 
 **Causes:**
-- No metering data imported for period
-- No active participants in period
-- Tariffs not configured
+- No active participants with metering-point assignments overlapping the selected period.
+- The wrong ZEV is selected in the global ZEV selector.
 
 **Fix:**
-1. Check [Metering Data](06-metering-analysis.md) — is there data for the period?
-2. Check [Participants](03-participant-management.md) — are members active?
-3. Check [Tariffs](07-tariff-configuration.md) — are prices set?
+1. Check the ZEV selector in the top navigation.
+2. Verify that [Participants](03-participant-management.md) exist and have [metering-point assignments](04-metering-point-management.md) covering the period.
 
 ### Invoice totals look wrong
 
-**Steps to verify:**
-1. Check energy allocation manually (see [Billing Explained](08-billing-allocation-explained.md))
-2. Check tariff prices (see [Tariff Configuration](07-tariff-configuration.md))
-3. Check data quality (see [Metering Analysis](06-metering-analysis.md))
-
-If unsure, [regenerate after fixing data](5-metering-import.md#re-importing-corrections--updates).
+1. Verify [tariff prices](07-tariff-configuration.md) are correct for the period.
+2. Check [metering data](06-metering-analysis.md) completeness — missing readings lead to under-counted energy.
+3. Review the [billing allocation logic](08-billing-allocation-explained.md) to understand how local vs. grid energy is split.
+4. If needed, fix the data and click **Generate Again** to recreate the invoice.
 
 ### Email not received by participant
 
-**Troubleshooting:**
-1. Check participant email in [Participants](03-participant-management.md) — is it correct?
-2. Check email status in invoice **Email History**
-3. Click **Resend** to retry
-4. Review [Email Configuration](10-email-configuration.md)
+1. Check the participant's email address in [Participants](03-participant-management.md).
+2. Open the **Email Logs** modal to check delivery status and error messages.
+3. Click **Retry** on any failed log entry.
+4. Review [Email Configuration](10-email-configuration.md) for SMTP environment variable issues.
 
 ## Best Practices
 
-**Review before approval:**
-- Check data quality scores
-- Verify tariffs are correct for period
-- Export and spot-check a few invoices
-
-**Batch send:** Send all invoices at once to avoid duplicate sends
-
-**Archive:** Export invoices monthly for backup
-
-**Privacy:** Remember invoices contain sensitive data—secure PDFs and archive appropriately
+- **Check metering completeness** before generating invoices — the Metering Data column shows exactly which meters are missing data and how many days are affected.
+- **Approve after review** — open the invoice detail page to verify line items and totals before approving.
+- **Generate PDFs before sending** — while not strictly required, generating the PDF first lets you review the document before emailing.
+- **Use Generate Again sparingly** — regenerating replaces the existing invoice. If the old invoice was already sent, consider whether the participant needs to be notified of the change.
 
 ## Next Steps
 
-- **Configure email:** [Email Configuration](10-email-configuration.md)
-- **Track payments:** Payment methods depend on your ZEV setup
-- **Reports:** Review invoices by period and participant
-
----
-
-**See also:** [Invoice Data Quality Issues](06-metering-analysis.md#billing-impact-of-data-quality-issues)
+- **Configure email delivery:** [Email Configuration](10-email-configuration.md)
+- **Understand billing logic:** [Billing & Allocation Explained](08-billing-allocation-explained.md)
+- **Manage tariffs:** [Tariff Configuration](07-tariff-configuration.md)
