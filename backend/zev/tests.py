@@ -40,7 +40,6 @@ class ParticipantEndpointRestrictionTests(TestCase):
 		)
 		self.metering_point = MeteringPoint.objects.create(
 			zev=self.zev,
-			participant=self.participant,
 			meter_id="MP-1",
 			meter_type=MeteringPointType.CONSUMPTION,
 		)
@@ -70,7 +69,6 @@ class ParticipantEndpointRestrictionTests(TestCase):
 			"/api/v1/zev/metering-points/",
 			{
 				"zev": str(self.zev.id),
-				"participant": str(self.participant.id),
 				"meter_id": "MP-2",
 				"meter_type": MeteringPointType.CONSUMPTION,
 				"is_active": True,
@@ -165,7 +163,6 @@ class ZevCreationWizardTests(TestCase):
 
 		metering_points = MeteringPoint.objects.filter(zev=created_zev).order_by("meter_id")
 		self.assertEqual(metering_points.count(), 2)
-		self.assertTrue(all(mp.participant_id == owner_participant.id for mp in metering_points))
 
 		assignments = MeteringPointAssignment.objects.filter(participant=owner_participant)
 		self.assertEqual(assignments.count(), 2)

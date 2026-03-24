@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Zev, Participant, MeteringPoint
+from .models import Zev, Participant, MeteringPoint, MeteringPointAssignment
 
 
 class ParticipantInline(admin.TabularInline):
@@ -9,10 +9,11 @@ class ParticipantInline(admin.TabularInline):
     fields = ("first_name", "last_name", "email", "valid_from", "valid_to")
 
 
-class MeteringPointInline(admin.TabularInline):
-    model = MeteringPoint
+class MeteringPointAssignmentInline(admin.TabularInline):
+    model = MeteringPointAssignment
     extra = 0
-    fields = ("meter_id", "meter_type", "is_active", "valid_from", "valid_to")
+    fields = ("metering_point", "valid_from", "valid_to")
+    autocomplete_fields = ("metering_point",)
 
 
 @admin.register(Zev)
@@ -28,11 +29,11 @@ class ParticipantAdmin(admin.ModelAdmin):
     list_display = ("full_name", "zev", "email", "valid_from", "valid_to")
     list_filter = ("zev",)
     search_fields = ("first_name", "last_name", "email")
-    inlines = [MeteringPointInline]
+    inlines = [MeteringPointAssignmentInline]
 
 
 @admin.register(MeteringPoint)
 class MeteringPointAdmin(admin.ModelAdmin):
-    list_display = ("meter_id", "participant", "meter_type", "is_active")
+    list_display = ("meter_id", "zev", "meter_type", "is_active")
     list_filter = ("meter_type", "is_active")
     search_fields = ("meter_id",)

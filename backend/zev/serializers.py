@@ -11,16 +11,6 @@ class MeteringPointSerializer(serializers.ModelSerializer):
         model = MeteringPoint
         fields = "__all__"
         read_only_fields = ["id", "created_at", "updated_at"]
-        extra_kwargs = {
-            "participant": {"required": False, "allow_null": True},
-        }
-
-    def validate(self, attrs):
-        zev = attrs.get("zev") or getattr(self.instance, "zev", None)
-        participant = attrs.get("participant", getattr(self.instance, "participant", None))
-        if participant and zev and participant.zev_id != zev.id:
-            raise serializers.ValidationError({"participant": "Participant must belong to selected ZEV."})
-        return attrs
 
 
 class MeteringPointAssignmentSerializer(serializers.ModelSerializer):
@@ -77,37 +67,11 @@ class MeteringPointAssignmentSerializer(serializers.ModelSerializer):
 
         return attrs
 
-    def _sync_current_participant(self, metering_point_id: int) -> None:
-        today = timezone.localdate()
-        current_assignment = (
-            MeteringPointAssignment.objects.filter(
-                metering_point_id=metering_point_id,
-                valid_from__lte=today,
-            )
-            .filter(models.Q(valid_to__isnull=True) | models.Q(valid_to__gte=today))
-            .order_by("-valid_from")
-            .first()
-        )
-        MeteringPoint.objects.filter(pk=metering_point_id).update(
-            participant=current_assignment.participant if current_assignment else None
-        )
-
-    def create(self, validated_data):
-        assignment = super().create(validated_data)
-        self._sync_current_participant(assignment.metering_point_id)
-        return assignment
-
-    def update(self, instance, validated_data):
-        assignment = super().update(instance, validated_data)
-        self._sync_current_participant(assignment.metering_point_id)
-        return assignment
-
-
 class ParticipantSerializer(serializers.ModelSerializer):
     account_username = serializers.CharField(source="user.username", read_only=True)
     initial_password = serializers.SerializerMethodField()
     full_name = serializers.ReadOnlyField()
-    metering_points = MeteringPointSerializer(many=True, read_only=True)
+    metering_points = serializers.SerializerMethodField()
     has_metering_point_assignment = serializers.SerializerMethodField()
 
     def get_initial_password(self, obj):
@@ -115,6 +79,14 @@ class ParticipantSerializer(serializers.ModelSerializer):
 
     def get_has_metering_point_assignment(self, obj):
         return obj.metering_point_assignments.exists()
+
+    def get_metering_points(self, obj):
+        metering_points = (
+            MeteringPoint.objects.filter(assignments__participant=obj)
+            .distinct()
+            .order_by("meter_id")
+        )
+        return MeteringPointSerializer(metering_points, many=True, context=self.context).data
 
     def validate(self, attrs):
         if "user" in attrs:

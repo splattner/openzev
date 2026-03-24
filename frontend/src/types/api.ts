@@ -204,7 +204,6 @@ export interface ParticipantInput {
 export interface MeteringPoint {
     id: string
     zev: string
-    participant?: string | null
     meter_id: string
     meter_type: 'consumption' | 'production' | 'bidirectional'
     is_active: boolean
@@ -213,7 +212,6 @@ export interface MeteringPoint {
 
 export interface MeteringPointInput {
     zev: string
-    participant?: string | null
     meter_id: string
     meter_type: 'consumption' | 'production' | 'bidirectional'
     is_active: boolean

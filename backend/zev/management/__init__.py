@@ -15,7 +15,7 @@ from django.core.management.base import BaseCommand
 from django.db import transaction
 
 from accounts.models import User, UserRole
-from zev.models import Zev, Participant, MeteringPoint, MeteringPointType
+from zev.models import Zev, Participant, MeteringPoint, MeteringPointAssignment, MeteringPointType
 from tariffs.models import Tariff, TariffPeriod, EnergyType, PeriodType
 from metering.models import MeterReading, ReadingDirection
 
@@ -128,18 +128,23 @@ class Command(BaseCommand):
         for p, meter_base in participants:
             for kind, mp_type in [("C", MeteringPointType.CONSUMPTION), ("P", MeteringPointType.PRODUCTION)]:
                 mp = MeteringPoint.objects.filter(
-                    participant=p, meter_id=f"{meter_base}-{kind}"
+                    zev=zev, meter_id=f"{meter_base}-{kind}"
                 ).first()
                 if not mp:
                     mp = MeteringPoint.objects.create(
                         zev=zev,
-                        participant=p,
                         meter_id=f"{meter_base}-{kind}",
                         meter_type=mp_type,
                         is_active=True,
                     )
                     if verbosity >= 1:
                         self.stdout.write(f"  → Created metering point: {mp.meter_id}")
+                MeteringPointAssignment.objects.get_or_create(
+                    metering_point=mp,
+                    participant=p,
+                    valid_from=date(2026, 1, 1),
+                    defaults={"valid_to": None},
+                )
                 metering_points[(p, kind)] = mp
 
         # ─── Create tariffs ──────────────────────────────────────────────

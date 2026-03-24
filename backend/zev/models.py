@@ -169,14 +169,6 @@ class MeteringPoint(models.Model):
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     zev = models.ForeignKey(Zev, on_delete=models.CASCADE, related_name="metering_points")
-    participant = models.ForeignKey(
-        Participant,
-        on_delete=models.SET_NULL,
-        related_name="metering_points",
-        null=True,
-        blank=True,
-        help_text="Deprecated direct link. Use assignments for temporal participant ownership.",
-    )
     meter_id = models.CharField(max_length=100, help_text="Messpunktnummer / Meter ID (e.g. CH9876543210987000000000044440859)")
     meter_type = models.CharField(
         max_length=20, choices=MeteringPointType.choices, default=MeteringPointType.CONSUMPTION
@@ -190,9 +182,7 @@ class MeteringPoint(models.Model):
         ordering = ["meter_id"]
 
     def __str__(self):
-        if self.participant:
-            return f"{self.meter_id} ({self.participant.full_name})"
-        return f"{self.meter_id} (unassigned)"
+        return self.meter_id
 
 
 class MeteringPointAssignment(models.Model):

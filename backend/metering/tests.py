@@ -7,7 +7,7 @@ from rest_framework.test import APIClient
 
 from accounts.models import User, UserRole
 from metering.models import MeterReading, ReadingDirection, ReadingResolution
-from zev.models import Zev, Participant, MeteringPoint, MeteringPointType
+from zev.models import Zev, Participant, MeteringPoint, MeteringPointAssignment, MeteringPointType
 
 
 def make_user(username, role, password="pass1234"):
@@ -37,15 +37,23 @@ class DashboardSummaryAlignmentTests(TestCase):
 
 		self.consumption_mp = MeteringPoint.objects.create(
 			zev=self.zev,
-			participant=self.participant,
 			meter_id="CH-CONS-1",
 			meter_type=MeteringPointType.CONSUMPTION,
 		)
 		self.production_mp = MeteringPoint.objects.create(
 			zev=self.zev,
-			participant=self.participant,
 			meter_id="CH-PROD-1",
 			meter_type=MeteringPointType.PRODUCTION,
+		)
+		MeteringPointAssignment.objects.create(
+			metering_point=self.consumption_mp,
+			participant=self.participant,
+			valid_from=date(2026, 1, 1),
+		)
+		MeteringPointAssignment.objects.create(
+			metering_point=self.production_mp,
+			participant=self.participant,
+			valid_from=date(2026, 1, 1),
 		)
 
 		MeterReading.objects.create(
@@ -123,9 +131,13 @@ class DashboardSummaryAlignmentTests(TestCase):
 		)
 		second_consumption_mp = MeteringPoint.objects.create(
 			zev=self.zev,
-			participant=second_participant,
 			meter_id="CH-CONS-2",
 			meter_type=MeteringPointType.CONSUMPTION,
+		)
+		MeteringPointAssignment.objects.create(
+			metering_point=second_consumption_mp,
+			participant=second_participant,
+			valid_from=date(2026, 1, 1),
 		)
 
 		MeterReading.objects.create(
@@ -202,9 +214,13 @@ class ImportParserRobustnessTests(TestCase):
 		)
 		self.metering_point = MeteringPoint.objects.create(
 			zev=self.zev,
-			participant=self.participant,
 			meter_id="CH-IMPORT-1",
 			meter_type=MeteringPointType.CONSUMPTION,
+		)
+		MeteringPointAssignment.objects.create(
+			metering_point=self.metering_point,
+			participant=self.participant,
+			valid_from=date(2026, 1, 1),
 		)
 
 	def test_malformed_csv_payload_is_reported_without_crash(self):
@@ -335,9 +351,13 @@ class MeteringRawDataEndpointTests(TestCase):
 		)
 		self.metering_point = MeteringPoint.objects.create(
 			zev=self.zev,
-			participant=self.participant,
 			meter_id="CH-RAW-1",
 			meter_type=MeteringPointType.BIDIRECTIONAL,
+		)
+		MeteringPointAssignment.objects.create(
+			metering_point=self.metering_point,
+			participant=self.participant,
+			valid_from=date(2026, 1, 1),
 		)
 
 		MeterReading.objects.create(
@@ -424,8 +444,6 @@ class DataQualityStatusTests(TestCase):
 			meter_type=MeteringPointType.CONSUMPTION,
 		)
 
-		# Create assignment (metering point validity replaced by assignment)
-		from zev.models import MeteringPointAssignment
 		MeteringPointAssignment.objects.create(
 			metering_point=self.metering_point,
 			participant=self.participant,

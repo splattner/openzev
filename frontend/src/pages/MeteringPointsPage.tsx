@@ -30,7 +30,6 @@ import type { MeteringPoint, MeteringPointAssignment, MeteringPointAssignmentInp
 
 const defaultMpForm = (): MeteringPointInput => ({
     zev: '',
-    participant: null,
     meter_id: '',
     meter_type: 'consumption',
     is_active: true,
@@ -150,7 +149,6 @@ export function MeteringPointsPage() {
         setEditingMpId(point.id)
         setMpForm({
             zev: point.zev,
-            participant: point.participant ?? null,
             meter_id: point.meter_id,
             meter_type: point.meter_type,
             is_active: point.is_active,
@@ -175,7 +173,6 @@ export function MeteringPointsPage() {
         const payload: MeteringPointInput = {
             ...mpForm,
             zev: zevForSubmit,
-            participant: mpForm.participant || null,
         }
         saveMpMutation.mutate({ id: editingMpId ?? undefined, payload })
     }

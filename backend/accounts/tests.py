@@ -3,7 +3,7 @@ from rest_framework.test import APIClient
 
 from .models import AppSettings, User, UserRole, VatRate
 from invoices.models import Invoice, InvoiceStatus
-from zev.models import MeteringPoint, MeteringPointType, Participant, Zev
+from zev.models import MeteringPoint, MeteringPointAssignment, MeteringPointType, Participant, Zev
 from datetime import date
 
 
@@ -311,9 +311,13 @@ class RbacEndpointMatrixTests(TestCase):
 		)
 		self.metering_point = MeteringPoint.objects.create(
 			zev=self.zev,
-			participant=self.participant,
 			meter_id="RBAC-MP-1",
 			meter_type=MeteringPointType.CONSUMPTION,
+		)
+		MeteringPointAssignment.objects.create(
+			metering_point=self.metering_point,
+			participant=self.participant,
+			valid_from=date(2026, 1, 1),
 		)
 
 		for role, user in {
@@ -394,10 +398,9 @@ class RbacEndpointMatrixTests(TestCase):
 				"url": "/api/v1/zev/metering-points/",
 				"payload": {
 					"zev": str(self.zev.id),
-					"participant": str(self.participant.id),
 					"meter_id": "RBAC-MP-CREATE",
 					"meter_type": MeteringPointType.CONSUMPTION,
-					"valid_from": "2026-01-01",
+					"is_active": True,
 				},
 				"expected": {"admin": 201, "owner": 201, "participant": 403, "guest": 403},
 			},
@@ -497,10 +500,9 @@ class RbacEndpointMatrixTests(TestCase):
 				"/api/v1/zev/metering-points/",
 				{
 					"zev": str(self.zev.id),
-					"participant": str(self.participant.id),
 					"meter_id": "RBAC-MP-unauth",
 					"meter_type": MeteringPointType.CONSUMPTION,
-					"valid_from": "2026-01-01",
+					"is_active": True,
 				},
 			),
 			("PATCH", f"/api/v1/zev/participants/{self.participant.id}/", {"phone": "+41 79 999 99 99"}),

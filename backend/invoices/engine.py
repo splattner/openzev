@@ -296,9 +296,13 @@ def generate_invoice(participant: Participant, period_start: date, period_end: d
 
     # ─── 1. Collect participant consumption readings ───────────────────────
     consumption_mps = MeteringPoint.objects.filter(
-        participant=participant,
+        zev=zev,
         meter_type__in=[MeteringPointType.CONSUMPTION, MeteringPointType.BIDIRECTIONAL],
-    )
+        assignments__participant=participant,
+        assignments__valid_from__lte=period_end,
+    ).filter(
+        models.Q(assignments__valid_to__isnull=True) | models.Q(assignments__valid_to__gte=period_start)
+    ).distinct()
     participant_readings = MeterReading.objects.filter(
         metering_point__in=consumption_mps,
         timestamp__gte=start_dt,
@@ -309,9 +313,13 @@ def generate_invoice(participant: Participant, period_start: date, period_end: d
 
     # ─── 2. Collect participant production (OUT) readings ──────────────────
     production_mps = MeteringPoint.objects.filter(
-        participant=participant,
+        zev=zev,
         meter_type__in=[MeteringPointType.PRODUCTION, MeteringPointType.BIDIRECTIONAL],
-    )
+        assignments__participant=participant,
+        assignments__valid_from__lte=period_end,
+    ).filter(
+        models.Q(assignments__valid_to__isnull=True) | models.Q(assignments__valid_to__gte=period_start)
+    ).distinct()
     feedin_readings = MeterReading.objects.filter(
         metering_point__in=production_mps,
         timestamp__gte=start_dt,
@@ -320,9 +328,12 @@ def generate_invoice(participant: Participant, period_start: date, period_end: d
     )
     # ─── 3. Calculate ZEV total production/consumption by timestamp ───────
     all_production_mps = MeteringPoint.objects.filter(
-        participant__zev=zev,
+        zev=zev,
         meter_type__in=[MeteringPointType.PRODUCTION, MeteringPointType.BIDIRECTIONAL],
-    )
+        assignments__valid_from__lte=period_end,
+    ).filter(
+        models.Q(assignments__valid_to__isnull=True) | models.Q(assignments__valid_to__gte=period_start)
+    ).distinct()
     zev_production_by_ts = {
         row["timestamp"]: row["total_kwh"] or Decimal("0")
         for row in MeterReading.objects.filter(
@@ -336,9 +347,12 @@ def generate_invoice(participant: Participant, period_start: date, period_end: d
     }
 
     all_consumption_mps = MeteringPoint.objects.filter(
-        participant__zev=zev,
+        zev=zev,
         meter_type__in=[MeteringPointType.CONSUMPTION, MeteringPointType.BIDIRECTIONAL],
-    )
+        assignments__valid_from__lte=period_end,
+    ).filter(
+        models.Q(assignments__valid_to__isnull=True) | models.Q(assignments__valid_to__gte=period_start)
+    ).distinct()
     zev_consumption_by_ts = {
         row["timestamp"]: row["total_kwh"] or Decimal("0")
         for row in MeterReading.objects.filter(

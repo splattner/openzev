@@ -1,7 +1,5 @@
 from django.db.models import Q
-from django.db import models
 from django.http import HttpResponse
-from django.utils import timezone
 from django.utils.crypto import get_random_string
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
@@ -244,37 +242,17 @@ class MeteringPointViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
-        qs = MeteringPoint.objects.select_related("zev", "participant")
+        qs = MeteringPoint.objects.select_related("zev")
         if user.is_admin:
             return qs
         if user.is_zev_owner:
             return qs.filter(zev__owner=user)
-        return qs.filter(
-            Q(participant__user=user) | Q(assignments__participant__user=user)
-        ).distinct()
+        return qs.filter(assignments__participant__user=user).distinct()
 
 
 class MeteringPointAssignmentViewSet(viewsets.ModelViewSet):
     serializer_class = MeteringPointAssignmentSerializer
     permission_classes = [IsAuthenticated, MeteringPointAssignmentPermission]
-
-    def perform_destroy(self, instance):
-        metering_point_id = instance.metering_point_id
-        instance.delete()
-        # Re-sync the deprecated FK after the assignment is removed
-        today = timezone.localdate()
-        current_assignment = (
-            MeteringPointAssignment.objects.filter(
-                metering_point_id=metering_point_id,
-                valid_from__lte=today,
-            )
-            .filter(models.Q(valid_to__isnull=True) | models.Q(valid_to__gte=today))
-            .order_by("-valid_from")
-            .first()
-        )
-        MeteringPoint.objects.filter(pk=metering_point_id).update(
-            participant=current_assignment.participant if current_assignment else None
-        )
 
     def get_queryset(self):
         user = self.request.user

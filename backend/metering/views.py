@@ -9,7 +9,7 @@ from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from accounts.permissions import IsZevOwnerOrAdmin
-from zev.models import Zev, Participant
+from zev.models import Zev, Participant, MeteringPointAssignment
 from .models import MeterReading, ImportLog
 from .serializers import MeterReadingSerializer, ImportLogSerializer
 from .importers.csv_importer import import_csv, preview_csv
@@ -22,15 +22,12 @@ class MeterReadingViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
-        qs = MeterReading.objects.select_related("metering_point__zev", "metering_point__participant")
+        qs = MeterReading.objects.select_related("metering_point__zev")
         if user.is_admin:
             return qs
         if user.is_zev_owner:
             return qs.filter(metering_point__zev__owner=user)
-        return qs.filter(
-            Q(metering_point__participant__user=user)
-            | Q(metering_point__assignments__participant__user=user)
-        ).distinct()
+        return qs.filter(metering_point__assignments__participant__user=user).distinct()
 
     @action(detail=False, methods=["get"], url_path="chart-data",
             permission_classes=[IsAuthenticated])
@@ -172,6 +169,8 @@ class MeterReadingViewSet(viewsets.ModelViewSet):
 
             base = qs.annotate(bucket=trunc_fn("timestamp"))
 
+            today = date_type.today()
+
             zev_ts_rows = (
                 base.values("bucket", "timestamp", "direction")
                 .annotate(total_kwh=Sum("energy_kwh"))
@@ -238,34 +237,48 @@ class MeterReadingViewSet(viewsets.ModelViewSet):
             ]
 
             participant_rows = (
-                base.filter(direction="in", metering_point__participant__isnull=False)
+                base.filter(
+                    direction="in",
+                    metering_point__assignments__valid_from__lte=today,
+                )
+                .filter(
+                    Q(metering_point__assignments__valid_to__isnull=True)
+                    | Q(metering_point__assignments__valid_to__gte=today)
+                )
                 .values(
-                    "metering_point__participant_id",
-                    "metering_point__participant__first_name",
-                    "metering_point__participant__last_name",
+                    "metering_point__assignments__participant_id",
+                    "metering_point__assignments__participant__first_name",
+                    "metering_point__assignments__participant__last_name",
                     "timestamp",
                     "bucket",
                 )
                 .annotate(consumed_kwh=Sum("energy_kwh"))
-                .order_by("metering_point__participant_id", "timestamp")
+                .order_by("metering_point__assignments__participant_id", "timestamp")
             )
 
             participant_production_rows = (
-                base.filter(direction="out", metering_point__participant__isnull=False)
+                base.filter(
+                    direction="out",
+                    metering_point__assignments__valid_from__lte=today,
+                )
+                .filter(
+                    Q(metering_point__assignments__valid_to__isnull=True)
+                    | Q(metering_point__assignments__valid_to__gte=today)
+                )
                 .values(
-                    "metering_point__participant_id",
-                    "metering_point__participant__first_name",
-                    "metering_point__participant__last_name",
+                    "metering_point__assignments__participant_id",
+                    "metering_point__assignments__participant__first_name",
+                    "metering_point__assignments__participant__last_name",
                     "timestamp",
                     "bucket",
                 )
                 .annotate(produced_kwh=Sum("energy_kwh"))
-                .order_by("metering_point__participant_id", "timestamp")
+                .order_by("metering_point__assignments__participant_id", "timestamp")
             )
 
             participant_map = {}
             for row in participant_rows:
-                pid = str(row["metering_point__participant_id"])
+                pid = str(row["metering_point__assignments__participant_id"])
                 ts = row["timestamp"]
                 bucket_key = row["bucket"].isoformat()
                 consumed = row["consumed_kwh"] or Decimal("0")
@@ -285,8 +298,8 @@ class MeterReadingViewSet(viewsets.ModelViewSet):
                     participant_map[pid] = {
                         "participant_id": pid,
                         "participant_name": (
-                            f"{row['metering_point__participant__first_name']} "
-                            f"{row['metering_point__participant__last_name']}"
+                            f"{row['metering_point__assignments__participant__first_name']} "
+                            f"{row['metering_point__assignments__participant__last_name']}"
                         ).strip(),
                         "total_consumed_kwh": Decimal("0"),
                         "total_produced_kwh": Decimal("0"),
@@ -312,7 +325,7 @@ class MeterReadingViewSet(viewsets.ModelViewSet):
                 participant_map[pid]["timeline_map"][bucket_key]["imported_kwh"] += from_grid
 
             for row in participant_production_rows:
-                pid = str(row["metering_point__participant_id"])
+                pid = str(row["metering_point__assignments__participant_id"])
                 bucket_key = row["bucket"].isoformat()
                 produced = row["produced_kwh"] or Decimal("0")
 
@@ -320,8 +333,8 @@ class MeterReadingViewSet(viewsets.ModelViewSet):
                     participant_map[pid] = {
                         "participant_id": pid,
                         "participant_name": (
-                            f"{row['metering_point__participant__first_name']} "
-                            f"{row['metering_point__participant__last_name']}"
+                            f"{row['metering_point__assignments__participant__first_name']} "
+                            f"{row['metering_point__assignments__participant__last_name']}"
                         ).strip(),
                         "total_consumed_kwh": Decimal("0"),
                         "total_produced_kwh": Decimal("0"),
@@ -565,7 +578,12 @@ class MeterReadingViewSet(viewsets.ModelViewSet):
                 severity = "red"
 
             # Get participant name
-            participant = mp.assignments.filter(valid_to__isnull=True).first()
+            participant = (
+                mp.assignments.filter(valid_from__lte=today)
+                .filter(Q(valid_to__isnull=True) | Q(valid_to__gte=today))
+                .order_by("-valid_from")
+                .first()
+            )
             participant_name = participant.participant.full_name if participant else "Unassigned"
 
             result.append({

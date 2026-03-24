@@ -409,8 +409,7 @@ def _build_contract_context(participant) -> dict:
 
     today = date.today()
 
-    # Collect metering points via direct FK and via assignments (open or current)
-    direct_mp_ids = set(participant.metering_points.values_list("id", flat=True))
+    # Collect metering points via assignments (open or current)
     assigned_mp_ids = set(
         MeteringPointAssignment.objects.filter(
             participant=participant,
@@ -426,7 +425,7 @@ def _build_contract_context(participant) -> dict:
         ).values_list("metering_point_id", flat=True)
     )
 
-    all_mps = list(MeteringPoint.objects.filter(id__in=direct_mp_ids | assigned_mp_ids))
+    all_mps = list(MeteringPoint.objects.filter(id__in=assigned_mp_ids))
 
     consumption_mps = [
         mp for mp in all_mps
