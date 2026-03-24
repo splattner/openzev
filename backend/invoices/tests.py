@@ -327,15 +327,23 @@ class InvoiceBillingIntegrationTests(TestCase):
 
         self.consumption_mp = MeteringPoint.objects.create(
             zev=self.zev,
-            participant=self.participant,
             meter_id="CH-BILL-CONS-1",
             meter_type=MeteringPointType.CONSUMPTION,
         )
         self.production_mp = MeteringPoint.objects.create(
             zev=self.zev,
-            participant=self.participant,
             meter_id="CH-BILL-PROD-1",
             meter_type=MeteringPointType.PRODUCTION,
+        )
+        MeteringPointAssignment.objects.create(
+            metering_point=self.consumption_mp,
+            participant=self.participant,
+            valid_from=date(2026, 1, 1),
+        )
+        MeteringPointAssignment.objects.create(
+            metering_point=self.production_mp,
+            participant=self.participant,
+            valid_from=date(2026, 1, 1),
         )
 
         local_tariff = Tariff.objects.create(
@@ -415,13 +423,11 @@ class InvoicePeriodOverviewTests(TestCase):
 
         self.mp_with_data = MeteringPoint.objects.create(
             zev=self.zev,
-            participant=self.p_with_data,
             meter_id="CH-OVERVIEW-1",
             meter_type=MeteringPointType.CONSUMPTION,
         )
         self.mp_missing_data = MeteringPoint.objects.create(
             zev=self.zev,
-            participant=self.p_missing_data,
             meter_id="CH-OVERVIEW-2",
             meter_type=MeteringPointType.CONSUMPTION,
         )
@@ -565,9 +571,13 @@ class InvoiceMathEdgeCaseTests(TestCase):
 
         self.consumption_mp = MeteringPoint.objects.create(
             zev=self.zev,
-            participant=self.participant,
             meter_id="CH-MATH-CONS-1",
             meter_type=MeteringPointType.CONSUMPTION,
+        )
+        MeteringPointAssignment.objects.create(
+            metering_point=self.consumption_mp,
+            participant=self.participant,
+            valid_from=date(2026, 1, 1),
         )
 
     def test_monthly_fee_counts_intersecting_month_boundaries(self):
@@ -696,9 +706,13 @@ class InvoiceVatRateSelectionTests(TestCase):
 
         self.consumption_mp = MeteringPoint.objects.create(
             zev=self.zev,
-            participant=self.participant,
             meter_id="CH-VAT-CONS-1",
             meter_type=MeteringPointType.CONSUMPTION,
+        )
+        MeteringPointAssignment.objects.create(
+            metering_point=self.consumption_mp,
+            participant=self.participant,
+            valid_from=date(2026, 1, 1),
         )
 
         grid_tariff = Tariff.objects.create(

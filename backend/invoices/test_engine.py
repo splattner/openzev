@@ -32,13 +32,11 @@ class InvoiceEngineTests(TestCase):
         )
         self.consumption_mp = MeteringPoint.objects.create(
             zev=self.zev,
-            participant=self.participant,
             meter_id="MP-C-1",
             meter_type=MeteringPointType.CONSUMPTION,
         )
         self.production_mp = MeteringPoint.objects.create(
             zev=self.zev,
-            participant=self.participant,
             meter_id="MP-P-1",
             meter_type=MeteringPointType.PRODUCTION,
         )
@@ -293,9 +291,13 @@ class InvoiceEngineTests(TestCase):
         )
         consumer_mp = MeteringPoint.objects.create(
             zev=self.zev,
-            participant=consumer,
             meter_id="MP-C-2",
             meter_type=MeteringPointType.CONSUMPTION,
+        )
+        MeteringPointAssignment.objects.create(
+            metering_point=consumer_mp,
+            participant=consumer,
+            valid_from=date(2026, 1, 1),
         )
 
         producer_2 = Participant.objects.create(
@@ -307,9 +309,13 @@ class InvoiceEngineTests(TestCase):
         )
         producer_2_mp = MeteringPoint.objects.create(
             zev=self.zev,
-            participant=producer_2,
             meter_id="MP-P-2",
             meter_type=MeteringPointType.PRODUCTION,
+        )
+        MeteringPointAssignment.objects.create(
+            metering_point=producer_2_mp,
+            participant=producer_2,
+            valid_from=date(2026, 1, 1),
         )
 
         ts = datetime(2026, 1, 15, 0, 0, tzinfo=timezone.utc)

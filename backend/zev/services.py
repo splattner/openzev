@@ -167,7 +167,6 @@ def create_zev_with_owner_setup(*, zev_data: dict, owner_data: dict, metering_po
     for metering_point_data in metering_points_data:
         metering_point = MeteringPoint.objects.create(
             zev=zev,
-            participant=owner_participant,
             meter_id=metering_point_data['meter_id'],
             meter_type=metering_point_data['meter_type'],
             is_active=metering_point_data.get('is_active', True),

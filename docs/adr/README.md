@@ -12,6 +12,7 @@ This directory captures key architectural decisions for OpenZEV.
 - [0006: Invoice lifecycle state machine and regeneration locking](0006-invoice-lifecycle-and-locking.md)
 - [0007: Timezone policy for storage, queries, and display](0007-timezone-policy.md)
 - [0008: Security model and audit logging scope](0008-security-and-audit-logging.md)
+- [0009: Remove direct MeteringPoint participant FK](0009-remove-direct-meteringpoint-participant-fk.md)
 
 ## Conventions
 

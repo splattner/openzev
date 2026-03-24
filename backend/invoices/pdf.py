@@ -543,9 +543,13 @@ def _build_hourly_profile_chart_svg(invoice, tr: dict) -> str | None:
 
     # ── Participant consumption readings ────────────────────────────────────
     consumption_mps = _MP.objects.filter(
-        participant=participant,
+        zev=zev,
         meter_type__in=[_MPT.CONSUMPTION, _MPT.BIDIRECTIONAL],
-    )
+        assignments__participant=participant,
+        assignments__valid_from__lte=pe,
+    ).filter(
+        _dj.Q(assignments__valid_to__isnull=True) | _dj.Q(assignments__valid_to__gte=ps)
+    ).distinct()
     participant_readings = list(
         MeterReading.objects.filter(
             metering_point__in=consumption_mps,
@@ -564,9 +568,12 @@ def _build_hourly_profile_chart_svg(invoice, tr: dict) -> str | None:
 
     # ── ZEV-level production and consumption by timestamp ───────────────────
     all_prod_mps = _MP.objects.filter(
-        participant__zev=zev,
+        zev=zev,
         meter_type__in=[_MPT.PRODUCTION, _MPT.BIDIRECTIONAL],
-    )
+        assignments__valid_from__lte=pe,
+    ).filter(
+        _dj.Q(assignments__valid_to__isnull=True) | _dj.Q(assignments__valid_to__gte=ps)
+    ).distinct()
     zev_prod_by_ts = {
         row["timestamp"]: float(row["total_kwh"] or 0)
         for row in MeterReading.objects.filter(
@@ -577,9 +584,12 @@ def _build_hourly_profile_chart_svg(invoice, tr: dict) -> str | None:
         ).values("timestamp").annotate(total_kwh=_dj.Sum("energy_kwh"))
     }
     all_cons_mps = _MP.objects.filter(
-        participant__zev=zev,
+        zev=zev,
         meter_type__in=[_MPT.CONSUMPTION, _MPT.BIDIRECTIONAL],
-    )
+        assignments__valid_from__lte=pe,
+    ).filter(
+        _dj.Q(assignments__valid_to__isnull=True) | _dj.Q(assignments__valid_to__gte=ps)
+    ).distinct()
     zev_cons_by_ts = {
         row["timestamp"]: float(row["total_kwh"] or 0)
         for row in MeterReading.objects.filter(
