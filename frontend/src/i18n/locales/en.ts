@@ -204,6 +204,13 @@ export const en = {
             failedEmails: '({{n}} failed)',
             attempts: '{{n}} attempts',
             noParticipants: 'No participants found for this period.',
+            emptyState: {
+                title: 'No billable participants in this period yet',
+                description: 'Add participants, assign metering points, and verify tariffs before generating invoices.',
+                participantsAction: 'Add participants',
+                meteringPointsAction: 'Assign metering points',
+                tariffsAction: 'Review tariffs',
+            },
             deleteModal: {
                 title: 'Delete Invoice',
                 message: 'Are you sure you want to delete this invoice? This action cannot be undone.',
@@ -225,6 +232,11 @@ export const en = {
             downloadContract: 'Contract PDF',
             contractDownloadError: 'Could not download the contract.',
             noParticipants: 'No participants yet.',
+            emptyState: {
+                title: 'No participants yet',
+                description: 'Create your first participant to start assignments and invoicing.',
+                createAction: 'Create first participant',
+            },
             col: {
                 name: 'Name',
                 contact: 'Contact',
@@ -361,6 +373,12 @@ export const en = {
             assign: '+ Assign',
             chart: 'Chart',
             noMeteringPoints: 'No metering points yet. Create one above.',
+            emptyState: {
+                title: 'No metering points yet',
+                description: 'Add a metering point, then assign it to a participant to include it in billing.',
+                createAction: 'Create metering point',
+                participantsAction: 'Manage participants',
+            },
             noAssignments: 'No participant assignments yet.',
             active: 'Active',
             inactive: 'Inactive',

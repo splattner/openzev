@@ -404,9 +404,22 @@ export function MeteringPointsPage() {
             {/* ── Metering Points List ──────────────────────────────────────────────── */}
             <div className="table-card">
                 {meteringPoints.length === 0 ? (
-                    <p className="muted" style={{ padding: '1rem' }}>
-                        No metering points yet. Create one above.
-                    </p>
+                    <section className="card" style={{ margin: '1rem', display: 'grid', gap: '0.75rem' }}>
+                        <h3 style={{ margin: 0 }}>{t('pages.meteringPoints.emptyState.title')}</h3>
+                        <p className="muted" style={{ margin: 0 }}>{t('pages.meteringPoints.emptyState.description')}</p>
+                        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+                            {canManageMeteringPoints && (
+                                <button className="button button-primary" type="button" onClick={openCreateMpModal}>
+                                    {t('pages.meteringPoints.emptyState.createAction')}
+                                </button>
+                            )}
+                            {canManageMeteringPoints && (
+                                <Link className="button button-secondary" to="/participants" style={{ textDecoration: 'none' }}>
+                                    {t('pages.meteringPoints.emptyState.participantsAction')}
+                                </Link>
+                            )}
+                        </div>
+                    </section>
                 ) : (
                     meteringPoints.map((point) => {
                         const assignments = filteredAssignmentsByMeteringPoint.get(point.id) ?? []

@@ -329,6 +329,22 @@ export function InvoicesPage() {
                 <div className="card">{t('pages.invoices.loading')}</div>
             ) : periodOverviewQuery.isError ? (
                 <div className="card error-banner">{t('pages.invoices.failed')}</div>
+            ) : rows.length === 0 ? (
+                <section className="card" style={{ display: 'grid', gap: '0.75rem' }}>
+                    <h3 style={{ margin: 0 }}>{t('pages.invoices.emptyState.title')}</h3>
+                    <p className="muted" style={{ margin: 0 }}>{t('pages.invoices.emptyState.description')}</p>
+                    <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+                        <Link className="button button-primary" to="/participants" style={{ textDecoration: 'none' }}>
+                            {t('pages.invoices.emptyState.participantsAction')}
+                        </Link>
+                        <Link className="button button-secondary" to="/metering-points" style={{ textDecoration: 'none' }}>
+                            {t('pages.invoices.emptyState.meteringPointsAction')}
+                        </Link>
+                        <Link className="button button-secondary" to="/tariffs" style={{ textDecoration: 'none' }}>
+                            {t('pages.invoices.emptyState.tariffsAction')}
+                        </Link>
+                    </div>
+                </section>
             ) : (
                 <div className="table-card">
                     <table>
@@ -345,7 +361,7 @@ export function InvoicesPage() {
                             </tr>
                         </thead>
                         <tbody>
-                            {rows.length ? rows.map((row) => {
+                            {rows.map((row) => {
                                 const invoice = row.invoice
                                 const latestEmailLog = getLatestEmailLog(invoice)
                                 return (
@@ -520,11 +536,7 @@ export function InvoicesPage() {
                                         </td>
                                     </tr>
                                 )
-                            }) : (
-                                <tr>
-                                    <td colSpan={8}>{t('pages.invoices.noParticipants')}</td>
-                                </tr>
-                            )}
+                            })}
                         </tbody>
                     </table>
                 </div>

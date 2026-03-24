@@ -204,6 +204,13 @@ export const de = {
             failedEmails: '({{n}} fehlgeschlagen)',
             attempts: '{{n}} Versuche',
             noParticipants: 'Keine Teilnehmer für diese Periode gefunden.',
+            emptyState: {
+                title: 'Noch keine abrechenbaren Teilnehmer in dieser Periode',
+                description: 'Fügen Sie Teilnehmer hinzu, weisen Sie Zählpunkte zu und prüfen Sie Tarife, bevor Sie Rechnungen erstellen.',
+                participantsAction: 'Teilnehmer hinzufügen',
+                meteringPointsAction: 'Zählpunkte zuweisen',
+                tariffsAction: 'Tarife prüfen',
+            },
             deleteModal: {
                 title: 'Rechnung löschen',
                 message: 'Sind Sie sicher, dass Sie diese Rechnung löschen möchten? Diese Aktion kann nicht rückgängig gemacht werden.',
@@ -225,6 +232,11 @@ export const de = {
             downloadContract: 'Vertrag PDF',
             contractDownloadError: 'Vertrag konnte nicht heruntergeladen werden.',
             noParticipants: 'Noch keine Teilnehmer.',
+            emptyState: {
+                title: 'Noch keine Teilnehmer',
+                description: 'Erstellen Sie den ersten Teilnehmer, um mit Zuweisungen und Abrechnung zu starten.',
+                createAction: 'Ersten Teilnehmer erstellen',
+            },
             col: {
                 name: 'Name',
                 contact: 'Kontakt',
@@ -360,6 +372,12 @@ export const de = {
             assign: '+ Zuweisen',
             chart: 'Diagramm',
             noMeteringPoints: 'Noch keine Zählpunkte. Erstellen Sie oben einen.',
+            emptyState: {
+                title: 'Noch keine Zählpunkte',
+                description: 'Fügen Sie einen Zählpunkt hinzu und weisen Sie ihn einem Teilnehmer zu, damit er in die Abrechnung einfliesst.',
+                createAction: 'Zählpunkt erstellen',
+                participantsAction: 'Teilnehmer verwalten',
+            },
             noAssignments: 'Noch keine Teilnehmerzuweisungen.',
             active: 'Aktiv',
             inactive: 'Inaktiv',

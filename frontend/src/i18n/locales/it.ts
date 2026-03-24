@@ -193,6 +193,13 @@ export const it = {
             failedEmails: '({{n}} non riuscito/i)',
             attempts: '{{n}} tentativi',
             noParticipants: 'Nessun partecipante trovato per questo periodo.',
+            emptyState: {
+                title: 'Nessun partecipante fatturabile in questo periodo',
+                description: 'Aggiungi partecipanti, assegna punti di misura e verifica le tariffe prima di generare le fatture.',
+                participantsAction: 'Aggiungi partecipanti',
+                meteringPointsAction: 'Assegna punti di misura',
+                tariffsAction: 'Verifica tariffe',
+            },
             deleteModal: {
                 title: 'Elimina fattura',
                 message: 'Sei sicuro di voler eliminare questa fattura? Questa azione non può essere annullata.',
@@ -214,6 +221,11 @@ export const it = {
             downloadContract: 'PDF contratto',
             contractDownloadError: 'Impossibile scaricare il contratto.',
             noParticipants: 'Nessun partecipante ancora.',
+            emptyState: {
+                title: 'Nessun partecipante ancora',
+                description: 'Crea il primo partecipante per iniziare assegnazioni e fatturazione.',
+                createAction: 'Crea primo partecipante',
+            },
             col: {
                 name: 'Nome',
                 contact: 'Contatto',
@@ -350,6 +362,12 @@ export const it = {
             assign: '+ Assegna',
             chart: 'Grafico',
             noMeteringPoints: 'Nessun punto di misura ancora. Creane uno sopra.',
+            emptyState: {
+                title: 'Nessun punto di misura ancora',
+                description: 'Aggiungi un punto di misura e assegnalo a un partecipante per includerlo nella fatturazione.',
+                createAction: 'Crea punto di misura',
+                participantsAction: 'Gestisci partecipanti',
+            },
             noAssignments: 'Nessuna assegnazione di partecipante ancora.',
             active: 'Attivo',
             inactive: 'Inattivo',

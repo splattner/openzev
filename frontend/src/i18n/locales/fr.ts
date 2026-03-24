@@ -193,6 +193,13 @@ export const fr = {
             failedEmails: '({{n}} échoué(s))',
             attempts: '{{n}} tentatives',
             noParticipants: 'Aucun participant trouvé pour cette période.',
+            emptyState: {
+                title: 'Aucun participant facturable pour cette période',
+                description: 'Ajoutez des participants, assignez des points de mesure et vérifiez les tarifs avant de générer des factures.',
+                participantsAction: 'Ajouter des participants',
+                meteringPointsAction: 'Assigner des points de mesure',
+                tariffsAction: 'Vérifier les tarifs',
+            },
             deleteModal: {
                 title: 'Supprimer la facture',
                 message: 'Êtes-vous sûr de vouloir supprimer cette facture ? Cette action est irréversible.',
@@ -214,6 +221,11 @@ export const fr = {
             downloadContract: 'PDF contrat',
             contractDownloadError: 'Impossible de télécharger le contrat.',
             noParticipants: 'Aucun participant pour le moment.',
+            emptyState: {
+                title: 'Aucun participant pour le moment',
+                description: 'Créez votre premier participant pour démarrer les attributions et la facturation.',
+                createAction: 'Créer le premier participant',
+            },
             col: {
                 name: 'Nom',
                 contact: 'Contact',
@@ -350,6 +362,12 @@ export const fr = {
             assign: '+ Assigner',
             chart: 'Graphique',
             noMeteringPoints: 'Aucun point de mesure pour le moment. Créez-en un ci-dessus.',
+            emptyState: {
+                title: 'Aucun point de mesure pour le moment',
+                description: 'Ajoutez un point de mesure, puis assignez-le à un participant pour l’inclure dans la facturation.',
+                createAction: 'Créer un point de mesure',
+                participantsAction: 'Gérer les participants',
+            },
             noAssignments: 'Aucune attribution de participant pour le moment.',
             active: 'Actif',
             inactive: 'Inactif',

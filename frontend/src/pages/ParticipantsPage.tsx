@@ -360,20 +360,31 @@ export function ParticipantsPage() {
                 </form>
             </FormModal>
 
-            <div className="table-card">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>{t('pages.participants.col.name')}</th>
-                            <th>{t('pages.participants.col.contact')}</th>
-                            <th>{t('pages.participants.col.address')}</th>
-                            <th>{t('pages.participants.col.validFrom')}</th>
-                            <th>{t('pages.participants.col.validTo')}</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {sortedParticipants.length ? sortedParticipants.map((participant) => {
+            {sortedParticipants.length === 0 ? (
+                <section className="card" style={{ display: 'grid', gap: '0.75rem' }}>
+                    <h3 style={{ margin: 0 }}>{t('pages.participants.emptyState.title')}</h3>
+                    <p className="muted" style={{ margin: 0 }}>{t('pages.participants.emptyState.description')}</p>
+                    <div>
+                        <button className="button button-primary" type="button" onClick={openCreateModal}>
+                            {t('pages.participants.emptyState.createAction')}
+                        </button>
+                    </div>
+                </section>
+            ) : (
+                <div className="table-card">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>{t('pages.participants.col.name')}</th>
+                                <th>{t('pages.participants.col.contact')}</th>
+                                <th>{t('pages.participants.col.address')}</th>
+                                <th>{t('pages.participants.col.validFrom')}</th>
+                                <th>{t('pages.participants.col.validTo')}</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {sortedParticipants.map((participant) => {
                             const ownerRow = isOwnerParticipant(participant)
 
                             return (
@@ -445,14 +456,11 @@ export function ParticipantsPage() {
                                     </td>
                                 </tr>
                             )
-                        }) : (
-                            <tr>
-                                <td colSpan={6}>{t('pages.participants.noParticipants')}</td>
-                            </tr>
-                        )}
-                    </tbody>
-                </table>
-            </div>
+                            })}
+                        </tbody>
+                    </table>
+                </div>
+            )}
 
             {dialog && (
                 <ConfirmDialog
