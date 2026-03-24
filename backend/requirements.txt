@@ -18,7 +18,7 @@ django-celery-beat==2.9.0
 django-cors-headers==4.9.0
 django-environ==0.13.0
 django-timezone-field==7.2.1
-djangorestframework==3.17.0
+djangorestframework==3.17.1
 djangorestframework_simplejwt==5.5.1
 drf-spectacular==0.29.0
 et_xmlfile==2.0.0
