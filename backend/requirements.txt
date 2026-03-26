@@ -3,7 +3,7 @@ asgiref==3.11.1
 attrs==25.4.0
 billiard==4.2.4
 brotli==1.2.0
-celery==5.6.2
+celery==5.6.3
 cffi==2.0.0
 click==8.3.1
 click-didyoumean==0.3.1
