@@ -1,8 +1,8 @@
 name: Release Charts
 
 on:
-    push:
-        branches: [main]
+    release:
+        types: [published]
 
 permissions:
     contents: write
@@ -19,8 +19,8 @@ jobs:
 
             - name: Configure Git
               run: |
-                  git config user.name "github-actions[bot]"
-                  git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+                  git config user.name "$GITHUB_ACTOR"
+                  git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
 
             - name: Run chart-releaser
               uses: helm/chart-releaser-action@v1.7.0
