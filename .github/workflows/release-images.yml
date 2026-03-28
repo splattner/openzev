@@ -28,7 +28,7 @@ jobs:
                     - image: frontend
                       context: .
                       dockerfile: frontend/Dockerfile
-                      build_args: ""
+                      build_args: VITE_API_BASE_URL=/api/v1
                     - image: fullstack
                       context: .
                       dockerfile: Dockerfile.fullstack
