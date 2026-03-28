@@ -82,6 +82,15 @@ Default ingress routes:
 
 Configure hosts/paths in `values.yaml` under `ingress.hosts`.
 
+When exposing OpenZEV via a domain, also set Django `ALLOWED_HOSTS`:
+
+```yaml
+backend:
+  allowedHosts: "openzev.example.com"
+```
+
+If this is missing, Django may reject requests with `400 Bad Request`.
+
 ## Email configuration
 
 Set email-related values under `email` in `values.yaml`:

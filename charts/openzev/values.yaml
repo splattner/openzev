@@ -26,6 +26,9 @@ backend:
   tolerations: []
   affinity: {}
   extraEnv: {}
+  # Comma-separated list for Django ALLOWED_HOSTS.
+  # Example: "openzev.example.com,openzev.local"
+  allowedHosts: ""
   corsAllowedOrigins: ""
 
 worker:
