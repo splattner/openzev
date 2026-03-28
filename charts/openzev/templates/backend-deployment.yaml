@@ -1,0 +1,124 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "openzev.fullname" . }}-backend
+  labels:
+    {{- include "openzev.labels" . | nindent 4 }}
+    app.kubernetes.io/component: backend
+spec:
+  replicas: {{ .Values.backend.replicaCount }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: backend
+  template:
+    metadata:
+      labels:
+        {{- include "openzev.labels" . | nindent 8 }}
+        app.kubernetes.io/component: backend
+      {{- with .Values.backend.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      {{- with .Values.backend.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: backend
+          image: "{{ .Values.backend.image.repository }}:{{ include "openzev.imageTag" (dict "tag" .Values.backend.image.tag "context" .) }}"
+          imagePullPolicy: {{ .Values.backend.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8000
+              protocol: TCP
+          env:
+            - name: SECRET_KEY
+              {{- if .Values.secretKey.existingSecret.name }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secretKey.existingSecret.name }}
+                  key: {{ .Values.secretKey.existingSecret.key }}
+              {{- else }}
+              value: {{ .Values.secretKey.value | quote }}
+              {{- end }}
+            - name: DATABASE_URL
+              {{- if .Values.database.existingSecret.name }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.database.existingSecret.name }}
+                  key: {{ .Values.database.existingSecret.key }}
+              {{- else }}
+              value: {{ .Values.database.url | quote }}
+              {{- end }}
+            - name: CELERY_BROKER_URL
+              value: {{ .Values.redis.url | quote }}
+            - name: EMAIL_BACKEND
+              value: {{ .Values.email.backend | quote }}
+            - name: EMAIL_HOST
+              value: {{ .Values.email.host | quote }}
+            - name: EMAIL_PORT
+              value: {{ .Values.email.port | quote }}
+            - name: EMAIL_USE_TLS
+              value: {{ .Values.email.useTls | quote }}
+            - name: EMAIL_HOST_USER
+              value: {{ .Values.email.hostUser | quote }}
+            - name: DEFAULT_FROM_EMAIL
+              value: {{ .Values.email.defaultFromEmail | quote }}
+            - name: FRONTEND_URL
+              value: {{ .Values.email.frontendUrl | quote }}
+            - name: EMAIL_HOST_PASSWORD
+              {{- if .Values.email.existingSecret.name }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.email.existingSecret.name }}
+                  key: {{ .Values.email.existingSecret.key }}
+              {{- else }}
+              value: ""
+              {{- end }}
+            {{- if .Values.backend.corsAllowedOrigins }}
+            - name: CORS_ALLOWED_ORIGINS
+              value: {{ .Values.backend.corsAllowedOrigins | quote }}
+            {{- end }}
+            {{- range $key, $value := .Values.backend.extraEnv }}
+            - name: {{ $key }}
+              value: {{ $value | quote }}
+            {{- end }}
+          volumeMounts:
+            - name: media
+              mountPath: /app/media
+          readinessProbe:
+            tcpSocket:
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 20
+          {{- with .Values.backend.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.backend.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      volumes:
+        - name: media
+          persistentVolumeClaim:
+            claimName: {{ include "openzev.mediaClaimName" . }}
+      {{- with .Values.backend.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.backend.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.backend.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

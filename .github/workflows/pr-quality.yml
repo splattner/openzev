@@ -34,6 +34,22 @@ jobs:
             - name: Build frontend
               run: npm run build
 
+    helm-lint-template:
+        name: Helm lint and template
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v6
+
+            - name: Setup Helm
+              uses: azure/setup-helm@v4
+
+            - name: Lint chart
+              run: helm lint ./charts/openzev
+
+            - name: Render chart
+              run: helm template openzev ./charts/openzev > /tmp/openzev-helm-render.yaml
+
     backend-check-test:
         name: Backend checks and tests
         runs-on: ubuntu-latest
