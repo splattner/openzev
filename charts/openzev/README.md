@@ -2,6 +2,8 @@
 
 Deploys OpenZEV frontend, backend, and Celery worker on Kubernetes.
 
+For full installation and production values examples, see the root guide: `README.md#helm-installation-kubernetes`.
+
 ## Included resources
 
 - Frontend `Deployment` + `Service`

@@ -143,6 +143,85 @@ To stop:
 docker compose -f docker-compose.fullstack.yml down
 ```
 
+## Helm Installation (Kubernetes)
+
+OpenZEV also ships as a Helm chart in `charts/openzev`.
+
+What the chart deploys:
+
+- Frontend deployment + service
+- Backend deployment + service
+- Celery worker deployment
+- Ingress
+- PVC for `/app/media`
+
+What the chart does not deploy:
+
+- PostgreSQL
+- Redis
+
+You must provide reachable external database and Redis endpoints.
+
+### Install from published Helm repo
+
+```bash
+helm repo add openzev https://splattner.github.io/openzev
+helm repo update
+helm install openzev openzev/openzev -n openzev --create-namespace
+```
+
+### Install from local chart
+
+```bash
+helm upgrade --install openzev ./charts/openzev -n openzev --create-namespace
+```
+
+### Example values for external services and secrets
+
+```yaml
+database:
+  existingSecret:
+    name: openzev-db-secret
+    key: DATABASE_URL
+
+redis:
+  url: redis://redis.example.svc.cluster.local:6379/0
+
+secretKey:
+  existingSecret:
+    name: openzev-django-secret
+    key: SECRET_KEY
+
+email:
+  backend: django.core.mail.backends.smtp.EmailBackend
+  host: smtp.example.com
+  port: 587
+  useTls: true
+  hostUser: openzev@example.com
+  defaultFromEmail: openzev@example.com
+  frontendUrl: https://openzev.example.com
+  existingSecret:
+    name: openzev-mail-secret
+    key: EMAIL_HOST_PASSWORD
+
+ingress:
+  enabled: true
+  className: nginx
+  hosts:
+    - host: openzev.example.com
+      frontendPaths:
+        - /
+      backendPaths:
+        - /api
+        - /admin
+```
+
+Apply values file:
+
+```bash
+helm upgrade --install openzev openzev/openzev -n openzev --create-namespace -f values-prod.yaml
+```
+
 ## Prebuilt Container Images
 
 Prebuilt images are published to GitHub Container Registry (GHCR), the current image names are:
