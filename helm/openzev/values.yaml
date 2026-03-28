@@ -1,0 +1,113 @@
+nameOverride: ""
+fullnameOverride: ""
+
+commonLabels: {}
+
+secretKey:
+  value: "change-me-in-production-use-a-long-random-string"
+  existingSecret:
+    name: ""
+    key: SECRET_KEY
+
+backend:
+  replicaCount: 1
+  image:
+    repository: ghcr.io/splattner/openzev-backend
+    tag: ""
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 8000
+  podAnnotations: {}
+  podSecurityContext: {}
+  securityContext: {}
+  resources: {}
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  extraEnv: {}
+  corsAllowedOrigins: ""
+
+worker:
+  replicaCount: 1
+  image:
+    repository: ghcr.io/splattner/openzev-backend
+    tag: ""
+    pullPolicy: IfNotPresent
+  command:
+    - celery
+    - -A
+    - config
+    - worker
+    - -l
+    - info
+  podAnnotations: {}
+  podSecurityContext: {}
+  securityContext: {}
+  resources: {}
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  extraEnv: {}
+
+frontend:
+  replicaCount: 1
+  image:
+    repository: ghcr.io/splattner/openzev-frontend
+    tag: ""
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 80
+  podAnnotations: {}
+  podSecurityContext: {}
+  securityContext: {}
+  resources: {}
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+media:
+  pvc:
+    existingClaim: ""
+    accessModes:
+      - ReadWriteOnce
+    size: 10Gi
+    storageClassName: ""
+
+# If existingSecret.name is set, DATABASE_URL is read from secret key.
+database:
+  url: "postgres://openzev:openzev@db:5432/openzev"
+  existingSecret:
+    name: ""
+    key: DATABASE_URL
+
+# Redis is external to this chart.
+redis:
+  url: "redis://redis:6379/0"
+
+email:
+  backend: "django.core.mail.backends.console.EmailBackend"
+  host: "smtp.example.com"
+  port: 587
+  useTls: true
+  hostUser: ""
+  defaultFromEmail: "openzev@example.com"
+  frontendUrl: "http://localhost:5173"
+  # EMAIL_HOST_PASSWORD is read from an existing Kubernetes Secret when name is set.
+  existingSecret:
+    name: ""
+    key: EMAIL_HOST_PASSWORD
+
+ingress:
+  enabled: true
+  className: ""
+  annotations: {}
+  tls: []
+  hosts:
+    - host: openzev.local
+      frontendPaths:
+        - /
+      backendPaths:
+        - /api
+        - /admin

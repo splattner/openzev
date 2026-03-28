@@ -5,7 +5,17 @@
       "release-type": "simple",
       "changelog-path": "CHANGELOG.md",
       "extra-files": [
-        "frontend/package.json"
+        "frontend/package.json",
+        {
+          "type": "yaml",
+          "path": "helm/openzev/Chart.yaml",
+          "jsonpath": "$.version"
+        },
+        {
+          "type": "yaml",
+          "path": "helm/openzev/Chart.yaml",
+          "jsonpath": "$.appVersion"
+        }
       ]
     }
   }
