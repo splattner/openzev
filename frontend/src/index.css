@@ -92,7 +92,7 @@ th {
   background: #0f172a;
   color: #fff;
   transition: padding 0.2s ease;
-  height: 100vh;
+  height: 100dvh;
   position: sticky;
   top: 0;
   overflow: hidden;
@@ -113,7 +113,23 @@ th {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+  padding-right: 0.25rem;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.5) transparent;
   align-content: start;
+}
+
+.sidebar-top::-webkit-scrollbar {
+  width: 8px;
+}
+
+.sidebar-top::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.45);
+  border-radius: 999px;
+}
+
+.sidebar-top::-webkit-scrollbar-track {
+  background: transparent;
 }
 
 .sidebar-brand-row {
@@ -938,7 +954,17 @@ h3 {
   }
 
   .sidebar {
+    position: static;
+    top: auto;
+    height: auto;
+    overflow: visible;
+    gap: 1rem;
     padding: 1.5rem;
+  }
+
+  .sidebar-top {
+    overflow: visible;
+    padding-right: 0;
   }
 
   .content {
