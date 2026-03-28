@@ -1,6 +1,6 @@
 from datetime import date, timedelta
 
-from django.contrib.auth.models import AbstractUser
+from django.contrib.auth.models import AbstractUser, UserManager
 from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
@@ -14,6 +14,15 @@ class UserRole(models.TextChoices):
     GUEST = "guest", "Guest"
 
 
+class OpenZevUserManager(UserManager):
+    def create_superuser(self, username, email=None, password=None, **extra_fields):
+        # Keep Django superuser flags and OpenZEV role in sync.
+        extra_fields.setdefault("role", UserRole.ADMIN)
+        if extra_fields.get("role") != UserRole.ADMIN:
+            raise ValueError("Superuser must have role='admin'.")
+        return super().create_superuser(username, email=email, password=password, **extra_fields)
+
+
 class User(AbstractUser):
     """Extended user model with role-based access control."""
 
@@ -23,6 +32,7 @@ class User(AbstractUser):
         default=UserRole.PARTICIPANT,
     )
     must_change_password = models.BooleanField(default=False)
+    objects = OpenZevUserManager()
 
     @property
     def is_admin(self):
