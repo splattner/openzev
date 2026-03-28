@@ -65,6 +65,10 @@ spec:
               value: {{ .Values.email.defaultFromEmail | quote }}
             - name: FRONTEND_URL
               value: {{ .Values.email.frontendUrl | quote }}
+            {{- if .Values.backend.allowedHosts }}
+            - name: ALLOWED_HOSTS
+              value: {{ .Values.backend.allowedHosts | quote }}
+            {{- end }}
             - name: EMAIL_HOST_PASSWORD
               {{- if .Values.email.existingSecret.name }}
               valueFrom:
