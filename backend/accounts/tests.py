@@ -19,6 +19,26 @@ class UserModelTests(TestCase):
 		self.assertTrue(owner.is_zev_owner)
 		self.assertFalse(participant.is_admin)
 
+	def test_create_superuser_sets_admin_role(self):
+		superuser = User.objects.create_superuser(
+			username="root",
+			email="root@example.com",
+			password="super-secret",
+		)
+
+		self.assertEqual(superuser.role, UserRole.ADMIN)
+		self.assertTrue(superuser.is_superuser)
+		self.assertTrue(superuser.is_staff)
+
+	def test_create_superuser_rejects_non_admin_role(self):
+		with self.assertRaisesMessage(ValueError, "Superuser must have role='admin'."):
+			User.objects.create_superuser(
+				username="invalid-root",
+				email="invalid@example.com",
+				password="super-secret",
+				role=UserRole.PARTICIPANT,
+			)
+
 
 class PasswordChangeFlagTests(TestCase):
 	def test_change_password_clears_must_change_password_flag(self):
