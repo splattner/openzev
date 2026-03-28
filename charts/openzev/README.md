@@ -18,7 +18,17 @@ Deploys OpenZEV frontend, backend, and Celery worker on Kubernetes.
 ## Install
 
 ```bash
-helm upgrade --install openzev ./helm/openzev
+helm upgrade --install openzev ./charts/openzev
+```
+
+## Use as a Helm repo
+
+After enabling GitHub Pages on the `gh-pages` branch, add this repository as a Helm repo:
+
+```bash
+helm repo add openzev https://splattner.github.io/openzev
+helm repo update
+helm install openzev openzev/openzev
 ```
 
 ## Database credentials via existing secret

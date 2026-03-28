@@ -8,12 +8,12 @@
         "frontend/package.json",
         {
           "type": "yaml",
-          "path": "helm/openzev/Chart.yaml",
+          "path": "charts/openzev/Chart.yaml",
           "jsonpath": "$.version"
         },
         {
           "type": "yaml",
-          "path": "helm/openzev/Chart.yaml",
+          "path": "charts/openzev/Chart.yaml",
           "jsonpath": "$.appVersion"
         }
       ]
