@@ -32,6 +32,7 @@ class TariffViewSet(viewsets.ModelViewSet):
             'billing_mode': tariff.billing_mode,
             'energy_type': tariff.energy_type,
             'fixed_price_chf': str(tariff.fixed_price_chf) if tariff.fixed_price_chf is not None else None,
+            'percentage': str(tariff.percentage) if tariff.percentage is not None else None,
             'valid_from': tariff.valid_from.isoformat(),
             'valid_to': tariff.valid_to.isoformat() if tariff.valid_to else None,
             'notes': tariff.notes,

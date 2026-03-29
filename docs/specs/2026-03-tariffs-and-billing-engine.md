@@ -356,6 +356,7 @@ ELSE:
 | `billing_mode` | string | One of the 6 billing modes |
 | `energy_type` | string \| null | `local`, `grid`, `feed_in`, or `null` |
 | `fixed_price_chf` | string \| null | Decimal as string, `null` when N/A |
+| `percentage` | string \| null | Decimal as string, populated for `percentage_of_energy` |
 | `valid_from` | string | ISO 8601 date |
 | `valid_to` | string \| null | ISO 8601 date or `null` |
 | `notes` | string | |
@@ -373,8 +374,6 @@ ELSE:
 
 Stripped fields: `id`, `zev`, `created_at`, `updated_at` are excluded so the
 preset is portable across ZEVs.
-
-**Note:** The `percentage` model field is not included in the export serialization.
 
 ### 6.2 Tariff preset import
 
