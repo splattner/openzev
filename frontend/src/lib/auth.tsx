@@ -8,7 +8,7 @@ interface AuthContextValue {
     isLoading: boolean
     isImpersonating: boolean
     impersonator: User | null
-    login: (username: string, password: string) => Promise<User>
+    login: (email: string, password: string) => Promise<User>
     storeTokens: (tokens: AuthTokens) => void
     refreshUser: () => Promise<User>
     startImpersonation: (participantUserId: number) => Promise<void>
@@ -68,8 +68,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             isLoading,
             isImpersonating: impersonator !== null,
             impersonator,
-            async login(username: string, password: string) {
-                const tokens = await loginRequest(username, password)
+            async login(email: string, password: string) {
+                const tokens = await loginRequest(email, password)
                 localStorage.setItem(ACCESS_KEY, tokens.access)
                 localStorage.setItem(REFRESH_KEY, tokens.refresh)
                 localStorage.removeItem(IMPERSONATION_ACCESS_KEY)

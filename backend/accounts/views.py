@@ -6,6 +6,7 @@ from rest_framework.exceptions import PermissionDenied, ValidationError
 import secrets
 from urllib.parse import urlencode
 from django.conf import settings
+from django.utils.text import slugify
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.core.mail import EmailMessage
@@ -163,21 +164,24 @@ def impersonate_participant(request, user_id: int):
 @permission_classes([AllowAny])
 def register(request):
     """Self-registration: create a pending zev_owner account and send a verification email."""
-    username = request.data.get("username", "").strip()
     email = request.data.get("email", "").strip()
 
     errors = {}
-    if not username:
-        errors["username"] = "Username is required."
     if not email:
         errors["email"] = "Email is required."
     if errors:
         return Response(errors, status=status.HTTP_400_BAD_REQUEST)
 
-    if User.objects.filter(username=username).exists():
-        return Response({"username": "This username is already taken."}, status=status.HTTP_400_BAD_REQUEST)
     if User.objects.filter(email__iexact=email).exists():
         return Response({"email": "An account with this email already exists."}, status=status.HTTP_400_BAD_REQUEST)
+
+    email_local = slugify(email.split("@", 1)[0]).replace("-", ".") if "@" in email else ""
+    base_username = email_local or "owner"
+    username = base_username
+    suffix = 1
+    while User.objects.filter(username=username).exists():
+        suffix += 1
+        username = f"{base_username}{suffix}"
 
     user = User.objects.create_user(
         username=username,
@@ -200,7 +204,7 @@ def register(request):
     EmailMessage(
         subject="Verify your OpenZEV account",
         body=(
-            f"Hello {username},\n\n"
+            f"Hello,\n\n"
             f"Thank you for registering with OpenZEV.\n"
             f"Please verify your email address by clicking the link below:\n\n"
             f"{verify_url}\n\n"

@@ -128,7 +128,6 @@ export interface ZevWizardInput extends Omit<ZevInput, 'owner'> {
 }
 
 export interface RegisterInput {
-    username: string
     email: string
 }
 

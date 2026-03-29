@@ -199,6 +199,8 @@ Defined in `accounts/permissions.py` and `zev/permissions.py`.
 
 **Token endpoint:** `POST /api/v1/auth/token/`
 
+**Payload:** `{ email, password }` (preferred) or `{ username, password }` (backward-compatible)
+
 Custom `TokenObtainPairSerializer` embeds in the token:
 
 | Claim | Value |
@@ -217,15 +219,16 @@ Axios interceptor attaches `Authorization: Bearer {access}` to all API requests.
 
 **Endpoint:** `POST /api/v1/auth/register/` (AllowAny)
 
-**Payload:** `{ username, email }`
+**Payload:** `{ email }`
 
 **Flow:**
-1. Validate uniqueness of `username` and `email` (case-insensitive for email).
-2. Create `User` with `role=zev_owner`, `is_active=False`,
+1. Validate uniqueness of `email` (case-insensitive).
+2. Generate an internal unique `username` from the email local-part (suffix when needed).
+3. Create `User` with `role=zev_owner`, `is_active=False`,
    `must_change_password=True`, unusable password.
-3. Generate `EmailVerificationToken` (48-byte `token_urlsafe`).
-4. Send verification email with link `{FRONTEND_URL}/verify-email?token={token}`.
-5. Return `201` with `"Verification email sent."`.
+4. Generate `EmailVerificationToken` (48-byte `token_urlsafe`).
+5. Send verification email with link `{FRONTEND_URL}/verify-email?token={token}`.
+6. Return `201` with "Verification email sent.".
 
 ### 5.3 Email verification
 

@@ -1,4 +1,5 @@
 from django.test import TestCase
+from django.core import mail
 from rest_framework.test import APIClient
 
 from .models import AppSettings, User, UserRole, VatRate
@@ -61,6 +62,81 @@ class PasswordChangeFlagTests(TestCase):
 		self.assertEqual(change_resp.status_code, 200)
 		user.refresh_from_db()
 		self.assertFalse(user.must_change_password)
+
+
+class TokenLoginCredentialTests(TestCase):
+	def test_login_accepts_email(self):
+		client = APIClient()
+		user = User.objects.create_user(
+			username="email_login",
+			email="email-login@example.com",
+			password="pass1234",
+			role=UserRole.PARTICIPANT,
+		)
+
+		resp = client.post(
+			"/api/v1/auth/token/",
+			{"email": user.email, "password": "pass1234"},
+		)
+
+		self.assertEqual(resp.status_code, 200)
+		self.assertIn("access", resp.data)
+		self.assertIn("refresh", resp.data)
+
+
+class RegistrationTests(TestCase):
+	def test_register_accepts_email_only_and_generates_username(self):
+		client = APIClient()
+
+		resp = client.post(
+			"/api/v1/auth/register/",
+			{"email": "new.owner@example.com"},
+			format="json",
+		)
+
+		self.assertEqual(resp.status_code, 201)
+		user = User.objects.get(email__iexact="new.owner@example.com")
+		self.assertEqual(user.username, "newowner")
+		self.assertEqual(user.role, UserRole.ZEV_OWNER)
+		self.assertFalse(user.is_active)
+		self.assertTrue(user.must_change_password)
+		self.assertGreaterEqual(len(mail.outbox), 1)
+
+	def test_register_rejects_duplicate_email_case_insensitive(self):
+		User.objects.create_user(
+			username="existing.owner",
+			email="existing.owner@example.com",
+			password="pass1234",
+			role=UserRole.ZEV_OWNER,
+		)
+		client = APIClient()
+
+		resp = client.post(
+			"/api/v1/auth/register/",
+			{"email": "EXISTING.OWNER@example.com"},
+			format="json",
+		)
+
+		self.assertEqual(resp.status_code, 400)
+		self.assertIn("email", resp.data)
+
+	def test_login_still_accepts_username(self):
+		client = APIClient()
+		user = User.objects.create_user(
+			username="username_login",
+			email="username-login@example.com",
+			password="pass1234",
+			role=UserRole.PARTICIPANT,
+		)
+
+		resp = client.post(
+			"/api/v1/auth/token/",
+			{"username": user.username, "password": "pass1234"},
+		)
+
+		self.assertEqual(resp.status_code, 200)
+		self.assertIn("access", resp.data)
+		self.assertIn("refresh", resp.data)
 
 
 class ImpersonationTests(TestCase):

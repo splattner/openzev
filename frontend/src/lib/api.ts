@@ -110,8 +110,8 @@ api.interceptors.request.use((config) => {
     return config
 })
 
-export async function login(username: string, password: string): Promise<AuthTokens> {
-    const { data } = await api.post<AuthTokens>('/auth/token/', { username, password })
+export async function login(email: string, password: string): Promise<AuthTokens> {
+    const { data } = await api.post<AuthTokens>('/auth/token/', { email, password })
     return data
 }
 
