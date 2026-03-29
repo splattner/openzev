@@ -11,14 +11,13 @@ export function LoginPage() {
     const { login } = useAuth()
 
     // Login state
-    const [username, setUsername] = useState('')
+    const [email, setEmail] = useState('')
     const [password, setPassword] = useState('')
     const [error, setError] = useState<string | null>(null)
     const [loading, setLoading] = useState(false)
 
     // Register modal state
     const [showModal, setShowModal] = useState(false)
-    const [regUsername, setRegUsername] = useState('')
     const [regEmail, setRegEmail] = useState('')
     const [regError, setRegError] = useState<string | null>(null)
     const [regLoading, setRegLoading] = useState(false)
@@ -29,7 +28,7 @@ export function LoginPage() {
         setLoading(true)
         setError(null)
         try {
-            const me = await login(username, password)
+            const me = await login(email, password)
             navigate(me.must_change_password ? '/account' : '/')
         } catch {
             setError(t('auth.invalid'))
@@ -43,7 +42,7 @@ export function LoginPage() {
         setRegLoading(true)
         setRegError(null)
         try {
-            await apiRegister({ username: regUsername, email: regEmail })
+            await apiRegister({ email: regEmail })
             setRegSuccess(t('auth.register.success', { email: regEmail }))
         } catch (err) {
             setRegError(formatApiError(err))
@@ -53,7 +52,6 @@ export function LoginPage() {
     }
 
     function openModal() {
-        setRegUsername('')
         setRegEmail('')
         setRegError(null)
         setRegSuccess(null)
@@ -76,8 +74,8 @@ export function LoginPage() {
                     <p className="muted">{t('auth.signIn')}</p>
 
                     <label>
-                        <span>{t('auth.username')}</span>
-                        <input value={username} onChange={(e) => setUsername(e.target.value)} required />
+                        <span>{t('auth.email')}</span>
+                        <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
                     </label>
 
                     <label>
@@ -114,16 +112,6 @@ export function LoginPage() {
                             <div className="success-banner">{regSuccess}</div>
                         ) : (
                             <form onSubmit={handleRegister}>
-                                <label>
-                                    <span>{t('auth.username')}</span>
-                                    <input
-                                        value={regUsername}
-                                        onChange={(e) => setRegUsername(e.target.value)}
-                                        placeholder={t('auth.register.usernamePlaceholder')}
-                                        required
-                                    />
-                                </label>
-
                                 <label>
                                     <span>{t('auth.register.email')}</span>
                                     <input

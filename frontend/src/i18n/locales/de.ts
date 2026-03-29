@@ -25,6 +25,7 @@ export const de = {
     auth: {
         welcome: 'Willkommen',
         signIn: 'Melden Sie sich bei OpenZEV an',
+        email: 'E-Mail-Adresse',
         username: 'Benutzername',
         password: 'Passwort',
         submit: 'Anmelden',

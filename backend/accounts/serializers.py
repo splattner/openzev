@@ -1,4 +1,5 @@
 from django.contrib.auth.password_validation import validate_password
+from django.contrib.auth import get_user_model
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from .models import AppSettings, User, UserRole, VatRate
@@ -66,6 +67,34 @@ class ChangePasswordSerializer(serializers.Serializer):
 
 
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
+    email = serializers.EmailField(required=False, allow_blank=True, write_only=True)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Phase 1 migration: allow email-only login while keeping username fallback.
+        self.fields[self.username_field].required = False
+        self.fields[self.username_field].allow_blank = True
+
+    def validate(self, attrs):
+        email = (attrs.get("email") or "").strip()
+        username = (attrs.get(self.username_field) or "").strip()
+
+        if email:
+            user_model = get_user_model()
+            matches = list(
+                user_model.objects.filter(email__iexact=email).values_list(self.username_field, flat=True)[:2]
+            )
+            # Keep login failure generic and avoid ambiguous email authentication.
+            if len(matches) != 1:
+                self.fail("no_active_account")
+            attrs[self.username_field] = matches[0]
+        elif username:
+            attrs[self.username_field] = username
+        else:
+            self.fail("no_active_account")
+
+        return super().validate(attrs)
+
     @classmethod
     def get_token(cls, user):
         token = super().get_token(user)
