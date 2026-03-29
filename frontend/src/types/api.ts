@@ -496,6 +496,15 @@ export interface DashboardStats {
 export interface PdfTemplateResponse {
     template_name: string
     content: string
+    is_customized: boolean
+    detail?: string
+}
+
+export interface EmailTemplateResponse {
+    template_key: string
+    subject: string
+    body: string
+    is_customized: boolean
     detail?: string
 }
 

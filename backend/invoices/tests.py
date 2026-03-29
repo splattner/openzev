@@ -22,7 +22,7 @@ from django.test.utils import override_settings
 from rest_framework.test import APIClient
 
 from accounts.models import AppSettings, User, UserRole, VatRate
-from invoices.models import Invoice, InvoiceItem, InvoiceStatus
+from invoices.models import Invoice, InvoiceItem, InvoiceStatus, PdfTemplate
 from invoices.engine import generate_invoice
 from invoices.tasks import send_invoice_email_task
 from invoices.serializers import InvoiceSerializer
@@ -153,17 +153,55 @@ class InvoiceRBACTests(TestCase):
         template_path = settings.BASE_DIR / "templates" / "invoices" / "invoice_pdf.html"
         original = template_path.read_text(encoding="utf-8")
         updated = original + "\n<!-- test marker -->\n"
-        try:
-            resp = self.client.patch(
-                "/api/v1/invoices/invoices/pdf-template/",
-                {"content": updated},
-                format="json",
-            )
-            self.assertEqual(resp.status_code, 200)
-            self.assertIn("detail", resp.data)
-            self.assertEqual(template_path.read_text(encoding="utf-8"), updated)
-        finally:
-            template_path.write_text(original, encoding="utf-8")
+        resp = self.client.patch(
+            "/api/v1/invoices/invoices/pdf-template/",
+            {"content": updated},
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn("detail", resp.data)
+        self.assertTrue(resp.data["is_customized"])
+
+        record = PdfTemplate.objects.get(template_name="invoices/invoice_pdf.html")
+        self.assertEqual(record.content, updated)
+        # On-disk file remains the immutable default.
+        self.assertEqual(template_path.read_text(encoding="utf-8"), original)
+
+    def test_admin_can_reset_pdf_template_to_default(self):
+        auth(self.client, self.admin)
+        template_name = "invoices/invoice_pdf.html"
+        default_content = (settings.BASE_DIR / "templates" / template_name).read_text(encoding="utf-8")
+        PdfTemplate.objects.create(template_name=template_name, content="<html>custom</html>")
+
+        resp = self.client.delete("/api/v1/invoices/invoices/pdf-template/")
+
+        self.assertEqual(resp.status_code, 200)
+        self.assertFalse(resp.data["is_customized"])
+        self.assertEqual(resp.data["content"], default_content)
+        self.assertFalse(PdfTemplate.objects.filter(template_name=template_name).exists())
+
+    def test_admin_can_read_and_update_contract_pdf_template(self):
+        auth(self.client, self.admin)
+        get_resp = self.client.get("/api/v1/invoices/invoices/contract-pdf-template/")
+        self.assertEqual(get_resp.status_code, 200)
+        self.assertIn("content", get_resp.data)
+        self.assertFalse(get_resp.data["is_customized"])
+
+        updated = get_resp.data["content"] + "\n<!-- contract marker -->\n"
+        patch_resp = self.client.patch(
+            "/api/v1/invoices/invoices/contract-pdf-template/",
+            {"content": updated},
+            format="json",
+        )
+        self.assertEqual(patch_resp.status_code, 200)
+        self.assertTrue(patch_resp.data["is_customized"])
+        record = PdfTemplate.objects.get(template_name="contracts/participant_contract_pdf.html")
+        self.assertEqual(record.content, updated)
+
+    def test_owner_cannot_read_contract_pdf_template(self):
+        auth(self.client, self.owner1)
+        resp = self.client.get("/api/v1/invoices/invoices/contract-pdf-template/")
+        self.assertEqual(resp.status_code, 403)
 
     def test_admin_can_delete_paid_invoice(self):
         inv = make_invoice(self.zev1, self.p1, InvoiceStatus.PAID)

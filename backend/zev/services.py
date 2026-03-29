@@ -103,17 +103,28 @@ def send_participant_invitation(participant, invited_by) -> tuple[str, str]:
     user.must_change_password = True
     user.save(update_fields=['password', 'must_change_password'])
 
-    subject = f'Invitation to OpenZEV for {participant.zev.name}'
+    from invoices.models import EmailTemplate, EMAIL_TEMPLATE_DEFAULTS
+
+    defaults = EMAIL_TEMPLATE_DEFAULTS["participant_invitation"]
+    override = EmailTemplate.objects.filter(template_key="participant_invitation").first()
+    subject_tpl = override.subject if override else defaults["subject"]
+    body_tpl = override.body if override else defaults["body"]
+
     inviter_name = invited_by.get_full_name() or invited_by.username
-    body = (
-        f'Hello {participant.full_name},\n\n'
-        f'{inviter_name} invited you to access your OpenZEV participant account for {participant.zev.name}.\n\n'
-        f'Login username: {user.username}\n'
-        f'Temporary password: {temporary_password}\n\n'
-        f'Please sign in and change your password after your first login.\n\n'
-        f'Best regards,\n'
-        f'OpenZEV'
-    )
+    template_ctx = {
+        "participant_name": participant.full_name,
+        "inviter_name": inviter_name,
+        "zev_name": participant.zev.name,
+        "username": user.username,
+        "temporary_password": temporary_password,
+    }
+
+    try:
+        subject = subject_tpl.format_map(template_ctx)
+        body = body_tpl.format_map(template_ctx)
+    except (KeyError, ValueError):
+        subject = defaults["subject"].format_map(template_ctx)
+        body = defaults["body"].format_map(template_ctx)
 
     email = EmailMessage(
         subject=subject,

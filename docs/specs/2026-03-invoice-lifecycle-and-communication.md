@@ -106,9 +106,18 @@ Ordering: `["sort_order", "item_type", "description"]`.
 
 Ordering: `["-created_at"]`.
 
----
+### 3.4 PdfTemplate
 
-## 4. Invoice status machine
+| Field | Type | Description |
+|---|---|-|
+| `id` | `BigAutoField` (PK) | Auto-generated |
+| `template_name` | `CharField(200)`, unique | Relative path used as lookup key (e.g. `invoices/invoice_pdf.html`) |
+| `content` | `TextField` | Full HTML content of the customized template |
+| `updated_at` | `DateTimeField` (auto) | Last modification timestamp |
+
+A row exists only when the template has been customized via the admin API. When no row is present, the on-disk default file is used. Deleting the row reverts to the default.
+
+---
 
 ### 4.1 States
 
@@ -255,12 +264,38 @@ Validation: `period_start` must be before `period_end`.
 
 ### 5.7 PDF template management
 
+Both the invoice and contract PDF templates are editable via the admin API. Templates are stored in the database (`PdfTemplate` model) when customized; on-disk files serve as immutable defaults and are never modified.
+
+#### Invoice PDF template
+
 | Method | URL | Permission | Description |
 |---|---|---|---|
-| `GET` | `/invoices/pdf-template/` | `admin` only | Read current HTML template content |
-| `PATCH` | `/invoices/pdf-template/` | `admin` only | Update HTML template content |
+| `GET` | `/invoices/invoices/pdf-template/` | `admin` only | Return current content + `is_customized` flag (DB if overridden, else on-disk default) |
+| `PATCH` | `/invoices/invoices/pdf-template/` | `admin` only | Save content to database; never writes to filesystem |
+| `DELETE` | `/invoices/invoices/pdf-template/` | `admin` only | Remove DB override; reverts to on-disk default |
 
-Template file location: `backend/templates/invoices/invoice_pdf.html`.
+#### Contract PDF template
+
+| Method | URL | Permission | Description |
+|---|---|---|---|
+| `GET` | `/invoices/invoices/contract-pdf-template/` | `admin` only | Return current content + `is_customized` flag |
+| `PATCH` | `/invoices/invoices/contract-pdf-template/` | `admin` only | Save content to database |
+| `DELETE` | `/invoices/invoices/contract-pdf-template/` | `admin` only | Remove DB override; reverts to on-disk default |
+
+**Response shape (GET and PATCH):**
+
+```json
+{
+  "template_name": "invoices/invoice_pdf.html",
+  "content": "<!DOCTYPE html>...",
+  "is_customized": true,
+  "detail": "PDF template updated successfully."
+}
+```
+
+- `is_customized: false` means the on-disk default is active.
+- `is_customized: true` means a DB row overrides the default.
+- DELETE returns `is_customized: false` and the default content.
 
 ---
 
@@ -284,6 +319,7 @@ Template file location: `backend/templates/invoices/invoice_pdf.html`.
 | Generate PDF / send email / retry email | Yes | Yes | No |
 | Delete | Any status | Draft/cancelled only | No |
 | PDF template read/write | Yes | No (HTTP 403) | No |
+| Contract PDF template read/write | Yes | No (HTTP 403) | No |
 | Dashboard | Yes | No (HTTP 403) | No |
 
 Permission enforcement uses `IsZevOwnerOrAdmin` for action endpoints, with
@@ -351,7 +387,9 @@ rejected (HTTP `400`). The retried send creates a **new** `EmailLog` entry.
 ### 8.1 Pipeline
 
 1. Build template context from invoice, participant, ZEV, items, and settings.
-2. Render HTML using Django template engine (`render_to_string`).
+2. Look up `PdfTemplate` by `template_name` in the database.
+   - If a DB record exists: render using `django.template.Template(content).render(Context(context))`.
+   - Otherwise: render from the on-disk default using `render_to_string(template_name, context)`.
 3. Convert HTML → PDF via WeasyPrint.
 4. Save PDF to `invoice.pdf_file` (`invoices/pdf/invoice_{number}.pdf`).
 
@@ -462,7 +500,7 @@ Strips legacy period suffixes from `description` on serialization.
 
 - State machine changes require migration and transition compatibility checks.
 - Rollback plan includes safe handling of in-flight async send tasks.
-- Invoice PDF template can be hot-updated via admin API (§5.7) without deployment.
+- Invoice PDF template can be hot-updated via admin API (§5.7) without deployment. Templates are stored in the database and survive container restarts.
 
 ---
 
@@ -474,7 +512,8 @@ Strips legacy period suffixes from `description` on serialization.
 | Duplicate or lost email sends | High | Per-attempt `EmailLog` audit trail, bounded retries (max 3), explicit retry endpoint |
 | Regeneration races with approval/sending | Medium | Lifecycle locking: only draft/cancelled invoices may be replaced (`@transaction.atomic`) |
 | QR-Rechnung generation failure | Low | Graceful skip with log warning; invoice renders without QR section |
-| PDF template corruption via admin API | Medium | Template path is server-filesystem; original can be restored from version control |
+| PDF template corruption via admin API | Medium | Templates stored in DB; on-disk default always intact and recoverable via DELETE endpoint |
+| Contract template corruption via admin API | Medium | Same DB-backed recovery mechanism applies |
 | Orphaned pending email logs | Low | Status persisted before send attempt; failed tasks retry or surface in UI |
 
 ---
@@ -535,4 +574,6 @@ Strips legacy period suffixes from `description` on serialization.
 - [ ] Period overview correctly computes metering completeness per assignment window (§5.5)
 - [ ] Participants with no active assignment are excluded from period overview (§5.5)
 - [ ] Role-scoped queryset filtering is enforced server-side (§6.1)
-- [ ] PDF template is hot-updatable by admin only (§5.7)
+- [ ] PDF template is hot-updatable by admin only; changes persist to DB and survive restarts (§5.7)
+- [ ] Contract PDF template is hot-updatable by admin only via the same mechanism (§5.7)
+- [ ] Reset-to-default DELETE reverts to on-disk file without modifying it (§5.7)

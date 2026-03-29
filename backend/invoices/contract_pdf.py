@@ -8,6 +8,7 @@ from datetime import date
 from decimal import Decimal
 
 from django.template.loader import render_to_string
+from django.template import Template, Context
 from weasyprint import HTML
 
 from tariffs.models import BillingMode, EnergyType, PeriodType
@@ -461,6 +462,12 @@ def _build_contract_context(participant) -> dict:
 def generate_contract_pdf(participant) -> bytes:
     """Generate a participation contract PDF for the given participant."""
     context = _build_contract_context(participant)
-    html_string = render_to_string(CONTRACT_TEMPLATE_NAME, context)
+    # Import here to avoid circular imports at module load time
+    from .models import PdfTemplate
+    record = PdfTemplate.objects.filter(template_name=CONTRACT_TEMPLATE_NAME).first()
+    if record:
+        html_string = Template(record.content).render(Context(context))
+    else:
+        html_string = render_to_string(CONTRACT_TEMPLATE_NAME, context)
     pdf_bytes = HTML(string=html_string, base_url=".").write_pdf()
     return pdf_bytes

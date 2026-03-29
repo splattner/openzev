@@ -35,6 +35,7 @@ def send_invoice_email_task(self, invoice_id: str, recipient_email: str = None):
     formatted_period_end = _format_date_value(invoice.period_end, app_settings.date_format_short)
 
     from zev.models import DEFAULT_EMAIL_SUBJECT_TEMPLATE, DEFAULT_EMAIL_BODY_TEMPLATE
+    from .models import EmailTemplate, EMAIL_TEMPLATE_DEFAULTS
 
     template_ctx = {
         "invoice_number": invoice.invoice_number,
@@ -45,8 +46,13 @@ def send_invoice_email_task(self, invoice_id: str, recipient_email: str = None):
         "total_chf": invoice.total_chf,
     }
 
-    subject_tpl = invoice.zev.email_subject_template or DEFAULT_EMAIL_SUBJECT_TEMPLATE
-    body_tpl = invoice.zev.email_body_template or DEFAULT_EMAIL_BODY_TEMPLATE
+    # Resolution order: per-ZEV override → admin global override → hardcoded default
+    global_override = EmailTemplate.objects.filter(template_key="invoice_email").first()
+    global_subject = global_override.subject if global_override else DEFAULT_EMAIL_SUBJECT_TEMPLATE
+    global_body = global_override.body if global_override else DEFAULT_EMAIL_BODY_TEMPLATE
+
+    subject_tpl = invoice.zev.email_subject_template or global_subject
+    body_tpl = invoice.zev.email_body_template or global_body
 
     try:
         subject = subject_tpl.format_map(template_ctx)

@@ -9,6 +9,7 @@ from pathlib import Path
 from datetime import date, datetime
 
 from django.template.loader import render_to_string
+from django.template import Template, Context
 from django.core.files.base import ContentFile
 from django.utils import timezone
 from accounts.models import AppSettings
@@ -804,9 +805,19 @@ def _build_template_context(invoice) -> dict:
     }
 
 
+def _render_template(template_name: str, context: dict) -> str:
+    """Render a template from DB if customized, otherwise from the on-disk default."""
+    # Import here to avoid circular imports at module load time
+    from .models import PdfTemplate
+    record = PdfTemplate.objects.filter(template_name=template_name).first()
+    if record:
+        return Template(record.content).render(Context(context))
+    return render_to_string(template_name, context)
+
+
 def generate_pdf(invoice) -> bytes:
     """Render the invoice to PDF bytes."""
-    html_string = render_to_string(TEMPLATE_NAME, _build_template_context(invoice))
+    html_string = _render_template(TEMPLATE_NAME, _build_template_context(invoice))
     pdf_bytes = HTML(string=html_string, base_url=".").write_pdf()
     return pdf_bytes
 

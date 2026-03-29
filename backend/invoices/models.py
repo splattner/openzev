@@ -73,6 +73,90 @@ class InvoiceItem(models.Model):
         return f"{self.description}: {self.quantity_kwh} {self.unit} × {self.unit_price_chf} = {self.total_chf} CHF"
 
 
+class PdfTemplate(models.Model):
+    """
+    Customized PDF template stored in the database.
+
+    The on-disk file is the default.  When a user edits a template via the
+    admin UI the content is persisted here so it survives container restarts.
+    Deleting the row reverts to the on-disk default.
+    """
+
+    template_name = models.CharField(max_length=200, unique=True)
+    content = models.TextField()
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self) -> str:
+        return self.template_name
+
+
+# ── Email template defaults ─────────────────────────────────────────────
+
+DEFAULT_INVOICE_EMAIL_SUBJECT = "Invoice {invoice_number} – {zev_name}"
+DEFAULT_INVOICE_EMAIL_BODY = (
+    "Dear {participant_name},\n\n"
+    "Please find your energy invoice for the period "
+    "{period_start} to {period_end} attached.\n\n"
+    "Total: CHF {total_chf}\n\n"
+    "Kind regards,\n{zev_name}"
+)
+
+DEFAULT_INVITATION_EMAIL_SUBJECT = "Invitation to OpenZEV for {zev_name}"
+DEFAULT_INVITATION_EMAIL_BODY = (
+    "Hello {participant_name},\n\n"
+    "{inviter_name} invited you to access your OpenZEV participant account for {zev_name}.\n\n"
+    "Login username: {username}\n"
+    "Temporary password: {temporary_password}\n\n"
+    "Please sign in and change your password after your first login.\n\n"
+    "Best regards,\nOpenZEV"
+)
+
+DEFAULT_VERIFICATION_EMAIL_SUBJECT = "Verify your OpenZEV account"
+DEFAULT_VERIFICATION_EMAIL_BODY = (
+    "Hello,\n\n"
+    "Thank you for registering with OpenZEV.\n"
+    "Please verify your email address by clicking the link below:\n\n"
+    "{verify_url}\n\n"
+    "This link is valid for 24 hours.\n\n"
+    "If you did not register for OpenZEV, please ignore this email.\n\n"
+    "Best regards,\nOpenZEV"
+)
+
+EMAIL_TEMPLATE_DEFAULTS = {
+    "invoice_email": {
+        "subject": DEFAULT_INVOICE_EMAIL_SUBJECT,
+        "body": DEFAULT_INVOICE_EMAIL_BODY,
+    },
+    "participant_invitation": {
+        "subject": DEFAULT_INVITATION_EMAIL_SUBJECT,
+        "body": DEFAULT_INVITATION_EMAIL_BODY,
+    },
+    "email_verification": {
+        "subject": DEFAULT_VERIFICATION_EMAIL_SUBJECT,
+        "body": DEFAULT_VERIFICATION_EMAIL_BODY,
+    },
+}
+
+
+class EmailTemplate(models.Model):
+    """
+    Admin-customizable email template stored in the database.
+
+    Each template_key maps to a specific email type (invoice_email,
+    participant_invitation, email_verification).  Hardcoded defaults
+    are defined in EMAIL_TEMPLATE_DEFAULTS.  Deleting the DB row
+    reverts to the hardcoded default.
+    """
+
+    template_key = models.CharField(max_length=100, unique=True)
+    subject = models.CharField(max_length=500)
+    body = models.TextField()
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self) -> str:
+        return self.template_key
+
+
 class EmailLog(models.Model):
     """Audit log for invoice emails."""
 
