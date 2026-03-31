@@ -215,6 +215,69 @@ After import, review **Metering Data → Data Quality** to see:
 
 See [Metering Analysis](06-metering-analysis.md) for details.
 
+## Generating Sample Data (CLI)
+
+For development, testing, or demo purposes, OpenZEV includes a management command to generate realistic metering data with proper daily patterns.
+
+### Usage
+
+```bash
+python manage.py generate_metering_data <meter_id> <type> --start <date> --days <n> [--interval <interval>]
+```
+
+| Argument | Required | Description |
+| --- | --- | --- |
+| `meter_id` | ✓ | Meter ID (e.g. `CH1234567890120000000006666665030`) or metering point UUID |
+| `type` | ✓ | `consumption`, `production`, or `bidirectional` |
+| `--start` | ✓ | Start date in `YYYY-MM-DD` format |
+| `--days` | ✓ | Number of days to generate |
+| `--interval` | | `15min` (default) or `hourly` |
+| `--peak-kwh` | | Override auto-scaled peak kWh per interval |
+| `--net-metering` | | Simulate grid connection meter: production offsets consumption. Auto-enabled for `bidirectional` type |
+| `--dry-run` | | Show statistics without writing to the database |
+
+### Examples
+
+```bash
+# 30 days of consumption at 15-minute intervals
+python manage.py generate_metering_data CH1234567890120000000006666665030 consumption \
+    --start 2026-01-01 --days 30 --interval 15min
+
+# 90 days of solar production at hourly intervals
+python manage.py generate_metering_data CH9876543210987000000000044440859 production \
+    --start 2026-01-01 --days 90 --interval hourly
+
+# 60 days of bidirectional data (net metering auto-enabled)
+python manage.py generate_metering_data CH1234567890120000000006666665030 bidirectional \
+    --start 2026-01-01 --days 60
+
+# Consumption meter behind a solar system (grid connection meter)
+python manage.py generate_metering_data CH1234567890120000000006666665030 consumption \
+    --start 2026-01-01 --days 30 --net-metering
+
+# Preview without writing
+python manage.py generate_metering_data CH1234567890120000000006666665030 consumption \
+    --start 2026-01-01 --days 7 --dry-run
+```
+
+When running in Docker:
+
+```bash
+docker compose exec backend python manage.py generate_metering_data \
+    CH1234567890120000000006666665030 consumption --start 2026-01-01 --days 30
+```
+
+### Data Profiles
+
+The generated data uses realistic patterns:
+
+- **Consumption:** Household load profile with morning and evening peaks, low overnight usage, and weekday/weekend variation.
+- **Production:** Solar generation bell curve peaking around 13:00, with seasonal variation (higher in summer) and random cloud effects.
+- **Bidirectional:** Generates both consumption and production readings using net metering (auto-enabled).
+- **Net metering (`--net-metering`):** Simulates a grid connection meter where local solar production offsets consumption. Only the surplus is recorded — `IN` readings reflect grid import (consumption exceeding production), `OUT` readings reflect grid export (production exceeding consumption).
+
+Duplicate readings (same metering point, timestamp, and direction) are skipped automatically.
+
 ## Next Steps
 
 - **Check data quality:** [Metering Analysis](06-metering-analysis.md)
