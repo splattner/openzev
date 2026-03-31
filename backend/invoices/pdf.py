@@ -70,6 +70,14 @@ INVOICE_TRANSLATIONS: dict[str, dict[str, str]] = {
         "hourly_chart_title": "Durchschnittliches Tagesverbrauchsprofil (24 h)",
         "hourly_chart_description": "Durchschnittlicher st\u00fcndlicher Energiebezug \u00fcber die Abrechnungsperiode \u2014 aufgeteilt in lokale ZEV-Energie und Netzbezug.",
         "feed_in_hint": "Hinweis: Die Verg\u00fctung f\u00fcr lokale Energie wird anteilig an Produzenten verteilt. Der Einspeisetarif gilt nur f\u00fcr tats\u00e4chlich ins Netz exportierte Energie.",
+        "flow_title": "Energiefluss",
+        "flow_description": "Verteilung der Energiestr\u00f6me in Ihrer ZEV f\u00fcr die Abrechnungsperiode.",
+        "flow_grid_import": "Netzbezug",
+        "flow_grid_export": "Netzeinspeisung",
+        "flow_local_production": "Lokale Produktion",
+        "flow_total_local_production": "Gesamte lokale Produktion",
+        "flow_local_consumption": "Lokaler Verbrauch",
+        "flow_others": "Andere",
     },
     "fr": {
         "invoice_label": "Facture",
@@ -121,6 +129,14 @@ INVOICE_TRANSLATIONS: dict[str, dict[str, str]] = {
         "hourly_chart_title": "Profil de consommation journali\u00e8re moyen (24 h)",
         "hourly_chart_description": "Consommation \u00e9nerg\u00e9tique horaire moyenne sur la p\u00e9riode de facturation \u2014 r\u00e9partie en \u00e9nergie locale ZEV et importation r\u00e9seau.",
         "feed_in_hint": "Remarque : la r\u00e9mun\u00e9ration de l\u2019\u00e9nergie locale est r\u00e9partie proportionnellement entre les producteurs. Le tarif d\u2019injection s\u2019applique uniquement \u00e0 l\u2019\u00e9nergie effectivement export\u00e9e vers le r\u00e9seau.",
+        "flow_title": "Flux d'\u00e9nergie",
+        "flow_description": "R\u00e9partition des flux d'\u00e9nergie dans votre CEL pour la p\u00e9riode de facturation.",
+        "flow_grid_import": "Import r\u00e9seau",
+        "flow_grid_export": "Export r\u00e9seau",
+        "flow_local_production": "Production locale",
+        "flow_total_local_production": "Production locale totale",
+        "flow_local_consumption": "Consommation locale",
+        "flow_others": "Autres",
     },
     "it": {
         "invoice_label": "Fattura",
@@ -172,6 +188,14 @@ INVOICE_TRANSLATIONS: dict[str, dict[str, str]] = {
         "hourly_chart_title": "Profilo di consumo giornaliero medio (24 h)",
         "hourly_chart_description": "Consumo energetico orario medio nel periodo di fatturazione \u2014 suddiviso in energia locale ZEV e importazione dalla rete.",
         "feed_in_hint": "Nota: il compenso per l\u2019energia locale \u00e8 ripartito proporzionalmente tra i produttori. La tariffa di immissione si applica solo all\u2019energia effettivamente esportata in rete.",
+        "flow_title": "Flusso energetico",
+        "flow_description": "Distribuzione dei flussi energetici nella vostra CEL per il periodo di fatturazione.",
+        "flow_grid_import": "Importazione dalla rete",
+        "flow_grid_export": "Esportazione in rete",
+        "flow_local_production": "Produzione locale",
+        "flow_total_local_production": "Produzione locale totale",
+        "flow_local_consumption": "Consumo locale",
+        "flow_others": "Altri",
     },
     "en": {
         "invoice_label": "Invoice",
@@ -223,6 +247,14 @@ INVOICE_TRANSLATIONS: dict[str, dict[str, str]] = {
         "hourly_chart_title": "Average Daily Consumption Profile (24 h)",
         "hourly_chart_description": "Average hourly energy draw over the billing period \u2014 split between local ZEV energy and grid import.",
         "feed_in_hint": "Note: Local energy revenue is distributed to producers proportionally. Feed-in tariff is applied only to energy actually exported to the grid.",
+        "flow_title": "Energy Flow",
+        "flow_description": "Distribution of energy flows in your ZEV for the billing period.",
+        "flow_grid_import": "Grid Import",
+        "flow_grid_export": "Grid Export",
+        "flow_local_production": "Local Production",
+        "flow_total_local_production": "Total Local Production",
+        "flow_local_consumption": "Local Consumption",
+        "flow_others": "Others",
     },
 }
 
@@ -363,6 +395,441 @@ def _build_savings_data(invoice, tr: dict) -> dict | None:
         "hypothetical_chf": f"{hypothetical_chf:.2f}",
         "saved_chf": f"{saved_chf:.2f}",
     }
+
+
+def _compute_period_participant_stats(invoice) -> tuple[dict, list[dict]]:
+    """Compute ZEV-level totals and per-participant energy stats for the invoice
+    period, using the same local-pool allocation logic as the dashboard.
+
+    Returns (totals, participant_stats) where:
+      totals = {produced_kwh, consumed_kwh, imported_kwh, exported_kwh}
+      participant_stats = [{participant_id, participant_name, total_consumed_kwh,
+                            total_produced_kwh, from_zev_kwh, from_grid_kwh}, ...]
+    """
+    import datetime as _dt
+    from decimal import Decimal
+    from django.db import models as _dj
+    from metering.models import MeterReading, ReadingDirection
+    from zev.models import MeteringPoint as _MP, MeteringPointType as _MPT
+
+    zev = invoice.zev
+    ps = invoice.period_start
+    pe = invoice.period_end
+    start_dt = _dt.datetime.combine(ps, _dt.time.min).replace(tzinfo=_dt.timezone.utc)
+    end_dt = _dt.datetime.combine(pe, _dt.time.max).replace(tzinfo=_dt.timezone.utc) + _dt.timedelta(seconds=1)
+
+    # All metering points in this ZEV
+    cons_mps = _MP.objects.filter(
+        zev=zev,
+        meter_type__in=[_MPT.CONSUMPTION, _MPT.BIDIRECTIONAL],
+        assignments__valid_from__lte=pe,
+    ).filter(
+        _dj.Q(assignments__valid_to__isnull=True) | _dj.Q(assignments__valid_to__gte=ps)
+    ).distinct()
+
+    prod_mps = _MP.objects.filter(
+        zev=zev,
+        meter_type__in=[_MPT.PRODUCTION, _MPT.BIDIRECTIONAL],
+        assignments__valid_from__lte=pe,
+    ).filter(
+        _dj.Q(assignments__valid_to__isnull=True) | _dj.Q(assignments__valid_to__gte=ps)
+    ).distinct()
+
+    # ZEV-level aggregation by timestamp
+    cons_by_ts: dict[_dt.datetime, Decimal] = {}
+    prod_by_ts: dict[_dt.datetime, Decimal] = {}
+
+    for row in (
+        MeterReading.objects.filter(
+            metering_point__in=cons_mps,
+            timestamp__gte=start_dt, timestamp__lt=end_dt,
+            direction=ReadingDirection.IN,
+        ).values("timestamp").annotate(total=_dj.Sum("energy_kwh"))
+    ):
+        cons_by_ts[row["timestamp"]] = row["total"] or Decimal("0")
+
+    for row in (
+        MeterReading.objects.filter(
+            metering_point__in=prod_mps,
+            timestamp__gte=start_dt, timestamp__lt=end_dt,
+            direction=ReadingDirection.OUT,
+        ).values("timestamp").annotate(total=_dj.Sum("energy_kwh"))
+    ):
+        prod_by_ts[row["timestamp"]] = row["total"] or Decimal("0")
+
+    totals = {"produced_kwh": Decimal("0"), "consumed_kwh": Decimal("0"),
+              "imported_kwh": Decimal("0"), "exported_kwh": Decimal("0")}
+    all_ts = set(cons_by_ts) | set(prod_by_ts)
+    for ts in all_ts:
+        c = cons_by_ts.get(ts, Decimal("0"))
+        p = prod_by_ts.get(ts, Decimal("0"))
+        totals["consumed_kwh"] += c
+        totals["produced_kwh"] += p
+        totals["imported_kwh"] += max(c - p, Decimal("0"))
+        totals["exported_kwh"] += max(p - c, Decimal("0"))
+
+    # Per-participant consumption with local-pool allocation
+    participant_rows = (
+        MeterReading.objects.filter(
+            metering_point__in=cons_mps,
+            timestamp__gte=start_dt, timestamp__lt=end_dt,
+            direction=ReadingDirection.IN,
+        ).values(
+            "metering_point__assignments__participant_id",
+            "metering_point__assignments__participant__first_name",
+            "metering_point__assignments__participant__last_name",
+            "timestamp",
+        ).annotate(consumed_kwh=_dj.Sum("energy_kwh"))
+    )
+
+    participant_map: dict[str, dict] = {}
+    for row in participant_rows:
+        pid = str(row["metering_point__assignments__participant_id"])
+        ts = row["timestamp"]
+        consumed = row["consumed_kwh"] or Decimal("0")
+        total_consumed = cons_by_ts.get(ts, Decimal("0"))
+        total_produced = prod_by_ts.get(ts, Decimal("0"))
+        local_pool = min(total_produced, total_consumed)
+
+        if total_consumed > 0 and local_pool > 0:
+            from_zev = min(consumed, local_pool * (consumed / total_consumed))
+        else:
+            from_zev = Decimal("0")
+        from_grid = max(consumed - from_zev, Decimal("0"))
+
+        if pid not in participant_map:
+            participant_map[pid] = {
+                "participant_id": pid,
+                "participant_name": (
+                    f"{row['metering_point__assignments__participant__first_name']} "
+                    f"{row['metering_point__assignments__participant__last_name']}"
+                ).strip(),
+                "total_consumed_kwh": Decimal("0"),
+                "total_produced_kwh": Decimal("0"),
+                "from_zev_kwh": Decimal("0"),
+                "from_grid_kwh": Decimal("0"),
+            }
+        participant_map[pid]["total_consumed_kwh"] += consumed
+        participant_map[pid]["from_zev_kwh"] += from_zev
+        participant_map[pid]["from_grid_kwh"] += from_grid
+
+    # Per-participant production
+    prod_rows = (
+        MeterReading.objects.filter(
+            metering_point__in=prod_mps,
+            timestamp__gte=start_dt, timestamp__lt=end_dt,
+            direction=ReadingDirection.OUT,
+        ).values(
+            "metering_point__assignments__participant_id",
+            "metering_point__assignments__participant__first_name",
+            "metering_point__assignments__participant__last_name",
+        ).annotate(produced_kwh=_dj.Sum("energy_kwh"))
+    )
+    for row in prod_rows:
+        pid = str(row["metering_point__assignments__participant_id"])
+        if pid not in participant_map:
+            participant_map[pid] = {
+                "participant_id": pid,
+                "participant_name": (
+                    f"{row['metering_point__assignments__participant__first_name']} "
+                    f"{row['metering_point__assignments__participant__last_name']}"
+                ).strip(),
+                "total_consumed_kwh": Decimal("0"),
+                "total_produced_kwh": Decimal("0"),
+                "from_zev_kwh": Decimal("0"),
+                "from_grid_kwh": Decimal("0"),
+            }
+        participant_map[pid]["total_produced_kwh"] += (row["produced_kwh"] or Decimal("0"))
+
+    float_totals = {k: float(v) for k, v in totals.items()}
+    stats = sorted(
+        [
+            {
+                "participant_id": v["participant_id"],
+                "participant_name": v["participant_name"],
+                "total_consumed_kwh": float(v["total_consumed_kwh"]),
+                "total_produced_kwh": float(v["total_produced_kwh"]),
+                "from_zev_kwh": float(v["from_zev_kwh"]),
+                "from_grid_kwh": float(v["from_grid_kwh"]),
+            }
+            for v in participant_map.values()
+        ],
+        key=lambda x: x["total_consumed_kwh"],
+        reverse=True,
+    )
+    return float_totals, stats
+
+
+def _build_energy_flow_svg(invoice, tr: dict) -> str | None:
+    """Generate an SVG Sankey-style energy flow diagram for the invoice period.
+
+    Shows producers → total production → local consumption / grid export → consumers,
+    with the invoice participant highlighted and all other consumers aggregated as 'Others'.
+    """
+    totals, all_stats = _compute_period_participant_stats(invoice)
+    total_produced = totals["produced_kwh"]
+
+    pid = str(invoice.participant_id)
+    producers = [p for p in all_stats if p["total_produced_kwh"] > 0]
+    all_consumers = [p for p in all_stats if p["total_consumed_kwh"] > 0]
+
+    # Highlight invoice participant, aggregate others
+    highlighted = next((c for c in all_consumers if c["participant_id"] == pid), None)
+    others = [c for c in all_consumers if c["participant_id"] != pid]
+    consumers = []
+    if highlighted:
+        consumers.append(highlighted)
+    if others:
+        consumers.append({
+            "participant_id": "__others__",
+            "participant_name": tr["flow_others"],
+            "total_consumed_kwh": sum(c["total_consumed_kwh"] for c in others),
+            "total_produced_kwh": sum(c["total_produced_kwh"] for c in others),
+            "from_zev_kwh": sum(c["from_zev_kwh"] for c in others),
+            "from_grid_kwh": sum(c["from_grid_kwh"] for c in others),
+        })
+
+    sum_from_zev = sum(c["from_zev_kwh"] for c in consumers)
+    sum_from_grid = sum(c["from_grid_kwh"] for c in consumers)
+    local_cons = sum_from_zev if sum_from_zev > 0 else max(0, total_produced - totals["exported_kwh"])
+    grid_import = sum_from_grid if sum_from_grid > 0 else totals["imported_kwh"]
+    grid_export = max(0, total_produced - local_cons)
+
+    if total_produced <= 0 and grid_import <= 0:
+        return None
+    if not consumers and grid_export <= 0:
+        return None
+
+    # ── Node definitions ───────────────────────────────────────────────────
+    PROD_COLORS = ["#16a34a", "#22c55e", "#15803d", "#059669", "#4ade80", "#34d399"]
+    CONS_COLORS = ["#2563eb", "#3b82f6", "#1d4ed8", "#6366f1", "#60a5fa", "#818cf8"]
+    OTHERS_COLOR = "#94a3b8"
+    TOTAL_PROD_C = "#16a34a"
+    LOCAL_CONS_C = "#0ea5e9"
+    GRID_IMP_C = "#f59e0b"
+    GRID_EXP_C = "#8b5cf6"
+
+    class N:
+        __slots__ = ("id", "label", "value", "color", "col", "y", "h", "pct")
+        def __init__(self, id, label, value, color, col, pct=""):
+            self.id = id; self.label = label; self.value = value
+            self.color = color; self.col = col; self.y = 0.0; self.h = 0.0
+            self.pct = pct
+
+    col0, col1, col2, col3, col4 = [], [], [], [], []
+
+    # Col 0: individual producers
+    attributed = sum(p["total_produced_kwh"] for p in producers)
+    if total_produced > 0:
+        if attributed > 0:
+            sf = min(1.0, total_produced / attributed) if attributed > total_produced else 1.0
+            for i, p in enumerate(producers):
+                col0.append(N(f"prod-{p['participant_id']}", p["participant_name"],
+                              p["total_produced_kwh"] * sf, PROD_COLORS[i % len(PROD_COLORS)], 0))
+            remainder = total_produced - attributed * sf
+            if remainder > 0.01:
+                col0.append(N("prod-other", tr["flow_local_production"], remainder,
+                              PROD_COLORS[len(producers) % len(PROD_COLORS)], 0))
+        else:
+            col0.append(N("prod-local", tr["flow_local_production"], total_produced, TOTAL_PROD_C, 0))
+
+    # Col 1: total local production
+    if total_produced > 0:
+        col1.append(N("total-prod", tr["flow_total_local_production"], total_produced, TOTAL_PROD_C, 1))
+
+    # Col 2: local consumption + grid export
+    self_pct = ((total_produced - grid_export) / total_produced * 100) if total_produced > 0 else 0
+    exp_pct = (grid_export / total_produced * 100) if total_produced > 0 else 0
+    if local_cons > 0:
+        col2.append(N("local-cons", tr["flow_local_consumption"], local_cons, LOCAL_CONS_C, 2,
+                       pct=f"{self_pct:.1f}%"))
+    if grid_export > 0:
+        col2.append(N("grid-export", tr["flow_grid_export"], grid_export, GRID_EXP_C, 2,
+                       pct=f"{exp_pct:.1f}%"))
+
+    # Col 3: grid import
+    if grid_import > 0:
+        col3.append(N("grid-import", tr["flow_grid_import"], grid_import, GRID_IMP_C, 3))
+
+    # Col 4: consumers (highlighted + others)
+    for i, c in enumerate(consumers):
+        color = OTHERS_COLOR if c["participant_id"] == "__others__" else CONS_COLORS[i % len(CONS_COLORS)]
+        col4.append(N(f"cons-{c['participant_id']}", c["participant_name"],
+                      c["total_consumed_kwh"], color, 4))
+
+    all_cols = [col0, col1, col2, col3, col4]
+    if all(len(c) == 0 for c in all_cols):
+        return None
+
+    # ── Layout constants ────────────────────────────────────────────────────
+    W, H_MIN, H_MAX = 520, 200, 360
+    PAD_TOP, PAD_BOTTOM = 24, 36
+    PAD_LEFT, PAD_RIGHT = 80, 80
+    BAR_W = 10
+    MIN_H = 4
+    OUTER_GAP, INNER_GAP = 8, 40
+
+    col_usable = W - PAD_LEFT - PAD_RIGHT - BAR_W
+    col_x = [
+        PAD_LEFT,
+        round(PAD_LEFT + col_usable / 4),
+        round(PAD_LEFT + col_usable * 2 / 4),
+        round(PAD_LEFT + col_usable * 3 / 4),
+        PAD_LEFT + col_usable,
+    ]
+
+    max_nodes = max(len(c) for c in all_cols) if any(all_cols) else 1
+    view_h = max(H_MIN, min(H_MAX, max_nodes * 44 + PAD_TOP + PAD_BOTTOM))
+    usable_h = view_h - PAD_TOP - PAD_BOTTOM
+
+    # Compute unified scale
+    scale = float("inf")
+    for col in all_cols:
+        if not col:
+            continue
+        total_val = sum(n.value for n in col)
+        if total_val <= 0:
+            continue
+        is_inner = col[0].col in (1, 2, 3)
+        gap = INNER_GAP if is_inner else OUTER_GAP
+        avail = usable_h - (len(col) - 1) * gap
+        if avail > 0:
+            scale = min(scale, avail / total_val)
+    if not (0 < scale < float("inf")):
+        return None
+
+    # Position nodes vertically centered per column
+    def pos_col(nodes):
+        if not nodes:
+            return
+        is_inner = nodes[0].col in (1, 2, 3)
+        gap = INNER_GAP if is_inner else OUTER_GAP
+        total_h = sum(max(MIN_H, n.value * scale) for n in nodes) + (len(nodes) - 1) * gap
+        y = PAD_TOP + (usable_h - total_h) / 2
+        for n in nodes:
+            n.h = max(MIN_H, n.value * scale)
+            n.y = y
+            y += n.h + gap
+
+    for c in all_cols:
+        pos_col(c)
+
+    node_map = {}
+    for c in all_cols:
+        for n in c:
+            node_map[n.id] = n
+
+    # ── Build links ────────────────────────────────────────────────────────
+    links = []  # (src_id, tgt_id, value, color)
+
+    # Col 0→1: producers → total production
+    if "total-prod" in node_map:
+        for n in col0:
+            links.append((n.id, "total-prod", n.value, n.color))
+
+    # Col 1→2: total prod → local cons + grid export
+    if "total-prod" in node_map and "local-cons" in node_map:
+        links.append(("total-prod", "local-cons", local_cons, LOCAL_CONS_C))
+    if "total-prod" in node_map and "grid-export" in node_map:
+        links.append(("total-prod", "grid-export", grid_export, GRID_EXP_C))
+
+    # Col 2→4: local cons → consumers (from_zev)
+    if "local-cons" in node_map:
+        for c in consumers:
+            if c["from_zev_kwh"] < 0.01:
+                continue
+            tid = f"cons-{c['participant_id']}"
+            if tid in node_map:
+                links.append(("local-cons", tid, c["from_zev_kwh"], LOCAL_CONS_C))
+
+    # Col 3→4: grid import → consumers (from_grid)
+    if "grid-import" in node_map:
+        for c in consumers:
+            if c["from_grid_kwh"] < 0.01:
+                continue
+            tid = f"cons-{c['participant_id']}"
+            if tid in node_map:
+                links.append(("grid-import", tid, c["from_grid_kwh"], GRID_IMP_C))
+
+    # Position links (compute y offsets per node port)
+    src_out = {n.id: n.y for c in all_cols for n in c}
+    tgt_in = {n.id: n.y for c in all_cols for n in c}
+
+    positioned_links = []
+    for src_id, tgt_id, value, color in links:
+        src = node_map[src_id]
+        tgt = node_map[tgt_id]
+        th = max(1, value * scale)
+        sy = src_out[src_id]
+        ty = tgt_in[tgt_id]
+        src_out[src_id] += th
+        tgt_in[tgt_id] += th
+        sx = col_x[src.col] + BAR_W
+        tx = col_x[tgt.col]
+        positioned_links.append((sx, sy, tx, ty, th, color, value))
+
+    # ── SVG rendering ─────────────────────────────────────────────────────
+    svg = [f'<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{view_h}" '
+           f'viewBox="0 0 {W} {view_h}">']
+
+    # Flow ribbons
+    for sx, sy, tx, ty, th, color, val in positioned_links:
+        mx = (sx + tx) / 2
+        svg.append(
+            f'<path d="M{sx},{sy:.1f} C{mx},{sy:.1f} {mx},{ty:.1f} {tx},{ty:.1f} '
+            f'L{tx},{ty + th:.1f} C{mx},{ty + th:.1f} {mx},{sy + th:.1f} {sx},{sy + th:.1f} Z" '
+            f'fill="{color}" fill-opacity="0.2" stroke="{color}" stroke-opacity="0.3" stroke-width="0.5"/>'
+        )
+        # Value label on ribbon (if thick enough)
+        if th >= 10:
+            mid_x = (sx + tx) / 2
+            mid_y = (sy + ty + th) / 2
+            svg.append(
+                f'<text x="{mid_x:.1f}" y="{mid_y:.1f}" text-anchor="middle" '
+                f'dominant-baseline="central" font-size="6" fill="#374151" '
+                f'fill-opacity="0.7">{val:.1f} kWh</text>'
+            )
+
+    # Node bars + labels
+    for col_nodes in all_cols:
+        for n in col_nodes:
+            x = col_x[n.col]
+            svg.append(f'<rect x="{x}" y="{n.y:.1f}" width="{BAR_W}" '
+                       f'height="{n.h:.1f}" fill="{n.color}" rx="2"/>')
+
+            if n.col == 0:  # left labels
+                svg.append(
+                    f'<text x="{x - 6}" y="{n.y + n.h / 2 - 4:.1f}" text-anchor="end" '
+                    f'dominant-baseline="central" font-size="7" fill="#374151">{_esc(n.label)}</text>')
+                svg.append(
+                    f'<text x="{x - 6}" y="{n.y + n.h / 2 + 5:.1f}" text-anchor="end" '
+                    f'dominant-baseline="central" font-size="6" fill="#9ca3af">{n.value:.1f} kWh</text>')
+            elif n.col == 4:  # right labels
+                svg.append(
+                    f'<text x="{x + BAR_W + 6}" y="{n.y + n.h / 2 - 4:.1f}" text-anchor="start" '
+                    f'dominant-baseline="central" font-size="7" fill="#374151">{_esc(n.label)}</text>')
+                svg.append(
+                    f'<text x="{x + BAR_W + 6}" y="{n.y + n.h / 2 + 5:.1f}" text-anchor="start" '
+                    f'dominant-baseline="central" font-size="6" fill="#9ca3af">{n.value:.1f} kWh</text>')
+            else:  # mid-column labels below bar
+                svg.append(
+                    f'<text x="{x + BAR_W / 2}" y="{n.y + n.h + 10:.1f}" text-anchor="middle" '
+                    f'font-size="6.5" fill="#374151">{_esc(n.label)}</text>')
+                svg.append(
+                    f'<text x="{x + BAR_W / 2}" y="{n.y + n.h + 20:.1f}" text-anchor="middle" '
+                    f'font-size="6" fill="#9ca3af">{n.value:.1f} kWh</text>')
+                if n.pct:
+                    svg.append(
+                        f'<text x="{x + BAR_W / 2}" y="{n.y + n.h + 29:.1f}" text-anchor="middle" '
+                        f'font-size="7" font-weight="600" fill="{n.color}">{n.pct}</text>')
+
+    svg.append("</svg>")
+    return "\n".join(svg)
+
+
+def _esc(text: str) -> str:
+    """Escape text for safe embedding in SVG."""
+    return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;")
 
 
 def _build_energy_chart_svg(invoice, tr: dict) -> str | None:
@@ -793,6 +1260,7 @@ def _build_template_context(invoice) -> dict:
         "participant": invoice.participant,
         "qr_svg": qr_svg,
         "energy_chart_svg": _build_energy_chart_svg(invoice, tr),
+        "energy_flow_svg": _build_energy_flow_svg(invoice, tr),
         "hourly_profile_chart_svg": _build_hourly_profile_chart_svg(invoice, tr),
         "savings_data": _build_savings_data(invoice, tr),
         "tr": tr,

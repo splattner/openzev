@@ -519,6 +519,12 @@ export interface ZevOwnerDashboardSummary {
         imported_kwh: number
         exported_kwh: number
     }
+    zev_totals: {
+        produced_kwh: number
+        consumed_kwh: number
+        imported_kwh: number
+        exported_kwh: number
+    }
     timeline: Array<{
         bucket: string
         produced_kwh: number
@@ -550,6 +556,21 @@ export interface ParticipantDashboardSummary {
         imported_from_grid_kwh: number
         total_consumed_kwh: number
     }>
+    zev_totals: {
+        produced_kwh: number
+        consumed_kwh: number
+        imported_kwh: number
+        exported_kwh: number
+    }
+    zev_participant_stats: Array<{
+        participant_id: string
+        participant_name: string
+        total_consumed_kwh: number
+        total_produced_kwh: number
+        from_zev_kwh: number
+        from_grid_kwh: number
+    }>
+    current_participant_id: string | null
 }
 
 export type MeteringDashboardSummary = ZevOwnerDashboardSummary | ParticipantDashboardSummary

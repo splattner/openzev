@@ -796,6 +796,15 @@ export const en = {
                 actions: 'Actions',
             },
             viewDetails: 'View details',
+            energyFlow: {
+                title: 'Energy Flow',
+                gridImport: 'Grid Import',
+                gridExport: 'Grid Export',
+                localProduction: 'Local Production',
+                totalLocalProduction: 'Total Local Production',
+                localConsumption: 'Local Consumption',
+                others: 'Others',
+            },
         },
     },
     meteringDataQuality: {
