@@ -93,6 +93,77 @@ CONTRACT_TRANSLATIONS: dict[str, dict] = {
         "tariff_col_calc": "Berechnung",
         "contract_date": "Datum Vertragsabschluss",
         "meter_hint": "Die Messpunktnummer ist auf der Stromrechnung zu finden. Sie besteht aus 33 Stellen und beginnt mit CH.",
+        "info_title": "Informationen zum (v)ZEV",
+        "info_subtitle": "Zusammenfassung der wichtigsten Regelungen für Zusammenschlüsse zum Eigenverbrauch",
+        "info_zev_title": "Was ist ein ZEV?",
+        "info_zev_text": (
+            "Ein Zusammenschluss zum Eigenverbrauch (ZEV) ermöglicht es Grundeigentümern, den lokal produzierten "
+            "Strom (z.\u202fB. aus Solaranlagen) gemeinsam zu nutzen. Die Teilnehmer befinden sich am gleichen "
+            "Netzanschluss. Der ZEV tritt gegenüber dem Netzbetreiber als ein einzelner Kunde auf und "
+            "organisiert die interne Stromabrechnung selbständig."
+        ),
+        "info_vzev_title": "Was ist ein virtueller ZEV (vZEV)?",
+        "info_vzev_text": (
+            "Ein virtueller ZEV (vZEV) erweitert das ZEV-Modell: Die Teilnehmer müssen sich nicht mehr am "
+            "gleichen Netzanschluss befinden, sondern können über das gesamte Netzgebiet desselben Netzbetreibers "
+            "verteilt sein. Jeder Teilnehmer behält seinen eigenen Netzanschluss. Die Zuteilung des Eigenverbrauchs "
+            "erfolgt virtuell anhand von Smart-Meter-Daten."
+        ),
+        "info_legal_title": "Gesetzliche Grundlagen",
+        "info_legal_items": [
+            "Energiegesetz (EnG, SR 730.0), Art. 16–18 — Regelungen zum Eigenverbrauch und ZEV",
+            "Energieverordnung (EnV, SR 730.01), Art. 14–18 — Ausführungsbestimmungen",
+            "Stromversorgungsgesetz (StromVG, SR 734.7) — Netzzugang und Grundversorgung",
+            "Bundesgesetz über eine sichere Stromversorgung mit erneuerbaren Energien (Mantelerlass) — "
+            "Erweiterung um vZEV (Art. 17a–17c EnG)",
+        ],
+        "info_rights_title": "Rechte und Pflichten der Teilnehmer",
+        "info_rights_items": [
+            "Der lokale Stromtarif darf den regulären Netztarif des Netzbetreibers nicht übersteigen.",
+            "Jeder Teilnehmer kann mit einer Frist von zwei Monaten auf Ende einer Abrechnungsperiode austreten.",
+            "Der vZEV-Verantwortliche erstellt die internen Stromabrechnungen und verwaltet den Zusammenschluss.",
+            "Änderungen (Wegzug, Eigentümerwechsel) sind dem vZEV-Verantwortlichen unverzüglich zu melden.",
+            "Die Grundversorgung durch den Netzbetreiber bleibt für alle Teilnehmer jederzeit gewährleistet.",
+        ],
+        "info_liability_title": "Solidarische Haftung",
+        "info_liability_text": (
+            "Alle Teilnehmer eines ZEV bzw. vZEV haften gegenüber dem Netzbetreiber solidarisch für die "
+            "Netzkosten und den bezogenen Strom (Art. 17 Abs. 2 EnG). Das bedeutet: Kann ein Teilnehmer seine "
+            "Stromrechnung nicht begleichen, können die übrigen Teilnehmer für den ausstehenden Betrag in "
+            "Anspruch genommen werden. Die interne Aufteilung der Kosten regelt der vZEV-Verantwortliche "
+            "über die Stromabrechnung."
+        ),
+        "info_tariff_title": "Tarifbestimmungen",
+        "info_tariff_text": (
+            "Der Tarif für lokal produzierten Strom wird zwischen den Vertragsparteien vereinbart. "
+            "Er darf gemäss Gesetz den regulären Stromtarif des Netzbetreibers (inkl. Netznutzung, "
+            "Abgaben und Zuschläge) nicht überschreiten. Der Anteil Strom, der nicht lokal gedeckt werden kann, "
+            "wird weiterhin zum regulären Tarif vom Netzbetreiber bezogen."
+        ),
+        "info_note_title": "Hinweis",
+        "info_note_text": (
+            "Diese Zusammenfassung dient der allgemeinen Information und ersetzt keine Rechtsberatung. "
+            "Die massgeblichen gesetzlichen Bestimmungen sind verbindlich."
+        ),
+        "duration_title": "Vertragsdauer und Kündigung",
+        "duration_text": (
+            "Dieser Vertrag wird auf unbestimmte Dauer abgeschlossen und tritt mit der Unterschrift beider "
+            "Parteien in Kraft. Er kann von jeder Partei mit einer Frist von zwei Monaten auf Ende einer "
+            "Abrechnungsperiode schriftlich gekündigt werden."
+        ),
+        "jurisdiction_title": "Anwendbares Recht und Gerichtsstand",
+        "jurisdiction_text": (
+            "Dieser Vertrag unterliegt schweizerischem Recht. Gerichtsstand ist der Sitz des vZEV "
+            "bzw. der Wohnort des vZEV-Verantwortlichen, sofern nichts anderes vereinbart wird."
+        ),
+        "info_privacy_title": "Datenschutz",
+        "info_privacy_text": (
+            "Im Rahmen des vZEV werden Smart-Meter-Daten (Stromverbrauch und -produktion) erhoben und "
+            "verarbeitet. Diese Daten werden ausschliesslich für die Abrechnung der internen Stromkosten, "
+            "die Ermittlung des Eigenverbrauchsanteils sowie die Verwaltung des vZEV verwendet. "
+            "Die Daten werden nicht an unbefugte Dritte weitergegeben. Es gelten die Bestimmungen des "
+            "Bundesgesetzes über den Datenschutz (DSG, SR 235.1)."
+        ),
     },
     "fr": {
         "contract_title": "Contrat de participation vZEV",
@@ -160,6 +231,77 @@ CONTRACT_TRANSLATIONS: dict[str, dict] = {
         "tariff_col_calc": "Calcul",
         "contract_date": "Date de conclusion du contrat",
         "meter_hint": "Le numéro de point de mesure figure sur la facture d'électricité. Il comporte 33 caractères et commence par CH.",
+        "info_title": "Informations sur le (v)RCP",
+        "info_subtitle": "Résumé des principales dispositions relatives aux regroupements pour la consommation propre",
+        "info_zev_title": "Qu'est-ce qu'un RCP ?",
+        "info_zev_text": (
+            "Un regroupement pour la consommation propre (RCP) permet aux propriétaires fonciers d'utiliser "
+            "conjointement l'électricité produite localement (p.\u202fex. à partir d'installations solaires). "
+            "Les participants se trouvent au même point de raccordement au réseau. Le RCP se présente auprès du "
+            "gestionnaire de réseau comme un client unique et organise la facturation interne de manière autonome."
+        ),
+        "info_vzev_title": "Qu'est-ce qu'un RCP virtuel (vRCP) ?",
+        "info_vzev_text": (
+            "Un RCP virtuel (vRCP) étend le modèle RCP : les participants n'ont plus besoin de se trouver au "
+            "même point de raccordement et peuvent être répartis sur l'ensemble de la zone de desserte du même "
+            "gestionnaire de réseau. Chaque participant conserve son propre raccordement. L'attribution de la "
+            "consommation propre s'effectue virtuellement sur la base des données de compteurs intelligents."
+        ),
+        "info_legal_title": "Bases légales",
+        "info_legal_items": [
+            "Loi sur l'énergie (LEne, RS 730.0), art. 16–18 — Réglementation de la consommation propre et du RCP",
+            "Ordonnance sur l'énergie (OEne, RS 730.01), art. 14–18 — Dispositions d'exécution",
+            "Loi sur l'approvisionnement en électricité (LApEl, RS 734.7) — Accès au réseau et approvisionnement de base",
+            "Loi fédérale relative à un approvisionnement en électricité sûr reposant sur des énergies renouvelables "
+            "(acte modificateur unique) — Extension au vRCP (art. 17a–17c LEne)",
+        ],
+        "info_rights_title": "Droits et obligations des participants",
+        "info_rights_items": [
+            "Le tarif local d'électricité ne doit pas dépasser le tarif réseau ordinaire du gestionnaire de réseau.",
+            "Chaque participant peut se retirer moyennant un préavis de deux mois pour la fin d'une période de facturation.",
+            "Le responsable du vRCP établit les factures d'électricité internes et administre le regroupement.",
+            "Les changements (déménagement, changement de propriétaire) doivent être signalés sans délai au responsable.",
+            "L'approvisionnement de base par le gestionnaire de réseau reste garanti en tout temps pour tous les participants.",
+        ],
+        "info_liability_title": "Responsabilité solidaire",
+        "info_liability_text": (
+            "Tous les participants d'un RCP ou vRCP sont solidairement responsables envers le gestionnaire de "
+            "réseau pour les coûts de réseau et l'électricité achetée (art. 17 al. 2 LEne). Cela signifie que "
+            "si un participant ne peut pas payer sa facture d'électricité, les autres participants peuvent être "
+            "tenus de régler le montant dû. La répartition interne des coûts est gérée par le responsable du "
+            "vRCP par le biais de la facturation d'électricité."
+        ),
+        "info_tariff_title": "Dispositions tarifaires",
+        "info_tariff_text": (
+            "Le tarif de l'électricité produite localement est convenu entre les parties contractantes. "
+            "Conformément à la loi, il ne doit pas dépasser le tarif d'électricité ordinaire du gestionnaire de "
+            "réseau (y compris utilisation du réseau, taxes et suppléments). La part d'électricité qui ne peut pas "
+            "être couverte localement continue d'être achetée au tarif ordinaire auprès du gestionnaire de réseau."
+        ),
+        "info_note_title": "Remarque",
+        "info_note_text": (
+            "Ce résumé est fourni à titre d'information générale et ne remplace pas un conseil juridique. "
+            "Les dispositions légales applicables font foi."
+        ),
+        "duration_title": "Durée du contrat et résiliation",
+        "duration_text": (
+            "Le présent contrat est conclu pour une durée indéterminée et entre en vigueur dès la signature "
+            "des deux parties. Il peut être résilié par chaque partie par écrit avec un préavis de deux mois "
+            "pour la fin d'une période de facturation."
+        ),
+        "jurisdiction_title": "Droit applicable et for juridique",
+        "jurisdiction_text": (
+            "Le présent contrat est soumis au droit suisse. Le for juridique est le siège du vRCP "
+            "ou le domicile du responsable du vRCP, sauf convention contraire."
+        ),
+        "info_privacy_title": "Protection des données",
+        "info_privacy_text": (
+            "Dans le cadre du vRCP, des données de compteurs intelligents (consommation et production "
+            "d'électricité) sont collectées et traitées. Ces données sont utilisées exclusivement pour la "
+            "facturation des coûts d'électricité internes, la détermination de la part de consommation propre "
+            "et la gestion du vRCP. Les données ne sont pas transmises à des tiers non autorisés. "
+            "Les dispositions de la loi fédérale sur la protection des données (LPD, RS 235.1) s'appliquent."
+        ),
     },
     "it": {
         "contract_title": "Contratto di partecipazione ZEV virtuale",
@@ -227,6 +369,77 @@ CONTRACT_TRANSLATIONS: dict[str, dict] = {
         "tariff_col_calc": "Calcolo",
         "contract_date": "Data di conclusione del contratto",
         "meter_hint": "Il numero del punto di misura si trova sulla fattura dell'elettricità. È composto da 33 caratteri e inizia con CH.",
+        "info_title": "Informazioni sul (v)RCP",
+        "info_subtitle": "Riepilogo delle principali disposizioni relative ai raggruppamenti per il consumo proprio",
+        "info_zev_title": "Che cos'è un RCP?",
+        "info_zev_text": (
+            "Un raggruppamento per il consumo proprio (RCP) consente ai proprietari fondiari di utilizzare "
+            "congiuntamente l'elettricità prodotta localmente (ad es. da impianti solari). I partecipanti si trovano "
+            "allo stesso punto di allacciamento alla rete. Il RCP si presenta nei confronti del gestore di rete come "
+            "un unico cliente e organizza la fatturazione interna in modo autonomo."
+        ),
+        "info_vzev_title": "Che cos'è un RCP virtuale (vRCP)?",
+        "info_vzev_text": (
+            "Un RCP virtuale (vRCP) estende il modello RCP: i partecipanti non devono più trovarsi allo stesso "
+            "punto di allacciamento e possono essere distribuiti sull'intera zona di copertura dello stesso gestore "
+            "di rete. Ogni partecipante mantiene il proprio allacciamento. L'attribuzione del consumo proprio "
+            "avviene virtualmente sulla base dei dati dei contatori intelligenti."
+        ),
+        "info_legal_title": "Basi legali",
+        "info_legal_items": [
+            "Legge sull'energia (LEne, RS 730.0), art. 16–18 — Regolamentazione del consumo proprio e del RCP",
+            "Ordinanza sull'energia (OEne, RS 730.01), art. 14–18 — Disposizioni d'esecuzione",
+            "Legge sull'approvvigionamento elettrico (LAEl, RS 734.7) — Accesso alla rete e approvvigionamento di base",
+            "Legge federale su un approvvigionamento elettrico sicuro con le energie rinnovabili "
+            "(atto modificatore unico) — Estensione al vRCP (art. 17a–17c LEne)",
+        ],
+        "info_rights_title": "Diritti e obblighi dei partecipanti",
+        "info_rights_items": [
+            "La tariffa locale dell'elettricità non deve superare la tariffa di rete ordinaria del gestore di rete.",
+            "Ogni partecipante può recedere con un preavviso di due mesi per la fine di un periodo di fatturazione.",
+            "Il responsabile del vRCP emette le fatture elettriche interne e amministra il raggruppamento.",
+            "Le modifiche (trasloco, cambio di proprietà) devono essere comunicate senza indugio al responsabile.",
+            "L'approvvigionamento di base da parte del gestore di rete resta garantito in ogni momento per tutti i partecipanti.",
+        ],
+        "info_liability_title": "Responsabilità solidale",
+        "info_liability_text": (
+            "Tutti i partecipanti di un RCP o vRCP sono solidalmente responsabili nei confronti del gestore di "
+            "rete per i costi di rete e l'elettricità acquistata (art. 17 cpv. 2 LEne). Ciò significa che se "
+            "un partecipante non è in grado di pagare la propria fattura dell'elettricità, gli altri partecipanti "
+            "possono essere chiamati a coprire l'importo dovuto. La ripartizione interna dei costi è gestita dal "
+            "responsabile del vRCP attraverso la fatturazione dell'elettricità."
+        ),
+        "info_tariff_title": "Disposizioni tariffarie",
+        "info_tariff_text": (
+            "La tariffa per l'elettricità prodotta localmente è concordata tra le parti contraenti. "
+            "Per legge non deve superare la tariffa ordinaria del gestore di rete (inclusi utilizzo della rete, "
+            "tasse e supplementi). La quota di elettricità che non può essere coperta localmente continua a essere "
+            "acquistata alla tariffa ordinaria dal gestore di rete."
+        ),
+        "info_note_title": "Avviso",
+        "info_note_text": (
+            "Questo riepilogo è fornito a scopo informativo generale e non sostituisce una consulenza legale. "
+            "Le disposizioni di legge applicabili sono vincolanti."
+        ),
+        "duration_title": "Durata del contratto e disdetta",
+        "duration_text": (
+            "Il presente contratto è stipulato a tempo indeterminato ed entra in vigore con la firma di entrambe "
+            "le parti. Può essere disdetto da ciascuna parte per iscritto con un preavviso di due mesi per la "
+            "fine di un periodo di fatturazione."
+        ),
+        "jurisdiction_title": "Diritto applicabile e foro competente",
+        "jurisdiction_text": (
+            "Il presente contratto è soggetto al diritto svizzero. Il foro competente è la sede del vRCP "
+            "o il domicilio del responsabile del vRCP, salvo diverso accordo."
+        ),
+        "info_privacy_title": "Protezione dei dati",
+        "info_privacy_text": (
+            "Nell'ambito del vRCP vengono raccolti e trattati dati di contatori intelligenti (consumo e produzione "
+            "di elettricità). Questi dati sono utilizzati esclusivamente per la fatturazione dei costi elettrici "
+            "interni, la determinazione della quota di consumo proprio e la gestione del vRCP. "
+            "I dati non vengono trasmessi a terzi non autorizzati. Si applicano le disposizioni della "
+            "legge federale sulla protezione dei dati (LPD, RS 235.1)."
+        ),
     },
     "en": {
         "contract_title": "vZEV Participation Agreement",
@@ -294,6 +507,76 @@ CONTRACT_TRANSLATIONS: dict[str, dict] = {
         "tariff_col_calc": "Calculation",
         "contract_date": "Contract date",
         "meter_hint": "The metering point number can be found on your electricity bill. It consists of 33 characters starting with CH.",
+        "info_title": "Information on (v)ZEV",
+        "info_subtitle": "Summary of the key regulations for self-consumption communities in Switzerland",
+        "info_zev_title": "What is a ZEV?",
+        "info_zev_text": (
+            "A self-consumption community (ZEV — Zusammenschluss zum Eigenverbrauch) allows property owners to "
+            "collectively use locally produced electricity (e.g. from solar installations). Participants are "
+            "connected at the same grid connection point. The ZEV acts as a single customer toward the grid operator "
+            "and manages internal electricity billing independently."
+        ),
+        "info_vzev_title": "What is a virtual ZEV (vZEV)?",
+        "info_vzev_text": (
+            "A virtual ZEV (vZEV) extends the ZEV model: participants no longer need to share the same grid "
+            "connection point and can be distributed across the entire service area of the same grid operator. "
+            "Each participant retains their own grid connection. Self-consumption allocation is performed "
+            "virtually based on smart meter data."
+        ),
+        "info_legal_title": "Legal basis",
+        "info_legal_items": [
+            "Energy Act (EnG, SR 730.0), Art. 16–18 — Self-consumption and ZEV regulations",
+            "Energy Ordinance (EnV, SR 730.01), Art. 14–18 — Implementing provisions",
+            "Electricity Supply Act (StromVG, SR 734.7) — Grid access and universal service obligation",
+            "Federal Act on a Secure Electricity Supply with Renewable Energies (Mantelerlass) — "
+            "Extension to vZEV (Art. 17a–17c EnG)",
+        ],
+        "info_rights_title": "Participant rights and obligations",
+        "info_rights_items": [
+            "The local electricity tariff must not exceed the regular grid tariff of the grid operator.",
+            "Each participant may withdraw with two months' notice at the end of a billing period.",
+            "The vZEV manager issues internal electricity invoices and administers the community.",
+            "Changes (relocation, change of ownership) must be reported to the vZEV manager without delay.",
+            "Universal grid supply by the grid operator remains guaranteed at all times for all participants.",
+        ],
+        "info_liability_title": "Joint and several liability",
+        "info_liability_text": (
+            "All participants of a ZEV or vZEV are jointly and severally liable toward the grid operator for "
+            "grid costs and purchased electricity (Art. 17 para. 2 EnG). This means that if one participant "
+            "cannot pay their electricity bill, the other participants may be held responsible for the "
+            "outstanding amount. The internal allocation of costs is managed by the vZEV manager through "
+            "the electricity billing."
+        ),
+        "info_tariff_title": "Tariff provisions",
+        "info_tariff_text": (
+            "The tariff for locally produced electricity is agreed between the contracting parties. "
+            "By law, it must not exceed the regular electricity tariff of the grid operator (including grid usage, "
+            "levies, and surcharges). Any electricity that cannot be covered locally continues to be purchased "
+            "at the regular tariff from the grid operator."
+        ),
+        "info_note_title": "Disclaimer",
+        "info_note_text": (
+            "This summary is provided for general information purposes and does not constitute legal advice. "
+            "The applicable statutory provisions are authoritative."
+        ),
+        "duration_title": "Contract duration and termination",
+        "duration_text": (
+            "This agreement is concluded for an indefinite period and takes effect upon signature by both "
+            "parties. It may be terminated by either party in writing with two months' notice at the end "
+            "of a billing period."
+        ),
+        "jurisdiction_title": "Governing law and jurisdiction",
+        "jurisdiction_text": (
+            "This agreement is governed by Swiss law. The place of jurisdiction is the registered seat "
+            "of the vZEV or the domicile of the vZEV manager, unless otherwise agreed."
+        ),
+        "info_privacy_title": "Data protection",
+        "info_privacy_text": (
+            "Within the vZEV, smart meter data (electricity consumption and production) is collected and "
+            "processed. This data is used exclusively for billing internal electricity costs, determining "
+            "the self-consumption share, and administering the vZEV. Data is not disclosed to unauthorised "
+            "third parties. The provisions of the Federal Act on Data Protection (FADP, SR 235.1) apply."
+        ),
     },
 }
 
