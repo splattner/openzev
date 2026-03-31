@@ -22,9 +22,9 @@ export function InvoiceDetailPage() {
         return <div className="card error-banner">Failed to load invoice details.</div>
     }
 
-    const invoice = invoiceQuery.data
+    const inv = invoiceQuery.data
     const groupedItems = Object.entries(
-        (invoice.items || []).reduce<Record<string, NonNullable<typeof invoice.items>>>((groups, item) => {
+        (inv.items || []).reduce<Record<string, NonNullable<typeof inv.items>>>((groups, item) => {
             const key = item.tariff_category || 'energy'
             if (!groups[key]) {
                 groups[key] = []
@@ -38,9 +38,9 @@ export function InvoiceDetailPage() {
         <div className="page-stack">
             <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
                 <div>
-                    <h2 style={{ marginBottom: '0.2rem' }}>Invoice {invoice.invoice_number}</h2>
+                    <h2 style={{ marginBottom: '0.2rem' }}>Invoice {inv.invoice_number}</h2>
                     <p className="muted" style={{ margin: 0 }}>
-                        {invoice.participant_name} · {formatShortDate(invoice.period_start, settings)} → {formatShortDate(invoice.period_end, settings)}
+                        {inv.participant_name} · {formatShortDate(inv.period_start, settings)} → {formatShortDate(inv.period_end, settings)}
                     </p>
                 </div>
                 <Link to="/invoices" className="button button-primary" style={{ textDecoration: 'none' }}>
@@ -49,18 +49,18 @@ export function InvoiceDetailPage() {
             </header>
 
             <section className="grid grid-4">
-                <div className="card"><strong>{t('pages.invoiceDetail.status')}</strong><div>{invoice.status}</div></div>
-                <div className="card"><strong>{t('pages.invoiceDetail.total')}</strong><div>CHF {invoice.total_chf}</div></div>
-                <div className="card"><strong>{t('pages.invoiceDetail.subtotal')}</strong><div>CHF {invoice.subtotal_chf ?? '-'}</div></div>
-                <div className="card"><strong>{t('pages.invoiceDetail.vat')}</strong><div>CHF {invoice.vat_chf ?? '-'}</div></div>
+                <div className="card"><strong>{t('pages.invoiceDetail.status')}</strong><div>{inv.status}</div></div>
+                <div className="card"><strong>{t('pages.invoiceDetail.total')}</strong><div>CHF {inv.total_chf}</div></div>
+                <div className="card"><strong>{t('pages.invoiceDetail.subtotal')}</strong><div>CHF {inv.subtotal_chf ?? '-'}</div></div>
+                <div className="card"><strong>{t('pages.invoiceDetail.vat')}</strong><div>CHF {inv.vat_chf ?? '-'}</div></div>
             </section>
 
             <section className="card">
                 <h3 style={{ marginTop: 0 }}>{t('pages.invoiceDetail.energyTotals')}</h3>
                 <div className="inline-form grid grid-4">
-                    <div><strong>{t('pages.invoiceDetail.local')}</strong><div>{invoice.total_local_kwh ?? '0'} kWh</div></div>
-                    <div><strong>{t('pages.invoiceDetail.grid')}</strong><div>{invoice.total_grid_kwh ?? '0'} kWh</div></div>
-                    <div><strong>{t('pages.invoiceDetail.feedIn')}</strong><div>{invoice.total_feed_in_kwh ?? '0'} kWh</div></div>
+                    <div><strong>{t('pages.invoiceDetail.local')}</strong><div>{inv.total_local_kwh ?? '0'} kWh</div></div>
+                    <div><strong>{t('pages.invoiceDetail.grid')}</strong><div>{inv.total_grid_kwh ?? '0'} kWh</div></div>
+                    <div><strong>{t('pages.invoiceDetail.feedIn')}</strong><div>{inv.total_feed_in_kwh ?? '0'} kWh</div></div>
                 </div>
             </section>
 

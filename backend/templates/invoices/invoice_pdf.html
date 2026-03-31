@@ -168,12 +168,16 @@
             padding-top: 2mm;
         }
 
+        /* Charts page wrapper */
+        .charts-page {
+            page-break-before: always;
+        }
+
         /* Energy chart section */
         .chart-section {
             margin-top: 4mm;
             padding-top: 3mm;
             border-top: 1px solid #eee;
-            page-break-before: always;
         }
 
         .chart-section h3 {
@@ -468,12 +472,26 @@
         </div>
         {% endif %}
 
+        {% if energy_flow_svg or energy_chart_svg or hourly_profile_chart_svg %}
+        <div class="charts-page">
+
+        <!-- ── Energy Flow Chart ─────────────────── -->
+        {% if energy_flow_svg %}
+        <div class="chart-section">
+            <h3>{{ tr.flow_title }}</h3>
+            <p>{{ tr.flow_description }}</p>
+            <div style="max-width: 520px; margin: 0 auto;">
+                {{ energy_flow_svg|safe }}
+            </div>
+        </div>
+        {% endif %}
+
         <!-- ── Energy Consumption Chart ─────────── -->
         {% if energy_chart_svg %}
         <div class="chart-section">
             <h3>{{ tr.chart_title }}</h3>
             <p>{{ tr.chart_description }}</p>
-            <div style="max-width: 520px;">
+            <div style="max-width: 520px; margin: 0 auto;">
                 {{ energy_chart_svg|safe }}
             </div>
         </div>
@@ -484,9 +502,12 @@
         <div class="hourly-chart-section">
             <h3>{{ tr.hourly_chart_title }}</h3>
             <p>{{ tr.hourly_chart_description }}</p>
-            <div style="max-width: 520px;">
+            <div style="max-width: 520px; margin: 0 auto;">
                 {{ hourly_profile_chart_svg|safe }}
             </div>
+        </div>
+        {% endif %}
+
         </div>
         {% endif %}
 

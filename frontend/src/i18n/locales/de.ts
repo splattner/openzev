@@ -795,6 +795,15 @@ export const de = {
                 actions: 'Aktionen',
             },
             viewDetails: 'Details anzeigen',
+            energyFlow: {
+                title: 'Energiefluss',
+                gridImport: 'Netzbezug',
+                gridExport: 'Netzeinspeisung',
+                localProduction: 'Lokale Produktion',
+                totalLocalProduction: 'Gesamte lokale Produktion',
+                localConsumption: 'Lokaler Verbrauch',
+                others: 'Andere',
+            },
         },
     },
     meteringDataQuality: {

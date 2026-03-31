@@ -23,6 +23,7 @@ import { useAuth } from '../lib/auth'
 import { useManagedZev } from '../lib/managedZev'
 import { StatCard } from '../components/StatCard'
 import { DateRangeShortcutPicker } from '../components/DateRangeShortcutPicker'
+import { EnergyFlowChart } from '../components/EnergyFlowChart'
 import {
     daysAgoIso,
     todayIso,
@@ -174,33 +175,19 @@ export function DashboardPage() {
 
             {summary && summary.role === 'zev_owner' && (
                 <>
-                    <section className="grid grid-4">
-                        <StatCard label={t('pages.dashboard.stats.producedInZev')} value={`${summary.totals.produced_kwh.toFixed(2)} kWh`} />
-                        <StatCard label={t('pages.dashboard.stats.consumedInZev')} value={`${summary.totals.consumed_kwh.toFixed(2)} kWh`} />
-                        <StatCard label={t('pages.dashboard.stats.importedFromGrid')} value={`${summary.totals.imported_kwh.toFixed(2)} kWh`} />
-                        <StatCard label={t('pages.dashboard.stats.exportedToGrid')} value={`${summary.totals.exported_kwh.toFixed(2)} kWh`} />
-                    </section>
-
-                    {(() => {
-                        const totalProduced = summary.totals.produced_kwh
-                        const locallyUsed = Math.max(0, totalProduced - summary.totals.exported_kwh)
-                        const selfConsumptionPct = totalProduced > 0 ? (locallyUsed / totalProduced * 100) : 0
-                        const exportPct = totalProduced > 0 ? (summary.totals.exported_kwh / totalProduced * 100) : 0
-                        return (
-                            <section className="grid grid-2">
-                                <StatCard
-                                    label={t('pages.dashboard.stats.selfConsumptionRate')}
-                                    value={`${selfConsumptionPct.toFixed(1)}%`}
-                                    hint={t('pages.dashboard.hints.selfConsumption', { local: locallyUsed.toFixed(2), total: totalProduced.toFixed(2) })}
-                                />
-                                <StatCard
-                                    label={t('pages.dashboard.stats.exportRatio')}
-                                    value={`${exportPct.toFixed(1)}%`}
-                                    hint={t('pages.dashboard.hints.export', { exported: summary.totals.exported_kwh.toFixed(2), total: totalProduced.toFixed(2) })}
-                                />
-                            </section>
-                        )
-                    })()}
+                    {summary.participant_stats.length > 0 && (
+                        <section className="card">
+                            <h3 style={{ marginTop: 0 }}>
+                                {t('pages.dashboard.energyFlow.title')}
+                                {selectedZevName ? ` — ${selectedZevName}` : ''}
+                            </h3>
+                            <EnergyFlowChart
+                                totals={summary.zev_totals}
+                                participantStats={summary.participant_stats}
+                                highlightParticipantId={selectedParticipantId || undefined}
+                            />
+                        </section>
+                    )}
 
                     <section className="card">
                         <h3 style={{ marginTop: 0 }}>
@@ -310,6 +297,17 @@ export function DashboardPage() {
                         <StatCard label={t('pages.dashboard.participantStats.importedFromGrid')} value={`${summary.totals.imported_from_grid_kwh.toFixed(2)} kWh`} />
                         <StatCard label={t('pages.dashboard.participantStats.totalConsumption')} value={`${summary.totals.total_consumed_kwh.toFixed(2)} kWh`} />
                     </section>
+
+                    {summary.zev_participant_stats.length > 0 && summary.current_participant_id && (
+                        <section className="card">
+                            <h3 style={{ marginTop: 0 }}>{t('pages.dashboard.energyFlow.title')}</h3>
+                            <EnergyFlowChart
+                                totals={summary.zev_totals}
+                                participantStats={summary.zev_participant_stats}
+                                highlightParticipantId={summary.current_participant_id}
+                            />
+                        </section>
+                    )}
 
                     <section className="card" style={{ minHeight: 360 }}>
                         <h3 style={{ marginTop: 0 }}>{t('pages.dashboard.consumptionSplit')}</h3>

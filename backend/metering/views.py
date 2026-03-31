@@ -374,6 +374,7 @@ class MeterReadingViewSet(viewsets.ModelViewSet):
             )
 
             response_totals = {k: float(v) for k, v in totals.items()}
+            zev_wide_totals = dict(response_totals)
             response_timeline = timeline
             selected_participant_name = None
 
@@ -401,6 +402,7 @@ class MeterReadingViewSet(viewsets.ModelViewSet):
                 "role": "zev_owner",
                 "bucket": bucket,
                 "totals": response_totals,
+                "zev_totals": zev_wide_totals,
                 "timeline": response_timeline,
                 "participant_stats": participant_stats,
                 "selected_participant_id": selected_participant_id,
@@ -484,11 +486,136 @@ class MeterReadingViewSet(viewsets.ModelViewSet):
             for _, item in sorted(timeline_map.items(), key=lambda entry: entry[0])
         ]
 
+        # ── ZEV-wide totals & per-participant stats (for Sankey chart) ──
+        zev_totals = {
+            "produced_kwh": Decimal("0"),
+            "consumed_kwh": Decimal("0"),
+            "imported_kwh": Decimal("0"),
+            "exported_kwh": Decimal("0"),
+        }
+        for _, data in zev_pivot.items():
+            consumed = data["consumed"]
+            produced = data["produced"]
+            zev_totals["produced_kwh"] += produced
+            zev_totals["consumed_kwh"] += consumed
+            zev_totals["imported_kwh"] += max(consumed - produced, Decimal("0"))
+            zev_totals["exported_kwh"] += max(produced - consumed, Decimal("0"))
+
+        today = date_type.today()
+        all_consumption_rows = (
+            zev_qs.annotate(bucket=trunc_fn("timestamp"))
+            .filter(
+                direction="in",
+                metering_point__assignments__valid_from__lte=today,
+            )
+            .filter(
+                Q(metering_point__assignments__valid_to__isnull=True)
+                | Q(metering_point__assignments__valid_to__gte=today)
+            )
+            .values(
+                "metering_point__assignments__participant_id",
+                "metering_point__assignments__participant__first_name",
+                "metering_point__assignments__participant__last_name",
+                "timestamp",
+            )
+            .annotate(consumed_kwh=Sum("energy_kwh"))
+            .order_by("metering_point__assignments__participant_id", "timestamp")
+        )
+        all_production_rows = (
+            zev_qs.annotate(bucket=trunc_fn("timestamp"))
+            .filter(
+                direction="out",
+                metering_point__assignments__valid_from__lte=today,
+            )
+            .filter(
+                Q(metering_point__assignments__valid_to__isnull=True)
+                | Q(metering_point__assignments__valid_to__gte=today)
+            )
+            .values(
+                "metering_point__assignments__participant_id",
+                "metering_point__assignments__participant__first_name",
+                "metering_point__assignments__participant__last_name",
+            )
+            .annotate(produced_kwh=Sum("energy_kwh"))
+            .order_by("metering_point__assignments__participant_id")
+        )
+
+        all_p_map = {}
+        for row in all_consumption_rows:
+            pid = str(row["metering_point__assignments__participant_id"])
+            ts = row["timestamp"]
+            consumed = row["consumed_kwh"] or Decimal("0")
+            zev_at_ts = zev_pivot.get(ts, {})
+            total_consumed = zev_at_ts.get("consumed", Decimal("0"))
+            total_produced = zev_at_ts.get("produced", Decimal("0"))
+            local_pool = min(total_produced, total_consumed)
+            if total_consumed > 0 and local_pool > 0:
+                from_zev = min(consumed, local_pool * (consumed / total_consumed))
+            else:
+                from_zev = Decimal("0")
+            from_grid = max(consumed - from_zev, Decimal("0"))
+            if pid not in all_p_map:
+                all_p_map[pid] = {
+                    "participant_id": pid,
+                    "participant_name": (
+                        f"{row['metering_point__assignments__participant__first_name']} "
+                        f"{row['metering_point__assignments__participant__last_name']}"
+                    ).strip(),
+                    "total_consumed_kwh": Decimal("0"),
+                    "total_produced_kwh": Decimal("0"),
+                    "from_zev_kwh": Decimal("0"),
+                    "from_grid_kwh": Decimal("0"),
+                }
+            all_p_map[pid]["total_consumed_kwh"] += consumed
+            all_p_map[pid]["from_zev_kwh"] += from_zev
+            all_p_map[pid]["from_grid_kwh"] += from_grid
+
+        for row in all_production_rows:
+            pid = str(row["metering_point__assignments__participant_id"])
+            produced = row["produced_kwh"] or Decimal("0")
+            if pid not in all_p_map:
+                all_p_map[pid] = {
+                    "participant_id": pid,
+                    "participant_name": (
+                        f"{row['metering_point__assignments__participant__first_name']} "
+                        f"{row['metering_point__assignments__participant__last_name']}"
+                    ).strip(),
+                    "total_consumed_kwh": Decimal("0"),
+                    "total_produced_kwh": Decimal("0"),
+                    "from_zev_kwh": Decimal("0"),
+                    "from_grid_kwh": Decimal("0"),
+                }
+            all_p_map[pid]["total_produced_kwh"] += produced
+
+        zev_participant_stats = sorted(
+            [
+                {
+                    "participant_id": item["participant_id"],
+                    "participant_name": item["participant_name"],
+                    "total_consumed_kwh": float(item["total_consumed_kwh"]),
+                    "total_produced_kwh": float(item["total_produced_kwh"]),
+                    "from_zev_kwh": float(item["from_zev_kwh"]),
+                    "from_grid_kwh": float(item["from_grid_kwh"]),
+                }
+                for item in all_p_map.values()
+            ],
+            key=lambda x: x["total_consumed_kwh"],
+            reverse=True,
+        )
+
+        current_participant_ids = list(
+            Participant.objects.filter(user=user, zev_id__in=zev_ids)
+            .values_list("id", flat=True)
+        )
+
         return Response({
             "role": "participant",
             "bucket": bucket,
             "totals": {k: float(v) for k, v in totals.items()},
             "timeline": timeline,
+            "zev_totals": {k: float(v) for k, v in zev_totals.items()},
+            "zev_participant_stats": zev_participant_stats,
+            "current_participant_id": str(current_participant_ids[0]) if current_participant_ids else None,
         })
 
     @action(detail=False, methods=["get"], url_path="data-quality-status", permission_classes=[IsAuthenticated])
