@@ -104,7 +104,7 @@ export function InvoicesPage() {
     const [retiringEmailId, setRetiringEmailId] = useState<string | null>(null)
 
     useEffect(() => {
-        if (!selectedZev) {
+        if (!selectedZevId) {
             setPeriod({ period_start: '', period_end: '' })
             return
         }
@@ -113,7 +113,7 @@ export function InvoicesPage() {
             period_start: toIsoDate(start),
             period_end: toIsoDate(endOfBillingPeriod(start, interval)),
         })
-    }, [selectedZev?.id, interval])
+    }, [selectedZevId, interval])
 
     const periodOverviewQuery = useQuery({
         queryKey: ['invoice-period-overview', selectedZevId, period.period_start, period.period_end],

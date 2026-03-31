@@ -7,20 +7,166 @@ from rest_framework.response import Response
 from accounts.permissions import IsZevOwnerOrAdmin
 from django.db.models import Count, Q, Sum, F, DecimalField
 from django.conf import settings
-from pathlib import Path
+from django.template import Template, Context
 from zev.models import Zev, Participant, MeteringPoint, MeteringPointAssignment
 from metering.models import MeterReading
-from .models import Invoice, InvoiceStatus, EmailLog
+from .models import Invoice, InvoiceStatus, EmailLog, PdfTemplate, EmailTemplate, EMAIL_TEMPLATE_DEFAULTS
 from .serializers import (
     InvoiceSerializer, GenerateInvoiceSerializer, GenerateZevInvoicesSerializer
 )
 from .engine import generate_invoice, generate_invoices_for_zev
-from .pdf import TEMPLATE_NAME, save_invoice_pdf
+from .pdf import TEMPLATE_NAME, save_invoice_pdf, INVOICE_TRANSLATIONS
+from .contract_pdf import CONTRACT_TEMPLATE_NAME, CONTRACT_TRANSLATIONS
 from .tasks import send_invoice_email_task
 
 
-def _get_invoice_template_path() -> Path:
-    return settings.BASE_DIR / "templates" / TEMPLATE_NAME
+def _read_default_template(template_name: str) -> str:
+    """Read the on-disk (default) content for a template."""
+    path = settings.BASE_DIR / "templates" / template_name
+    return path.read_text(encoding="utf-8")
+
+
+class _Obj:
+    """Simple namespace that allows attribute access on a dict."""
+    def __init__(self, **kwargs):
+        self.__dict__.update(kwargs)
+
+    def __str__(self):
+        return self.__dict__.get("_str", "")
+
+    def get_status_display(self):
+        return self.__dict__.get("_status_display", "Draft")
+
+    def get_zev_type_display(self):
+        return self.__dict__.get("_zev_type_display", "vZEV")
+
+    def get_full_name(self):
+        return self.__dict__.get("_full_name", "")
+
+
+def _build_sample_invoice_context() -> dict:
+    tr = INVOICE_TRANSLATIONS.get("en", INVOICE_TRANSLATIONS["de"])
+    return {
+        "invoice": _Obj(
+            invoice_number="INV-2026-001",
+            _status_display="Draft",
+            subtotal_chf="450.00",
+            vat_rate="8.1",
+            vat_chf="36.45",
+            total_chf="486.45",
+            notes="Sample invoice for template preview.",
+        ),
+        "items": [],
+        "grouped_items": [
+            {
+                "key": "energy",
+                "label": tr["cat_energy"],
+                "items": [
+                    _Obj(description="Local ZEV energy Jan 2026", quantity_kwh="320.50", unit="kWh", unit_price_chf="0.18", total_chf="57.69"),
+                    _Obj(description="Grid energy Jan 2026", quantity_kwh="180.00", unit="kWh", unit_price_chf="0.22", total_chf="39.60"),
+                ],
+                "subtotal": "97.29",
+            },
+            {
+                "key": "grid_fees",
+                "label": tr["cat_grid_fees"],
+                "items": [
+                    _Obj(description="Grid usage fee Jan 2026", quantity_kwh="500.50", unit="kWh", unit_price_chf="0.08", total_chf="40.04"),
+                ],
+                "subtotal": "40.04",
+            },
+        ],
+        "zev": _Obj(
+            name="Solar Community Example",
+            vat_number="CHE-123.456.789",
+            bank_iban="CH93 0076 2011 6238 5295 7",
+        ),
+        "owner_participant": _Obj(
+            full_name="Maria Muster",
+            address_line1="Solarweg 1",
+            address_line2="",
+            postal_code="8000",
+            city="Zürich",
+        ),
+        "creditor_city": "Zürich",
+        "participant": _Obj(
+            full_name="Hans Beispiel",
+            address_line1="Musterstrasse 42",
+            postal_code="3000",
+            city="Bern",
+            email="hans@example.com",
+        ),
+        "qr_svg": None,
+        "energy_chart_svg": None,
+        "hourly_profile_chart_svg": None,
+        "savings_data": {
+            "local_kwh": "320.50",
+            "local_chf": "57.69",
+            "local_rp": "18.00",
+            "grid_rp": "22.00",
+            "saved_rp": "4.00",
+            "hypothetical_chf": "70.51",
+            "saved_chf": "12.82",
+        },
+        "tr": tr,
+        "formatted_dates": {
+            "invoice_date": "15.01.2026",
+            "period_start": "01.01.2026",
+            "period_end": "31.01.2026",
+            "due_date": "14.02.2026",
+        },
+    }
+
+
+def _build_sample_contract_context() -> dict:
+    tr = CONTRACT_TRANSLATIONS.get("en", CONTRACT_TRANSLATIONS["de"])
+    return {
+        "participant": _Obj(
+            full_name="Hans Beispiel",
+            address_line1="Musterstrasse 42",
+            address_line2="",
+            postal_code="3000",
+            city="Bern",
+            phone="+41 31 123 45 67",
+            email="hans@example.com",
+        ),
+        "owner_participant": _Obj(
+            full_name="Maria Muster",
+            address_line1="Solarweg 1",
+            address_line2="",
+            postal_code="8000",
+            city="Zürich",
+            phone="+41 44 987 65 43",
+            email="maria@example.com",
+        ),
+        "zev": _Obj(
+            name="Solar Community Example",
+            _zev_type_display="vZEV",
+            grid_operator="Stadtwerk Zürich",
+            vat_number="CHE-123.456.789",
+            bank_iban="CH93 0076 2011 6238 5295 7",
+            owner=_Obj(
+                _full_name="Maria Muster",
+                username="maria",
+                email="maria@example.com",
+            ),
+        ),
+        "consumption_mps": [
+            _Obj(meter_id="CH1008845123456000000000000012345", location_description="Apartment 3B"),
+        ],
+        "production_mps": [
+            _Obj(meter_id="CH1008845123456000000000000054321", location_description="Rooftop PV system"),
+        ],
+        "local_tariff_rows": [
+            {"name": "Local solar tariff", "rate_rp": "18.00", "rate_description": "Flat rate"},
+        ],
+        "billing_interval_display": "Quarterly",
+        "contract_date": "01.01.2026",
+        "tr": tr,
+        "lang": "en",
+        "local_tariff_notes": "The tariff may be adjusted annually based on production costs.",
+        "additional_contract_notes": "Participant agrees to the general terms and conditions of the ZEV.",
+    }
 
 
 class InvoiceViewSet(viewsets.ModelViewSet):
@@ -388,32 +534,207 @@ class InvoiceViewSet(viewsets.ModelViewSet):
             "recent_invoices": recent_data,
         })
 
-    @action(detail=False, methods=["get", "patch"], url_path="pdf-template", permission_classes=[IsAuthenticated])
+    @action(detail=False, methods=["get", "patch", "delete"], url_path="pdf-template", permission_classes=[IsAuthenticated])
     def pdf_template(self, request):
-        """Admin-only read/write access to the invoice PDF HTML template."""
+        """Admin-only read/write/reset access to the invoice PDF HTML template.
+
+        GET    — returns current content (DB override if present, else on-disk default)
+                 and is_customized flag.
+        PATCH  — saves content to the database (never touches the filesystem).
+        DELETE — removes the DB override, reverting to the on-disk default.
+        """
         if not request.user.is_admin:
             return Response({"error": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
 
-        template_path = _get_invoice_template_path()
-
         if request.method == "GET":
+            record = PdfTemplate.objects.filter(template_name=TEMPLATE_NAME).first()
+            content = record.content if record else _read_default_template(TEMPLATE_NAME)
             return Response(
                 {
                     "template_name": TEMPLATE_NAME,
-                    "content": template_path.read_text(encoding="utf-8"),
+                    "content": content,
+                    "is_customized": record is not None,
                 }
             )
 
-        content = request.data.get("content")
-        if not isinstance(content, str) or not content.strip():
-            return Response({"error": "Template content is required."}, status=status.HTTP_400_BAD_REQUEST)
+        if request.method == "PATCH":
+            content = request.data.get("content")
+            if not isinstance(content, str) or not content.strip():
+                return Response({"error": "Template content is required."}, status=status.HTTP_400_BAD_REQUEST)
+            PdfTemplate.objects.update_or_create(
+                template_name=TEMPLATE_NAME,
+                defaults={"content": content},
+            )
+            return Response(
+                {
+                    "template_name": TEMPLATE_NAME,
+                    "content": content,
+                    "is_customized": True,
+                    "detail": "PDF template updated successfully.",
+                }
+            )
 
-        template_path.write_text(content, encoding="utf-8")
+        # DELETE — revert to default
+        PdfTemplate.objects.filter(template_name=TEMPLATE_NAME).delete()
         return Response(
             {
                 "template_name": TEMPLATE_NAME,
-                "content": content,
-                "detail": "PDF template updated successfully.",
+                "content": _read_default_template(TEMPLATE_NAME),
+                "is_customized": False,
+                "detail": "PDF template reset to default.",
             }
         )
+
+    @action(detail=False, methods=["get", "patch", "delete"], url_path="contract-pdf-template", permission_classes=[IsAuthenticated])
+    def contract_pdf_template(self, request):
+        """Admin-only read/write/reset access to the contract PDF HTML template.
+
+        GET    — returns current content (DB override if present, else on-disk default)
+                 and is_customized flag.
+        PATCH  — saves content to the database (never touches the filesystem).
+        DELETE — removes the DB override, reverting to the on-disk default.
+        """
+        if not request.user.is_admin:
+            return Response({"error": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
+
+        if request.method == "GET":
+            record = PdfTemplate.objects.filter(template_name=CONTRACT_TEMPLATE_NAME).first()
+            content = record.content if record else _read_default_template(CONTRACT_TEMPLATE_NAME)
+            return Response(
+                {
+                    "template_name": CONTRACT_TEMPLATE_NAME,
+                    "content": content,
+                    "is_customized": record is not None,
+                }
+            )
+
+        if request.method == "PATCH":
+            content = request.data.get("content")
+            if not isinstance(content, str) or not content.strip():
+                return Response({"error": "Template content is required."}, status=status.HTTP_400_BAD_REQUEST)
+            PdfTemplate.objects.update_or_create(
+                template_name=CONTRACT_TEMPLATE_NAME,
+                defaults={"content": content},
+            )
+            return Response(
+                {
+                    "template_name": CONTRACT_TEMPLATE_NAME,
+                    "content": content,
+                    "is_customized": True,
+                    "detail": "Contract PDF template updated successfully.",
+                }
+            )
+
+        # DELETE — revert to default
+        PdfTemplate.objects.filter(template_name=CONTRACT_TEMPLATE_NAME).delete()
+        return Response(
+            {
+                "template_name": CONTRACT_TEMPLATE_NAME,
+                "content": _read_default_template(CONTRACT_TEMPLATE_NAME),
+                "is_customized": False,
+                "detail": "Contract PDF template reset to default.",
+            }
+        )
+
+    @action(detail=False, methods=["post"], url_path="preview-pdf-template", permission_classes=[IsAuthenticated])
+    def preview_pdf_template(self, request):
+        """Render a PDF template with sample data and return the HTML preview.
+
+        POST body: { "content": "<html>...", "template_type": "invoice" | "contract" }
+        Returns: { "html": "<rendered html>" }
+        """
+        if not request.user.is_admin:
+            return Response({"error": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
+
+        content = request.data.get("content")
+        template_type = request.data.get("template_type", "invoice")
+
+        if not isinstance(content, str) or not content.strip():
+            return Response({"error": "Template content is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if template_type == "contract":
+            context = _build_sample_contract_context()
+        else:
+            context = _build_sample_invoice_context()
+
+        try:
+            rendered = Template(content).render(Context(context))
+        except Exception as exc:
+            return Response(
+                {"error": f"Template rendering error: {exc}"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        return Response({"html": rendered})
+
+    @action(detail=False, methods=["get"], url_path="email-templates", permission_classes=[IsAuthenticated])
+    def email_templates(self, request):
+        """Admin-only: list all email templates with current content (DB override or hardcoded default)."""
+        if not request.user.is_admin:
+            return Response({"error": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
+
+        overrides = {et.template_key: et for et in EmailTemplate.objects.all()}
+        result = []
+        for key, defaults in EMAIL_TEMPLATE_DEFAULTS.items():
+            override = overrides.get(key)
+            result.append({
+                "template_key": key,
+                "subject": override.subject if override else defaults["subject"],
+                "body": override.body if override else defaults["body"],
+                "is_customized": override is not None,
+            })
+        return Response(result)
+
+    @action(detail=False, methods=["get", "patch", "delete"], url_path="email-template/(?P<template_key>[a-z_]+)", permission_classes=[IsAuthenticated])
+    def email_template(self, request, template_key=None):
+        """Admin-only read/write/reset access to a single email template.
+
+        GET    — returns current subject+body (DB override if present, else hardcoded default).
+        PATCH  — saves subject/body to the database.
+        DELETE — removes the DB override, reverting to the hardcoded default.
+        """
+        if not request.user.is_admin:
+            return Response({"error": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
+
+        defaults = EMAIL_TEMPLATE_DEFAULTS.get(template_key)
+        if not defaults:
+            return Response({"error": "Unknown template key."}, status=status.HTTP_404_NOT_FOUND)
+
+        if request.method == "GET":
+            record = EmailTemplate.objects.filter(template_key=template_key).first()
+            return Response({
+                "template_key": template_key,
+                "subject": record.subject if record else defaults["subject"],
+                "body": record.body if record else defaults["body"],
+                "is_customized": record is not None,
+            })
+
+        if request.method == "PATCH":
+            subject = request.data.get("subject")
+            body = request.data.get("body")
+            if not isinstance(subject, str) or not subject.strip():
+                return Response({"error": "Subject is required."}, status=status.HTTP_400_BAD_REQUEST)
+            if not isinstance(body, str) or not body.strip():
+                return Response({"error": "Body is required."}, status=status.HTTP_400_BAD_REQUEST)
+            EmailTemplate.objects.update_or_create(
+                template_key=template_key,
+                defaults={"subject": subject, "body": body},
+            )
+            return Response({
+                "template_key": template_key,
+                "subject": subject,
+                "body": body,
+                "is_customized": True,
+                "detail": "Email template updated successfully.",
+            })
+
+        # DELETE — revert to default
+        EmailTemplate.objects.filter(template_key=template_key).delete()
+        return Response({
+            "template_key": template_key,
+            "subject": defaults["subject"],
+            "body": defaults["body"],
+            "is_customized": False,
+            "detail": "Email template reset to default.",
+        })
 

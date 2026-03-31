@@ -7,6 +7,7 @@ import type {
     RawMeteringDailyRow,
     DashboardStats,
     EmailLog,
+    EmailTemplateResponse,
     ImpersonationTokens,
     ImportPreviewResult,
     ImportLog,
@@ -555,6 +556,53 @@ export async function fetchInvoicePdfTemplate(): Promise<PdfTemplateResponse> {
 
 export async function updateInvoicePdfTemplate(content: string): Promise<PdfTemplateResponse> {
     const { data } = await api.patch<PdfTemplateResponse>('/invoices/invoices/pdf-template/', { content })
+    return data
+}
+
+export async function fetchContractPdfTemplate(): Promise<PdfTemplateResponse> {
+    const { data } = await api.get<PdfTemplateResponse>('/invoices/invoices/contract-pdf-template/')
+    return data
+}
+
+export async function updateContractPdfTemplate(content: string): Promise<PdfTemplateResponse> {
+    const { data } = await api.patch<PdfTemplateResponse>('/invoices/invoices/contract-pdf-template/', { content })
+    return data
+}
+
+export async function resetInvoicePdfTemplate(): Promise<PdfTemplateResponse> {
+    const { data } = await api.delete<PdfTemplateResponse>('/invoices/invoices/pdf-template/')
+    return data
+}
+
+export async function resetContractPdfTemplate(): Promise<PdfTemplateResponse> {
+    const { data } = await api.delete<PdfTemplateResponse>('/invoices/invoices/contract-pdf-template/')
+    return data
+}
+
+export async function previewPdfTemplate(content: string, templateType: 'invoice' | 'contract'): Promise<{ html: string }> {
+    const { data } = await api.post<{ html: string }>('/invoices/invoices/preview-pdf-template/', { content, template_type: templateType })
+    return data
+}
+
+// ── Email Templates ─────────────────────────────────────────────────────
+
+export async function fetchEmailTemplates(): Promise<EmailTemplateResponse[]> {
+    const { data } = await api.get<EmailTemplateResponse[]>('/invoices/invoices/email-templates/')
+    return data
+}
+
+export async function fetchEmailTemplate(templateKey: string): Promise<EmailTemplateResponse> {
+    const { data } = await api.get<EmailTemplateResponse>(`/invoices/invoices/email-template/${templateKey}/`)
+    return data
+}
+
+export async function updateEmailTemplate(templateKey: string, subject: string, body: string): Promise<EmailTemplateResponse> {
+    const { data } = await api.patch<EmailTemplateResponse>(`/invoices/invoices/email-template/${templateKey}/`, { subject, body })
+    return data
+}
+
+export async function resetEmailTemplate(templateKey: string): Promise<EmailTemplateResponse> {
+    const { data } = await api.delete<EmailTemplateResponse>(`/invoices/invoices/email-template/${templateKey}/`)
     return data
 }
 

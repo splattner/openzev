@@ -201,17 +201,25 @@ def register(request):
     frontend_url = settings.FRONTEND_URL.rstrip("/")
     verify_url = f"{frontend_url}/verify-email?token={token.token}"
 
+    from invoices.models import EmailTemplate, EMAIL_TEMPLATE_DEFAULTS
+
+    defaults = EMAIL_TEMPLATE_DEFAULTS["email_verification"]
+    override = EmailTemplate.objects.filter(template_key="email_verification").first()
+    subject_tpl = override.subject if override else defaults["subject"]
+    body_tpl = override.body if override else defaults["body"]
+
+    template_ctx = {"verify_url": verify_url}
+
+    try:
+        subject = subject_tpl.format_map(template_ctx)
+        body = body_tpl.format_map(template_ctx)
+    except (KeyError, ValueError):
+        subject = defaults["subject"].format_map(template_ctx)
+        body = defaults["body"].format_map(template_ctx)
+
     EmailMessage(
-        subject="Verify your OpenZEV account",
-        body=(
-            f"Hello,\n\n"
-            f"Thank you for registering with OpenZEV.\n"
-            f"Please verify your email address by clicking the link below:\n\n"
-            f"{verify_url}\n\n"
-            f"This link is valid for 24 hours.\n\n"
-            f"If you did not register for OpenZEV, please ignore this email.\n\n"
-            f"Best regards,\nOpenZEV"
-        ),
+        subject=subject,
+        body=body,
         from_email=settings.DEFAULT_FROM_EMAIL,
         to=[email],
     ).send(fail_silently=False)

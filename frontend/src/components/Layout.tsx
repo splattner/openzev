@@ -257,6 +257,10 @@ export function Layout() {
                                                     <span className="nav-icon"><PdfIcon /></span>
                                                     <span className="nav-label">{t('nav.adminPdfTemplates')}</span>
                                                 </NavLink>
+                                                <NavLink to="/admin/email-templates" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`} title={t('nav.adminEmailTemplates')}>
+                                                    <span className="nav-icon"><MailIcon /></span>
+                                                    <span className="nav-label">{t('nav.adminEmailTemplates')}</span>
+                                                </NavLink>
                                             </div>
                                         )}
                                     </>
@@ -446,6 +450,10 @@ function OverviewIcon() {
 
 function PdfIcon() {
     return <IconSvg path="M7 3h8l4 4v14a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Zm1 14h2.5a2.5 2.5 0 0 0 0-5H8Zm1.5-3.5h1a1 1 0 1 1 0 2h-1Zm5.5-1.5h-3v5h1.5v-1.75h1.25M13.5 13.5h1.5m-1.5 2h1.25" />
+}
+
+function MailIcon() {
+    return <IconSvg path="M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Zm0 2 8 5 8-5" />
 }
 
 function AccountIcon() {
