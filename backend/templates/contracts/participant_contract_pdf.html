@@ -66,8 +66,8 @@
             color: #2c5f2e;
             border-bottom: 1px solid #2c5f2e;
             padding-bottom: 1mm;
-            margin-top: 6mm;
-            margin-bottom: 4mm;
+            margin-top: 4mm;
+            margin-bottom: 3mm;
         }
 
         .sub-heading {
@@ -236,7 +236,7 @@
         .sig-intro {
             font-size: 8.5pt;
             color: #555;
-            margin-bottom: 8mm;
+            margin-bottom: 5mm;
             line-height: 1.5;
         }
 
@@ -253,36 +253,34 @@
             font-size: 9pt;
             font-weight: bold;
             color: #2c5f2e;
-            margin-bottom: 10mm;
+            margin-bottom: 6mm;
         }
 
         .sig-line {
             border-bottom: 1px solid #888;
             margin-bottom: 1mm;
-            min-height: 10mm;
+            min-height: 7mm;
         }
 
         .sig-line-label {
             font-size: 7.5pt;
             color: #999;
-            margin-bottom: 6mm;
+            margin-bottom: 4mm;
         }
 
         /* ── Footer / page number ────────────────────────────────────── */
-        .page-footer {
-            position: fixed;
-            bottom: 8mm;
-            left: 16mm;
-            right: 16mm;
-            font-size: 7pt;
-            color: #aaa;
-            display: flex;
-            justify-content: space-between;
-        }
-
         @page {
             size: A4;
             margin: 0;
+
+            @bottom-right {
+                content: "{{ tr.page_label }} " counter(page) " {{ tr.page_of }} " counter(pages);
+                font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+                font-size: 7pt;
+                color: #aaa;
+                margin-right: 16mm;
+                margin-bottom: 8mm;
+            }
         }
 
         .page-break {
@@ -306,7 +304,6 @@
             </div>
             <div class="contract-title-block">
                 <div class="contract-title">{{ tr.contract_title }}</div>
-                <div class="contract-date">{{ tr.contract_date }}: {{ contract_date }}</div>
             </div>
         </div>
 
@@ -461,7 +458,7 @@
             </div>
             <div class="contract-title-block">
                 <div class="contract-title">{{ tr.contract_title }}</div>
-                <div class="contract-date">{{ tr.contract_date }}: {{ contract_date }}</div>
+
             </div>
         </div>
 
@@ -496,7 +493,7 @@
         </div>
 
         <!-- Local tariff future conditions -->
-        <div class="field-row" style="margin-bottom: 6mm;">
+        <div class="field-row" style="margin-bottom: 4mm;">
             <div class="field-label">{{ tr.local_tariff_note }}</div>
             <div class="freetext-box"
                 style="color: {% if local_tariff_notes %}#333{% else %}#bbb{% endif %}; font-style: {% if local_tariff_notes %}normal{% else %}italic{% endif %};">
@@ -525,11 +522,19 @@
             </div>
         </div>
 
+        <!-- Contract duration and termination -->
+        <div class="section-heading" style="font-size: 9.5pt; margin-top: 3mm;">{{ tr.duration_title }}</div>
+        <p class="subject-text" style="margin-bottom: 2mm;">{{ tr.duration_text }}</p>
+
+        <!-- Governing law and jurisdiction -->
+        <div class="section-heading" style="font-size: 9.5pt; margin-top: 3mm;">{{ tr.jurisdiction_title }}</div>
+        <p class="subject-text" style="margin-bottom: 2mm;">{{ tr.jurisdiction_text }}</p>
+
         <!-- Additional agreements -->
-        <div class="field-row" style="margin-bottom: 8mm;">
+        <div class="field-row" style="margin-bottom: 5mm;">
             <div class="field-label">{{ tr.additional_label }}:</div>
             <div class="freetext-box"
-                style="min-height: 25mm; color: {% if additional_contract_notes %}#333{% else %}#bbb{% endif %}; font-style: {% if additional_contract_notes %}normal{% else %}italic{% endif %};">
+                style="min-height: 18mm; color: {% if additional_contract_notes %}#333{% else %}#bbb{% endif %}; font-style: {% if additional_contract_notes %}normal{% else %}italic{% endif %};">
                 {% if additional_contract_notes %}{{ additional_contract_notes }}{% else %}<span
                     class="freetext-placeholder">{{ tr.additional_placeholder }}</span>{% endif %}
             </div>
@@ -563,6 +568,68 @@
         </div>
 
     </div><!-- /page 2 -->
+
+    <!-- ════════════════════════════════════════════════════════════════════ -->
+    <!-- PAGE 3 — Information (v)ZEV                                          -->
+    <!-- ════════════════════════════════════════════════════════════════════ -->
+    <div class="page page-break">
+
+        <!-- Header (repeated) -->
+        <div class="header">
+            <div>
+                <div class="zev-name">{{ zev.name }}</div>
+                <div class="zev-meta">{{ zev.get_zev_type_display }}</div>
+            </div>
+            <div class="contract-title-block">
+                <div class="contract-title">{{ tr.info_title }}</div>
+            </div>
+        </div>
+
+        <p style="font-size: 8.5pt; color: #555; margin-bottom: 3mm;">{{ tr.info_subtitle }}</p>
+
+        <!-- ZEV -->
+        <div class="section-heading">{{ tr.info_zev_title }}</div>
+        <p class="subject-text" style="margin-bottom: 2mm;">{{ tr.info_zev_text }}</p>
+
+        <!-- vZEV -->
+        <div class="section-heading">{{ tr.info_vzev_title }}</div>
+        <p class="subject-text" style="margin-bottom: 2mm;">{{ tr.info_vzev_text }}</p>
+
+        <!-- Legal basis -->
+        <div class="section-heading">{{ tr.info_legal_title }}</div>
+        <ul style="font-size: 8.5pt; line-height: 1.5; color: #333; margin: 0 0 2mm 5mm; padding-left: 4mm;">
+            {% for item in tr.info_legal_items %}
+            <li style="margin-bottom: 1mm;">{{ item }}</li>
+            {% endfor %}
+        </ul>
+
+        <!-- Rights and obligations -->
+        <div class="section-heading">{{ tr.info_rights_title }}</div>
+        <ul style="font-size: 8.5pt; line-height: 1.5; color: #333; margin: 0 0 2mm 5mm; padding-left: 4mm;">
+            {% for item in tr.info_rights_items %}
+            <li style="margin-bottom: 1mm;">{{ item }}</li>
+            {% endfor %}
+        </ul>
+
+        <!-- Joint and several liability -->
+        <div class="section-heading">{{ tr.info_liability_title }}</div>
+        <p class="subject-text" style="margin-bottom: 2mm;">{{ tr.info_liability_text }}</p>
+
+        <!-- Data protection -->
+        <div class="section-heading">{{ tr.info_privacy_title }}</div>
+        <p class="subject-text" style="margin-bottom: 2mm;">{{ tr.info_privacy_text }}</p>
+
+        <!-- Tariff provisions -->
+        <div class="section-heading">{{ tr.info_tariff_title }}</div>
+        <p class="subject-text" style="margin-bottom: 3mm;">{{ tr.info_tariff_text }}</p>
+
+        <!-- Disclaimer -->
+        <div style="margin-top: 3mm; padding: 2mm 4mm; background: #f8f8f8; border-left: 3px solid #2c5f2e;">
+            <div style="font-size: 8pt; font-weight: bold; color: #2c5f2e; margin-bottom: 1mm;">{{ tr.info_note_title }}</div>
+            <p style="font-size: 7.5pt; color: #666; line-height: 1.4; margin: 0;">{{ tr.info_note_text }}</p>
+        </div>
+
+    </div><!-- /page 3 -->
 
 </body>
 
