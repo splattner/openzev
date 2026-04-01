@@ -29,6 +29,7 @@ Welcome to the OpenZEV user documentation. This guide covers everything you need
 
 - **[Troubleshooting](12-troubleshooting.md)** — Common issues and solutions
 - **[Glossary](13-glossary.md)** — Terms and concepts used in OpenZEV
+- **[Feature Flags](14-feature-flags.md)** — Enable/disable runtime functionality and environment overrides
 
 ## Navigating the Interface
 

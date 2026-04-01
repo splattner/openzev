@@ -261,6 +261,10 @@ export function Layout() {
                                                     <span className="nav-icon"><MailIcon /></span>
                                                     <span className="nav-label">{t('nav.adminEmailTemplates')}</span>
                                                 </NavLink>
+                                                <NavLink to="/admin/features" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`} title={t('nav.adminFeatures')}>
+                                                    <span className="nav-icon"><ToggleIcon /></span>
+                                                    <span className="nav-label">{t('nav.adminFeatures')}</span>
+                                                </NavLink>
                                             </div>
                                         )}
                                     </>
@@ -454,6 +458,10 @@ function PdfIcon() {
 
 function MailIcon() {
     return <IconSvg path="M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Zm0 2 8 5 8-5" />
+}
+
+function ToggleIcon() {
+    return <IconSvg path="M16 5H8a7 7 0 1 0 0 14h8a7 7 0 1 0 0-14Zm0 10a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" />
 }
 
 function AccountIcon() {

@@ -18,9 +18,10 @@ from .serializers import (
     UserSerializer, UserCreateSerializer,
     ChangePasswordSerializer, CustomTokenObtainPairSerializer,
     AppSettingsSerializer,
+    FeatureFlagSerializer,
     VatRateSerializer,
 )
-from .models import AppSettings, VatRate
+from .models import AppSettings, FeatureFlag, VatRate
 from .permissions import IsAdmin
 
 
@@ -128,6 +129,33 @@ def app_settings(request):
     return Response(serializer.data)
 
 
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def feature_flags_list(request):
+    """Return all feature flags. Public read access is allowed."""
+    FeatureFlag.sync_defaults()
+    flags = FeatureFlag.objects.all()
+    return Response(FeatureFlagSerializer(flags, many=True).data)
+
+
+@api_view(["PATCH"])
+@permission_classes([IsAuthenticated])
+def feature_flag_update(request, pk: int):
+    """Toggle a feature flag. Admin-only."""
+    if not request.user.is_admin:
+        raise PermissionDenied("Only admins can update feature flags.")
+
+    try:
+        flag = FeatureFlag.objects.get(pk=pk)
+    except FeatureFlag.DoesNotExist:
+        return Response({"detail": "Feature flag not found."}, status=status.HTTP_404_NOT_FOUND)
+
+    serializer = FeatureFlagSerializer(flag, data=request.data, partial=True)
+    serializer.is_valid(raise_exception=True)
+    serializer.save()
+    return Response(serializer.data)
+
+
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def impersonate_participant(request, user_id: int):
@@ -164,6 +192,12 @@ def impersonate_participant(request, user_id: int):
 @permission_classes([AllowAny])
 def register(request):
     """Self-registration: create a pending zev_owner account and send a verification email."""
+    if not FeatureFlag.is_enabled(FeatureFlag.ZEV_SELF_REGISTRATION_ENABLED):
+        return Response(
+            {"detail": "Self-registration is currently disabled."},
+            status=status.HTTP_403_FORBIDDEN,
+        )
+
     email = request.data.get("email", "").strip()
 
     errors = {}

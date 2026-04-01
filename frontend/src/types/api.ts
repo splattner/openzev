@@ -61,6 +61,18 @@ export interface VatRateInput {
     valid_to?: string | null
 }
 
+export interface FeatureFlag {
+    id: number
+    name: string
+    description: string
+    enabled: boolean
+    updated_at: string
+}
+
+export interface FeatureFlagInput {
+    enabled: boolean
+}
+
 export interface Zev {
     id: string
     name: string

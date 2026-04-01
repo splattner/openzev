@@ -1,14 +1,20 @@
 import { useState, type FormEvent } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import AppFooter from '../components/AppFooter'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '../lib/auth'
-import { register as apiRegister, formatApiError } from '../lib/api'
+import { fetchFeatureFlags, register as apiRegister, formatApiError } from '../lib/api'
 
 export function LoginPage() {
     const { t } = useTranslation()
     const navigate = useNavigate()
     const { login } = useAuth()
+    const featureFlagsQuery = useQuery({
+        queryKey: ['public-feature-flags'],
+        queryFn: fetchFeatureFlags,
+        staleTime: 60_000,
+    })
 
     // Login state
     const [email, setEmail] = useState('')
@@ -22,6 +28,9 @@ export function LoginPage() {
     const [regError, setRegError] = useState<string | null>(null)
     const [regLoading, setRegLoading] = useState(false)
     const [regSuccess, setRegSuccess] = useState<string | null>(null)
+    const selfRegistrationEnabled = featureFlagsQuery.data?.find(
+        (flag) => flag.name === 'zev_self_registration_enabled',
+    )?.enabled ?? true
 
     async function handleSubmit(event: FormEvent<HTMLFormElement>) {
         event.preventDefault()
@@ -60,7 +69,7 @@ export function LoginPage() {
 
     return (
         <div className="login-shell">
-            <div className="login-split">
+            <div className={`login-split${selfRegistrationEnabled ? '' : ' login-split-single'}`}>
                 {/* Left: sign-in card */}
                 <form className="card login-card" onSubmit={handleSubmit}>
                     <div className="login-brand">
@@ -91,15 +100,17 @@ export function LoginPage() {
                 </form>
 
                 {/* Right: register panel */}
-                <div className="login-register-panel">
-                    <div className="login-register-inner">
-                        <h2>{t('auth.register.title')}</h2>
-                        <p>{t('auth.register.description')}</p>
-                        <button className="button button-outline" type="button" onClick={openModal}>
-                            {t('auth.register.cta')}
-                        </button>
+                {selfRegistrationEnabled && (
+                    <div className="login-register-panel">
+                        <div className="login-register-inner">
+                            <h2>{t('auth.register.title')}</h2>
+                            <p>{t('auth.register.description')}</p>
+                            <button className="button button-outline" type="button" onClick={openModal}>
+                                {t('auth.register.cta')}
+                            </button>
+                        </div>
                     </div>
-                </div>
+                )}
             </div>
 
             {/* Register modal */}
