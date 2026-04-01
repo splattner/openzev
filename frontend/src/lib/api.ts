@@ -455,6 +455,29 @@ export async function downloadAllPdfs(payload: {
     return data as Blob
 }
 
+export async function downloadAnnualStatement(params: {
+    year: number
+    participant_id?: string
+    zev_id?: string
+}): Promise<Blob> {
+    const { data } = await api.get('/invoices/invoices/annual-statement/', {
+        params,
+        responseType: 'blob',
+    })
+    return data as Blob
+}
+
+export async function downloadAllAnnualStatements(params: {
+    year: number
+    zev_id: string
+}): Promise<Blob> {
+    const { data } = await api.get('/invoices/invoices/annual-statements-zip/', {
+        params,
+        responseType: 'blob',
+    })
+    return data as Blob
+}
+
 export async function fetchInvoicePeriodOverview(params: {
     zev_id: string
     period_start: string
@@ -630,7 +653,22 @@ export async function resetContractPdfTemplate(): Promise<PdfTemplateResponse> {
     return data
 }
 
-export async function previewPdfTemplate(content: string, templateType: 'invoice' | 'contract'): Promise<{ html: string }> {
+export async function fetchAnnualStatementPdfTemplate(): Promise<PdfTemplateResponse> {
+    const { data } = await api.get<PdfTemplateResponse>('/invoices/invoices/annual-statement-pdf-template/')
+    return data
+}
+
+export async function updateAnnualStatementPdfTemplate(content: string): Promise<PdfTemplateResponse> {
+    const { data } = await api.patch<PdfTemplateResponse>('/invoices/invoices/annual-statement-pdf-template/', { content })
+    return data
+}
+
+export async function resetAnnualStatementPdfTemplate(): Promise<PdfTemplateResponse> {
+    const { data } = await api.delete<PdfTemplateResponse>('/invoices/invoices/annual-statement-pdf-template/')
+    return data
+}
+
+export async function previewPdfTemplate(content: string, templateType: 'invoice' | 'contract' | 'annual_statement'): Promise<{ html: string }> {
     const { data } = await api.post<{ html: string }>('/invoices/invoices/preview-pdf-template/', { content, template_type: templateType })
     return data
 }
