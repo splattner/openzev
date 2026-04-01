@@ -13,13 +13,13 @@ import {
     YAxis,
 } from 'recharts'
 import { fetchChartData, fetchMeteringPoints, fetchRawMeteringData, fetchZevs, api, formatApiError } from '../lib/api'
-import { DateRangeShortcutPicker } from '../components/DateRangeShortcutPicker'
+import { BillingPeriodSelector } from '../components/BillingPeriodSelector'
 import { useAuth } from '../lib/auth'
 import { useManagedZev } from '../lib/managedZev'
 import {
-    daysAgoIso,
-    todayIso,
-} from '../lib/dateRangePresets'
+    type BillingInterval,
+    getCurrentBillingPeriod,
+} from '../lib/billingPeriod'
 import { formatDateTime, formatMonthYear, formatShortDate, useAppSettings } from '../lib/appSettings'
 import type { ChartDataPoint, RawMeteringDailyRow, RawMeteringReading, DataQualityStatusResponse } from '../types/api'
 
@@ -136,42 +136,46 @@ export function MeteringChartPage() {
     const { t } = useTranslation()
     const { user } = useAuth()
     const { settings } = useAppSettings()
-    const { selectedZevId } = useManagedZev()
+    const { selectedZevId, selectedZev } = useManagedZev()
     const isManagedScope = user?.role === 'admin' || user?.role === 'zev_owner'
+    const interval: BillingInterval = (selectedZev?.billing_interval as BillingInterval) ?? 'monthly'
 
     // Tab state
     const [activeTab, setActiveTab] = useState<'chart' | 'quality'>('chart')
 
     // Controlled state
     const [selectedMpId, setSelectedMpId] = useState<string>(searchParams.get('metering_point') ?? '')
-    const [dateFrom, setDateFrom] = useState<string>(daysAgoIso(30))
-    const [dateTo, setDateTo] = useState<string>(todayIso())
+    const [period, setPeriod] = useState<{ from: string; to: string }>(() => getCurrentBillingPeriod(interval))
     const [bucket, setBucket] = useState<'day' | 'hour' | 'month'>('day')
+
+    useEffect(() => {
+        setPeriod(getCurrentBillingPeriod(interval))
+    }, [selectedZevId, interval])
 
     // Data queries
     const zevsQuery = useQuery({ queryKey: ['zevs'], queryFn: fetchZevs })
     const mpQuery = useQuery({ queryKey: ['metering-points'], queryFn: fetchMeteringPoints })
 
     const chartQuery = useQuery({
-        queryKey: ['chart-data', selectedMpId, dateFrom, dateTo, bucket],
+        queryKey: ['chart-data', selectedMpId, period.from, period.to, bucket],
         queryFn: () =>
-            fetchChartData({ meteringPoint: selectedMpId, dateFrom, dateTo, bucket }),
+            fetchChartData({ meteringPoint: selectedMpId, dateFrom: period.from, dateTo: period.to, bucket }),
         enabled: !!selectedMpId,
     })
 
     const rawDataQuery = useQuery({
-        queryKey: ['raw-metering-data', selectedMpId, dateFrom, dateTo],
+        queryKey: ['raw-metering-data', selectedMpId, period.from, period.to],
         queryFn: () =>
-            fetchRawMeteringData({ meteringPoint: selectedMpId, dateFrom, dateTo }),
+            fetchRawMeteringData({ meteringPoint: selectedMpId, dateFrom: period.from, dateTo: period.to }),
         enabled: !!selectedMpId,
     })
 
     const qualityQuery = useQuery({
-        queryKey: ['metering-data-quality', dateFrom, dateTo, selectedZevId],
+        queryKey: ['metering-data-quality', period.from, period.to, selectedZevId],
         queryFn: async () => {
             const params = new URLSearchParams({
-                date_from: dateFrom,
-                date_to: dateTo,
+                date_from: period.from,
+                date_to: period.to,
                 ...(selectedZevId && isManagedScope ? { zev_id: selectedZevId } : {}),
             })
             const { data } = await api.get<DataQualityStatusResponse>(
@@ -273,13 +277,26 @@ export function MeteringChartPage() {
                 className="card"
                 style={{
                     display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
                     gap: '1rem',
-                    alignItems: 'end',
                 }}
             >
+                <BillingPeriodSelector
+                    interval={interval}
+                    from={period.from}
+                    to={period.to}
+                    onChange={setPeriod}
+                />
+
                 {activeTab === 'chart' && (
-                    <>
+                    <div
+                        className="inline-form"
+                        style={{
+                            display: 'grid',
+                            gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+                            gap: '1rem',
+                            alignItems: 'end',
+                        }}
+                    >
                         <label>
                             <span>Metering Point *</span>
                             <select
@@ -296,15 +313,6 @@ export function MeteringChartPage() {
                             </select>
                         </label>
 
-                        <DateRangeShortcutPicker
-                            from={dateFrom}
-                            to={dateTo}
-                            onChange={({ from, to }) => {
-                                setDateFrom(from)
-                                setDateTo(to)
-                            }}
-                        />
-
                         <label>
                             <span>Resolution</span>
                             <select
@@ -316,11 +324,19 @@ export function MeteringChartPage() {
                                 <option value="month">Monthly</option>
                             </select>
                         </label>
-                    </>
+                    </div>
                 )}
 
                 {activeTab === 'quality' && (
-                    <>
+                    <div
+                        className="inline-form"
+                        style={{
+                            display: 'grid',
+                            gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+                            gap: '1rem',
+                            alignItems: 'end',
+                        }}
+                    >
                         <label>
                             <span>{t('meteringDataQuality.meterId')} (optional)</span>
                             <select
@@ -336,16 +352,7 @@ export function MeteringChartPage() {
                                 ))}
                             </select>
                         </label>
-
-                        <DateRangeShortcutPicker
-                            from={dateFrom}
-                            to={dateTo}
-                            onChange={({ from, to }) => {
-                                setDateFrom(from)
-                                setDateTo(to)
-                            }}
-                        />
-                    </>
+                    </div>
                 )}
             </div>
 

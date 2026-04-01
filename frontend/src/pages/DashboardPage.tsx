@@ -22,12 +22,12 @@ import { formatShortDate, useAppSettings } from '../lib/appSettings'
 import { useAuth } from '../lib/auth'
 import { useManagedZev } from '../lib/managedZev'
 import { StatCard } from '../components/StatCard'
-import { DateRangeShortcutPicker } from '../components/DateRangeShortcutPicker'
+import { BillingPeriodSelector } from '../components/BillingPeriodSelector'
 import { EnergyFlowChart } from '../components/EnergyFlowChart'
 import {
-    daysAgoIso,
-    todayIso,
-} from '../lib/dateRangePresets'
+    type BillingInterval,
+    getCurrentBillingPeriod,
+} from '../lib/billingPeriod'
 
 export function DashboardPage() {
     const { t } = useTranslation()
@@ -35,8 +35,8 @@ export function DashboardPage() {
     const { settings } = useAppSettings()
     const { managedZevs, selectedZevId, selectedZev, isLoading: managedZevLoading } = useManagedZev()
 
-    const [dateFrom, setDateFrom] = useState(daysAgoIso(30))
-    const [dateTo, setDateTo] = useState(todayIso())
+    const interval: BillingInterval = (selectedZev?.billing_interval as BillingInterval) ?? 'monthly'
+    const [period, setPeriod] = useState<{ from: string; to: string }>(() => getCurrentBillingPeriod(interval))
     const [bucket, setBucket] = useState<'day' | 'hour' | 'month'>('day')
     const [selectedParticipantId, setSelectedParticipantId] = useState('')
 
@@ -46,12 +46,16 @@ export function DashboardPage() {
         setSelectedParticipantId('')
     }, [selectedZevId])
 
+    useEffect(() => {
+        setPeriod(getCurrentBillingPeriod(interval))
+    }, [selectedZevId, interval])
+
     const summaryQuery = useQuery({
-        queryKey: ['metering-dashboard-summary', user?.role, selectedZevId, selectedParticipantId, dateFrom, dateTo, bucket],
+        queryKey: ['metering-dashboard-summary', user?.role, selectedZevId, selectedParticipantId, period.from, period.to, bucket],
         queryFn: () =>
             fetchMeteringDashboardSummary({
-                dateFrom,
-                dateTo,
+                dateFrom: period.from,
+                dateTo: period.to,
                 bucket,
                 zevId: isZevScopedRole ? selectedZevId : undefined,
                 participantId: isZevScopedRole && selectedParticipantId ? selectedParticipantId : undefined,
@@ -104,60 +108,60 @@ export function DashboardPage() {
 
             {(user?.role === 'admin' || user?.role === 'zev_owner') && (
                 <section className="card">
-                    <div className="inline-form grid grid-3">
-                        <DateRangeShortcutPicker
-                            from={dateFrom}
-                            to={dateTo}
-                            onChange={({ from, to }) => {
-                                setDateFrom(from)
-                                setDateTo(to)
-                            }}
+                    <div className="grid">
+                        <BillingPeriodSelector
+                            interval={interval}
+                            from={period.from}
+                            to={period.to}
+                            onChange={setPeriod}
                         />
-                        <label>
-                            <span>{t('pages.dashboard.participant')}</span>
-                            <select
-                                value={selectedParticipantId}
-                                onChange={(e) => setSelectedParticipantId(e.target.value)}
-                            >
-                                <option value="">{t('pages.dashboard.allParticipants')}</option>
-                                {summary?.role === 'zev_owner' && summary.participant_stats.map((participant) => (
-                                    <option key={participant.participant_id} value={participant.participant_id}>
-                                        {participant.participant_name || participant.participant_id}
-                                    </option>
-                                ))}
-                            </select>
-                        </label>
-                        <label>
-                            <span>{t('pages.dashboard.resolution')}</span>
-                            <select value={bucket} onChange={(e) => setBucket(e.target.value as 'day' | 'hour' | 'month')}>
-                                <option value="hour">{t('pages.dashboard.hourly')}</option>
-                                <option value="day">{t('pages.dashboard.daily')}</option>
-                                <option value="month">{t('pages.dashboard.monthly')}</option>
-                            </select>
-                        </label>
+                        <div className="inline-form grid grid-2">
+                            <label>
+                                <span>{t('pages.dashboard.participant')}</span>
+                                <select
+                                    value={selectedParticipantId}
+                                    onChange={(e) => setSelectedParticipantId(e.target.value)}
+                                >
+                                    <option value="">{t('pages.dashboard.allParticipants')}</option>
+                                    {summary?.role === 'zev_owner' && summary.participant_stats.map((participant) => (
+                                        <option key={participant.participant_id} value={participant.participant_id}>
+                                            {participant.participant_name || participant.participant_id}
+                                        </option>
+                                    ))}
+                                </select>
+                            </label>
+                            <label>
+                                <span>{t('pages.dashboard.resolution')}</span>
+                                <select value={bucket} onChange={(e) => setBucket(e.target.value as 'day' | 'hour' | 'month')}>
+                                    <option value="hour">{t('pages.dashboard.hourly')}</option>
+                                    <option value="day">{t('pages.dashboard.daily')}</option>
+                                    <option value="month">{t('pages.dashboard.monthly')}</option>
+                                </select>
+                            </label>
+                        </div>
                     </div>
                 </section>
             )}
 
             {user?.role === 'participant' && (
                 <section className="card">
-                    <div className="inline-form grid grid-4">
-                        <DateRangeShortcutPicker
-                            from={dateFrom}
-                            to={dateTo}
-                            onChange={({ from, to }) => {
-                                setDateFrom(from)
-                                setDateTo(to)
-                            }}
+                    <div className="grid">
+                        <BillingPeriodSelector
+                            interval={interval}
+                            from={period.from}
+                            to={period.to}
+                            onChange={setPeriod}
                         />
-                        <label>
-                            <span>{t('pages.dashboard.resolution')}</span>
-                            <select value={bucket} onChange={(e) => setBucket(e.target.value as 'day' | 'hour' | 'month')}>
-                                <option value="hour">{t('pages.dashboard.hourly')}</option>
-                                <option value="day">{t('pages.dashboard.daily')}</option>
-                                <option value="month">{t('pages.dashboard.monthly')}</option>
-                            </select>
-                        </label>
+                        <div className="inline-form" style={{ maxWidth: '320px' }}>
+                            <label>
+                                <span>{t('pages.dashboard.resolution')}</span>
+                                <select value={bucket} onChange={(e) => setBucket(e.target.value as 'day' | 'hour' | 'month')}>
+                                    <option value="hour">{t('pages.dashboard.hourly')}</option>
+                                    <option value="day">{t('pages.dashboard.daily')}</option>
+                                    <option value="month">{t('pages.dashboard.monthly')}</option>
+                                </select>
+                            </label>
+                        </div>
                     </div>
                 </section>
             )}
