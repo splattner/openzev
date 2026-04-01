@@ -36,6 +36,7 @@ import type {
     VatRateInput,
     FeatureFlag,
     FeatureFlagInput,
+    HourlyProfileResponse,
     Zev,
     ZevInput,
     ZevWizardInput,
@@ -664,6 +665,23 @@ export async function fetchMeteringDashboardSummary(params?: {
             bucket: params?.bucket ?? 'day',
             zev_id: params?.zevId,
             participant_id: params?.participantId,
+        },
+    })
+    return data
+}
+
+export async function fetchHourlyProfile(params: {
+    dateFrom: string
+    dateTo: string
+    zevId?: string
+    participantId?: string
+}): Promise<HourlyProfileResponse> {
+    const { data } = await api.get<HourlyProfileResponse>('/metering/readings/hourly-profile/', {
+        params: {
+            date_from: params.dateFrom,
+            date_to: params.dateTo,
+            zev_id: params.zevId,
+            participant_id: params.participantId,
         },
     })
     return data

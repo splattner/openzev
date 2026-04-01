@@ -799,6 +799,10 @@ export const en = {
                 totalConsumption: 'Total Consumption',
             },
             consumptionSplit: 'Consumption Split',
+            hourlyProfile: {
+                title: 'Average Daily Consumption Profile (24 h)',
+                description: 'Average hourly energy draw over the billing period — split between local ZEV energy and grid import.',
+            },
             invoicesSection: 'Invoices',
             loadingInvoices: 'Loading invoices…',
             failedInvoices: 'Failed to load invoices.',

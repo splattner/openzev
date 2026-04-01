@@ -796,6 +796,10 @@ export const fr = {
                 totalConsumption: 'Consommation totale',
             },
             consumptionSplit: 'Répartition de la consommation',
+            hourlyProfile: {
+                title: 'Profil de consommation journalier moyen (24 h)',
+                description: 'Consommation horaire moyenne sur la période de facturation — répartie entre énergie locale CEL et importation réseau.',
+            },
             invoicesSection: 'Factures',
             loadingInvoices: 'Chargement des factures…',
             failedInvoices: 'Impossible de charger les factures.',

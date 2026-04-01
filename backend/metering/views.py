@@ -618,6 +618,165 @@ class MeterReadingViewSet(viewsets.ModelViewSet):
             "current_participant_id": str(current_participant_ids[0]) if current_participant_ids else None,
         })
 
+    @action(detail=False, methods=["get"], url_path="hourly-profile", permission_classes=[IsAuthenticated])
+    def hourly_profile(self, request):
+        """
+        Return a 24-hour average daily consumption profile for a participant,
+        split into local ZEV energy and grid import.
+
+        Query params:
+          date_from  – YYYY-MM-DD (required)
+          date_to    – YYYY-MM-DD (required)
+          zev_id     – UUID (optional, required for admin/owner)
+          participant_id – UUID (optional, for admin/owner to view a specific participant)
+        """
+        from zev.models import MeteringPoint, MeteringPointType
+
+        user = request.user
+        date_from = request.query_params.get("date_from")
+        date_to = request.query_params.get("date_to")
+        if not date_from or not date_to:
+            return Response({"error": "date_from and date_to are required."}, status=400)
+
+        ps = date_type.fromisoformat(date_from)
+        pe = date_type.fromisoformat(date_to)
+        start_dt = datetime.combine(ps, datetime.min.time(), tzinfo=dt_timezone.utc)
+        end_dt = datetime.combine(pe, datetime.min.time(), tzinfo=dt_timezone.utc) + timedelta(days=1)
+
+        zev_id = request.query_params.get("zev_id")
+        participant_id = request.query_params.get("participant_id")
+
+        # Determine participant and ZEV
+        if user.role == "participant":
+            zev_ids = list(
+                Participant.objects.filter(user=user).values_list("zev_id", flat=True).distinct()
+            )
+            if not zev_ids:
+                return Response({"hourly_profile": None})
+            participant_ids = list(
+                Participant.objects.filter(user=user, zev_id__in=zev_ids).values_list("id", flat=True)
+            )
+            selected_zev_id = zev_ids[0]
+        elif user.is_admin or user.role == "zev_owner":
+            if not zev_id:
+                owner_zevs = Zev.objects.all() if user.is_admin else Zev.objects.filter(owner=user)
+                if owner_zevs.count() == 1:
+                    selected_zev_id = str(owner_zevs.first().id)
+                else:
+                    return Response({"error": "zev_id query parameter is required."}, status=400)
+            else:
+                if not user.is_admin and not Zev.objects.filter(id=zev_id, owner=user).exists():
+                    return Response({"error": "Permission denied for selected ZEV."}, status=403)
+                selected_zev_id = zev_id
+
+            if participant_id:
+                if not Participant.objects.filter(id=participant_id, zev_id=selected_zev_id).exists():
+                    return Response({"error": "Participant not found for selected ZEV."}, status=404)
+                participant_ids = [participant_id]
+            else:
+                return Response({"hourly_profile": None})
+        else:
+            return Response({"hourly_profile": None})
+
+        # Participant consumption readings (sub-daily only)
+        consumption_mps = MeteringPoint.objects.filter(
+            zev_id=selected_zev_id,
+            meter_type__in=[MeteringPointType.CONSUMPTION, MeteringPointType.BIDIRECTIONAL],
+            assignments__participant_id__in=participant_ids,
+            assignments__valid_from__lte=pe,
+        ).filter(
+            Q(assignments__valid_to__isnull=True) | Q(assignments__valid_to__gte=ps)
+        ).distinct()
+
+        participant_readings = list(
+            MeterReading.objects.filter(
+                metering_point__in=consumption_mps,
+                timestamp__gte=start_dt,
+                timestamp__lt=end_dt,
+                direction="in",
+            ).order_by("timestamp")
+        )
+
+        if not participant_readings:
+            return Response({"hourly_profile": None})
+
+        resolutions = {r.resolution for r in participant_readings}
+        if resolutions == {"daily"}:
+            return Response({"hourly_profile": None})
+
+        # ZEV-level production and consumption by timestamp
+        all_prod_mps = MeteringPoint.objects.filter(
+            zev_id=selected_zev_id,
+            meter_type__in=[MeteringPointType.PRODUCTION, MeteringPointType.BIDIRECTIONAL],
+            assignments__valid_from__lte=pe,
+        ).filter(
+            Q(assignments__valid_to__isnull=True) | Q(assignments__valid_to__gte=ps)
+        ).distinct()
+
+        zev_prod_by_ts = {
+            row["timestamp"]: float(row["total_kwh"] or 0)
+            for row in MeterReading.objects.filter(
+                metering_point__in=all_prod_mps,
+                timestamp__gte=start_dt,
+                timestamp__lt=end_dt,
+                direction="out",
+            ).values("timestamp").annotate(total_kwh=Sum("energy_kwh"))
+        }
+
+        all_cons_mps = MeteringPoint.objects.filter(
+            zev_id=selected_zev_id,
+            meter_type__in=[MeteringPointType.CONSUMPTION, MeteringPointType.BIDIRECTIONAL],
+            assignments__valid_from__lte=pe,
+        ).filter(
+            Q(assignments__valid_to__isnull=True) | Q(assignments__valid_to__gte=ps)
+        ).distinct()
+
+        zev_cons_by_ts = {
+            row["timestamp"]: float(row["total_kwh"] or 0)
+            for row in MeterReading.objects.filter(
+                metering_point__in=all_cons_mps,
+                timestamp__gte=start_dt,
+                timestamp__lt=end_dt,
+                direction="in",
+            ).values("timestamp").annotate(total_kwh=Sum("energy_kwh"))
+        }
+
+        # Accumulate local/grid per hour-of-day
+        hourly_local = [0.0] * 24
+        hourly_grid = [0.0] * 24
+
+        for reading in participant_readings:
+            ts = reading.timestamp
+            hour = ts.hour
+            p_kwh = float(reading.energy_kwh)
+            zev_cons = zev_cons_by_ts.get(ts, 0.0)
+            zev_prod = zev_prod_by_ts.get(ts, 0.0)
+            local_pool = min(zev_prod, zev_cons)
+
+            if zev_cons > 0 and local_pool > 0:
+                r_local = min(p_kwh, local_pool * p_kwh / zev_cons)
+            else:
+                r_local = 0.0
+            r_grid = max(p_kwh - r_local, 0.0)
+
+            hourly_local[hour] += r_local
+            hourly_grid[hour] += r_grid
+
+        total_days = (pe - ps).days + 1
+        hourly_local = [v / total_days for v in hourly_local]
+        hourly_grid = [v / total_days for v in hourly_grid]
+
+        profile = [
+            {
+                "hour": h,
+                "from_zev_kwh": round(hourly_local[h], 4),
+                "from_grid_kwh": round(hourly_grid[h], 4),
+            }
+            for h in range(24)
+        ]
+
+        return Response({"hourly_profile": profile})
+
     @action(detail=False, methods=["get"], url_path="data-quality-status", permission_classes=[IsAuthenticated])
     def data_quality_status(self, request):
         """
