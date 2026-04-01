@@ -1,9 +1,12 @@
+import io
+import zipfile
 from datetime import date as date_type, datetime, timedelta, timezone as dt_timezone
 
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from django.http import HttpResponse
 from accounts.permissions import IsZevOwnerOrAdmin
 from django.db.models import Count, Q, Sum, F, DecimalField
 from django.conf import settings
@@ -464,6 +467,102 @@ class InvoiceViewSet(viewsets.ModelViewSet):
         # Queue retry
         send_invoice_email_task.delay(str(invoice.pk), email_log.recipient)
         return Response({"detail": f"Email retry queued for {email_log.recipient}."})
+
+    # ── Batch operations ────────────────────────────────────────────────
+
+    def _get_period_invoices(self, request):
+        """Helper: resolve ZEV and period invoices from request data, with permission check."""
+        s = GenerateZevInvoicesSerializer(data=request.data)
+        s.is_valid(raise_exception=True)
+        try:
+            zev = Zev.objects.get(pk=s.validated_data["zev_id"])
+        except Zev.DoesNotExist:
+            return None, None, Response({"error": "ZEV not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        if not request.user.is_admin and zev.owner != request.user:
+            return None, None, Response({"error": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
+
+        invoices = Invoice.objects.filter(
+            zev=zev,
+            period_start=s.validated_data["period_start"],
+            period_end=s.validated_data["period_end"],
+        ).select_related("participant", "zev").prefetch_related("items", "email_logs")
+        return zev, invoices, None
+
+    @action(detail=False, methods=["post"], url_path="approve-all",
+            permission_classes=[IsAuthenticated, IsZevOwnerOrAdmin])
+    def approve_all(self, request):
+        """Approve all draft invoices for a ZEV period."""
+        _zev, invoices, error = self._get_period_invoices(request)
+        if error:
+            return error
+
+        drafts = invoices.filter(status=InvoiceStatus.DRAFT)
+        count = drafts.update(status=InvoiceStatus.APPROVED)
+        return Response({"approved": count})
+
+    @action(detail=False, methods=["post"], url_path="send-all",
+            permission_classes=[IsAuthenticated, IsZevOwnerOrAdmin])
+    def send_all(self, request):
+        """Queue emails for all approved invoices in a ZEV period."""
+        _zev, invoices, error = self._get_period_invoices(request)
+        if error:
+            return error
+
+        approved = list(invoices.filter(status=InvoiceStatus.APPROVED))
+        queued = 0
+        skipped = 0
+        for invoice in approved:
+            recipient = invoice.participant.email
+            if not recipient:
+                skipped += 1
+                continue
+            send_invoice_email_task.delay(str(invoice.pk), recipient)
+            queued += 1
+        return Response({"queued": queued, "skipped": skipped})
+
+    @action(detail=False, methods=["post"], url_path="generate-pdfs-all",
+            permission_classes=[IsAuthenticated, IsZevOwnerOrAdmin])
+    def generate_pdfs_all(self, request):
+        """Generate PDFs for all invoices in a ZEV period."""
+        _zev, invoices, error = self._get_period_invoices(request)
+        if error:
+            return error
+
+        invoice_list = list(invoices)
+        count = 0
+        for invoice in invoice_list:
+            save_invoice_pdf(invoice)
+            count += 1
+        return Response({"generated": count})
+
+    @action(detail=False, methods=["post"], url_path="download-pdfs",
+            permission_classes=[IsAuthenticated, IsZevOwnerOrAdmin])
+    def download_pdfs(self, request):
+        """Download all period PDFs as a single ZIP file."""
+        _zev, invoices, error = self._get_period_invoices(request)
+        if error:
+            return error
+
+        invoices_with_pdf = list(invoices.exclude(pdf_file="").exclude(pdf_file__isnull=True))
+        if not invoices_with_pdf:
+            return Response({"error": "No PDFs available for this period."}, status=status.HTTP_404_NOT_FOUND)
+
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+            for invoice in invoices_with_pdf:
+                try:
+                    pdf_content = invoice.pdf_file.read()
+                    filename = f"{invoice.invoice_number}.pdf"
+                    zf.writestr(filename, pdf_content)
+                except Exception:
+                    continue
+        buf.seek(0)
+
+        response = HttpResponse(buf.getvalue(), content_type="application/zip")
+        period = invoices_with_pdf[0].period_start.isoformat()
+        response["Content-Disposition"] = f'attachment; filename="invoices-{period}.zip"'
+        return response
 
     @action(detail=False, methods=["get"], permission_classes=[IsAuthenticated])
     def dashboard(self, request):

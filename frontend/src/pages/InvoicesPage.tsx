@@ -3,16 +3,21 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import {
+    approveAllInvoices,
     approveInvoice,
     deleteInvoice,
+    downloadAllPdfs,
     fetchEmailLogs,
     fetchInvoice,
     fetchInvoicePeriodOverview,
     formatApiError,
+    generateAllPdfs,
     generateInvoice,
     generateInvoicePdf,
+    generateInvoicesForZev,
     markInvoicePaid,
     retryFailedEmail,
+    sendAllInvoices,
     sendInvoiceEmail,
 } from '../lib/api'
 import { EmailLogsModal } from '../components/EmailLogsModal'
@@ -196,6 +201,66 @@ export function InvoicesPage() {
         onError: (error) => pushToast(formatApiError(error, 'Failed to retry email.'), 'error'),
     })
 
+    // ── Batch mutations ──────────────────────────────────────────────
+
+    const batchPayload = { zev_id: selectedZevId, period_start: period.period_start, period_end: period.period_end }
+
+    const generateAllMutation = useMutation({
+        mutationFn: () => generateInvoicesForZev(batchPayload),
+        onSuccess: (invoices) => {
+            pushToast(t('pages.invoices.batch.generatedAll', { n: invoices.length }), 'success')
+            void queryClient.invalidateQueries({ queryKey: ['invoice-period-overview'] })
+        },
+        onError: (error) => pushToast(formatApiError(error, t('pages.invoices.batch.generateAllFailed')), 'error'),
+    })
+
+    const approveAllMutation = useMutation({
+        mutationFn: () => approveAllInvoices(batchPayload),
+        onSuccess: (result) => {
+            pushToast(t('pages.invoices.batch.approvedAll', { n: result.approved }), 'success')
+            void queryClient.invalidateQueries({ queryKey: ['invoice-period-overview'] })
+        },
+        onError: (error) => pushToast(formatApiError(error, t('pages.invoices.batch.approveAllFailed')), 'error'),
+    })
+
+    const sendAllMutation = useMutation({
+        mutationFn: () => sendAllInvoices(batchPayload),
+        onSuccess: (result) => {
+            const msg = result.skipped > 0
+                ? t('pages.invoices.batch.sentAllWithSkipped', { queued: result.queued, skipped: result.skipped })
+                : t('pages.invoices.batch.sentAll', { n: result.queued })
+            pushToast(msg, 'success')
+            void queryClient.invalidateQueries({ queryKey: ['invoice-period-overview'] })
+        },
+        onError: (error) => pushToast(formatApiError(error, t('pages.invoices.batch.sendAllFailed')), 'error'),
+    })
+
+    const generateAllPdfsMutation = useMutation({
+        mutationFn: () => generateAllPdfs(batchPayload),
+        onSuccess: (result) => {
+            pushToast(t('pages.invoices.batch.generatedAllPdfs', { n: result.generated }), 'success')
+            void queryClient.invalidateQueries({ queryKey: ['invoice-period-overview'] })
+        },
+        onError: (error) => pushToast(formatApiError(error, t('pages.invoices.batch.generateAllPdfsFailed')), 'error'),
+    })
+
+    const downloadAllPdfsMutation = useMutation({
+        mutationFn: () => downloadAllPdfs(batchPayload),
+        onSuccess: (blob) => {
+            const url = URL.createObjectURL(blob)
+            const a = document.createElement('a')
+            a.href = url
+            a.download = `invoices-${period.period_start}.zip`
+            document.body.appendChild(a)
+            a.click()
+            document.body.removeChild(a)
+            URL.revokeObjectURL(url)
+        },
+        onError: (error) => pushToast(formatApiError(error, t('pages.invoices.batch.downloadFailed')), 'error'),
+    })
+
+    const anyBatchPending = generateAllMutation.isPending || approveAllMutation.isPending || sendAllMutation.isPending || generateAllPdfsMutation.isPending || downloadAllPdfsMutation.isPending
+
     // Polling effect for email status
     useEffect(() => {
         if (!pollingInvoiceId || !emailPollingStartedAt) return
@@ -279,6 +344,12 @@ export function InvoicesPage() {
 
     const rows = useMemo(() => periodOverviewQuery.data?.rows ?? [], [periodOverviewQuery.data?.rows])
 
+    const draftCount = useMemo(() => rows.filter((r) => r.invoice?.status === 'draft').length, [rows])
+    const approvedCount = useMemo(() => rows.filter((r) => r.invoice?.status === 'approved').length, [rows])
+    const invoiceCount = useMemo(() => rows.filter((r) => r.invoice).length, [rows])
+    const pdfCount = useMemo(() => rows.filter((r) => r.invoice?.pdf_url).length, [rows])
+    const isOwnerOrAdmin = user?.role === 'admin' || user?.role === 'zev_owner'
+
     if (!selectedZevId) {
         return (
             <div className="page-stack">
@@ -346,6 +417,52 @@ export function InvoicesPage() {
                     </div>
                 </section>
             ) : (
+                <>
+                {isOwnerOrAdmin && (
+                    <section className="card" style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                        <span style={{ fontWeight: 600, marginRight: '0.5rem' }}>{t('pages.invoices.batch.title')}</span>
+                        <button
+                            className="button button-primary"
+                            type="button"
+                            disabled={anyBatchPending}
+                            onClick={() => generateAllMutation.mutate()}
+                        >
+                            {t('pages.invoices.batch.generateAll')}
+                        </button>
+                        <button
+                            className="button"
+                            type="button"
+                            disabled={anyBatchPending || invoiceCount === 0}
+                            onClick={() => generateAllPdfsMutation.mutate()}
+                        >
+                            {t('pages.invoices.batch.generateAllPdfs')} {invoiceCount > 0 && `(${invoiceCount})`}
+                        </button>
+                        <button
+                            className="button"
+                            type="button"
+                            disabled={anyBatchPending || draftCount === 0}
+                            onClick={() => approveAllMutation.mutate()}
+                        >
+                            {t('pages.invoices.batch.approveAll')} {draftCount > 0 && `(${draftCount})`}
+                        </button>
+                        <button
+                            className="button"
+                            type="button"
+                            disabled={anyBatchPending || approvedCount === 0}
+                            onClick={() => sendAllMutation.mutate()}
+                        >
+                            {t('pages.invoices.batch.sendAll')} {approvedCount > 0 && `(${approvedCount})`}
+                        </button>
+                        <button
+                            className="button button-secondary"
+                            type="button"
+                            disabled={anyBatchPending || pdfCount === 0}
+                            onClick={() => downloadAllPdfsMutation.mutate()}
+                        >
+                            {t('pages.invoices.batch.downloadAll')} {pdfCount > 0 && `(${pdfCount})`}
+                        </button>
+                    </section>
+                )}
                 <div className="table-card">
                     <table>
                         <thead>
@@ -540,6 +657,7 @@ export function InvoicesPage() {
                         </tbody>
                     </table>
                 </div>
+                </>
             )}
 
             {/* Delete Confirmation Modal */}
