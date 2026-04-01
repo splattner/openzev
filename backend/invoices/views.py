@@ -20,6 +20,7 @@ from .serializers import (
 from .engine import generate_invoice, generate_invoices_for_zev
 from .pdf import TEMPLATE_NAME, save_invoice_pdf, INVOICE_TRANSLATIONS
 from .contract_pdf import CONTRACT_TEMPLATE_NAME, CONTRACT_TRANSLATIONS
+from .annual_statement import generate_annual_statement_pdf, ANNUAL_STATEMENT_TEMPLATE, ANNUAL_TRANSLATIONS
 from .tasks import send_invoice_email_task
 
 
@@ -169,6 +170,112 @@ def _build_sample_contract_context() -> dict:
         "lang": "en",
         "local_tariff_notes": "The tariff may be adjusted annually based on production costs.",
         "additional_contract_notes": "Participant agrees to the general terms and conditions of the ZEV.",
+    }
+
+
+def _build_sample_annual_statement_context() -> dict:
+    tr = ANNUAL_TRANSLATIONS.get("en", ANNUAL_TRANSLATIONS["de"])
+    monthly_data = []
+    for i, month in enumerate(tr["months"]):
+        consumed = 320.0 + i * 15
+        from_zev = consumed * 0.62
+        from_grid = consumed - from_zev
+        produced = 80.0 + i * 10 if i < 6 else 80.0 + (11 - i) * 10
+        self_suf = round(from_zev / consumed * 100) if consumed > 0 else 0
+        monthly_data.append({
+            "month_label": month,
+            "consumed_kwh": f"{consumed:.2f}",
+            "from_zev_kwh": f"{from_zev:.2f}",
+            "from_grid_kwh": f"{from_grid:.2f}",
+            "produced_kwh": f"{produced:.2f}",
+            "self_sufficiency_pct": self_suf,
+        })
+    total_consumed = sum(float(m["consumed_kwh"]) for m in monthly_data)
+    total_from_zev = sum(float(m["from_zev_kwh"]) for m in monthly_data)
+    total_from_grid = sum(float(m["from_grid_kwh"]) for m in monthly_data)
+    total_produced = sum(float(m["produced_kwh"]) for m in monthly_data)
+    from .annual_statement import _build_monthly_chart_svg
+    return {
+        "lang": "en",
+        "tr": tr,
+        "year": 2025,
+        "zev": _Obj(
+            name="Solar Community Example",
+            vat_number="CHE-123.456.789",
+        ),
+        "participant": _Obj(
+            full_name="Hans Beispiel",
+            address_line1="Musterstrasse 42",
+            address_line2="",
+            postal_code="3000",
+            city="Bern",
+        ),
+        "owner_participant": _Obj(
+            full_name="Maria Muster",
+            address_line1="Solarweg 1",
+            address_line2="",
+            postal_code="8000",
+            city="Zürich",
+        ),
+        "monthly_data": monthly_data,
+        "totals": {
+            "total_consumed_kwh": f"{total_consumed:.2f}",
+            "from_zev_kwh": f"{total_from_zev:.2f}",
+            "from_grid_kwh": f"{total_from_grid:.2f}",
+            "total_produced_kwh": f"{total_produced:.2f}",
+            "self_sufficiency_pct": round(total_from_zev / total_consumed * 100) if total_consumed > 0 else 0,
+        },
+        "monthly_chart_svg": _build_monthly_chart_svg(monthly_data, tr),
+        "invoices": [
+            {
+                "invoice_number": "INV-2025-001",
+                "period_start_formatted": "01.01.2025",
+                "period_end_formatted": "31.03.2025",
+                "subtotal_chf": "450.00",
+                "vat_chf": "36.45",
+                "total_chf": "486.45",
+            },
+            {
+                "invoice_number": "INV-2025-002",
+                "period_start_formatted": "01.04.2025",
+                "period_end_formatted": "30.06.2025",
+                "subtotal_chf": "520.00",
+                "vat_chf": "42.12",
+                "total_chf": "562.12",
+            },
+            {
+                "invoice_number": "INV-2025-003",
+                "period_start_formatted": "01.07.2025",
+                "period_end_formatted": "30.09.2025",
+                "subtotal_chf": "380.00",
+                "vat_chf": "30.78",
+                "total_chf": "410.78",
+            },
+            {
+                "invoice_number": "INV-2025-004",
+                "period_start_formatted": "01.10.2025",
+                "period_end_formatted": "31.12.2025",
+                "subtotal_chf": "490.00",
+                "vat_chf": "39.69",
+                "total_chf": "529.69",
+            },
+        ],
+        "invoice_totals": {
+            "subtotal_chf": "1840.00",
+            "vat_chf": "149.04",
+            "total_chf": "1989.04",
+        },
+        "savings": {
+            "local_kwh": "2976.00",
+            "local_chf": "535.68",
+            "local_rp": "18.00",
+            "grid_rp": "22.00",
+            "hypothetical_chf": "654.72",
+            "saved_chf": "119.04",
+        },
+        "formatted_dates": {
+            "statement_date": "01.01.2026",
+        },
     }
 
 
@@ -564,6 +671,108 @@ class InvoiceViewSet(viewsets.ModelViewSet):
         response["Content-Disposition"] = f'attachment; filename="invoices-{period}.zip"'
         return response
 
+    @action(detail=False, methods=["get"], url_path="annual-statement",
+            permission_classes=[IsAuthenticated])
+    def annual_statement(self, request):
+        """Generate and return an annual statement PDF for a participant."""
+        participant_id = request.query_params.get("participant_id")
+        year_raw = request.query_params.get("year")
+        zev_id = request.query_params.get("zev_id")
+
+        if not year_raw:
+            return Response({"error": "year is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            year = int(year_raw)
+        except ValueError:
+            return Response({"error": "year must be a number."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Participants can generate their own statement
+        if request.user.role == 'participant' and not request.user.is_admin:
+            participant = Participant.objects.filter(user=request.user).first()
+            if not participant:
+                return Response({"error": "Participant not found."}, status=status.HTTP_404_NOT_FOUND)
+            zev = participant.zev
+        else:
+            # Owner/admin must provide participant_id and zev_id
+            if not participant_id or not zev_id:
+                return Response(
+                    {"error": "participant_id and zev_id are required."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            try:
+                zev = Zev.objects.get(pk=zev_id)
+            except Zev.DoesNotExist:
+                return Response({"error": "ZEV not found."}, status=status.HTTP_404_NOT_FOUND)
+
+            if not request.user.is_admin and zev.owner != request.user:
+                return Response({"error": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
+
+            try:
+                participant = Participant.objects.get(pk=participant_id, zev=zev)
+            except Participant.DoesNotExist:
+                return Response({"error": "Participant not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        pdf_bytes = generate_annual_statement_pdf(participant, zev, year)
+        response = HttpResponse(pdf_bytes, content_type="application/pdf")
+        filename = f"annual-statement-{year}-{participant.last_name}.pdf"
+        response["Content-Disposition"] = f'inline; filename="{filename}"'
+        return response
+
+    @action(detail=False, methods=["get"], url_path="annual-statements-zip",
+            permission_classes=[IsAuthenticated, IsZevOwnerOrAdmin])
+    def annual_statements_zip(self, request):
+        """Generate annual statement PDFs for all participants and return as ZIP."""
+        year_raw = request.query_params.get("year")
+        zev_id = request.query_params.get("zev_id")
+
+        if not year_raw or not zev_id:
+            return Response(
+                {"error": "year and zev_id are required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            year = int(year_raw)
+        except ValueError:
+            return Response({"error": "year must be a number."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            zev = Zev.objects.get(pk=zev_id)
+        except Zev.DoesNotExist:
+            return Response({"error": "ZEV not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        if not request.user.is_admin and zev.owner != request.user:
+            return Response({"error": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
+
+        participants = list(
+            zev.participants.filter(valid_from__year__lte=year)
+            .exclude(valid_to__year__lt=year)
+            .order_by("last_name", "first_name")
+        )
+
+        if not participants:
+            return Response(
+                {"error": "No participants found for this ZEV and year."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+            for participant in participants:
+                try:
+                    pdf_bytes = generate_annual_statement_pdf(participant, zev, year)
+                    safe_name = f"{participant.last_name}_{participant.first_name}".replace(" ", "_")
+                    filename = f"annual-statement-{year}-{safe_name}.pdf"
+                    zf.writestr(filename, pdf_bytes)
+                except Exception:
+                    continue
+
+        buf.seek(0)
+        response = HttpResponse(buf.getvalue(), content_type="application/zip")
+        response["Content-Disposition"] = f'attachment; filename="annual-statements-{year}.zip"'
+        return response
+
     @action(detail=False, methods=["get"], permission_classes=[IsAuthenticated])
     def dashboard(self, request):
         """Get dashboard statistics (admin only)."""
@@ -735,6 +944,57 @@ class InvoiceViewSet(viewsets.ModelViewSet):
             }
         )
 
+    @action(detail=False, methods=["get", "patch", "delete"], url_path="annual-statement-pdf-template", permission_classes=[IsAuthenticated])
+    def annual_statement_pdf_template(self, request):
+        """Admin-only read/write/reset access to the annual statement PDF HTML template.
+
+        GET    — returns current content (DB override if present, else on-disk default)
+                 and is_customized flag.
+        PATCH  — saves content to the database (never touches the filesystem).
+        DELETE — removes the DB override, reverting to the on-disk default.
+        """
+        if not request.user.is_admin:
+            return Response({"error": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
+
+        if request.method == "GET":
+            record = PdfTemplate.objects.filter(template_name=ANNUAL_STATEMENT_TEMPLATE).first()
+            content = record.content if record else _read_default_template(ANNUAL_STATEMENT_TEMPLATE)
+            return Response(
+                {
+                    "template_name": ANNUAL_STATEMENT_TEMPLATE,
+                    "content": content,
+                    "is_customized": record is not None,
+                }
+            )
+
+        if request.method == "PATCH":
+            content = request.data.get("content")
+            if not isinstance(content, str) or not content.strip():
+                return Response({"error": "Template content is required."}, status=status.HTTP_400_BAD_REQUEST)
+            PdfTemplate.objects.update_or_create(
+                template_name=ANNUAL_STATEMENT_TEMPLATE,
+                defaults={"content": content},
+            )
+            return Response(
+                {
+                    "template_name": ANNUAL_STATEMENT_TEMPLATE,
+                    "content": content,
+                    "is_customized": True,
+                    "detail": "Annual statement PDF template updated successfully.",
+                }
+            )
+
+        # DELETE — revert to default
+        PdfTemplate.objects.filter(template_name=ANNUAL_STATEMENT_TEMPLATE).delete()
+        return Response(
+            {
+                "template_name": ANNUAL_STATEMENT_TEMPLATE,
+                "content": _read_default_template(ANNUAL_STATEMENT_TEMPLATE),
+                "is_customized": False,
+                "detail": "Annual statement PDF template reset to default.",
+            }
+        )
+
     @action(detail=False, methods=["post"], url_path="preview-pdf-template", permission_classes=[IsAuthenticated])
     def preview_pdf_template(self, request):
         """Render a PDF template with sample data and return the HTML preview.
@@ -753,6 +1013,8 @@ class InvoiceViewSet(viewsets.ModelViewSet):
 
         if template_type == "contract":
             context = _build_sample_contract_context()
+        elif template_type == "annual_statement":
+            context = _build_sample_annual_statement_context()
         else:
             context = _build_sample_invoice_context()
 

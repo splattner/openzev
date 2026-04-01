@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom'
 import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery } from '@tanstack/react-query'
 import {
     Bar,
     BarChart,
@@ -18,6 +18,8 @@ import {
     fetchInvoices,
     fetchHourlyProfile,
     fetchMeteringDashboardSummary,
+    downloadAnnualStatement,
+    downloadAllAnnualStatements,
 } from '../lib/api'
 import { formatShortDate, formatDateTime, formatMonthYear, useAppSettings } from '../lib/appSettings'
 import { useAuth } from '../lib/auth'
@@ -40,6 +42,7 @@ export function DashboardPage() {
     const [period, setPeriod] = useState<{ from: string; to: string }>(() => getCurrentBillingPeriod(interval))
     const [bucket, setBucket] = useState<'day' | 'hour' | 'month'>('day')
     const [selectedParticipantId, setSelectedParticipantId] = useState('')
+    const [annualStatementYear, setAnnualStatementYear] = useState(new Date().getFullYear() - 1)
 
     const isZevScopedRole = user?.role === 'admin' || user?.role === 'zev_owner'
 
@@ -129,6 +132,34 @@ export function DashboardPage() {
             ),
         [participantInvoicesQuery.data],
     )
+
+    const annualStatementMutation = useMutation({
+        mutationFn: (year: number) => downloadAnnualStatement({ year }),
+        onSuccess: (blob, year) => {
+            const url = URL.createObjectURL(blob)
+            const a = document.createElement('a')
+            a.href = url
+            a.download = `annual-statement-${year}.pdf`
+            document.body.appendChild(a)
+            a.click()
+            a.remove()
+            URL.revokeObjectURL(url)
+        },
+    })
+
+    const allAnnualStatementsMutation = useMutation({
+        mutationFn: (year: number) => downloadAllAnnualStatements({ year, zev_id: selectedZevId! }),
+        onSuccess: (blob, year) => {
+            const url = URL.createObjectURL(blob)
+            const a = document.createElement('a')
+            a.href = url
+            a.download = `annual-statements-${year}.zip`
+            document.body.appendChild(a)
+            a.click()
+            a.remove()
+            URL.revokeObjectURL(url)
+        },
+    })
 
     return (
         <div className="page-stack">
@@ -345,6 +376,39 @@ export function DashboardPage() {
                             </ResponsiveContainer>
                         </section>
                     )}
+
+                    <section className="card">
+                        <h3 style={{ marginTop: 0 }}>{t('pages.dashboard.annualStatement.title')}</h3>
+                        <p className="muted" style={{ marginBottom: '1rem' }}>{t('pages.dashboard.annualStatement.ownerDescription')}</p>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                                <span>{t('pages.dashboard.annualStatement.year')}</span>
+                                <select
+                                    value={annualStatementYear}
+                                    onChange={(e) => setAnnualStatementYear(Number(e.target.value))}
+                                    style={{ width: 'auto' }}
+                                >
+                                    {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i).map((y) => (
+                                        <option key={y} value={y}>{y}</option>
+                                    ))}
+                                </select>
+                            </label>
+                            <button
+                                className="button button-primary"
+                                disabled={allAnnualStatementsMutation.isPending}
+                                onClick={() => allAnnualStatementsMutation.mutate(annualStatementYear)}
+                            >
+                                {allAnnualStatementsMutation.isPending
+                                    ? t('pages.dashboard.annualStatement.downloading')
+                                    : t('pages.dashboard.annualStatement.downloadAll')}
+                            </button>
+                        </div>
+                        {allAnnualStatementsMutation.isError && (
+                            <p className="muted" style={{ color: 'var(--color-danger, #dc2626)', marginTop: '0.5rem' }}>
+                                {t('pages.dashboard.annualStatement.error')}
+                            </p>
+                        )}
+                    </section>
                 </>
             )}
 
@@ -454,6 +518,39 @@ export function DashboardPage() {
                                     ))}
                                 </tbody>
                             </table>
+                        )}
+                    </section>
+
+                    <section className="card">
+                        <h3 style={{ marginTop: 0 }}>{t('pages.dashboard.annualStatement.title')}</h3>
+                        <p className="muted" style={{ marginBottom: '1rem' }}>{t('pages.dashboard.annualStatement.description')}</p>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                                <span>{t('pages.dashboard.annualStatement.year')}</span>
+                                <select
+                                    value={annualStatementYear}
+                                    onChange={(e) => setAnnualStatementYear(Number(e.target.value))}
+                                    style={{ width: 'auto' }}
+                                >
+                                    {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i).map((y) => (
+                                        <option key={y} value={y}>{y}</option>
+                                    ))}
+                                </select>
+                            </label>
+                            <button
+                                className="button button-primary"
+                                disabled={annualStatementMutation.isPending}
+                                onClick={() => annualStatementMutation.mutate(annualStatementYear)}
+                            >
+                                {annualStatementMutation.isPending
+                                    ? t('pages.dashboard.annualStatement.downloading')
+                                    : t('pages.dashboard.annualStatement.download')}
+                            </button>
+                        </div>
+                        {annualStatementMutation.isError && (
+                            <p className="muted" style={{ color: 'var(--color-danger, #dc2626)', marginTop: '0.5rem' }}>
+                                {t('pages.dashboard.annualStatement.error')}
+                            </p>
                         )}
                     </section>
                 </>

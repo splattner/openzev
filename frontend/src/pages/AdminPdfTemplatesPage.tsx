@@ -4,11 +4,14 @@ import { useTranslation } from 'react-i18next'
 import {
     fetchContractPdfTemplate,
     fetchInvoicePdfTemplate,
+    fetchAnnualStatementPdfTemplate,
     previewPdfTemplate,
     resetContractPdfTemplate,
     resetInvoicePdfTemplate,
+    resetAnnualStatementPdfTemplate,
     updateContractPdfTemplate,
     updateInvoicePdfTemplate,
+    updateAnnualStatementPdfTemplate,
 } from '../lib/api'
 import type { PdfTemplateResponse } from '../types/api'
 import { useToast } from '../lib/toast'
@@ -204,7 +207,7 @@ function TemplateEditor({
     isResetting: boolean
     title: string
     fieldGroups: FieldGroup[]
-    templateType: 'invoice' | 'contract'
+    templateType: 'invoice' | 'contract' | 'annual_statement'
 }) {
     const { t } = useTranslation()
     const [content, setContent] = useState('')
@@ -336,7 +339,7 @@ export function AdminPdfTemplatesPage() {
     const { t } = useTranslation()
     const { pushToast } = useToast()
     const queryClient = useQueryClient()
-    const [activeTab, setActiveTab] = useState<'invoice' | 'contract'>('invoice')
+    const [activeTab, setActiveTab] = useState<'invoice' | 'contract' | 'annual_statement'>('invoice')
 
     const invoiceFieldGroups: FieldGroup[] = [
         {
@@ -485,6 +488,102 @@ export function AdminPdfTemplatesPage() {
         },
     ]
 
+    const annualStatementFieldGroups: FieldGroup[] = [
+        {
+            title: t('admin.fields.annualStatementData'),
+            fields: [
+                { variable: '{{ year }}', description: t('admin.fields.annualYear') },
+                { variable: '{{ lang }}', description: t('admin.fields.languageCode') },
+            ],
+        },
+        {
+            title: t('admin.fields.participant'),
+            fields: [
+                { variable: '{{ participant.full_name }}', description: t('admin.fields.fullName') },
+                { variable: '{{ participant.address_line1 }}', description: t('admin.fields.addressLine1') },
+                { variable: '{{ participant.address_line2 }}', description: t('admin.fields.addressLine2') },
+                { variable: '{{ participant.postal_code }}', description: t('admin.fields.postalCode') },
+                { variable: '{{ participant.city }}', description: t('admin.fields.city') },
+            ],
+        },
+        {
+            title: t('admin.fields.zev'),
+            fields: [
+                { variable: '{{ zev.name }}', description: t('admin.fields.zevName') },
+                { variable: '{{ zev.vat_number }}', description: t('admin.fields.vatNumber') },
+            ],
+        },
+        {
+            title: t('admin.fields.ownerParticipant'),
+            fields: [
+                { variable: '{{ owner_participant.full_name }}', description: t('admin.fields.fullName') },
+                { variable: '{{ owner_participant.address_line1 }}', description: t('admin.fields.addressLine1') },
+                { variable: '{{ owner_participant.postal_code }}', description: t('admin.fields.postalCode') },
+                { variable: '{{ owner_participant.city }}', description: t('admin.fields.city') },
+            ],
+        },
+        {
+            title: t('admin.fields.annualTotals'),
+            fields: [
+                { variable: '{{ totals.total_consumed_kwh }}', description: t('admin.fields.annualTotalConsumed') },
+                { variable: '{{ totals.from_zev_kwh }}', description: t('admin.fields.annualFromZev') },
+                { variable: '{{ totals.from_grid_kwh }}', description: t('admin.fields.annualFromGrid') },
+                { variable: '{{ totals.total_produced_kwh }}', description: t('admin.fields.annualTotalProduced') },
+                { variable: '{{ totals.self_sufficiency_pct }}', description: t('admin.fields.annualSelfSufficiency') },
+            ],
+        },
+        {
+            title: t('admin.fields.annualMonthlyData'),
+            fields: [
+                { variable: '{% for row in monthly_data %}', description: t('admin.fields.annualMonthlyLoop') },
+                { variable: '{{ row.month_label }}', description: t('admin.fields.annualMonthLabel') },
+                { variable: '{{ row.consumed_kwh }}', description: t('admin.fields.annualMonthConsumed') },
+                { variable: '{{ row.from_zev_kwh }}', description: t('admin.fields.annualMonthFromZev') },
+                { variable: '{{ row.from_grid_kwh }}', description: t('admin.fields.annualMonthFromGrid') },
+                { variable: '{{ row.produced_kwh }}', description: t('admin.fields.annualMonthProduced') },
+                { variable: '{{ row.self_sufficiency_pct }}', description: t('admin.fields.annualMonthSelfSufficiency') },
+            ],
+        },
+        {
+            title: t('admin.fields.annualInvoices'),
+            fields: [
+                { variable: '{% for inv in invoices %}', description: t('admin.fields.annualInvoiceLoop') },
+                { variable: '{{ inv.invoice_number }}', description: t('admin.fields.invoiceNumber') },
+                { variable: '{{ inv.period_start_formatted }}', description: t('admin.fields.periodStart') },
+                { variable: '{{ inv.period_end_formatted }}', description: t('admin.fields.periodEnd') },
+                { variable: '{{ inv.subtotal_chf }}', description: t('admin.fields.subtotal') },
+                { variable: '{{ inv.vat_chf }}', description: t('admin.fields.vatAmount') },
+                { variable: '{{ inv.total_chf }}', description: t('admin.fields.total') },
+                { variable: '{{ invoice_totals.subtotal_chf }}', description: t('admin.fields.annualInvoiceTotalSubtotal') },
+                { variable: '{{ invoice_totals.total_chf }}', description: t('admin.fields.annualInvoiceTotalTotal') },
+            ],
+        },
+        {
+            title: t('admin.fields.chartsAndSavings'),
+            fields: [
+                { variable: '{{ monthly_chart_svg|safe }}', description: t('admin.fields.annualMonthlyChart') },
+                { variable: '{{ savings.local_kwh }}', description: t('admin.fields.savingsLocalKwh') },
+                { variable: '{{ savings.local_chf }}', description: t('admin.fields.annualSavingsLocalChf') },
+                { variable: '{{ savings.local_rp }}', description: t('admin.fields.annualSavingsLocalRp') },
+                { variable: '{{ savings.grid_rp }}', description: t('admin.fields.annualSavingsGridRp') },
+                { variable: '{{ savings.hypothetical_chf }}', description: t('admin.fields.annualSavingsHypothetical') },
+                { variable: '{{ savings.saved_chf }}', description: t('admin.fields.savingsSavedChf') },
+            ],
+        },
+        {
+            title: t('admin.fields.formattedDates'),
+            fields: [
+                { variable: '{{ formatted_dates.statement_date }}', description: t('admin.fields.annualStatementDate') },
+            ],
+        },
+        {
+            title: t('admin.fields.translations'),
+            fields: [
+                { variable: '{{ tr.<key> }}', description: t('admin.fields.trDescription') },
+            ],
+        },
+    ]
+
     const invoiceTemplateQuery = useQuery({
         queryKey: ['admin-pdf-template'],
         queryFn: fetchInvoicePdfTemplate,
@@ -527,6 +626,29 @@ export function AdminPdfTemplatesPage() {
         onSuccess: (result) => {
             pushToast(result.detail ?? t('admin.resetToDefault'), 'success')
             void queryClient.invalidateQueries({ queryKey: ['admin-contract-pdf-template'] })
+        },
+        onError: () => pushToast(t('common.error'), 'error'),
+    })
+
+    const annualStatementTemplateQuery = useQuery({
+        queryKey: ['admin-annual-statement-pdf-template'],
+        queryFn: fetchAnnualStatementPdfTemplate,
+    })
+
+    const saveAnnualStatementMutation = useMutation({
+        mutationFn: updateAnnualStatementPdfTemplate,
+        onSuccess: (result) => {
+            pushToast(result.detail ?? t('common.save'), 'success')
+            void queryClient.invalidateQueries({ queryKey: ['admin-annual-statement-pdf-template'] })
+        },
+        onError: () => pushToast(t('common.error'), 'error'),
+    })
+
+    const resetAnnualStatementMutation = useMutation({
+        mutationFn: resetAnnualStatementPdfTemplate,
+        onSuccess: (result) => {
+            pushToast(result.detail ?? t('admin.resetToDefault'), 'success')
+            void queryClient.invalidateQueries({ queryKey: ['admin-annual-statement-pdf-template'] })
         },
         onError: () => pushToast(t('common.error'), 'error'),
     })
@@ -574,6 +696,22 @@ export function AdminPdfTemplatesPage() {
                 >
                     {t('admin.contractTemplate')}
                 </button>
+                <button
+                    onClick={() => setActiveTab('annual_statement')}
+                    style={{
+                        background: 'transparent',
+                        color: activeTab === 'annual_statement' ? 'var(--color-text, #000)' : 'var(--color-text-muted, #888)',
+                        borderBottom: activeTab === 'annual_statement' ? '2px solid var(--color-primary, #0066cc)' : 'none',
+                        padding: '0.75rem 1rem',
+                        fontSize: '1rem',
+                        fontWeight: activeTab === 'annual_statement' ? 600 : 400,
+                        cursor: 'pointer',
+                        border: 'none',
+                        borderBlockEnd: activeTab === 'annual_statement' ? '2px solid var(--color-primary, #0066cc)' : 'none',
+                    }}
+                >
+                    {t('admin.annualStatementTemplate')}
+                </button>
             </div>
 
             {activeTab === 'invoice' && (
@@ -603,6 +741,21 @@ export function AdminPdfTemplatesPage() {
                     title={t('admin.contractTemplate')}
                     fieldGroups={contractFieldGroups}
                     templateType="contract"
+                />
+            )}
+
+            {activeTab === 'annual_statement' && (
+                <TemplateEditor
+                    data={annualStatementTemplateQuery.data}
+                    isLoading={annualStatementTemplateQuery.isLoading}
+                    isError={annualStatementTemplateQuery.isError}
+                    onSave={(content) => saveAnnualStatementMutation.mutate(content)}
+                    onReset={() => resetAnnualStatementMutation.mutate()}
+                    isSaving={saveAnnualStatementMutation.isPending}
+                    isResetting={resetAnnualStatementMutation.isPending}
+                    title={t('admin.annualStatementTemplate')}
+                    fieldGroups={annualStatementFieldGroups}
+                    templateType="annual_statement"
                 />
             )}
         </div>

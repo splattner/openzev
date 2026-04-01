@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="{{ lang }}">
+
+<head>
+    <meta charset="UTF-8">
+    <title>{{ tr.title }} {{ year }}</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+            font-size: 10pt;
+            color: #222;
+        }
+
+        .page {
+            padding: 13mm 16mm 16mm;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 6mm;
+        }
+
+        .company-name {
+            font-size: 13pt;
+            font-weight: bold;
+            color: #2c5f2e;
+        }
+
+        .company-meta {
+            font-size: 8pt;
+            color: #555;
+            margin-top: 1mm;
+        }
+
+        .statement-title {
+            font-size: 14pt;
+            font-weight: bold;
+            margin-bottom: 3mm;
+        }
+
+        .meta-row {
+            display: flex;
+            gap: 10mm;
+            margin-bottom: 5mm;
+        }
+
+        .meta-block dt {
+            font-size: 7pt;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .meta-block dd {
+            font-size: 9pt;
+            font-weight: 600;
+        }
+
+        .address-row {
+            display: flex;
+            gap: 10mm;
+            margin-bottom: 5mm;
+        }
+
+        .address-block {
+            flex: 1;
+        }
+
+        .address-block h3 {
+            font-size: 7pt;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 1mm;
+        }
+
+        .address-block p {
+            font-size: 9pt;
+            line-height: 1.5;
+        }
+
+        h2.section-title {
+            font-size: 11pt;
+            font-weight: bold;
+            color: #2c5f2e;
+            margin: 5mm 0 3mm;
+            padding-bottom: 1mm;
+            border-bottom: 0.5pt solid #ccc;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 9pt;
+            margin-bottom: 4mm;
+        }
+
+        thead th {
+            background: #f5f5f5;
+            font-weight: 600;
+            font-size: 8pt;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+            padding: 2mm 2mm;
+            border-bottom: 1pt solid #ddd;
+            text-align: left;
+        }
+
+        thead th.number {
+            text-align: right;
+        }
+
+        tbody td {
+            padding: 1.5mm 2mm;
+            border-bottom: 0.5pt solid #eee;
+        }
+
+        tbody td.number {
+            text-align: right;
+            font-variant-numeric: tabular-nums;
+        }
+
+        tbody tr.total-row td {
+            font-weight: bold;
+            border-top: 1pt solid #999;
+            border-bottom: none;
+            padding-top: 2mm;
+        }
+
+        .summary-cards {
+            display: flex;
+            gap: 4mm;
+            margin-bottom: 5mm;
+        }
+
+        .summary-card {
+            flex: 1;
+            border: 0.5pt solid #ddd;
+            border-radius: 2mm;
+            padding: 3mm;
+            text-align: center;
+        }
+
+        .summary-card .card-label {
+            font-size: 7pt;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 1mm;
+        }
+
+        .summary-card .card-value {
+            font-size: 14pt;
+            font-weight: bold;
+            color: #2c5f2e;
+        }
+
+        .summary-card .card-unit {
+            font-size: 8pt;
+            color: #555;
+        }
+
+        .summary-card.highlight {
+            background: #f0f9f0;
+            border-color: #2c5f2e;
+        }
+
+        .savings-box {
+            background: #f0f9f0;
+            border: 0.5pt solid #2c5f2e;
+            border-radius: 2mm;
+            padding: 4mm;
+            margin-bottom: 5mm;
+        }
+
+        .savings-box h3 {
+            font-size: 10pt;
+            color: #2c5f2e;
+            margin-bottom: 2mm;
+        }
+
+        .savings-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 9pt;
+            padding: 1mm 0;
+        }
+
+        .savings-row.total {
+            font-weight: bold;
+            border-top: 0.5pt solid #2c5f2e;
+            margin-top: 1mm;
+            padding-top: 2mm;
+        }
+
+        .chart-container {
+            margin-bottom: 5mm;
+        }
+
+        .chart-container .chart-description {
+            font-size: 8pt;
+            color: #666;
+            margin-bottom: 2mm;
+        }
+
+        .bar-chart {
+            width: 100%;
+            height: auto;
+        }
+
+        .footer {
+            margin-top: 6mm;
+            padding-top: 3mm;
+            border-top: 0.5pt solid #ccc;
+            font-size: 8pt;
+            color: #888;
+            text-align: center;
+        }
+
+        @page {
+            size: A4;
+            margin: 0;
+        }
+
+        @media print {
+            .page {
+                page-break-after: always;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="page">
+        <!-- Header -->
+        <div class="header">
+            <div>
+                <div class="company-name">{{ zev.name }}</div>
+                {% if zev.vat_number %}
+                <div class="company-meta">{{ zev.vat_number }}</div>
+                {% endif %}
+            </div>
+            <div style="text-align: right;">
+                <div style="font-size: 8pt; color: #888;">{{ tr.statement_date }}</div>
+                <div style="font-size: 9pt; font-weight: 600;">{{ formatted_dates.statement_date }}</div>
+            </div>
+        </div>
+
+        <!-- Title -->
+        <div class="statement-title">{{ tr.title }} {{ year }}</div>
+
+        <!-- Addresses -->
+        <div class="address-row">
+            <div class="address-block">
+                <h3>{{ tr.from_label }}</h3>
+                <p>
+                    {{ zev.name }}<br>
+                    {% if owner_participant %}
+                    {{ owner_participant.full_name }}<br>
+                    {% if owner_participant.address_line1 %}{{ owner_participant.address_line1 }}<br>{% endif %}
+                    {% if owner_participant.postal_code or owner_participant.city %}{{ owner_participant.postal_code }} {{ owner_participant.city }}{% endif %}
+                    {% endif %}
+                </p>
+            </div>
+            <div class="address-block">
+                <h3>{{ tr.to_label }}</h3>
+                <p>
+                    {{ participant.full_name }}<br>
+                    {% if participant.address_line1 %}{{ participant.address_line1 }}<br>{% endif %}
+                    {% if participant.address_line2 %}{{ participant.address_line2 }}<br>{% endif %}
+                    {% if participant.postal_code or participant.city %}{{ participant.postal_code }} {{ participant.city }}{% endif %}
+                </p>
+            </div>
+        </div>
+
+        <!-- Summary Cards -->
+        <div class="summary-cards">
+            <div class="summary-card">
+                <div class="card-label">{{ tr.total_consumption }}</div>
+                <div class="card-value">{{ totals.total_consumed_kwh }}</div>
+                <div class="card-unit">kWh</div>
+            </div>
+            <div class="summary-card">
+                <div class="card-label">{{ tr.from_zev }}</div>
+                <div class="card-value">{{ totals.from_zev_kwh }}</div>
+                <div class="card-unit">kWh</div>
+            </div>
+            <div class="summary-card">
+                <div class="card-label">{{ tr.from_grid }}</div>
+                <div class="card-value">{{ totals.from_grid_kwh }}</div>
+                <div class="card-unit">kWh</div>
+            </div>
+            <div class="summary-card highlight">
+                <div class="card-label">{{ tr.self_sufficiency }}</div>
+                <div class="card-value">{{ totals.self_sufficiency_pct }}%</div>
+                <div class="card-unit">{{ tr.autarky }}</div>
+            </div>
+        </div>
+
+        <!-- Monthly Breakdown -->
+        <h2 class="section-title">{{ tr.monthly_breakdown }}</h2>
+
+        {% if monthly_chart_svg %}
+        <div class="chart-container">
+            <div class="chart-description">{{ tr.monthly_chart_description }}</div>
+            {{ monthly_chart_svg|safe }}
+        </div>
+        {% endif %}
+
+        <table>
+            <thead>
+                <tr>
+                    <th>{{ tr.month_col }}</th>
+                    <th class="number">{{ tr.consumption_col }} (kWh)</th>
+                    <th class="number">{{ tr.from_zev_col }} (kWh)</th>
+                    <th class="number">{{ tr.from_grid_col }} (kWh)</th>
+                    <th class="number">{{ tr.production_col }} (kWh)</th>
+                    <th class="number">{{ tr.self_sufficiency_col }}</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in monthly_data %}
+                <tr>
+                    <td>{{ row.month_label }}</td>
+                    <td class="number">{{ row.consumed_kwh }}</td>
+                    <td class="number">{{ row.from_zev_kwh }}</td>
+                    <td class="number">{{ row.from_grid_kwh }}</td>
+                    <td class="number">{{ row.produced_kwh }}</td>
+                    <td class="number">{{ row.self_sufficiency_pct }}%</td>
+                </tr>
+                {% endfor %}
+                <tr class="total-row">
+                    <td>{{ tr.total_label }}</td>
+                    <td class="number">{{ totals.total_consumed_kwh }}</td>
+                    <td class="number">{{ totals.from_zev_kwh }}</td>
+                    <td class="number">{{ totals.from_grid_kwh }}</td>
+                    <td class="number">{{ totals.total_produced_kwh }}</td>
+                    <td class="number">{{ totals.self_sufficiency_pct }}%</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <!-- Invoices -->
+        <div style="page-break-before: always;"></div>
+        <h2 class="section-title">{{ tr.invoices_title }}</h2>
+        {% if invoices %}
+        <table>
+            <thead>
+                <tr>
+                    <th>{{ tr.invoice_number_col }}</th>
+                    <th>{{ tr.period_col }}</th>
+                    <th class="number">{{ tr.subtotal_col }} (CHF)</th>
+                    <th class="number">{{ tr.vat_col }} (CHF)</th>
+                    <th class="number">{{ tr.total_col }} (CHF)</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for inv in invoices %}
+                <tr>
+                    <td>{{ inv.invoice_number }}</td>
+                    <td>{{ inv.period_start_formatted }} – {{ inv.period_end_formatted }}</td>
+                    <td class="number">{{ inv.subtotal_chf }}</td>
+                    <td class="number">{{ inv.vat_chf }}</td>
+                    <td class="number">{{ inv.total_chf }}</td>
+                </tr>
+                {% endfor %}
+                <tr class="total-row">
+                    <td colspan="2">{{ tr.total_label }}</td>
+                    <td class="number">{{ invoice_totals.subtotal_chf }}</td>
+                    <td class="number">{{ invoice_totals.vat_chf }}</td>
+                    <td class="number">{{ invoice_totals.total_chf }}</td>
+                </tr>
+            </tbody>
+        </table>
+        {% else %}
+        <p style="color: #888; font-size: 9pt;">{{ tr.no_invoices }}</p>
+        {% endif %}
+
+        <!-- Savings -->
+        {% if savings %}
+        <h2 class="section-title">{{ tr.savings_title }}</h2>
+        <div class="savings-box">
+            <div class="savings-row">
+                <span>{{ tr.savings_local_label }} ({{ savings.local_kwh }} kWh × {{ savings.local_rp }} {{ tr.rp_unit }})</span>
+                <span>CHF {{ savings.local_chf }}</span>
+            </div>
+            <div class="savings-row">
+                <span>{{ tr.savings_grid_label }} ({{ savings.local_kwh }} kWh × {{ savings.grid_rp }} {{ tr.rp_unit }})</span>
+                <span>CHF {{ savings.hypothetical_chf }}</span>
+            </div>
+            <div class="savings-row total">
+                <span>{{ tr.savings_saved_label }}</span>
+                <span>CHF {{ savings.saved_chf }}</span>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Footer -->
+        <div class="footer">
+            {{ zev.name }} · {{ tr.title }} {{ year }} · {{ tr.generated_on }} {{ formatted_dates.statement_date }}
+        </div>
+    </div>
+</body>
+
+</html>
