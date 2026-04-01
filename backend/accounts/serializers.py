@@ -2,7 +2,7 @@ from django.contrib.auth.password_validation import validate_password
 from django.contrib.auth import get_user_model
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
-from .models import AppSettings, User, UserRole, VatRate
+from .models import AppSettings, FeatureFlag, User, UserRole, VatRate
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -110,6 +110,13 @@ class AppSettingsSerializer(serializers.ModelSerializer):
         model = AppSettings
         fields = ["date_format_short", "date_format_long", "date_time_format", "updated_at"]
         read_only_fields = ["updated_at"]
+
+
+class FeatureFlagSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = FeatureFlag
+        fields = ["id", "name", "description", "enabled", "updated_at"]
+        read_only_fields = ["id", "name", "description", "updated_at"]
 
 
 class VatRateSerializer(serializers.ModelSerializer):

@@ -2,7 +2,7 @@ from django.test import TestCase
 from django.core import mail
 from rest_framework.test import APIClient
 
-from .models import AppSettings, User, UserRole, VatRate
+from .models import AppSettings, FeatureFlag, User, UserRole, VatRate
 from invoices.models import Invoice, InvoiceStatus
 from zev.models import MeteringPoint, MeteringPointAssignment, MeteringPointType, Participant, Zev
 from datetime import date
@@ -137,6 +137,33 @@ class RegistrationTests(TestCase):
 		self.assertEqual(resp.status_code, 200)
 		self.assertIn("access", resp.data)
 		self.assertIn("refresh", resp.data)
+
+	def test_register_blocked_when_self_registration_feature_disabled(self):
+		FeatureFlag.sync_defaults()
+		flag = FeatureFlag.objects.get(name=FeatureFlag.ZEV_SELF_REGISTRATION_ENABLED)
+		flag.enabled = False
+		flag.save(update_fields=["enabled"])
+
+		client = APIClient()
+		resp = client.post(
+			"/api/v1/auth/register/",
+			{"email": "blocked.owner@example.com"},
+			format="json",
+		)
+
+		self.assertEqual(resp.status_code, 403)
+		self.assertIn("detail", resp.data)
+
+
+class FeatureFlagsApiTests(TestCase):
+	def test_feature_flags_list_is_public_and_contains_self_registration_flag(self):
+		client = APIClient()
+		resp = client.get("/api/v1/auth/feature-flags/")
+
+		self.assertEqual(resp.status_code, 200)
+		self.assertTrue(
+			any(flag["name"] == FeatureFlag.ZEV_SELF_REGISTRATION_ENABLED for flag in resp.data)
+		)
 
 
 class ImpersonationTests(TestCase):

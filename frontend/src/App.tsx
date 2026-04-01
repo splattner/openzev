@@ -7,6 +7,7 @@ import { AdminDashboardPage } from './pages/AdminDashboardPage'
 import { AdminAccountsPage } from './pages/AdminAccountsPage'
 import { AdminPdfTemplatesPage } from './pages/AdminPdfTemplatesPage'
 import { AdminEmailTemplatesPage } from './pages/AdminEmailTemplatesPage'
+import { AdminFeaturesPage } from './pages/AdminFeaturesPage'
 import { AdminRegionalSettingsPage } from './pages/AdminRegionalSettingsPage'
 import { AdminVatSettingsPage } from './pages/AdminVatSettingsPage'
 import { DashboardPage } from './pages/DashboardPage'
@@ -78,6 +79,14 @@ function App() {
             element={
               <ProtectedRoute allowedRoles={['admin']}>
                 <AdminEmailTemplatesPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="admin/features"
+            element={
+              <ProtectedRoute allowedRoles={['admin']}>
+                <AdminFeaturesPage />
               </ProtectedRoute>
             }
           />

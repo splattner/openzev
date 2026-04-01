@@ -141,6 +141,85 @@ class AppSettings(models.Model):
         return "Application settings"
 
 
+class FeatureFlag(models.Model):
+    """Persistent feature flag with code default and env-var override."""
+
+    ZEV_SELF_REGISTRATION_ENABLED = "zev_self_registration_enabled"
+
+    name = models.CharField(max_length=100, unique=True)
+    description = models.CharField(max_length=255, blank=True, default="")
+    enabled = models.BooleanField(default=False)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["name"]
+
+    def __str__(self):
+        return f"{self.name} ({'on' if self.enabled else 'off'})"
+
+    # ---- registry of known flags with code defaults ----
+
+    # Map of flag name → default enabled value.
+    # Register new flags here.
+    DEFAULTS: dict[str, bool] = {}
+    DESCRIPTIONS: dict[str, str] = {}
+
+    @classmethod
+    def register(cls, name: str, default: bool = False, description: str = ""):
+        """Register a known flag with its code default."""
+        cls.DEFAULTS[name] = default
+        cls.DESCRIPTIONS[name] = description
+
+    @classmethod
+    def sync_defaults(cls):
+        """Ensure every registered flag exists in the database.
+
+        Sets the initial ``enabled`` value to the code default, then applies
+        an environment-variable override if present
+        (``FEATURE_<UPPER_NAME>=true|false``).
+        """
+        import os
+
+        for flag_name, default_value in cls.DEFAULTS.items():
+            description = cls.DESCRIPTIONS.get(flag_name, "")
+            env_key = f"FEATURE_{flag_name.upper()}"
+            env_val = os.environ.get(env_key)
+            if env_val is not None:
+                initial = env_val.lower() in ("1", "true", "yes")
+            else:
+                initial = default_value
+
+            flag, created = cls.objects.get_or_create(
+                name=flag_name,
+                defaults={"enabled": initial, "description": description},
+            )
+            if not created and description and flag.description != description:
+                flag.description = description
+                flag.save(update_fields=["description"])
+
+    @classmethod
+    def is_enabled(cls, name: str) -> bool:
+        """Check whether a feature flag is enabled.
+
+        Resolution order:
+        1. Environment variable ``FEATURE_<UPPER_NAME>`` (if set).
+        2. Database value (if a row exists).
+        3. Code default from ``DEFAULTS``.
+        4. ``False``.
+        """
+        import os
+
+        env_key = f"FEATURE_{name.upper()}"
+        env_val = os.environ.get(env_key)
+        if env_val is not None:
+            return env_val.lower() in ("1", "true", "yes")
+
+        try:
+            return cls.objects.values_list("enabled", flat=True).get(name=name)
+        except cls.DoesNotExist:
+            return cls.DEFAULTS.get(name, False)
+
+
 class VatRate(models.Model):
     rate = models.DecimalField(
         max_digits=5,
@@ -186,3 +265,10 @@ class VatRate(models.Model):
     def __str__(self):
         valid_to = self.valid_to.isoformat() if self.valid_to else "open"
         return f"VAT {self.rate} ({self.valid_from} - {valid_to})"
+
+
+FeatureFlag.register(
+    FeatureFlag.ZEV_SELF_REGISTRATION_ENABLED,
+    default=True,
+    description="Allow ZEV owner self-registration from the login page.",
+)

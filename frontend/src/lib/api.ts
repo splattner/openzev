@@ -34,6 +34,8 @@ import type {
     UserInput,
     VatRate,
     VatRateInput,
+    FeatureFlag,
+    FeatureFlagInput,
     Zev,
     ZevInput,
     ZevWizardInput,
@@ -148,6 +150,16 @@ export async function updateVatRate(id: number, payload: Partial<VatRateInput>):
 
 export async function deleteVatRate(id: number): Promise<void> {
     await api.delete(`/auth/vat-rates/${id}/`)
+}
+
+export async function fetchFeatureFlags(): Promise<FeatureFlag[]> {
+    const { data } = await api.get<FeatureFlag[]>('/auth/feature-flags/')
+    return data
+}
+
+export async function updateFeatureFlag(id: number, payload: FeatureFlagInput): Promise<FeatureFlag> {
+    const { data } = await api.patch<FeatureFlag>(`/auth/feature-flags/${id}/`, payload)
+    return data
 }
 
 export async function fetchUsers(): Promise<PaginatedResponse<User>> {
