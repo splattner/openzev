@@ -409,14 +409,14 @@ export function EnergyFlowChart({ totals, participantStats, highlightParticipant
 
                         {isLeft && (
                             <>
-                                <text x={x - 8} y={n.y + n.h / 2 - 6} textAnchor="end" dominantBaseline="central" fontSize={11} fill="#374151">{n.label}</text>
+                                <text className="sankey-participant-label" x={x - 8} y={n.y + n.h / 2 - 6} textAnchor="end" dominantBaseline="central" fontSize={11} fill="#374151">{n.label}</text>
                                 <text x={x - 8} y={n.y + n.h / 2 + 7} textAnchor="end" dominantBaseline="central" fontSize={10} fill="#9ca3af">{n.value.toFixed(1)} kWh</text>
                             </>
                         )}
 
                         {isRight && (
                             <>
-                                <text x={x + BAR_W + 8} y={n.y + n.h / 2 - 6} textAnchor="start" dominantBaseline="central" fontSize={11} fill="#374151">{n.label}</text>
+                                <text className="sankey-participant-label" x={x + BAR_W + 8} y={n.y + n.h / 2 - 6} textAnchor="start" dominantBaseline="central" fontSize={11} fill="#374151">{n.label}</text>
                                 <text x={x + BAR_W + 8} y={n.y + n.h / 2 + 7} textAnchor="start" dominantBaseline="central" fontSize={10} fill="#9ca3af">{n.value.toFixed(1)} kWh</text>
                             </>
                         )}

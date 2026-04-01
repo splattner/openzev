@@ -168,7 +168,7 @@ January invoice:
 
 **VAT:**
 - Applied only if ZEV has a VAT number configured
-- Rate selected by invoice period end date from [Admin VAT Settings](02-zev-setup.md#vat-configuration)
+- Rate selected by invoice period end date from [Admin Console → VAT Settings](14-admin-console.md#vat-settings)
 - If no rate is active, VAT defaults to 0%
 
 **Final total:**
@@ -272,4 +272,4 @@ Alice's energy charges:
 
 ## Questions?
 
-See [FAQ and Glossary](13-glossary.md) for more on energy allocation and billing concepts.
+See [FAQ and Glossary](15-glossary.md) for more on energy allocation and billing concepts.

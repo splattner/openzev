@@ -25,11 +25,14 @@ Welcome to the OpenZEV user documentation. This guide covers everything you need
 - **[Invoice Management](09-invoice-management.md)** — Lifecycle, PDF generation, and tracking
 - **[Email Configuration](10-email-configuration.md)** — Templates, delivery, and resend behavior
 
+## Administration
+
+- **[Admin Console](14-admin-console.md)** — ZEV management, regional settings, VAT, PDF templates, email templates, feature flags
+
 ## Reference
 
 - **[Troubleshooting](12-troubleshooting.md)** — Common issues and solutions
-- **[Glossary](13-glossary.md)** — Terms and concepts used in OpenZEV
-- **[Feature Flags](14-feature-flags.md)** — Enable/disable runtime functionality and environment overrides
+- **[Glossary](15-glossary.md)** — Terms and concepts used in OpenZEV
 
 ## Navigating the Interface
 
@@ -55,5 +58,5 @@ OpenZEV is organized by role:
 ## Need Help?
 
 - Check the [Troubleshooting](12-troubleshooting.md) section
-- Review the [Glossary](13-glossary.md) for key terms
+- Review the [Glossary](15-glossary.md) for key terms
 - Consult the specific workflow guide for your task
