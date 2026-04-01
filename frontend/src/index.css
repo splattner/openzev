@@ -53,20 +53,20 @@ label {
   gap: 0.4rem;
 }
 
-table {
+.page-stack table {
   width: 100%;
   border-collapse: collapse;
 }
 
-th,
-td {
+.page-stack th,
+.page-stack td {
   padding: 0.95rem 1rem;
   border-bottom: 1px solid #e2e8f0;
   text-align: left;
   vertical-align: top;
 }
 
-th {
+.page-stack th {
   font-size: 0.85rem;
   color: #475569;
   background: #f8fafc;
@@ -794,6 +794,17 @@ h3 {
 
 .inline-form {
   align-items: end;
+}
+
+/* Mantine date picker: color customizations */
+.mantine-DatePickerInput-dropdown .mantine-DatePicker-day[data-selected] {
+  background: #0284c7;
+  color: #ffffff;
+}
+
+.mantine-DatePickerInput-dropdown .mantine-DatePicker-day[data-in-range] {
+  background: #e0f2fe;
+  color: #0f172a;
 }
 
 .actions-row {

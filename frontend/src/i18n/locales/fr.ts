@@ -96,6 +96,17 @@ export const fr = {
         noData: 'Aucune donnée disponible',
         saving: 'Enregistrement...',
         close: 'Fermer',
+        periodSelector: {
+            period: 'Période',
+            currentPeriod: 'Période actuelle',
+            customPeriod: 'Période personnalisée',
+            thisMonth: 'Ce mois-ci',
+            lastMonth: 'Mois dernier',
+            thisQuarter: 'Ce trimestre',
+            lastQuarter: 'Trimestre dernier',
+            thisYear: 'Cette année',
+            lastYear: 'Année dernière',
+        },
     },
     entity: {
         zev: 'ZEV',
