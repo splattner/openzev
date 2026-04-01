@@ -36,6 +36,7 @@ export function Layout() {
         }
         return window.localStorage.getItem('openzev.sidebarCollapsed') === 'true'
     })
+    const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
     const userMenuRef = useRef<HTMLDivElement | null>(null)
     const zevMenuRef = useRef<HTMLDivElement | null>(null)
 
@@ -57,6 +58,21 @@ export function Layout() {
     useEffect(() => {
         window.localStorage.setItem('openzev.sidebarCollapsed', String(isSidebarCollapsed))
     }, [isSidebarCollapsed])
+
+    // Close mobile menu on navigation
+    useEffect(() => {
+        setIsMobileMenuOpen(false)
+    }, [location.pathname])
+
+    // Prevent body scroll when mobile menu is open
+    useEffect(() => {
+        if (isMobileMenuOpen) {
+            document.body.style.overflow = 'hidden'
+        } else {
+            document.body.style.overflow = ''
+        }
+        return () => { document.body.style.overflow = '' }
+    }, [isMobileMenuOpen])
 
     useEffect(() => {
         function handleOutsideClick(event: MouseEvent) {
@@ -91,7 +107,12 @@ export function Layout() {
 
     return (
         <div className={`shell${isSidebarCollapsed ? ' shell-collapsed' : ''}`}>
-            <aside className={`sidebar${isSidebarCollapsed ? ' collapsed' : ''}`}>
+            {/* Mobile overlay */}
+            <div
+                className={`sidebar-overlay${isMobileMenuOpen ? ' visible' : ''}`}
+                onClick={() => setIsMobileMenuOpen(false)}
+            />
+            <aside className={`sidebar${isSidebarCollapsed ? ' collapsed' : ''}${isMobileMenuOpen ? ' mobile-open' : ''}`}>
                 <div className="sidebar-top">
                     <div className="sidebar-brand-row">
                         <div className="sidebar-brand">
@@ -291,6 +312,17 @@ export function Layout() {
 
             <main className="content">
                 <header className="top-nav">
+                    <button
+                        type="button"
+                        className="mobile-menu-button"
+                        onClick={() => setIsMobileMenuOpen((prev) => !prev)}
+                        aria-label={t('nav.menu')}
+                    >
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                            <path d="M3 12h18M3 6h18M3 18h18" />
+                        </svg>
+                    </button>
+
                     {isImpersonating && impersonator && (
                         <div className="impersonation-banner" role="status" aria-live="polite">
                             <span>

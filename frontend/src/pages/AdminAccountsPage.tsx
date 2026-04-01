@@ -460,7 +460,7 @@ export function AdminAccountsPage() {
             </FormModal>
 
             <FormModal isOpen={showEditUserModal} title={t('pages.accounts.editModal.title')} onClose={() => setShowEditUserModal(false)} maxWidth="760px">
-                <form onSubmit={submitEditUser} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <form onSubmit={submitEditUser} className="form-grid">
                     <label>
                         <span>{t('pages.accounts.editModal.username')}</span>
                         <input value={editUserForm.username} onChange={(event) => setEditUserForm((previous) => ({ ...previous, username: event.target.value }))} required />

@@ -13,6 +13,7 @@ export const de = {
         adminFeatures: 'Funktionen',
         collapseSidebar: 'Seitenleiste einklappen',
         expandSidebar: 'Seitenleiste ausklappen',
+        menu: 'Menü',
         zevs: 'ZEVs',
         participants: 'Teilnehmer',
         meteringPoints: 'Messstellen',

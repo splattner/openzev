@@ -96,6 +96,7 @@ export function BillingPeriodSelector({ interval, from, to, onChange }: BillingP
                 borderColor: 'divider',
                 borderRadius: 1,
                 backgroundColor: 'background.paper',
+                gap: 1,
             }}
         >
             {!isCustomOpen && (
@@ -110,13 +111,13 @@ export function BillingPeriodSelector({ interval, from, to, onChange }: BillingP
                         {t('pages.invoices.prevPeriod')}
                     </Button>
 
-                    <Box sx={{ textAlign: 'center', minWidth: 220 }}>
-                        <Typography sx={{ fontWeight: 700 }}>
+                    <Box sx={{ textAlign: 'center', minWidth: { xs: 0, sm: 220 }, flex: '1 1 auto' }}>
+                        <Typography sx={{ fontWeight: 700, fontSize: { xs: '0.85rem', sm: '1rem' } }}>
                             {from && to
                                 ? `${t('common.periodSelector.period')}: ${fromValue?.format(toDayJsDateFormat(settings.date_format_short)) ?? from} → ${toValue?.format(toDayJsDateFormat(settings.date_format_short)) ?? to}`
                                 : '—'}
                         </Typography>
-                        <Typography variant="body2" color="text.secondary">
+                        <Typography variant="body2" color="text.secondary" sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
                             {t('pages.invoices.billingInterval')} {t(`pages.zevs.billingIntervals.${interval}`)}
                         </Typography>
                     </Box>
@@ -134,7 +135,7 @@ export function BillingPeriodSelector({ interval, from, to, onChange }: BillingP
             )}
 
             {isCustomOpen && (
-                <Box sx={{ maxWidth: 400, minWidth: 280 }}>
+                <Box sx={{ maxWidth: 400, minWidth: { xs: '100%', sm: 280 } }}>
                     <DatePickerInput
                         type="range"
                         value={draftRange}

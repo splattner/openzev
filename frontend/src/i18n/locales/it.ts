@@ -11,6 +11,7 @@ export const it = {
         adminPdfTemplates: 'Modelli PDF',
         adminEmailTemplates: 'Modelli e-mail',
         adminFeatures: 'Funzionalità',
+        menu: 'Menu',
         zevs: 'ZEVs',
         participants: 'Partecipanti',
         meteringPoints: 'Punti di misurazione',

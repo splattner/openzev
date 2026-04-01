@@ -374,7 +374,7 @@ export function ZevListPage() {
             </div>
 
             <FormModal isOpen={showCreateModal} title={wizardStep === 5 ? t('pages.zevs.wizard.titleDone') : t('pages.zevs.wizard.titleStep', { step: wizardStep })} onClose={closeCreateModal} maxWidth="960px">
-                <form onSubmit={submitCreate} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <form onSubmit={submitCreate} className="form-grid">
                     {wizardStep === 1 && (
                         <>
                             <div className="card grid-span-full" style={{ padding: '0.85rem 1rem' }}>

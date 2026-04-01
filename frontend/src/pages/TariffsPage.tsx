@@ -379,7 +379,7 @@ export function TariffsPage() {
                 title={editingTariffId ? t('pages.tariffs.editTitle') : t('pages.tariffs.createTitle')}
                 onClose={closeTariffModal}
             >
-                <form onSubmit={submitTariff} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <form onSubmit={submitTariff} className="form-grid">
                     <label>
                         <span>{t('pages.tariffs.form.name')}</span>
                         <input
@@ -521,7 +521,7 @@ export function TariffsPage() {
                 title={editingPeriodId ? t('pages.tariffs.editPeriodTitle') : t('pages.tariffs.createPeriodTitle')}
                 onClose={closePeriodModal}
             >
-                <form onSubmit={submitPeriod} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <form onSubmit={submitPeriod} className="form-grid">
                     <label>
                         <span>{t('pages.tariffs.form.tariff')}</span>
                         <select
