@@ -417,6 +417,44 @@ export async function generateInvoicesForZev(payload: {
     return data
 }
 
+export async function approveAllInvoices(payload: {
+    zev_id: string
+    period_start: string
+    period_end: string
+}): Promise<{ approved: number }> {
+    const { data } = await api.post<{ approved: number }>('/invoices/invoices/approve-all/', payload)
+    return data
+}
+
+export async function sendAllInvoices(payload: {
+    zev_id: string
+    period_start: string
+    period_end: string
+}): Promise<{ queued: number; skipped: number }> {
+    const { data } = await api.post<{ queued: number; skipped: number }>('/invoices/invoices/send-all/', payload)
+    return data
+}
+
+export async function generateAllPdfs(payload: {
+    zev_id: string
+    period_start: string
+    period_end: string
+}): Promise<{ generated: number }> {
+    const { data } = await api.post<{ generated: number }>('/invoices/invoices/generate-pdfs-all/', payload)
+    return data
+}
+
+export async function downloadAllPdfs(payload: {
+    zev_id: string
+    period_start: string
+    period_end: string
+}): Promise<Blob> {
+    const { data } = await api.post('/invoices/invoices/download-pdfs/', payload, {
+        responseType: 'blob',
+    })
+    return data as Blob
+}
+
 export async function fetchInvoicePeriodOverview(params: {
     zev_id: string
     period_start: string
