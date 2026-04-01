@@ -103,6 +103,7 @@ export const en = {
             period: 'Period',
             currentPeriod: 'Current period',
             customPeriod: 'Custom period',
+            backToBillingPeriod: 'Back to billing period',
             thisMonth: 'This month',
             lastMonth: 'Last month',
             thisQuarter: 'This quarter',

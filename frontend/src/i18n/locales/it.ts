@@ -101,6 +101,7 @@ export const it = {
             period: 'Periodo',
             currentPeriod: 'Periodo corrente',
             customPeriod: 'Periodo personalizzato',
+            backToBillingPeriod: 'Torna al periodo di fatturazione',
             thisMonth: 'Questo mese',
             lastMonth: 'Mese scorso',
             thisQuarter: 'Questo trimestre',

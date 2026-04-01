@@ -106,12 +106,12 @@ export function BillingPeriodSelector({ interval, from, to, onChange }: BillingP
                         type="button"
                         onClick={() => onChange(shiftBillingPeriod(from, interval, -1))}
                         disabled={!from}
-                        sx={{ flexShrink: 0 }}
+                        sx={{ flexShrink: 0, mr: 'auto' }}
                     >
                         {t('pages.invoices.prevPeriod')}
                     </Button>
 
-                    <Box sx={{ textAlign: 'center', minWidth: { xs: 0, sm: 220 }, flex: '1 1 auto' }}>
+                    <Box sx={{ textAlign: 'center' }}>
                         <Typography sx={{ fontWeight: 700, fontSize: { xs: '0.85rem', sm: '1rem' } }}>
                             {from && to
                                 ? `${t('common.periodSelector.period')}: ${fromValue?.format(toDayJsDateFormat(settings.date_format_short)) ?? from} → ${toValue?.format(toDayJsDateFormat(settings.date_format_short)) ?? to}`
@@ -123,11 +123,21 @@ export function BillingPeriodSelector({ interval, from, to, onChange }: BillingP
                     </Box>
 
                     <Button
+                        size="small"
+                        variant="outlined"
+                        color="inherit"
+                        sx={{ borderRadius: 999, textTransform: 'none', px: 1.5, flexShrink: 0 }}
+                        onClick={() => setIsCustomOpen(true)}
+                    >
+                        {t('common.periodSelector.customPeriod')}
+                    </Button>
+
+                    <Button
                         className="button button-secondary"
                         type="button"
                         onClick={() => onChange(shiftBillingPeriod(from, interval, 1))}
                         disabled={!from}
-                        sx={{ flexShrink: 0 }}
+                        sx={{ flexShrink: 0, ml: 'auto' }}
                     >
                         {t('pages.invoices.nextPeriod')}
                     </Button>
@@ -135,33 +145,33 @@ export function BillingPeriodSelector({ interval, from, to, onChange }: BillingP
             )}
 
             {isCustomOpen && (
-                <Box sx={{ maxWidth: 400, minWidth: { xs: '100%', sm: 280 } }}>
-                    <DatePickerInput
-                        type="range"
-                        value={draftRange}
-                        onChange={([nextFrom, nextTo]) => updateRange(nextFrom, nextTo)}
-                        presets={presets}
-                        valueFormat={toDayJsDateFormat(settings.date_format_short)}
-                        clearable={false}
-                        popoverProps={{ withinPortal: true }}
-                    />
-                </Box>
-            )}
+                <>
+                    <Box sx={{ maxWidth: 400, minWidth: { xs: '100%', sm: 280 } }}>
+                        <DatePickerInput
+                            type="range"
+                            value={draftRange}
+                            onChange={([nextFrom, nextTo]) => updateRange(nextFrom, nextTo)}
+                            presets={presets}
+                            valueFormat={toDayJsDateFormat(settings.date_format_short)}
+                            clearable={false}
+                            popoverProps={{ withinPortal: true }}
+                        />
+                    </Box>
 
-            <Button
-                size="small"
-                variant={isCustomOpen ? 'contained' : 'outlined'}
-                color={isCustomOpen ? 'primary' : 'inherit'}
-                sx={{ borderRadius: 999, textTransform: 'none', px: 1.5, flexShrink: 0 }}
-                onClick={() => {
-                    if (isCustomOpen) {
-                        onChange(getCurrentBillingPeriod(interval))
-                    }
-                    setIsCustomOpen((prev) => !prev)
-                }}
-            >
-                {t('common.periodSelector.customPeriod')}
-            </Button>
+                    <Button
+                        size="small"
+                        variant="contained"
+                        color="primary"
+                        sx={{ borderRadius: 999, textTransform: 'none', px: 1.5, flexShrink: 0 }}
+                        onClick={() => {
+                            onChange(getCurrentBillingPeriod(interval))
+                            setIsCustomOpen(false)
+                        }}
+                    >
+                        {t('common.periodSelector.backToBillingPeriod')}
+                    </Button>
+                </>
+            )}
         </Stack>
     )
 }
