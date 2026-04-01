@@ -267,7 +267,7 @@ export function MeteringPointsPage() {
                 title={editingMpId ? t('pages.meteringPoints.editTitle') : t('pages.meteringPoints.createTitle')}
                 onClose={closeMpModal}
             >
-                <form onSubmit={submitMpForm} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <form onSubmit={submitMpForm} className="form-grid">
                     <label>
                         <span>{t('pages.meteringPoints.form.meterId')}</span>
                         <input
@@ -335,7 +335,7 @@ export function MeteringPointsPage() {
                 title={editingAssignId ? t('pages.meteringPoints.editAssignTitle') : t('pages.meteringPoints.assignTitle')}
                 onClose={closeAssignModal}
             >
-                <form onSubmit={submitAssignForm} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <form onSubmit={submitAssignForm} className="form-grid">
                     <label style={{ gridColumn: '1 / -1' }}>
                         <span>{t('pages.meteringPoints.assignForm.participant')}</span>
                         <select

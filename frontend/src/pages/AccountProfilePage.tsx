@@ -116,7 +116,7 @@ export function AccountProfilePage() {
                 </div>
             )}
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem', maxWidth: '1000px' }}>
+            <div className="form-grid" style={{ gap: '2rem', maxWidth: '1000px' }}>
                 {/* Profile Section */}
                 <div className="card">
                     <h2 style={{ marginTop: 0 }}>{t('account.profileSection')}</h2>

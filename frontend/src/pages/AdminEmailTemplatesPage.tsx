@@ -18,7 +18,7 @@ interface FieldInfo {
 function FieldReference({ fields }: { fields: FieldInfo[] }) {
     const { t } = useTranslation()
     return (
-        <aside className="card page-stack" style={{ minWidth: 340, maxHeight: '80vh', overflowY: 'auto' }}>
+        <aside className="card page-stack" style={{ maxHeight: '80vh', overflowY: 'auto' }}>
             <h4 style={{ margin: 0 }}>{t('admin.availableFields')}</h4>
             <p className="muted" style={{ fontSize: '0.85rem', margin: 0 }}>
                 {t('admin.emailTemplates.variableHint')}
@@ -88,7 +88,7 @@ function EmailTemplateEditor({
     })
 
     return (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 360px', gap: '1.5rem', alignItems: 'start' }}>
+        <div className="content-with-aside">
             <section className="card page-stack">
                 <div className="actions-row">
                     <h3 style={{ margin: 0 }}>{title}</h3>

@@ -247,7 +247,7 @@ export function ParticipantsPage() {
                 onClose={closeModal}
                 maxWidth="960px"
             >
-                <form onSubmit={submit} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <form onSubmit={submit} className="form-grid">
                     <label>
                         <span>{t('pages.participants.form.title')}</span>
                         <select

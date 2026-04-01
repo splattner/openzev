@@ -21,7 +21,7 @@ interface FieldGroup {
 function FieldReference({ groups }: { groups: FieldGroup[] }) {
     const { t } = useTranslation()
     return (
-        <aside className="card page-stack" style={{ minWidth: 400, maxHeight: '80vh', overflowY: 'auto' }}>
+        <aside className="card page-stack" style={{ maxHeight: '80vh', overflowY: 'auto' }}>
             <h4 style={{ margin: 0 }}>{t('admin.availableFields')}</h4>
             {groups.map((group) => (
                 <div key={group.title}>
@@ -250,7 +250,7 @@ function TemplateEditor({
     }, [showPreview, previewHtml])
 
     return (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 420px', gap: '1.5rem', alignItems: 'start' }}>
+        <div className="content-with-aside">
             <section className="card page-stack">
                 <div className="actions-row">
                     <h3 style={{ margin: 0 }}>{title}</h3>

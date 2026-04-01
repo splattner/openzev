@@ -202,7 +202,7 @@ export function DashboardPage() {
                         {ownerChartData.length === 0 ? (
                             <p className="muted">{t('pages.dashboard.noData')}</p>
                         ) : (
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
+                            <div className="form-grid" style={{ gap: '2rem' }}>
                                 <div>
                                     <p style={{ margin: '0 0 0.5rem', fontWeight: 600, fontSize: '0.875rem', color: '#374151' }}>{t('pages.dashboard.consumption')}</p>
                                     <ResponsiveContainer width="100%" height={300}>

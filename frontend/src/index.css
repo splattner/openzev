@@ -241,6 +241,7 @@ label {
   align-items: center;
   gap: 0.8rem;
   padding: 0.9rem 1rem;
+  min-height: 2.75rem;
   border-radius: 0.9rem;
   color: #cbd5e1;
   transition: background 0.2s ease, color 0.2s ease;
@@ -750,7 +751,8 @@ h3 {
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
-  padding: 0.55rem 0.85rem;
+  padding: 0.6rem 0.9rem;
+  min-height: 2.5rem;
   border: 0;
   border-radius: 0.7rem;
   background: linear-gradient(135deg, #0284c7, #16a34a);
@@ -949,6 +951,48 @@ h3 {
   text-decoration: underline;
 }
 
+/* Responsive form grids — inline 2-col grids that collapse on mobile */
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+/* Main + aside layout (e.g. admin template editor + field reference) */
+.content-with-aside {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 1.5rem;
+  align-items: start;
+}
+
+/* Hamburger button visible only on mobile */
+.mobile-menu-button {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  border-radius: 0.75rem;
+  background: rgba(255, 255, 255, 0.92);
+  cursor: pointer;
+  flex-shrink: 0;
+  padding: 0;
+  margin-right: auto;
+}
+
+.mobile-menu-button svg {
+  width: 1.4rem;
+  height: 1.4rem;
+  color: #334155;
+}
+
+/* Sidebar overlay backdrop for mobile */
+.sidebar-overlay {
+  display: none;
+}
+
 @media (max-width: 1100px) {
   .grid-3 {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -959,27 +1003,104 @@ h3 {
   }
 }
 
-@media (max-width: 900px) {
-  .shell {
+@media (max-width: 768px) {
+  /* Switch shell to single-column — sidebar becomes an overlay */
+  .shell,
+  .shell.shell-collapsed {
     grid-template-columns: 1fr;
   }
 
-  .sidebar {
-    position: static;
-    top: auto;
-    height: auto;
-    overflow: visible;
-    gap: 1rem;
+  /* Sidebar is a fixed drawer */
+  .sidebar,
+  .sidebar.collapsed {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 280px;
+    height: 100dvh;
+    z-index: 200;
+    transform: translateX(-100%);
+    transition: transform 0.25s ease;
     padding: 1.5rem;
+    overflow-y: auto;
   }
 
-  .sidebar-top {
-    overflow: visible;
-    padding-right: 0;
+  .sidebar.mobile-open {
+    transform: translateX(0);
+  }
+
+  /* Dark overlay behind drawer */
+  .sidebar-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.45);
+    z-index: 199;
+  }
+
+  .sidebar-overlay.visible {
+    display: block;
+  }
+
+  /* Collapse button hidden on mobile — hamburger replaces it */
+  .sidebar-collapse-button {
+    display: none;
+  }
+
+  /* Show hamburger */
+  .mobile-menu-button {
+    display: inline-flex;
   }
 
   .content {
-    padding: 1.25rem;
+    padding: 1rem;
+  }
+
+  /* Top nav: allow wrapping and smaller gaps */
+  .top-nav {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  /* User/ZEV menu triggers: remove fixed min-width */
+  .user-menu-trigger {
+    min-width: 0;
+  }
+
+  .zev-menu,
+  .zev-menu-dropdown {
+    min-width: 0;
+  }
+
+  /* User meta text can truncate */
+  .user-meta strong,
+  .user-meta small {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 30vw;
+  }
+
+  /* Table cards always scroll horizontally on mobile */
+  .table-card {
+    overflow-x: auto;
+  }
+
+  /* Two-column form grids collapse to single column */
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  /* Content+aside stacks vertically */
+  .content-with-aside {
+    grid-template-columns: 1fr;
+  }
+
+  /* Cards: reduce padding */
+  .card,
+  .table-card {
+    padding: 1rem;
   }
 }
 
@@ -991,8 +1112,15 @@ h3 {
     grid-template-columns: 1fr;
   }
 
-  .table-card {
-    overflow-x: auto;
+  .content {
+    padding: 0.75rem;
+  }
+
+  /* Smaller card radius on narrow screens */
+  .card,
+  .table-card,
+  .stat-card {
+    border-radius: 0.75rem;
   }
 }
 

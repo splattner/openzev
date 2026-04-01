@@ -13,6 +13,7 @@ export const en = {
         adminFeatures: 'Features',
         collapseSidebar: 'Collapse sidebar',
         expandSidebar: 'Expand sidebar',
+        menu: 'Menu',
         zevs: 'ZEVs',
         participants: 'Participants',
         meteringPoints: 'Metering Points',
