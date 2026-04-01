@@ -103,6 +103,7 @@ export const de = {
             period: 'Zeitraum',
             currentPeriod: 'Aktueller Zeitraum',
             customPeriod: 'Benutzerdefinierter Zeitraum',
+            backToBillingPeriod: 'Zurück zum Abrechnungszeitraum',
             thisMonth: 'Dieser Monat',
             lastMonth: 'Letzter Monat',
             thisQuarter: 'Dieses Quartal',
