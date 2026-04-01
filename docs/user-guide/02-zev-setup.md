@@ -64,20 +64,7 @@ New ZEV owners can register themselves and create their ZEV without admin involv
 
 ### Option B: Admin-Created ZEV (with Owner Wizard)
 
-Admins can create a ZEV together with a new owner account in a single step.
-
-1. Go to **Admin → ZEV Management**
-2. Click **Create New ZEV**
-3. Fill in ZEV details (name, start date, type, billing interval, etc.)
-4. Fill in the owner details (username, name, email, address)
-5. Optionally add initial metering points for the owner
-6. Click **Create**
-
-The system creates the ZEV, the owner account (with a temporary password), and optionally a participant record and metering points for the owner.
-
-Admins can also create a bare ZEV (without the wizard) via the standard CRUD interface, assigning an existing user as owner.
-
-![Admin ZEV management](screenshots/15-admin-zevs.png)
+Admins can create a ZEV together with a new owner account in a single step. See [Admin Console → ZEV Management](14-admin-console.md#zev-management) for details.
 
 ## ZEV Settings
 
@@ -139,13 +126,9 @@ Choose how often invoices are generated:
 If your ZEV is VAT-registered:
 
 1. Enter your **VAT Number** (UID format) in ZEV Settings
-2. Ask an admin to configure VAT rates in **Admin → VAT Settings**
-3. VAT rates are validity-window based — admins can set rates for specific periods
-4. The system automatically applies the correct rate based on invoice period end date
+2. Ask an admin to configure VAT rates — see [Admin Console → VAT Settings](14-admin-console.md#vat-settings)
 
 If no VAT number is set on the ZEV, or no VAT rate is active for an invoice period, VAT defaults to **0%**.
-
-![VAT settings](screenshots/13-admin-vat-settings.png)
 
 ### Email Templates
 
@@ -167,28 +150,7 @@ Both fields support variable placeholders:
 
 Leave fields blank to use the system defaults. If a template contains an invalid placeholder, the system falls back to defaults automatically.
 
-For more details on email delivery, see [Email Configuration](10-email-configuration.md).
-
-## Regional Settings
-
-**Admins** configure regional defaults in **Admin → Regional Settings**:
-
-![Regional settings](screenshots/12-admin-regional-settings.png)
-
-- **Default Timezone** — Used for timestamp interpretation in metering imports
-- **Date Format** — Display format for invoices and exports
-- **Currency** — Default billing currency (currently CHF)
-
-> **Note:** Timezone alignment is critical for accurate billing. See [Metering Data Import](05-metering-import.md) for details.
-
-## Invoice PDF Template
-
-**Admins** can manage PDF invoice templates in **Admin → PDF Templates**:
-
-![PDF templates](screenshots/14-admin-pdf-templates.png)
-
-- Edit the HTML/CSS template used for invoice PDF generation
-- Template changes apply to newly generated invoices only
+For more details on email delivery, see [Email Configuration](10-email-configuration.md). For system-wide default email templates managed by admins, see [Admin Console → Email Templates](14-admin-console.md#email-templates).
 
 ## Access Control
 

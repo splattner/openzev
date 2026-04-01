@@ -103,6 +103,8 @@ Login as a participant (alice or bob):
 - **Metering Data** shows your consumption charts
 - **Invoices** lists your personal invoices (read-only)
 
+![Participant Dashboard](screenshots/02b-participant-dashboard.png)
+
 ![Account profile](screenshots/16-account-profile.png)
 
 ## API Access

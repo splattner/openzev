@@ -53,6 +53,56 @@ async function navigateTo(page: Page, urlPath: string) {
   await page.waitForTimeout(1500)
 }
 
+/** Get a fresh admin access token. */
+async function getAdminToken(page: Page): Promise<string> {
+  const resp = await page.request.post(`${API_BASE}/auth/token/`, {
+    data: { username: USER, password: PASS },
+  })
+  expect(resp.ok(), `Admin login failed (${resp.status()})`).toBeTruthy()
+  const tokens = await resp.json() as { access: string; refresh: string }
+  return tokens.access
+}
+
+/**
+ * Impersonate a participant by calling the API, then inject the resulting
+ * tokens and impersonation metadata into localStorage so the app picks
+ * up the impersonated session on the next navigation.
+ */
+async function impersonateFirstParticipant(page: Page): Promise<boolean> {
+  const adminToken = await getAdminToken(page)
+  const headers = { Authorization: `Bearer ${adminToken}` }
+
+  // Fetch the list of users and find one with role "participant"
+  const usersResp = await page.request.get(`${API_BASE}/auth/users/`, { headers })
+  expect(usersResp.ok(), `Fetching users failed (${usersResp.status()})`).toBeTruthy()
+  const usersBody = await usersResp.json() as { results: Array<{ id: number; role: string }> }
+  const participant = usersBody.results.find(u => u.role === 'participant')
+  if (!participant) return false
+
+  // Call the impersonate endpoint
+  const impResp = await page.request.post(`${API_BASE}/auth/users/${participant.id}/impersonate/`, { headers })
+  expect(impResp.ok(), `Impersonation failed (${impResp.status()})`).toBeTruthy()
+  const impTokens = await impResp.json() as {
+    access: string
+    refresh: string
+    impersonator: unknown
+  }
+
+  // Inject impersonation state into localStorage
+  await page.addInitScript((data) => {
+    // Store original admin tokens so the app knows we're impersonating
+    localStorage.setItem('openzev.impersonation.original_access', data.adminToken)
+    localStorage.setItem('openzev.impersonation.original_refresh', 'placeholder')
+    localStorage.setItem('openzev.impersonation.impersonator', JSON.stringify(data.impersonator))
+    // Replace active tokens with the impersonated participant's tokens
+    localStorage.setItem('openzev.access', data.access)
+    localStorage.setItem('openzev.refresh', data.refresh)
+    localStorage.setItem('openzev.sidebarCollapsed', 'false')
+  }, { adminToken, access: impTokens.access, refresh: impTokens.refresh, impersonator: impTokens.impersonator })
+
+  return true
+}
+
 // ---------------------------------------------------------------------------
 // PII blurring — page-specific CSS + JS to redact sensitive information
 // ---------------------------------------------------------------------------
@@ -87,6 +137,13 @@ const PAGE_BLUR: Record<string, BlurConfig> = {
       'section.card > h3',                          // energy balance heading (ZEV + participant name)
       '.inline-form select',                         // participant filter dropdown
       'section.card table tbody td:first-child',     // participant name column in stats table
+      '.sankey-participant-label',                   // participant names in Sankey energy flow chart
+    ].join(', '),
+  },
+  'participant-dashboard': {
+    selectors: [
+      '.impersonation-banner strong',                // impersonation banner name
+      '.sankey-participant-label',                   // participant names in Sankey energy flow chart
     ].join(', '),
   },
   participants: {
@@ -231,6 +288,18 @@ test.describe('User Guide Screenshots', () => {
     await screenshotViewport(page, '02-dashboard', 'dashboard')
   })
 
+  // 02b — Participant Dashboard (via impersonation)
+  test('02b-participant-dashboard', async ({ page }) => {
+    const ok = await impersonateFirstParticipant(page)
+    if (!ok) {
+      test.skip()
+      return
+    }
+    await navigateTo(page, '/')
+    await page.waitForSelector('.card, .stat-card', { timeout: 10_000 })
+    await screenshotViewport(page, '02b-participant-dashboard', 'participant-dashboard')
+  })
+
   // 03 — Participants
   test('03-participants', async ({ page }) => {
     await navigateTo(page, '/participants')
@@ -366,6 +435,13 @@ test.describe('User Guide Screenshots', () => {
     await navigateTo(page, '/admin/pdf-templates')
     await page.waitForSelector('.card, textarea', { timeout: 10_000 })
     await screenshot(page, '14-admin-pdf-templates')
+  })
+
+  // 14b — Admin Email Templates
+  test('14b-admin-email-templates', async ({ page }) => {
+    await navigateTo(page, '/admin/email-templates')
+    await page.waitForSelector('.card, textarea', { timeout: 10_000 })
+    await screenshot(page, '14b-admin-email-templates')
   })
 
   // 15 — Admin ZEV List
