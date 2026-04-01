@@ -16,9 +16,10 @@ import {
 } from 'recharts'
 import {
     fetchInvoices,
+    fetchHourlyProfile,
     fetchMeteringDashboardSummary,
 } from '../lib/api'
-import { formatShortDate, useAppSettings } from '../lib/appSettings'
+import { formatShortDate, formatDateTime, formatMonthYear, useAppSettings } from '../lib/appSettings'
 import { useAuth } from '../lib/auth'
 import { useManagedZev } from '../lib/managedZev'
 import { StatCard } from '../components/StatCard'
@@ -41,6 +42,18 @@ export function DashboardPage() {
     const [selectedParticipantId, setSelectedParticipantId] = useState('')
 
     const isZevScopedRole = user?.role === 'admin' || user?.role === 'zev_owner'
+
+    const formatBucketLabel = (value: string) => {
+        switch (bucket) {
+            case 'hour':
+                return formatDateTime(value, settings)
+            case 'month':
+                return formatMonthYear(value)
+            default:
+                return formatShortDate(value, settings)
+        }
+    }
+    const formatBucketTooltipLabel = (label: unknown) => formatBucketLabel(String(label ?? ''))
 
     useEffect(() => {
         setSelectedParticipantId('')
@@ -67,6 +80,17 @@ export function DashboardPage() {
         queryFn: fetchInvoices,
         enabled: user?.role === 'participant',
     })
+    const hourlyProfileQuery = useQuery({
+        queryKey: ['hourly-profile', selectedZevId, selectedParticipantId, period.from, period.to],
+        queryFn: () =>
+            fetchHourlyProfile({
+                dateFrom: period.from,
+                dateTo: period.to,
+                zevId: isZevScopedRole ? selectedZevId : undefined,
+                participantId: isZevScopedRole && selectedParticipantId ? selectedParticipantId : undefined,
+            }),
+        enabled: user?.role === 'participant' || (isZevScopedRole && !!selectedParticipantId),
+    })
 
     const summary = summaryQuery.data
     const selectedZevName = selectedZev?.name
@@ -89,6 +113,14 @@ export function DashboardPage() {
     const participantTimeline = useMemo(
         () => (summary?.role === 'participant' ? summary.timeline : []),
         [summary],
+    )
+    const hourlyProfile = hourlyProfileQuery.data?.hourly_profile ?? null
+    const hourlyProfileData = useMemo(
+        () => hourlyProfile?.map((entry) => ({
+            ...entry,
+            label: `${String(entry.hour).padStart(2, '0')}:00`,
+        })) ?? [],
+        [hourlyProfile],
     )
     const participantInvoicesWithPdf = useMemo(
         () =>
@@ -208,9 +240,9 @@ export function DashboardPage() {
                                     <ResponsiveContainer width="100%" height={300}>
                                         <BarChart data={ownerChartData} margin={{ top: 4, right: 4, bottom: 4, left: 0 }}>
                                             <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                                            <XAxis dataKey="bucket" tick={{ fontSize: 10 }} />
+                                            <XAxis dataKey="bucket" tick={{ fontSize: 10 }} tickFormatter={formatBucketLabel} />
                                             <YAxis tick={{ fontSize: 10 }} unit=" kWh" width={60} />
-                                            <Tooltip formatter={(v) => `${Number(v).toFixed(2)} kWh`} />
+                                            <Tooltip formatter={(v) => `${Number(v).toFixed(2)} kWh`} labelFormatter={formatBucketTooltipLabel} />
                                             <Legend />
                                             <Bar dataKey="locally_consumed" name={t('pages.dashboard.chart.fromZev')} stackId="c" fill="#16a34a" />
                                             <Bar dataKey="imported_kwh" name={t('pages.dashboard.chart.fromGrid')} stackId="c" fill="#f59e0b" radius={[3, 3, 0, 0]} />
@@ -222,10 +254,11 @@ export function DashboardPage() {
                                     <ResponsiveContainer width="100%" height={300}>
                                         <ComposedChart data={ownerChartData} margin={{ top: 4, right: 50, bottom: 4, left: 0 }}>
                                             <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                                            <XAxis dataKey="bucket" tick={{ fontSize: 10 }} />
+                                            <XAxis dataKey="bucket" tick={{ fontSize: 10 }} tickFormatter={formatBucketLabel} />
                                             <YAxis yAxisId="kwh" tick={{ fontSize: 10 }} unit=" kWh" width={60} />
                                             <YAxis yAxisId="pct" orientation="right" tick={{ fontSize: 10 }} unit="%" width={44} domain={[0, 100]} />
                                             <Tooltip
+                                                labelFormatter={formatBucketTooltipLabel}
                                                 formatter={(v, name) =>
                                                     name === 'Self-consumed %'
                                                         ? [`${Number(v).toFixed(1)}%`, name]
@@ -291,6 +324,27 @@ export function DashboardPage() {
                             </table>
                         )}
                     </section>
+
+                    {selectedParticipantId && hourlyProfileData.length > 0 && (
+                        <section className="card" style={{ minHeight: 360 }}>
+                            <h3 style={{ marginTop: 0 }}>
+                                {t('pages.dashboard.hourlyProfile.title')}
+                                {selectedParticipantName ? ` — ${selectedParticipantName}` : ''}
+                            </h3>
+                            <p className="muted" style={{ marginTop: 0, fontSize: '0.875rem' }}>{t('pages.dashboard.hourlyProfile.description')}</p>
+                            <ResponsiveContainer width="100%" height={320}>
+                                <BarChart data={hourlyProfileData} margin={{ top: 4, right: 4, bottom: 4, left: 0 }}>
+                                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                                    <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+                                    <YAxis tick={{ fontSize: 11 }} unit=" kWh" width={60} />
+                                    <Tooltip formatter={(v) => `${Number(v).toFixed(4)} kWh`} />
+                                    <Legend />
+                                    <Bar dataKey="from_zev_kwh" name={t('pages.dashboard.chart.fromZev')} stackId="c" fill="#16a34a" />
+                                    <Bar dataKey="from_grid_kwh" name={t('pages.dashboard.chart.fromGrid')} stackId="c" fill="#f59e0b" radius={[3, 3, 0, 0]} />
+                                </BarChart>
+                            </ResponsiveContainer>
+                        </section>
+                    )}
                 </>
             )}
 
@@ -321,9 +375,9 @@ export function DashboardPage() {
                             <ResponsiveContainer width="100%" height={320}>
                                 <BarChart data={participantTimeline} margin={{ top: 4, right: 4, bottom: 4, left: 0 }}>
                                     <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                                    <XAxis dataKey="bucket" tick={{ fontSize: 11 }} />
+                                    <XAxis dataKey="bucket" tick={{ fontSize: 11 }} tickFormatter={formatBucketLabel} />
                                     <YAxis tick={{ fontSize: 11 }} unit=" kWh" width={60} />
-                                    <Tooltip formatter={(v) => `${Number(v).toFixed(2)} kWh`} />
+                                    <Tooltip formatter={(v) => `${Number(v).toFixed(2)} kWh`} labelFormatter={formatBucketTooltipLabel} />
                                     <Legend />
                                     <Bar dataKey="consumed_from_zev_kwh" name={t('pages.dashboard.chart.fromZev')} stackId="c" fill="#16a34a" />
                                     <Bar dataKey="imported_from_grid_kwh" name={t('pages.dashboard.chart.fromGrid')} stackId="c" fill="#f59e0b" radius={[3, 3, 0, 0]} />
@@ -331,6 +385,24 @@ export function DashboardPage() {
                             </ResponsiveContainer>
                         )}
                     </section>
+
+                    {hourlyProfileData.length > 0 && (
+                        <section className="card" style={{ minHeight: 360 }}>
+                            <h3 style={{ marginTop: 0 }}>{t('pages.dashboard.hourlyProfile.title')}</h3>
+                            <p className="muted" style={{ marginTop: 0, fontSize: '0.875rem' }}>{t('pages.dashboard.hourlyProfile.description')}</p>
+                            <ResponsiveContainer width="100%" height={320}>
+                                <BarChart data={hourlyProfileData} margin={{ top: 4, right: 4, bottom: 4, left: 0 }}>
+                                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                                    <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+                                    <YAxis tick={{ fontSize: 11 }} unit=" kWh" width={60} />
+                                    <Tooltip formatter={(v) => `${Number(v).toFixed(4)} kWh`} />
+                                    <Legend />
+                                    <Bar dataKey="from_zev_kwh" name={t('pages.dashboard.chart.fromZev')} stackId="c" fill="#16a34a" />
+                                    <Bar dataKey="from_grid_kwh" name={t('pages.dashboard.chart.fromGrid')} stackId="c" fill="#f59e0b" radius={[3, 3, 0, 0]} />
+                                </BarChart>
+                            </ResponsiveContainer>
+                        </section>
+                    )}
 
                     <section className="card">
                         <h3 style={{ marginTop: 0 }}>{t('pages.dashboard.invoicesSection')}</h3>

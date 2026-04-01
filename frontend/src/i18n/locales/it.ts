@@ -796,6 +796,10 @@ export const it = {
                 totalConsumption: 'Consumo totale',
             },
             consumptionSplit: 'Ripartizione consumo',
+            hourlyProfile: {
+                title: 'Profilo medio di consumo giornaliero (24 h)',
+                description: 'Consumo orario medio nel periodo di fatturazione — suddiviso tra energia locale CEE e importazione dalla rete.',
+            },
             invoicesSection: 'Fatture',
             loadingInvoices: 'Caricamento fatture…',
             failedInvoices: 'Impossibile caricare le fatture.',

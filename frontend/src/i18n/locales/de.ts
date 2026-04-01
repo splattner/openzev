@@ -798,6 +798,10 @@ export const de = {
                 totalConsumption: 'Gesamtverbrauch',
             },
             consumptionSplit: 'Verbrauchsaufteilung',
+            hourlyProfile: {
+                title: 'Durchschnittliches Tagesverbrauchsprofil (24 h)',
+                description: 'Durchschnittlicher stündlicher Energiebezug über die Abrechnungsperiode — aufgeteilt in lokale ZEV-Energie und Netzbezug.',
+            },
             invoicesSection: 'Rechnungen',
             loadingInvoices: 'Rechnungen werden geladen…',
             failedInvoices: 'Rechnungen konnten nicht geladen werden.',

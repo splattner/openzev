@@ -586,3 +586,13 @@ export interface ParticipantDashboardSummary {
 }
 
 export type MeteringDashboardSummary = ZevOwnerDashboardSummary | ParticipantDashboardSummary
+
+export interface HourlyProfileEntry {
+    hour: number
+    from_zev_kwh: number
+    from_grid_kwh: number
+}
+
+export interface HourlyProfileResponse {
+    hourly_profile: HourlyProfileEntry[] | null
+}
