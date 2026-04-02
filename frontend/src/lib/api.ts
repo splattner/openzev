@@ -379,6 +379,14 @@ export async function deleteMeteringPoint(id: string): Promise<void> {
     await api.delete(`/zev/metering-points/${id}/`)
 }
 
+export async function deleteMeteringPointReadings(
+    id: string,
+    payload: { delete_all: boolean; date_from?: string; date_to?: string },
+): Promise<{ deleted_count: number }> {
+    const { data } = await api.post<{ deleted_count: number }>(`/zev/metering-points/${id}/delete-readings/`, payload)
+    return data
+}
+
 export async function fetchMeteringPointAssignments(meteringPointId?: string): Promise<PaginatedResponse<MeteringPointAssignment>> {
     const params = meteringPointId ? { metering_point: meteringPointId } : {}
     const { data } = await api.get<PaginatedResponse<MeteringPointAssignment>>('/zev/metering-point-assignments/', { params })

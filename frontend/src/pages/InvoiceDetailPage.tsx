@@ -4,6 +4,12 @@ import { useTranslation } from 'react-i18next'
 import { fetchInvoice } from '../lib/api'
 import { formatShortDate, useAppSettings } from '../lib/appSettings'
 
+function humanizeType(type: string): string {
+    return type
+        .replace(/_/g, ' ')
+        .replace(/\b\w/g, (char) => char.toUpperCase())
+}
+
 export function InvoiceDetailPage() {
     const { t } = useTranslation()
     const { invoiceId } = useParams<{ invoiceId: string }>()
@@ -86,7 +92,11 @@ export function InvoiceDetailPage() {
                                 <tbody>
                                     {items.map((item) => (
                                         <tr key={item.id}>
-                                            <td>{item.item_type}</td>
+                                            <td>
+                                                {t(`pages.invoiceDetail.itemTypes.${item.item_type}` as Parameters<typeof t>[0], {
+                                                    defaultValue: humanizeType(item.item_type),
+                                                })}
+                                            </td>
                                             <td>{item.description}</td>
                                             <td>{item.quantity_kwh}</td>
                                             <td>{item.unit}</td>

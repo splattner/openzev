@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useMemo, useState, type FormEvent } from 'react'
+import { DataGrid, type GridColDef, type GridRenderCellParams } from '@mui/x-data-grid'
 import { FormModal } from '../components/FormModal'
 import {
     fetchImportLogs,
@@ -115,6 +116,91 @@ export function ImportsPage() {
         : !!file && !!scopedZevId
 
     const previewRows = useMemo(() => preview?.preview_rows ?? [], [preview])
+    const importLogRows = useMemo(
+        () =>
+            importLogs.map((log) => ({
+                ...log,
+                created_display: formatDateTime(log.created_at, settings),
+                filename_display: log.filename || '-',
+                rows_total_display: log.rows_total ?? '-',
+            })),
+        [importLogs, settings],
+    )
+
+    const importLogColumns = useMemo<GridColDef[]>(
+        () => [
+            {
+                field: 'created_display',
+                headerName: 'Created',
+                flex: 1.2,
+                minWidth: 190,
+                sortable: false,
+                filterable: false,
+            },
+            {
+                field: 'source',
+                headerName: 'Source',
+                flex: 0.8,
+                minWidth: 110,
+                sortable: false,
+                filterable: false,
+            },
+            {
+                field: 'filename_display',
+                headerName: 'Filename',
+                flex: 1.3,
+                minWidth: 190,
+                sortable: false,
+                filterable: false,
+            },
+            {
+                field: 'rows_total_display',
+                headerName: 'Total',
+                flex: 0.6,
+                minWidth: 90,
+                align: 'right',
+                headerAlign: 'right',
+                sortable: false,
+                filterable: false,
+            },
+            {
+                field: 'rows_imported',
+                headerName: 'Imported',
+                type: 'number',
+                flex: 0.7,
+                minWidth: 105,
+                align: 'right',
+                headerAlign: 'right',
+                sortable: false,
+                filterable: false,
+            },
+            {
+                field: 'rows_skipped',
+                headerName: 'Skipped',
+                type: 'number',
+                flex: 0.7,
+                minWidth: 105,
+                align: 'right',
+                headerAlign: 'right',
+                sortable: false,
+                filterable: false,
+            },
+            {
+                field: 'protocol',
+                headerName: 'Protocol',
+                flex: 0.9,
+                minWidth: 150,
+                sortable: false,
+                filterable: false,
+                renderCell: (params: GridRenderCellParams<ImportLog>) => (
+                    <button type="button" className="button button-primary" onClick={() => setSelectedLog(params.row)}>
+                        Open protocol
+                    </button>
+                ),
+            },
+        ],
+        [],
+    )
 
     function resetWizard() {
         setWizardOpen(false)
@@ -471,41 +557,32 @@ export function ImportsPage() {
                 </div>
             </FormModal>
 
-            <div className="table-card">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Created</th>
-                            <th>Source</th>
-                            <th>Filename</th>
-                            <th>Total</th>
-                            <th>Imported</th>
-                            <th>Skipped</th>
-                            <th>Protocol</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {importLogs.length ? importLogs.map((log) => (
-                            <tr key={log.id}>
-                                <td>{formatDateTime(log.created_at, settings)}</td>
-                                <td>{log.source}</td>
-                                <td>{log.filename || '-'}</td>
-                                <td>{log.rows_total ?? '-'}</td>
-                                <td>{log.rows_imported}</td>
-                                <td>{log.rows_skipped}</td>
-                                <td>
-                                    <button type="button" className="button button-primary" onClick={() => setSelectedLog(log)}>
-                                        Open protocol
-                                    </button>
-                                </td>
-                            </tr>
-                        )) : (
-                            <tr>
-                                <td colSpan={7}>No import logs yet.</td>
-                            </tr>
-                        )}
-                    </tbody>
-                </table>
+            <div className="table-card" style={{ width: '100%' }}>
+                <DataGrid
+                    rows={importLogRows}
+                    columns={importLogColumns}
+                    getRowId={(row) => row.id}
+                    disableRowSelectionOnClick
+                    disableColumnFilter
+                    disableColumnSorting
+                    disableColumnMenu
+                    hideFooterSelectedRowCount
+                    pageSizeOptions={[10, 25, 50, 100]}
+                    initialState={{
+                        pagination: {
+                            paginationModel: { pageSize: 25, page: 0 },
+                        },
+                    }}
+                    localeText={{
+                        noRowsLabel: 'No import logs yet.',
+                    }}
+                    sx={{
+                        border: 0,
+                        '& .MuiDataGrid-columnHeaders': {
+                            backgroundColor: '#f8fafc',
+                        },
+                    }}
+                />
             </div>
 
             <FormModal isOpen={!!selectedLog} title="Import protocol" onClose={() => setSelectedLog(null)}>
