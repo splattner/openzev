@@ -1,17 +1,49 @@
 import { useEffect, useState } from 'react'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { useLocation } from 'react-router-dom'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useLocation, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '../lib/auth'
 import { useToast } from '../lib/toast'
-import { changePassword, updateProfile } from '../lib/api'
+import { changePassword, deleteSocialAccount, fetchOAuthProviders, fetchSocialAccounts, oauthLinkInitiate, updateProfile } from '../lib/api'
+import { ConfirmDialog, useConfirmDialog } from '../components/ConfirmDialog'
 
 export function AccountProfilePage() {
     const { t } = useTranslation()
     const location = useLocation()
+    const [searchParams, setSearchParams] = useSearchParams()
     const { user, refreshUser } = useAuth()
     const { pushToast } = useToast()
     const queryClient = useQueryClient()
+    const { dialog, confirm, handleConfirm, handleCancel, isLoading: dialogLoading } = useConfirmDialog()
+
+    // Social accounts & OAuth providers
+    const socialAccountsQuery = useQuery({
+        queryKey: ['social-accounts'],
+        queryFn: fetchSocialAccounts,
+    })
+    const oauthProvidersQuery = useQuery({
+        queryKey: ['oauth-providers-public'],
+        queryFn: fetchOAuthProviders,
+    })
+
+    // Handle oauth_linked / oauth_error query params
+    useEffect(() => {
+        const linked = searchParams.get('oauth_linked')
+        const oauthError = searchParams.get('oauth_error')
+        if (linked === 'true') {
+            void queryClient.invalidateQueries({ queryKey: ['social-accounts'] })
+            pushToast(t('account.linkSuccess'), 'success')
+            const next = new URLSearchParams(searchParams)
+            next.delete('oauth_linked')
+            setSearchParams(next, { replace: true })
+        } else if (oauthError) {
+            pushToast(t('auth.oauth.errors.generic', { code: oauthError }), 'error')
+            const next = new URLSearchParams(searchParams)
+            next.delete('oauth_error')
+            setSearchParams(next, { replace: true })
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [])
 
     // Profile form state
     const [profileForm, setProfileForm] = useState({
@@ -26,6 +58,8 @@ export function AccountProfilePage() {
         newPassword: '',
         confirmPassword: '',
     })
+
+    const [linkingProvider, setLinkingProvider] = useState<string | null>(null)
 
     useEffect(() => {
         setProfileForm({
@@ -61,6 +95,39 @@ export function AccountProfilePage() {
             pushToast(message, 'error')
         },
     })
+
+    // Social account unlink mutation
+    const unlinkMutation = useMutation({
+        mutationFn: (id: number) => deleteSocialAccount(id),
+        onSuccess: () => {
+            void queryClient.invalidateQueries({ queryKey: ['social-accounts'] })
+            pushToast(t('account.unlinkSuccess'), 'success')
+        },
+        onError: () => {
+            pushToast(t('common.error'), 'error')
+        },
+    })
+
+    async function handleUnlink(id: number, displayName: string) {
+        confirm({
+            title: t('account.unlinkConfirmTitle'),
+            message: t('account.unlinkConfirmMessage', { provider: displayName }),
+            confirmText: t('account.unlinkAccount'),
+            isDangerous: true,
+            onConfirm: () => unlinkMutation.mutate(id),
+        })
+    }
+
+    async function handleLink(providerSlug: string) {
+        setLinkingProvider(providerSlug)
+        try {
+            const { redirect_url } = await oauthLinkInitiate(providerSlug)
+            window.location.href = redirect_url
+        } catch {
+            pushToast(t('auth.oauth.errors.initFailed'), 'error')
+            setLinkingProvider(null)
+        }
+    }
 
     const handleProfileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { name, value } = e.target
@@ -229,7 +296,77 @@ export function AccountProfilePage() {
                         </button>
                     </form>
                 </div>
+                {/* Linked Accounts Section */}
+                <div className="card">
+                    <h2 style={{ marginTop: 0 }}>{t('account.linkedAccountsSection')}</h2>
+                    <p className="muted" style={{ marginBottom: '1.5rem' }}>{t('account.linkedAccountsDescription')}</p>
+
+                    {oauthProvidersQuery.isLoading && <p className="muted">{t('common.loading')}</p>}
+
+                    {!oauthProvidersQuery.isLoading && (oauthProvidersQuery.data ?? []).length === 0 && (
+                        <p className="muted">{t('account.noProviders')}</p>
+                    )}
+
+                    {(oauthProvidersQuery.data ?? []).map((provider) => {
+                        const linked = (socialAccountsQuery.data ?? []).find(
+                            (sa) => sa.provider_name === provider.name,
+                        )
+                        return (
+                            <div
+                                key={provider.name}
+                                style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                    padding: '0.75rem 0',
+                                    borderBottom: '1px solid var(--border)',
+                                }}
+                            >
+                                <div>
+                                    <strong>{provider.display_name}</strong>
+                                    {linked && (
+                                        <small style={{ display: 'block', color: '#6b7280' }}>
+                                            {t('account.linkedSince', {
+                                                date: new Date(linked.created_at).toLocaleDateString(),
+                                            })}
+                                        </small>
+                                    )}
+                                </div>
+                                {linked ? (
+                                    <button
+                                        type="button"
+                                        className="button button-sm button-danger"
+                                        disabled={unlinkMutation.isPending}
+                                        onClick={() => void handleUnlink(linked.id, provider.display_name)}
+                                    >
+                                        {t('account.unlinkAccount')}
+                                    </button>
+                                ) : (
+                                    <button
+                                        type="button"
+                                        className="button button-sm button-secondary"
+                                        disabled={linkingProvider !== null}
+                                        onClick={() => void handleLink(provider.name)}
+                                    >
+                                        {linkingProvider === provider.name
+                                            ? t('common.loading')
+                                            : t('account.linkAccount', { provider: provider.display_name })}
+                                    </button>
+                                )}
+                            </div>
+                        )
+                    })}
+                </div>
             </div>
+
+            {dialog && (
+                <ConfirmDialog
+                    {...dialog}
+                    isLoading={dialogLoading}
+                    onConfirm={handleConfirm}
+                    onCancel={handleCancel}
+                />
+            )}
         </div>
     )
 }

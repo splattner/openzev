@@ -153,6 +153,7 @@ EMAIL_HOST_USER = env("EMAIL_HOST_USER", default="")
 EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD", default="")
 DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default="openzev@example.com")
 FRONTEND_URL = env("FRONTEND_URL", default="http://localhost:5173")
+BACKEND_URL = env("BACKEND_URL", default="http://localhost:8000")
 
 # ── Celery ────────────────────────────────────────────────────────────────────
 CELERY_BROKER_URL = env("CELERY_BROKER_URL", default="redis://localhost:6379/0")

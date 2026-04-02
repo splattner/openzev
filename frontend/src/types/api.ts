@@ -143,6 +143,48 @@ export interface RegisterInput {
     email: string
 }
 
+export interface OAuthProvider {
+    id: number
+    name: string
+    display_name: string
+    enabled: boolean
+}
+
+export interface OAuthProviderConfig extends OAuthProvider {
+    client_id: string
+    client_secret: string
+    authorization_url: string
+    token_url: string
+    userinfo_url: string
+    scope: string
+    created_at: string
+    updated_at: string
+}
+
+export interface OAuthProviderConfigInput {
+    name: string
+    display_name: string
+    client_id: string
+    client_secret: string
+    authorization_url: string
+    token_url: string
+    userinfo_url: string
+    scope: string
+    enabled: boolean
+}
+
+export interface SocialAccount {
+    id: number
+    provider_name: string
+    provider_display_name: string
+    uid: string
+    created_at: string
+}
+
+export interface OAuthLoginInitiateResponse {
+    redirect_url: string
+}
+
 export interface SelfSetupZevInput {
     name: string
     start_date: string

@@ -410,6 +410,82 @@ class VatRateSettingsTests(TestCase):
 		self.assertIn("valid_to", resp.data)
 
 
+class OAuthProviderConfigTests(TestCase):
+	def _auth(self, client, user, password="pass1234"):
+		resp = client.post("/api/v1/auth/token/", {"username": user.username, "password": password})
+		client.credentials(HTTP_AUTHORIZATION=f"Bearer {resp.data['access']}")
+
+	def setUp(self):
+		self.client = APIClient()
+		self.admin = User.objects.create_user(username="admin_oauth", password="pass1234", role=UserRole.ADMIN)
+		self.owner = User.objects.create_user(username="owner_oauth", password="pass1234", role=UserRole.ZEV_OWNER)
+
+	def test_admin_can_create_provider_with_internal_host_urls(self):
+		self._auth(self.client, self.admin)
+
+		resp = self.client.post(
+			"/api/v1/auth/oauth/providers/config/",
+			{
+				"name": "Keycloak Internal",
+				"display_name": "Keycloak",
+				"client_id": "openzev",
+				"client_secret": "secret",
+				"authorization_url": "http://keycloak:8080/realms/openzev/protocol/openid-connect/auth",
+				"token_url": "http://keycloak:8080/realms/openzev/protocol/openid-connect/token",
+				"userinfo_url": "http://keycloak:8080/realms/openzev/protocol/openid-connect/userinfo",
+				"scope": "openid email profile",
+				"enabled": True,
+			},
+			format="json",
+		)
+
+		self.assertEqual(resp.status_code, 201)
+		self.assertEqual(resp.data["name"], "keycloak-internal")
+
+	def test_admin_can_create_provider_without_scheme(self):
+		self._auth(self.client, self.admin)
+
+		resp = self.client.post(
+			"/api/v1/auth/oauth/providers/config/",
+			{
+				"name": "GitHub",
+				"display_name": "GitHub",
+				"client_id": "openzev",
+				"client_secret": "secret",
+				"authorization_url": "github.com/login/oauth/authorize",
+				"token_url": "github.com/login/oauth/access_token",
+				"userinfo_url": "api.github.com/user",
+				"scope": "read:user user:email",
+				"enabled": True,
+			},
+			format="json",
+		)
+
+		self.assertEqual(resp.status_code, 201)
+		self.assertEqual(resp.data["authorization_url"], "https://github.com/login/oauth/authorize")
+
+	def test_non_admin_cannot_create_provider(self):
+		self._auth(self.client, self.owner)
+
+		resp = self.client.post(
+			"/api/v1/auth/oauth/providers/config/",
+			{
+				"name": "github",
+				"display_name": "GitHub",
+				"client_id": "openzev",
+				"client_secret": "secret",
+				"authorization_url": "https://github.com/login/oauth/authorize",
+				"token_url": "https://github.com/login/oauth/access_token",
+				"userinfo_url": "https://api.github.com/user",
+				"scope": "read:user user:email",
+				"enabled": True,
+			},
+			format="json",
+		)
+
+		self.assertEqual(resp.status_code, 403)
+
+
 class RbacEndpointMatrixTests(TestCase):
 	def _auth(self, client, user, password="pass1234"):
 		resp = client.post("/api/v1/auth/token/", {"username": user.username, "password": password})

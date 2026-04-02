@@ -220,6 +220,70 @@ class FeatureFlag(models.Model):
             return cls.DEFAULTS.get(name, False)
 
 
+class OAuthProvider(models.Model):
+    """Stores configuration for an external OAuth 2.0 / OIDC provider."""
+
+    name = models.CharField(max_length=50, unique=True, help_text="Slug used in URLs (e.g. 'github', 'google').")
+    display_name = models.CharField(max_length=100, help_text="Human-readable label (e.g. 'GitHub').")
+    client_id = models.CharField(max_length=500)
+    client_secret = models.CharField(max_length=500)
+    authorization_url = models.URLField(max_length=500, help_text="Provider authorization endpoint URL.")
+    token_url = models.URLField(max_length=500, help_text="Provider token endpoint URL.")
+    userinfo_url = models.URLField(max_length=500, help_text="Provider userinfo endpoint URL.")
+    scope = models.CharField(max_length=255, default="openid email profile")
+    enabled = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["name"]
+
+    def __str__(self):
+        return self.display_name
+
+
+class SocialAccount(models.Model):
+    """Persists the link between a Django user and an OAuth provider identity."""
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="social_accounts")
+    provider = models.ForeignKey(OAuthProvider, on_delete=models.CASCADE, related_name="social_accounts")
+    uid = models.CharField(max_length=500, help_text="Unique identifier returned by the provider (sub / id).")
+    extra_data = models.JSONField(default=dict)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ("provider", "uid")
+        ordering = ["provider__name"]
+
+    def __str__(self):
+        return f"{self.user} @ {self.provider}"
+
+
+class OAuthState(models.Model):
+    """Short-lived CSRF state token for an in-flight OAuth authorisation request."""
+
+    state = models.CharField(max_length=64, unique=True, db_index=True)
+    provider = models.ForeignKey(OAuthProvider, on_delete=models.CASCADE)
+    # If set, this is a *link* request; the completed callback attaches the
+    # social account to this user instead of creating a new session.
+    user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def is_valid(self) -> bool:
+        return timezone.now() < self.created_at + timedelta(minutes=10)
+
+
+class OAuthExchangeCode(models.Model):
+    """Very short-lived one-time code the frontend exchanges for JWT tokens."""
+
+    code = models.CharField(max_length=64, unique=True, db_index=True)
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def is_valid(self) -> bool:
+        return timezone.now() < self.created_at + timedelta(seconds=60)
+
+
 class VatRate(models.Model):
     rate = models.DecimalField(
         max_digits=5,

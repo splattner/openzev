@@ -1,8 +1,10 @@
 from django.contrib.auth.password_validation import validate_password
 from django.contrib.auth import get_user_model
+from django.utils.text import slugify
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
-from .models import AppSettings, FeatureFlag, User, UserRole, VatRate
+from urllib.parse import urlparse
+from .models import AppSettings, FeatureFlag, OAuthProvider, SocialAccount, User, UserRole, VatRate
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -117,6 +119,74 @@ class FeatureFlagSerializer(serializers.ModelSerializer):
         model = FeatureFlag
         fields = ["id", "name", "description", "enabled", "updated_at"]
         read_only_fields = ["id", "name", "description", "updated_at"]
+
+
+class OAuthProviderSerializer(serializers.ModelSerializer):
+    """Full serializer for admin CRUD — includes client_secret."""
+
+    # Use CharField to allow internal hostnames like "keycloak:8080" while
+    # still enforcing a scheme/netloc via custom validators below.
+    authorization_url = serializers.CharField(max_length=500)
+    token_url = serializers.CharField(max_length=500)
+    userinfo_url = serializers.CharField(max_length=500)
+
+    def validate_name(self, value):
+        normalized = slugify((value or "").strip())
+        if not normalized:
+            raise serializers.ValidationError("Provider slug cannot be empty.")
+        return normalized
+
+    def _validate_endpoint_url(self, value: str) -> str:
+        url = (value or "").strip()
+        if "://" not in url:
+            url = f"https://{url}"
+
+        parsed = urlparse(url)
+        if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+            raise serializers.ValidationError("Enter a valid URL (http:// or https://).")
+        return url
+
+    def validate_authorization_url(self, value):
+        return self._validate_endpoint_url(value)
+
+    def validate_token_url(self, value):
+        return self._validate_endpoint_url(value)
+
+    def validate_userinfo_url(self, value):
+        return self._validate_endpoint_url(value)
+
+    def validate_display_name(self, value):
+        text = (value or "").strip()
+        if not text:
+            raise serializers.ValidationError("Display name cannot be empty.")
+        return text
+
+    class Meta:
+        model = OAuthProvider
+        fields = [
+            "id", "name", "display_name", "client_id", "client_secret",
+            "authorization_url", "token_url", "userinfo_url", "scope",
+            "enabled", "created_at", "updated_at",
+        ]
+        read_only_fields = ["id", "created_at", "updated_at"]
+
+
+class OAuthProviderPublicSerializer(serializers.ModelSerializer):
+    """Public serializer — never exposes client_secret."""
+
+    class Meta:
+        model = OAuthProvider
+        fields = ["id", "name", "display_name", "enabled"]
+
+
+class SocialAccountSerializer(serializers.ModelSerializer):
+    provider_name = serializers.CharField(source="provider.name", read_only=True)
+    provider_display_name = serializers.CharField(source="provider.display_name", read_only=True)
+
+    class Meta:
+        model = SocialAccount
+        fields = ["id", "provider_name", "provider_display_name", "uid", "created_at"]
+        read_only_fields = ["id", "provider_name", "provider_display_name", "uid", "created_at"]
 
 
 class VatRateSerializer(serializers.ModelSerializer):

@@ -4,7 +4,7 @@ import AppFooter from '../components/AppFooter'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '../lib/auth'
-import { fetchFeatureFlags, register as apiRegister, formatApiError } from '../lib/api'
+import { fetchFeatureFlags, fetchOAuthProviders, oauthLoginInitiate, register as apiRegister, formatApiError } from '../lib/api'
 
 export function LoginPage() {
     const { t } = useTranslation()
@@ -15,12 +15,18 @@ export function LoginPage() {
         queryFn: fetchFeatureFlags,
         staleTime: 60_000,
     })
+    const oauthProvidersQuery = useQuery({
+        queryKey: ['oauth-providers-public'],
+        queryFn: fetchOAuthProviders,
+        staleTime: 60_000,
+    })
 
     // Login state
     const [email, setEmail] = useState('')
     const [password, setPassword] = useState('')
     const [error, setError] = useState<string | null>(null)
     const [loading, setLoading] = useState(false)
+    const [oauthLoading, setOauthLoading] = useState<string | null>(null)
 
     // Register modal state
     const [showModal, setShowModal] = useState(false)
@@ -31,6 +37,8 @@ export function LoginPage() {
     const selfRegistrationEnabled = featureFlagsQuery.data?.find(
         (flag) => flag.name === 'zev_self_registration_enabled',
     )?.enabled ?? true
+
+    const oauthProviders = oauthProvidersQuery.data ?? []
 
     async function handleSubmit(event: FormEvent<HTMLFormElement>) {
         event.preventDefault()
@@ -43,6 +51,18 @@ export function LoginPage() {
             setError(t('auth.invalid'))
         } finally {
             setLoading(false)
+        }
+    }
+
+    async function handleOAuthLogin(providerSlug: string) {
+        setOauthLoading(providerSlug)
+        setError(null)
+        try {
+            const { redirect_url } = await oauthLoginInitiate(providerSlug)
+            window.location.href = redirect_url
+        } catch {
+            setError(t('auth.oauth.errors.initFailed'))
+            setOauthLoading(null)
         }
     }
 
@@ -97,6 +117,29 @@ export function LoginPage() {
                     <button className="button" type="submit" disabled={loading}>
                         {loading ? t('common.loading') : t('auth.submit')}
                     </button>
+
+                    {oauthProviders.length > 0 && (
+                        <>
+                            <div className="login-divider">
+                                <span>{t('auth.oauth.or')}</span>
+                            </div>
+                            <div className="oauth-provider-list">
+                                {oauthProviders.map((provider) => (
+                                    <button
+                                        key={provider.name}
+                                        type="button"
+                                        className="button button-outline oauth-provider-button"
+                                        disabled={oauthLoading !== null}
+                                        onClick={() => void handleOAuthLogin(provider.name)}
+                                    >
+                                        {oauthLoading === provider.name
+                                            ? t('common.loading')
+                                            : t('auth.oauth.loginWith', { provider: provider.display_name })}
+                                    </button>
+                                ))}
+                            </div>
+                        </>
+                    )}
                 </form>
 
                 {/* Right: register panel */}

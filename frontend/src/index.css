@@ -1202,6 +1202,30 @@ h3 {
   justify-content: center;
 }
 
+  .login-divider {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    color: #9ca3af;
+    font-size: 0.875rem;
+  }
+
+  .login-divider::before,
+  .login-divider::after {
+    content: '';
+    flex: 1;
+    border-top: 1px solid #e5e7eb;
+  }
+
+  .oauth-provider-list {
+    display: grid;
+    gap: 0.5rem;
+  }
+
+  .oauth-provider-button {
+    width: 100%;
+  }
+
 .login-register-inner {
   display: grid;
   gap: 1.25rem;

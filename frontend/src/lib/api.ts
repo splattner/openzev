@@ -18,6 +18,10 @@ import type {
     MeteringPointAssignment,
     MeteringPointAssignmentInput,
     MeteringPointInput,
+    OAuthLoginInitiateResponse,
+    OAuthProvider,
+    OAuthProviderConfig,
+    OAuthProviderConfigInput,
     PaginatedResponse,
     Participant,
     ParticipantAccountCreateResult,
@@ -25,6 +29,7 @@ import type {
     PdfTemplateResponse,
     RegisterInput,
     SelfSetupZevInput,
+    SocialAccount,
     Tariff,
     TariffInput,
     TariffPreset,
@@ -208,6 +213,58 @@ export async function verifyEmail(token: string): Promise<AuthTokens> {
 export async function setInitialPassword(newPassword: string): Promise<AuthTokens> {
     const { data } = await api.post<AuthTokens>('/auth/me/set-initial-password/', { new_password: newPassword })
     return data
+}
+
+// ── OAuth ─────────────────────────────────────────────────────────────────────
+
+export async function fetchOAuthProviders(): Promise<OAuthProvider[]> {
+    const { data } = await api.get<OAuthProvider[]>('/auth/oauth/providers/')
+    return data
+}
+
+export async function oauthLoginInitiate(providerSlug: string): Promise<OAuthLoginInitiateResponse> {
+    const { data } = await api.post<OAuthLoginInitiateResponse>(`/auth/oauth/login/${providerSlug}/`)
+    return data
+}
+
+export async function oauthLinkInitiate(providerSlug: string): Promise<OAuthLoginInitiateResponse> {
+    const { data } = await api.post<OAuthLoginInitiateResponse>(`/auth/oauth/link/${providerSlug}/`)
+    return data
+}
+
+export async function oauthTokenExchange(code: string): Promise<AuthTokens> {
+    const { data } = await api.post<AuthTokens>('/auth/oauth/token-exchange/', { code })
+    return data
+}
+
+export async function fetchSocialAccounts(): Promise<SocialAccount[]> {
+    const { data } = await api.get<SocialAccount[]>('/auth/me/social-accounts/')
+    return data
+}
+
+export async function deleteSocialAccount(id: number): Promise<void> {
+    await api.delete(`/auth/me/social-accounts/${id}/`)
+}
+
+// ── OAuth provider config (admin) ─────────────────────────────────────────────
+
+export async function fetchOAuthProviderConfigs(): Promise<OAuthProviderConfig[]> {
+    const { data } = await api.get<OAuthProviderConfig[] | PaginatedResponse<OAuthProviderConfig>>('/auth/oauth/providers/config/')
+    return Array.isArray(data) ? data : data.results
+}
+
+export async function createOAuthProviderConfig(payload: OAuthProviderConfigInput): Promise<OAuthProviderConfig> {
+    const { data } = await api.post<OAuthProviderConfig>('/auth/oauth/providers/config/', payload)
+    return data
+}
+
+export async function updateOAuthProviderConfig(id: number, payload: Partial<OAuthProviderConfigInput>): Promise<OAuthProviderConfig> {
+    const { data } = await api.patch<OAuthProviderConfig>(`/auth/oauth/providers/config/${id}/`, payload)
+    return data
+}
+
+export async function deleteOAuthProviderConfig(id: number): Promise<void> {
+    await api.delete(`/auth/oauth/providers/config/${id}/`)
 }
 
 export async function createSelfSetupZev(
