@@ -8,6 +8,7 @@ import { AdminAccountsPage } from './pages/AdminAccountsPage'
 import { AdminPdfTemplatesPage } from './pages/AdminPdfTemplatesPage'
 import { AdminEmailTemplatesPage } from './pages/AdminEmailTemplatesPage'
 import { AdminFeaturesPage } from './pages/AdminFeaturesPage'
+import { AdminInvoicesPage } from './pages/AdminInvoicesPage'
 import { AdminRegionalSettingsPage } from './pages/AdminRegionalSettingsPage'
 import { AdminVatSettingsPage } from './pages/AdminVatSettingsPage'
 import { DashboardPage } from './pages/DashboardPage'
@@ -87,6 +88,14 @@ function App() {
             element={
               <ProtectedRoute allowedRoles={['admin']}>
                 <AdminFeaturesPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="admin/invoices"
+            element={
+              <ProtectedRoute allowedRoles={['admin']}>
+                <AdminInvoicesPage />
               </ProtectedRoute>
             }
           />

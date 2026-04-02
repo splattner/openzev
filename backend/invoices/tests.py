@@ -148,6 +148,53 @@ class InvoiceRBACTests(TestCase):
         resp = self.client.get("/api/v1/invoices/invoices/pdf-template/")
         self.assertEqual(resp.status_code, 403)
 
+    def test_owner_can_download_financial_summary_pdf(self):
+        # Owner needs a participant record to download their own summary
+        owner_participant = make_participant(self.zev1, user=self.owner1, first="Owner", last="One")
+        make_invoice(self.zev1, owner_participant, InvoiceStatus.PAID)
+        auth(self.client, self.owner1)
+
+        resp = self.client.get(
+            "/api/v1/invoices/invoices/financial-summary/",
+            {"zev_id": str(self.zev1.pk), "year": 2026},
+        )
+
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp["Content-Type"], "application/pdf")
+        self.assertIn("financial-summary-2026", resp["Content-Disposition"])
+
+    def test_owner_financial_summary_requires_year_and_zev_id(self):
+        auth(self.client, self.owner1)
+
+        resp = self.client.get("/api/v1/invoices/invoices/financial-summary/")
+
+        self.assertEqual(resp.status_code, 400)
+
+    def test_participant_can_download_own_financial_summary_pdf(self):
+        make_invoice(self.zev1, self.p1, InvoiceStatus.PAID)
+        auth(self.client, self.puser)
+
+        resp = self.client.get(
+            "/api/v1/invoices/invoices/financial-summary/",
+            {"year": 2026},
+        )
+
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp["Content-Type"], "application/pdf")
+        self.assertIn("financial-summary-2026", resp["Content-Disposition"])
+
+    def test_owner_can_download_financial_summary_for_participant(self):
+        make_invoice(self.zev1, self.p1, InvoiceStatus.PAID)
+        auth(self.client, self.owner1)
+
+        resp = self.client.get(
+            "/api/v1/invoices/invoices/financial-summary/",
+            {"zev_id": str(self.zev1.pk), "year": 2026, "participant_id": str(self.p1.pk)},
+        )
+
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp["Content-Type"], "application/pdf")
+
     def test_admin_can_update_pdf_template(self):
         auth(self.client, self.admin)
         template_path = settings.BASE_DIR / "templates" / "invoices" / "invoice_pdf.html"

@@ -18,7 +18,7 @@ class Invoice(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     invoice_number = models.CharField(max_length=50, unique=True)
     zev = models.ForeignKey(Zev, on_delete=models.PROTECT, related_name="invoices")
-    participant = models.ForeignKey(Participant, on_delete=models.PROTECT, related_name="invoices")
+    participant = models.ForeignKey(Participant, on_delete=models.CASCADE, related_name="invoices")
     period_start = models.DateField()
     period_end = models.DateField()
     status = models.CharField(max_length=20, choices=InvoiceStatus.choices, default=InvoiceStatus.DRAFT)

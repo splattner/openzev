@@ -278,19 +278,19 @@ def generate_invoice(participant: Participant, period_start: date, period_end: d
     # Guard: do not overwrite already-approved/sent/paid invoices
     locked = Invoice.objects.filter(
         participant=participant,
-        period_start=period_start,
-        period_end=period_end,
+        period_start__lte=period_end,
+        period_end__gte=period_start,
     ).exclude(status__in=[InvoiceStatus.DRAFT, InvoiceStatus.CANCELLED]).first()
     if locked:
         raise ValueError(
             f"Invoice {locked.invoice_number} already has status '{locked.status}' and cannot be regenerated."
         )
 
-    # Delete any existing draft or cancelled invoice for this period
+    # Delete any existing draft or cancelled invoice whose period overlaps
     Invoice.objects.filter(
         participant=participant,
-        period_start=period_start,
-        period_end=period_end,
+        period_start__lte=period_end,
+        period_end__gte=period_start,
         status__in=[InvoiceStatus.DRAFT, InvoiceStatus.CANCELLED],
     ).delete()
 

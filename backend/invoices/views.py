@@ -21,6 +21,7 @@ from .engine import generate_invoice, generate_invoices_for_zev
 from .pdf import TEMPLATE_NAME, save_invoice_pdf, INVOICE_TRANSLATIONS
 from .contract_pdf import CONTRACT_TEMPLATE_NAME, CONTRACT_TRANSLATIONS
 from .annual_statement import generate_annual_statement_pdf, ANNUAL_STATEMENT_TEMPLATE, ANNUAL_TRANSLATIONS
+from .financial_summary import generate_financial_summary_pdf
 from .tasks import send_invoice_email_task
 
 
@@ -771,6 +772,68 @@ class InvoiceViewSet(viewsets.ModelViewSet):
         buf.seek(0)
         response = HttpResponse(buf.getvalue(), content_type="application/zip")
         response["Content-Disposition"] = f'attachment; filename="annual-statements-{year}.zip"'
+        return response
+
+    @action(detail=False, methods=["get"], url_path="financial-summary",
+            permission_classes=[IsAuthenticated])
+    def financial_summary(self, request):
+        """Generate annual financial summary PDF for a producer participant."""
+        year_raw = request.query_params.get("year")
+        zev_id = request.query_params.get("zev_id")
+        participant_id = request.query_params.get("participant_id")
+
+        if not year_raw:
+            return Response(
+                {"error": "year is required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            year = int(year_raw)
+        except ValueError:
+            return Response({"error": "year must be a number."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Participants can generate their own summary
+        if request.user.role == 'participant' and not request.user.is_admin:
+            participant = Participant.objects.filter(user=request.user).first()
+            if not participant:
+                return Response({"error": "Participant not found."}, status=status.HTTP_404_NOT_FOUND)
+            zev = participant.zev
+        else:
+            # Owner/admin must provide zev_id
+            if not zev_id:
+                return Response(
+                    {"error": "zev_id is required."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            try:
+                zev = Zev.objects.get(pk=zev_id)
+            except Zev.DoesNotExist:
+                return Response({"error": "ZEV not found."}, status=status.HTTP_404_NOT_FOUND)
+
+            if not request.user.is_admin and zev.owner != request.user:
+                return Response({"error": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
+
+            if participant_id:
+                try:
+                    participant = Participant.objects.get(pk=participant_id, zev=zev)
+                except Participant.DoesNotExist:
+                    return Response({"error": "Participant not found."}, status=status.HTTP_404_NOT_FOUND)
+            else:
+                # Default to the current user's participant record, then try ZEV owner
+                participant = Participant.objects.filter(user=request.user, zev=zev).first()
+                if not participant and zev.owner:
+                    participant = Participant.objects.filter(user=zev.owner, zev=zev).first()
+                if not participant:
+                    return Response(
+                        {"error": "participant_id is required (no default participant found)."},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+
+        pdf_bytes = generate_financial_summary_pdf(zev, participant, year)
+        response = HttpResponse(pdf_bytes, content_type="application/pdf")
+        filename = f"financial-summary-{year}-{participant.last_name}.pdf"
+        response["Content-Disposition"] = f'attachment; filename="{filename}"'
         return response
 
     @action(detail=False, methods=["get"], permission_classes=[IsAuthenticated])

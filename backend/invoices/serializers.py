@@ -32,6 +32,7 @@ class InvoiceSerializer(serializers.ModelSerializer):
     items = InvoiceItemSerializer(many=True, read_only=True)
     email_logs = EmailLogSerializer(many=True, read_only=True)
     participant_name = serializers.CharField(source="participant.full_name", read_only=True)
+    zev_name = serializers.CharField(source="zev.name", read_only=True)
     pdf_url = serializers.SerializerMethodField()
 
     class Meta:
