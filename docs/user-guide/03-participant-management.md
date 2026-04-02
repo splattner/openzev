@@ -78,26 +78,6 @@ Each meter shows:
 
 > **See also:** [Metering Points](04-metering-points.md) for setup details.
 
-## Bulk Participant Operations
-
-For larger communities, OpenZEV supports bulk import of participants via CSV:
-
-1. Go to **Participants → Import**
-2. Prepare CSV file with columns:
-   - `first_name`
-   - `last_name`
-   - `email`
-   - `company` (optional)
-   - `phone` (optional)
-   - `valid_from`
-   - `valid_to` (optional)
-
-3. Upload the file
-4. Review the preview
-5. Confirm import
-
-> **Tip:** Export an existing participant list as template first.
-
 ## Removing a Participant
 
 Participants are **never deleted**—instead, mark them inactive:

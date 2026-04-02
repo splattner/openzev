@@ -106,20 +106,6 @@ OpenZEV validates metering points during import:
 | **Assignment Window** | Reading timestamp within assignment Valid From/To | Readings rejected outside period |
 | **Resolution Match** | Import matches declared resolution | Import warns on mismatch |
 
-## Bulk Import of Metering Points
-
-For communities with many meters:
-
-1. Go to **Metering Points → Import**
-2. Prepare CSV with columns:
-   - `metering_point_id` (required, unique)
-   - `participant_email` (email of participant owner)
-   - `type` (`consumption`, `production`, `bidirectional`)
-   - `description` (optional)
-
-3. Upload and review preview
-4. Confirm import
-
 ## Meter Maintenance
 
 ### Updating a Metering Point
