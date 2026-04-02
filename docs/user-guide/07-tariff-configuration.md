@@ -81,6 +81,31 @@ Feed-in Tariff "Solar Credit"
 ├─ Flat: CHF 0.08/kWh
 ```
 
+### Percentage of Energy Tariff
+
+A percentage tariff derives its price from other active tariffs rather than specifying a fixed CHF/kWh rate.
+
+Instead of setting a price, you set a **percentage** (0–100%). During billing, OpenZEV looks up the sum of all active **grid energy tariff** rates at each timestamp and multiplies by the percentage to calculate the effective per-kWh price.
+
+**Configuration:**
+- **Billing Mode** — Select `Percentage of energy tariffs`
+- **Energy Type** — `Local Energy`, `Grid Energy`, or `Feed-in` (determines which energy stream the tariff applies to)
+- **Percentage** — The percentage value (e.g., 50%)
+
+> **Note:** Percentage tariffs do not have HT/NT periods. The effective price is derived automatically from the grid energy tariff rates at each timestamp.
+
+Example:
+```
+Percentage Tariff "Local Energy 50%"
+├─ Energy type: Local Energy
+├─ Percentage: 50%
+├─ Effective price: 50% of grid energy rate
+│   (if Grid HT = CHF 0.28/kWh → Local = CHF 0.14/kWh)
+│   (if Grid NT = CHF 0.18/kWh → Local = CHF 0.09/kWh)
+```
+
+This is useful when you want to set local energy prices as a fraction of the grid energy rate, so that price changes to the grid tariff are automatically reflected.
+
 ### Fixed Fee Tariff
 
 Flat monthly, quarterly, or annual charges (not energy-dependent).

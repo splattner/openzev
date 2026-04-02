@@ -140,6 +140,41 @@ If a template has been customized, a **Reset to Default** button appears alongsi
 
 Templates that have not been customized do not show the reset button.
 
+## Invoice Management
+
+Admins can view and manage all invoices across all ZEVs in **Admin Console → Invoice Management**.
+
+![Admin invoice management](screenshots/17-admin-invoices.png)
+
+### Overview
+
+The admin invoice page provides a searchable, sortable table of **every invoice in the system**, regardless of which ZEV it belongs to.
+
+| Column | Description |
+|---|---|
+| **Number** | Invoice number (e.g. `INV-00001`) |
+| **ZEV** | The ZEV the invoice belongs to |
+| **Participant** | Participant name |
+| **Period** | Billing period date range |
+| **Total** | Invoice total in CHF |
+| **Status** | Badge showing `Draft`, `Approved`, `Sent`, `Paid`, or `Cancelled` |
+| **Actions** | Delete button |
+
+### Searching and Filtering
+
+- Use the **quick filter** search bar in the toolbar to search across all columns.
+- Click on a column header to **sort** by that column.
+- Use column-level filters for more targeted searching (e.g., filter by status using the dropdown).
+
+### Deleting Invoices
+
+Admins can delete any invoice directly from this page:
+
+1. Click the **Delete** button in the Actions column.
+2. Confirm the deletion in the confirmation dialog.
+
+> **Warning:** Deleting an invoice is permanent and cannot be undone. The invoice and its associated PDF are removed.
+
 ## Feature Flags
 
 Feature flags are runtime switches that allow you to enable or disable specific functionality without changing code.

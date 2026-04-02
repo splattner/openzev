@@ -193,6 +193,12 @@ const PAGE_BLUR: Record<string, BlurConfig> = {
       '.table-card table tbody td:nth-child(2)',     // owner name
     ].join(', '),
   },
+  'admin-invoices': {
+    selectors: [
+      '.MuiDataGrid-cell[data-field="participant_name"]', // participant name
+      '.MuiDataGrid-cell[data-field="zev_name"]',         // ZEV name
+    ].join(', '),
+  },
   'account-profile': {
     blurInputs: 'input[name="first_name"], input[name="last_name"], input[name="email"], input[disabled]',
   },
@@ -456,5 +462,12 @@ test.describe('User Guide Screenshots', () => {
     await navigateTo(page, '/account')
     await page.waitForSelector('form, .card', { timeout: 10_000 })
     await screenshot(page, '16-account-profile', 'account-profile')
+  })
+
+  // 17 — Admin Invoices
+  test('17-admin-invoices', async ({ page }) => {
+    await navigateTo(page, '/admin/invoices')
+    await page.waitForSelector('.MuiDataGrid-root, .card', { timeout: 10_000 })
+    await screenshot(page, '17-admin-invoices', 'admin-invoices')
   })
 })
