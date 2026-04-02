@@ -16,6 +16,7 @@ import {
     generateInvoicePdf,
     generateInvoicesForZev,
     markInvoicePaid,
+    markInvoiceSent,
     retryFailedEmail,
     sendAllInvoices,
     sendInvoiceEmail,
@@ -178,6 +179,15 @@ export function InvoicesPage() {
             void queryClient.invalidateQueries({ queryKey: ['invoice-period-overview'] })
         },
         onError: (error) => pushToast(formatApiError(error, 'Failed to send email.'), 'error'),
+    })
+
+    const markSentMutation = useMutation({
+        mutationFn: markInvoiceSent,
+        onSuccess: () => {
+            pushToast(t('pages.invoices.markedSent'), 'success')
+            void queryClient.invalidateQueries({ queryKey: ['invoice-period-overview'] })
+        },
+        onError: (error) => pushToast(formatApiError(error, 'Failed to mark invoice as sent.'), 'error'),
     })
 
     const markPaidMutation = useMutation({
@@ -588,20 +598,22 @@ export function InvoicesPage() {
                                         </td>
                                         <td>
                                             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-                                                <button
-                                                    className="button button-primary"
-                                                    type="button"
-                                                    disabled={generateMutation.isPending}
-                                                    onClick={() =>
-                                                        generateMutation.mutate({
-                                                            participant_id: row.participant_id,
-                                                            period_start: period.period_start,
-                                                            period_end: period.period_end,
-                                                        })
-                                                    }
-                                                >
-                                                    {invoice ? t('pages.invoices.generateAgain') : t('pages.invoices.generateInvoice')}
-                                                </button>
+                                                {(!invoice || invoice.status === 'draft' || invoice.status === 'cancelled') && (
+                                                    <button
+                                                        className="button button-primary"
+                                                        type="button"
+                                                        disabled={generateMutation.isPending}
+                                                        onClick={() =>
+                                                            generateMutation.mutate({
+                                                                participant_id: row.participant_id,
+                                                                period_start: period.period_start,
+                                                                period_end: period.period_end,
+                                                            })
+                                                        }
+                                                    >
+                                                        {invoice ? t('pages.invoices.generateAgain') : t('pages.invoices.generateInvoice')}
+                                                    </button>
+                                                )}
                                                 {invoice && (
                                                     <Link className="button" style={{ textDecoration: 'none' }} to={`/invoices/${invoice.id}`}>
                                                         {t('pages.invoices.openDetails')}
@@ -627,6 +639,16 @@ export function InvoicesPage() {
                                                         {t('pages.invoices.delete')}
                                                     </button>
                                                 )}
+                                                {invoice && invoice.status === 'approved' && (
+                                                    <button
+                                                        className="button"
+                                                        type="button"
+                                                        disabled={markSentMutation.isPending}
+                                                        onClick={() => markSentMutation.mutate(invoice.id)}
+                                                    >
+                                                        {t('pages.invoices.markSent')}
+                                                    </button>
+                                                )}
                                                 {invoice && (invoice.status === 'approved' || invoice.status === 'sent') && (
                                                     <button
                                                         className="button"
@@ -639,7 +661,7 @@ export function InvoicesPage() {
                                                         {pollingInvoiceId === invoice.id ? t('pages.invoices.sending') : invoice.status === 'sent' ? t('pages.invoices.resendEmail') : t('pages.invoices.sendEmail')}
                                                     </button>
                                                 )}
-                                                {invoice && (invoice.status === 'approved' || invoice.status === 'sent') && (
+                                                {invoice && invoice.status === 'sent' && (
                                                     <button
                                                         className="button"
                                                         type="button"

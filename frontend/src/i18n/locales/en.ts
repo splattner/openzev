@@ -341,6 +341,8 @@ export const en = {
             sending: 'Sending...',
             resendEmail: 'Resend Email',
             sendEmail: 'Send Email',
+            markSent: 'Mark as Sent',
+            markedSent: 'Invoice marked as sent.',
             markPaid: 'Mark Paid',
             failedEmails: '({{n}} failed)',
             attempts: '{{n}} attempts',
