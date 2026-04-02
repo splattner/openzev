@@ -338,6 +338,8 @@ export const it = {
             sending: 'Invio in corso...',
             resendEmail: 'Invia nuovamente e-mail',
             sendEmail: 'Invia e-mail',
+            markSent: 'Segna come inviato',
+            markedSent: 'Fattura segnata come inviata.',
             markPaid: 'Segna come pagato',
             failedEmails: '({{n}} non riuscito/i)',
             attempts: '{{n}} tentativi',

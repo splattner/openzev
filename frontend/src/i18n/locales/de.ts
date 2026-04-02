@@ -341,6 +341,8 @@ export const de = {
             sending: 'Wird gesendet...',
             resendEmail: 'E-Mail erneut senden',
             sendEmail: 'E-Mail senden',
+            markSent: 'Als versendet markieren',
+            markedSent: 'Rechnung als versendet markiert.',
             markPaid: 'Als bezahlt markieren',
             failedEmails: '({{n}} fehlgeschlagen)',
             attempts: '{{n}} Versuche',
