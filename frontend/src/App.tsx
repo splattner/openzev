@@ -24,6 +24,8 @@ import { TariffsPage } from './pages/TariffsPage'
 import { VerifyEmailPage } from './pages/VerifyEmailPage'
 import { ZevListPage } from './pages/ZevListPage'
 import { ZevSettingsPage } from './pages/ZevSettingsPage'
+import { OAuthCallbackPage } from './pages/OAuthCallbackPage'
+import { AdminOAuthPage } from './pages/AdminOAuthPage'
 
 function App() {
   return (
@@ -31,6 +33,7 @@ function App() {
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/verify-email" element={<VerifyEmailPage />} />
+        <Route path="/oauth/callback" element={<OAuthCallbackPage />} />
         <Route
           path="/"
           element={
@@ -88,6 +91,14 @@ function App() {
             element={
               <ProtectedRoute allowedRoles={['admin']}>
                 <AdminFeaturesPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="admin/oauth"
+            element={
+              <ProtectedRoute allowedRoles={['admin']}>
+                <AdminOAuthPage />
               </ProtectedRoute>
             }
           />
