@@ -1,3 +1,5 @@
+from datetime import date as date_type, datetime, timedelta, timezone as dt_timezone
+
 from django.db.models import Q
 from django.http import HttpResponse
 from django.utils.crypto import get_random_string
@@ -5,8 +7,10 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from accounts.permissions import IsAdmin
 from accounts.models import User, UserRole
 from accounts.serializers import UserSerializer
+from metering.models import MeterReading
 from .models import Zev, Participant, MeteringPoint, MeteringPointAssignment
 from .serializers import (
     ZevSerializer,
@@ -248,6 +252,50 @@ class MeteringPointViewSet(viewsets.ModelViewSet):
         if user.is_zev_owner:
             return qs.filter(zev__owner=user)
         return qs.filter(assignments__participant__user=user).distinct()
+
+    @action(
+        detail=True,
+        methods=["post"],
+        url_path="delete-readings",
+        permission_classes=[IsAuthenticated, IsAdmin],
+    )
+    def delete_readings(self, request, pk=None):
+        metering_point = self.get_object()
+        delete_all = bool(request.data.get("delete_all", False))
+        date_from = request.data.get("date_from")
+        date_to = request.data.get("date_to")
+
+        readings_qs = MeterReading.objects.filter(metering_point=metering_point)
+
+        if not delete_all:
+            if not date_from or not date_to:
+                return Response(
+                    {"error": "date_from and date_to are required when delete_all is false."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            try:
+                parsed_from = date_type.fromisoformat(date_from)
+                parsed_to = date_type.fromisoformat(date_to)
+            except ValueError:
+                return Response(
+                    {"error": "Invalid date format. Use YYYY-MM-DD."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            if parsed_to < parsed_from:
+                return Response(
+                    {"error": "date_to must be on or after date_from."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            start_dt = datetime.combine(parsed_from, datetime.min.time(), tzinfo=dt_timezone.utc)
+            end_dt_exclusive = datetime.combine(parsed_to, datetime.min.time(), tzinfo=dt_timezone.utc) + timedelta(days=1)
+            readings_qs = readings_qs.filter(timestamp__gte=start_dt, timestamp__lt=end_dt_exclusive)
+
+        deleted_count = readings_qs.count()
+        readings_qs.delete()
+
+        return Response({"deleted_count": deleted_count}, status=status.HTTP_200_OK)
 
 
 class MeteringPointAssignmentViewSet(viewsets.ModelViewSet):

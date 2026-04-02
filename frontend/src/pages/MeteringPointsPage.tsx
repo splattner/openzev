@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useMemo, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import dayjs from 'dayjs'
+import { DatePickerInput } from '@mantine/dates'
 import { DatePicker } from '@mui/x-date-pickers/DatePicker'
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs'
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider'
@@ -11,6 +12,7 @@ import {
     createMeteringPoint,
     createMeteringPointAssignment,
     deleteMeteringPoint,
+    deleteMeteringPointReadings,
     deleteMeteringPointAssignment,
     fetchMeteringPointAssignments,
     fetchMeteringPoints,
@@ -21,6 +23,7 @@ import {
 } from '../lib/api'
 import { formatShortDate, toDayJsDateFormat, useAppSettings } from '../lib/appSettings'
 import { useAuth } from '../lib/auth'
+import { quickRangeToDates } from '../lib/dateRangePresets'
 import { useManagedZev } from '../lib/managedZev'
 import { useTranslation } from 'react-i18next'
 import { useToast } from '../lib/toast'
@@ -74,6 +77,11 @@ export function MeteringPointsPage() {
     const [editingAssignId, setEditingAssignId] = useState<string | null>(null)
     const [showAssignModal, setShowAssignModal] = useState(false)
     const [selectedMpId, setSelectedMpId] = useState<string | null>(null)
+    const [showDeleteDataModal, setShowDeleteDataModal] = useState(false)
+    const [deleteDataTarget, setDeleteDataTarget] = useState<MeteringPoint | null>(null)
+    const [deleteDataMode, setDeleteDataMode] = useState<'all' | 'range'>('all')
+    const [deleteDataFrom, setDeleteDataFrom] = useState('')
+    const [deleteDataTo, setDeleteDataTo] = useState('')
 
     // ── Lookups ──────────────────────────────────────────────────────────────────
     const participantNameById = useMemo(
@@ -136,6 +144,21 @@ export function MeteringPointsPage() {
             void queryClient.invalidateQueries({ queryKey: ['metering-points'] })
         },
         onError: (error) => pushToast(formatApiError(error, 'Failed to remove assignment.'), 'error'),
+    })
+
+    const deleteMeteringDataMutation = useMutation({
+        mutationFn: ({
+            meteringPointId,
+            payload,
+        }: {
+            meteringPointId: string
+            payload: { delete_all: boolean; date_from?: string; date_to?: string }
+        }) => deleteMeteringPointReadings(meteringPointId, payload),
+        onSuccess: (result) => {
+            pushToast(t('pages.meteringPoints.deleteData.success', { count: result.deleted_count }), 'success')
+            closeDeleteDataModal()
+        },
+        onError: (error) => pushToast(formatApiError(error, t('pages.meteringPoints.deleteData.failed')), 'error'),
     })
 
     // ── Metering-point form handlers ──────────────────────────────────────────────
@@ -202,6 +225,68 @@ export function MeteringPointsPage() {
         setEditingAssignId(null)
         setSelectedMpId(null)
         setAssignForm(defaultAssignmentForm())
+    }
+
+    function openDeleteDataModal(point: MeteringPoint) {
+        setDeleteDataTarget(point)
+        setDeleteDataMode('all')
+        setDeleteDataFrom('')
+        setDeleteDataTo('')
+        setShowDeleteDataModal(true)
+    }
+
+    function closeDeleteDataModal() {
+        setShowDeleteDataModal(false)
+        setDeleteDataTarget(null)
+        setDeleteDataMode('all')
+        setDeleteDataFrom('')
+        setDeleteDataTo('')
+    }
+
+    function submitDeleteData() {
+        if (!deleteDataTarget) return
+
+        let payload: { delete_all: boolean; date_from?: string; date_to?: string }
+        let confirmMessage: string
+
+        if (deleteDataMode === 'range') {
+            if (!deleteDataFrom || !deleteDataTo) {
+                pushToast(t('pages.meteringPoints.deleteData.validationDatesRequired'), 'error')
+                return
+            }
+            if (deleteDataTo < deleteDataFrom) {
+                pushToast(t('pages.meteringPoints.deleteData.validationDateOrder'), 'error')
+                return
+            }
+            payload = {
+                delete_all: false,
+                date_from: deleteDataFrom,
+                date_to: deleteDataTo,
+            }
+            confirmMessage = t('pages.meteringPoints.deleteData.confirmMessageRange', {
+                meterId: deleteDataTarget.meter_id,
+                from: formatShortDate(deleteDataFrom, settings),
+                to: formatShortDate(deleteDataTo, settings),
+            })
+        } else {
+            payload = { delete_all: true }
+            confirmMessage = t('pages.meteringPoints.deleteData.confirmMessageAll', {
+                meterId: deleteDataTarget.meter_id,
+            })
+        }
+
+        confirm({
+            title: t('pages.meteringPoints.deleteData.confirmTitle'),
+            message: confirmMessage,
+            confirmText: t('pages.meteringPoints.deleteData.confirm'),
+            isDangerous: true,
+            onConfirm: async () => {
+                await deleteMeteringDataMutation.mutateAsync({
+                    meteringPointId: deleteDataTarget.id,
+                    payload,
+                })
+            },
+        })
     }
 
     function submitAssignForm(event: FormEvent<HTMLFormElement>) {
@@ -487,6 +572,16 @@ export function MeteringPointsPage() {
                                             >
                                                 Edit
                                             </button>
+                                            {user?.role === 'admin' && (
+                                                <button
+                                                    className="button button-secondary"
+                                                    type="button"
+                                                    style={{ padding: '4px 10px', fontSize: '0.8rem' }}
+                                                    onClick={() => openDeleteDataModal(point)}
+                                                >
+                                                    {t('pages.meteringPoints.deleteData.button')}
+                                                </button>
+                                            )}
                                             <button
                                                 className="button danger"
                                                 type="button"
@@ -580,6 +675,137 @@ export function MeteringPointsPage() {
                     })
                 )}
             </div>
+
+            <FormModal
+                isOpen={showDeleteDataModal}
+                title={t('pages.meteringPoints.deleteData.title')}
+                onClose={closeDeleteDataModal}
+            >
+                <div className="page-stack" style={{ gap: '1rem' }}>
+                    <p className="muted" style={{ margin: 0, lineHeight: 1.45 }}>
+                        {t('pages.meteringPoints.deleteData.description', { meterId: deleteDataTarget?.meter_id ?? '' })}
+                    </p>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.75rem' }}>
+                        <label
+                            style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '0.6rem',
+                                border: deleteDataMode === 'all' ? '2px solid #0f766e' : '1px solid var(--color-border, #d1d5db)',
+                                borderRadius: '0.6rem',
+                                padding: '0.75rem 0.85rem',
+                                background: deleteDataMode === 'all' ? '#ecfeff' : 'white',
+                                cursor: 'pointer',
+                            }}
+                        >
+                            <input
+                                type="radio"
+                                name="deleteDataMode"
+                                checked={deleteDataMode === 'all'}
+                                onChange={() => setDeleteDataMode('all')}
+                            />
+                            <span style={{ fontWeight: 600 }}>{t('pages.meteringPoints.deleteData.modeAll')}</span>
+                        </label>
+
+                        <label
+                            style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '0.6rem',
+                                border: deleteDataMode === 'range' ? '2px solid #0f766e' : '1px solid var(--color-border, #d1d5db)',
+                                borderRadius: '0.6rem',
+                                padding: '0.75rem 0.85rem',
+                                background: deleteDataMode === 'range' ? '#ecfeff' : 'white',
+                                cursor: 'pointer',
+                            }}
+                        >
+                            <input
+                                type="radio"
+                                name="deleteDataMode"
+                                checked={deleteDataMode === 'range'}
+                                onChange={() => setDeleteDataMode('range')}
+                            />
+                            <span style={{ fontWeight: 600 }}>{t('pages.meteringPoints.deleteData.modeRange')}</span>
+                        </label>
+                    </div>
+
+                    {deleteDataMode === 'range' && (
+                        <label style={{ display: 'grid', gap: '0.4rem' }}>
+                            <span style={{ fontWeight: 600 }}>{t('pages.meteringPoints.deleteData.rangeLabel')}</span>
+                            <DatePickerInput
+                                type="range"
+                                value={[deleteDataFrom || null, deleteDataTo || null]}
+                                onChange={([nextFrom, nextTo]) => {
+                                    setDeleteDataFrom(nextFrom ?? '')
+                                    setDeleteDataTo(nextTo ?? '')
+                                }}
+                                presets={[
+                                    {
+                                        value: (() => {
+                                            const range = quickRangeToDates('this_month')
+                                            return [range.from, range.to] as [string, string]
+                                        })(),
+                                        label: t('common.periodSelector.thisMonth'),
+                                    },
+                                    {
+                                        value: (() => {
+                                            const range = quickRangeToDates('last_month')
+                                            return [range.from, range.to] as [string, string]
+                                        })(),
+                                        label: t('common.periodSelector.lastMonth'),
+                                    },
+                                    {
+                                        value: (() => {
+                                            const range = quickRangeToDates('this_quarter')
+                                            return [range.from, range.to] as [string, string]
+                                        })(),
+                                        label: t('common.periodSelector.thisQuarter'),
+                                    },
+                                    {
+                                        value: (() => {
+                                            const range = quickRangeToDates('last_quarter')
+                                            return [range.from, range.to] as [string, string]
+                                        })(),
+                                        label: t('common.periodSelector.lastQuarter'),
+                                    },
+                                    {
+                                        value: (() => {
+                                            const range = quickRangeToDates('this_year')
+                                            return [range.from, range.to] as [string, string]
+                                        })(),
+                                        label: t('common.periodSelector.thisYear'),
+                                    },
+                                    {
+                                        value: (() => {
+                                            const range = quickRangeToDates('last_year')
+                                            return [range.from, range.to] as [string, string]
+                                        })(),
+                                        label: t('common.periodSelector.lastYear'),
+                                    },
+                                ]}
+                                valueFormat={toDayJsDateFormat(settings.date_format_short)}
+                                clearable={false}
+                                popoverProps={{ withinPortal: true, zIndex: 1400 }}
+                            />
+                        </label>
+                    )}
+
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.25rem' }}>
+                        <button className="button button-secondary" type="button" onClick={closeDeleteDataModal}>
+                            {t('common.cancel')}
+                        </button>
+                        <button
+                            className="button button-danger"
+                            type="button"
+                            onClick={submitDeleteData}
+                            disabled={deleteMeteringDataMutation.isPending}
+                        >
+                            {t('pages.meteringPoints.deleteData.confirm')}
+                        </button>
+                    </div>
+                </div>
+            </FormModal>
 
             {dialog && (
                 <ConfirmDialog {...dialog} isLoading={dialogLoading} onConfirm={handleConfirm} onCancel={handleCancel} />

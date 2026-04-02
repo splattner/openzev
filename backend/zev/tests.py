@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime, timezone
 
 from django.test import TestCase
 from django.core import mail
@@ -6,6 +6,7 @@ from django.test import override_settings
 from rest_framework.test import APIClient
 
 from accounts.models import User, UserRole
+from metering.models import MeterReading
 from zev.models import MeteringPoint, MeteringPointAssignment, MeteringPointType, Participant, Zev
 
 
@@ -551,3 +552,93 @@ class MeteringPointAssignmentValidationTests(TestCase):
 			format="json",
 		)
 		self.assertEqual(resp.status_code, 200)
+
+
+class MeteringPointReadingsDeletionTests(TestCase):
+	def setUp(self):
+		self.admin_client = APIClient()
+		self.owner_client = APIClient()
+
+		self.admin = make_user("admin_delete_readings", UserRole.ADMIN)
+		self.owner = make_user("owner_delete_readings", UserRole.ZEV_OWNER)
+
+		self.zev = Zev.objects.create(
+			name="Delete Readings ZEV",
+			owner=self.owner,
+			zev_type="vzev",
+			invoice_prefix="DR",
+		)
+		self.metering_point = MeteringPoint.objects.create(
+			zev=self.zev,
+			meter_id="MP-DELETE-1",
+			meter_type=MeteringPointType.CONSUMPTION,
+		)
+
+		MeterReading.objects.create(
+			metering_point=self.metering_point,
+			timestamp=datetime(2026, 1, 10, 10, 0, tzinfo=timezone.utc),
+			energy_kwh="1.0000",
+			direction="in",
+		)
+		MeterReading.objects.create(
+			metering_point=self.metering_point,
+			timestamp=datetime(2026, 1, 20, 10, 0, tzinfo=timezone.utc),
+			energy_kwh="2.0000",
+			direction="in",
+		)
+		MeterReading.objects.create(
+			metering_point=self.metering_point,
+			timestamp=datetime(2026, 2, 1, 10, 0, tzinfo=timezone.utc),
+			energy_kwh="3.0000",
+			direction="in",
+		)
+
+		auth(self.admin_client, self.admin)
+		auth(self.owner_client, self.owner)
+
+	def test_admin_can_delete_all_readings_for_metering_point(self):
+		resp = self.admin_client.post(
+			f"/api/v1/zev/metering-points/{self.metering_point.id}/delete-readings/",
+			{"delete_all": True},
+			format="json",
+		)
+
+		self.assertEqual(resp.status_code, 200)
+		self.assertEqual(resp.data["deleted_count"], 3)
+		self.assertEqual(MeterReading.objects.filter(metering_point=self.metering_point).count(), 0)
+
+	def test_admin_can_delete_readings_in_date_range(self):
+		resp = self.admin_client.post(
+			f"/api/v1/zev/metering-points/{self.metering_point.id}/delete-readings/",
+			{
+				"delete_all": False,
+				"date_from": "2026-01-15",
+				"date_to": "2026-01-31",
+			},
+			format="json",
+		)
+
+		self.assertEqual(resp.status_code, 200)
+		self.assertEqual(resp.data["deleted_count"], 1)
+		remaining = MeterReading.objects.filter(metering_point=self.metering_point).order_by("timestamp")
+		self.assertEqual(remaining.count(), 2)
+		self.assertEqual(remaining[0].timestamp.date().isoformat(), "2026-01-10")
+		self.assertEqual(remaining[1].timestamp.date().isoformat(), "2026-02-01")
+
+	def test_delete_range_requires_dates_when_delete_all_false(self):
+		resp = self.admin_client.post(
+			f"/api/v1/zev/metering-points/{self.metering_point.id}/delete-readings/",
+			{"delete_all": False},
+			format="json",
+		)
+
+		self.assertEqual(resp.status_code, 400)
+
+	def test_non_admin_cannot_delete_readings(self):
+		resp = self.owner_client.post(
+			f"/api/v1/zev/metering-points/{self.metering_point.id}/delete-readings/",
+			{"delete_all": True},
+			format="json",
+		)
+
+		self.assertEqual(resp.status_code, 403)
