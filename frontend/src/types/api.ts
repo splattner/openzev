@@ -344,6 +344,7 @@ export interface Invoice {
     id: string
     invoice_number: string
     zev: string
+    zev_name: string
     participant: string
     participant_name: string
     period_start: string

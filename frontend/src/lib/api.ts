@@ -478,6 +478,18 @@ export async function downloadAllAnnualStatements(params: {
     return data as Blob
 }
 
+export async function downloadFinancialSummary(params: {
+    year: number
+    zev_id?: string
+    participant_id?: string
+}): Promise<Blob> {
+    const { data } = await api.get('/invoices/invoices/financial-summary/', {
+        params,
+        responseType: 'blob',
+    })
+    return data as Blob
+}
+
 export async function fetchInvoicePeriodOverview(params: {
     zev_id: string
     period_start: string

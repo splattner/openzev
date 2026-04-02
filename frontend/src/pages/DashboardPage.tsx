@@ -20,6 +20,7 @@ import {
     fetchMeteringDashboardSummary,
     downloadAnnualStatement,
     downloadAllAnnualStatements,
+    downloadFinancialSummary,
 } from '../lib/api'
 import { formatShortDate, formatDateTime, formatMonthYear, useAppSettings } from '../lib/appSettings'
 import { useAuth } from '../lib/auth'
@@ -154,6 +155,20 @@ export function DashboardPage() {
             const a = document.createElement('a')
             a.href = url
             a.download = `annual-statements-${year}.zip`
+            document.body.appendChild(a)
+            a.click()
+            a.remove()
+            URL.revokeObjectURL(url)
+        },
+    })
+
+    const financialSummaryMutation = useMutation({
+        mutationFn: (year: number) => downloadFinancialSummary({ year, zev_id: selectedZevId || undefined }),
+        onSuccess: (blob, year) => {
+            const url = URL.createObjectURL(blob)
+            const a = document.createElement('a')
+            a.href = url
+            a.download = `financial-summary-${year}.pdf`
             document.body.appendChild(a)
             a.click()
             a.remove()
@@ -409,6 +424,39 @@ export function DashboardPage() {
                             </p>
                         )}
                     </section>
+
+                    <section className="card">
+                        <h3 style={{ marginTop: 0 }}>{t('pages.dashboard.financialSummary.title')}</h3>
+                        <p className="muted" style={{ marginBottom: '1rem' }}>{t('pages.dashboard.financialSummary.description')}</p>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                                <span>{t('pages.dashboard.financialSummary.year')}</span>
+                                <select
+                                    value={annualStatementYear}
+                                    onChange={(e) => setAnnualStatementYear(Number(e.target.value))}
+                                    style={{ width: 'auto' }}
+                                >
+                                    {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i).map((y) => (
+                                        <option key={y} value={y}>{y}</option>
+                                    ))}
+                                </select>
+                            </label>
+                            <button
+                                className="button button-primary"
+                                disabled={financialSummaryMutation.isPending}
+                                onClick={() => financialSummaryMutation.mutate(annualStatementYear)}
+                            >
+                                {financialSummaryMutation.isPending
+                                    ? t('pages.dashboard.financialSummary.downloading')
+                                    : t('pages.dashboard.financialSummary.download')}
+                            </button>
+                        </div>
+                        {financialSummaryMutation.isError && (
+                            <p className="muted" style={{ color: 'var(--color-danger, #dc2626)', marginTop: '0.5rem' }}>
+                                {t('pages.dashboard.financialSummary.error')}
+                            </p>
+                        )}
+                    </section>
                 </>
             )}
 
@@ -550,6 +598,39 @@ export function DashboardPage() {
                         {annualStatementMutation.isError && (
                             <p className="muted" style={{ color: 'var(--color-danger, #dc2626)', marginTop: '0.5rem' }}>
                                 {t('pages.dashboard.annualStatement.error')}
+                            </p>
+                        )}
+                    </section>
+
+                    <section className="card">
+                        <h3 style={{ marginTop: 0 }}>{t('pages.dashboard.financialSummary.title')}</h3>
+                        <p className="muted" style={{ marginBottom: '1rem' }}>{t('pages.dashboard.financialSummary.description')}</p>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                                <span>{t('pages.dashboard.financialSummary.year')}</span>
+                                <select
+                                    value={annualStatementYear}
+                                    onChange={(e) => setAnnualStatementYear(Number(e.target.value))}
+                                    style={{ width: 'auto' }}
+                                >
+                                    {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i).map((y) => (
+                                        <option key={y} value={y}>{y}</option>
+                                    ))}
+                                </select>
+                            </label>
+                            <button
+                                className="button button-primary"
+                                disabled={financialSummaryMutation.isPending}
+                                onClick={() => financialSummaryMutation.mutate(annualStatementYear)}
+                            >
+                                {financialSummaryMutation.isPending
+                                    ? t('pages.dashboard.financialSummary.downloading')
+                                    : t('pages.dashboard.financialSummary.download')}
+                            </button>
+                        </div>
+                        {financialSummaryMutation.isError && (
+                            <p className="muted" style={{ color: 'var(--color-danger, #dc2626)', marginTop: '0.5rem' }}>
+                                {t('pages.dashboard.financialSummary.error')}
                             </p>
                         )}
                     </section>

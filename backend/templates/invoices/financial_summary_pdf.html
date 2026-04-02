@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="{{ lang }}">
+
+<head>
+    <meta charset="UTF-8">
+    <title>{{ tr.title }} {{ year }}</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+            font-size: 10pt;
+            color: #222;
+        }
+
+        .page {
+            padding: 13mm 16mm 16mm;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 6mm;
+        }
+
+        .company-name {
+            font-size: 13pt;
+            font-weight: bold;
+            color: #2c5f2e;
+        }
+
+        .company-meta {
+            font-size: 8pt;
+            color: #555;
+            margin-top: 1mm;
+        }
+
+        .statement-title {
+            font-size: 14pt;
+            font-weight: bold;
+            margin-bottom: 1mm;
+        }
+
+        .statement-subtitle {
+            font-size: 9pt;
+            color: #555;
+            margin-bottom: 4mm;
+        }
+
+        .meta-row {
+            display: flex;
+            gap: 10mm;
+            margin-bottom: 5mm;
+        }
+
+        .meta-block dt {
+            font-size: 7pt;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .meta-block dd {
+            font-size: 9pt;
+            font-weight: 600;
+        }
+
+        h2.section-title {
+            font-size: 11pt;
+            font-weight: bold;
+            color: #2c5f2e;
+            margin: 5mm 0 3mm;
+            padding-bottom: 1mm;
+            border-bottom: 0.5pt solid #ccc;
+        }
+
+        .revenue-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 10pt;
+            margin-bottom: 5mm;
+        }
+
+        .revenue-table td {
+            padding: 2mm 2mm;
+            border-bottom: 0.5pt solid #eee;
+        }
+
+        .revenue-table td.number {
+            text-align: right;
+            font-variant-numeric: tabular-nums;
+            white-space: nowrap;
+        }
+
+        .revenue-table tr.total td {
+            font-weight: bold;
+            font-size: 11pt;
+            border-top: 1pt solid #999;
+            border-bottom: none;
+            padding-top: 2.5mm;
+        }
+
+        .revenue-table tr.total td.number {
+            color: #2c5f2e;
+        }
+
+        .taxable-note {
+            background: #f0f9f0;
+            border: 0.5pt solid #2c5f2e;
+            border-radius: 2mm;
+            padding: 3mm 4mm;
+            font-size: 8pt;
+            color: #2c5f2e;
+            margin-bottom: 5mm;
+        }
+
+        table.breakdown {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 9pt;
+            margin-bottom: 4mm;
+        }
+
+        table.breakdown thead th {
+            background: #f5f5f5;
+            font-weight: 600;
+            font-size: 8pt;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+            padding: 2mm 2mm;
+            border-bottom: 1pt solid #ddd;
+            text-align: left;
+        }
+
+        table.breakdown thead th.number {
+            text-align: right;
+        }
+
+        table.breakdown tbody td {
+            padding: 1.5mm 2mm;
+            border-bottom: 0.5pt solid #eee;
+        }
+
+        table.breakdown tbody td.number {
+            text-align: right;
+            font-variant-numeric: tabular-nums;
+        }
+
+        table.breakdown tbody tr.total-row td {
+            font-weight: bold;
+            border-top: 1pt solid #999;
+            border-bottom: none;
+            padding-top: 2mm;
+        }
+
+        .footer {
+            margin-top: 6mm;
+            padding-top: 3mm;
+            border-top: 0.5pt solid #ccc;
+            font-size: 8pt;
+            color: #888;
+            text-align: center;
+        }
+
+        @page {
+            size: A4;
+            margin: 0;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="page">
+        <!-- Header -->
+        <div class="header">
+            <div>
+                <div class="company-name">{{ zev.name }}</div>
+                {% if zev.vat_number %}
+                <div class="company-meta">{{ zev.vat_number }}</div>
+                {% endif %}
+            </div>
+            <div style="text-align: right;">
+                <div style="font-size: 8pt; color: #888;">{{ tr.generated_on }}</div>
+                <div style="font-size: 9pt; font-weight: 600;">{{ formatted_dates.generated_on }}</div>
+            </div>
+        </div>
+
+        <!-- Title -->
+        <div class="statement-title">{{ tr.title }} {{ year }}</div>
+        <div class="statement-subtitle">{{ tr.subtitle }}</div>
+
+        <!-- Meta -->
+        <div class="meta-row">
+            <dl class="meta-block">
+                <dt>{{ tr.zev }}</dt>
+                <dd>{{ zev.name }}</dd>
+            </dl>
+            <dl class="meta-block">
+                <dt>{{ tr.year }}</dt>
+                <dd>{{ year }}</dd>
+            </dl>
+            <dl class="meta-block">
+                <dt>{{ tr.producer }}</dt>
+                <dd>{{ producer_name }}</dd>
+            </dl>
+        </div>
+
+        {% if not has_data %}
+        <p style="color: #888; font-size: 9pt; margin-top: 5mm;">{{ tr.no_data }}</p>
+        {% else %}
+
+        <!-- Taxable Income -->
+        <h2 class="section-title">{{ tr.taxable_income }}</h2>
+        <table class="revenue-table">
+            <tbody>
+                <tr>
+                    <td>{{ tr.local_sold }}</td>
+                    <td class="number" style="color: #666;">{{ totals.local_sold_kwh }} {{ tr.kwh }}</td>
+                    <td class="number">{{ totals.local_sold }} {{ tr.chf }}</td>
+                </tr>
+                <tr>
+                    <td>{{ tr.local_consumed }}</td>
+                    <td class="number" style="color: #666;">{{ totals.local_consumed_kwh }} {{ tr.kwh }}</td>
+                    <td class="number">−{{ totals.local_consumed }} {{ tr.chf }}</td>
+                </tr>
+                <tr>
+                    <td style="font-weight: 600;">{{ tr.net_local }}</td>
+                    <td class="number"></td>
+                    <td class="number" style="font-weight: 600;">{{ totals.net_local }} {{ tr.chf }}</td>
+                </tr>
+                <tr>
+                    <td>{{ tr.feed_in }}</td>
+                    <td class="number" style="color: #666;">{{ totals.feed_in_kwh }} {{ tr.kwh }}</td>
+                    <td class="number">{{ totals.feed_in }} {{ tr.chf }}</td>
+                </tr>
+                <tr class="total">
+                    <td>{{ tr.total_taxable }}</td>
+                    <td class="number"></td>
+                    <td class="number">{{ totals.total_taxable }} {{ tr.chf }}</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="taxable-note">{{ tr.taxable_note }}</div>
+
+        {% if tariff_rows %}
+        <!-- Tariff Detail -->
+        <h2 class="section-title">{{ tr.tariff_detail }}</h2>
+        <table class="breakdown">
+            <thead>
+                <tr>
+                    <th>{{ tr.tariff_category }}</th>
+                    <th>{{ tr.tariff_name }}</th>
+                    <th class="number">{{ tr.kwh }}</th>
+                    <th class="number">{{ tr.tariff_price }}</th>
+                    <th class="number">{{ tr.chf }}</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in tariff_rows %}
+                <tr>
+                    <td>{{ row.category }}</td>
+                    <td>{{ row.description }}</td>
+                    <td class="number">{{ row.quantity_kwh }}</td>
+                    <td class="number">{{ row.unit_price }}</td>
+                    <td class="number">{{ row.total_chf }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% endif %}
+
+        <!-- Monthly Breakdown -->
+        <h2 class="section-title">{{ tr.monthly_breakdown }}</h2>
+        <table class="breakdown">
+            <thead>
+                <tr>
+                    <th>{{ tr.month }}</th>
+                    <th class="number">{{ tr.local_sold }}</th>
+                    <th class="number">{{ tr.local_consumed }}</th>
+                    <th class="number">{{ tr.net_local }}</th>
+                    <th class="number">{{ tr.feed_in }}</th>
+                    <th class="number">{{ tr.total_taxable }}</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in monthly_rows %}
+                <tr>
+                    <td>{{ row.month }}</td>
+                    <td class="number">{{ row.local_sold }}</td>
+                    <td class="number">{{ row.local_consumed }}</td>
+                    <td class="number">{{ row.net_local }}</td>
+                    <td class="number">{{ row.feed_in }}</td>
+                    <td class="number">{{ row.total }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        {% endif %}
+
+        <!-- Footer -->
+        <div class="footer">
+            {{ zev.name }} — {{ tr.title }} {{ year }}
+        </div>
+    </div>
+</body>
+
+</html>

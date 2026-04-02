@@ -266,6 +266,10 @@ export function Layout() {
                                                     <span className="nav-icon"><UsersIcon /></span>
                                                     <span className="nav-label">Accounts & Participants</span>
                                                 </NavLink>
+                                                <NavLink to="/admin/invoices" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`} title={t('nav.adminInvoices')}>
+                                                    <span className="nav-icon"><InvoiceIcon /></span>
+                                                    <span className="nav-label">{t('nav.adminInvoices')}</span>
+                                                </NavLink>
                                                 <NavLink to="/admin/settings/regional" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`} title="Regional Settings">
                                                     <span className="nav-icon"><SettingsIcon /></span>
                                                     <span className="nav-label">Regional Settings</span>
