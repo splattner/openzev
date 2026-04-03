@@ -431,8 +431,8 @@ def oauth_login_initiate(request, provider_slug: str):
     provider = get_object_or_404(OAuthProvider, name=provider_slug, enabled=True)
     state_token = secrets.token_urlsafe(32)
     OAuthState.objects.create(state=state_token, provider=provider)
-    backend_url = getattr(settings, "BACKEND_URL", "http://localhost:8000")
-    redirect_uri = f"{backend_url}/api/v1/auth/oauth/callback/{provider_slug}/"
+    frontend_url = getattr(settings, "FRONTEND_URL", "http://localhost:5173").rstrip("/")
+    redirect_uri = f"{frontend_url}/api/v1/auth/oauth/callback/{provider_slug}/"
     params = {
         "client_id": provider.client_id,
         "response_type": "code",
@@ -450,8 +450,8 @@ def oauth_link_initiate(request, provider_slug: str):
     provider = get_object_or_404(OAuthProvider, name=provider_slug, enabled=True)
     state_token = secrets.token_urlsafe(32)
     OAuthState.objects.create(state=state_token, provider=provider, user=request.user)
-    backend_url = getattr(settings, "BACKEND_URL", "http://localhost:8000")
-    redirect_uri = f"{backend_url}/api/v1/auth/oauth/callback/{provider_slug}/"
+    frontend_url = getattr(settings, "FRONTEND_URL", "http://localhost:5173").rstrip("/")
+    redirect_uri = f"{frontend_url}/api/v1/auth/oauth/callback/{provider_slug}/"
     params = {
         "client_id": provider.client_id,
         "response_type": "code",
@@ -500,8 +500,8 @@ def oauth_callback(request, provider_slug: str):
     state_obj.delete()
 
     # Exchange authorisation code for tokens and fetch user profile
-    backend_url = getattr(settings, "BACKEND_URL", "http://localhost:8000")
-    redirect_uri = f"{backend_url}/api/v1/auth/oauth/callback/{provider_slug}/"
+    frontend_url_base = getattr(settings, "FRONTEND_URL", "http://localhost:5173").rstrip("/")
+    redirect_uri = f"{frontend_url_base}/api/v1/auth/oauth/callback/{provider_slug}/"
     try:
         token_data = _exchange_code_for_tokens(provider, code, redirect_uri)
         user_info = _fetch_user_info(provider, token_data["access_token"])
