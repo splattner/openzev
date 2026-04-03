@@ -101,7 +101,10 @@ Set email-related values under `email` in `values.yaml`:
 - `email.useTls`
 - `email.hostUser`
 - `email.defaultFromEmail`
-- `email.frontendUrl`
+
+Set frontend base URL used by backend-generated links and redirects at top-level:
+
+- `frontendUrl`
 
 `EMAIL_HOST_PASSWORD` can be loaded from an existing secret:
 

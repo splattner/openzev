@@ -3,6 +3,10 @@ fullnameOverride: ""
 
 commonLabels: {}
 
+# Public frontend base URL used by backend-generated links/redirects
+# (verification emails and OAuth callback redirects).
+frontendUrl: "http://localhost:5173"
+
 secretKey:
   value: "change-me-in-production-use-a-long-random-string"
   existingSecret:
@@ -96,7 +100,6 @@ email:
   useTls: true
   hostUser: ""
   defaultFromEmail: "openzev@example.com"
-  frontendUrl: "http://localhost:5173"
   # EMAIL_HOST_PASSWORD is read from an existing Kubernetes Secret when name is set.
   existingSecret:
     name: ""
