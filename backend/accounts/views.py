@@ -431,8 +431,7 @@ def oauth_login_initiate(request, provider_slug: str):
     provider = get_object_or_404(OAuthProvider, name=provider_slug, enabled=True)
     state_token = secrets.token_urlsafe(32)
     OAuthState.objects.create(state=state_token, provider=provider)
-    frontend_url = getattr(settings, "FRONTEND_URL", "http://localhost:5173").rstrip("/")
-    redirect_uri = f"{frontend_url}/api/v1/auth/oauth/callback/{provider_slug}/"
+    redirect_uri = provider.redirect_url
     params = {
         "client_id": provider.client_id,
         "response_type": "code",
@@ -450,8 +449,7 @@ def oauth_link_initiate(request, provider_slug: str):
     provider = get_object_or_404(OAuthProvider, name=provider_slug, enabled=True)
     state_token = secrets.token_urlsafe(32)
     OAuthState.objects.create(state=state_token, provider=provider, user=request.user)
-    frontend_url = getattr(settings, "FRONTEND_URL", "http://localhost:5173").rstrip("/")
-    redirect_uri = f"{frontend_url}/api/v1/auth/oauth/callback/{provider_slug}/"
+    redirect_uri = provider.redirect_url
     params = {
         "client_id": provider.client_id,
         "response_type": "code",
@@ -471,7 +469,7 @@ def oauth_callback(request, provider_slug: str):
     This is a plain Django view (not DRF) because it returns an HTTP redirect
     that the browser follows, not a JSON response.
     """
-    frontend_url = getattr(settings, "FRONTEND_URL", "http://localhost:5173")
+    frontend_url = getattr(settings, "FRONTEND_URL", "http://localhost:5173").rstrip("/")
     error = request.GET.get("error")
     if error:
         return HttpResponseRedirect(
@@ -500,8 +498,7 @@ def oauth_callback(request, provider_slug: str):
     state_obj.delete()
 
     # Exchange authorisation code for tokens and fetch user profile
-    frontend_url_base = getattr(settings, "FRONTEND_URL", "http://localhost:5173").rstrip("/")
-    redirect_uri = f"{frontend_url_base}/api/v1/auth/oauth/callback/{provider_slug}/"
+    redirect_uri = provider.redirect_url
     try:
         token_data = _exchange_code_for_tokens(provider, code, redirect_uri)
         user_info = _fetch_user_info(provider, token_data["access_token"])

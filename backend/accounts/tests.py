@@ -1,8 +1,10 @@
 from django.test import TestCase
 from django.core import mail
+from django.test.utils import override_settings
 from rest_framework.test import APIClient
+from urllib.parse import parse_qs, urlparse
 
-from .models import AppSettings, FeatureFlag, User, UserRole, VatRate
+from .models import AppSettings, FeatureFlag, OAuthProvider, User, UserRole, VatRate
 from invoices.models import Invoice, InvoiceStatus
 from zev.models import MeteringPoint, MeteringPointAssignment, MeteringPointType, Participant, Zev
 from datetime import date
@@ -433,6 +435,7 @@ class OAuthProviderConfigTests(TestCase):
 				"authorization_url": "http://keycloak:8080/realms/openzev/protocol/openid-connect/auth",
 				"token_url": "http://keycloak:8080/realms/openzev/protocol/openid-connect/token",
 				"userinfo_url": "http://keycloak:8080/realms/openzev/protocol/openid-connect/userinfo",
+				"redirect_url": "https://app.example.com/api/v1/auth/oauth/callback/keycloak-internal/",
 				"scope": "openid email profile",
 				"enabled": True,
 			},
@@ -455,6 +458,7 @@ class OAuthProviderConfigTests(TestCase):
 				"authorization_url": "github.com/login/oauth/authorize",
 				"token_url": "github.com/login/oauth/access_token",
 				"userinfo_url": "api.github.com/user",
+				"redirect_url": "app.example.com/api/v1/auth/oauth/callback/github/",
 				"scope": "read:user user:email",
 				"enabled": True,
 			},
@@ -463,6 +467,7 @@ class OAuthProviderConfigTests(TestCase):
 
 		self.assertEqual(resp.status_code, 201)
 		self.assertEqual(resp.data["authorization_url"], "https://github.com/login/oauth/authorize")
+		self.assertEqual(resp.data["redirect_url"], "https://app.example.com/api/v1/auth/oauth/callback/github/")
 
 	def test_non_admin_cannot_create_provider(self):
 		self._auth(self.client, self.owner)
@@ -477,6 +482,7 @@ class OAuthProviderConfigTests(TestCase):
 				"authorization_url": "https://github.com/login/oauth/authorize",
 				"token_url": "https://github.com/login/oauth/access_token",
 				"userinfo_url": "https://api.github.com/user",
+				"redirect_url": "https://app.example.com/api/v1/auth/oauth/callback/github/",
 				"scope": "read:user user:email",
 				"enabled": True,
 			},
@@ -484,6 +490,57 @@ class OAuthProviderConfigTests(TestCase):
 		)
 
 		self.assertEqual(resp.status_code, 403)
+
+	@override_settings(FRONTEND_URL="https://portal.example.com")
+	def test_admin_create_provider_without_redirect_url_uses_default(self):
+		self._auth(self.client, self.admin)
+
+		resp = self.client.post(
+			"/api/v1/auth/oauth/providers/config/",
+			{
+				"name": "GitHub",
+				"display_name": "GitHub",
+				"client_id": "openzev",
+				"client_secret": "secret",
+				"authorization_url": "https://github.com/login/oauth/authorize",
+				"token_url": "https://github.com/login/oauth/access_token",
+				"userinfo_url": "https://api.github.com/user",
+				"scope": "read:user user:email",
+				"enabled": True,
+			},
+			format="json",
+		)
+
+		self.assertEqual(resp.status_code, 201)
+		self.assertEqual(
+			resp.data["redirect_url"],
+			"https://portal.example.com/api/v1/auth/oauth/callback/github/",
+		)
+
+	def test_login_initiate_uses_provider_redirect_url(self):
+		provider = OAuthProvider.objects.create(
+			name="github",
+			display_name="GitHub",
+			client_id="client-id",
+			client_secret="secret",
+			authorization_url="https://github.com/login/oauth/authorize",
+			token_url="https://github.com/login/oauth/access_token",
+			userinfo_url="https://api.github.com/user",
+			redirect_url="https://app.example.com/api/v1/auth/oauth/callback/github/",
+			scope="read:user user:email",
+			enabled=True,
+		)
+
+		resp = self.client.post(f"/api/v1/auth/oauth/login/{provider.name}/")
+
+		self.assertEqual(resp.status_code, 200)
+		redirect_url = resp.data["redirect_url"]
+		parsed = urlparse(redirect_url)
+		params = parse_qs(parsed.query)
+		self.assertEqual(
+			params["redirect_uri"][0],
+			"https://app.example.com/api/v1/auth/oauth/callback/github/",
+		)
 
 
 class RbacEndpointMatrixTests(TestCase):
