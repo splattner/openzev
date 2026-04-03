@@ -67,7 +67,7 @@ spec:
             - name: DEFAULT_FROM_EMAIL
               value: {{ .Values.email.defaultFromEmail | quote }}
             - name: FRONTEND_URL
-              value: {{ .Values.email.frontendUrl | quote }}
+              value: {{ .Values.frontendUrl | quote }}
             {{- if .Values.backend.allowedHosts }}
             - name: ALLOWED_HOSTS
               value: {{ .Values.backend.allowedHosts | quote }}
