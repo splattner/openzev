@@ -230,6 +230,7 @@ class OAuthProvider(models.Model):
     authorization_url = models.URLField(max_length=500, help_text="Provider authorization endpoint URL.")
     token_url = models.URLField(max_length=500, help_text="Provider token endpoint URL.")
     userinfo_url = models.URLField(max_length=500, help_text="Provider userinfo endpoint URL.")
+    redirect_url = models.URLField(max_length=500, help_text="Redirect/callback URL registered in the provider app.")
     scope = models.CharField(max_length=255, default="openid email profile")
     enabled = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)

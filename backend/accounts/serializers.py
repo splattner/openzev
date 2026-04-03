@@ -1,5 +1,6 @@
 from django.contrib.auth.password_validation import validate_password
 from django.contrib.auth import get_user_model
+from django.conf import settings
 from django.utils.text import slugify
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
@@ -129,6 +130,7 @@ class OAuthProviderSerializer(serializers.ModelSerializer):
     authorization_url = serializers.CharField(max_length=500)
     token_url = serializers.CharField(max_length=500)
     userinfo_url = serializers.CharField(max_length=500)
+    redirect_url = serializers.CharField(max_length=500, required=False, allow_blank=True)
 
     def validate_name(self, value):
         normalized = slugify((value or "").strip())
@@ -155,6 +157,23 @@ class OAuthProviderSerializer(serializers.ModelSerializer):
     def validate_userinfo_url(self, value):
         return self._validate_endpoint_url(value)
 
+    def validate_redirect_url(self, value):
+        return self._validate_endpoint_url(value)
+
+    def _build_default_redirect_url(self, provider_name: str) -> str:
+        frontend_url = getattr(settings, "FRONTEND_URL", "http://localhost:5173").rstrip("/")
+        return f"{frontend_url}/api/v1/auth/oauth/callback/{provider_name}/"
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        provider_name = attrs.get("name") or getattr(self.instance, "name", "")
+        redirect_url = attrs.get("redirect_url")
+
+        if provider_name and (redirect_url is None or redirect_url == ""):
+            attrs["redirect_url"] = self._build_default_redirect_url(provider_name)
+
+        return attrs
+
     def validate_display_name(self, value):
         text = (value or "").strip()
         if not text:
@@ -165,7 +184,7 @@ class OAuthProviderSerializer(serializers.ModelSerializer):
         model = OAuthProvider
         fields = [
             "id", "name", "display_name", "client_id", "client_secret",
-            "authorization_url", "token_url", "userinfo_url", "scope",
+            "authorization_url", "token_url", "userinfo_url", "redirect_url", "scope",
             "enabled", "created_at", "updated_at",
         ]
         read_only_fields = ["id", "created_at", "updated_at"]

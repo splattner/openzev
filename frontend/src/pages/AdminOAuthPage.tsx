@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
+import { FormControlLabel, Switch } from '@mui/material'
 import {
     createOAuthProviderConfig,
     deleteOAuthProviderConfig,
@@ -21,6 +22,7 @@ const EMPTY_FORM: OAuthProviderConfigInput = {
     authorization_url: '',
     token_url: '',
     userinfo_url: '',
+    redirect_url: '',
     scope: 'openid email profile',
     enabled: true,
 }
@@ -88,6 +90,7 @@ export function AdminOAuthPage() {
             authorization_url: provider.authorization_url,
             token_url: provider.token_url,
             userinfo_url: provider.userinfo_url,
+            redirect_url: provider.redirect_url,
             scope: provider.scope,
             enabled: provider.enabled,
         })
@@ -161,6 +164,7 @@ export function AdminOAuthPage() {
                             <tr>
                                 <th>{t('adminOAuth.colName')}</th>
                                 <th>{t('adminOAuth.colClientId')}</th>
+                                <th>{t('adminOAuth.colRedirectUrl')}</th>
                                 <th>{t('adminOAuth.colScope')}</th>
                                 <th style={{ textAlign: 'center' }}>{t('adminOAuth.colEnabled')}</th>
                                 <th>{t('common.actions')}</th>
@@ -176,6 +180,11 @@ export function AdminOAuthPage() {
                                     </td>
                                     <td>
                                         <code style={{ fontSize: '0.8em' }}>{provider.client_id}</code>
+                                    </td>
+                                    <td>
+                                        <code style={{ fontSize: '0.8em', wordBreak: 'break-all' }}>
+                                            {provider.redirect_url}
+                                        </code>
                                     </td>
                                     <td style={{ fontSize: '0.85em' }}>{provider.scope}</td>
                                     <td style={{ textAlign: 'center' }}>
@@ -206,15 +215,6 @@ export function AdminOAuthPage() {
                     </table>
                 )}
             </div>
-
-            {/* Callback URL info */}
-            <section className="card" style={{ maxWidth: 720 }}>
-                <h3 style={{ marginTop: 0 }}>{t('adminOAuth.callbackUrlTitle')}</h3>
-                <p className="muted">{t('adminOAuth.callbackUrlDescription')}</p>
-                <code style={{ display: 'block', padding: '0.75rem', background: 'var(--bg-subtle)', borderRadius: '0.375rem', wordBreak: 'break-all' }}>
-                    {window.location.origin.replace(/:\d+$/, ':8000')}/api/v1/auth/oauth/callback/&#123;provider-name&#125;/
-                </code>
-            </section>
 
             {/* Create / edit form modal */}
             {showForm && (
@@ -316,6 +316,18 @@ export function AdminOAuthPage() {
                             </label>
 
                             <label>
+                                <span>{t('adminOAuth.fieldRedirectUrl')}</span>
+                                <input
+                                    type="url"
+                                    name="redirect_url"
+                                    value={form.redirect_url}
+                                    onChange={handleChange}
+                                    placeholder="https://app.example.com/api/v1/auth/oauth/callback/github/"
+                                />
+                                <small className="muted">{t('adminOAuth.fieldRedirectUrlHint')}</small>
+                            </label>
+
+                            <label>
                                 <span>{t('adminOAuth.fieldScope')}</span>
                                 <input
                                     type="text"
@@ -326,15 +338,16 @@ export function AdminOAuthPage() {
                                 />
                             </label>
 
-                            <label className="checkbox-label">
-                                <input
-                                    type="checkbox"
-                                    name="enabled"
-                                    checked={form.enabled}
-                                    onChange={handleChange}
-                                />
-                                <span>{t('adminOAuth.fieldEnabled')}</span>
-                            </label>
+                            <FormControlLabel
+                                control={(
+                                    <Switch
+                                        name="enabled"
+                                        checked={form.enabled}
+                                        onChange={handleChange}
+                                    />
+                                )}
+                                label={t('adminOAuth.fieldEnabled')}
+                            />
 
                             {formError && <div className="error-banner">{formError}</div>}
 

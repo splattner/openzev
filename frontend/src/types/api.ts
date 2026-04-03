@@ -156,6 +156,7 @@ export interface OAuthProviderConfig extends OAuthProvider {
     authorization_url: string
     token_url: string
     userinfo_url: string
+    redirect_url: string
     scope: string
     created_at: string
     updated_at: string
@@ -169,6 +170,7 @@ export interface OAuthProviderConfigInput {
     authorization_url: string
     token_url: string
     userinfo_url: string
+    redirect_url: string
     scope: string
     enabled: boolean
 }
