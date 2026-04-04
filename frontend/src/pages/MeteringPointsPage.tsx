@@ -144,20 +144,23 @@ export function MeteringPointsPage() {
             id ? updateMeteringPoint(id, payload) : createMeteringPoint(payload),
         onSuccess: (_, variables) => {
             closeMpModal()
-            pushToast(variables.id ? 'Metering point updated.' : 'Metering point created.', 'success')
+            pushToast(
+                variables.id ? t('pages.meteringPoints.messages.updated') : t('pages.meteringPoints.messages.created'),
+                'success',
+            )
             void queryClient.invalidateQueries({ queryKey: ['metering-points'] })
         },
-        onError: (error) => pushToast(formatApiError(error, 'Failed to save metering point.'), 'error'),
+        onError: (error) => pushToast(formatApiError(error, t('pages.meteringPoints.messages.saveFailed')), 'error'),
     })
 
     const deleteMpMutation = useMutation({
         mutationFn: deleteMeteringPoint,
         onSuccess: () => {
-            pushToast('Metering point deleted.', 'success')
+            pushToast(t('pages.meteringPoints.messages.deleted'), 'success')
             void queryClient.invalidateQueries({ queryKey: ['metering-points'] })
             void queryClient.invalidateQueries({ queryKey: ['metering-point-assignments'] })
         },
-        onError: (error) => pushToast(formatApiError(error, 'Failed to delete metering point.'), 'error'),
+        onError: (error) => pushToast(formatApiError(error, t('pages.meteringPoints.messages.deleteFailed')), 'error'),
     })
 
     // ── Assignment mutations ──────────────────────────────────────────────────────
@@ -166,21 +169,26 @@ export function MeteringPointsPage() {
             id ? updateMeteringPointAssignment(id, payload) : createMeteringPointAssignment(payload),
         onSuccess: (_, variables) => {
             closeAssignModal()
-            pushToast(variables.id ? 'Assignment updated.' : 'Assignment created.', 'success')
+            pushToast(
+                variables.id
+                    ? t('pages.meteringPoints.messages.assignmentUpdated')
+                    : t('pages.meteringPoints.messages.assignmentCreated'),
+                'success',
+            )
             void queryClient.invalidateQueries({ queryKey: ['metering-point-assignments'] })
             void queryClient.invalidateQueries({ queryKey: ['metering-points'] })
         },
-        onError: (error) => pushToast(formatApiError(error, 'Failed to save assignment.'), 'error'),
+        onError: (error) => pushToast(formatApiError(error, t('pages.meteringPoints.messages.assignmentSaveFailed')), 'error'),
     })
 
     const deleteAssignMutation = useMutation({
         mutationFn: deleteMeteringPointAssignment,
         onSuccess: () => {
-            pushToast('Assignment removed.', 'success')
+            pushToast(t('pages.meteringPoints.messages.assignmentRemoved'), 'success')
             void queryClient.invalidateQueries({ queryKey: ['metering-point-assignments'] })
             void queryClient.invalidateQueries({ queryKey: ['metering-points'] })
         },
-        onError: (error) => pushToast(formatApiError(error, 'Failed to remove assignment.'), 'error'),
+        onError: (error) => pushToast(formatApiError(error, t('pages.meteringPoints.messages.assignmentRemoveFailed')), 'error'),
     })
 
     const deleteMeteringDataMutation = useMutation({
@@ -227,7 +235,7 @@ export function MeteringPointsPage() {
         event.preventDefault()
         const zevForSubmit = canManageMeteringPoints ? selectedZevId : mpForm.zev
         if (!zevForSubmit) {
-            pushToast('Select a ZEV before saving the metering point.', 'error')
+            pushToast(t('pages.meteringPoints.messages.selectZev'), 'error')
             return
         }
         const payload: MeteringPointInput = {
@@ -329,7 +337,7 @@ export function MeteringPointsPage() {
     function submitAssignForm(event: FormEvent<HTMLFormElement>) {
         event.preventDefault()
         if (!assignForm.participant) {
-            pushToast('Select a participant.', 'error')
+            pushToast(t('pages.meteringPoints.messages.selectParticipant'), 'error')
             return
         }
         const payload: MeteringPointAssignmentInput = {
@@ -374,10 +382,10 @@ export function MeteringPointsPage() {
 
     // ── Loading / error ───────────────────────────────────────────────────────────
     if (meteringPointsQuery.isLoading) {
-        return <div className="card">Loading metering points…</div>
+        return <div className="card">{t('pages.meteringPoints.loading')}</div>
     }
     if (meteringPointsQuery.isError) {
-        return <div className="card error-banner">Failed to load metering points.</div>
+        return <div className="card error-banner">{t('pages.meteringPoints.loadFailed')}</div>
     }
 
     return (

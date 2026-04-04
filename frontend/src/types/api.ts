@@ -474,6 +474,12 @@ export interface ImportLog {
     created_at: string
 }
 
+export interface ImportDeletionResult {
+    deleted_logs: number
+    deleted_readings: number
+    mode?: 'all' | 'period'
+}
+
 export interface ImportPreviewRow {
     row: number
     meter_id: string | null

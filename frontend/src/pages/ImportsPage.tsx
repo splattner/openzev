@@ -1,8 +1,22 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useMemo, useState, type FormEvent } from 'react'
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
+import {
+    faArrowLeft,
+    faArrowRight,
+    faEye,
+    faMagnifyingGlass,
+    faPlus,
+    faTrash,
+    faUpload,
+    faXmark,
+} from '@fortawesome/free-solid-svg-icons'
 import { DataGrid, type GridColDef, type GridRenderCellParams } from '@mui/x-data-grid'
+import { ConfirmDialog, useConfirmDialog } from '../components/ConfirmDialog'
 import { FormModal } from '../components/FormModal'
 import {
+    bulkDeleteImportLogs,
+    deleteImportLog,
     fetchImportLogs,
     fetchZevs,
     previewCsvImport,
@@ -11,6 +25,7 @@ import {
 import { formatDateTime, useAppSettings } from '../lib/appSettings'
 import { useAuth } from '../lib/auth'
 import { useManagedZev } from '../lib/managedZev'
+import { useTranslation } from 'react-i18next'
 import { useToast } from '../lib/toast'
 import type { ImportLog, ImportPreviewResult } from '../types/api'
 
@@ -41,9 +56,11 @@ function Badge({ label, ok }: { label: string; ok: boolean }) {
 export function ImportsPage() {
     const queryClient = useQueryClient()
     const { pushToast } = useToast()
+    const { dialog, confirm, handleConfirm, handleCancel, isLoading: dialogLoading } = useConfirmDialog()
     const { user } = useAuth()
     const { settings } = useAppSettings()
     const { selectedZevId, selectedZev } = useManagedZev()
+    const { t } = useTranslation()
     const isManagedScope = user?.role === 'admin' || user?.role === 'zev_owner'
 
     const { data, isLoading, isError } = useQuery({ queryKey: ['imports'], queryFn: fetchImportLogs })
@@ -75,6 +92,10 @@ export function ImportsPage() {
 
     const [preview, setPreview] = useState<ImportPreviewResult | null>(null)
     const [selectedLog, setSelectedLog] = useState<ImportLog | null>(null)
+    const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false)
+    const [bulkDeleteMode, setBulkDeleteMode] = useState<'period' | 'all'>('period')
+    const [bulkDeleteFrom, setBulkDeleteFrom] = useState('')
+    const [bulkDeleteTo, setBulkDeleteTo] = useState('')
 
     const scopedZevId = isManagedScope ? selectedZevId : zevId
     const availableZevs = (zevsQuery.data?.results ?? []).filter((zev) => !isManagedScope || !selectedZevId || zev.id === selectedZevId)
@@ -85,18 +106,18 @@ export function ImportsPage() {
         onSuccess: (result) => {
             setPreview(result)
             if (result.errors.length > 0) {
-                pushToast(`Preview loaded with ${result.errors.length} issue(s).`, 'error')
+                pushToast(t('pages.imports.messages.previewLoadedWithIssues', { count: result.errors.length }), 'error')
             } else {
-                pushToast('Preview loaded.', 'success')
+                pushToast(t('pages.imports.messages.previewLoaded'), 'success')
             }
         },
-        onError: () => pushToast('Failed to load preview.', 'error'),
+        onError: () => pushToast(t('pages.imports.messages.previewFailed'), 'error'),
     })
 
     const uploadMutation = useMutation({
         mutationFn: uploadMeteringFile,
         onSuccess: (result) => {
-            pushToast(`Imported ${result.rows_imported} rows (${result.rows_skipped} skipped).`, 'success')
+            pushToast(t('pages.imports.messages.importSuccess', { imported: result.rows_imported, skipped: result.rows_skipped }), 'success')
             setWizardOpen(false)
             setWizardStep(1)
             setFile(null)
@@ -105,8 +126,46 @@ export function ImportsPage() {
         },
         onError: (error) => {
             const errorMessage = (error as { response?: { data?: { error?: string } } })?.response?.data?.error
-            pushToast(errorMessage || 'Import failed.', 'error')
+            pushToast(errorMessage || t('pages.imports.messages.importFailed'), 'error')
         },
+    })
+
+    const deleteImportMutation = useMutation({
+        mutationFn: deleteImportLog,
+        onSuccess: (result, importId) => {
+            if (selectedLog?.id === importId) {
+                setSelectedLog(null)
+            }
+            pushToast(
+                t('pages.imports.messages.deleteSuccess', {
+                    logs: result.deleted_logs,
+                    readings: result.deleted_readings,
+                }),
+                'success',
+            )
+            void queryClient.invalidateQueries({ queryKey: ['imports'] })
+        },
+        onError: () => pushToast(t('pages.imports.messages.deleteFailed'), 'error'),
+    })
+
+    const bulkDeleteMutation = useMutation({
+        mutationFn: bulkDeleteImportLogs,
+        onSuccess: (result) => {
+            setShowBulkDeleteModal(false)
+            setBulkDeleteMode('period')
+            setBulkDeleteFrom('')
+            setBulkDeleteTo('')
+            setSelectedLog(null)
+            pushToast(
+                t('pages.imports.messages.deleteSuccess', {
+                    logs: result.deleted_logs,
+                    readings: result.deleted_readings,
+                }),
+                'success',
+            )
+            void queryClient.invalidateQueries({ queryKey: ['imports'] })
+        },
+        onError: () => pushToast(t('pages.imports.messages.deleteFailed'), 'error'),
     })
 
     const canGoStep2 = !!file
@@ -131,7 +190,7 @@ export function ImportsPage() {
         () => [
             {
                 field: 'created_display',
-                headerName: 'Created',
+                headerName: t('pages.imports.columns.created'),
                 flex: 1.2,
                 minWidth: 190,
                 sortable: false,
@@ -139,7 +198,7 @@ export function ImportsPage() {
             },
             {
                 field: 'source',
-                headerName: 'Source',
+                headerName: t('pages.imports.columns.source'),
                 flex: 0.8,
                 minWidth: 110,
                 sortable: false,
@@ -147,7 +206,7 @@ export function ImportsPage() {
             },
             {
                 field: 'filename_display',
-                headerName: 'Filename',
+                headerName: t('pages.imports.columns.filename'),
                 flex: 1.3,
                 minWidth: 190,
                 sortable: false,
@@ -155,7 +214,7 @@ export function ImportsPage() {
             },
             {
                 field: 'rows_total_display',
-                headerName: 'Total',
+                headerName: t('pages.imports.columns.total'),
                 flex: 0.6,
                 minWidth: 90,
                 align: 'right',
@@ -165,7 +224,7 @@ export function ImportsPage() {
             },
             {
                 field: 'rows_imported',
-                headerName: 'Imported',
+                headerName: t('pages.imports.columns.imported'),
                 type: 'number',
                 flex: 0.7,
                 minWidth: 105,
@@ -176,7 +235,7 @@ export function ImportsPage() {
             },
             {
                 field: 'rows_skipped',
-                headerName: 'Skipped',
+                headerName: t('pages.imports.columns.skipped'),
                 type: 'number',
                 flex: 0.7,
                 minWidth: 105,
@@ -187,19 +246,48 @@ export function ImportsPage() {
             },
             {
                 field: 'protocol',
-                headerName: 'Protocol',
+                headerName: t('pages.imports.columns.protocol'),
                 flex: 0.9,
                 minWidth: 150,
                 sortable: false,
                 filterable: false,
                 renderCell: (params: GridRenderCellParams<ImportLog>) => (
                     <button type="button" className="button button-primary" onClick={() => setSelectedLog(params.row)}>
-                        Open protocol
+                        <FontAwesomeIcon icon={faEye} fixedWidth />
+                        {t('pages.imports.actions.openProtocol')}
+                    </button>
+                ),
+            },
+            {
+                field: 'actions',
+                headerName: t('pages.imports.columns.actions'),
+                flex: 0.9,
+                minWidth: 150,
+                sortable: false,
+                filterable: false,
+                renderCell: (params: GridRenderCellParams<ImportLog>) => (
+                    <button
+                        type="button"
+                        className="button button-danger"
+                        disabled={deleteImportMutation.isPending || dialogLoading}
+                        onClick={() => confirm({
+                            title: t('pages.imports.delete.singleTitle'),
+                            message: t('pages.imports.delete.singleMessage', {
+                                filename: params.row.filename || '-',
+                                createdAt: formatDateTime(params.row.created_at, settings),
+                            }),
+                            confirmText: t('pages.imports.delete.confirmAction'),
+                            isDangerous: true,
+                            onConfirm: () => deleteImportMutation.mutate(params.row.id),
+                        })}
+                    >
+                        <FontAwesomeIcon icon={faTrash} fixedWidth />
+                        {t('pages.imports.actions.deleteImport')}
                     </button>
                 ),
             },
         ],
-        [],
+        [confirm, deleteImportMutation, dialogLoading, settings, t],
     )
 
     function resetWizard() {
@@ -217,6 +305,13 @@ export function ImportsPage() {
         setOverwriteExisting(false)
         setColumnMap(defaultColumnMap)
         setPreview(null)
+    }
+
+    function closeBulkDeleteModal() {
+        setShowBulkDeleteModal(false)
+        setBulkDeleteMode('period')
+        setBulkDeleteFrom('')
+        setBulkDeleteTo('')
     }
 
     function handleHasHeaderChange(nextHasHeader: boolean) {
@@ -239,7 +334,7 @@ export function ImportsPage() {
     function handleNextStep(event: FormEvent<HTMLFormElement>) {
         event.preventDefault()
         if (!file) {
-            pushToast('Please choose a file first.', 'error')
+            pushToast(t('pages.imports.messages.chooseFileFirst'), 'error')
             return
         }
         setWizardStep(2)
@@ -247,7 +342,7 @@ export function ImportsPage() {
 
     function loadPreview() {
         if (!file) {
-            pushToast('Please choose a file first.', 'error')
+            pushToast(t('pages.imports.messages.chooseFileFirst'), 'error')
             return
         }
         previewMutation.mutate({
@@ -264,17 +359,17 @@ export function ImportsPage() {
 
     function startImport() {
         if (!file) {
-            pushToast('Please choose a file first.', 'error')
+            pushToast(t('pages.imports.messages.chooseFileFirst'), 'error')
             return
         }
 
         if (source === 'csv') {
             if (!preview) {
-                pushToast('Load preview before starting import.', 'error')
+                pushToast(t('pages.imports.messages.loadPreviewFirst'), 'error')
                 return
             }
             if ((preview.summary.missing_metering_points ?? 0) > 0) {
-                pushToast('Create missing metering points before starting import.', 'error')
+                pushToast(t('pages.imports.messages.createMissingMetersFirst'), 'error')
                 return
             }
             uploadMutation.mutate({
@@ -294,31 +389,69 @@ export function ImportsPage() {
         }
 
         if (!scopedZevId) {
-            pushToast('Please select a ZEV for SDAT-CH import.', 'error')
+            pushToast(t('pages.imports.messages.selectZevForSdatch'), 'error')
             return
         }
 
         uploadMutation.mutate({ source, zevId: scopedZevId, file })
     }
 
-    if (isLoading) return <div className="card">Loading import logs...</div>
-    if (isError) return <div className="card error-banner">Failed to load import logs.</div>
+    function submitBulkDelete() {
+        if (bulkDeleteMode === 'period') {
+            if (!bulkDeleteFrom || !bulkDeleteTo) {
+                pushToast(t('pages.imports.messages.deleteDatesRequired'), 'error')
+                return
+            }
+            if (bulkDeleteTo < bulkDeleteFrom) {
+                pushToast(t('pages.imports.messages.deleteDateOrder'), 'error')
+                return
+            }
+        }
+
+        confirm({
+            title: t('pages.imports.delete.bulkTitle'),
+            message: bulkDeleteMode === 'period'
+                ? t('pages.imports.delete.bulkPeriodMessage', { from: bulkDeleteFrom, to: bulkDeleteTo })
+                : t('pages.imports.delete.bulkAllMessage'),
+            confirmText: t('pages.imports.delete.confirmAction'),
+            isDangerous: true,
+            onConfirm: () =>
+                bulkDeleteMutation.mutate({
+                    mode: bulkDeleteMode,
+                    dateFrom: bulkDeleteMode === 'period' ? bulkDeleteFrom : undefined,
+                    dateTo: bulkDeleteMode === 'period' ? bulkDeleteTo : undefined,
+                    zevId: selectedZevId || undefined,
+                }),
+        })
+    }
+
+    if (isLoading) return <div className="card">{t('pages.imports.loading')}</div>
+    if (isError) return <div className="card error-banner">{t('pages.imports.loadFailed')}</div>
 
     return (
         <div className="page-stack">
             <header>
-                <h2>Metering Imports</h2>
-                <p className="muted">Guided import wizard with preview and import protocol.</p>
+                <h2>{t('pages.imports.title')}</h2>
+                <p className="muted">{t('pages.imports.description')}</p>
             </header>
 
             <section className="card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
                 <div>
-                    <h3 style={{ marginBottom: '0.3rem' }}>Start new import</h3>
-                    <p className="muted" style={{ margin: 0 }}>Step-by-step flow with column mapping and preview checks.</p>
+                    <h3 style={{ marginBottom: '0.3rem' }}>{t('pages.imports.startTitle')}</h3>
+                    <p className="muted" style={{ margin: 0 }}>{t('pages.imports.startDescription')}</p>
                 </div>
-                <button className="button button-primary" onClick={() => setWizardOpen(true)}>
-                    + New Import
-                </button>
+                <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+                    {importLogs.length > 0 && (
+                        <button className="button button-danger" type="button" onClick={() => setShowBulkDeleteModal(true)}>
+                            <FontAwesomeIcon icon={faTrash} fixedWidth />
+                            {t('pages.imports.actions.deleteImports')}
+                        </button>
+                    )}
+                    <button className="button button-primary" onClick={() => setWizardOpen(true)}>
+                        <FontAwesomeIcon icon={faPlus} fixedWidth />
+                        {t('pages.imports.actions.newImport')}
+                    </button>
+                </div>
             </section>
 
             <FormModal isOpen={wizardOpen} title="Import Wizard" onClose={resetWizard} maxWidth="1080px">
@@ -348,9 +481,11 @@ export function ImportsPage() {
 
                             <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.6rem' }}>
                                 <button type="button" className="button button-secondary" onClick={resetWizard}>
+                                    <FontAwesomeIcon icon={faXmark} fixedWidth />
                                     Cancel
                                 </button>
                                 <button type="submit" className="button button-primary" disabled={!canGoStep2}>
+                                    <FontAwesomeIcon icon={faArrowRight} fixedWidth />
                                     Next: Configuration
                                 </button>
                             </div>
@@ -464,6 +599,7 @@ export function ImportsPage() {
 
                                     <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                                         <button type="button" className="button button-primary" onClick={loadPreview} disabled={previewMutation.isPending || !file}>
+                                            <FontAwesomeIcon icon={faMagnifyingGlass} fixedWidth />
                                             {previewMutation.isPending ? 'Loading preview...' : 'Load Preview'}
                                         </button>
                                         {preview && (
@@ -546,9 +682,11 @@ export function ImportsPage() {
 
                             <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.6rem', marginTop: '0.4rem' }}>
                                 <button type="button" className="button button-secondary" onClick={() => setWizardStep(1)}>
+                                    <FontAwesomeIcon icon={faArrowLeft} fixedWidth />
                                     Back
                                 </button>
                                 <button type="button" className="button button-primary" onClick={startImport} disabled={uploadMutation.isPending || !canStartImport}>
+                                    <FontAwesomeIcon icon={faUpload} fixedWidth />
                                     {uploadMutation.isPending ? 'Importing...' : 'Start Import'}
                                 </button>
                             </div>
@@ -574,7 +712,7 @@ export function ImportsPage() {
                         },
                     }}
                     localeText={{
-                        noRowsLabel: 'No import logs yet.',
+                        noRowsLabel: t('pages.imports.noRows'),
                     }}
                     sx={{
                         border: 0,
@@ -585,33 +723,71 @@ export function ImportsPage() {
                 />
             </div>
 
-            <FormModal isOpen={!!selectedLog} title="Import protocol" onClose={() => setSelectedLog(null)}>
+            <FormModal isOpen={showBulkDeleteModal} title={t('pages.imports.delete.bulkModalTitle')} onClose={closeBulkDeleteModal} maxWidth="640px">
+                <div className="page-stack" style={{ gap: '1rem' }}>
+                    <p className="muted" style={{ margin: 0 }}>{t('pages.imports.delete.bulkDescription')}</p>
+
+                    <label>
+                        <span>{t('pages.imports.delete.modeLabel')}</span>
+                        <select value={bulkDeleteMode} onChange={(event) => setBulkDeleteMode(event.target.value as 'period' | 'all')}>
+                            <option value="period">{t('pages.imports.delete.modePeriod')}</option>
+                            <option value="all">{t('pages.imports.delete.modeAll')}</option>
+                        </select>
+                    </label>
+
+                    {bulkDeleteMode === 'period' && (
+                        <div className="inline-form grid grid-2">
+                            <label>
+                                <span>{t('pages.imports.delete.dateFrom')}</span>
+                                <input type="date" value={bulkDeleteFrom} onChange={(event) => setBulkDeleteFrom(event.target.value)} />
+                            </label>
+                            <label>
+                                <span>{t('pages.imports.delete.dateTo')}</span>
+                                <input type="date" value={bulkDeleteTo} onChange={(event) => setBulkDeleteTo(event.target.value)} />
+                            </label>
+                        </div>
+                    )}
+
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+                        <button className="button button-secondary" type="button" onClick={closeBulkDeleteModal}>
+                            <FontAwesomeIcon icon={faXmark} fixedWidth />
+                            {t('common.cancel')}
+                        </button>
+                        <button className="button button-danger" type="button" onClick={submitBulkDelete} disabled={bulkDeleteMutation.isPending || dialogLoading}>
+                            <FontAwesomeIcon icon={faTrash} fixedWidth />
+                            {t('pages.imports.delete.confirmAction')}
+                        </button>
+                    </div>
+                </div>
+            </FormModal>
+
+            <FormModal isOpen={!!selectedLog} title={t('pages.imports.protocol.title')} onClose={() => setSelectedLog(null)}>
                 {selectedLog && (
                     <div className="page-stack" style={{ gap: '0.75rem' }}>
-                        <div><strong>Created:</strong> {formatDateTime(selectedLog.created_at, settings)}</div>
-                        <div><strong>Source:</strong> {selectedLog.source}</div>
-                        <div><strong>Filename:</strong> {selectedLog.filename || '-'}</div>
-                        <div><strong>Total rows:</strong> {selectedLog.rows_total ?? '-'}</div>
-                        <div><strong>Imported rows:</strong> {selectedLog.rows_imported}</div>
-                        <div><strong>Skipped rows:</strong> {selectedLog.rows_skipped}</div>
+                        <div><strong>{t('pages.imports.protocol.created')}</strong> {formatDateTime(selectedLog.created_at, settings)}</div>
+                        <div><strong>{t('pages.imports.protocol.source')}</strong> {selectedLog.source}</div>
+                        <div><strong>{t('pages.imports.protocol.filename')}</strong> {selectedLog.filename || '-'}</div>
+                        <div><strong>{t('pages.imports.protocol.totalRows')}</strong> {selectedLog.rows_total ?? '-'}</div>
+                        <div><strong>{t('pages.imports.protocol.importedRows')}</strong> {selectedLog.rows_imported}</div>
+                        <div><strong>{t('pages.imports.protocol.skippedRows')}</strong> {selectedLog.rows_skipped}</div>
 
-                        <h4 style={{ marginBottom: '0.4rem' }}>Skipped row reasons</h4>
+                        <h4 style={{ marginBottom: '0.4rem' }}>{t('pages.imports.protocol.skippedReasons')}</h4>
                         {(selectedLog.errors?.length ?? 0) === 0 ? (
-                            <p className="muted" style={{ margin: 0 }}>No skipped row details for this import.</p>
+                            <p className="muted" style={{ margin: 0 }}>{t('pages.imports.protocol.noSkippedDetails')}</p>
                         ) : (
                             <div style={{ maxHeight: 300, overflow: 'auto', border: '1px solid var(--color-border, #ddd)', borderRadius: 6 }}>
                                 <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                                     <thead>
                                         <tr>
-                                            <th style={{ textAlign: 'left', padding: '0.5rem 0.75rem' }}>Row</th>
-                                            <th style={{ textAlign: 'left', padding: '0.5rem 0.75rem' }}>Reason</th>
+                                            <th style={{ textAlign: 'left', padding: '0.5rem 0.75rem' }}>{t('pages.imports.protocol.row')}</th>
+                                            <th style={{ textAlign: 'left', padding: '0.5rem 0.75rem' }}>{t('pages.imports.protocol.reason')}</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         {selectedLog.errors?.map((entry, index) => (
                                             <tr key={`${entry.row ?? 'global'}-${index}`} style={{ borderTop: '1px solid var(--color-border, #eee)' }}>
                                                 <td style={{ padding: '0.5rem 0.75rem', verticalAlign: 'top' }}>
-                                                    {entry.row ?? 'General'}
+                                                    {entry.row ?? t('pages.imports.protocol.general')}
                                                 </td>
                                                 <td style={{ padding: '0.5rem 0.75rem' }}>{entry.error}</td>
                                             </tr>
@@ -623,6 +799,10 @@ export function ImportsPage() {
                     </div>
                 )}
             </FormModal>
+
+            {dialog && (
+                <ConfirmDialog {...dialog} isLoading={dialogLoading} onConfirm={handleConfirm} onCancel={handleCancel} />
+            )}
         </div>
     )
 }
