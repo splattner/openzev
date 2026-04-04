@@ -1,5 +1,15 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useMemo, useState, type ChangeEvent, type FormEvent } from 'react'
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
+import {
+    faCheck,
+    faDownload,
+    faPen,
+    faPlus,
+    faTrash,
+    faUpload,
+    faXmark,
+} from '@fortawesome/free-solid-svg-icons'
 import dayjs from 'dayjs'
 import { DatePicker } from '@mui/x-date-pickers/DatePicker'
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs'
@@ -48,6 +58,8 @@ const defaultPeriodForm: TariffPeriodInput = {
     weekdays: '',
 }
 
+const tariffCategoryOrder: Tariff['category'][] = ['energy', 'grid_fees', 'levies', 'metering']
+
 export function TariffsPage() {
     const queryClient = useQueryClient()
     const { pushToast } = useToast()
@@ -82,6 +94,31 @@ export function TariffsPage() {
         [periodsQuery.data?.results, allowedTariffIds],
     )
 
+    const periodsByTariff = useMemo(() => {
+        const grouped = new Map<string, TariffPeriod[]>()
+
+        periods.forEach((period) => {
+            const existing = grouped.get(period.tariff) ?? []
+            existing.push(period)
+            grouped.set(period.tariff, existing)
+        })
+
+        grouped.forEach((tariffPeriods) => {
+            tariffPeriods.sort((left, right) => {
+                const periodTypeOrder = { flat: 0, high: 1, low: 2 }
+                const typeDelta = periodTypeOrder[left.period_type] - periodTypeOrder[right.period_type]
+                if (typeDelta !== 0) return typeDelta
+
+                const fromDelta = (left.time_from ?? '').localeCompare(right.time_from ?? '')
+                if (fromDelta !== 0) return fromDelta
+
+                return (left.time_to ?? '').localeCompare(right.time_to ?? '')
+            })
+        })
+
+        return grouped
+    }, [periods])
+
     const tariffNameById = useMemo(() => {
         return new Map((tariffs || []).map((tariff) => [tariff.id, tariff.name]))
     }, [tariffs])
@@ -89,6 +126,22 @@ export function TariffsPage() {
     const energyTariffs = useMemo(() => {
         return tariffs.filter((tariff) => tariff.billing_mode === 'energy')
     }, [tariffs])
+
+    const tariffsWithPeriodsCount = useMemo(
+        () => tariffs.filter((tariff) => (periodsByTariff.get(tariff.id)?.length ?? 0) > 0).length,
+        [tariffs, periodsByTariff],
+    )
+
+    const tariffSections = useMemo(
+        () =>
+            tariffCategoryOrder
+                .map((category) => ({
+                    category,
+                    tariffs: tariffs.filter((tariff) => tariff.category === category),
+                }))
+                .filter((section) => section.tariffs.length > 0),
+        [tariffs],
+    )
 
     const tariffMutation = useMutation({
         mutationFn: ({ id, payload }: { id?: string; payload: TariffInput }) => {
@@ -250,13 +303,15 @@ export function TariffsPage() {
         setTariffForm(defaultTariffForm)
     }
 
-    function openCreatePeriodModal() {
-        if (!energyTariffs.length) {
+    function openCreatePeriodModal(tariffId?: string) {
+        const defaultTariffId = tariffId ?? energyTariffs[0]?.id
+
+        if (!defaultTariffId) {
             pushToast('Create an energy-based tariff before adding tariff periods.', 'error')
             return
         }
         setEditingPeriodId(null)
-        setPeriodForm({ ...defaultPeriodForm, tariff: energyTariffs[0]?.id || '' })
+        setPeriodForm({ ...defaultPeriodForm, tariff: defaultTariffId })
         setShowPeriodModal(true)
     }
 
@@ -315,11 +370,11 @@ export function TariffsPage() {
         reader.readAsText(file)
     }
     if (tariffsQuery.isLoading || periodsQuery.isLoading) {
-        return <div className="card">Loading tariffs...</div>
+        return <div className="card">{t('common.loading')}</div>
     }
 
     if (tariffsQuery.isError || periodsQuery.isError) {
-        return <div className="card error-banner">Failed to load tariffs.</div>
+        return <div className="card error-banner">{t('common.error')}</div>
     }
 
     return (
@@ -329,17 +384,43 @@ export function TariffsPage() {
                 <p className="muted">{t('pages.tariffs.description')}</p>
             </header>
 
-            <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
-                <button className="button button-primary" onClick={openCreateTariffModal}>
-                    {t('pages.tariffs.newTariff')}
-                </button>
-                <button className="button button-secondary" onClick={openExportModal}>
-                    {t('pages.tariffs.exportJson')}
-                </button>
-                <button className="button button-secondary" onClick={openImportModal}>
-                    {t('pages.tariffs.importJson')}
-                </button>
-            </div>
+            <section className="card tariff-toolbar">
+                <div className="tariff-toolbar-header">
+                    <div className="tariff-summary" aria-label={t('pages.tariffs.summaryLabel')}>
+                        <span className="tariff-summary-stat">
+                            <span className="tariff-summary-label">{t('pages.tariffs.summary.total')}</span>
+                            <span className="tariff-summary-value">{tariffs.length}</span>
+                        </span>
+                        <span className="tariff-summary-stat">
+                            <span className="tariff-summary-label">{t('pages.tariffs.summary.energyBased')}</span>
+                            <span className="tariff-summary-value">{energyTariffs.length}</span>
+                        </span>
+                        <span className="tariff-summary-stat">
+                            <span className="tariff-summary-label">{t('pages.tariffs.summary.withPeriods')}</span>
+                            <span className="tariff-summary-value">{tariffsWithPeriodsCount}</span>
+                        </span>
+                        <span className="tariff-summary-stat">
+                            <span className="tariff-summary-label">{t('pages.tariffs.summary.totalPeriods')}</span>
+                            <span className="tariff-summary-value">{periods.length}</span>
+                        </span>
+                    </div>
+
+                    <div className="actions-row actions-row-wrap">
+                        <button className="button button-primary" onClick={openCreateTariffModal}>
+                            <FontAwesomeIcon icon={faPlus} fixedWidth />
+                            {t('pages.tariffs.newTariff')}
+                        </button>
+                        <button className="button button-secondary" onClick={openExportModal}>
+                            <FontAwesomeIcon icon={faDownload} fixedWidth />
+                            {t('pages.tariffs.exportJson')}
+                        </button>
+                        <button className="button button-secondary" onClick={openImportModal}>
+                            <FontAwesomeIcon icon={faUpload} fixedWidth />
+                            {t('pages.tariffs.importJson')}
+                        </button>
+                    </div>
+                </div>
+            </section>
 
             <FormModal
                 isOpen={showExportModal}
@@ -349,8 +430,12 @@ export function TariffsPage() {
             >
                 <div style={{ display: 'grid', gap: '1rem' }}>
                     <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
-                        <button className="button button-secondary" type="button" onClick={closeExportModal}>{t('pages.tariffs.cancel')}</button>
+                        <button className="button button-secondary" type="button" onClick={closeExportModal}>
+                            <FontAwesomeIcon icon={faXmark} fixedWidth />
+                            {t('pages.tariffs.cancel')}
+                        </button>
                         <button className="button button-primary" type="button" onClick={handleExport} disabled={exportMutation.isPending}>
+                            <FontAwesomeIcon icon={faDownload} fixedWidth />
                             {t('pages.tariffs.export')}
                         </button>
                     </div>
@@ -369,7 +454,10 @@ export function TariffsPage() {
                         <input type="file" accept="application/json,.json" onChange={handleImportFile} />
                     </label>
                     <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                        <button className="button button-secondary" type="button" onClick={closeImportModal}>{t('pages.tariffs.close')}</button>
+                        <button className="button button-secondary" type="button" onClick={closeImportModal}>
+                            <FontAwesomeIcon icon={faXmark} fixedWidth />
+                            {t('pages.tariffs.close')}
+                        </button>
                     </div>
                 </div>
             </FormModal>
@@ -501,20 +589,16 @@ export function TariffsPage() {
                     </label>
                     <div style={{ gridColumn: '1 / -1', display: 'flex', gap: '1rem', justifyContent: 'flex-end', marginTop: '1rem' }}>
                         <button className="button button-secondary" type="button" onClick={closeTariffModal}>
-                            Cancel
+                            <FontAwesomeIcon icon={faXmark} fixedWidth />
+                            {t('common.cancel')}
                         </button>
                         <button className="button button-primary" type="submit" disabled={tariffMutation.isPending}>
+                            <FontAwesomeIcon icon={faCheck} fixedWidth />
                             {editingTariffId ? t('pages.tariffs.saveTariff') : t('pages.tariffs.createTariff')}
                         </button>
                     </div>
                 </form>
             </FormModal>
-
-            <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
-                <button className="button button-primary" onClick={openCreatePeriodModal}>
-                    {t('pages.tariffs.newPeriod')}
-                </button>
-            </div>
 
             <FormModal
                 isOpen={showPeriodModal}
@@ -582,120 +666,191 @@ export function TariffsPage() {
                     </label>
                     <div style={{ gridColumn: '1 / -1', display: 'flex', gap: '1rem', justifyContent: 'flex-end', marginTop: '1rem' }}>
                         <button className="button button-secondary" type="button" onClick={closePeriodModal}>
-                            Cancel
+                            <FontAwesomeIcon icon={faXmark} fixedWidth />
+                            {t('common.cancel')}
                         </button>
                         <button className="button button-primary" type="submit" disabled={periodMutation.isPending}>
+                            <FontAwesomeIcon icon={faCheck} fixedWidth />
                             {editingPeriodId ? t('pages.tariffs.savePeriod') : t('pages.tariffs.createPeriod')}
                         </button>
                     </div>
                 </form>
             </FormModal>
 
-            <div className="table-card">
-                <h3>{t('pages.tariffs.tariffList')}</h3>
-                <table>
-                    <thead>
-                        <tr>
-                            <th>{t('pages.tariffs.col.name')}</th>
-                            <th>{t('pages.tariffs.col.category')}</th>
-                            <th>{t('pages.tariffs.col.billingMode')}</th>
-                            <th>{t('pages.tariffs.col.pricing')}</th>
-                            <th>{t('pages.tariffs.col.validity')}</th>
-                            <th>{t('pages.tariffs.col.actions')}</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {tariffs.length ? tariffs.map((tariff) => (
-                            <tr key={tariff.id}>
-                                <td>{tariff.name}</td>
-                                <td>{t(`pages.tariffs.categories.${tariff.category}` as Parameters<typeof t>[0])}</td>
-                                <td>{t(`pages.tariffs.billingModes.${tariff.billing_mode}` as Parameters<typeof t>[0])}</td>
-                                <td>
-                                    {tariff.billing_mode === 'energy'
+            {tariffs.length === 0 ? (
+                <section className="card tariff-empty-state">
+                    <h3>{t('pages.tariffs.noTariffs')}</h3>
+                    <p className="muted">{t('pages.tariffs.description')}</p>
+                    <div className="actions-row actions-row-wrap">
+                        <button className="button button-primary" type="button" onClick={openCreateTariffModal}>
+                            <FontAwesomeIcon icon={faPlus} fixedWidth />
+                            {t('pages.tariffs.newTariff')}
+                        </button>
+                        <button className="button button-secondary" type="button" onClick={openImportModal}>
+                            <FontAwesomeIcon icon={faUpload} fixedWidth />
+                            {t('pages.tariffs.importJson')}
+                        </button>
+                    </div>
+                </section>
+            ) : (
+                <div className="tariff-category-sections">
+                    {tariffSections.map((section) => (
+                        <section
+                            key={section.category}
+                            className={`tariff-category-section tariff-category-section-${section.category.replace(/_/g, '-')}`}
+                        >
+                            <div className="tariff-category-header">
+                                <div className="tariff-category-title-row">
+                                    <h3>{t(`pages.tariffs.categories.${section.category}` as Parameters<typeof t>[0])}</h3>
+                                    <span className="badge badge-neutral">{section.tariffs.length}</span>
+                                </div>
+                            </div>
+
+                            <div className="tariff-card-list">
+                                {section.tariffs.map((tariff) => {
+                                    const tariffPeriods = periodsByTariff.get(tariff.id) ?? []
+                                    const usesPeriods = tariff.billing_mode === 'energy'
+                                    const pricingLabel = tariff.billing_mode === 'energy'
                                         ? t(`pages.tariffs.energyTypes.${tariff.energy_type || 'local'}` as Parameters<typeof t>[0])
                                         : tariff.billing_mode === 'percentage_of_energy'
                                             ? `${tariff.percentage ?? '0'}% · ${t(`pages.tariffs.energyTypes.${tariff.energy_type || 'local'}` as Parameters<typeof t>[0])}`
-                                            : `CHF ${tariff.fixed_price_chf || '0.00'}`}
-                                </td>
-                                <td>{formatShortDate(tariff.valid_from, settings)} → {tariff.valid_to ? formatShortDate(tariff.valid_to, settings) : '-'}</td>
-                                <td className="actions-cell">
-                                    <button className="button button-primary" type="button" onClick={() => startTariffEdit(tariff)}>
-                                        Edit
-                                    </button>
-                                    <button
-                                        className="button danger"
-                                        type="button"
-                                        disabled={deleteTariffMutation.isPending || dialogLoading}
-                                        onClick={() => confirm({
-                                            title: t('pages.tariffs.deleteTitle'),
-                                            message: t('pages.tariffs.deleteMessage', { name: tariff.name }),
-                                            confirmText: t('pages.tariffs.deleteConfirm'),
-                                            isDangerous: true,
-                                            onConfirm: () => deleteTariffMutation.mutate(tariff.id),
-                                        })}
-                                    >
-                                        Delete
-                                    </button>
-                                </td>
-                            </tr>
-                        )) : (
-                            <tr>
-                                <td colSpan={6}>{t('pages.tariffs.noTariffs')}</td>
-                            </tr>
-                        )}
-                    </tbody>
-                </table>
-            </div>
+                                            : `CHF ${tariff.fixed_price_chf || '0.00'}`
 
-            <div className="table-card">
-                <h3>{t('pages.tariffs.tariffPeriods')}</h3>
-                <table>
-                    <thead>
-                        <tr>
-                            <th>{t('pages.tariffs.periodCol.tariff')}</th>
-                            <th>{t('pages.tariffs.periodCol.type')}</th>
-                            <th>{t('pages.tariffs.periodCol.pricePerKwh')}</th>
-                            <th>{t('pages.tariffs.periodCol.time')}</th>
-                            <th>{t('pages.tariffs.periodCol.weekdays')}</th>
-                            <th>{t('pages.tariffs.periodCol.actions')}</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {periods.length ? periods.map((period) => (
-                            <tr key={period.id}>
-                                <td>{tariffNameById.get(period.tariff) || period.tariff}</td>
-                                <td>{t(`pages.tariffs.periodTypes.${period.period_type}` as Parameters<typeof t>[0], { defaultValue: period.period_type })}</td>
-                                <td>{period.price_chf_per_kwh}</td>
-                                <td>{period.time_from || '-'} → {period.time_to || '-'}</td>
-                                <td>{period.weekdays || t('pages.tariffs.allWeekdays')}</td>
-                                <td className="actions-cell">
-                                    <button className="button button-primary" type="button" onClick={() => startPeriodEdit(period)}>
-                                        Edit
-                                    </button>
-                                    <button
-                                        className="button danger"
-                                        type="button"
-                                        disabled={deletePeriodMutation.isPending || dialogLoading}
-                                        onClick={() => confirm({
-                                            title: t('pages.tariffs.deletePeriodTitle'),
-                                            message: t('pages.tariffs.deletePeriodMessage', { name: tariffNameById.get(period.tariff) ?? period.tariff }),
-                                            confirmText: t('pages.tariffs.deletePeriodConfirm'),
-                                            isDangerous: true,
-                                            onConfirm: () => deletePeriodMutation.mutate(period.id),
-                                        })}
-                                    >
-                                        Delete
-                                    </button>
-                                </td>
-                            </tr>
-                        )) : (
-                            <tr>
-                                <td colSpan={6}>{t('pages.tariffs.noPeriods')}</td>
-                            </tr>
-                        )}
-                    </tbody>
-                </table>
-            </div>
+                                    return (
+                                        <article key={tariff.id} className="tariff-card">
+                                            <div className="tariff-card-header">
+                                                <div className="tariff-card-title">
+                                                    <div className="tariff-card-heading">
+                                                        <strong>{tariff.name}</strong>
+                                                        <div className="tariff-name-badges">
+                                                            <span className="badge badge-info">
+                                                                {t(`pages.tariffs.billingModes.${tariff.billing_mode}` as Parameters<typeof t>[0], { defaultValue: tariff.billing_mode })}
+                                                            </span>
+                                                            {tariff.energy_type && (
+                                                                <span className="badge badge-success">
+                                                                    {t(`pages.tariffs.energyTypes.${tariff.energy_type}` as Parameters<typeof t>[0])}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <div className="tariff-card-actions">
+                                                    <button className="button button-primary button-compact" type="button" onClick={() => startTariffEdit(tariff)}>
+                                                        <FontAwesomeIcon icon={faPen} fixedWidth />
+                                                        {t('common.edit')}
+                                                    </button>
+                                                    <button
+                                                        className="button button-danger button-compact"
+                                                        type="button"
+                                                        disabled={deleteTariffMutation.isPending || dialogLoading}
+                                                        onClick={() => confirm({
+                                                            title: t('pages.tariffs.deleteTitle'),
+                                                            message: t('pages.tariffs.deleteMessage', { name: tariff.name }),
+                                                            confirmText: t('pages.tariffs.deleteConfirm'),
+                                                            isDangerous: true,
+                                                            onConfirm: () => deleteTariffMutation.mutate(tariff.id),
+                                                        })}
+                                                    >
+                                                        <FontAwesomeIcon icon={faTrash} fixedWidth />
+                                                        {t('common.delete')}
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            <div className="tariff-card-details">
+                                                <div className="tariff-detail-card">
+                                                    <span className="tariff-detail-label">{t('pages.tariffs.col.pricing')}</span>
+                                                    <span className="tariff-detail-value">{pricingLabel}</span>
+                                                </div>
+                                                <div className="tariff-detail-card">
+                                                    <span className="tariff-detail-label">{t('pages.tariffs.col.validity')}</span>
+                                                    <span className="tariff-detail-value">
+                                                        {formatShortDate(tariff.valid_from, settings)} - {tariff.valid_to ? formatShortDate(tariff.valid_to, settings) : '-'}
+                                                    </span>
+                                                </div>
+                                                <div className="tariff-detail-card tariff-detail-card-wide">
+                                                    <span className="tariff-detail-label">{t('pages.tariffs.form.notes')}</span>
+                                                    <span className="tariff-detail-value">{tariff.notes?.trim() || t('pages.tariffs.noNotes')}</span>
+                                                </div>
+                                            </div>
+
+                                            <div className="tariff-period-section">
+                                                <div className="tariff-period-section-header">
+                                                    <div className="tariff-period-section-title-row">
+                                                        <h4>{t('pages.tariffs.tariffPeriods')}</h4>
+                                                        {usesPeriods && tariffPeriods.length > 0 && (
+                                                            <span className="badge badge-neutral">{tariffPeriods.length}</span>
+                                                        )}
+                                                    </div>
+                                                    {usesPeriods && (
+                                                        <button
+                                                            className="button button-secondary button-compact"
+                                                            type="button"
+                                                            onClick={() => openCreatePeriodModal(tariff.id)}
+                                                        >
+                                                            <FontAwesomeIcon icon={faPlus} fixedWidth />
+                                                            {t('pages.tariffs.addPeriod')}
+                                                        </button>
+                                                    )}
+                                                </div>
+
+                                                {!usesPeriods ? (
+                                                    <p className="muted tariff-period-empty">{t('pages.tariffs.fixedFeeHint')}</p>
+                                                ) : tariffPeriods.length === 0 ? (
+                                                    <p className="muted tariff-period-empty">{t('pages.tariffs.noPeriods')}</p>
+                                                ) : (
+                                                    <div className="tariff-period-list">
+                                                        {tariffPeriods.map((period) => (
+                                                            <div key={period.id} className="tariff-period-row">
+                                                                <div className="tariff-period-main">
+                                                                    <div className="tariff-period-line">
+                                                                        <span className="badge badge-neutral">
+                                                                            {t(`pages.tariffs.periodTypes.${period.period_type}` as Parameters<typeof t>[0], { defaultValue: period.period_type })}
+                                                                        </span>
+                                                                        <strong>CHF {period.price_chf_per_kwh}/kWh</strong>
+                                                                    </div>
+                                                                    <div className="muted tariff-period-meta">
+                                                                        {period.period_type === 'flat'
+                                                                            ? `${t('pages.tariffs.allDay')} · ${t('pages.tariffs.allWeekdays')}`
+                                                                            : `${period.time_from || '--'} - ${period.time_to || '--'} · ${period.weekdays || t('pages.tariffs.allWeekdays')}`}
+                                                                    </div>
+                                                                </div>
+
+                                                                <div className="tariff-period-actions">
+                                                                    <button className="button button-secondary button-compact" type="button" onClick={() => startPeriodEdit(period)}>
+                                                                        <FontAwesomeIcon icon={faPen} fixedWidth />
+                                                                        {t('common.edit')}
+                                                                    </button>
+                                                                    <button
+                                                                        className="button button-danger button-compact"
+                                                                        type="button"
+                                                                        disabled={deletePeriodMutation.isPending || dialogLoading}
+                                                                        onClick={() => confirm({
+                                                                            title: t('pages.tariffs.deletePeriodTitle'),
+                                                                            message: t('pages.tariffs.deletePeriodMessage', { name: tariffNameById.get(period.tariff) ?? period.tariff }),
+                                                                            confirmText: t('pages.tariffs.deletePeriodConfirm'),
+                                                                            isDangerous: true,
+                                                                            onConfirm: () => deletePeriodMutation.mutate(period.id),
+                                                                        })}
+                                                                    >
+                                                                        <FontAwesomeIcon icon={faTrash} fixedWidth />
+                                                                        {t('common.delete')}
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </article>
+                                    )
+                                })}
+                            </div>
+                        </section>
+                    ))}
+                </div>
+            )}
 
             {dialog && (
                 <ConfirmDialog {...dialog} isLoading={dialogLoading} onConfirm={handleConfirm} onCancel={handleCancel} />

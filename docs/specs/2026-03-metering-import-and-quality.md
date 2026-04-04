@@ -492,12 +492,22 @@ All import endpoints use `MultiPartParser` and `FormParser`.
 
 | Method | URL | Permission | Description |
 |---|---|---|---|
-| `GET` | `/import-logs/` | `IsAuthenticated, IsZevOwnerOrAdmin` | List import logs (read-only) |
+| `GET` | `/import-logs/` | `IsAuthenticated, IsZevOwnerOrAdmin` | List import logs |
 | `GET` | `/import-logs/{id}/` | `IsAuthenticated, IsZevOwnerOrAdmin` | Retrieve single import log |
+| `DELETE` | `/import-logs/{id}/` | `IsAuthenticated, IsZevOwnerOrAdmin` | Delete a single import log and all readings in its `batch_id` |
+| `POST` | `/import-logs/bulk-delete/` | `IsAuthenticated, IsZevOwnerOrAdmin` | Delete all visible import logs in a selected created-at period or delete all visible logs |
 
 **Queryset scoping:**
 - `admin` → all import logs.
 - `zev_owner` → logs where `zev.owner == user` OR `imported_by == user`.
+
+**Deletion semantics:**
+- Single-log delete removes the selected `ImportLog` and all `MeterReading` rows with `import_batch == batch_id`.
+- Bulk delete operates on the same scoped queryset as the list endpoint.
+- Bulk delete accepts `mode = all | period`.
+- `mode = period` requires `date_from` and `date_to` and filters by `ImportLog.created_at::date` inclusively.
+- Bulk delete may additionally be narrowed with `zev_id`.
+- Delete responses return counts for both deleted logs and deleted readings.
 
 ---
 

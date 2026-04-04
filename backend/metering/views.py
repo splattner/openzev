@@ -1,9 +1,11 @@
 from datetime import date as date_type, datetime, timedelta, timezone as dt_timezone
 
+from django.db import transaction
 from django.db.models import Q, Sum
 from django.db.models.functions import TruncDay, TruncHour, TruncMonth
+from django.utils.dateparse import parse_date
 from decimal import Decimal
-from rest_framework import viewsets, status
+from rest_framework import mixins, viewsets, status
 from rest_framework.decorators import action
 from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.permissions import IsAuthenticated
@@ -890,7 +892,7 @@ class MeterReadingViewSet(viewsets.ModelViewSet):
         })
 
 
-class ImportLogViewSet(viewsets.ReadOnlyModelViewSet):
+class ImportLogViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.DestroyModelMixin, viewsets.GenericViewSet):
     serializer_class = ImportLogSerializer
     permission_classes = [IsAuthenticated, IsZevOwnerOrAdmin]
 
@@ -899,6 +901,51 @@ class ImportLogViewSet(viewsets.ReadOnlyModelViewSet):
         if user.is_admin:
             return ImportLog.objects.all()
         return ImportLog.objects.filter(Q(zev__owner=user) | Q(imported_by=user)).distinct()
+
+    def _delete_import_logs(self, queryset):
+        batch_ids = set(queryset.exclude(batch_id__isnull=True).values_list("batch_id", flat=True))
+        deleted_logs = queryset.count()
+
+        with transaction.atomic():
+            if batch_ids:
+                deleted_readings, _ = MeterReading.objects.filter(import_batch__in=batch_ids).delete()
+            else:
+                deleted_readings = 0
+            queryset.delete()
+
+        return {
+            "deleted_logs": deleted_logs,
+            "deleted_readings": deleted_readings,
+        }
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        result = self._delete_import_logs(self.get_queryset().filter(pk=instance.pk))
+        return Response(result, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=["post"], url_path="bulk-delete")
+    def bulk_delete(self, request):
+        mode = request.data.get("mode", "all")
+        queryset = self.get_queryset()
+
+        zev_id = request.data.get("zev_id")
+        if zev_id:
+            queryset = queryset.filter(zev_id=zev_id)
+
+        if mode == "period":
+            date_from = parse_date(request.data.get("date_from") or "")
+            date_to = parse_date(request.data.get("date_to") or "")
+            if not date_from or not date_to:
+                return Response({"error": "date_from and date_to are required for period deletion."}, status=status.HTTP_400_BAD_REQUEST)
+            if date_to < date_from:
+                return Response({"error": "date_to must be on or after date_from."}, status=status.HTTP_400_BAD_REQUEST)
+            queryset = queryset.filter(created_at__date__gte=date_from, created_at__date__lte=date_to)
+        elif mode != "all":
+            return Response({"error": "Unsupported deletion mode."}, status=status.HTTP_400_BAD_REQUEST)
+
+        result = self._delete_import_logs(queryset)
+        result["mode"] = mode
+        return Response(result, status=status.HTTP_200_OK)
 
 
 class ImportView(viewsets.ViewSet):

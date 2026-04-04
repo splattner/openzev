@@ -11,6 +11,7 @@ import type {
     ImpersonationTokens,
     ImportPreviewResult,
     ImportLog,
+    ImportDeletionResult,
     Invoice,
     InvoicePeriodOverview,
     MeteringDashboardSummary,
@@ -311,6 +312,26 @@ export async function fetchMeteringPoints(): Promise<PaginatedResponse<MeteringP
 
 export async function fetchImportLogs(): Promise<PaginatedResponse<ImportLog>> {
     const { data } = await api.get<PaginatedResponse<ImportLog>>('/metering/import-logs/')
+    return data
+}
+
+export async function deleteImportLog(id: string): Promise<ImportDeletionResult> {
+    const { data } = await api.delete<ImportDeletionResult>(`/metering/import-logs/${id}/`)
+    return data
+}
+
+export async function bulkDeleteImportLogs(payload: {
+    mode: 'all' | 'period'
+    dateFrom?: string
+    dateTo?: string
+    zevId?: string
+}): Promise<ImportDeletionResult> {
+    const { data } = await api.post<ImportDeletionResult>('/metering/import-logs/bulk-delete/', {
+        mode: payload.mode,
+        date_from: payload.dateFrom,
+        date_to: payload.dateTo,
+        zev_id: payload.zevId,
+    })
     return data
 }
 

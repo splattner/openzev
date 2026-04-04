@@ -1093,6 +1093,244 @@ h3 {
   color: #0f172a;
 }
 
+.tariff-toolbar {
+  display: grid;
+  gap: 1rem;
+}
+
+.tariff-toolbar-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.tariff-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.tariff-summary-stat {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.28rem 0.55rem;
+  border-radius: 999px;
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+}
+
+.tariff-summary-label {
+  font-size: 0.78rem;
+  color: #475569;
+}
+
+.tariff-summary-value {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.tariff-empty-state {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.tariff-category-sections {
+  display: grid;
+  gap: 1.25rem;
+}
+
+.tariff-category-section {
+  display: grid;
+  gap: 1rem;
+  padding: 1rem 1.1rem;
+  border-radius: 1.15rem;
+  border: 1px solid #dbe4ee;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.tariff-category-section-energy {
+  background: linear-gradient(180deg, rgba(236, 253, 245, 0.92), rgba(255, 255, 255, 0.9));
+  border-color: #bbf7d0;
+}
+
+.tariff-category-section-grid-fees {
+  background: linear-gradient(180deg, rgba(239, 246, 255, 0.92), rgba(255, 255, 255, 0.9));
+  border-color: #bfdbfe;
+}
+
+.tariff-category-section-levies {
+  background: linear-gradient(180deg, rgba(255, 251, 235, 0.94), rgba(255, 255, 255, 0.9));
+  border-color: #fde68a;
+}
+
+.tariff-category-section-metering {
+  background: linear-gradient(180deg, rgba(245, 243, 255, 0.94), rgba(255, 255, 255, 0.9));
+  border-color: #ddd6fe;
+}
+
+.tariff-category-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.tariff-category-title-row,
+.tariff-period-section-title-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.tariff-category-title-row h3 {
+  color: #0f172a;
+}
+
+.tariff-card-list {
+  display: grid;
+  gap: 1rem;
+}
+
+.tariff-card {
+  border: 1px solid #dbe4ee;
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.96);
+  padding: 1rem 1.1rem;
+  display: grid;
+  gap: 1rem;
+}
+
+.tariff-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.tariff-card-title {
+  display: grid;
+  gap: 0.4rem;
+  flex: 1 1 320px;
+  min-width: 220px;
+}
+
+.tariff-card-heading {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.tariff-card-title strong {
+  color: #0f172a;
+}
+
+.tariff-name-badges {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+}
+
+.tariff-card-badges,
+.tariff-card-actions,
+.tariff-period-line,
+.tariff-period-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.tariff-card-actions,
+.tariff-period-actions {
+  justify-content: flex-end;
+}
+
+.tariff-card-details {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.75rem;
+}
+
+.tariff-detail-card {
+  display: grid;
+  gap: 0.35rem;
+  padding: 0.8rem 0.9rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.9rem;
+  background: #fff;
+}
+
+.tariff-detail-card-wide {
+  grid-column: span 2;
+}
+
+.tariff-detail-label {
+  font-size: 0.78rem;
+  color: #475569;
+}
+
+.tariff-detail-value {
+  color: #0f172a;
+  line-height: 1.45;
+  word-break: break-word;
+}
+
+.tariff-period-section {
+  display: grid;
+  gap: 0.75rem;
+  padding-top: 0.25rem;
+  border-top: 1px solid #e2e8f0;
+}
+
+.tariff-period-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.tariff-period-section-header h4 {
+  margin: 0;
+}
+
+.tariff-period-list {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.tariff-period-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.8rem 0.9rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.9rem;
+  background: #fff;
+  flex-wrap: wrap;
+}
+
+.tariff-period-main {
+  display: grid;
+  gap: 0.3rem;
+}
+
+.tariff-period-meta,
+.tariff-period-empty {
+  margin: 0;
+  font-size: 0.84rem;
+}
+
 .participant-filter-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -1487,6 +1725,19 @@ h3 {
   .table-card,
   .stat-card {
     border-radius: 0.75rem;
+  }
+
+  .tariff-detail-card-wide {
+    grid-column: auto;
+  }
+
+  .tariff-card-actions,
+  .tariff-period-actions {
+    justify-content: flex-start;
+  }
+
+  .tariff-category-section {
+    padding: 0.9rem;
   }
 }
 
