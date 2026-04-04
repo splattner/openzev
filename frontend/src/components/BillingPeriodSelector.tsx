@@ -1,4 +1,6 @@
 import dayjs from 'dayjs'
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
+import { faArrowLeft, faArrowRight } from '@fortawesome/free-solid-svg-icons'
 import { DatePickerInput } from '@mantine/dates'
 import { Box, Button, Stack, Typography } from '@mui/material'
 import { useEffect, useState } from 'react'
@@ -101,15 +103,16 @@ export function BillingPeriodSelector({ interval, from, to, onChange }: BillingP
         >
             {!isCustomOpen && (
                 <>
-                    <Button
+                    <button
                         className="button button-secondary"
                         type="button"
                         onClick={() => onChange(shiftBillingPeriod(from, interval, -1))}
                         disabled={!from}
-                        sx={{ flexShrink: 0, mr: 'auto' }}
+                        style={{ flexShrink: 0, marginRight: 'auto' }}
                     >
+                        <FontAwesomeIcon icon={faArrowLeft} fixedWidth />
                         {t('pages.invoices.prevPeriod')}
-                    </Button>
+                    </button>
 
                     <Box sx={{ textAlign: 'center' }}>
                         <Typography sx={{ fontWeight: 700, fontSize: { xs: '0.85rem', sm: '1rem' } }}>
@@ -132,15 +135,16 @@ export function BillingPeriodSelector({ interval, from, to, onChange }: BillingP
                         {t('common.periodSelector.customPeriod')}
                     </Button>
 
-                    <Button
+                    <button
                         className="button button-secondary"
                         type="button"
                         onClick={() => onChange(shiftBillingPeriod(from, interval, 1))}
                         disabled={!from}
-                        sx={{ flexShrink: 0, ml: 'auto' }}
+                        style={{ flexShrink: 0, marginLeft: 'auto' }}
                     >
                         {t('pages.invoices.nextPeriod')}
-                    </Button>
+                        <FontAwesomeIcon icon={faArrowRight} fixedWidth />
+                    </button>
                 </>
             )}
 

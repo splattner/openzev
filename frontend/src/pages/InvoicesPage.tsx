@@ -2,6 +2,22 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
+import {
+    faArrowLeft,
+    faArrowRight,
+    faCheck,
+    faCheckDouble,
+    faDownload,
+    faEllipsis,
+    faEnvelope,
+    faFileInvoice,
+    faFilePdf,
+    faMoneyBillWave,
+    faPaperPlane,
+    faRotate,
+    faTrash,
+} from '@fortawesome/free-solid-svg-icons'
 import {
     approveAllInvoices,
     approveInvoice,
@@ -21,12 +37,13 @@ import {
     sendAllInvoices,
     sendInvoiceEmail,
 } from '../lib/api'
+import { ActionMenu, type ActionMenuItem } from '../components/ActionMenu'
 import { EmailLogsModal } from '../components/EmailLogsModal'
 import { useAuth } from '../lib/auth'
 import { useManagedZev } from '../lib/managedZev'
 import { useToast } from '../lib/toast'
 import { formatShortDate, useAppSettings } from '../lib/appSettings'
-import type { EmailLog } from '../types/api'
+import type { EmailLog, Invoice, InvoicePeriodParticipantRow } from '../types/api'
 
 type BillingInterval = 'monthly' | 'quarterly' | 'semi_annual' | 'annual'
 
@@ -45,6 +62,10 @@ function emailStatusBadgeClass(status: string): string {
 
 function humanizeStatus(status: string): string {
     return status.replace('_', ' ').replace(/^./, (char) => char.toUpperCase())
+}
+
+function hasDeletePermission(invoice: Invoice, role: string | undefined): boolean {
+    return invoice.status === 'draft' || invoice.status === 'cancelled' || role === 'admin'
 }
 
 function getLatestEmailLog(invoice: { email_logs?: Array<{ created_at: string; recipient: string; status: string; id: string }> } | null) {
@@ -358,7 +379,235 @@ export function InvoicesPage() {
     const approvedCount = useMemo(() => rows.filter((r) => r.invoice?.status === 'approved').length, [rows])
     const invoiceCount = useMemo(() => rows.filter((r) => r.invoice).length, [rows])
     const pdfCount = useMemo(() => rows.filter((r) => r.invoice?.pdf_url).length, [rows])
+    const generationCandidateCount = useMemo(
+        () => rows.filter((row) => !row.invoice || row.invoice.status === 'cancelled').length,
+        [rows],
+    )
+    const pdfMissingCount = useMemo(
+        () => rows.filter((row) => row.invoice && !row.invoice.pdf_url).length,
+        [rows],
+    )
     const isOwnerOrAdmin = user?.role === 'admin' || user?.role === 'zev_owner'
+
+    const batchStats = [
+        { key: 'invoices', label: t('pages.invoices.batch.summaryInvoices'), value: invoiceCount },
+        { key: 'drafts', label: t('pages.invoices.batch.summaryDrafts'), value: draftCount },
+        { key: 'approved', label: t('pages.invoices.batch.summaryApproved'), value: approvedCount },
+        { key: 'pdfs', label: t('pages.invoices.batch.summaryPdfs'), value: pdfCount },
+    ]
+
+    const recommendedBatchAction: ActionMenuItem | null = useMemo(() => {
+        if (draftCount > 0) {
+            return {
+                key: 'approve-all',
+                label: t('pages.invoices.batch.approveAll'),
+                icon: <FontAwesomeIcon icon={faCheckDouble} fixedWidth />,
+                onClick: () => approveAllMutation.mutate(),
+                disabled: anyBatchPending || draftCount === 0,
+            }
+        }
+        if (approvedCount > 0) {
+            return {
+                key: 'send-all',
+                label: t('pages.invoices.batch.sendAll'),
+                icon: <FontAwesomeIcon icon={faPaperPlane} fixedWidth />,
+                onClick: () => sendAllMutation.mutate(),
+                disabled: anyBatchPending || approvedCount === 0,
+            }
+        }
+        if (generationCandidateCount > 0) {
+            return {
+                key: 'generate-all',
+                label: t('pages.invoices.batch.generateAll'),
+                icon: <FontAwesomeIcon icon={faFileInvoice} fixedWidth />,
+                onClick: () => generateAllMutation.mutate(),
+                disabled: anyBatchPending || generationCandidateCount === 0,
+            }
+        }
+        if (pdfMissingCount > 0) {
+            return {
+                key: 'generate-all-pdfs',
+                label: t('pages.invoices.batch.generateAllPdfs'),
+                icon: <FontAwesomeIcon icon={faFilePdf} fixedWidth />,
+                onClick: () => generateAllPdfsMutation.mutate(),
+                disabled: anyBatchPending || pdfMissingCount === 0,
+            }
+        }
+        return null
+    }, [
+        anyBatchPending,
+        approveAllMutation,
+        approvedCount,
+        draftCount,
+        generateAllMutation,
+        generateAllPdfsMutation,
+        generationCandidateCount,
+        pdfMissingCount,
+        sendAllMutation,
+        t,
+    ])
+
+    const batchMenuItems: ActionMenuItem[] = [
+        {
+            key: 'generate-all',
+            label: `${t('pages.invoices.batch.generateAll')}${generationCandidateCount > 0 ? ` (${generationCandidateCount})` : ''}`,
+            icon: <FontAwesomeIcon icon={faFileInvoice} fixedWidth />,
+            onClick: () => generateAllMutation.mutate(),
+            disabled: anyBatchPending || generationCandidateCount === 0,
+        },
+        {
+            key: 'approve-all',
+            label: `${t('pages.invoices.batch.approveAll')}${draftCount > 0 ? ` (${draftCount})` : ''}`,
+            icon: <FontAwesomeIcon icon={faCheckDouble} fixedWidth />,
+            onClick: () => approveAllMutation.mutate(),
+            disabled: anyBatchPending || draftCount === 0,
+        },
+        {
+            key: 'send-all',
+            label: `${t('pages.invoices.batch.sendAll')}${approvedCount > 0 ? ` (${approvedCount})` : ''}`,
+            icon: <FontAwesomeIcon icon={faPaperPlane} fixedWidth />,
+            onClick: () => sendAllMutation.mutate(),
+            disabled: anyBatchPending || approvedCount === 0,
+        },
+        {
+            key: 'generate-all-pdfs',
+            label: `${t('pages.invoices.batch.generateAllPdfs')}${invoiceCount > 0 ? ` (${invoiceCount})` : ''}`,
+            icon: <FontAwesomeIcon icon={faFilePdf} fixedWidth />,
+            onClick: () => generateAllPdfsMutation.mutate(),
+            disabled: anyBatchPending || invoiceCount === 0,
+        },
+    ]
+
+    function getPrimaryRowAction(row: InvoicePeriodParticipantRow): ActionMenuItem | null {
+        const invoice = row.invoice
+
+        if (!invoice || invoice.status === 'cancelled') {
+            return {
+                key: 'generate',
+                label: invoice ? t('pages.invoices.generateAgain') : t('pages.invoices.generateInvoice'),
+                icon: <FontAwesomeIcon icon={faFileInvoice} fixedWidth />,
+                onClick: () =>
+                    generateMutation.mutate({
+                        participant_id: row.participant_id,
+                        period_start: period.period_start,
+                        period_end: period.period_end,
+                    }),
+                disabled: generateMutation.isPending,
+            }
+        }
+
+        if (invoice.status === 'draft') {
+            return {
+                key: 'approve',
+                label: t('pages.invoices.approve'),
+                icon: <FontAwesomeIcon icon={faCheck} fixedWidth />,
+                onClick: () => approveMutation.mutate(invoice.id),
+                disabled: approveMutation.isPending,
+            }
+        }
+
+        if (invoice.status === 'approved') {
+            return {
+                key: 'send-email',
+                label: pollingInvoiceId === invoice.id ? t('pages.invoices.sending') : t('pages.invoices.sendEmail'),
+                icon: <FontAwesomeIcon icon={faEnvelope} fixedWidth />,
+                onClick: () => emailMutation.mutate(invoice.id),
+                disabled: emailMutation.isPending || pollingInvoiceId === invoice.id,
+            }
+        }
+
+        if (invoice.status === 'sent') {
+            return {
+                key: 'mark-paid',
+                label: t('pages.invoices.markPaid'),
+                icon: <FontAwesomeIcon icon={faMoneyBillWave} fixedWidth />,
+                onClick: () => markPaidMutation.mutate(invoice.id),
+                disabled: markPaidMutation.isPending,
+            }
+        }
+
+        return null
+    }
+
+    function getRowMenuItems(row: InvoicePeriodParticipantRow): ActionMenuItem[] {
+        const invoice = row.invoice
+        if (!invoice) {
+            return []
+        }
+
+        const items: ActionMenuItem[] = []
+
+        if (invoice.status === 'draft' || invoice.status === 'cancelled') {
+            items.push({
+                key: 'generate-again',
+                label: t('pages.invoices.regenerateInvoice'),
+                icon: <FontAwesomeIcon icon={faRotate} fixedWidth />,
+                section: t('pages.invoices.menuSections.invoice'),
+                onClick: () =>
+                    generateMutation.mutate({
+                        participant_id: row.participant_id,
+                        period_start: period.period_start,
+                        period_end: period.period_end,
+                    }),
+                disabled: generateMutation.isPending,
+            })
+        }
+
+        items.push({
+            key: invoice.pdf_url ? 'regenerate-pdf' : 'generate-pdf',
+            label: invoice.pdf_url ? t('pages.invoices.regeneratePdf') : t('pages.invoices.generatePdf'),
+            icon: <FontAwesomeIcon icon={faFilePdf} fixedWidth />,
+            section: t('pages.invoices.menuSections.pdf'),
+            onClick: () => pdfMutation.mutate(invoice.id),
+            disabled: pdfMutation.isPending,
+        })
+
+        if (invoice.email_logs?.length) {
+            items.push({
+                key: 'email-logs',
+                label: t('pages.invoices.viewLogs'),
+                icon: <FontAwesomeIcon icon={faEnvelope} fixedWidth />,
+                section: t('pages.invoices.menuSections.email'),
+                onClick: () => openEmailLogs(invoice.id, invoice.invoice_number),
+            })
+        }
+
+        if (invoice.status === 'approved') {
+            items.push({
+                key: 'mark-sent',
+                label: t('pages.invoices.markSent'),
+                icon: <FontAwesomeIcon icon={faPaperPlane} fixedWidth />,
+                section: t('pages.invoices.menuSections.invoice'),
+                onClick: () => markSentMutation.mutate(invoice.id),
+                disabled: markSentMutation.isPending,
+            })
+        }
+
+        if (invoice.status === 'sent') {
+            items.push({
+                key: 'resend-email',
+                label: t('pages.invoices.resendEmail'),
+                icon: <FontAwesomeIcon icon={faEnvelope} fixedWidth />,
+                section: t('pages.invoices.menuSections.email'),
+                onClick: () => emailMutation.mutate(invoice.id),
+                disabled: emailMutation.isPending || pollingInvoiceId === invoice.id,
+            })
+        }
+
+        if (hasDeletePermission(invoice, user?.role)) {
+            items.push({
+                key: 'delete',
+                label: t('pages.invoices.delete'),
+                icon: <FontAwesomeIcon icon={faTrash} fixedWidth />,
+                section: t('pages.invoices.menuSections.danger'),
+                onClick: () => setDeleteModalInvoiceId(invoice.id),
+                disabled: deleteMutation.isPending,
+                danger: true,
+            })
+        }
+
+        return items
+    }
 
     if (!selectedZevId) {
         return (
@@ -385,6 +634,7 @@ export function InvoicesPage() {
                     onClick={() => setPeriod((prev) => shiftBillingPeriod(prev.period_start, interval, -1))}
                     disabled={!period.period_start}
                 >
+                    <FontAwesomeIcon icon={faArrowLeft} fixedWidth />
                     {t('pages.invoices.prevPeriod')}
                 </button>
                 <div style={{ textAlign: 'center' }}>
@@ -394,7 +644,9 @@ export function InvoicesPage() {
                             ? `${formatShortDate(period.period_start, settings)} → ${formatShortDate(period.period_end, settings)}`
                             : '—'}
                     </div>
-                    <div className="muted" style={{ fontSize: '0.85rem' }}>{t('pages.invoices.billingInterval')} {interval.replace('_', ' ')}</div>
+                    <div className="muted" style={{ fontSize: '0.85rem' }}>
+                        {t('pages.invoices.billingInterval')} {interval.replace('_', ' ')}
+                    </div>
                 </div>
                 <button
                     className="button button-secondary"
@@ -403,6 +655,7 @@ export function InvoicesPage() {
                     disabled={!period.period_start}
                 >
                     {t('pages.invoices.nextPeriod')}
+                    <FontAwesomeIcon icon={faArrowRight} fixedWidth />
                 </button>
             </section>
 
@@ -428,261 +681,211 @@ export function InvoicesPage() {
                 </section>
             ) : (
                 <>
-                {isOwnerOrAdmin && (
-                    <section className="card" style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
-                        <span style={{ fontWeight: 600, marginRight: '0.5rem' }}>{t('pages.invoices.batch.title')}</span>
-                        <button
-                            className="button button-primary"
-                            type="button"
-                            disabled={anyBatchPending}
-                            onClick={() => generateAllMutation.mutate()}
-                        >
-                            {t('pages.invoices.batch.generateAll')}
-                        </button>
-                        <button
-                            className="button"
-                            type="button"
-                            disabled={anyBatchPending || invoiceCount === 0}
-                            onClick={() => generateAllPdfsMutation.mutate()}
-                        >
-                            {t('pages.invoices.batch.generateAllPdfs')} {invoiceCount > 0 && `(${invoiceCount})`}
-                        </button>
-                        <button
-                            className="button"
-                            type="button"
-                            disabled={anyBatchPending || draftCount === 0}
-                            onClick={() => approveAllMutation.mutate()}
-                        >
-                            {t('pages.invoices.batch.approveAll')} {draftCount > 0 && `(${draftCount})`}
-                        </button>
-                        <button
-                            className="button"
-                            type="button"
-                            disabled={anyBatchPending || approvedCount === 0}
-                            onClick={() => sendAllMutation.mutate()}
-                        >
-                            {t('pages.invoices.batch.sendAll')} {approvedCount > 0 && `(${approvedCount})`}
-                        </button>
-                        <button
-                            className="button button-secondary"
-                            type="button"
-                            disabled={anyBatchPending || pdfCount === 0}
-                            onClick={() => downloadAllPdfsMutation.mutate()}
-                        >
-                            {t('pages.invoices.batch.downloadAll')} {pdfCount > 0 && `(${pdfCount})`}
-                        </button>
-                    </section>
-                )}
-                <div className="table-card">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>{t('pages.invoices.col.participant')}</th>
-                                <th>{t('pages.invoices.col.meteringData')}</th>
-                                <th>{t('pages.invoices.col.invoice')}</th>
-                                <th>{t('pages.invoices.col.status')}</th>
-                                <th>{t('pages.invoices.col.email')}</th>
-                                <th>{t('pages.invoices.col.total')}</th>
-                                <th>{t('pages.invoices.col.pdf')}</th>
-                                <th>{t('pages.invoices.col.actions')}</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {rows.map((row) => {
-                                const invoice = row.invoice
-                                const latestEmailLog = getLatestEmailLog(invoice)
-                                return (
-                                    <tr key={row.participant_id}>
-                                        <td>
-                                            <strong>{row.participant_name}</strong>
-                                            {row.participant_email ? <div className="muted">{row.participant_email}</div> : null}
-                                        </td>
-                                        <td>
-                                            {row.metering_data_complete ? (
-                                                <span className="badge badge-success">{t('pages.invoices.metering.complete')}</span>
-                                            ) : (
-                                                <>
-                                                    <span className="badge badge-danger">{t('pages.invoices.metering.missing')}</span>
-                                                    <div className="muted" style={{ fontSize: '0.85rem' }}>
-                                                        {t('pages.invoices.metering.pointsWithData', { n: row.metering_points_with_data, total: row.metering_points_total })}
-                                                    </div>
-                                                    {row.missing_meter_ids.length > 0 && (
-                                                        <div className="muted" style={{ fontSize: '0.8rem' }}>
-                                                            Missing: {
-                                                                row.missing_meter_details?.length
-                                                                    ? row.missing_meter_details
-                                                                        .map((item) => `${item.meter_id} (${item.missing_days} day${item.missing_days === 1 ? '' : 's'})`)
-                                                                        .join(', ')
-                                                                    : row.missing_meter_ids.join(', ')
-                                                            }
-                                                        </div>
-                                                    )}
-                                                </>
-                                            )}
-                                        </td>
-                                        <td>{invoice ? invoice.invoice_number : <span className="muted">{t('pages.invoices.notCreated')}</span>}</td>
-                                        <td>
-                                            {invoice ? (
-                                                <span className={invoiceStatusBadgeClass(invoice.status)}>{humanizeStatus(invoice.status)}</span>
-                                            ) : (
-                                                <span className="badge badge-neutral">{t('pages.invoices.notCreated')}</span>
-                                            )}
-                                        </td>
-                                        <td>
-                                            {invoice && latestEmailLog ? (
-                                                <>
-                                                    <span className={emailStatusBadgeClass(latestEmailLog.status)}>
-                                                        {humanizeStatus(latestEmailLog.status)}
-                                                    </span>
-                                                    <div style={{ marginTop: '0.3rem' }}>
-                                                        <button
-                                                            className="button button-secondary"
-                                                            style={{ fontSize: '0.75rem', padding: '0.3rem 0.5rem' }}
-                                                            type="button"
-                                                            onClick={() => openEmailLogs(invoice.id, invoice.invoice_number)}
-                                                        >
-                                                            {invoice.email_logs?.filter((log) => log.status === 'sent').length ?? 0}/{invoice.email_logs?.length ?? 0}
-                                                        </button>
-                                                        {(invoice.email_logs?.filter((log) => log.status === 'failed').length ?? 0) > 0 && (
-                                                            <span style={{ color: '#ef4444', marginLeft: '0.3rem', fontSize: '0.85rem', fontWeight: 'bold' }}>
-                                                                {t('pages.invoices.failedEmails', { n: invoice.email_logs?.filter((log) => log.status === 'failed').length })}
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                    {(invoice.email_logs?.length ?? 0) > 1 && (
+                    {isOwnerOrAdmin && (
+                        <section className="card invoice-batch-toolbar">
+                            <div className="invoice-batch-header">
+                                <div className="invoice-batch-title">{t('pages.invoices.batch.title')}</div>
+                                <div className="invoice-batch-summary">
+                                    {batchStats.map((stat) => (
+                                        <span key={stat.key} className="invoice-batch-stat">
+                                            <span className="invoice-batch-stat-label">{stat.label}</span>
+                                            <span className="invoice-batch-stat-value">{stat.value}</span>
+                                        </span>
+                                    ))}
+                                </div>
+                            </div>
+                            <div className="invoice-batch-actions">
+                                {recommendedBatchAction && (
+                                    <button
+                                        className="button button-primary"
+                                        type="button"
+                                        disabled={recommendedBatchAction.disabled}
+                                        onClick={recommendedBatchAction.onClick}
+                                    >
+                                        {recommendedBatchAction.icon}
+                                        {recommendedBatchAction.label}
+                                    </button>
+                                )}
+                                <button
+                                    className="button button-secondary button-compact"
+                                    type="button"
+                                    disabled={anyBatchPending || pdfCount === 0}
+                                    onClick={() => downloadAllPdfsMutation.mutate()}
+                                >
+                                    <FontAwesomeIcon icon={faDownload} fixedWidth />
+                                    {t('pages.invoices.batch.downloadAll')} {pdfCount > 0 && `(${pdfCount})`}
+                                </button>
+                                <ActionMenu
+                                    label={t('pages.invoices.moreBatchActions')}
+                                    icon={<FontAwesomeIcon icon={faEllipsis} fixedWidth />}
+                                    items={batchMenuItems.filter((item) => item.key !== recommendedBatchAction?.key)}
+                                />
+                            </div>
+                        </section>
+                    )}
+
+                    <div className="table-card">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>{t('pages.invoices.col.participant')}</th>
+                                    <th>{t('pages.invoices.col.meteringData')}</th>
+                                    <th>{t('pages.invoices.col.invoice')}</th>
+                                    <th>{t('pages.invoices.col.email')}</th>
+                                    <th>{t('pages.invoices.col.total')}</th>
+                                    <th>{t('pages.invoices.col.pdf')}</th>
+                                    <th className="invoice-actions-cell">{t('pages.invoices.col.actions')}</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {rows.map((row) => {
+                                    const invoice = row.invoice
+                                    const latestEmailLog = getLatestEmailLog(invoice)
+                                    const primaryAction = getPrimaryRowAction(row)
+                                    const rowMenuItems = getRowMenuItems(row)
+
+                                    return (
+                                        <tr key={row.participant_id}>
+                                            <td>
+                                                <strong>{row.participant_name}</strong>
+                                                {row.participant_email ? <div className="muted">{row.participant_email}</div> : null}
+                                            </td>
+                                            <td>
+                                                {row.metering_data_complete ? (
+                                                    <span className="badge badge-success">{t('pages.invoices.metering.complete')}</span>
+                                                ) : (
+                                                    <>
+                                                        <span className="badge badge-danger">{t('pages.invoices.metering.missing')}</span>
                                                         <div className="muted" style={{ fontSize: '0.85rem' }}>
-                                                            {t('pages.invoices.attempts', { n: invoice.email_logs?.length })}
+                                                            {t('pages.invoices.metering.pointsWithData', {
+                                                                n: row.metering_points_with_data,
+                                                                total: row.metering_points_total,
+                                                            })}
                                                         </div>
-                                                    )}
-                                                </>
-                                            ) : (
-                                                <span className="muted">—</span>
-                                            )}
-                                        </td>
-                                        <td>{invoice ? `CHF ${invoice.total_chf}` : <span className="muted">—</span>}</td>
-                                        <td>
-                                            {invoice ? (
-                                                invoice.pdf_url ? (
-                                                    <div style={{ display: 'flex', gap: '0.35rem' }}>
-                                                        <a
-                                                            href={invoice.pdf_url}
-                                                            target="_blank"
-                                                            rel="noreferrer"
-                                                            className="button button-primary"
-                                                            style={{ textDecoration: 'none', padding: '0.3rem 0.5rem' }}
-                                                        >
-                                                            {t('pages.invoices.openPdf')}
-                                                        </a>
-                                                        <button
-                                                            className="button"
-                                                            type="button"
-                                                            disabled={pdfMutation.isPending}
-                                                            onClick={() => pdfMutation.mutate(invoice.id)}
-                                                        >
-                                                            {t('pages.invoices.regenerate')}
-                                                        </button>
+                                                        {row.missing_meter_ids.length > 0 && (
+                                                            <ul className="metering-missing-list muted">
+                                                                {row.missing_meter_details?.length
+                                                                    ? row.missing_meter_details.map((item) => (
+                                                                        <li key={item.meter_id}>
+                                                                            {item.meter_id} ({item.missing_days} day{item.missing_days === 1 ? '' : 's'})
+                                                                        </li>
+                                                                    ))
+                                                                    : row.missing_meter_ids.map((meterId) => <li key={meterId}>{meterId}</li>)}
+                                                            </ul>
+                                                        )}
+                                                    </>
+                                                )}
+                                            </td>
+                                            <td>
+                                                {invoice ? (
+                                                    <div className="invoice-cell-stack">
+                                                        <span>{invoice.invoice_number}</span>
+                                                        <span className={invoiceStatusBadgeClass(invoice.status)}>{humanizeStatus(invoice.status)}</span>
                                                     </div>
                                                 ) : (
-                                                    <button
-                                                        className="button"
-                                                        type="button"
-                                                        disabled={pdfMutation.isPending}
-                                                        onClick={() => pdfMutation.mutate(invoice.id)}
-                                                    >
-                                                        {t('pages.invoices.generatePdf')}
-                                                    </button>
-                                                )
-                                            ) : (
-                                                <span className="muted">—</span>
-                                            )}
-                                        </td>
-                                        <td>
-                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-                                                {(!invoice || invoice.status === 'draft' || invoice.status === 'cancelled') && (
-                                                    <button
-                                                        className="button button-primary"
-                                                        type="button"
-                                                        disabled={generateMutation.isPending}
-                                                        onClick={() =>
-                                                            generateMutation.mutate({
-                                                                participant_id: row.participant_id,
-                                                                period_start: period.period_start,
-                                                                period_end: period.period_end,
-                                                            })
-                                                        }
-                                                    >
-                                                        {invoice ? t('pages.invoices.generateAgain') : t('pages.invoices.generateInvoice')}
-                                                    </button>
+                                                    <div className="invoice-cell-stack">
+                                                        <span className="muted">{t('pages.invoices.notCreated')}</span>
+                                                        <span className="badge badge-neutral">{t('pages.invoices.notCreated')}</span>
+                                                    </div>
                                                 )}
-                                                {invoice && (
-                                                    <Link className="button" style={{ textDecoration: 'none' }} to={`/invoices/${invoice.id}`}>
-                                                        {t('pages.invoices.openDetails')}
-                                                    </Link>
+                                            </td>
+                                            <td>
+                                                {invoice && latestEmailLog ? (
+                                                    <div className="invoice-cell-stack">
+                                                        <span className={emailStatusBadgeClass(latestEmailLog.status)}>
+                                                            {humanizeStatus(latestEmailLog.status)}
+                                                        </span>
+                                                        <div>
+                                                            <button
+                                                                className="table-inline-action"
+                                                                type="button"
+                                                                onClick={() => openEmailLogs(invoice.id, invoice.invoice_number)}
+                                                            >
+                                                                <FontAwesomeIcon icon={faEnvelope} fixedWidth />
+                                                                {t('pages.invoices.viewLogs')} ({invoice.email_logs?.length ?? 0})
+                                                            </button>
+                                                            {(invoice.email_logs?.filter((log) => log.status === 'failed').length ?? 0) > 0 && (
+                                                                <span style={{ color: '#ef4444', marginLeft: '0.3rem', fontSize: '0.85rem', fontWeight: 'bold' }}>
+                                                                    {t('pages.invoices.failedEmails', {
+                                                                        n: invoice.email_logs?.filter((log) => log.status === 'failed').length,
+                                                                    })}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        {(invoice.email_logs?.length ?? 0) > 1 && (
+                                                            <div className="muted" style={{ fontSize: '0.85rem' }}>
+                                                                {t('pages.invoices.attempts', { n: invoice.email_logs?.length })}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                ) : (
+                                                    <span className="muted">—</span>
                                                 )}
-                                                {invoice && invoice.status === 'draft' && (
-                                                    <button
-                                                        className="button"
-                                                        type="button"
-                                                        disabled={approveMutation.isPending}
-                                                        onClick={() => approveMutation.mutate(invoice.id)}
-                                                    >
-                                                        {t('pages.invoices.approve')}
-                                                    </button>
+                                            </td>
+                                            <td>{invoice ? `CHF ${invoice.total_chf}` : <span className="muted">—</span>}</td>
+                                            <td>
+                                                {invoice ? (
+                                                    invoice.pdf_url ? (
+                                                        <div className="invoice-cell-stack">
+                                                            <a
+                                                                href={invoice.pdf_url}
+                                                                target="_blank"
+                                                                rel="noreferrer"
+                                                                className="table-inline-link"
+                                                            >
+                                                                <FontAwesomeIcon icon={faFilePdf} fixedWidth />
+                                                                {t('pages.invoices.openPdf')}
+                                                            </a>
+                                                            <span className="badge badge-success">{t('pages.invoices.pdfReady')}</span>
+                                                        </div>
+                                                    ) : (
+                                                        <span className="badge badge-neutral">{t('pages.invoices.pdfMissing')}</span>
+                                                    )
+                                                ) : (
+                                                    <span className="muted">—</span>
                                                 )}
-                                                {invoice && (invoice.status === 'draft' || invoice.status === 'cancelled' || user?.role === 'admin') && (
-                                                    <button
-                                                        className="button button-danger"
-                                                        type="button"
-                                                        disabled={deleteMutation.isPending}
-                                                        onClick={() => setDeleteModalInvoiceId(invoice.id)}
-                                                    >
-                                                        {t('pages.invoices.delete')}
-                                                    </button>
-                                                )}
-                                                {invoice && invoice.status === 'approved' && (
-                                                    <button
-                                                        className="button"
-                                                        type="button"
-                                                        disabled={markSentMutation.isPending}
-                                                        onClick={() => markSentMutation.mutate(invoice.id)}
-                                                    >
-                                                        {t('pages.invoices.markSent')}
-                                                    </button>
-                                                )}
-                                                {invoice && (invoice.status === 'approved' || invoice.status === 'sent') && (
-                                                    <button
-                                                        className="button"
-                                                        type="button"
-                                                        disabled={emailMutation.isPending || pollingInvoiceId === invoice.id}
-                                                        onClick={() => {
-                                                            emailMutation.mutate(invoice.id)
-                                                        }}
-                                                    >
-                                                        {pollingInvoiceId === invoice.id ? t('pages.invoices.sending') : invoice.status === 'sent' ? t('pages.invoices.resendEmail') : t('pages.invoices.sendEmail')}
-                                                    </button>
-                                                )}
-                                                {invoice && invoice.status === 'sent' && (
-                                                    <button
-                                                        className="button"
-                                                        type="button"
-                                                        disabled={markPaidMutation.isPending}
-                                                        onClick={() => markPaidMutation.mutate(invoice.id)}
-                                                    >
-                                                        {t('pages.invoices.markPaid')}
-                                                    </button>
-                                                )}
-                                            </div>
-                                        </td>
-                                    </tr>
-                                )
-                            })}
-                        </tbody>
-                    </table>
-                </div>
+                                            </td>
+                                            <td className="invoice-actions-cell">
+                                                <div className="invoice-row-actions">
+                                                    {primaryAction && (
+                                                        <button
+                                                            className="button button-primary button-compact"
+                                                            type="button"
+                                                            disabled={primaryAction.disabled}
+                                                            onClick={primaryAction.onClick}
+                                                        >
+                                                            {primaryAction.icon}
+                                                            {primaryAction.label}
+                                                        </button>
+                                                    )}
+                                                    {invoice && (
+                                                        <Link
+                                                            className="button button-secondary button-compact"
+                                                            style={{ textDecoration: 'none' }}
+                                                            to={`/invoices/${invoice.id}`}
+                                                        >
+                                                            <FontAwesomeIcon icon={faFileInvoice} fixedWidth />
+                                                            {t('pages.invoices.openDetails')}
+                                                        </Link>
+                                                    )}
+                                                    {rowMenuItems.length > 0 && (
+                                                        <ActionMenu
+                                                            label={t('pages.invoices.moreActions')}
+                                                            icon={<FontAwesomeIcon icon={faEllipsis} fixedWidth />}
+                                                            items={rowMenuItems}
+                                                        />
+                                                    )}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    )
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
                 </>
             )}
 
-            {/* Delete Confirmation Modal */}
             {deleteModalInvoiceId && (
                 <div
                     style={{

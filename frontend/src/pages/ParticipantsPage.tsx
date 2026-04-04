@@ -1,5 +1,16 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useState, type FormEvent } from 'react'
+import { useMemo, useState, type FormEvent } from 'react'
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
+import {
+    faDownload,
+    faEllipsis,
+    faEnvelope,
+    faPen,
+    faPlus,
+    faTrash,
+    faTriangleExclamation,
+} from '@fortawesome/free-solid-svg-icons'
+import { ActionMenu, type ActionMenuItem } from '../components/ActionMenu'
 import { ConfirmDialog, useConfirmDialog } from '../components/ConfirmDialog'
 import { FormModal } from '../components/FormModal'
 import {
@@ -35,21 +46,19 @@ const defaultForm: ParticipantInput = {
     valid_to: null,
 }
 
-const titleOptions: Array<{ value: NonNullable<ParticipantInput['title']>; label: string }> = [
-    { value: '', label: 'No title' },
-    { value: 'mr', label: 'Mr.' },
-    { value: 'mrs', label: 'Mrs.' },
-    { value: 'ms', label: 'Ms.' },
-    { value: 'dr', label: 'Dr.' },
-    { value: 'prof', label: 'Prof.' },
-]
+type ParticipantReadinessFilter = 'all' | 'attention' | 'ready'
+type ParticipantValidityState = 'current' | 'upcoming' | 'ended'
 
-const titleLabelByValue: Record<string, string> = {
-    mr: 'Mr.',
-    mrs: 'Mrs.',
-    ms: 'Ms.',
-    dr: 'Dr.',
-    prof: 'Prof.',
+function getParticipantValidityState(participant: Participant, todayIso: string): ParticipantValidityState {
+    if (participant.valid_from > todayIso) return 'upcoming'
+    if (participant.valid_to && participant.valid_to < todayIso) return 'ended'
+    return 'current'
+}
+
+function participantValidityBadgeClass(state: ParticipantValidityState): string {
+    if (state === 'current') return 'badge badge-success'
+    if (state === 'upcoming') return 'badge badge-info'
+    return 'badge badge-neutral'
 }
 
 export function ParticipantsPage() {
@@ -67,6 +76,8 @@ export function ParticipantsPage() {
     const [editingId, setEditingId] = useState<string | null>(null)
     const [showModal, setShowModal] = useState(false)
     const [error, setError] = useState<string | null>(null)
+    const [searchTerm, setSearchTerm] = useState('')
+    const [readinessFilter, setReadinessFilter] = useState<ParticipantReadinessFilter>('all')
     const [credentialsNotice, setCredentialsNotice] = useState<{
         participantName: string
         username: string
@@ -74,24 +85,46 @@ export function ParticipantsPage() {
         message: string
     } | null>(null)
 
+    const titleOptions = useMemo(
+        () => [
+            { value: '' as const, label: t('pages.zevs.titles.none') },
+            { value: 'mr' as const, label: t('pages.zevs.titles.mr') },
+            { value: 'mrs' as const, label: t('pages.zevs.titles.mrs') },
+            { value: 'ms' as const, label: t('pages.zevs.titles.ms') },
+            { value: 'dr' as const, label: t('pages.zevs.titles.dr') },
+            { value: 'prof' as const, label: t('pages.zevs.titles.prof') },
+        ],
+        [t],
+    )
+    const titleLabelByValue = useMemo(
+        () => ({
+            mr: t('pages.zevs.titles.mr'),
+            mrs: t('pages.zevs.titles.mrs'),
+            ms: t('pages.zevs.titles.ms'),
+            dr: t('pages.zevs.titles.dr'),
+            prof: t('pages.zevs.titles.prof'),
+        }),
+        [t],
+    )
+
     const createMutation = useMutation({
         mutationFn: createParticipant,
         onSuccess: (participant) => {
             setForm(defaultForm)
             setError(null)
             setShowModal(false)
-            pushToast('Participant and account created.', 'success')
+            pushToast(t('pages.participants.messages.created'), 'success')
             if (participant.account_username && participant.initial_password) {
                 setCredentialsNotice({
                     participantName: `${participant.first_name} ${participant.last_name}`,
                     username: participant.account_username,
                     password: participant.initial_password,
-                    message: 'Initial login credentials were generated for this participant.',
+                    message: t('pages.participants.messages.credentialsGenerated'),
                 })
             }
             void queryClient.invalidateQueries({ queryKey: ['participants'] })
         },
-        onError: (error) => setError(formatApiError(error, 'Failed to create participant.')),
+        onError: (error) => setError(formatApiError(error, t('pages.participants.messages.createFailed'))),
     })
 
     const updateMutation = useMutation({
@@ -101,16 +134,16 @@ export function ParticipantsPage() {
             setForm(defaultForm)
             setError(null)
             setShowModal(false)
-            pushToast('Participant updated.', 'success')
+            pushToast(t('pages.participants.messages.updated'), 'success')
             void queryClient.invalidateQueries({ queryKey: ['participants'] })
         },
-        onError: (error) => setError(formatApiError(error, 'Failed to update participant.')),
+        onError: (error) => setError(formatApiError(error, t('pages.participants.messages.updateFailed'))),
     })
 
     const deleteMutation = useMutation({
         mutationFn: deleteParticipant,
         onSuccess: () => {
-            pushToast('Participant deleted.', 'success')
+            pushToast(t('pages.participants.messages.deleted'), 'success')
             void queryClient.invalidateQueries({ queryKey: ['participants'] })
         },
     })
@@ -119,15 +152,20 @@ export function ParticipantsPage() {
         mutationFn: sendParticipantInvitation,
         onSuccess: (result, participantId) => {
             const participant = data?.results.find((entry) => entry.id === participantId)
-            pushToast(result.detail, 'success')
+            pushToast(
+                t('pages.participants.messages.invitationSent', {
+                    email: participant?.email || '',
+                }),
+                'success',
+            )
             setCredentialsNotice({
-                participantName: participant ? `${participant.first_name} ${participant.last_name}` : 'Participant',
+                participantName: participant ? `${participant.first_name} ${participant.last_name}` : t('pages.participants.fallbackName'),
                 username: result.username,
                 password: result.temporary_password,
-                message: 'A fresh temporary password was created and emailed to the participant.',
+                message: t('pages.participants.messages.invitationReset'),
             })
         },
-        onError: (error) => pushToast(formatApiError(error, 'Failed to send invitation.'), 'error'),
+        onError: (error) => pushToast(formatApiError(error, t('pages.participants.messages.invitationFailed')), 'error'),
     })
 
     function formatParticipantName(participant: Participant): string {
@@ -173,11 +211,11 @@ export function ParticipantsPage() {
         event.preventDefault()
         const zevForSubmit = isManagedScope ? selectedZevId : form.zev
         if (!zevForSubmit) {
-            setError('Please select a ZEV.')
+            setError(t('pages.participants.messages.selectZev'))
             return
         }
         if (!form.email) {
-            setError('Please provide an email address.')
+            setError(t('pages.participants.messages.emailRequired'))
             return
         }
         if (editingId) {
@@ -196,20 +234,58 @@ export function ParticipantsPage() {
         return warnings
     }
 
-    if (isLoading) return <div className="card">Loading participants...</div>
-    if (isError) return <div className="card error-banner">Failed to load participants.</div>
+    function formatParticipantAddress(participant: Participant): string {
+        return [
+            participant.address_line1,
+            participant.address_line2,
+            [participant.postal_code, participant.city].filter(Boolean).join(' '),
+        ].filter(Boolean).join(', ')
+    }
+
+    if (isLoading) return <div className="card">{t('common.loading')}</div>
+    if (isError) return <div className="card error-banner">{t('common.error')}</div>
 
     const participants = (data?.results ?? []).filter((participant) => !isManagedScope || !selectedZevId || participant.zev === selectedZevId)
     const ownerIdByZevId = new Map((zevsQuery.data?.results ?? []).map((zev) => [zev.id, zev.owner]))
     const isOwnerParticipant = (participant: Participant) => ownerIdByZevId.get(participant.zev) === participant.user
-    const sortedParticipants = [...participants].sort((left, right) => {
-        const leftIsOwner = isOwnerParticipant(left)
-        const rightIsOwner = isOwnerParticipant(right)
-        if (leftIsOwner !== rightIsOwner) {
-            return leftIsOwner ? -1 : 1
-        }
-        return formatParticipantName(left).localeCompare(formatParticipantName(right))
+    const todayIso = new Date().toISOString().slice(0, 10)
+    const participantCards = [...participants]
+        .map((participant) => {
+            const warnings = participantWarnings(participant)
+            const ownerRow = isOwnerParticipant(participant)
+            const validityState = getParticipantValidityState(participant, todayIso)
+
+            return {
+                participant,
+                warnings,
+                ownerRow,
+                validityState,
+                displayName: formatParticipantName(participant),
+                address: formatParticipantAddress(participant),
+            }
+        })
+        .sort((left, right) => {
+            if (left.ownerRow !== right.ownerRow) {
+                return left.ownerRow ? -1 : 1
+            }
+            return left.displayName.localeCompare(right.displayName)
+        })
+    const normalizedSearch = searchTerm.trim().toLowerCase()
+    const filteredParticipants = participantCards.filter((entry) => {
+        const matchesReadiness = readinessFilter === 'all'
+            || (readinessFilter === 'attention' && entry.warnings.length > 0)
+            || (readinessFilter === 'ready' && entry.warnings.length === 0)
+        const matchesSearch = !normalizedSearch
+            || entry.displayName.toLowerCase().includes(normalizedSearch)
+            || (entry.participant.email || '').toLowerCase().includes(normalizedSearch)
+            || entry.address.toLowerCase().includes(normalizedSearch)
+
+        return matchesReadiness && matchesSearch
     })
+    const ownerCount = participantCards.filter((entry) => entry.ownerRow).length
+    const warningCount = participantCards.filter((entry) => entry.warnings.length > 0).length
+    const noMeteringCount = participantCards.filter((entry) => !entry.participant.has_metering_point_assignment).length
+    const hasFilters = !!normalizedSearch || readinessFilter !== 'all'
 
     return (
         <div className="page-stack">
@@ -235,11 +311,52 @@ export function ParticipantsPage() {
                 </section>
             )}
 
-            <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
-                <button className="button button-primary" onClick={openCreateModal}>
-                    {t('pages.participants.newParticipant')}
-                </button>
-            </div>
+            <section className="card participant-toolbar">
+                <div className="participant-toolbar-header">
+                    <div className="participant-summary" aria-label={t('pages.participants.summaryLabel')}>
+                        <span className="participant-summary-stat">
+                            <span className="participant-summary-label">{t('pages.participants.summary.total')}</span>
+                            <span className="participant-summary-value">{participantCards.length}</span>
+                        </span>
+                        <span className="participant-summary-stat">
+                            <span className="participant-summary-label">{t('pages.participants.summary.owners')}</span>
+                            <span className="participant-summary-value">{ownerCount}</span>
+                        </span>
+                        <span className="participant-summary-stat">
+                            <span className="participant-summary-label">{t('pages.participants.summary.attention')}</span>
+                            <span className="participant-summary-value">{warningCount}</span>
+                        </span>
+                        <span className="participant-summary-stat">
+                            <span className="participant-summary-label">{t('pages.participants.summary.noMetering')}</span>
+                            <span className="participant-summary-value">{noMeteringCount}</span>
+                        </span>
+                    </div>
+
+                    <button className="button button-primary" type="button" onClick={openCreateModal}>
+                        <FontAwesomeIcon icon={faPlus} fixedWidth />
+                        {t('pages.participants.newParticipant')}
+                    </button>
+                </div>
+
+                <div className="participant-filter-grid">
+                    <label>
+                        <span>{t('pages.participants.filters.search')}</span>
+                        <input
+                            value={searchTerm}
+                            onChange={(event) => setSearchTerm(event.target.value)}
+                            placeholder={t('pages.participants.filters.searchPlaceholder')}
+                        />
+                    </label>
+                    <label>
+                        <span>{t('pages.participants.filters.readiness')}</span>
+                        <select value={readinessFilter} onChange={(event) => setReadinessFilter(event.target.value as ParticipantReadinessFilter)}>
+                            <option value="all">{t('pages.participants.filters.all')}</option>
+                            <option value="attention">{t('pages.participants.filters.attention')}</option>
+                            <option value="ready">{t('pages.participants.filters.ready')}</option>
+                        </select>
+                    </label>
+                </div>
+            </section>
 
             <FormModal
                 isOpen={showModal}
@@ -351,114 +468,163 @@ export function ParticipantsPage() {
 
                     <div style={{ gridColumn: '1 / -1', display: 'flex', gap: '1rem', justifyContent: 'flex-end', marginTop: '1rem' }}>
                         <button className="button button-secondary" type="button" onClick={closeModal}>
-                            Cancel
+                            {t('common.cancel')}
                         </button>
                         <button className="button button-primary" type="submit" disabled={createMutation.isPending || updateMutation.isPending}>
-                            {editingId ? t('pages.participants.saveParticipant') : t('pages.participants.createTitle')}
+                            {editingId ? t('pages.participants.saveParticipant') : t('common.create')}
                         </button>
                     </div>
                 </form>
             </FormModal>
 
-            {sortedParticipants.length === 0 ? (
+            {participantCards.length === 0 ? (
                 <section className="card" style={{ display: 'grid', gap: '0.75rem' }}>
                     <h3 style={{ margin: 0 }}>{t('pages.participants.emptyState.title')}</h3>
                     <p className="muted" style={{ margin: 0 }}>{t('pages.participants.emptyState.description')}</p>
                     <div>
                         <button className="button button-primary" type="button" onClick={openCreateModal}>
+                            <FontAwesomeIcon icon={faPlus} fixedWidth />
                             {t('pages.participants.emptyState.createAction')}
                         </button>
                     </div>
                 </section>
+            ) : filteredParticipants.length === 0 ? (
+                <section className="card" style={{ display: 'grid', gap: '0.75rem' }}>
+                    <h3 style={{ margin: 0 }}>{t('pages.participants.noResults.title')}</h3>
+                    <p className="muted" style={{ margin: 0 }}>{t('pages.participants.noResults.description')}</p>
+                    {hasFilters && (
+                        <div>
+                            <button
+                                className="button button-secondary"
+                                type="button"
+                                onClick={() => {
+                                    setSearchTerm('')
+                                    setReadinessFilter('all')
+                                }}
+                            >
+                                {t('pages.participants.filters.clear')}
+                            </button>
+                        </div>
+                    )}
+                </section>
             ) : (
-                <div className="table-card">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>{t('pages.participants.col.name')}</th>
-                                <th>{t('pages.participants.col.contact')}</th>
-                                <th>{t('pages.participants.col.address')}</th>
-                                <th>{t('pages.participants.col.validFrom')}</th>
-                                <th>{t('pages.participants.col.validTo')}</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {sortedParticipants.map((participant) => {
-                            const ownerRow = isOwnerParticipant(participant)
+                <div className="table-card participant-card-list">
+                    {filteredParticipants.map(({ participant, warnings, ownerRow, validityState, displayName, address }) => {
+                        const menuItems: ActionMenuItem[] = []
 
-                            return (
-                                <tr key={participant.id}>
-                                    <td>
-                                        <div>{formatParticipantName(participant)}</div>
-                                        {ownerRow && (
-                                            <div>
-                                                <span className="badge badge-info" style={{ marginTop: '0.3rem' }}>
-                                                    {t('pages.participants.owner')}
+                        menuItems.push({
+                            key: 'invitation',
+                            label: t('pages.participants.sendInvitation'),
+                            icon: <FontAwesomeIcon icon={faEnvelope} fixedWidth />,
+                            disabled: invitationMutation.isPending || !participant.email,
+                            onClick: () => invitationMutation.mutate(participant.id),
+                        })
+
+                        if (!ownerRow) {
+                            menuItems.push({
+                                key: 'delete',
+                                label: t('common.delete'),
+                                icon: <FontAwesomeIcon icon={faTrash} fixedWidth />,
+                                disabled: deleteMutation.isPending || dialogLoading,
+                                danger: true,
+                                onClick: () => confirm({
+                                    title: t('pages.participants.deleteTitle'),
+                                    message: t('pages.participants.deleteMessage', { name: displayName }),
+                                    confirmText: t('pages.participants.deleteConfirm'),
+                                    isDangerous: true,
+                                    onConfirm: () => deleteMutation.mutate(participant.id),
+                                }),
+                            })
+                        }
+
+                        const directAction = menuItems.length === 1 && !ownerRow ? menuItems[0] : null
+                        const overflowItems = directAction ? [] : menuItems
+
+                        return (
+                            <article key={participant.id} className="participant-card">
+                                <div className="participant-card-header">
+                                    <div className="participant-card-title">
+                                        <div className="participant-card-badges">
+                                            {ownerRow && <span className="badge badge-info">{t('pages.participants.owner')}</span>}
+                                            <span className={participantValidityBadgeClass(validityState)}>
+                                                {t(`pages.participants.validity.${validityState}`)}
+                                            </span>
+                                            {warnings.length > 0 && (
+                                                <span className="badge badge-warning">
+                                                    <FontAwesomeIcon icon={faTriangleExclamation} fixedWidth />
+                                                    {t('pages.participants.attentionNeeded')}
                                                 </span>
-                                            </div>
-                                        )}
-                                        {participantWarnings(participant).length > 0 && (
-                                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.25rem', marginTop: '0.3rem' }}>
-                                                {participantWarnings(participant).map((warning) => (
-                                                    <span key={warning} className="badge badge-warning">{warning}</span>
-                                                ))}
-                                            </div>
-                                        )}
-                                    </td>
-                                    <td>
-                                        <div>{participant.email || '-'}</div>
-                                        <div className="muted">{participant.phone || 'No phone'}</div>
-                                    </td>
-                                    <td>
-                                        {[participant.address_line1, participant.address_line2, [participant.postal_code, participant.city].filter(Boolean).join(' ')].filter(Boolean).join(', ') || '-'}
-                                    </td>
-                                    <td>{formatShortDate(participant.valid_from, settings)}</td>
-                                    <td>{participant.valid_to ? formatShortDate(participant.valid_to, settings) : '-'}</td>
-                                    <td className="actions-cell">
-                                        <button
-                                            className="button"
-                                            type="button"
-                                            disabled={invitationMutation.isPending}
-                                            onClick={() => invitationMutation.mutate(participant.id)}
-                                        >
-                                            {t('pages.participants.sendInvitation')}
+                                            )}
+                                        </div>
+                                        <strong>{displayName}</strong>
+                                    </div>
+
+                                    <div className="participant-card-actions">
+                                        <button className="button button-primary button-compact" type="button" onClick={() => startEdit(participant)}>
+                                            <FontAwesomeIcon icon={faPen} fixedWidth />
+                                            {t('common.edit')}
                                         </button>
                                         <button
-                                            className="button button-secondary"
+                                            className="button button-secondary button-compact"
                                             type="button"
                                             onClick={() => downloadParticipantContractPdf(
                                                 participant.id,
-                                                `contract_${participant.last_name}_${participant.first_name}.pdf`
+                                                `contract_${participant.last_name}_${participant.first_name}.pdf`,
                                             ).catch(() => pushToast(t('pages.participants.contractDownloadError'), 'error'))}
                                         >
+                                            <FontAwesomeIcon icon={faDownload} fixedWidth />
                                             {t('pages.participants.downloadContract')}
                                         </button>
-                                        <button className="button button-primary" type="button" onClick={() => startEdit(participant)}>
-                                            Edit
-                                        </button>
-                                        {!ownerRow && (
+                                        {directAction && (
                                             <button
-                                                className="button danger"
+                                                className={`button ${directAction.danger ? 'button-danger' : 'button-secondary'} button-compact`}
                                                 type="button"
-                                                disabled={deleteMutation.isPending || dialogLoading}
-                                                onClick={() => confirm({
-                                                    title: t('pages.participants.deleteTitle'),
-                                                    message: t('pages.participants.deleteMessage', { name: formatParticipantName(participant) }),
-                                                    confirmText: t('pages.participants.deleteConfirm'),
-                                                    isDangerous: true,
-                                                    onConfirm: () => deleteMutation.mutate(participant.id),
-                                                })}
+                                                disabled={directAction.disabled}
+                                                onClick={directAction.onClick}
                                             >
-                                                Delete
+                                                {directAction.icon}
+                                                {directAction.label}
                                             </button>
                                         )}
-                                    </td>
-                                </tr>
-                            )
-                            })}
-                        </tbody>
-                    </table>
+                                        {overflowItems.length > 0 && (
+                                            <ActionMenu
+                                                label={t('pages.participants.moreActions')}
+                                                icon={<FontAwesomeIcon icon={faEllipsis} fixedWidth />}
+                                                items={overflowItems}
+                                            />
+                                        )}
+                                    </div>
+                                </div>
+
+                                <div className="participant-card-body">
+                                    <div className="participant-card-grid">
+                                        <div className="participant-card-section">
+                                            <div className="participant-card-label">{t('pages.participants.section.contact')}</div>
+                                            <div>{participant.email || t('pages.participants.noEmailValue')}</div>
+                                            <div className="muted">{participant.phone || t('pages.participants.noPhone')}</div>
+                                        </div>
+                                        <div className="participant-card-section">
+                                            <div className="participant-card-label">{t('pages.participants.section.address')}</div>
+                                            <div>{address || t('pages.participants.noAddressValue')}</div>
+                                        </div>
+                                        <div className="participant-card-section">
+                                            <div className="participant-card-label">{t('pages.participants.section.validity')}</div>
+                                            <div>{formatShortDate(participant.valid_from, settings)}</div>
+                                            <div className="muted">{participant.valid_to ? formatShortDate(participant.valid_to, settings) : t('pages.participants.openEnded')}</div>
+                                        </div>
+                                    </div>
+
+                                    {warnings.length > 0 && (
+                                        <div className="participant-warning-list">
+                                            {warnings.map((warning) => (
+                                                <span key={warning} className="badge badge-warning">{warning}</span>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            </article>
+                        )
+                    })}
                 </div>
             )}
 

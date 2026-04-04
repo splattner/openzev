@@ -2,10 +2,22 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useMemo, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import dayjs from 'dayjs'
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
+import {
+    faChartLine,
+    faDatabase,
+    faEllipsis,
+    faPen,
+    faPlus,
+    faTrash,
+    faUserPlus,
+} from '@fortawesome/free-solid-svg-icons'
 import { DatePickerInput } from '@mantine/dates'
+import { FormControlLabel, Switch } from '@mui/material'
 import { DatePicker } from '@mui/x-date-pickers/DatePicker'
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs'
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider'
+import { ActionMenu, type ActionMenuItem } from '../components/ActionMenu'
 import { ConfirmDialog, useConfirmDialog } from '../components/ConfirmDialog'
 import { FormModal } from '../components/FormModal'
 import {
@@ -46,6 +58,28 @@ const defaultAssignmentForm = (meteringPointId = ''): MeteringPointAssignmentInp
     valid_to: null,
 })
 
+type MeteringPointStatusFilter = 'all' | 'active' | 'inactive'
+type MeteringPointTypeFilter = 'all' | MeteringPoint['meter_type']
+type AssignmentState = 'current' | 'upcoming' | 'ended'
+
+function getAssignmentState(assignment: MeteringPointAssignment, todayIso: string): AssignmentState {
+    if (assignment.valid_from > todayIso) return 'upcoming'
+    if (assignment.valid_to && assignment.valid_to < todayIso) return 'ended'
+    return 'current'
+}
+
+function assignmentStateBadgeClass(state: AssignmentState): string {
+    if (state === 'current') return 'badge badge-success'
+    if (state === 'upcoming') return 'badge badge-info'
+    return 'badge badge-neutral'
+}
+
+function assignmentStateSortOrder(state: AssignmentState): number {
+    if (state === 'current') return 0
+    if (state === 'upcoming') return 1
+    return 2
+}
+
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export function MeteringPointsPage() {
@@ -82,6 +116,9 @@ export function MeteringPointsPage() {
     const [deleteDataMode, setDeleteDataMode] = useState<'all' | 'range'>('all')
     const [deleteDataFrom, setDeleteDataFrom] = useState('')
     const [deleteDataTo, setDeleteDataTo] = useState('')
+    const [searchTerm, setSearchTerm] = useState('')
+    const [statusFilter, setStatusFilter] = useState<MeteringPointStatusFilter>('all')
+    const [typeFilter, setTypeFilter] = useState<MeteringPointTypeFilter>('all')
 
     // ── Lookups ──────────────────────────────────────────────────────────────────
     const participantNameById = useMemo(
@@ -310,14 +347,30 @@ export function MeteringPointsPage() {
         return (participantsQuery.data?.results ?? []).filter((p) => p.zev === mp.zev)
     }, [selectedMpId, meteringPointsQuery.data, participantsQuery.data])
 
-    const meteringPoints = (meteringPointsQuery.data?.results ?? []).filter(
+    const scopedMeteringPoints = (meteringPointsQuery.data?.results ?? []).filter(
         (point) => !canManageMeteringPoints || !selectedZevId || point.zev === selectedZevId,
     )
     const filteredAssignmentsByMeteringPoint = new Map(
         Array.from(assignmentsByMeteringPoint.entries()).filter(([meteringPointId]) =>
-            meteringPoints.some((point) => point.id === meteringPointId),
+            scopedMeteringPoints.some((point) => point.id === meteringPointId),
         ),
     )
+    const normalizedSearch = searchTerm.trim().toLowerCase()
+    const meteringPoints = scopedMeteringPoints.filter((point) => {
+        const matchesStatus = statusFilter === 'all'
+            || (statusFilter === 'active' && point.is_active)
+            || (statusFilter === 'inactive' && !point.is_active)
+        const matchesType = typeFilter === 'all' || point.meter_type === typeFilter
+        const matchesSearch = !normalizedSearch
+            || point.meter_id.toLowerCase().includes(normalizedSearch)
+            || (point.location_description ?? '').toLowerCase().includes(normalizedSearch)
+
+        return matchesStatus && matchesType && matchesSearch
+    })
+    const activeCount = scopedMeteringPoints.filter((point) => point.is_active).length
+    const inactiveCount = scopedMeteringPoints.length - activeCount
+    const assignedCount = scopedMeteringPoints.filter((point) => (filteredAssignmentsByMeteringPoint.get(point.id) ?? []).length > 0).length
+    const hasFilters = !!normalizedSearch || statusFilter !== 'all' || typeFilter !== 'all'
 
     // ── Loading / error ───────────────────────────────────────────────────────────
     if (meteringPointsQuery.isLoading) {
@@ -338,13 +391,67 @@ export function MeteringPointsPage() {
                 </p>
             </header>
 
-            {canManageMeteringPoints && (
-                <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
-                    <button className="button button-primary" onClick={openCreateMpModal}>
-                        {t('pages.meteringPoints.newMeteringPoint')}
-                    </button>
+            <section className="card metering-toolbar">
+                <div className="metering-toolbar-header">
+                    <div className="metering-summary" aria-label={t('pages.meteringPoints.summaryLabel')}>
+                        <span className="metering-summary-stat">
+                            <span className="metering-summary-label">{t('pages.meteringPoints.summary.total')}</span>
+                            <span className="metering-summary-value">{scopedMeteringPoints.length}</span>
+                        </span>
+                        <span className="metering-summary-stat">
+                            <span className="metering-summary-label">{t('pages.meteringPoints.summary.active')}</span>
+                            <span className="metering-summary-value">{activeCount}</span>
+                        </span>
+                        <span className="metering-summary-stat">
+                            <span className="metering-summary-label">{t('pages.meteringPoints.summary.inactive')}</span>
+                            <span className="metering-summary-value">{inactiveCount}</span>
+                        </span>
+                        <span className="metering-summary-stat">
+                            <span className="metering-summary-label">{t('pages.meteringPoints.summary.assigned')}</span>
+                            <span className="metering-summary-value">{assignedCount}</span>
+                        </span>
+                        <span className="metering-summary-stat">
+                            <span className="metering-summary-label">{t('pages.meteringPoints.summary.unassigned')}</span>
+                            <span className="metering-summary-value">{scopedMeteringPoints.length - assignedCount}</span>
+                        </span>
+                    </div>
+
+                    {canManageMeteringPoints && (
+                        <button className="button button-primary" type="button" onClick={openCreateMpModal}>
+                            <FontAwesomeIcon icon={faPlus} fixedWidth />
+                            {t('pages.meteringPoints.newMeteringPoint')}
+                        </button>
+                    )}
                 </div>
-            )}
+
+                <div className="metering-filter-grid">
+                    <label>
+                        <span>{t('pages.meteringPoints.filters.search')}</span>
+                        <input
+                            value={searchTerm}
+                            onChange={(event) => setSearchTerm(event.target.value)}
+                            placeholder={t('pages.meteringPoints.filters.searchPlaceholder')}
+                        />
+                    </label>
+                    <label>
+                        <span>{t('pages.meteringPoints.filters.status')}</span>
+                        <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as MeteringPointStatusFilter)}>
+                            <option value="all">{t('pages.meteringPoints.filters.allStatuses')}</option>
+                            <option value="active">{t('pages.meteringPoints.active')}</option>
+                            <option value="inactive">{t('pages.meteringPoints.inactive')}</option>
+                        </select>
+                    </label>
+                    <label>
+                        <span>{t('pages.meteringPoints.filters.type')}</span>
+                        <select value={typeFilter} onChange={(event) => setTypeFilter(event.target.value as MeteringPointTypeFilter)}>
+                            <option value="all">{t('pages.meteringPoints.filters.allTypes')}</option>
+                            <option value="consumption">{t('pages.meteringPoints.meterTypes.consumption')}</option>
+                            <option value="production">{t('pages.meteringPoints.meterTypes.production')}</option>
+                            <option value="bidirectional">{t('pages.meteringPoints.meterTypes.bidirectional')}</option>
+                        </select>
+                    </label>
+                </div>
+            </section>
 
             {/* ── Metering Point Create/Edit Modal ──────────────────────────────────── */}
             <FormModal
@@ -376,16 +483,17 @@ export function MeteringPointsPage() {
                         </select>
                     </label>
 
-                    <label>
-                        <span>{t('pages.meteringPoints.form.active')}</span>
-                        <select
-                            value={String(mpForm.is_active)}
-                            onChange={(e) => setMpForm((prev) => ({ ...prev, is_active: e.target.value === 'true' }))}
-                        >
-                            <option value="true">Yes</option>
-                            <option value="false">No</option>
-                        </select>
-                    </label>
+                    <div style={{ gridColumn: '1 / -1' }}>
+                        <FormControlLabel
+                            control={
+                                <Switch
+                                    checked={mpForm.is_active}
+                                    onChange={(_event, checked) => setMpForm((prev) => ({ ...prev, is_active: checked }))}
+                                />
+                            }
+                            label={t('pages.meteringPoints.form.active')}
+                        />
+                    </div>
 
                     <label style={{ gridColumn: '1 / -1' }}>
                         <span>{t('pages.meteringPoints.form.location')}</span>
@@ -405,7 +513,7 @@ export function MeteringPointsPage() {
                         }}
                     >
                         <button className="button button-secondary" type="button" onClick={closeMpModal}>
-                            Cancel
+                            {t('common.cancel')}
                         </button>
                         <button className="button button-primary" type="submit" disabled={saveMpMutation.isPending}>
                             {editingMpId ? t('pages.meteringPoints.saveChanges') : t('pages.meteringPoints.createButton')}
@@ -474,7 +582,7 @@ export function MeteringPointsPage() {
                         }}
                     >
                         <button className="button button-secondary" type="button" onClick={closeAssignModal}>
-                            Cancel
+                            {t('common.cancel')}
                         </button>
                         <button className="button button-primary" type="submit" disabled={saveAssignMutation.isPending}>
                             {editingAssignId ? t('pages.meteringPoints.saveAssignment') : t('pages.meteringPoints.assignParticipant')}
@@ -485,13 +593,14 @@ export function MeteringPointsPage() {
 
             {/* ── Metering Points List ──────────────────────────────────────────────── */}
             <div className="table-card">
-                {meteringPoints.length === 0 ? (
+                {scopedMeteringPoints.length === 0 ? (
                     <section className="card" style={{ margin: '1rem', display: 'grid', gap: '0.75rem' }}>
                         <h3 style={{ margin: 0 }}>{t('pages.meteringPoints.emptyState.title')}</h3>
                         <p className="muted" style={{ margin: 0 }}>{t('pages.meteringPoints.emptyState.description')}</p>
                         <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
                             {canManageMeteringPoints && (
                                 <button className="button button-primary" type="button" onClick={openCreateMpModal}>
+                                    <FontAwesomeIcon icon={faPlus} fixedWidth />
                                     {t('pages.meteringPoints.emptyState.createAction')}
                                 </button>
                             )}
@@ -502,177 +611,172 @@ export function MeteringPointsPage() {
                             )}
                         </div>
                     </section>
-                ) : (
-                    meteringPoints.map((point) => {
-                        const assignments = filteredAssignmentsByMeteringPoint.get(point.id) ?? []
-                        const todayIso = new Date().toISOString().slice(0, 10)
-
-                        return (
-                            <div
-                                key={point.id}
-                                style={{
-                                    border: '1px solid var(--color-border, #e0e0e0)',
-                                    borderRadius: '6px',
-                                    marginBottom: '1rem',
-                                    overflow: 'hidden',
-                                }}
-                            >
-                                {/* Header row */}
-                                <div
-                                    style={{
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '0.75rem',
-                                        padding: '0.75rem 1rem',
-                                        background: 'var(--color-surface-alt, #f6f8fa)',
-                                        borderBottom: assignments.length > 0 ? '1px solid var(--color-border, #e0e0e0)' : undefined,
-                                        flexWrap: 'wrap',
+                ) : meteringPoints.length === 0 ? (
+                    <section className="card" style={{ margin: '1rem', display: 'grid', gap: '0.75rem' }}>
+                        <h3 style={{ margin: 0 }}>{t('pages.meteringPoints.noResults.title')}</h3>
+                        <p className="muted" style={{ margin: 0 }}>{t('pages.meteringPoints.noResults.description')}</p>
+                        {hasFilters && (
+                            <div>
+                                <button
+                                    className="button button-secondary"
+                                    type="button"
+                                    onClick={() => {
+                                        setSearchTerm('')
+                                        setStatusFilter('all')
+                                        setTypeFilter('all')
                                     }}
                                 >
-                                    <div style={{ flex: 1, minWidth: 180 }}>
-                                        <span
-                                            style={{
-                                                fontSize: '0.78rem',
-                                                padding: '2px 8px',
-                                                borderRadius: '4px',
-                                                background: point.is_active ? '#d1fae5' : '#fee2e2',
-                                                color: point.is_active ? '#065f46' : '#991b1b',
-                                                marginRight: '0.6rem',
-                                            }}
-                                        >
-                                            {point.is_active ? t('pages.meteringPoints.active') : t('pages.meteringPoints.inactive')}
-                                        </span>
-                                        <strong>{point.meter_id}</strong>
-                                    </div>
-                                    <span className="muted" style={{ fontSize: '0.82rem' }}><strong>{t('pages.meteringPoints.typeLabel')}</strong> {point.meter_type}</span>
-                                    {canManageMeteringPoints && (
-                                        <button
-                                            className="button button-primary"
-                                            type="button"
-                                            style={{ padding: '4px 10px', fontSize: '0.8rem' }}
-                                            onClick={() => openCreateAssignModal(point.id)}
-                                        >
-                                            {t('pages.meteringPoints.assign')}
-                                        </button>
-                                    )}
-                                    <Link
-                                        className="button button-primary"
-                                        style={{ padding: '4px 10px', fontSize: '0.8rem', textDecoration: 'none' }}
-                                        to={`/metering-data?metering_point=${point.id}`}
-                                    >
-                                        {t('pages.meteringPoints.chart')}
-                                    </Link>
-                                    {canManageMeteringPoints && (
-                                        <>
-                                            <button
-                                                className="button button-primary"
-                                                type="button"
-                                                style={{ padding: '4px 10px', fontSize: '0.8rem' }}
-                                                onClick={() => openEditMpModal(point)}
-                                            >
-                                                Edit
-                                            </button>
-                                            {user?.role === 'admin' && (
+                                    {t('pages.meteringPoints.filters.clear')}
+                                </button>
+                            </div>
+                        )}
+                    </section>
+                ) : (
+                    <div className="metering-point-list">
+                        {meteringPoints.map((point) => {
+                            const assignments = filteredAssignmentsByMeteringPoint.get(point.id) ?? []
+                            const todayIso = new Date().toISOString().slice(0, 10)
+                            const sortedAssignments = [...assignments].sort((left, right) => {
+                                const leftState = getAssignmentState(left, todayIso)
+                                const rightState = getAssignmentState(right, todayIso)
+                                const stateDelta = assignmentStateSortOrder(leftState) - assignmentStateSortOrder(rightState)
+
+                                if (stateDelta !== 0) return stateDelta
+                                return right.valid_from.localeCompare(left.valid_from)
+                            })
+                            const pointMenuItems: ActionMenuItem[] = []
+
+                            if (canManageMeteringPoints) {
+                                pointMenuItems.push({
+                                    key: 'edit',
+                                    label: t('common.edit'),
+                                    icon: <FontAwesomeIcon icon={faPen} fixedWidth />,
+                                    onClick: () => openEditMpModal(point),
+                                })
+                                if (user?.role === 'admin') {
+                                    pointMenuItems.push({
+                                        key: 'delete-data',
+                                        label: t('pages.meteringPoints.deleteData.button'),
+                                        icon: <FontAwesomeIcon icon={faDatabase} fixedWidth />,
+                                        onClick: () => openDeleteDataModal(point),
+                                    })
+                                }
+                                pointMenuItems.push({
+                                    key: 'delete',
+                                    label: t('common.delete'),
+                                    icon: <FontAwesomeIcon icon={faTrash} fixedWidth />,
+                                    disabled: deleteMpMutation.isPending || dialogLoading,
+                                    danger: true,
+                                    onClick: () => confirm({
+                                        title: t('pages.meteringPoints.deleteTitle'),
+                                        message: t('pages.meteringPoints.deleteMessage', { meterId: point.meter_id }),
+                                        confirmText: t('pages.meteringPoints.deleteConfirm'),
+                                        isDangerous: true,
+                                        onConfirm: () => deleteMpMutation.mutate(point.id),
+                                    }),
+                                })
+                            }
+
+                            return (
+                                <article key={point.id} className="metering-point-card">
+                                    <div className="metering-point-card-header">
+                                        <div className="metering-point-title">
+                                            <div className="metering-point-badges">
+                                                <span className={point.is_active ? 'badge badge-success' : 'badge badge-danger'}>
+                                                    {point.is_active ? t('pages.meteringPoints.active') : t('pages.meteringPoints.inactive')}
+                                                </span>
+                                                <span className="badge badge-neutral">{t(`pages.meteringPoints.meterTypes.${point.meter_type}`)}</span>
+                                            </div>
+                                            <strong>{point.meter_id}</strong>
+                                        </div>
+
+                                        <div className="metering-point-actions">
+                                            {canManageMeteringPoints && assignments.length === 0 && (
                                                 <button
-                                                    className="button button-secondary"
+                                                    className="button button-primary button-compact"
                                                     type="button"
-                                                    style={{ padding: '4px 10px', fontSize: '0.8rem' }}
-                                                    onClick={() => openDeleteDataModal(point)}
+                                                    onClick={() => openCreateAssignModal(point.id)}
                                                 >
-                                                    {t('pages.meteringPoints.deleteData.button')}
+                                                    <FontAwesomeIcon icon={faUserPlus} fixedWidth />
+                                                    {t('pages.meteringPoints.assign')}
                                                 </button>
                                             )}
-                                            <button
-                                                className="button danger"
-                                                type="button"
-                                                style={{ padding: '4px 10px', fontSize: '0.8rem' }}
-                                                disabled={deleteMpMutation.isPending || dialogLoading}
-                                                onClick={() => confirm({
-                                                    title: t('pages.meteringPoints.deleteTitle'),
-                                                    message: t('pages.meteringPoints.deleteMessage', { meterId: point.meter_id }),
-                                                    confirmText: t('pages.meteringPoints.deleteConfirm'),
-                                                    isDangerous: true,
-                                                    onConfirm: () => deleteMpMutation.mutate(point.id),
-                                                })}
+                                            <Link
+                                                className="button button-secondary button-compact"
+                                                style={{ textDecoration: 'none' }}
+                                                to={`/metering-data?metering_point=${point.id}`}
                                             >
-                                                Delete
-                                            </button>
-                                        </>
-                                    )}
-                                </div>
+                                                <FontAwesomeIcon icon={faChartLine} fixedWidth />
+                                                {t('pages.meteringPoints.chart')}
+                                            </Link>
+                                            {canManageMeteringPoints && (
+                                                <ActionMenu
+                                                    label={t('pages.meteringPoints.moreActions')}
+                                                    icon={<FontAwesomeIcon icon={faEllipsis} fixedWidth />}
+                                                    items={pointMenuItems}
+                                                />
+                                            )}
+                                        </div>
+                                    </div>
 
-                                {/* Assignment rows */}
-                                {canManageMeteringPoints && assignments.length > 0 ? (
-                                    <table style={{ width: '100%', fontSize: '0.88rem' }}>
-                                        <thead>
-                                            <tr>
-                                                <th style={{ textAlign: 'left', padding: '0.4rem 1rem', fontWeight: 500 }}>
-                                                    {t('pages.meteringPoints.assignCol.participant')}
-                                                </th>
-                                                <th style={{ textAlign: 'left', padding: '0.4rem 1rem', fontWeight: 500 }}>
-                                                    {t('pages.meteringPoints.assignCol.validFrom')}
-                                                </th>
-                                                <th style={{ textAlign: 'left', padding: '0.4rem 1rem', fontWeight: 500 }}>{t('pages.meteringPoints.assignCol.validTo')}</th>
-                                                <th style={{ padding: '0.4rem 1rem' }}></th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {assignments.map((a) => (
-                                                <tr
-                                                    key={a.id}
-                                                    style={{
-                                                        borderTop: '1px solid var(--color-border, #e0e0e0)',
-                                                        background: a.valid_to && a.valid_to < todayIso ? '#f8fafc' : undefined,
-                                                        color: a.valid_to && a.valid_to < todayIso ? '#94a3b8' : undefined,
-                                                    }}
-                                                >
-                                                    <td style={{ padding: '0.4rem 1rem' }}>
-                                                        {participantNameById.get(a.participant) ?? a.participant}
-                                                    </td>
-                                                    <td style={{ padding: '0.4rem 1rem' }}>{formatShortDate(a.valid_from, settings)}</td>
-                                                    <td style={{ padding: '0.4rem 1rem' }}>{a.valid_to ? formatShortDate(a.valid_to, settings) : '—'}</td>
-                                                    <td style={{ padding: '0.4rem 1rem', textAlign: 'right' }}>
-                                                        <span style={{ display: 'inline-flex', gap: '0.5rem' }}>
-                                                            <button
-                                                                className="button button-primary"
-                                                                type="button"
-                                                                style={{ padding: '2px 8px', fontSize: '0.78rem' }}
-                                                                onClick={() => openEditAssignModal(a)}
-                                                            >
-                                                                Edit
-                                                            </button>
-                                                            <button
-                                                                className="button danger"
-                                                                type="button"
-                                                                style={{ padding: '2px 8px', fontSize: '0.78rem' }}
-                                                                disabled={deleteAssignMutation.isPending || dialogLoading}
-                                                                onClick={() => confirm({
-                                                                    title: t('pages.meteringPoints.removeAssignTitle'),
-                                                                    message: t('pages.meteringPoints.removeAssignMessage', { name: participantNameById.get(a.participant) ?? a.participant }),
-                                                                    confirmText: t('pages.meteringPoints.removeAssignConfirm'),
-                                                                    isDangerous: true,
-                                                                    onConfirm: () => deleteAssignMutation.mutate(a.id),
-                                                                })}
-                                                            >
-                                                                Remove
-                                                            </button>
-                                                        </span>
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                ) : canManageMeteringPoints ? (
-                                    <p
-                                        className="muted"
-                                        style={{ margin: 0, padding: '0.5rem 1rem', fontSize: '0.82rem', fontStyle: 'italic' }}
-                                    >
-                                        {t('pages.meteringPoints.noAssignments')}
-                                    </p>
-                                ) : null}
-                            </div>
-                        )
-                    })
+                                    {canManageMeteringPoints && (
+                                        <div className="metering-point-body">
+                                            {sortedAssignments.length > 0 ? (
+                                                <div className="metering-assignment-list">
+                                                    {sortedAssignments.map((assignment) => {
+                                                        const assignmentState = getAssignmentState(assignment, todayIso)
+                                                        return (
+                                                            <div key={assignment.id} className="metering-assignment-row">
+                                                                <div className="metering-assignment-main">
+                                                                    <div className="metering-assignment-line">
+                                                                        <strong>{participantNameById.get(assignment.participant) ?? assignment.participant}</strong>
+                                                                        <span className={assignmentStateBadgeClass(assignmentState)}>
+                                                                            {t(`pages.meteringPoints.assignmentState.${assignmentState}`)}
+                                                                        </span>
+                                                                    </div>
+                                                                    <div className="muted">
+                                                                        {formatShortDate(assignment.valid_from, settings)} - {assignment.valid_to ? formatShortDate(assignment.valid_to, settings) : t('pages.meteringPoints.openEnded')}
+                                                                    </div>
+                                                                </div>
+
+                                                                <div className="metering-assignment-actions">
+                                                                    <button
+                                                                        className="button button-secondary button-compact"
+                                                                        type="button"
+                                                                        onClick={() => openEditAssignModal(assignment)}
+                                                                    >
+                                                                        <FontAwesomeIcon icon={faPen} fixedWidth />
+                                                                        {t('common.edit')}
+                                                                    </button>
+                                                                    <button
+                                                                        className="button button-danger button-compact"
+                                                                        type="button"
+                                                                        disabled={deleteAssignMutation.isPending || dialogLoading}
+                                                                        onClick={() => confirm({
+                                                                            title: t('pages.meteringPoints.removeAssignTitle'),
+                                                                            message: t('pages.meteringPoints.removeAssignMessage', { name: participantNameById.get(assignment.participant) ?? assignment.participant }),
+                                                                            confirmText: t('pages.meteringPoints.removeAssignConfirm'),
+                                                                            isDangerous: true,
+                                                                            onConfirm: () => deleteAssignMutation.mutate(assignment.id),
+                                                                        })}
+                                                                    >
+                                                                        <FontAwesomeIcon icon={faTrash} fixedWidth />
+                                                                        {t('pages.meteringPoints.removeAssignment')}
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                        )
+                                                    })}
+                                                </div>
+                                            ) : (
+                                                <p className="muted metering-no-assignments">{t('pages.meteringPoints.noAssignments')}</p>
+                                            )}
+                                        </div>
+                                    )}
+                                </article>
+                            )
+                        })}
+                    </div>
                 )}
             </div>
 
