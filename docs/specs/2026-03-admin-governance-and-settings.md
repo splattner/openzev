@@ -313,11 +313,15 @@ All admin routes are nested under `/admin/*` and wrapped with `<ProtectedRoute a
 | Route | Page component | Purpose |
 |---|---|---|
 | `/admin` | `AdminDashboardPage` | Platform statistics dashboard |
-| `/admin/settings/regional` | `AdminRegionalSettingsPage` | Date format configuration |
+| `/admin/system-settings` | `AdminSystemSettingsPage` | Tabbed system settings for date formats, feature flags, and OAuth providers |
 | `/admin/settings/vat` | `AdminVatSettingsPage` | VAT rate CRUD |
 | `/admin/pdf-templates` | `AdminPdfTemplatesPage` | Invoice HTML template editor |
 | `/admin/accounts` | `AdminAccountsPage` | User account management |
 | `/admin/zevs` | `ZevListPage` | ZEV list management |
+
+Legacy routes `/admin/settings/regional`, `/admin/features`, and `/admin/oauth`
+remain available as redirects into the corresponding tab of
+`/admin/system-settings`.
 
 ### 9.3 AdminDashboardPage
 
@@ -328,14 +332,29 @@ All admin routes are nested under `/admin/*` and wrapped with `<ProtectedRoute a
 - Invoice status breakdown: colour-coded grid of draft/approved/sent/paid/cancelled counts.
 - Email statistics: total/sent/pending/failed with colour-coded cards.
 
-### 9.4 AdminRegionalSettingsPage
+### 9.4 AdminSystemSettingsPage
 
-**File:** `frontend/src/pages/AdminRegionalSettingsPage.tsx`
+**File:** `frontend/src/pages/AdminSystemSettingsPage.tsx`
 
-- Loads current settings from `useAppSettings()` hook.
-- Form with 3 dropdowns: short date format, long date format, date & time format.
-- Live preview section showing formatted output for a sample date (`2026-03-18`) and datetime (`2026-03-18T14:35:00Z`).
-- Saves via `updateAppSettings` mutation. On success, updates the query cache directly: `queryClient.setQueryData(['app-settings'], data)`.
+- Canonical route: `/admin/system-settings`
+- Uses query-param tabs: `regional`, `features`, `oauth`
+- Renders one page shell with a tab bar and per-tab content.
+- **Regional tab:**
+    - Loads current settings from `useAppSettings()`.
+    - Form with 3 dropdowns: short date format, long date format, date & time format.
+    - Live preview section showing formatted output for a sample date (`2026-03-18`) and datetime (`2026-03-18T14:35:00Z`).
+    - Saves via `updateAppSettings` mutation. On success, updates the query cache directly: `queryClient.setQueryData(['app-settings'], data)`.
+- **Functions tab:**
+    - Uses `fetchFeatureFlags` with query key `['feature-flags']`.
+    - Displays the registered feature flags in a table with toggle switches.
+    - Toggling uses `updateFeatureFlag` and invalidates `['feature-flags']` after success.
+- **OAuth tab:**
+    - Uses `fetchOAuthProviderConfigs` with query key `['oauth-provider-configs']`.
+    - Displays configured providers in a table with enabled badges and compact Edit/Delete actions.
+    - Provider create/edit uses a shared modal form; delete uses `ConfirmDialog`.
+
+Legacy routes `/admin/settings/regional`, `/admin/features`, and `/admin/oauth`
+redirect to the matching tab on this page.
 
 ### 9.5 AdminVatSettingsPage
 
@@ -514,7 +533,7 @@ Tests cover dashboard access (`test_invoice_dashboard_is_admin_only`) confirming
 
 ### 13.2 Frontend
 
-- AdminRegionalSettingsPage: format selector renders all 4 options per format type, preview updates live, save mutation calls `updateAppSettings`.
+- AdminSystemSettingsPage: tab selector switches between regional settings, feature flags, and OAuth providers. Regional format selector renders all 4 options per format type, preview updates live, and save mutation calls `updateAppSettings`.
 - AdminVatSettingsPage: form validates percentage 0–100, converts to fraction, create/edit/delete flows work. Overlap errors display as toast.
 - AdminPdfTemplatesPage: textarea loads server content, save sends updated content.
 - AdminDashboardPage: stats display, auto-refresh at 30s interval.

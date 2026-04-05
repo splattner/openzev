@@ -17,6 +17,10 @@ Create or update a spec for changes that are large, risky, or cross-cutting, esp
 
 You can usually skip a full spec for small bugfixes, copy updates, or isolated UI polish.
 
+Exception: when refactoring or standardizing frontend CRUD / management-page UX,
+use `2026-04-frontend-management-page-design.md` as the reference spec even if
+the change is mostly presentational.
+
 ## Quality standard
 
 Specs should contain **implementation-grade detail** — enough that a developer could re-implement the described feature from the spec alone, without reading the existing code. This means:
@@ -56,6 +60,16 @@ Baseline specs describe the current implementation. They must be kept in sync:
 | Invoice workflow, email sending, PDF rendering, EmailLog | `2026-03-invoice-lifecycle-and-communication.md` |
 | AppSettings, VatRate, admin dashboard, PDF template, ZEV config | `2026-03-admin-governance-and-settings.md` |
 
+## Reference specs
+
+Reference specs document cross-cutting implementation patterns that do not map
+cleanly to a single product capability baseline but should still guide future
+work.
+
+| Change area | Reference spec |
+|---|---|
+| Frontend CRUD / management-page cleanup, action hierarchy, section-vs-tab decisions, icon usage, responsive CRUD layouts | `2026-04-frontend-management-page-design.md` |
+
 ## Conventions
 
 - Keep specs concise and implementation-oriented
@@ -73,3 +87,10 @@ These specs describe the current major product capabilities and should be update
 - `2026-03-tariffs-and-billing-engine.md`
 - `2026-03-invoice-lifecycle-and-communication.md`
 - `2026-03-admin-governance-and-settings.md`
+
+## Frontend reference specs
+
+These specs capture reusable UI and interaction patterns and should be consulted
+for future frontend cleanup and standardization work:
+
+- `2026-04-frontend-management-page-design.md`
