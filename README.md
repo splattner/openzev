@@ -59,31 +59,31 @@ OpenZEV gives operators one place to manage participants, metering points, tarif
 
 ### Login
 
-![Login](docs/screenshots/login.png)
+![Login](docs/user-guide/screenshots/01-login.png)
 
 ### Dashboard
 
-![Dashboard](docs/screenshots/dashboard.png)
+![Dashboard](docs/user-guide/screenshots/02-dashboard.png)
 
 Overview of KPIs, invoice status, and operational health.
 
 ### Metering Points
 
-![ZEV Settings](docs/screenshots/meteringpoints.png)
+![ZEV Settings](docs/user-guide/screenshots/04-metering-points.png)
 
 ### Metering Data
 
-![Metering Data](docs/screenshots/meteringdata.png)
+![Metering Data](docs/user-guide/screenshots/05-metering-data.png)
 
 ### Invoices
 
-![Invoices](docs/screenshots/invoices.png)
+![Invoices](docs/user-guide/screenshots/08-invoices.png)
 
 Invoice lifecycle management, PDF generation, and email tracking.
 
 ### Metering Import Wizard
 
-![Metering Import Wizard](docs/screenshots/import-wizard.png)
+![Metering Import Wizard](docs/user-guide/screenshots/09-imports.png)
 
 Step-by-step import flow with mapping, preview, and validation feedback.
 

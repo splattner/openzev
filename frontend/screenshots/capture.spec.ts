@@ -64,6 +64,41 @@ async function getAdminToken(page: Page): Promise<string> {
 }
 
 /**
+ * Create a fresh unassigned metering point in the first available ZEV and pin
+ * the frontend ZEV selection to that same tenant so the screenshot test can
+ * reliably open the assign modal regardless of seed data state.
+ */
+async function prepareUnassignedMeteringPoint(page: Page): Promise<{ meterId: string } | null> {
+  const adminToken = await getAdminToken(page)
+  const headers = { Authorization: `Bearer ${adminToken}` }
+
+  const zevsResp = await page.request.get(`${API_BASE}/zev/zevs/`, { headers })
+  expect(zevsResp.ok(), `Fetching ZEVs failed (${zevsResp.status()})`).toBeTruthy()
+  const zevsBody = await zevsResp.json() as { results?: Array<{ id: string }> }
+  const zevId = zevsBody.results?.[0]?.id
+  if (!zevId) return null
+
+  const meterId = `screenshot-mp-${Date.now()}`
+  const createResp = await page.request.post(`${API_BASE}/zev/metering-points/`, {
+    headers,
+    data: {
+      zev: zevId,
+      meter_id: meterId,
+      meter_type: 'consumption',
+      is_active: true,
+      location_description: 'Screenshot fixture',
+    },
+  })
+  expect(createResp.ok(), `Creating metering point failed (${createResp.status()})`).toBeTruthy()
+
+  await page.addInitScript((selectedZevId: string) => {
+    localStorage.setItem('openzev.selectedZevId', selectedZevId)
+  }, zevId)
+
+  return { meterId }
+}
+
+/**
  * Impersonate a participant by calling the API, then inject the resulting
  * tokens and impersonation metadata into localStorage so the app picks
  * up the impersonated session on the next navigation.
@@ -148,20 +183,24 @@ const PAGE_BLUR: Record<string, BlurConfig> = {
   },
   participants: {
     selectors: [
-      '.table-card table tbody td:nth-child(1)',     // participant name
-      '.table-card table tbody td:nth-child(2)',     // email + phone
-      '.table-card table tbody td:nth-child(3)',     // address
+      '.participant-card-title strong',              // participant name
+      '.participant-card-section:nth-child(1) > div:not(.participant-card-label)', // email + phone
+      '.participant-card-section:nth-child(2) > div:not(.participant-card-label)', // address
       'section.card p strong',                       // credentials notice: name
       'code',                                        // credentials notice: username/password
     ].join(', '),
   },
   'metering-points': {
-    selectors: '.table-card table tbody td:first-child', // participant name in assignment sub-table
+    selectors: [
+      '.metering-point-title strong',                // metering point id
+      '.metering-assignment-line strong',            // assigned participant name
+    ].join(', '),
   },
   'metering-points-modal': {
     selectors: [
-      '.table-card table tbody td:first-child',      // participant name in assignment sub-table
-      'div[style*="z-index: 1000"] select',           // participant dropdown inside modal
+      '.metering-point-title strong',                // metering point id
+      '.metering-assignment-line strong',            // assigned participant name in background card
+      'div[style*="z-index: 1000"] select',          // participant dropdown inside modal
     ].join(', '),
   },
   invoices: {
@@ -200,6 +239,10 @@ const PAGE_BLUR: Record<string, BlurConfig> = {
     ].join(', '),
   },
   'account-profile': {
+    selectors: [
+      '.form-grid > .card:last-child strong',       // OAuth provider display name
+      '.form-grid > .card:last-child button',       // link buttons can include provider name
+    ].join(', '),
     blurInputs: 'input[name="first_name"], input[name="last_name"], input[name="email"], input[disabled]',
   },
 }
@@ -322,11 +365,23 @@ test.describe('User Guide Screenshots', () => {
 
   // 04b — Metering Points with Assign Participant modal
   test('04b-metering-points-assign', async ({ page }) => {
+    const fixture = await prepareUnassignedMeteringPoint(page)
+    if (!fixture) {
+      test.skip()
+      return
+    }
+
     await navigateTo(page, '/metering-points')
-    await page.waitForSelector('table, .card', { timeout: 10_000 })
-    // Click the first "+ Zuweisen" / "+ Assign" button
-    const assignBtn = page.locator('button').filter({ hasText: /Zuweisen|Assign/ }).first()
+    await page.waitForSelector('.metering-point-card, table, .card', { timeout: 10_000 })
+
+    const pointCard = page.locator('.metering-point-card').filter({ hasText: fixture.meterId }).first()
+    await expect(pointCard).toBeVisible({ timeout: 10_000 })
+
+    const assignBtn = pointCard.getByRole('button', {
+      name: /assign|zuweisen|assigner|assegna/i,
+    })
     await assignBtn.click()
+
     // Wait for modal overlay to appear
     await page.waitForSelector('div[style*="z-index: 1000"]', { timeout: 5_000 })
     await page.waitForTimeout(500)
