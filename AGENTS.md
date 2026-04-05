@@ -71,6 +71,9 @@ For larger or risky changes, consult or create specs and ADRs:
   - `2026-03-invoice-lifecycle-and-communication.md` — invoice workflow, email, PDF rendering
   - `2026-03-admin-governance-and-settings.md` — AppSettings, VAT, admin dashboard, ZEV config
 
+- **Reference specs** document reusable cross-cutting patterns that should guide future work even when no baseline feature spec changes directly:
+  - `2026-04-frontend-management-page-design.md` — reference spec for frontend CRUD / management-page cleanup, action hierarchy, page grouping, icons, i18n discipline, and responsive layouts
+
 - When you create or modify a spec, link it in your PR using `.github/PULL_REQUEST_TEMPLATE.md`.
 
 ### Spec maintenance rules
@@ -78,6 +81,7 @@ For larger or risky changes, consult or create specs and ADRs:
 When making code changes, follow these rules to keep specs accurate:
 
 1. **Before coding:** Read the relevant baseline spec(s) to understand documented behavior.
+  For frontend CRUD / management-page cleanup work, also read `2026-04-frontend-management-page-design.md` before making layout or interaction changes.
 2. **After coding:** If your change modifies behavior described in a baseline spec, update the affected sections of that spec in the same commit/PR.
 3. **What to update:** Only the sections that changed — don't rewrite unrelated parts. Common updates include: adding/removing model fields, changing API endpoints or permissions, adding tests, modifying frontend components.
 4. **Validation:** After updating a spec, verify every claim in the changed sections against the actual code. Check field names, types, defaults, permission classes, endpoint paths, serializer fields, test method names, and test counts.

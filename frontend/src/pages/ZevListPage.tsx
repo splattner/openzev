@@ -1,5 +1,17 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useRef, useState, type FormEvent } from 'react'
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
+import {
+    faArrowLeft,
+    faArrowRight,
+    faCheck,
+    faCopy,
+    faPen,
+    faPlus,
+    faTrash,
+    faUser,
+    faXmark,
+} from '@fortawesome/free-solid-svg-icons'
 import { ConfirmDialog, useConfirmDialog } from '../components/ConfirmDialog'
 import { ZevEmailTemplateFields } from '../components/ZevEmailTemplateFields'
 import { ZevGeneralSettingsFields } from '../components/ZevGeneralSettingsFields'
@@ -366,6 +378,7 @@ export function ZevListPage() {
             <div className="actions-row actions-row-gap-lg mb-1">
                 {isAdmin ? (
                     <button className="button button-primary" onClick={openCreateModal}>
+                        <FontAwesomeIcon icon={faPlus} fixedWidth />
                         {t('pages.zevs.newZev')}
                     </button>
                 ) : (
@@ -476,7 +489,10 @@ export function ZevListPage() {
                             </div>
 
                             <div>
-                                <button className="button button-secondary" type="button" onClick={addMeteringPoint}>{t('pages.zevs.wizard.addMeteringPoint')}</button>
+                                <button className="button button-secondary" type="button" onClick={addMeteringPoint}>
+                                    <FontAwesomeIcon icon={faPlus} fixedWidth />
+                                    {t('pages.zevs.wizard.addMeteringPoint')}
+                                </button>
                             </div>
 
                             {expandedMeteringPointIndex !== null && editingMeteringPointData && (
@@ -514,9 +530,13 @@ export function ZevListPage() {
                                     </div>
                                     <div style={{ display: 'flex', gap: '0.75rem' }}>
                                         <button className="button button-primary" type="button" onClick={saveMeteringPoint}>
+                                            <FontAwesomeIcon icon={faCheck} fixedWidth />
                                             {expandedMeteringPointIndex === -1 ? t('pages.zevs.wizard.add') : t('pages.zevs.wizard.save')}
                                         </button>
-                                        <button className="button button-secondary" type="button" onClick={closeEditMeteringPoint}>{t('pages.tariffs.cancel')}</button>
+                                        <button className="button button-secondary" type="button" onClick={closeEditMeteringPoint}>
+                                            <FontAwesomeIcon icon={faXmark} fixedWidth />
+                                            {t('common.cancel')}
+                                        </button>
                                     </div>
                                 </div>
                             )}
@@ -541,19 +561,21 @@ export function ZevListPage() {
                                                     <td>
                                                         <div style={{ display: 'flex', gap: '0.5rem' }}>
                                                             <button
-                                                                className="button button-secondary"
+                                                                className="button button-secondary button-compact"
                                                                 type="button"
                                                                 onClick={() => openEditMeteringPoint(index)}
                                                             >
-                                                                Edit
+                                                                <FontAwesomeIcon icon={faPen} fixedWidth />
+                                                                {t('common.edit')}
                                                             </button>
                                                             <button
-                                                                className="button danger"
+                                                                className="button button-danger button-compact"
                                                                 type="button"
                                                                 onClick={() => removeMeteringPoint(index)}
                                                                 disabled={createForm.metering_points.length === 1}
                                                             >
-                                                                Delete
+                                                                <FontAwesomeIcon icon={faTrash} fixedWidth />
+                                                                {t('common.delete')}
                                                             </button>
                                                         </div>
                                                     </td>
@@ -591,6 +613,7 @@ export function ZevListPage() {
                                         type="button"
                                         onClick={() => copyToClipboard(createdCredentials.username, 'Username')}
                                     >
+                                        <FontAwesomeIcon icon={faCopy} fixedWidth />
                                         {t('pages.zevs.wizard.copyUsername')}
                                     </button>
                                 </div>
@@ -603,6 +626,7 @@ export function ZevListPage() {
                                         type="button"
                                         onClick={() => copyToClipboard(createdCredentials.temporary_password, 'Password')}
                                     >
+                                        <FontAwesomeIcon icon={faCopy} fixedWidth />
                                         {t('pages.zevs.wizard.copyPassword')}
                                     </button>
                                 </div>
@@ -615,18 +639,35 @@ export function ZevListPage() {
                     {createError && <div className="error-banner grid-span-full">{createError}</div>}
 
                     <div className="actions-row actions-row-end actions-row-gap-lg grid-span-full mt-1">
-                        {wizardStep < 5 && <button className="button button-secondary" type="button" onClick={closeCreateModal}>{t('pages.tariffs.cancel')}</button>}
-                        {wizardStep > 1 && wizardStep < 5 && <button className="button button-secondary" type="button" onClick={goToPreviousStep}>{t('pages.zevs.wizard.back')}</button>}
+                        {wizardStep < 5 && (
+                            <button className="button button-secondary" type="button" onClick={closeCreateModal}>
+                                <FontAwesomeIcon icon={faXmark} fixedWidth />
+                                {t('common.cancel')}
+                            </button>
+                        )}
+                        {wizardStep > 1 && wizardStep < 5 && (
+                            <button className="button button-secondary" type="button" onClick={goToPreviousStep}>
+                                <FontAwesomeIcon icon={faArrowLeft} fixedWidth />
+                                {t('pages.zevs.wizard.back')}
+                            </button>
+                        )}
                         {wizardStep < 4 && (
-                            <button key="next" className="button button-primary" type="button" onClick={goToNextStep}>{t('pages.zevs.wizard.next')}</button>
+                            <button key="next" className="button button-primary" type="button" onClick={goToNextStep}>
+                                <FontAwesomeIcon icon={faArrowRight} fixedWidth />
+                                {t('pages.zevs.wizard.next')}
+                            </button>
                         )}
                         {wizardStep === 4 && (
                             <button key="create" className="button button-primary" type="button" onClick={handleCreateZev} disabled={createMutation.isPending}>
+                                <FontAwesomeIcon icon={faCheck} fixedWidth />
                                 {createMutation.isPending ? t('pages.zevs.wizard.creating') : t('pages.zevs.wizard.createZev')}
                             </button>
                         )}
                         {wizardStep === 5 && (
-                            <button key="done" className="button button-primary" type="button" onClick={closeCreateModal}>{t('pages.zevs.wizard.done')}</button>
+                            <button key="done" className="button button-primary" type="button" onClick={closeCreateModal}>
+                                <FontAwesomeIcon icon={faCheck} fixedWidth />
+                                {t('pages.zevs.wizard.done')}
+                            </button>
                         )}
                     </div>
                 </form>
@@ -657,8 +698,14 @@ export function ZevListPage() {
                     {editError && <div className="error-banner">{editError}</div>}
 
                     <div className="actions-row actions-row-end actions-row-gap-lg">
-                        <button className="button button-secondary" type="button" onClick={closeEditModal}>{t('pages.tariffs.cancel')}</button>
-                        <button className="button button-primary" type="submit" disabled={updateMutation.isPending}>{t('pages.zevs.saveZev')}</button>
+                        <button className="button button-secondary" type="button" onClick={closeEditModal}>
+                            <FontAwesomeIcon icon={faXmark} fixedWidth />
+                            {t('common.cancel')}
+                        </button>
+                        <button className="button button-primary" type="submit" disabled={updateMutation.isPending}>
+                            <FontAwesomeIcon icon={faCheck} fixedWidth />
+                            {t('pages.zevs.saveZev')}
+                        </button>
                     </div>
                 </form>
             </FormModal>
@@ -699,12 +746,16 @@ export function ZevListPage() {
                     {ownerError && <div className="error-banner">{ownerError}</div>}
 
                     <div className="actions-row actions-row-end actions-row-gap-lg">
-                        <button className="button button-secondary" type="button" onClick={closeOwnerModal}>{t('pages.tariffs.cancel')}</button>
+                        <button className="button button-secondary" type="button" onClick={closeOwnerModal}>
+                            <FontAwesomeIcon icon={faXmark} fixedWidth />
+                            {t('common.cancel')}
+                        </button>
                         <button
                             className="button button-primary"
                             type="submit"
                             disabled={assignOwnerMutation.isPending || dialogLoading || !ownerTargetZev || String(ownerTargetZev.owner) === newOwnerId}
                         >
+                            <FontAwesomeIcon icon={faCheck} fixedWidth />
                             {t('pages.zevs.ownerModal.saveOwner')}
                         </button>
                     </div>
@@ -748,19 +799,26 @@ export function ZevListPage() {
                                 <td>{zev.grid_operator || '-'}</td>
                                 <td>{t(`pages.zevs.billingIntervals.${zev.billing_interval}` as Parameters<typeof t>[0], { defaultValue: zev.billing_interval })}</td>
                                 <td className="actions-cell">
-                                    <button className="button button-primary" type="button" onClick={() => startEdit(zev)}>Edit</button>
+                                    <button className="button button-primary button-compact" type="button" onClick={() => startEdit(zev)}>
+                                        <FontAwesomeIcon icon={faPen} fixedWidth />
+                                        {t('common.edit')}
+                                    </button>
                                     {isAdmin && (
-                                        <button className="button button-secondary" type="button" onClick={() => openOwnerModal(zev)}>
+                                        <button className="button button-secondary button-compact" type="button" onClick={() => openOwnerModal(zev)}>
+                                            <FontAwesomeIcon icon={faUser} fixedWidth />
                                             {t('pages.zevs.setOwner')}
                                         </button>
                                     )}
-                                    <button className="button danger" type="button" disabled={deleteMutation.isPending || dialogLoading} onClick={() => confirm({
+                                    <button className="button button-danger button-compact" type="button" disabled={deleteMutation.isPending || dialogLoading} onClick={() => confirm({
                                         title: t('pages.zevs.deleteTitle'),
                                         message: t('pages.zevs.deleteMessage', { name: zev.name }),
                                         confirmText: t('pages.zevs.deleteConfirm'),
                                         isDangerous: true,
                                         onConfirm: () => deleteMutation.mutate(zev.id),
-                                    })}>Delete</button>
+                                    })}>
+                                        <FontAwesomeIcon icon={faTrash} fixedWidth />
+                                        {t('common.delete')}
+                                    </button>
                                 </td>
                             </tr>
                         )) : (
