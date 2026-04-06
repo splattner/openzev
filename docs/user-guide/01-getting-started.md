@@ -21,10 +21,16 @@ cd /path/to/openzev
 docker compose up -d --build
 ```
 
+To start the stack and seed the full demo dataset in one step:
+
+```bash
+scripts/start-demo-environment.sh
+```
+
 Wait a few seconds for services to start, then access:
 
 - **Frontend (UI):** http://localhost:8080
-- **Backend API:** http://localhost:8000
+- **Backend API:** http://localhost:8001
 - **Database:** localhost:5432 (PostgreSQL)
 - **Message Broker:** localhost:6379 (Redis)
 
@@ -51,14 +57,14 @@ In fullstack mode:
 
 A demo dataset is pre-loaded with sample data for testing. Use these credentials:
 
-| Role | Username | Password | Purpose |
+| Role | Email | Password | Purpose |
 | --- | --- | --- | --- |
-| **Admin** | `admin` | `admin1234` | Full system management |
-| **ZEV Owner** | `zev_owner` | `owner1234` | Manage a ZEV community |
-| **Participant** | `alice` | `alice1234` | View own data and invoices |
-| **Participant** | `bob` | `bob1234` | View own data and invoices |
+| **Admin** | `admin@openzev.local` | `admin1234` | Full system management |
+| **ZEV Owner** | `owner@openzev.local` | `owner1234` | Manage a ZEV community |
+| **Participant** | `anna.consumer@openzev.local` | `participant1234` | View own data and invoices |
+| **Participant** | `ben.consumer@openzev.local` | `participant1234` | View own data and invoices |
 
-The demo dataset includes sample ZEV communities, participants, metering points, tariffs, and test readings.
+The demo dataset includes a sample ZEV community, participants, tariffs, and 15-minute interval metering data for Q1 and Q2 2026.
 
 ### Resetting Demo Data
 
@@ -98,7 +104,7 @@ If logged in as a ZEV owner:
 
 ### 4. View as Participant
 
-Login as a participant (alice or bob):
+Login as a participant (Anna or Ben):
 - **Dashboard** shows your energy consumption/production overview
 - **Metering Data** shows your consumption charts
 - **Invoices** lists your personal invoices (read-only)
@@ -111,9 +117,9 @@ Login as a participant (alice or bob):
 
 OpenZEV provides a complete REST API for programmatic access:
 
-- **Swagger UI:** http://localhost:8000/api/docs/
-- **ReDoc:** http://localhost:8000/api/redoc/
-- **API Base URL:** http://localhost:8000/api/v1/
+- **Swagger UI:** http://localhost:8001/api/docs/
+- **ReDoc:** http://localhost:8001/api/redoc/
+- **API Base URL:** http://localhost:8001/api/v1/
 
 The API is protected by JWT authentication. Demo credentials work for API access too.
 
