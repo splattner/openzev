@@ -110,10 +110,16 @@ Recommended default: keep frontend, backend, and worker separated for cleaner sc
 docker compose up -d --build
 ```
 
+To start the stack and seed a reusable demo environment in one command:
+
+```bash
+scripts/start-demo-environment.sh
+```
+
 Services:
 
 - Frontend: <http://localhost:8080>
-- Backend API: <http://localhost:8000>
+- Backend API: <http://localhost:8001>
 - PostgreSQL: localhost:5432
 - Redis: localhost:6379
 
@@ -339,17 +345,17 @@ python manage.py seed_demo
 
 Seeded demo users:
 
-- Admin: `admin` / `admin1234`
-- ZEV Owner: `zev_owner` / `owner1234`
-- Participant: `alice` / `alice1234`
-- Participant: `bob` / `bob1234`
+- Admin: `admin@openzev.local` / `admin1234`
+- ZEV Owner: `owner@openzev.local` / `owner1234`
+- Participant: `anna.consumer@openzev.local` / `participant1234`
+- Participant: `ben.consumer@openzev.local` / `participant1234`
 
-The seed command also creates sample ZEV data, participants, metering points, tariffs, and readings.
+The seed command also creates a sample ZEV, metering points, tariffs, and 15-minute interval readings for Q1 and Q2 2026.
 
 ## API & Developer Docs
 
-- Swagger UI: <http://localhost:8000/api/docs/>
-- ReDoc: <http://localhost:8000/api/redoc/>
+- Swagger UI: <http://localhost:8001/api/docs/>
+- ReDoc: <http://localhost:8001/api/redoc/>
 - Base API prefix: `/api/v1/`
 
 ## Development Notes
