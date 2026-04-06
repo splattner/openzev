@@ -693,18 +693,17 @@ def _build_contract_context(participant) -> dict:
 
     today = date.today()
 
-    # Collect metering points via assignments (open or current)
+    # Include all non-ended assignments so the contract can be prefilled for
+    # participants who start on a future meter assignment.
     assigned_mp_ids = set(
         MeteringPointAssignment.objects.filter(
             participant=participant,
-            valid_from__lte=today,
         ).filter(
-            valid_to__isnull=True
+            valid_to__isnull=True,
         ).values_list("metering_point_id", flat=True)
     ) | set(
         MeteringPointAssignment.objects.filter(
             participant=participant,
-            valid_from__lte=today,
             valid_to__gte=today,
         ).values_list("metering_point_id", flat=True)
     )
