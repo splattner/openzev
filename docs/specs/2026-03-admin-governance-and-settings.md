@@ -262,8 +262,8 @@ Uses `CONTRACT_TEMPLATE_NAME = "contracts/participant_contract_pdf.html"` render
 | `participant` | The participant record |
 | `owner_participant` | ZEV owner's participant profile |
 | `zev` | The ZEV record |
-| `consumption_mps` | Assigned consumption/bidirectional metering points |
-| `production_mps` | Assigned production metering points |
+| `consumption_mps` | Consumption/bidirectional metering points from assignments that are current or start in the future |
+| `production_mps` | Production metering points from assignments that are current or start in the future |
 | `local_tariff_rows` | Active local energy tariffs (rate + calculation display) |
 | `billing_interval_display` | Translated billing interval string |
 | `contract_date` | Today formatted as `dd.mm.yyyy` |
