@@ -13,7 +13,7 @@ coverage==7.13.5
 cron-descriptor==1.4.5
 cssselect2==0.9.0
 dj-database-url==3.1.2
-Django==6.0.3
+Django==6.0.4
 django-celery-beat==2.9.0
 django-cors-headers==4.9.0
 django-environ==0.13.0
@@ -46,7 +46,7 @@ pydyf==0.12.1
 Pygments==2.20.0
 PyJWT==2.12.1
 pyphen==0.17.2
-pytest==9.0.2
+pytest==9.0.3
 pytest-django==4.12.0
 python-crontab==3.3.0
 python-dateutil==2.9.0.post0
