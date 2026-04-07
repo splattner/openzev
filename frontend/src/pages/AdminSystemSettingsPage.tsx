@@ -448,23 +448,25 @@ export function AdminSystemSettingsPage() {
                                             </span>
                                         </td>
                                         <td className="actions-cell">
-                                            <button
-                                                type="button"
-                                                className="button button-primary button-compact"
-                                                onClick={() => openEditOAuthForm(provider)}
-                                            >
-                                                <FontAwesomeIcon icon={faPen} fixedWidth />
-                                                {t('common.edit')}
-                                            </button>
-                                            <button
-                                                type="button"
-                                                className="button button-danger button-compact"
-                                                onClick={() => confirmDeleteOAuthProvider(provider)}
-                                                disabled={deleteOAuthMutation.isPending || dialogLoading}
-                                            >
-                                                <FontAwesomeIcon icon={faTrash} fixedWidth />
-                                                {t('common.delete')}
-                                            </button>
+                                            <div className="actions-cell-content">
+                                                <button
+                                                    type="button"
+                                                    className="button button-primary button-compact"
+                                                    onClick={() => openEditOAuthForm(provider)}
+                                                >
+                                                    <FontAwesomeIcon icon={faPen} fixedWidth />
+                                                    {t('common.edit')}
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    className="button button-danger button-compact"
+                                                    onClick={() => confirmDeleteOAuthProvider(provider)}
+                                                    disabled={deleteOAuthMutation.isPending || dialogLoading}
+                                                >
+                                                    <FontAwesomeIcon icon={faTrash} fixedWidth />
+                                                    {t('common.delete')}
+                                                </button>
+                                            </div>
                                         </td>
                                     </tr>
                                 ))}

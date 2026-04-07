@@ -799,26 +799,28 @@ export function ZevListPage() {
                                 <td>{zev.grid_operator || '-'}</td>
                                 <td>{t(`pages.zevs.billingIntervals.${zev.billing_interval}` as Parameters<typeof t>[0], { defaultValue: zev.billing_interval })}</td>
                                 <td className="actions-cell">
-                                    <button className="button button-primary button-compact" type="button" onClick={() => startEdit(zev)}>
-                                        <FontAwesomeIcon icon={faPen} fixedWidth />
-                                        {t('common.edit')}
-                                    </button>
-                                    {isAdmin && (
-                                        <button className="button button-secondary button-compact" type="button" onClick={() => openOwnerModal(zev)}>
-                                            <FontAwesomeIcon icon={faUser} fixedWidth />
-                                            {t('pages.zevs.setOwner')}
+                                    <div className="actions-cell-content">
+                                        <button className="button button-primary button-compact" type="button" onClick={() => startEdit(zev)}>
+                                            <FontAwesomeIcon icon={faPen} fixedWidth />
+                                            {t('common.edit')}
                                         </button>
-                                    )}
-                                    <button className="button button-danger button-compact" type="button" disabled={deleteMutation.isPending || dialogLoading} onClick={() => confirm({
-                                        title: t('pages.zevs.deleteTitle'),
-                                        message: t('pages.zevs.deleteMessage', { name: zev.name }),
-                                        confirmText: t('pages.zevs.deleteConfirm'),
-                                        isDangerous: true,
-                                        onConfirm: () => deleteMutation.mutate(zev.id),
-                                    })}>
-                                        <FontAwesomeIcon icon={faTrash} fixedWidth />
-                                        {t('common.delete')}
-                                    </button>
+                                        {isAdmin && (
+                                            <button className="button button-secondary button-compact" type="button" onClick={() => openOwnerModal(zev)}>
+                                                <FontAwesomeIcon icon={faUser} fixedWidth />
+                                                {t('pages.zevs.setOwner')}
+                                            </button>
+                                        )}
+                                        <button className="button button-danger button-compact" type="button" disabled={deleteMutation.isPending || dialogLoading} onClick={() => confirm({
+                                            title: t('pages.zevs.deleteTitle'),
+                                            message: t('pages.zevs.deleteMessage', { name: zev.name }),
+                                            confirmText: t('pages.zevs.deleteConfirm'),
+                                            isDangerous: true,
+                                            onConfirm: () => deleteMutation.mutate(zev.id),
+                                        })}>
+                                            <FontAwesomeIcon icon={faTrash} fixedWidth />
+                                            {t('common.delete')}
+                                        </button>
+                                    </div>
                                 </td>
                             </tr>
                         )) : (

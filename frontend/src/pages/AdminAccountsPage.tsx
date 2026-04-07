@@ -386,34 +386,36 @@ export function AdminAccountsPage() {
                                         )}
                                     </td>
                                     <td className="actions-cell">
-                                        {linkedAccount ? (
-                                            <>
-                                                <button
-                                                    className="button button-primary button-compact"
-                                                    type="button"
-                                                    onClick={() => openEditUserModal(linkedAccount)}
-                                                >
-                                                    <FontAwesomeIcon icon={faPen} fixedWidth />
-                                                    {t('common.edit')}
-                                                </button>
-                                                <ActionMenu
-                                                    label={t('pages.accounts.moreActions')}
-                                                    icon={<FontAwesomeIcon icon={faEllipsis} fixedWidth />}
-                                                    items={linkedRowActions}
-                                                />
-                                            </>
-                                        ) : (
-                                            <>
-                                                <button className="button button-secondary button-compact" type="button" onClick={() => openLinkModal(participant)} disabled={linkableAccounts.length === 0}>
-                                                    <FontAwesomeIcon icon={faLink} fixedWidth />
-                                                    {t('pages.accounts.linkExisting')}
-                                                </button>
-                                                <button className="button button-primary button-compact" type="button" onClick={() => openCreateAccountModal(participant)}>
-                                                    <FontAwesomeIcon icon={faPlus} fixedWidth />
-                                                    {t('pages.accounts.createAccount')}
-                                                </button>
-                                            </>
-                                        )}
+                                        <div className="actions-cell-content">
+                                            {linkedAccount ? (
+                                                <>
+                                                    <button
+                                                        className="button button-primary button-compact"
+                                                        type="button"
+                                                        onClick={() => openEditUserModal(linkedAccount)}
+                                                    >
+                                                        <FontAwesomeIcon icon={faPen} fixedWidth />
+                                                        {t('common.edit')}
+                                                    </button>
+                                                    <ActionMenu
+                                                        label={t('pages.accounts.moreActions')}
+                                                        icon={<FontAwesomeIcon icon={faEllipsis} fixedWidth />}
+                                                        items={linkedRowActions}
+                                                    />
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <button className="button button-secondary button-compact" type="button" onClick={() => openLinkModal(participant)} disabled={linkableAccounts.length === 0}>
+                                                        <FontAwesomeIcon icon={faLink} fixedWidth />
+                                                        {t('pages.accounts.linkExisting')}
+                                                    </button>
+                                                    <button className="button button-primary button-compact" type="button" onClick={() => openCreateAccountModal(participant)}>
+                                                        <FontAwesomeIcon icon={faPlus} fixedWidth />
+                                                        {t('pages.accounts.createAccount')}
+                                                    </button>
+                                                </>
+                                            )}
+                                        </div>
                                     </td>
                                 </tr>
                             )
@@ -436,30 +438,32 @@ export function AdminAccountsPage() {
                                     <div className="muted">{account.email || '-'}</div>
                                 </td>
                                 <td className="actions-cell">
-                                    <button className="button button-primary button-compact" type="button" onClick={() => openEditUserModal(account)}>
-                                        <FontAwesomeIcon icon={faPen} fixedWidth />
-                                        {t('common.edit')}
-                                    </button>
-                                    <button
-                                        className="button button-danger button-compact"
-                                        type="button"
-                                        disabled={deleteUserMutation.isPending || dialogLoading}
-                                        onClick={() => {
-                                            confirm({
-                                                title: t('pages.accounts.deleteTitle'),
-                                                message: t('pages.accounts.deleteMessage', { username: account.username }),
-                                                confirmText: t('pages.accounts.deleteConfirm'),
-                                                cancelText: t('common.cancel'),
-                                                isDangerous: true,
-                                                onConfirm: async () => {
-                                                    await deleteUserMutation.mutateAsync(account.id)
-                                                },
-                                            })
-                                        }}
-                                    >
-                                        <FontAwesomeIcon icon={faTrash} fixedWidth />
-                                        {t('common.delete')}
-                                    </button>
+                                    <div className="actions-cell-content">
+                                        <button className="button button-primary button-compact" type="button" onClick={() => openEditUserModal(account)}>
+                                            <FontAwesomeIcon icon={faPen} fixedWidth />
+                                            {t('common.edit')}
+                                        </button>
+                                        <button
+                                            className="button button-danger button-compact"
+                                            type="button"
+                                            disabled={deleteUserMutation.isPending || dialogLoading}
+                                            onClick={() => {
+                                                confirm({
+                                                    title: t('pages.accounts.deleteTitle'),
+                                                    message: t('pages.accounts.deleteMessage', { username: account.username }),
+                                                    confirmText: t('pages.accounts.deleteConfirm'),
+                                                    cancelText: t('common.cancel'),
+                                                    isDangerous: true,
+                                                    onConfirm: async () => {
+                                                        await deleteUserMutation.mutateAsync(account.id)
+                                                    },
+                                                })
+                                            }}
+                                        >
+                                            <FontAwesomeIcon icon={faTrash} fixedWidth />
+                                            {t('common.delete')}
+                                        </button>
+                                    </div>
                                 </td>
                             </tr>
                         ))}

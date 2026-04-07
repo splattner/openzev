@@ -867,10 +867,16 @@ h3 {
 }
 
 .actions-cell {
+  text-align: right;
+}
+
+.actions-cell-content {
   display: flex;
   gap: 0.5rem;
   flex-wrap: wrap;
   justify-content: flex-end;
+  align-items: center;
+  min-height: 100%;
 }
 
 .invoice-batch-toolbar {
