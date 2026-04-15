@@ -129,6 +129,6 @@ jobs:
                   path: sbom-assets
 
             - name: Attach SBOM files to GitHub release
-              uses: softprops/action-gh-release@v2
+              uses: softprops/action-gh-release@v3
               with:
                   files: sbom-assets/**/*.spdx.json
