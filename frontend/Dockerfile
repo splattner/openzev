@@ -7,7 +7,7 @@ RUN npm ci
 COPY frontend .
 RUN npm run build
 
-FROM nginx:1.29-alpine
+FROM nginx:1.30-alpine
 ARG OCI_TITLE="OpenZEV Frontend"
 ARG OCI_DESCRIPTION="OpenZEV frontend web application"
 ARG OCI_URL="https://github.com/splattner/openzev"
