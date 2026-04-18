@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.1](https://github.com/splattner/openzev/compare/v1.0.0...v1.0.1) (2026-04-18)
+
+
+### Bug Fixes
+
+* first release failed, so I force a new version with this commit ([#148](https://github.com/splattner/openzev/issues/148)) ([55e9a0b](https://github.com/splattner/openzev/commit/55e9a0b0124c2c801f900237d6fdd5e32a690dff))
+
 ## 1.0.0 (2026-04-18)
 
 
