@@ -4,7 +4,7 @@ Open source platform for operating and billing (v)ZEV energy communities.
 
 ![OpenZEV](docs/openzevlogo_whitebg.png)
 
-OpenZEV gives operators one place to manage participants, metering points, tariffs, imports, and invoicing. It is built to support day-to-day operations from data import to payment tracking with role-based access for admins, owners, and participants.
+OpenZEV gives operators one place to manage participants, metering points, tariffs, imports, and invoicing for a vZEV or ZEV. It is built to support day-to-day operations from data import to payment tracking with role-based access for admins, owners, and participants.
 
 ## Disclaimer
 
