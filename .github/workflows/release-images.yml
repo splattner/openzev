@@ -1,6 +1,11 @@
 name: Release Images
 
 on:
+    workflow_call:
+        inputs:
+            tag_name:
+                required: true
+                type: string
     release:
         types: [published]
 
@@ -17,6 +22,8 @@ jobs:
     build-push-sign:
         name: Build, push, sign and SBOM (${{ matrix.image }})
         runs-on: ubuntu-latest
+        env:
+            TAG_NAME: ${{ inputs.tag_name || github.event.release.tag_name }}
         strategy:
             fail-fast: false
             matrix:
@@ -61,7 +68,7 @@ jobs:
               with:
                   images: ${{ env.IMAGE_PREFIX }}-${{ matrix.image }}
                   tags: |
-                      type=raw,value=${{ github.event.release.tag_name }}
+                      type=raw,value=${{ env.TAG_NAME }}
                       type=raw,value=latest
 
             - name: Build and push image
@@ -72,7 +79,7 @@ jobs:
                   file: ${{ matrix.dockerfile }}
                   build-args: |
                       ${{ matrix.build_args }}
-                      OCI_VERSION=${{ github.event.release.tag_name }}
+                      OCI_VERSION=${{ env.TAG_NAME }}
                       OCI_REVISION=${{ github.sha }}
                       OCI_CREATED=${{ steps.ts.outputs.created }}
                   push: true
@@ -88,7 +95,7 @@ jobs:
               id: sbom
               run: |
                   IMAGE_REF="${{ env.IMAGE_PREFIX }}-${{ matrix.image }}@${{ steps.build.outputs.digest }}"
-                  SBOM_FILE="sbom-${{ matrix.image }}-${{ github.event.release.tag_name }}.spdx.json"
+                  SBOM_FILE="sbom-${{ matrix.image }}-${{ env.TAG_NAME }}.spdx.json"
                   echo "image_ref=$IMAGE_REF" >> "$GITHUB_OUTPUT"
                   echo "sbom_file=$SBOM_FILE" >> "$GITHUB_OUTPUT"
 
