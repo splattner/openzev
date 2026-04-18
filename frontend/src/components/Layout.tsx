@@ -262,9 +262,9 @@ export function Layout() {
                                                     <span className="nav-icon"><BuildingIcon /></span>
                                                     <span className="nav-label">{t('nav.zevs')}</span>
                                                 </NavLink>
-                                                <NavLink to="/admin/accounts" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`} title="Accounts & Participants">
+                                                <NavLink to="/admin/accounts" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`} title={t('nav.adminAccounts')}>
                                                     <span className="nav-icon"><UsersIcon /></span>
-                                                    <span className="nav-label">Accounts & Participants</span>
+                                                    <span className="nav-label">{t('nav.adminAccounts')}</span>
                                                 </NavLink>
                                                 <NavLink to="/admin/invoices" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`} title={t('nav.adminInvoices')}>
                                                     <span className="nav-icon"><InvoiceIcon /></span>
@@ -274,9 +274,9 @@ export function Layout() {
                                                     <span className="nav-icon"><SettingsIcon /></span>
                                                     <span className="nav-label">{t('nav.adminSystemSettings')}</span>
                                                 </NavLink>
-                                                <NavLink to="/admin/settings/vat" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`} title="VAT Settings">
+                                                <NavLink to="/admin/settings/vat" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`} title={t('nav.adminVatSettings')}>
                                                     <span className="nav-icon"><SettingsIcon /></span>
-                                                    <span className="nav-label">VAT Settings</span>
+                                                    <span className="nav-label">{t('nav.adminVatSettings')}</span>
                                                 </NavLink>
                                                 <NavLink to="/admin/pdf-templates" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`} title={t('nav.adminPdfTemplates')}>
                                                     <span className="nav-icon"><PdfIcon /></span>
