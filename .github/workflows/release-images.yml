@@ -17,13 +17,12 @@ permissions:
 env:
     REGISTRY: ghcr.io
     IMAGE_PREFIX: ghcr.io/${{ github.repository_owner }}/openzev
+    TAG_NAME: ${{ inputs.tag_name || github.event.release.tag_name }}
 
 jobs:
     build-push-sign:
         name: Build, push, sign and SBOM (${{ matrix.image }})
         runs-on: ubuntu-latest
-        env:
-            TAG_NAME: ${{ inputs.tag_name || github.event.release.tag_name }}
         strategy:
             fail-fast: false
             matrix:
@@ -138,4 +137,5 @@ jobs:
             - name: Attach SBOM files to GitHub release
               uses: softprops/action-gh-release@v3
               with:
+                  tag_name: ${{ env.TAG_NAME }}
                   files: sbom-assets/**/*.spdx.json
