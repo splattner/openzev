@@ -35,5 +35,14 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- end -}}
 
 {{- define "openzev.imageTag" -}}
-{{- default .context.Chart.AppVersion .tag -}}
+{{- if .tag -}}
+{{- .tag -}}
+{{- else -}}
+{{- $appVersion := toString .context.Chart.AppVersion -}}
+{{- if hasPrefix "v" $appVersion -}}
+{{- $appVersion -}}
+{{- else -}}
+{{- printf "v%s" $appVersion -}}
+{{- end -}}
+{{- end -}}
 {{- end -}}
