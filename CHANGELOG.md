@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.3](https://github.com/splattner/openzev/compare/v1.0.2...v1.0.3) (2026-04-18)
+
+
+### Bug Fixes
+
+* use correct tag in helm chart ([#152](https://github.com/splattner/openzev/issues/152)) ([7e16049](https://github.com/splattner/openzev/commit/7e16049c0683d2ab038eb1e219477e39190d6305))
+
 ## [1.0.2](https://github.com/splattner/openzev/compare/v1.0.1...v1.0.2) (2026-04-18)
 
 
