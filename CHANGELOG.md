@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.2](https://github.com/splattner/openzev/compare/v1.0.1...v1.0.2) (2026-04-18)
+
+
+### Bug Fixes
+
+* sbom attachement to release failed ([#150](https://github.com/splattner/openzev/issues/150)) ([c2afea0](https://github.com/splattner/openzev/commit/c2afea0f6a2931db1c1610649adb7585fa8f490f))
+
 ## [1.0.1](https://github.com/splattner/openzev/compare/v1.0.0...v1.0.1) (2026-04-18)
 
 
