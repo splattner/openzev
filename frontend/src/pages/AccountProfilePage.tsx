@@ -122,7 +122,7 @@ export function AccountProfilePage() {
         setLinkingProvider(providerSlug)
         try {
             const { redirect_url } = await oauthLinkInitiate(providerSlug)
-            window.location.href = redirect_url
+            window.location.assign(redirect_url)
         } catch {
             pushToast(t('auth.oauth.errors.initFailed'), 'error')
             setLinkingProvider(null)
