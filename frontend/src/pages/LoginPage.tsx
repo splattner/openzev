@@ -59,7 +59,7 @@ export function LoginPage() {
         setError(null)
         try {
             const { redirect_url } = await oauthLoginInitiate(providerSlug)
-            window.location.href = redirect_url
+            window.location.assign(redirect_url)
         } catch {
             setError(t('auth.oauth.errors.initFailed'))
             setOauthLoading(null)
