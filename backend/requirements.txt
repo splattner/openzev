@@ -40,7 +40,7 @@ pandas==3.0.2
 pillow==12.2.0
 pluggy==1.6.0
 prompt_toolkit==3.0.52
-psycopg2-binary==2.9.11
+psycopg2-binary==2.9.12
 pycparser==3.0
 pydyf==0.12.1
 Pygments==2.20.0
