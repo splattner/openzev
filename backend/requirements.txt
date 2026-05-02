@@ -66,7 +66,7 @@ tzdata==2025.3
 tzlocal==5.3.1
 uritemplate==4.2.0
 vine==5.1.0
-wcwidth==0.6.0
+wcwidth==0.7.0
 weasyprint==68.1
 webencodings==0.5.1
 zopfli==0.4.1
