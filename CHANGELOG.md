@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.0](https://github.com/splattner/openzev/compare/v1.0.3...v1.1.0) (2026-05-27)
+
+
+### Features
+
+* **audit:** add centralized audit log and operational traceability ([#184](https://github.com/splattner/openzev/issues/184)) ([0b04e31](https://github.com/splattner/openzev/commit/0b04e310224ffc60a41de12b5492a9a0d0a7a29b))
+
 ## [1.0.3](https://github.com/splattner/openzev/compare/v1.0.2...v1.0.3) (2026-04-18)
 
 
