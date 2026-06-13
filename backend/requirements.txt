@@ -46,7 +46,7 @@ pydyf==0.12.1
 Pygments==2.20.0
 PyJWT==2.13.0
 pyphen==0.17.2
-pytest==9.0.3
+pytest==9.1.0
 pytest-cov==7.1.0
 pytest-django==4.12.0
 python-crontab==3.3.0
