@@ -64,7 +64,7 @@ svgwrite==1.4.3
 tinycss2==1.5.1
 tinyhtml5==2.1.0
 tzdata==2025.3
-tzlocal==5.4.3
+tzlocal==5.4.4
 uritemplate==4.2.0
 vine==5.1.0
 wcwidth==0.8.1
