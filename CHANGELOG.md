@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.2.0](https://github.com/splattner/openzev/compare/v1.1.0...v1.2.0) (2026-07-05)
+
+
+### Features
+
+* **frontend:** improve tariffs page UX and add validity filter ([#280](https://github.com/splattner/openzev/issues/280)) ([a1de7bf](https://github.com/splattner/openzev/commit/a1de7bf37a1c72d770f0433dce135394611bc179))
+
+
+### Bug Fixes
+
+* **frontend:** translate invoice status labels and DataGrid chrome ([#276](https://github.com/splattner/openzev/issues/276)) ([7e14f4a](https://github.com/splattner/openzev/commit/7e14f4a2676846036becf0c05222769544974bd0))
+
 ## [1.1.0](https://github.com/splattner/openzev/compare/v1.0.3...v1.1.0) (2026-05-27)
 
 
