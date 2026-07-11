@@ -1,5 +1,28 @@
 # Changelog
 
+## [1.3.0](https://github.com/splattner/openzev/compare/v1.2.0...v1.3.0) (2026-07-11)
+
+
+### Features
+
+* **frontend:** unify the period selector and move custom ranges into a popover ([#297](https://github.com/splattner/openzev/issues/297)) ([d33529c](https://github.com/splattner/openzev/commit/d33529c79d2e9aa83af3a19f8427551653c441ae))
+* **metering:** redesign raw-data view as a drill-down with intraday grid ([#301](https://github.com/splattner/openzev/issues/301)) ([0d22dea](https://github.com/splattner/openzev/commit/0d22dea4f086c3c2157638b78531dab055fb632d))
+
+
+### Bug Fixes
+
+* **deps:** pin pandas to 3.0.3, away from the yanked 3.0.4 ([#295](https://github.com/splattner/openzev/issues/295)) ([f843d18](https://github.com/splattner/openzev/commit/f843d18a0cac0119ce8b7957321d2e7d3e479336))
+* **deps:** update frontend-npm (major) ([#292](https://github.com/splattner/openzev/issues/292)) ([cc933e5](https://github.com/splattner/openzev/commit/cc933e5b1e00f51fd74fac0bf0396837dd12c3a4))
+* **frontend:** migrate the Metering Data page to i18n ([#296](https://github.com/splattner/openzev/issues/296)) ([7b45e74](https://github.com/splattner/openzev/commit/7b45e74a3c0b133dff0e86f3de3703b863cb369b))
+* **frontend:** migrate ZEV settings page to i18n and fix nav translation gaps ([#288](https://github.com/splattner/openzev/issues/288)) ([8c4608f](https://github.com/splattner/openzev/commit/8c4608f688b77af17eaa6acbaedc9957fe4c7ba6))
+* **frontend:** ship the Inter font (and recapture screenshots) ([#300](https://github.com/splattner/openzev/issues/300)) ([e969362](https://github.com/splattner/openzev/commit/e9693624076aeb1ae527e5a9a32ebaa7094091ce))
+* **screenshots:** repair PII blur, chart-data 500, empty demo data, and refresh all captures ([#294](https://github.com/splattner/openzev/issues/294)) ([ae6ff89](https://github.com/splattner/openzev/commit/ae6ff89112afbc310684a814a4e5d943f019185e))
+
+
+### Performance Improvements
+
+* **backend:** use a fast password hasher for tests ([#302](https://github.com/splattner/openzev/issues/302)) ([567f60f](https://github.com/splattner/openzev/commit/567f60f07e0552367bcaf6fd47e2306162e53575))
+
 ## [1.2.0](https://github.com/splattner/openzev/compare/v1.1.0...v1.2.0) (2026-07-05)
 
 
