@@ -23,7 +23,7 @@ djangorestframework_simplejwt==5.5.1
 drf-spectacular==0.30.0
 et_xmlfile==2.0.0
 factory_boy==3.3.3
-Faker==40.32.0
+Faker==40.35.0
 fonttools==4.63.0
 gunicorn==26.0.0
 inflection==0.5.1
@@ -36,7 +36,7 @@ lxml==6.1.1
 numpy==2.5.1
 openpyxl==3.1.5
 packaging==26.2
-pandas==3.0.3
+pandas==3.0.5
 pillow==12.3.0
 pluggy==1.6.0
 prompt_toolkit==3.0.52
