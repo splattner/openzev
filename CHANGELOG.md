@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.4.0](https://github.com/splattner/openzev/compare/v1.3.0...v1.4.0) (2026-07-24)
+
+
+### Features
+
+* **feasibility:** vZEV profitability & feasibility calculator ([#315](https://github.com/splattner/openzev/issues/315)) ([b13ab9a](https://github.com/splattner/openzev/commit/b13ab9ad5f4a2ab0056b811655178a2c0393da39))
+* **invoices:** emit document PDFs as PDF/A-3b ([#313](https://github.com/splattner/openzev/issues/313)) ([64cc017](https://github.com/splattner/openzev/commit/64cc017b428d238885001941a2c2fcb3e99f825a))
+
 ## [1.3.0](https://github.com/splattner/openzev/compare/v1.2.0...v1.3.0) (2026-07-11)
 
 
