@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.5.0](https://github.com/splattner/openzev/compare/v1.4.0...v1.5.0) (2026-07-25)
+
+
+### Features
+
+* **zev:** show participant building footprints on an OpenStreetMap map ([#319](https://github.com/splattner/openzev/issues/319)) ([fa834f6](https://github.com/splattner/openzev/commit/fa834f6b0ab54e2ac6aba490ac72aca3269741be))
+
+
+### Bug Fixes
+
+* **frontend:** stop clipping participant rows in the feasibility calculator ([#317](https://github.com/splattner/openzev/issues/317)) ([4658af7](https://github.com/splattner/openzev/commit/4658af7aa0a9ee52a0986aa347cba562cdd8cf42))
+* **zev:** let admins edit a ZEV owner's own participant record ([#320](https://github.com/splattner/openzev/issues/320)) ([f1449e7](https://github.com/splattner/openzev/commit/f1449e702dcf5233b680d6daaedab7e277d037db))
+
 ## [1.4.0](https://github.com/splattner/openzev/compare/v1.3.0...v1.4.0) (2026-07-24)
 
 
