@@ -357,7 +357,7 @@ export const en = {
                 openProtocol: 'Open protocol',
                 deleteImport: 'Delete import',
                 deleteImports: 'Delete imports',
-                newImport: '+ New Import',
+                newImport: 'New Import',
             },
             messages: {
                 previewLoadedWithIssues: 'Preview loaded with {{count}} issue(s).',

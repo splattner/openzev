@@ -363,7 +363,7 @@ export const fr = {
                 openProtocol: 'Ouvrir le protocole',
                 deleteImport: 'Supprimer l’import',
                 deleteImports: 'Supprimer les imports',
-                newImport: '+ Nouvel import',
+                newImport: 'Nouvel import',
             },
             messages: {
                 previewLoadedWithIssues: 'Aperçu chargé avec {{count}} problème(s).',

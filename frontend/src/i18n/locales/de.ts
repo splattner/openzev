@@ -356,7 +356,7 @@ export const de = {
                 openProtocol: 'Protokoll öffnen',
                 deleteImport: 'Import löschen',
                 deleteImports: 'Importe löschen',
-                newImport: '+ Neuer Import',
+                newImport: 'Neuer Import',
             },
             messages: {
                 previewLoadedWithIssues: 'Vorschau mit {{count}} Problem(en) geladen.',
