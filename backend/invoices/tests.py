@@ -197,6 +197,31 @@ class InvoiceRBACTests(TestCase):
         resp = self.client.get("/api/v1/invoices/invoices/contract-pdf-template/")
         self.assertEqual(resp.status_code, 403)
 
+    def test_generic_update_is_not_allowed(self):
+        # Invoices must only be mutated through the dedicated, audited
+        # workflow actions (generate/approve/mark-sent/mark-paid/cancel) —
+        # not the generic PUT/PATCH endpoint, which would bypass those
+        # permission checks and leave no audit trail.
+        inv = make_invoice(self.zev1, self.p1, InvoiceStatus.DRAFT)
+        auth(self.client, self.admin)
+
+        put_resp = self.client.put(
+            f"/api/v1/invoices/invoices/{inv.pk}/",
+            {"status": InvoiceStatus.PAID},
+            format="json",
+        )
+        self.assertEqual(put_resp.status_code, 405)
+
+        patch_resp = self.client.patch(
+            f"/api/v1/invoices/invoices/{inv.pk}/",
+            {"status": InvoiceStatus.PAID},
+            format="json",
+        )
+        self.assertEqual(patch_resp.status_code, 405)
+
+        inv.refresh_from_db()
+        self.assertEqual(inv.status, InvoiceStatus.DRAFT)
+
     def test_admin_can_delete_paid_invoice(self):
         inv = make_invoice(self.zev1, self.p1, InvoiceStatus.PAID)
         auth(self.client, self.admin)

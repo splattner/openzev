@@ -138,6 +138,7 @@ class ParticipantViewSet(ZevScopedQuerySetMixin, viewsets.ModelViewSet):
         )
 
     PARTICIPANT_TRACKED_FIELDS = [
+        "zev",
         "title",
         "first_name",
         "last_name",
@@ -155,6 +156,7 @@ class ParticipantViewSet(ZevScopedQuerySetMixin, viewsets.ModelViewSet):
 
     def _participant_snapshot(self, participant):
         return {
+            "zev": str(participant.zev_id) if participant.zev_id else None,
             "title": participant.title,
             "first_name": participant.first_name,
             "last_name": participant.last_name,
@@ -457,19 +459,22 @@ class MeteringPointViewSet(ZevScopedQuerySetMixin, viewsets.ModelViewSet):
             metadata={"zev_id": str(metering_point.zev_id), "meter_type": metering_point.meter_type},
         )
 
+    METERING_POINT_TRACKED_FIELDS = ["zev", "meter_id", "meter_type", "is_active", "location_description"]
+
+    def _metering_point_snapshot(self, metering_point):
+        return {
+            "zev": str(metering_point.zev_id) if metering_point.zev_id else None,
+            "meter_id": metering_point.meter_id,
+            "meter_type": metering_point.meter_type,
+            "is_active": metering_point.is_active,
+            "location_description": metering_point.location_description,
+        }
+
     def perform_update(self, serializer):
         metering_point = self.get_object()
-        before = {
-            "meter_type": metering_point.meter_type,
-            "is_active": metering_point.is_active,
-            "location_description": metering_point.location_description,
-        }
+        before = self._metering_point_snapshot(metering_point)
         metering_point = serializer.save()
-        after = {
-            "meter_type": metering_point.meter_type,
-            "is_active": metering_point.is_active,
-            "location_description": metering_point.location_description,
-        }
+        after = self._metering_point_snapshot(metering_point)
         _record_zev_event(
             request=self.request,
             action_category=AuditActionCategory.METERING,
@@ -479,7 +484,7 @@ class MeteringPointViewSet(ZevScopedQuerySetMixin, viewsets.ModelViewSet):
             target_id=str(metering_point.pk),
             target_display=metering_point.meter_id,
             summary=f"Updated metering point {metering_point.meter_id}.",
-            changes=build_diff(before, after, ["meter_type", "is_active", "location_description"]),
+            changes=build_diff(before, after, self.METERING_POINT_TRACKED_FIELDS),
         )
 
     def perform_destroy(self, instance):
@@ -597,12 +602,14 @@ class MeteringPointAssignmentViewSet(ZevScopedQuerySetMixin, viewsets.ModelViewS
     def perform_update(self, serializer):
         assignment = self.get_object()
         before = {
+            "metering_point": str(assignment.metering_point_id),
             "participant": str(assignment.participant_id),
             "valid_from": assignment.valid_from,
             "valid_to": assignment.valid_to,
         }
         assignment = serializer.save()
         after = {
+            "metering_point": str(assignment.metering_point_id),
             "participant": str(assignment.participant_id),
             "valid_from": assignment.valid_from,
             "valid_to": assignment.valid_to,
@@ -616,7 +623,7 @@ class MeteringPointAssignmentViewSet(ZevScopedQuerySetMixin, viewsets.ModelViewS
             target_id=str(assignment.pk),
             target_display=str(assignment.pk),
             summary=f"Updated metering point assignment for {assignment.metering_point.meter_id}.",
-            changes=build_diff(before, after, ["participant", "valid_from", "valid_to"]),
+            changes=build_diff(before, after, ["metering_point", "participant", "valid_from", "valid_to"]),
         )
 
     def perform_destroy(self, instance):

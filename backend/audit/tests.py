@@ -442,3 +442,113 @@ class AuditPhase3InstrumentationTests(TestCase):
         event = AuditEvent.objects.filter(action_type="import.upload").latest("created_at")
         self.assertEqual(event.action_category, AuditActionCategory.IMPORT)
         self.assertEqual(event.status, AuditEventStatus.FAILED)
+
+    def test_metering_point_update_emits_audit_event_with_field_changes(self):
+        auth(self.client, self.admin)
+        response = self.client.patch(
+            f"/api/v1/zev/metering-points/{self.metering_point.id}/",
+            {"meter_id": "CH9990000000000000000000000000099", "location_description": "Basement"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 200)
+
+        event = AuditEvent.objects.filter(
+            action_type="metering_point.update",
+            target_id=str(self.metering_point.id),
+        ).latest("created_at")
+        self.assertEqual(event.status, AuditEventStatus.SUCCESS)
+        self.assertEqual(event.changes_json.get("meter_id", {}).get("after"), "CH9990000000000000000000000000099")
+        self.assertEqual(event.changes_json.get("location_description", {}).get("after"), "Basement")
+
+    def test_metering_assignment_update_emits_audit_event_with_field_changes(self):
+        other_metering_point = MeteringPoint.objects.create(
+            zev=self.zev,
+            meter_id="CH9990000000000000000000000000002",
+            meter_type=MeteringPointType.CONSUMPTION,
+        )
+        assignment = MeteringPointAssignment.objects.get(
+            metering_point=self.metering_point,
+            participant=self.participant,
+        )
+        auth(self.client, self.admin)
+        response = self.client.patch(
+            f"/api/v1/zev/metering-point-assignments/{assignment.id}/",
+            {"metering_point": str(other_metering_point.id)},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 200)
+
+        event = AuditEvent.objects.filter(
+            action_type="metering_assignment.update",
+            target_id=str(assignment.id),
+        ).latest("created_at")
+        self.assertEqual(event.status, AuditEventStatus.SUCCESS)
+        self.assertEqual(event.changes_json.get("metering_point", {}).get("after"), str(other_metering_point.id))
+
+    def test_tariff_update_emits_audit_event_with_field_changes(self):
+        tariff = Tariff.objects.create(
+            zev=self.zev,
+            name="Phase3 Grid Tariff",
+            category=TariffCategory.ENERGY,
+            billing_mode=BillingMode.ENERGY,
+            energy_type="grid",
+            valid_from=timezone.localdate(),
+        )
+        auth(self.client, self.owner)
+        response = self.client.patch(
+            f"/api/v1/tariffs/tariffs/{tariff.id}/",
+            {"name": "Updated Grid Tariff", "notes": "Renegotiated rate."},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 200)
+
+        event = AuditEvent.objects.filter(
+            action_type="tariff.update",
+            target_id=str(tariff.id),
+        ).latest("created_at")
+        self.assertEqual(event.status, AuditEventStatus.SUCCESS)
+        self.assertEqual(event.changes_json.get("name", {}).get("after"), "Updated Grid Tariff")
+        self.assertEqual(event.changes_json.get("notes", {}).get("after"), "Renegotiated rate.")
+
+    def test_tariff_period_update_emits_audit_event_with_field_changes(self):
+        tariff = Tariff.objects.create(
+            zev=self.zev,
+            name="Phase3 Flat Tariff",
+            category=TariffCategory.ENERGY,
+            billing_mode=BillingMode.ENERGY,
+            energy_type="local",
+            valid_from=timezone.localdate(),
+        )
+        period = tariff.periods.create(period_type="flat", price_chf_per_kwh="0.20000")
+        auth(self.client, self.owner)
+        response = self.client.patch(
+            f"/api/v1/tariffs/periods/{period.id}/",
+            {"price_chf_per_kwh": "0.25000"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 200)
+
+        event = AuditEvent.objects.filter(
+            action_type="tariff_period.update",
+            target_id=str(period.id),
+        ).latest("created_at")
+        self.assertEqual(event.status, AuditEventStatus.SUCCESS)
+        self.assertEqual(event.changes_json.get("price_chf_per_kwh", {}).get("after"), "0.25000")
+
+    def test_user_update_emits_audit_event_with_field_changes(self):
+        auth(self.client, self.admin)
+        response = self.client.patch(
+            f"/api/v1/auth/users/{self.participant_user.id}/",
+            {"first_name": "Updated", "last_name": "Name", "must_change_password": True},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 200)
+
+        event = AuditEvent.objects.filter(
+            action_type="user.update",
+            target_id=str(self.participant_user.id),
+        ).latest("created_at")
+        self.assertEqual(event.status, AuditEventStatus.SUCCESS)
+        self.assertEqual(event.changes_json.get("first_name", {}).get("after"), "Updated")
+        self.assertEqual(event.changes_json.get("last_name", {}).get("after"), "Name")
+        self.assertEqual(event.changes_json.get("must_change_password", {}).get("after"), True)

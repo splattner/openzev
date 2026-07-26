@@ -62,25 +62,38 @@ class TariffViewSet(ZevScopedQuerySetMixin, viewsets.ModelViewSet):
             metadata={"zev_id": str(tariff.zev_id), "category": tariff.category},
         )
 
+    TARIFF_TRACKED_FIELDS = [
+        "zev",
+        "name",
+        "category",
+        "billing_mode",
+        "energy_type",
+        "fixed_price_chf",
+        "percentage",
+        "valid_from",
+        "valid_to",
+        "notes",
+    ]
+
+    def _tariff_snapshot(self, tariff):
+        return {
+            "zev": str(tariff.zev_id) if tariff.zev_id else None,
+            "name": tariff.name,
+            "category": tariff.category,
+            "billing_mode": tariff.billing_mode,
+            "energy_type": tariff.energy_type,
+            "fixed_price_chf": tariff.fixed_price_chf,
+            "percentage": tariff.percentage,
+            "valid_from": tariff.valid_from,
+            "valid_to": tariff.valid_to,
+            "notes": tariff.notes,
+        }
+
     def perform_update(self, serializer):
         tariff = self.get_object()
-        before = {
-            "name": tariff.name,
-            "category": tariff.category,
-            "billing_mode": tariff.billing_mode,
-            "energy_type": tariff.energy_type,
-            "valid_from": tariff.valid_from,
-            "valid_to": tariff.valid_to,
-        }
+        before = self._tariff_snapshot(tariff)
         tariff = serializer.save()
-        after = {
-            "name": tariff.name,
-            "category": tariff.category,
-            "billing_mode": tariff.billing_mode,
-            "energy_type": tariff.energy_type,
-            "valid_from": tariff.valid_from,
-            "valid_to": tariff.valid_to,
-        }
+        after = self._tariff_snapshot(tariff)
         _record_tariff_event(
             request=self.request,
             action_type="tariff.update",
@@ -89,11 +102,7 @@ class TariffViewSet(ZevScopedQuerySetMixin, viewsets.ModelViewSet):
             target_id=str(tariff.pk),
             target_display=tariff.name,
             summary=f"Updated tariff {tariff.name}.",
-            changes=build_diff(
-                before,
-                after,
-                ["name", "category", "billing_mode", "energy_type", "valid_from", "valid_to"],
-            ),
+            changes=build_diff(before, after, self.TARIFF_TRACKED_FIELDS),
         )
 
     def perform_destroy(self, instance):
@@ -310,23 +319,23 @@ class TariffPeriodViewSet(ZevScopedQuerySetMixin, viewsets.ModelViewSet):
             metadata={"tariff_id": str(period.tariff_id)},
         )
 
+    TARIFF_PERIOD_TRACKED_FIELDS = ["tariff", "period_type", "price_chf_per_kwh", "time_from", "time_to", "weekdays"]
+
+    def _tariff_period_snapshot(self, period):
+        return {
+            "tariff": str(period.tariff_id) if period.tariff_id else None,
+            "period_type": period.period_type,
+            "price_chf_per_kwh": period.price_chf_per_kwh,
+            "time_from": period.time_from,
+            "time_to": period.time_to,
+            "weekdays": period.weekdays,
+        }
+
     def perform_update(self, serializer):
         period = self.get_object()
-        before = {
-            "period_type": period.period_type,
-            "price_chf_per_kwh": period.price_chf_per_kwh,
-            "time_from": period.time_from,
-            "time_to": period.time_to,
-            "weekdays": period.weekdays,
-        }
+        before = self._tariff_period_snapshot(period)
         period = serializer.save()
-        after = {
-            "period_type": period.period_type,
-            "price_chf_per_kwh": period.price_chf_per_kwh,
-            "time_from": period.time_from,
-            "time_to": period.time_to,
-            "weekdays": period.weekdays,
-        }
+        after = self._tariff_period_snapshot(period)
         _record_tariff_event(
             request=self.request,
             action_type="tariff_period.update",
@@ -335,7 +344,7 @@ class TariffPeriodViewSet(ZevScopedQuerySetMixin, viewsets.ModelViewSet):
             target_id=str(period.pk),
             target_display=period.period_type,
             summary=f"Updated tariff period {period.period_type} for tariff {period.tariff.name}.",
-            changes=build_diff(before, after, ["period_type", "price_chf_per_kwh", "time_from", "time_to", "weekdays"]),
+            changes=build_diff(before, after, self.TARIFF_PERIOD_TRACKED_FIELDS),
         )
 
     def perform_destroy(self, instance):

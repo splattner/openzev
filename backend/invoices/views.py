@@ -2,7 +2,7 @@ import io
 import zipfile
 from datetime import date as date_type
 
-from rest_framework import viewsets, status
+from rest_framework import mixins, viewsets, status
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -80,7 +80,22 @@ def _record_invoice_event(
     )
 
 
-class InvoiceViewSet(ZevScopedQuerySetMixin, viewsets.ModelViewSet):
+class InvoiceViewSet(
+    ZevScopedQuerySetMixin,
+    mixins.CreateModelMixin,
+    mixins.ListModelMixin,
+    mixins.RetrieveModelMixin,
+    mixins.DestroyModelMixin,
+    viewsets.GenericViewSet,
+):
+    """Invoices are mutated only through the dedicated workflow actions below
+    (generate/approve/mark-sent/mark-paid/cancel etc.), each of which is
+    permission-checked and audit-logged. Generic update/partial_update is
+    intentionally not exposed — it would let any caller with read access to
+    an invoice overwrite status, totals, or participant/zev directly, bypassing
+    those workflow guards and leaving no audit trail.
+    """
+
     serializer_class = InvoiceSerializer
     permission_classes = [IsAuthenticated]
     zev_owner_filter = "zev__owner"

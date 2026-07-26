@@ -214,19 +214,24 @@ class UserDetailView(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = UserSerializer
     permission_classes = [IsAdmin]
 
+    USER_TRACKED_FIELDS = ["username", "email", "first_name", "last_name", "role", "must_change_password", "is_active"]
+
+    def _user_snapshot(self, user):
+        return {
+            "username": user.username,
+            "email": user.email,
+            "first_name": user.first_name,
+            "last_name": user.last_name,
+            "role": user.role,
+            "must_change_password": user.must_change_password,
+            "is_active": user.is_active,
+        }
+
     def perform_update(self, serializer):
         instance = self.get_object()
-        before = {
-            "role": instance.role,
-            "is_active": instance.is_active,
-            "email": instance.email,
-        }
+        before = self._user_snapshot(instance)
         user = serializer.save()
-        after = {
-            "role": user.role,
-            "is_active": user.is_active,
-            "email": user.email,
-        }
+        after = self._user_snapshot(user)
         _record_accounts_event(
             request=self.request,
             action_category=AuditActionCategory.AUTH,
@@ -236,7 +241,7 @@ class UserDetailView(generics.RetrieveUpdateDestroyAPIView):
             target_id=str(user.pk),
             target_display=user.email or user.username,
             summary=f"Updated user {user.email or user.username}.",
-            changes=build_diff(before, after, ["role", "is_active", "email"]),
+            changes=build_diff(before, after, self.USER_TRACKED_FIELDS),
         )
 
     def perform_destroy(self, instance):
