@@ -141,7 +141,11 @@ def get_cached_building_footprint(address_line1: str, postal_code: str, city: st
     if not (address_line1 or "").strip():
         return None
 
-    cached = cache.get(_cache_key(address_line1, postal_code, city))
+    try:
+        cached = cache.get(_cache_key(address_line1, postal_code, city))
+    except Exception:
+        logger.warning("Cache read failed for %s, %s %s", address_line1, postal_code, city, exc_info=True)
+        return None
     if cached is None or cached == _NOT_FOUND:
         return None
     return cached
