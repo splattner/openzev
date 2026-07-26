@@ -884,6 +884,8 @@ export const fr = {
                 validity: 'Validité',
                 actions: 'Actions',
             },
+            approxPrice: '≈ CHF {{price}}/kWh',
+            approxPriceTooltip: '{{percentage}} % du tarif réseau actif (CHF {{basePrice}}/kWh) = CHF {{effectivePrice}}/kWh',
             periodCol: {
                 tariff: 'Tarif',
                 type: 'Type',

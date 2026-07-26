@@ -93,6 +93,40 @@ export function TariffsPage() {
         return tariffs.filter((tariff) => tariff.billing_mode === 'energy')
     }, [tariffs])
 
+    // Percentage-of-energy tariffs price any energy type as a fraction of the
+    // active GRID energy tariff(s) — mirrors the resolution used for billing
+    // (backend/invoices/engine.py) and the ZEV contract PDF, using the same
+    // "prefer flat, else HT, else first period" representative price per tariff.
+    const percentageBasePricing = useMemo(() => {
+        const gridTariffsByZev = new Map<string, Tariff[]>()
+        tariffs
+            .filter((tariff) => tariff.billing_mode === 'energy' && tariff.energy_type === 'grid')
+            .forEach((tariff) => {
+                const existing = gridTariffsByZev.get(tariff.zev) ?? []
+                existing.push(tariff)
+                gridTariffsByZev.set(tariff.zev, existing)
+            })
+
+        const result = new Map<string, number>()
+        tariffs
+            .filter((tariff) => tariff.billing_mode === 'percentage_of_energy')
+            .forEach((pctTariff) => {
+                const candidateGridTariffs = (gridTariffsByZev.get(pctTariff.zev) ?? []).filter(
+                    (gridTariff) =>
+                        gridTariff.valid_from <= pctTariff.valid_from &&
+                        (!gridTariff.valid_to || gridTariff.valid_to >= pctTariff.valid_from),
+                )
+                const basePrice = candidateGridTariffs.reduce((sum, gridTariff) => {
+                    const representativePeriod = periodsByTariff.get(gridTariff.id)?.[0]
+                    return sum + (representativePeriod ? Number(representativePeriod.price_chf_per_kwh) : 0)
+                }, 0)
+                if (basePrice > 0) {
+                    result.set(pctTariff.id, basePrice)
+                }
+            })
+        return result
+    }, [tariffs, periodsByTariff])
+
     const tariffsWithPeriodsCount = useMemo(
         () => tariffs.filter((tariff) => (periodsByTariff.get(tariff.id)?.length ?? 0) > 0).length,
         [tariffs, periodsByTariff],
@@ -246,6 +280,7 @@ export function TariffsPage() {
                 <TariffCategorySections
                     tariffSections={tariffSections}
                     periodsByTariff={periodsByTariff}
+                    percentageBasePricing={percentageBasePricing}
                     settings={settings}
                     deleteTariffDisabled={deleteTariffPending || dialogLoading}
                     deletePeriodDisabled={deletePeriodPending || dialogLoading}

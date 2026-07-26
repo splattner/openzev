@@ -848,6 +848,8 @@ export const en = {
                 validity: 'Validity',
                 actions: 'Actions',
             },
+            approxPrice: '≈ CHF {{price}}/kWh',
+            approxPriceTooltip: '{{percentage}}% of the active grid tariff (CHF {{basePrice}}/kWh) = CHF {{effectivePrice}}/kWh',
             periodCol: {
                 tariff: 'Tariff',
                 type: 'Type',

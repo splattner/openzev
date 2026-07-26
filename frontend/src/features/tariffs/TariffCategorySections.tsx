@@ -19,6 +19,7 @@ type TariffSection = {
 type TariffCategorySectionsProps = {
     tariffSections: TariffSection[]
     periodsByTariff: Map<string, TariffPeriod[]>
+    percentageBasePricing: Map<string, number>
     settings: AppSettings
     deleteTariffDisabled: boolean
     deletePeriodDisabled: boolean
@@ -32,6 +33,7 @@ type TariffCategorySectionsProps = {
 export function TariffCategorySections({
     tariffSections,
     periodsByTariff,
+    percentageBasePricing,
     settings,
     deleteTariffDisabled,
     deletePeriodDisabled,
@@ -74,11 +76,22 @@ export function TariffCategorySections({
                         {section.tariffs.map((tariff) => {
                             const tariffPeriods = periodsByTariff.get(tariff.id) ?? []
                             const usesPeriods = tariff.billing_mode === 'energy'
+                            const energyTypeLabel = t(`pages.tariffs.energyTypes.${tariff.energy_type || 'local'}` as Parameters<typeof t>[0])
+                            const basePrice = percentageBasePricing.get(tariff.id)
                             const pricingLabel = tariff.billing_mode === 'energy'
-                                ? t(`pages.tariffs.energyTypes.${tariff.energy_type || 'local'}` as Parameters<typeof t>[0])
+                                ? energyTypeLabel
                                 : tariff.billing_mode === 'percentage_of_energy'
-                                    ? `${tariff.percentage ?? '0'}% · ${t(`pages.tariffs.energyTypes.${tariff.energy_type || 'local'}` as Parameters<typeof t>[0])}`
+                                    ? basePrice
+                                        ? `${tariff.percentage ?? '0'}% · ${energyTypeLabel} · ${t('pages.tariffs.approxPrice', { price: (basePrice * Number(tariff.percentage ?? 0) / 100).toFixed(3) })}`
+                                        : `${tariff.percentage ?? '0'}% · ${energyTypeLabel}`
                                     : `CHF ${tariff.fixed_price_chf || '0.00'}`
+                            const pricingTooltip = tariff.billing_mode === 'percentage_of_energy' && basePrice
+                                ? t('pages.tariffs.approxPriceTooltip', {
+                                    percentage: tariff.percentage ?? '0',
+                                    basePrice: basePrice.toFixed(3),
+                                    effectivePrice: (basePrice * Number(tariff.percentage ?? 0) / 100).toFixed(3),
+                                })
+                                : undefined
                             const notes = tariff.notes?.trim()
                             const isExpanded = expandedTariffIds.has(tariff.id)
 
@@ -131,7 +144,7 @@ export function TariffCategorySections({
                                         {!usesPeriods && (
                                             <div className="tariff-detail-card">
                                                 <span className="tariff-detail-label">{t('pages.tariffs.col.pricing')}</span>
-                                                <span className="tariff-detail-value">{pricingLabel}</span>
+                                                <span className="tariff-detail-value" title={pricingTooltip}>{pricingLabel}</span>
                                             </div>
                                         )}
                                         {usesPeriods && (
