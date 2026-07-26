@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.5.1](https://github.com/splattner/openzev/compare/v1.5.0...v1.5.1) (2026-07-26)
+
+
+### Bug Fixes
+
+* **audit:** close audit-diff gaps left by incomplete tracked-field lists ([#327](https://github.com/splattner/openzev/issues/327)) ([9b22fc7](https://github.com/splattner/openzev/commit/9b22fc74e7a9f30b71464a9ed5916c9d4b5991d7))
+* duplicate plus icon, cache outage crash, and Swiss number formatting ([#325](https://github.com/splattner/openzev/issues/325)) ([6a5cf07](https://github.com/splattner/openzev/commit/6a5cf07bacfd927fcb3bcc2f77227a4415b6b412))
+* **frontend:** keep the sidebar nav from overflowing and needing dual scroll ([#324](https://github.com/splattner/openzev/issues/324)) ([fb7e0de](https://github.com/splattner/openzev/commit/fb7e0de089437558da6562f0778920f2a00fe591))
+* **tariffs:** show the resolved CHF/kWh price for percentage-of-energy tariffs ([#326](https://github.com/splattner/openzev/issues/326)) ([27f287a](https://github.com/splattner/openzev/commit/27f287a4dd86dc65108ebb9105c2913052097f3f))
+* **zev:** include all editable fields in participant.update audit diff ([#322](https://github.com/splattner/openzev/issues/322)) ([3c02a33](https://github.com/splattner/openzev/commit/3c02a335d990cd3b7ef325ddbb575b9f7aafa9a7))
+
 ## [1.5.0](https://github.com/splattner/openzev/compare/v1.4.0...v1.5.0) (2026-07-25)
 
 
