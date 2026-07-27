@@ -111,16 +111,16 @@ All end-user documentation has been moved to `docs/user-guide/` and organized by
 
 ## Quick Start (Docker)
 
-Recommended default: keep frontend, backend, and worker separated for cleaner scaling and easier operations.
-
-```bash
-docker compose up -d --build
-```
-
 To start the stack and seed a reusable demo environment in one command:
 
 ```bash
 scripts/start-demo-environment.sh
+```
+
+Or, if you only need the running stack without demo data:
+
+```bash
+docker compose up -d --build
 ```
 
 Services:
@@ -367,8 +367,8 @@ The seed command also creates a sample ZEV, metering points, tariffs, and 15-min
 
 ## Development Notes
 
-- Default local database uses SQLite; production should use PostgreSQL or MariaDB.
-- Async email features require Redis + Celery worker running.
+- Without Docker, the backend defaults to SQLite (see `backend/.env.example`). Docker Compose uses PostgreSQL. MariaDB is also supported.
+- Async tasks (invoice emails, PDF generation, geocoding) require Redis + Celery. Docker Compose includes both; for other setups, ensure they are running.
 - Use `.env.example` as baseline for environment configuration.
 - Keep migrations up to date when changing models:
 
