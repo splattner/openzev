@@ -14,7 +14,9 @@ spelled out in each handler rather than folded into a parameterised helper.
 
 import io
 import zipfile
+from datetime import MAXYEAR, MINYEAR
 
+from django.core.exceptions import ValidationError
 from django.http import HttpResponse
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
@@ -30,13 +32,26 @@ from .financial_summary import generate_financial_summary_pdf
 
 
 def _parse_year(year_raw: str | None) -> tuple[int | None, Response | None]:
-    """Return ``(year, None)`` or ``(None, error response)``."""
+    """Return ``(year, None)`` or ``(None, error response)``.
+
+    The upper bound is ``MAXYEAR - 1`` because the report builders construct
+    ``datetime(year + 1, 1, 1)`` as the exclusive end of the period. Without
+    the range check an out-of-range year reaches that call and raises
+    ValueError from inside PDF generation, i.e. a 500 on a query parameter.
+    """
     if not year_raw:
         return None, Response({"error": "year is required."}, status=status.HTTP_400_BAD_REQUEST)
     try:
-        return int(year_raw), None
+        year = int(year_raw)
     except ValueError:
         return None, Response({"error": "year must be a number."}, status=status.HTTP_400_BAD_REQUEST)
+
+    if not MINYEAR <= year <= MAXYEAR - 1:
+        return None, Response(
+            {"error": f"year must be between {MINYEAR} and {MAXYEAR - 1}."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    return year, None
 
 
 def _get_authorised_zev(request, zev_id) -> tuple[Zev | None, Response | None]:
@@ -47,13 +62,29 @@ def _get_authorised_zev(request, zev_id) -> tuple[Zev | None, Response | None]:
     """
     try:
         zev = Zev.objects.get(pk=zev_id)
-    except Zev.DoesNotExist:
+    except (Zev.DoesNotExist, ValidationError):
+        # ValidationError is what the UUID primary key raises for a malformed
+        # id; to a caller that is indistinguishable from naming one that does
+        # not exist, so report it the same way rather than crashing.
         return None, Response({"error": "ZEV not found."}, status=status.HTTP_404_NOT_FOUND)
 
     if not request.user.is_admin and zev.owner != request.user:
         return None, Response({"error": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
 
     return zev, None
+
+
+def _get_participant_in_zev(participant_id, zev) -> tuple[Participant | None, Response | None]:
+    """Fetch ``participant_id`` scoped to ``zev``.
+
+    Scoping to the ZEV is what stops a caller authorised for one ZEV from
+    naming a participant of another. A malformed id is reported as not-found
+    for the same reason as in :func:`_get_authorised_zev`.
+    """
+    try:
+        return Participant.objects.get(pk=participant_id, zev=zev), None
+    except (Participant.DoesNotExist, ValidationError):
+        return None, Response({"error": "Participant not found."}, status=status.HTTP_404_NOT_FOUND)
 
 
 def _is_self_service(request) -> bool:
@@ -101,10 +132,9 @@ class AnnualStatementView(APIView):
             zev, error = _get_authorised_zev(request, zev_id)
             if error:
                 return error
-            try:
-                participant = Participant.objects.get(pk=participant_id, zev=zev)
-            except Participant.DoesNotExist:
-                return Response({"error": "Participant not found."}, status=status.HTTP_404_NOT_FOUND)
+            participant, error = _get_participant_in_zev(participant_id, zev)
+            if error:
+                return error
 
         return _pdf_response(
             generate_annual_statement_pdf(participant, zev, year),
@@ -197,10 +227,9 @@ class FinancialSummaryView(APIView):
 
             participant_id = request.query_params.get("participant_id")
             if participant_id:
-                try:
-                    participant = Participant.objects.get(pk=participant_id, zev=zev)
-                except Participant.DoesNotExist:
-                    return Response({"error": "Participant not found."}, status=status.HTTP_404_NOT_FOUND)
+                participant, error = _get_participant_in_zev(participant_id, zev)
+                if error:
+                    return error
             else:
                 # Default to the caller's own record in this ZEV, then the owner's.
                 participant = Participant.objects.filter(user=request.user, zev=zev).first()

@@ -8,7 +8,6 @@ boundary: cross-tenant reads, self-service, and malformed input.
 """
 
 import io
-import unittest
 import zipfile
 from datetime import date
 
@@ -219,35 +218,56 @@ class FinancialSummaryTests(ReportTestCase):
 
 
 class MalformedInputTests(ReportTestCase):
-    """Every one of these currently raises an uncaught exception -> 500.
+    """Malformed ids and out-of-range years used to raise uncaught exceptions.
 
-    They are reachable by any authenticated user through a query parameter, so
-    they are crashes on untrusted input rather than exotic edge cases. Fixed in
-    the following commit; pinned here first so the fix is visible in the diff.
+    All of these are reachable by any authenticated user through a query
+    parameter, so they were crashes on untrusted input rather than exotic edge
+    cases: a malformed UUID raised ValidationError past the DoesNotExist
+    handler, and an out-of-range year raised ValueError from date(year, 1, 1)
+    deep inside PDF generation.
     """
 
     def _get(self, url, user, **params):
         auth(self.client, user)
         return self.client.get(url, params)
 
-    @unittest.expectedFailure
-    def test_malformed_zev_id_is_404_not_500(self):
+    def test_malformed_zev_id_is_404(self):
         for url in (ANNUAL_STATEMENT, STATEMENTS_ZIP, FINANCIAL_SUMMARY):
             with self.subTest(url=url):
                 resp = self._get(url, self.admin, year=2026, zev_id="not-a-uuid",
                                  participant_id=str(self.participant.pk))
                 self.assertEqual(resp.status_code, 404)
 
-    @unittest.expectedFailure
-    def test_malformed_participant_id_is_404_not_500(self):
+    def test_malformed_participant_id_is_404(self):
         for url in (ANNUAL_STATEMENT, FINANCIAL_SUMMARY):
             with self.subTest(url=url):
                 resp = self._get(url, self.admin, year=2026, zev_id=str(self.zev.pk),
                                  participant_id="not-a-uuid")
                 self.assertEqual(resp.status_code, 404)
 
-    @unittest.expectedFailure
-    def test_out_of_range_year_is_400_not_500(self):
+    def test_year_is_validated_before_the_zev_is_authorised(self):
+        """Ordering change from the crash fix: the range check lives with the
+        year parse, which runs before the ZEV is fetched. A caller who is not
+        entitled to the ZEV *and* passes a bad year now gets 400 rather than
+        403 — which also stops the response confirming the ZEV exists."""
+        auth(self.client, self.other_owner)
+
+        resp = self.client.get(ANNUAL_STATEMENT, {
+            "year": "999999", "zev_id": str(self.zev.pk), "participant_id": str(self.participant.pk),
+        })
+
+        self.assertEqual(resp.status_code, 400)
+
+    def test_a_valid_year_still_yields_403_for_an_unauthorised_zev(self):
+        auth(self.client, self.other_owner)
+
+        resp = self.client.get(ANNUAL_STATEMENT, {
+            "year": "2026", "zev_id": str(self.zev.pk), "participant_id": str(self.participant.pk),
+        })
+
+        self.assertEqual(resp.status_code, 403)
+
+    def test_out_of_range_year_is_400(self):
         for year in ("999999", "-5", "0"):
             with self.subTest(year=year):
                 resp = self._get(ANNUAL_STATEMENT, self.admin, year=year,
