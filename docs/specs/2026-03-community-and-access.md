@@ -166,7 +166,7 @@ Defined in `accounts/permissions.py` and `zev/permissions.py`.
 | Class | Location | Logic |
 |---|---|---|
 | `IsAdmin` | `accounts` | `user.is_authenticated AND user.is_admin` |
-| `IsZevOwnerOrAdmin` | `accounts` | `user.is_authenticated AND user.is_zev_owner` (note: `is_zev_owner` is true for both admin and zev_owner roles) |
+| `IsZevOwnerOrAdmin` | `accounts` | `user.is_authenticated AND (user.is_zev_owner OR user.is_admin)` |
 | `IsParticipantOrAbove` | `accounts` | `user.is_authenticated` |
 | `BaseZevScopedPermission` | `zev` | Base class for ZEV-tenant-aware permissions; checks `has_permission` (role gate) and `has_object_permission` (ZEV ownership check) |
 | `ZevManagementPermission` | `zev` | Extends `BaseZevScopedPermission`; POST restricted to admin only |
