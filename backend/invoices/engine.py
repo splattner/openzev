@@ -86,6 +86,112 @@ def split_production(
     return ProductionSplit(local_pool * producer_share, export_pool * producer_share)
 
 
+# ─── Gathering ────────────────────────────────────────────────────────────────
+
+
+CONSUMPTION_METER_TYPES = [MeteringPointType.CONSUMPTION, MeteringPointType.BIDIRECTIONAL]
+PRODUCTION_METER_TYPES = [MeteringPointType.PRODUCTION, MeteringPointType.BIDIRECTIONAL]
+
+
+class PeriodReadings(NamedTuple):
+    """Everything the pricing loops need to read, fetched once per invoice.
+
+    The two ``*_by_ts`` maps are community-wide totals per timestamp; the two
+    querysets are the individual participant's own readings.
+    """
+
+    participant_consumption: models.QuerySet
+    participant_production: models.QuerySet
+    zev_consumption_by_ts: dict
+    zev_production_by_ts: dict
+
+
+def _assigned_metering_points(zev, meter_types, period_start, period_end, participant=None):
+    """Metering points of ``meter_types`` assigned during the period.
+
+    An assignment counts if it began on or before the period ended and had not
+    already finished before it began. Passing ``participant`` narrows this to
+    one member; omitting it covers the whole community.
+
+    Bidirectional points appear in both the consumption and production sets,
+    which is how a single meter can feed the pool and draw from it.
+    """
+    filters = {
+        "zev": zev,
+        "meter_type__in": meter_types,
+        "assignments__valid_from__lte": period_end,
+    }
+    if participant is not None:
+        filters["assignments__participant"] = participant
+    return MeteringPoint.objects.filter(**filters).filter(
+        models.Q(assignments__valid_to__isnull=True)
+        | models.Q(assignments__valid_to__gte=period_start)
+    ).distinct()
+
+
+def _readings_in_period(metering_points, start_dt, end_dt, direction):
+    return MeterReading.objects.filter(
+        metering_point__in=metering_points,
+        timestamp__gte=start_dt,
+        timestamp__lt=end_dt,
+        direction=direction,
+    )
+
+
+def _totals_by_timestamp(readings) -> dict:
+    """Sum ``readings`` per timestamp, so a share can be worked out per interval."""
+    return {
+        row["timestamp"]: row["total_kwh"] or Decimal("0")
+        for row in readings.values("timestamp").annotate(total_kwh=models.Sum("energy_kwh"))
+    }
+
+
+def _gather_period_readings(participant, period_start, period_end) -> PeriodReadings:
+    """Fetch the participant's own readings and the community-wide totals."""
+    zev = participant.zev
+    start_dt = _period_to_dt(period_start)
+    end_dt = _period_to_dt(period_end) + timedelta(days=1)  # exclusive upper bound
+
+    def points(meter_types, *, own):
+        return _assigned_metering_points(
+            zev, meter_types, period_start, period_end,
+            participant=participant if own else None,
+        )
+
+    return PeriodReadings(
+        participant_consumption=_readings_in_period(
+            points(CONSUMPTION_METER_TYPES, own=True), start_dt, end_dt, ReadingDirection.IN),
+        participant_production=_readings_in_period(
+            points(PRODUCTION_METER_TYPES, own=True), start_dt, end_dt, ReadingDirection.OUT),
+        zev_consumption_by_ts=_totals_by_timestamp(_readings_in_period(
+            points(CONSUMPTION_METER_TYPES, own=False), start_dt, end_dt, ReadingDirection.IN)),
+        zev_production_by_ts=_totals_by_timestamp(_readings_in_period(
+            points(PRODUCTION_METER_TYPES, own=False), start_dt, end_dt, ReadingDirection.OUT)),
+    )
+
+
+def _discard_replaceable_invoices(participant, period_start, period_end) -> None:
+    """Clear the way for a regeneration, or refuse to.
+
+    A draft or cancelled invoice overlapping this period is replaced; anything
+    further along its lifecycle has been sent to somebody and must not be
+    silently rewritten.
+    """
+    overlapping = Invoice.objects.filter(
+        participant=participant,
+        period_start__lte=period_end,
+        period_end__gte=period_start,
+    )
+    locked = overlapping.exclude(
+        status__in=[InvoiceStatus.DRAFT, InvoiceStatus.CANCELLED]
+    ).first()
+    if locked:
+        raise ValueError(
+            f"Invoice {locked.invoice_number} already has status '{locked.status}' and cannot be regenerated."
+        )
+    overlapping.filter(status__in=[InvoiceStatus.DRAFT, InvoiceStatus.CANCELLED]).delete()
+
+
 # ─── Pricing state ────────────────────────────────────────────────────────────
 
 
@@ -413,6 +519,85 @@ def _build_sort_order(tariff: Tariff) -> int:
     return category_rank + energy_rank + mode_rank
 
 
+def _price_fixed_fees(participant, tariffs, period_start, period_end, accumulator) -> None:
+    """Charge the tariffs that bill by time rather than by energy.
+
+    Counted once per invoice, not once per reading: a fee applies to every
+    calendar month the period touches, and the per-metering-point variants
+    multiply that by how many points the participant held in those months.
+    Yearly fees are charged as twelfths.
+    """
+    for tariff in tariffs:
+        if tariff.billing_mode in _ENERGY_BILLING_MODES:
+            continue
+        month_count = _count_billable_months(tariff, period_start, period_end)
+        if month_count <= 0:
+            continue
+
+        per_metering_point = tariff.billing_mode in (
+            BillingMode.PER_METERING_POINT_MONTHLY_FEE,
+            BillingMode.PER_METERING_POINT_YEARLY_FEE,
+        )
+        yearly = tariff.billing_mode in (
+            BillingMode.YEARLY_FEE,
+            BillingMode.PER_METERING_POINT_YEARLY_FEE,
+        )
+
+        if per_metering_point:
+            quantity = Decimal(_count_billable_metering_points_by_month(
+                participant, tariff, period_start, period_end))
+            if quantity <= 0:
+                continue
+        else:
+            quantity = Decimal(month_count)
+
+        unit_price = tariff.fixed_price_chf or Decimal("0")
+        if yearly:
+            unit_price = unit_price / Decimal("12")
+
+        accumulator.add(
+            tariff=tariff,
+            quantity=quantity,
+            total=quantity * unit_price,
+            unit="month",
+        )
+
+
+def _build_item_payloads(accumulator) -> tuple[list, Decimal]:
+    """Turn accumulated totals into rounded line-item payloads plus the subtotal.
+
+    Each line is rounded to the centime and the subtotal is the sum of those
+    rounded lines, so an invoice adds up to what is printed on it rather than
+    to a more precise figure rounded once at the end.
+    """
+    payloads = []
+    subtotal = Decimal("0")
+    for entry in accumulator:
+        quantity = Decimal(entry["quantity"])
+        total = Decimal(entry["total"])
+        if quantity == 0 and total == 0:
+            continue
+
+        quantized_total = total.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        subtotal += quantized_total
+        if quantity != 0:
+            unit_price = (total / quantity).quantize(Decimal("0.00001"), rounding=ROUND_HALF_UP)
+        else:
+            unit_price = Decimal("0")
+
+        raw_base_total = entry.get("base_total", Decimal("0"))
+        payloads.append({
+            "tariff": entry["tariff"],
+            "quantity": quantity.quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP),
+            "unit": str(entry["unit"]),
+            "unit_price": unit_price,
+            "total": quantized_total,
+            "base_rate": (raw_base_total / quantity).quantize(Decimal("0.00001"), rounding=ROUND_HALF_UP) if quantity and raw_base_total else None,
+        })
+
+    return payloads, subtotal.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+
 @transaction.atomic
 def generate_invoice(participant: Participant, period_start: date, period_end: date) -> Invoice:
     """
@@ -421,97 +606,12 @@ def generate_invoice(participant: Participant, period_start: date, period_end: d
     Raises ValueError if a non-draft, non-cancelled invoice already exists.
     """
     zev = participant.zev
-    start_dt = _period_to_dt(period_start)
-    end_dt = _period_to_dt(period_end) + timedelta(days=1)  # exclusive upper bound
 
-    # Guard: do not overwrite already-approved/sent/paid invoices
-    locked = Invoice.objects.filter(
-        participant=participant,
-        period_start__lte=period_end,
-        period_end__gte=period_start,
-    ).exclude(status__in=[InvoiceStatus.DRAFT, InvoiceStatus.CANCELLED]).first()
-    if locked:
-        raise ValueError(
-            f"Invoice {locked.invoice_number} already has status '{locked.status}' and cannot be regenerated."
-        )
+    _discard_replaceable_invoices(participant, period_start, period_end)
 
-    # Delete any existing draft or cancelled invoice whose period overlaps
-    Invoice.objects.filter(
-        participant=participant,
-        period_start__lte=period_end,
-        period_end__gte=period_start,
-        status__in=[InvoiceStatus.DRAFT, InvoiceStatus.CANCELLED],
-    ).delete()
-
-    # ─── 1. Collect participant consumption readings ───────────────────────
-    consumption_mps = MeteringPoint.objects.filter(
-        zev=zev,
-        meter_type__in=[MeteringPointType.CONSUMPTION, MeteringPointType.BIDIRECTIONAL],
-        assignments__participant=participant,
-        assignments__valid_from__lte=period_end,
-    ).filter(
-        models.Q(assignments__valid_to__isnull=True) | models.Q(assignments__valid_to__gte=period_start)
-    ).distinct()
-    participant_readings = MeterReading.objects.filter(
-        metering_point__in=consumption_mps,
-        timestamp__gte=start_dt,
-        timestamp__lt=end_dt,
-        direction=ReadingDirection.IN,
-    )
-
-    # ─── 2. Collect participant production (OUT) readings ──────────────────
-    production_mps = MeteringPoint.objects.filter(
-        zev=zev,
-        meter_type__in=[MeteringPointType.PRODUCTION, MeteringPointType.BIDIRECTIONAL],
-        assignments__participant=participant,
-        assignments__valid_from__lte=period_end,
-    ).filter(
-        models.Q(assignments__valid_to__isnull=True) | models.Q(assignments__valid_to__gte=period_start)
-    ).distinct()
-    feedin_readings = MeterReading.objects.filter(
-        metering_point__in=production_mps,
-        timestamp__gte=start_dt,
-        timestamp__lt=end_dt,
-        direction=ReadingDirection.OUT,
-    )
-    # ─── 3. Calculate ZEV total production/consumption by timestamp ───────
-    all_production_mps = MeteringPoint.objects.filter(
-        zev=zev,
-        meter_type__in=[MeteringPointType.PRODUCTION, MeteringPointType.BIDIRECTIONAL],
-        assignments__valid_from__lte=period_end,
-    ).filter(
-        models.Q(assignments__valid_to__isnull=True) | models.Q(assignments__valid_to__gte=period_start)
-    ).distinct()
-    zev_production_by_ts = {
-        row["timestamp"]: row["total_kwh"] or Decimal("0")
-        for row in MeterReading.objects.filter(
-            metering_point__in=all_production_mps,
-            timestamp__gte=start_dt,
-            timestamp__lt=end_dt,
-            direction=ReadingDirection.OUT,
-        )
-        .values("timestamp")
-        .annotate(total_kwh=models.Sum("energy_kwh"))
-    }
-
-    all_consumption_mps = MeteringPoint.objects.filter(
-        zev=zev,
-        meter_type__in=[MeteringPointType.CONSUMPTION, MeteringPointType.BIDIRECTIONAL],
-        assignments__valid_from__lte=period_end,
-    ).filter(
-        models.Q(assignments__valid_to__isnull=True) | models.Q(assignments__valid_to__gte=period_start)
-    ).distinct()
-    zev_consumption_by_ts = {
-        row["timestamp"]: row["total_kwh"] or Decimal("0")
-        for row in MeterReading.objects.filter(
-            metering_point__in=all_consumption_mps,
-            timestamp__gte=start_dt,
-            timestamp__lt=end_dt,
-            direction=ReadingDirection.IN,
-        )
-        .values("timestamp")
-        .annotate(total_kwh=models.Sum("energy_kwh"))
-    }
+    readings = _gather_period_readings(participant, period_start, period_end)
+    zev_consumption_by_ts = readings.zev_consumption_by_ts
+    zev_production_by_ts = readings.zev_production_by_ts
 
     # ─── 6. Fetch applicable tariffs ─────────────────────────────────────
     tariffs_list = list(
@@ -524,7 +624,7 @@ def generate_invoice(participant: Participant, period_start: date, period_end: d
 
     items_accumulator = ItemAccumulator()
 
-    for reading in participant_readings.order_by("timestamp").iterator():
+    for reading in readings.participant_consumption.order_by("timestamp").iterator():
         ts = reading.timestamp
         participant_kwh = reading.energy_kwh
         zev_consumption_at_ts = zev_consumption_by_ts.get(ts, Decimal("0"))
@@ -571,7 +671,7 @@ def generate_invoice(participant: Participant, period_start: date, period_end: d
 
     exported_kwh_acc = Decimal("0")
 
-    for reading in feedin_readings.order_by("timestamp").iterator():
+    for reading in readings.participant_production.order_by("timestamp").iterator():
         ts = reading.timestamp
         produced_kwh = reading.energy_kwh
 
@@ -621,67 +721,12 @@ def generate_invoice(participant: Participant, period_start: date, period_end: d
                     unit="kWh",
                 )
 
-    for tariff in tariffs_list:
-        if tariff.billing_mode in _ENERGY_BILLING_MODES:
-            continue
-        month_count = _count_billable_months(tariff, period_start, period_end)
-        if month_count <= 0:
-            continue
+    _price_fixed_fees(participant, tariffs_list, period_start, period_end, items_accumulator)
 
-        quantity = Decimal(month_count)
-        if tariff.billing_mode == BillingMode.MONTHLY_FEE:
-            unit_price = tariff.fixed_price_chf or Decimal("0")
-        elif tariff.billing_mode == BillingMode.YEARLY_FEE:
-            unit_price = (tariff.fixed_price_chf or Decimal("0")) / Decimal("12")
-        elif tariff.billing_mode == BillingMode.PER_METERING_POINT_MONTHLY_FEE:
-            quantity = Decimal(_count_billable_metering_points_by_month(participant, tariff, period_start, period_end))
-            if quantity <= 0:
-                continue
-            unit_price = tariff.fixed_price_chf or Decimal("0")
-        else:
-            quantity = Decimal(_count_billable_metering_points_by_month(participant, tariff, period_start, period_end))
-            if quantity <= 0:
-                continue
-            unit_price = (tariff.fixed_price_chf or Decimal("0")) / Decimal("12")
-
-        items_accumulator.add(
-            tariff=tariff,
-            quantity=quantity,
-            total=quantity * unit_price,
-            unit="month",
-        )
-
-    Q = Decimal("0.01")
     local_kwh = local_kwh_acc.quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP)
     grid_kwh = grid_kwh_acc.quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP)
 
-    item_payloads = []
-    subtotal = Decimal("0")
-    for accumulator in items_accumulator:
-        tariff = accumulator["tariff"]
-        quantity = Decimal(accumulator["quantity"])
-        total = Decimal(accumulator["total"])
-        if quantity == 0 and total == 0:
-            continue
-
-        quantized_total = total.quantize(Q, rounding=ROUND_HALF_UP)
-        subtotal += quantized_total
-        if quantity != 0:
-            unit_price = (total / quantity).quantize(Decimal("0.00001"), rounding=ROUND_HALF_UP)
-        else:
-            unit_price = Decimal("0")
-
-        raw_base_total = accumulator.get("base_total", Decimal("0"))
-        item_payloads.append({
-            "tariff": tariff,
-            "quantity": quantity.quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP),
-            "unit": str(accumulator["unit"]),
-            "unit_price": unit_price,
-            "total": quantized_total,
-            "base_rate": (raw_base_total / quantity).quantize(Decimal("0.00001"), rounding=ROUND_HALF_UP) if quantity and raw_base_total else None,
-        })
-
-    subtotal = subtotal.quantize(Q, rounding=ROUND_HALF_UP)
+    item_payloads, subtotal = _build_item_payloads(items_accumulator)
 
     vat_rate = _resolve_vat_rate(zev, period_end)
     vat_chf = (subtotal * vat_rate).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
