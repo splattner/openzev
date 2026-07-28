@@ -33,56 +33,20 @@ from .serializers import (
     VatRateSerializer,
 )
 from .models import AppSettings, FeatureFlag, VatRate
+from .cookies import (
+    ACCESS_COOKIE,
+    ADMIN_ACCESS_COOKIE,
+    ADMIN_REFRESH_COOKIE,
+    REFRESH_COOKIE,
+    clear_auth_cookies,
+    set_auth_cookies,
+)
 from .permissions import IsAdmin
 from audit.models import AuditActionCategory, AuditEventStatus
 from audit.mixins import AuditedUpdateMixin
 from audit.services import build_diff, record_audit_event
 
 logger = logging.getLogger(__name__)
-
-# ── Auth cookie helpers ───────────────────────────────────────────────────────
-
-_ACCESS_COOKIE = "openzev_access"
-_REFRESH_COOKIE = "openzev_refresh"
-_ADMIN_ACCESS_COOKIE = "openzev_admin_access"
-_ADMIN_REFRESH_COOKIE = "openzev_admin_refresh"
-
-
-def _cookie_kwargs() -> dict:
-    """Shared kwargs for all auth cookies: httpOnly, Secure in prod, SameSite=Lax."""
-    return {
-        "httponly": True,
-        "samesite": "Lax",
-        "secure": not settings.DEBUG,
-        "path": "/",
-    }
-
-
-def _set_auth_cookies(
-    response,
-    *,
-    access: str,
-    refresh: str,
-    access_cookie: str = _ACCESS_COOKIE,
-    refresh_cookie: str = _REFRESH_COOKIE,
-) -> None:
-    from datetime import timedelta
-    jwt_settings = settings.SIMPLE_JWT
-    access_max_age = int(jwt_settings.get("ACCESS_TOKEN_LIFETIME", timedelta(minutes=60)).total_seconds())
-    refresh_max_age = int(jwt_settings.get("REFRESH_TOKEN_LIFETIME", timedelta(days=7)).total_seconds())
-    kw = _cookie_kwargs()
-    response.set_cookie(access_cookie, access, max_age=access_max_age, **kw)
-    response.set_cookie(refresh_cookie, refresh, max_age=refresh_max_age, **kw)
-
-
-def _clear_auth_cookies(
-    response,
-    access_cookie: str = _ACCESS_COOKIE,
-    refresh_cookie: str = _REFRESH_COOKIE,
-) -> None:
-    response.delete_cookie(access_cookie, path="/")
-    response.delete_cookie(refresh_cookie, path="/")
-
 
 class CustomTokenObtainPairView(TokenObtainPairView):
     """JWT login — sets httpOnly cookies and returns a minimal JSON body."""
@@ -91,7 +55,7 @@ class CustomTokenObtainPairView(TokenObtainPairView):
     def post(self, request, *args, **kwargs):
         response = super().post(request, *args, **kwargs)
         if response.status_code == 200:
-            _set_auth_cookies(response, access=response.data["access"], refresh=response.data["refresh"])
+            set_auth_cookies(response, access=response.data["access"], refresh=response.data["refresh"])
             response.data = {"detail": "Login successful."}
         return response
 
@@ -102,7 +66,7 @@ class CookieTokenRefreshView(APIView):
     permission_classes = [AllowAny]
 
     def post(self, request, *args, **kwargs):
-        refresh_token = request.COOKIES.get(_REFRESH_COOKIE)
+        refresh_token = request.COOKIES.get(REFRESH_COOKIE)
         if not refresh_token:
             return Response({"detail": "Refresh token not found."}, status=status.HTTP_401_UNAUTHORIZED)
 
@@ -111,13 +75,13 @@ class CookieTokenRefreshView(APIView):
             serializer.is_valid(raise_exception=True)
         except (TokenError, ValidationError):
             response = Response({"detail": "Token is invalid or expired."}, status=status.HTTP_401_UNAUTHORIZED)
-            _clear_auth_cookies(response)
+            clear_auth_cookies(response)
             return response
 
         new_access = serializer.validated_data["access"]
         new_refresh = serializer.validated_data.get("refresh", refresh_token)
         response = Response({"detail": "Token refreshed."})
-        _set_auth_cookies(response, access=new_access, refresh=new_refresh)
+        set_auth_cookies(response, access=new_access, refresh=new_refresh)
         return response
 
 
@@ -127,9 +91,9 @@ class CookieTokenRefreshView(APIView):
 def logout_view(request):
     """Clear auth cookies and end the session, even if the access cookie is expired."""
     response = Response({"detail": "Logged out."})
-    _clear_auth_cookies(response)
+    clear_auth_cookies(response)
     # Also clear any active impersonation cookies
-    _clear_auth_cookies(response, access_cookie=_ADMIN_ACCESS_COOKIE, refresh_cookie=_ADMIN_REFRESH_COOKIE)
+    clear_auth_cookies(response, access_cookie=ADMIN_ACCESS_COOKIE, refresh_cookie=ADMIN_REFRESH_COOKIE)
     return response
 
 
@@ -510,17 +474,17 @@ def impersonate_participant(request, user_id: int):
     # Preserve the current admin tokens in backup cookies so they can be
     # restored when impersonation ends, then overwrite main cookies with the
     # impersonation tokens.
-    current_access = request.COOKIES.get(_ACCESS_COOKIE, "")
-    current_refresh = request.COOKIES.get(_REFRESH_COOKIE, "")
+    current_access = request.COOKIES.get(ACCESS_COOKIE, "")
+    current_refresh = request.COOKIES.get(REFRESH_COOKIE, "")
     if current_access and current_refresh:
-        _set_auth_cookies(
+        set_auth_cookies(
             response,
             access=current_access,
             refresh=current_refresh,
-            access_cookie=_ADMIN_ACCESS_COOKIE,
-            refresh_cookie=_ADMIN_REFRESH_COOKIE,
+            access_cookie=ADMIN_ACCESS_COOKIE,
+            refresh_cookie=ADMIN_REFRESH_COOKIE,
         )
-    _set_auth_cookies(response, access=str(refresh.access_token), refresh=str(refresh))
+    set_auth_cookies(response, access=str(refresh.access_token), refresh=str(refresh))
     return response
 
 
@@ -528,14 +492,14 @@ def impersonate_participant(request, user_id: int):
 @permission_classes([IsAuthenticated])
 def stop_impersonation(request):
     """Restore the original admin tokens after ending an impersonation session."""
-    admin_access = request.COOKIES.get(_ADMIN_ACCESS_COOKIE)
-    admin_refresh = request.COOKIES.get(_ADMIN_REFRESH_COOKIE)
+    admin_access = request.COOKIES.get(ADMIN_ACCESS_COOKIE)
+    admin_refresh = request.COOKIES.get(ADMIN_REFRESH_COOKIE)
     if not admin_access or not admin_refresh:
         return Response({"detail": "No active impersonation session."}, status=status.HTTP_400_BAD_REQUEST)
 
     response = Response({"detail": "Impersonation ended."})
-    _set_auth_cookies(response, access=admin_access, refresh=admin_refresh)
-    _clear_auth_cookies(response, access_cookie=_ADMIN_ACCESS_COOKIE, refresh_cookie=_ADMIN_REFRESH_COOKIE)
+    set_auth_cookies(response, access=admin_access, refresh=admin_refresh)
+    clear_auth_cookies(response, access_cookie=ADMIN_ACCESS_COOKIE, refresh_cookie=ADMIN_REFRESH_COOKIE)
     return response
 
 
@@ -652,7 +616,7 @@ def verify_email(request):
 
     refresh = RefreshToken.for_user(user)
     response = Response({"detail": "Email verified."})
-    _set_auth_cookies(response, access=str(refresh.access_token), refresh=str(refresh))
+    set_auth_cookies(response, access=str(refresh.access_token), refresh=str(refresh))
     return response
 
 
@@ -706,7 +670,7 @@ def set_initial_password(request):
     # Issue fresh tokens so the updated claims (must_change_password=False) take effect
     refresh = RefreshToken.for_user(user)
     response = Response({"detail": "Password set successfully."})
-    _set_auth_cookies(response, access=str(refresh.access_token), refresh=str(refresh))
+    set_auth_cookies(response, access=str(refresh.access_token), refresh=str(refresh))
     return response
 
 
@@ -976,7 +940,7 @@ def oauth_token_exchange(request):
 
     tokens = _make_jwt_for_user(user)
     response = Response({"detail": "Login successful."})
-    _set_auth_cookies(response, access=tokens["access"], refresh=tokens["refresh"])
+    set_auth_cookies(response, access=tokens["access"], refresh=tokens["refresh"])
     return response
 
 
