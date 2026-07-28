@@ -3,6 +3,8 @@ from django.core import mail
 from django.test.utils import override_settings
 from rest_framework.test import APIClient
 from urllib.parse import parse_qs, urlparse
+import os
+from unittest import mock
 
 from .models import (
 	AppSettings,
@@ -183,14 +185,65 @@ class RegistrationTests(TestCase):
 
 
 class FeatureFlagsApiTests(TestCase):
-	def test_feature_flags_list_is_public_and_contains_self_registration_flag(self):
+	def test_feature_flags_list_requires_admin(self):
 		client = APIClient()
+		# Anonymous callers are rejected with 401 (unauthenticated).
 		resp = client.get("/api/v1/auth/feature-flags/")
+		self.assertEqual(resp.status_code, 401)
 
+		# Non-admin authenticated callers are denied with 403.
+		User.objects.create_user(username="owner_ff", password="pass1234", role=UserRole.ZEV_OWNER)
+		_cookie_auth(client, "owner_ff", "pass1234")
+		resp = client.get("/api/v1/auth/feature-flags/")
+		self.assertEqual(resp.status_code, 403)
+
+	def test_feature_flags_list_visible_to_admin(self):
+		client = APIClient()
+		User.objects.create_user(username="admin_ff", password="pass1234", role=UserRole.ADMIN)
+		_cookie_auth(client, "admin_ff", "pass1234")
+
+		resp = client.get("/api/v1/auth/feature-flags/")
 		self.assertEqual(resp.status_code, 200)
 		self.assertTrue(
 			any(flag["name"] == FeatureFlag.ZEV_SELF_REGISTRATION_ENABLED for flag in resp.data)
 		)
+
+	def test_registration_enabled_is_public_and_minimal(self):
+		client = APIClient()
+		resp = client.get("/api/v1/auth/registration-enabled/")
+
+		self.assertEqual(resp.status_code, 200)
+		# Only a boolean is exposed — no flag names/descriptions leak.
+		self.assertEqual(set(resp.data.keys()), {"enabled"})
+		self.assertIsInstance(resp.data["enabled"], bool)
+
+	def test_registration_enabled_reflects_disabled_flag(self):
+		# Guard against a FEATURE_* env-var override shadowing the DB value.
+		env_key = f"FEATURE_{FeatureFlag.ZEV_SELF_REGISTRATION_ENABLED.upper()}"
+		with mock.patch.dict("os.environ"):
+			os.environ.pop(env_key, None)
+			FeatureFlag.sync_defaults()
+			flag = FeatureFlag.objects.get(name=FeatureFlag.ZEV_SELF_REGISTRATION_ENABLED)
+			flag.enabled = False
+			flag.save(update_fields=["enabled"])
+
+			resp = APIClient().get("/api/v1/auth/registration-enabled/")
+
+		self.assertEqual(resp.status_code, 200)
+		self.assertEqual(resp.data, {"enabled": False})
+
+	def test_anonymous_access_does_not_write_feature_flags(self):
+		# The public endpoint must be read-only: no default-sync writes.
+		self.assertEqual(FeatureFlag.objects.count(), 0)
+
+		resp = APIClient().get("/api/v1/auth/registration-enabled/")
+		self.assertEqual(resp.status_code, 200)
+		self.assertEqual(FeatureFlag.objects.count(), 0)
+
+		# The admin-only list is denied before its body (and sync) runs.
+		resp = APIClient().get("/api/v1/auth/feature-flags/")
+		self.assertEqual(resp.status_code, 401)
+		self.assertEqual(FeatureFlag.objects.count(), 0)
 
 
 class ImpersonationTests(TestCase):

@@ -342,12 +342,31 @@ def app_settings(request):
 
 
 @api_view(["GET"])
-@permission_classes([AllowAny])
+@permission_classes([IsAuthenticated, IsAdmin])
 def feature_flags_list(request):
-    """Return all feature flags. Public read access is allowed."""
+    """Return all feature flags. Admin-only.
+
+    Anonymous callers must not be able to enumerate internal flags; the
+    login page uses the dedicated ``registration-enabled`` endpoint instead.
+    Syncing defaults here is safe because only admins reach this view, so the
+    unauthenticated write-amplification concern no longer applies.
+    """
     FeatureFlag.sync_defaults()
     flags = FeatureFlag.objects.all()
     return Response(FeatureFlagSerializer(flags, many=True).data)
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def registration_enabled(request):
+    """Public, minimal endpoint exposing only whether self-registration is on.
+
+    Returns a single boolean so the login page can decide whether to show the
+    registration link, without enumerating the feature-flag table.
+    """
+    return Response(
+        {"enabled": FeatureFlag.is_enabled(FeatureFlag.ZEV_SELF_REGISTRATION_ENABLED)}
+    )
 
 
 @api_view(["PATCH"])

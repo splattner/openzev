@@ -4,7 +4,7 @@ from .views import (
     UserListCreateView,
     UserDetailView, me, change_password, app_settings,
     VatRateListCreateView, VatRateDetailView,
-    feature_flags_list, feature_flag_update,
+    feature_flags_list, feature_flag_update, registration_enabled,
     register, verify_email, set_initial_password,
 )
 from .views_oauth import (
@@ -40,6 +40,7 @@ urlpatterns = [
     path("vat-rates/<int:pk>/", VatRateDetailView.as_view(), name="vat-rate-detail"),
     path("feature-flags/", feature_flags_list, name="feature-flags-list"),
     path("feature-flags/<int:pk>/", feature_flag_update, name="feature-flag-update"),
+    path("registration-enabled/", registration_enabled, name="registration-enabled"),
     # OAuth provider config (admin)
     path("oauth/providers/config/", OAuthProviderListCreateView.as_view(), name="oauth-provider-list-create"),
     path("oauth/providers/config/<int:pk>/", OAuthProviderDetailView.as_view(), name="oauth-provider-detail"),

@@ -65,6 +65,11 @@ export async function fetchFeatureFlags(): Promise<FeatureFlag[]> {
   return data
 }
 
+export async function fetchRegistrationEnabled(): Promise<boolean> {
+  const { data } = await api.get<{ enabled: boolean }>('/auth/registration-enabled/')
+  return data.enabled
+}
+
 export async function updateFeatureFlag(id: number, payload: FeatureFlagInput): Promise<FeatureFlag> {
   const { data } = await api.patch<FeatureFlag>(`/auth/feature-flags/${id}/`, payload)
   return data

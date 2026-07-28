@@ -4,6 +4,7 @@ export const queryKeys = {
     appSettings: () => ['auth', 'app-settings'] as const,
     users: () => ['auth', 'users'] as const,
     featureFlags: () => ['auth', 'feature-flags'] as const,
+    registrationEnabled: () => ['auth', 'registration-enabled'] as const,
     vatRates: () => ['auth', 'vat-rates'] as const,
     oauthProviders: () => ['auth', 'oauth-providers'] as const,
     socialAccounts: () => ['auth', 'social-accounts'] as const,

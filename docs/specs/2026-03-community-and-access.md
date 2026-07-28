@@ -552,6 +552,9 @@ The sidebar (`Layout.tsx`) shows sections conditionally:
 | GET / PATCH | `/app-settings/` | IsAuthenticated (update: admin only) | Application settings singleton |
 | GET / POST | `/vat-rates/` | IsAdmin | VAT rate management |
 | GET / PATCH / DELETE | `/vat-rates/{id}/` | IsAdmin | VAT rate detail |
+| GET | `/feature-flags/` | IsAuthenticated, IsAdmin | List all feature flags (admin-only; syncs defaults on read) |
+| PATCH | `/feature-flags/{id}/` | IsAuthenticated (admin only) | Toggle a feature flag |
+| GET | `/registration-enabled/` | AllowAny | Public, minimal `{enabled: bool}` — self-registration status for the login page (no flag enumeration) |
 
 ### 10.2 ZEV endpoints (`/api/v1/zev/`)
 

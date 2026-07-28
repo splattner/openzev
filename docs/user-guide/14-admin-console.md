@@ -251,7 +251,13 @@ This ensures the feature is disabled in both UI and API layers.
 #### Read feature flags
 
 - `GET /api/v1/auth/feature-flags/`
-- Public read access (used by login page)
+- Admin only (returns the full flag list; used by the admin console)
+
+#### Read self-registration status (public)
+
+- `GET /api/v1/auth/registration-enabled/`
+- Public, returns only `{"enabled": bool}` (used by the login page; does not
+  enumerate the flag table)
 
 #### Update a feature flag
 
@@ -288,4 +294,6 @@ if FeatureFlag.is_enabled("my_new_feature"):
     ...
 ```
 
-Frontend code can read current states via `GET /api/v1/auth/feature-flags/`.
+Frontend admin pages read the full list via `GET /api/v1/auth/feature-flags/`
+(admin only). Public, unauthenticated code (e.g. the login page) must use the
+minimal `GET /api/v1/auth/registration-enabled/` endpoint instead.

@@ -4,7 +4,7 @@ import AppFooter from '../components/AppFooter'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '../lib/auth'
-import { fetchFeatureFlags, fetchOAuthProviders, oauthLoginInitiate, register as apiRegister } from '../lib/api/auth'
+import { fetchRegistrationEnabled, fetchOAuthProviders, oauthLoginInitiate, register as apiRegister } from '../lib/api/auth'
 import { formatApiError } from '../lib/api/errors'
 import { queryKeys } from '../lib/api/queryKeys'
 
@@ -13,8 +13,8 @@ export function LoginPage() {
     const navigate = useNavigate()
     const { login } = useAuth()
     const featureFlagsQuery = useQuery({
-        queryKey: queryKeys.auth.featureFlags(),
-        queryFn: fetchFeatureFlags,
+        queryKey: queryKeys.auth.registrationEnabled(),
+        queryFn: fetchRegistrationEnabled,
         staleTime: 60_000,
     })
     const oauthProvidersQuery = useQuery({
@@ -36,9 +36,10 @@ export function LoginPage() {
     const [regError, setRegError] = useState<string | null>(null)
     const [regLoading, setRegLoading] = useState(false)
     const [regSuccess, setRegSuccess] = useState<string | null>(null)
-    const selfRegistrationEnabled = featureFlagsQuery.data?.find(
-        (flag) => flag.name === 'zev_self_registration_enabled',
-    )?.enabled ?? true
+    // Fail closed: if the registration-enabled request is missing, errored, or
+    // blocked, do not advertise self-registration. The backend still enforces
+    // the flag, so this only affects UI/operational correctness.
+    const selfRegistrationEnabled = featureFlagsQuery.data === true
 
     const oauthProviders = oauthProvidersQuery.data ?? []
 
