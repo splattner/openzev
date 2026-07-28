@@ -8,7 +8,7 @@ from django.test import TestCase
 from rest_framework.test import APIClient
 
 from accounts.models import User, UserRole
-from metering.models import ImportLog, MeterReading, ReadingDirection, ReadingResolution
+from metering.models import ImportLog, MeterReading, ReadingDirection
 from testing.helpers import authenticate as auth
 from zev.models import MeteringPoint, MeteringPointAssignment, MeteringPointType, Participant, Zev
 

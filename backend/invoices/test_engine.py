@@ -249,7 +249,7 @@ class InvoiceEngineTests(TestCase):
         )
         TariffPeriod.objects.create(tariff=levy, period_type=PeriodType.FLAT, price_chf_per_kwh=Decimal("0.02"))
 
-        pct_tariff = Tariff.objects.create(
+        Tariff.objects.create(
             zev=self.zev,
             name="Surcharge 50%",
             category=TariffCategory.GRID_FEES,

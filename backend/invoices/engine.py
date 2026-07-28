@@ -13,7 +13,6 @@ from datetime import date, datetime, timezone as tz, timedelta
 from decimal import Decimal, ROUND_HALF_UP
 
 from django.db import models, transaction
-from django.utils import timezone
 
 from accounts.models import VatRate
 from zev.models import Zev, Participant, MeteringPoint, MeteringPointType, MeteringPointAssignment

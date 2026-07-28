@@ -56,6 +56,7 @@ qrcode==8.2
 redis==8.0.1
 referencing==0.37.0
 rpds-py==0.30.0
+ruff==0.16.0
 six==1.17.0
 sqlparse==0.5.5
 svgwrite==1.4.3

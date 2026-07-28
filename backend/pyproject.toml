@@ -1,0 +1,10 @@
+[tool.ruff]
+target-version = "py314"
+
+[tool.ruff.lint]
+# Deliberately narrow: real bugs and dead code (pyflakes) plus genuine syntax/
+# runtime errors, not style opinions. Broader presets (line length, import
+# sorting, datetime-naivety, blind-except, ...) flag hundreds of pre-existing,
+# unrelated findings across the codebase — expanding this is a separate,
+# deliberate decision, not something CI should silently start enforcing.
+select = ["E9", "F"]

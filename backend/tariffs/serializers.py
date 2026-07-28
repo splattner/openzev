@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.core.exceptions import ValidationError as DjangoValidationError
-from .models import BillingMode, EnergyType, Tariff, TariffPeriod
+from .models import BillingMode, Tariff, TariffPeriod
 
 ENERGY_BILLING_MODES = {BillingMode.ENERGY, BillingMode.PERCENTAGE_OF_ENERGY}
 

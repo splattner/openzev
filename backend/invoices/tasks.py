@@ -58,7 +58,7 @@ def send_invoice_email_task(self, invoice_id: str, recipient_email: str = None):
     formatted_period_end = _format_date_value(invoice.period_end, app_settings.date_format_short)
 
     from zev.models import DEFAULT_EMAIL_SUBJECT_TEMPLATE, DEFAULT_EMAIL_BODY_TEMPLATE
-    from .models import EmailTemplate, EMAIL_TEMPLATE_DEFAULTS
+    from .models import EmailTemplate
 
     template_ctx = {
         "invoice_number": invoice.invoice_number,

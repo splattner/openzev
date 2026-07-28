@@ -13,7 +13,7 @@ distinction). Those assertions are deliberate, not incidental.
 """
 
 import io
-from datetime import date, datetime, timezone
+from datetime import datetime, timezone
 from decimal import Decimal
 
 import openpyxl

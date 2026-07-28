@@ -13,7 +13,7 @@ from unittest import mock
 import pytest
 from django.core.files.base import ContentFile
 
-from invoices.models import EmailLog, Invoice, InvoiceStatus
+from invoices.models import EmailLog, InvoiceStatus
 from invoices.tasks import send_invoice_email_task
 from testing import factories
 

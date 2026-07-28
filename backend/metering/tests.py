@@ -1,13 +1,11 @@
-import uuid
 from datetime import date, datetime, timezone
 from decimal import Decimal
-from django.core.files.uploadedfile import SimpleUploadedFile
 
 from django.test import TestCase
 from rest_framework.test import APIClient
 
 from accounts.models import User, UserRole
-from metering.models import ImportLog, ImportSource, MeterReading, ReadingDirection, ReadingResolution
+from metering.models import MeterReading, ReadingDirection, ReadingResolution
 from zev.models import Zev, Participant, MeteringPoint, MeteringPointAssignment, MeteringPointType
 
 

@@ -8,11 +8,9 @@ Produces a year-end summary document for a participant showing:
 - Energy self-sufficiency ratio
 """
 import logging
-from datetime import date, datetime, time, timezone as dt_timezone, timedelta
+from datetime import date, datetime, timezone as dt_timezone
 from decimal import Decimal, ROUND_HALF_UP
 
-from django.template.loader import render_to_string
-from django.template import Template, Context
 from accounts.models import AppSettings
 from .pdf_render import render_pdf
 
@@ -446,9 +444,7 @@ def _build_monthly_chart_svg(monthly_data: list[dict], tr: dict) -> str | None:
 
     # Bars
     for i, (zev_val, grid_val) in enumerate(values):
-        total = zev_val + grid_val
         x = margin_l + i * (bar_w + gap) + gap / 2
-        bar_total_h = (total / max_val) * bar_area_h if max_val > 0 else 0
 
         # ZEV portion (bottom, green)
         zev_h = (zev_val / max_val) * bar_area_h if max_val > 0 else 0

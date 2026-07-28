@@ -91,7 +91,7 @@ class Command(BaseCommand):
 
         User = get_user_model()
 
-        admin = self._upsert_user(
+        self._upsert_user(
             User,
             username="admin",
             email="admin@openzev.local",

@@ -1,6 +1,5 @@
 from datetime import date as date_type, datetime, timedelta, timezone as dt_timezone
 
-from django.db.models import Q
 from django.http import HttpResponse
 from django.utils.crypto import get_random_string
 from rest_framework import viewsets, status

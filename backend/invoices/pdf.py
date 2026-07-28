@@ -5,7 +5,6 @@ converted to PDF. Optionally embeds a Swiss QR-Rechnung.
 """
 import io
 import logging
-from pathlib import Path
 from datetime import date, datetime
 
 from django.template.loader import render_to_string

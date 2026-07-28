@@ -10,7 +10,7 @@ from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from accounts.permissions import IsZevOwnerOrAdmin
-from zev.models import Zev, Participant, MeteringPoint, MeteringPointAssignment
+from zev.models import Zev, Participant, MeteringPoint
 from .models import MeterReading, ImportLog
 from zev.scoping import ZevScopedQuerySetMixin
 from .serializers import MeterReadingSerializer, ImportLogSerializer
