@@ -26,6 +26,9 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
 
+from audit.models import AuditActionCategory, AuditEventStatus
+from audit.services import record_audit_event
+
 from .cookies import set_auth_cookies
 from .models import (
     OAuthExchangeCode,
@@ -240,23 +243,47 @@ def oauth_callback(request, provider_slug: str):
         )
         user = social.user
     except SocialAccount.DoesNotExist:
-        if email:
-            try:
-                user = User.objects.get(email__iexact=email)
-            except User.DoesNotExist:
-                # Auto-provision a new account for this OAuth identity
-                username = _generate_username_from_email(email)
-                user = User.objects.create_user(
-                    username=username,
-                    email=email,
-                    first_name=user_info.get("given_name", ""),
-                    last_name=user_info.get("family_name", ""),
-                    password=None,
-                    is_active=True,
-                    role=UserRole.PARTICIPANT,
-                )
-        else:
+        if not email:
             return HttpResponseRedirect(f"{frontend_url}/login?oauth_error=no_email")
+
+        try:
+            user = User.objects.get(email__iexact=email)
+        except User.DoesNotExist:
+            # Auto-provision a new account for this OAuth identity. This grants
+            # nothing that did not already exist, and lands on the lowest role.
+            username = _generate_username_from_email(email)
+            user = User.objects.create_user(
+                username=username,
+                email=email,
+                first_name=user_info.get("given_name", ""),
+                last_name=user_info.get("family_name", ""),
+                password=None,
+                is_active=True,
+                role=UserRole.PARTICIPANT,
+            )
+        else:
+            # A provider identity we have never seen is claiming an account
+            # that already exists — and inheriting it means inheriting its
+            # role. Only proceed if the provider vouches for the address;
+            # otherwise anyone able to register that email at a configured
+            # provider could take the account over.
+            if user_info.get("email_verified") is not True:
+                logger.warning(
+                    "Refused OAuth account takeover: provider %s asserted unverified email for an existing user",
+                    provider_slug,
+                )
+                record_audit_event(
+                    action_category=AuditActionCategory.AUTH,
+                    action_type="oauth.link_refused",
+                    target_type="accounts.User",
+                    target=user,
+                    target_id=str(user.pk),
+                    target_display=user.email or user.username,
+                    summary="Refused to link an OAuth identity to an existing account: email not verified by the provider.",
+                    status=AuditEventStatus.DENIED,
+                    metadata={"provider": provider_slug, "email_verified": user_info.get("email_verified")},
+                )
+                return HttpResponseRedirect(f"{frontend_url}/login?oauth_error=email_not_verified")
 
         SocialAccount.objects.create(
             provider=provider,

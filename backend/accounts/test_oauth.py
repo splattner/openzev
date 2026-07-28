@@ -19,6 +19,7 @@ from django.test import TestCase
 from django.utils import timezone
 from rest_framework.test import APIClient
 
+from audit.models import AuditActionCategory, AuditEvent, AuditEventStatus
 from testing.helpers import authenticate as auth, make_user
 
 from .models import (
@@ -252,50 +253,106 @@ class CallbackLoginTests(OAuthTestCase):
         self.assertFalse(OAuthExchangeCode.objects.exists())
 
 
-class CallbackEmailLinkingHazardTests(OAuthTestCase):
-    """Documents — deliberately, not endorses — how an unknown provider identity
-    is attached to an existing local account.
+class CallbackExistingAccountTests(OAuthTestCase):
+    """Taking over an existing local account requires a verified email.
 
-    A ``sub`` the system has never seen is matched to a local user purely on the
-    email string the provider asserts. The provider's ``email_verified`` claim
-    is not consulted, and the matched account may be an admin. These tests pin
-    that behaviour so any change to it is visible; see the PR discussion for the
-    proposed guard.
+    An unrecognised ``sub`` matched to a local user by email inherits that
+    user's role, so anyone able to register the address at a configured
+    provider could otherwise claim the account. The provider has to vouch for
+    the address before that link is made.
     """
 
-    def test_an_unknown_identity_is_linked_to_an_existing_user_by_email_alone(self):
-        victim = make_user("victim", UserRole.ADMIN)
-        self.start_state("takeover")
-
-        with fake_provider_http({"access_token": "at"}, {"sub": "uid-unknown", "email": victim.email}):
-            resp = self.callback(code="c", state="takeover")
-
-        self.assertEqual(SocialAccount.objects.get(uid="uid-unknown").user, victim)
-        self.assertEqual(OAuthExchangeCode.objects.get().user, victim)
-        self.assertTrue(resp.url.startswith(f"{FRONTEND}/oauth/callback?code="))
-
-    def test_linking_happens_even_when_the_provider_says_the_email_is_unverified(self):
-        victim = make_user("victim2", UserRole.ADMIN)
-        self.start_state("unverified")
-
+    def _attempt(self, state, victim, **extra_claims):
+        self.start_state(state)
         with fake_provider_http(
             {"access_token": "at"},
-            {"sub": "uid-unverified", "email": victim.email, "email_verified": False},
+            {"sub": f"uid-{state}", "email": victim.email, **extra_claims},
         ):
-            self.callback(code="c", state="unverified")
+            return self.callback(code="c", state=state)
 
-        self.assertEqual(SocialAccount.objects.get(uid="uid-unverified").user, victim)
+    def test_a_verified_email_links_to_the_existing_account(self):
+        user = make_user("verified_owner", UserRole.ZEV_OWNER)
+
+        resp = self._attempt("verified", user, email_verified=True)
+
+        self.assertEqual(SocialAccount.objects.get(uid="uid-verified").user, user)
+        self.assertEqual(OAuthExchangeCode.objects.get().user, user)
+        self.assertTrue(resp.url.startswith(f"{FRONTEND}/oauth/callback?code="))
+
+    def test_an_absent_email_verified_claim_is_refused(self):
+        """Most of the real risk: a provider that simply omits the claim."""
+        victim = make_user("victim_absent", UserRole.ADMIN)
+
+        resp = self._attempt("absent", victim)
+
+        self.assertEqual(resp.url, f"{FRONTEND}/login?oauth_error=email_not_verified")
+        self.assertFalse(SocialAccount.objects.exists())
+        self.assertFalse(OAuthExchangeCode.objects.exists(), "no session may be issued")
+
+    def test_an_explicitly_unverified_email_is_refused(self):
+        victim = make_user("victim_false", UserRole.ADMIN)
+
+        resp = self._attempt("false", victim, email_verified=False)
+
+        self.assertEqual(resp.url, f"{FRONTEND}/login?oauth_error=email_not_verified")
+        self.assertFalse(SocialAccount.objects.exists())
+
+    def test_a_truthy_but_non_true_claim_is_refused(self):
+        """`"false"` and `0` are both truthy/falsy traps; only a real True passes."""
+        victim = make_user("victim_str", UserRole.ADMIN)
+
+        resp = self._attempt("stringy", victim, email_verified="false")
+
+        self.assertEqual(resp.url, f"{FRONTEND}/login?oauth_error=email_not_verified")
+        self.assertFalse(SocialAccount.objects.exists())
+
+    def test_a_refusal_is_audited_against_the_targeted_account(self):
+        victim = make_user("victim_audit", UserRole.ADMIN)
+
+        self._attempt("audited", victim, email_verified=False)
+
+        event = AuditEvent.objects.get()
+        self.assertEqual(event.action_category, AuditActionCategory.AUTH)
+        self.assertEqual(event.action_type, "oauth.link_refused")
+        self.assertEqual(event.status, AuditEventStatus.DENIED)
+        self.assertEqual(event.target_id, str(victim.pk))
+        self.assertEqual(event.metadata_json["provider"], self.provider.name)
+
+    def test_provisioning_a_brand_new_account_still_needs_no_verified_claim(self):
+        """The guard covers inheriting an existing account. A new user grants
+        nothing that did not already exist, so signup is unaffected."""
+        self.start_state("brandnew")
+
+        with fake_provider_http({"access_token": "at"}, {"sub": "uid-brandnew", "email": "nobody@example.com"}):
+            resp = self.callback(code="c", state="brandnew")
+
+        self.assertTrue(resp.url.startswith(f"{FRONTEND}/oauth/callback?code="))
+        self.assertEqual(User.objects.get(email="nobody@example.com").role, UserRole.PARTICIPANT)
+
+    def test_a_previously_linked_identity_is_unaffected(self):
+        """Once the link exists, the uid match short-circuits before any email
+        handling — so an established login does not start failing."""
+        user = make_user("already_linked", UserRole.ADMIN)
+        SocialAccount.objects.create(provider=self.provider, uid="uid-established", user=user)
+        self.start_state("established")
+
+        with fake_provider_http({"access_token": "at"}, {"sub": "uid-established", "email": user.email}):
+            resp = self.callback(code="c", state="established")
+
+        self.assertTrue(resp.url.startswith(f"{FRONTEND}/oauth/callback?code="))
+        self.assertEqual(OAuthExchangeCode.objects.get().user, user)
 
     def test_email_matching_is_case_insensitive(self):
-        victim = make_user("victim3", UserRole.PARTICIPANT)
+        user = make_user("case_user", UserRole.PARTICIPANT)
         self.start_state("case")
 
         with fake_provider_http(
-            {"access_token": "at"}, {"sub": "uid-case", "email": victim.email.upper()},
+            {"access_token": "at"},
+            {"sub": "uid-case", "email": user.email.upper(), "email_verified": True},
         ):
             self.callback(code="c", state="case")
 
-        self.assertEqual(SocialAccount.objects.get(uid="uid-case").user, victim)
+        self.assertEqual(SocialAccount.objects.get(uid="uid-case").user, user)
 
 
 class CallbackLinkFlowTests(OAuthTestCase):
