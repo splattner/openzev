@@ -316,104 +316,82 @@ class InvoiceViewSet(
         )
         return Response({"detail": f"Email queued for {recipient}."})
 
-    @action(detail=True, methods=["post"], url_path="approve",
-            permission_classes=[IsAuthenticated, IsZevOwnerOrAdmin])
-    def approve(self, request, pk=None):
+    def _perform_status_transition(self, request, *, action_type, workflow_fn, denied_verb, success_summary):
+        """Shared body for the four status-transition actions below.
+
+        Each just picks a workflow function (which raises InvoiceWorkflowError
+        on an invalid transition) and phrasing for the audit log; this method
+        owns the get-object/try-except/audit-event/response shape they all
+        share identically.
+        """
         invoice = self.get_object()
         try:
-            before = approve_invoice(invoice)
+            before = workflow_fn(invoice)
         except InvoiceWorkflowError as exc:
             _record_invoice_event(
                 request=request,
-                action_type="invoice.approve",
-                summary=f"Denied approval for {_invoice_target_display(invoice)} due to status guard.",
+                action_type=action_type,
+                summary=f"Denied {denied_verb} for {_invoice_target_display(invoice)}: {exc.user_message}",
                 status=AuditEventStatus.DENIED,
                 invoice=invoice,
             )
             return Response({"error": exc.user_message}, status=status.HTTP_400_BAD_REQUEST)
         _record_invoice_event(
             request=request,
-            action_type="invoice.approve",
-            summary=f"Approved invoice {_invoice_target_display(invoice)}.",
+            action_type=action_type,
+            summary=success_summary(invoice),
             invoice=invoice,
             changes=build_diff(before, {"status": invoice.status}, ["status"]),
         )
         return Response(InvoiceSerializer(invoice, context={"request": request}).data)
+
+    @action(detail=True, methods=["post"], url_path="approve",
+            permission_classes=[IsAuthenticated, IsZevOwnerOrAdmin])
+    def approve(self, request, pk=None):
+        """Transition a draft invoice to approved."""
+        return self._perform_status_transition(
+            request,
+            action_type="invoice.approve",
+            workflow_fn=approve_invoice,
+            denied_verb="approval",
+            success_summary=lambda invoice: f"Approved invoice {_invoice_target_display(invoice)}.",
+        )
 
     @action(detail=True, methods=["post"], url_path="mark-sent",
             permission_classes=[IsAuthenticated, IsZevOwnerOrAdmin])
     def mark_sent(self, request, pk=None):
         """Transition an approved invoice to sent/locked state."""
-        invoice = self.get_object()
-        try:
-            before = mark_invoice_sent(invoice)
-        except InvoiceWorkflowError as exc:
-            _record_invoice_event(
-                request=request,
-                action_type="invoice.mark_sent",
-                summary=f"Denied mark-sent for {_invoice_target_display(invoice)} due to status guard.",
-                status=AuditEventStatus.DENIED,
-                invoice=invoice,
-            )
-            return Response({"error": exc.user_message}, status=status.HTTP_400_BAD_REQUEST)
-        _record_invoice_event(
-            request=request,
+        return self._perform_status_transition(
+            request,
             action_type="invoice.mark_sent",
-            summary=f"Marked invoice {_invoice_target_display(invoice)} as sent.",
-            invoice=invoice,
-            changes=build_diff(before, {"status": invoice.status}, ["status"]),
+            workflow_fn=mark_invoice_sent,
+            denied_verb="mark-sent",
+            success_summary=lambda invoice: f"Marked invoice {_invoice_target_display(invoice)} as sent.",
         )
-        return Response(InvoiceSerializer(invoice, context={"request": request}).data)
 
     @action(detail=True, methods=["post"], url_path="mark-paid",
             permission_classes=[IsAuthenticated, IsZevOwnerOrAdmin])
     def mark_paid(self, request, pk=None):
         """Record that a sent invoice has been paid."""
-        invoice = self.get_object()
-        try:
-            before = mark_invoice_paid(invoice)
-        except InvoiceWorkflowError as exc:
-            _record_invoice_event(
-                request=request,
-                action_type="invoice.mark_paid",
-                summary=f"Denied mark-paid for {_invoice_target_display(invoice)} due to status guard.",
-                status=AuditEventStatus.DENIED,
-                invoice=invoice,
-            )
-            return Response({"error": exc.user_message}, status=status.HTTP_400_BAD_REQUEST)
-        _record_invoice_event(
-            request=request,
+        return self._perform_status_transition(
+            request,
             action_type="invoice.mark_paid",
-            summary=f"Marked invoice {_invoice_target_display(invoice)} as paid.",
-            invoice=invoice,
-            changes=build_diff(before, {"status": invoice.status}, ["status"]),
+            workflow_fn=mark_invoice_paid,
+            denied_verb="mark-paid",
+            success_summary=lambda invoice: f"Marked invoice {_invoice_target_display(invoice)} as paid.",
         )
-        return Response(InvoiceSerializer(invoice, context={"request": request}).data)
 
     @action(detail=True, methods=["post"], url_path="cancel",
             permission_classes=[IsAuthenticated, IsZevOwnerOrAdmin])
     def cancel(self, request, pk=None):
         """Cancel an invoice that has not yet been paid."""
-        invoice = self.get_object()
-        try:
-            before = cancel_invoice(invoice)
-        except InvoiceWorkflowError as exc:
-            _record_invoice_event(
-                request=request,
-                action_type="invoice.cancel",
-                summary=f"Denied cancellation for {_invoice_target_display(invoice)}: {exc.user_message}",
-                status=AuditEventStatus.DENIED,
-                invoice=invoice,
-            )
-            return Response({"error": exc.user_message}, status=status.HTTP_400_BAD_REQUEST)
-        _record_invoice_event(
-            request=request,
+        return self._perform_status_transition(
+            request,
             action_type="invoice.cancel",
-            summary=f"Cancelled invoice {_invoice_target_display(invoice)}.",
-            invoice=invoice,
-            changes=build_diff(before, {"status": invoice.status}, ["status"]),
+            workflow_fn=cancel_invoice,
+            denied_verb="cancellation",
+            success_summary=lambda invoice: f"Cancelled invoice {_invoice_target_display(invoice)}.",
         )
-        return Response(InvoiceSerializer(invoice, context={"request": request}).data)
 
     @action(detail=True, methods=["post"], url_path=r"retry-email/(?P<email_log_id>[^/.]+)",
             permission_classes=[IsAuthenticated, IsZevOwnerOrAdmin])
