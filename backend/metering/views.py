@@ -14,7 +14,7 @@ from zev.models import Zev, Participant, MeteringPoint, MeteringPointAssignment
 from .models import MeterReading, ImportLog
 from zev.scoping import ZevScopedQuerySetMixin
 from .serializers import MeterReadingSerializer, ImportLogSerializer
-from .importers.csv_importer import import_csv, preview_csv
+from .importers.csv_importer import ImportFileError, import_csv, preview_csv
 from .importers.sdatch_importer import import_sdatch
 from .analytics import (
     owner_dashboard_summary,
@@ -434,6 +434,17 @@ class ImportView(viewsets.ViewSet):
                 interval_minutes=interval_minutes,
                 values_count=values_count,
             )
+        except ImportFileError as exc:
+            record_audit_event(
+                request=request,
+                action_category=AuditActionCategory.IMPORT,
+                action_type="import.preview_csv",
+                target_type="metering.ImportLog",
+                summary="CSV import preview failed: file could not be read.",
+                status=AuditEventStatus.FAILED,
+                metadata={"error": str(exc), "filename": file.name},
+            )
+            return Response({"error": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as exc:
             record_audit_event(
                 request=request,
@@ -488,19 +499,31 @@ class ImportView(viewsets.ViewSet):
             overwrite_existing_raw = request.data.get("overwrite_existing", "false")
             overwrite_existing = str(overwrite_existing_raw).strip().lower() in {"1", "true", "yes", "on"}
 
-            log = import_csv(
-                file,
-                request.user,
-                zev=None,
-                column_map=column_map,
-                timestamp_format=timestamp_format,
-                has_header=has_header,
-                delimiter=delimiter,
-                format_profile=format_profile,
-                interval_minutes=interval_minutes,
-                values_count=values_count,
-                overwrite_existing=overwrite_existing,
-            )
+            try:
+                log = import_csv(
+                    file,
+                    request.user,
+                    zev=None,
+                    column_map=column_map,
+                    timestamp_format=timestamp_format,
+                    has_header=has_header,
+                    delimiter=delimiter,
+                    format_profile=format_profile,
+                    interval_minutes=interval_minutes,
+                    values_count=values_count,
+                    overwrite_existing=overwrite_existing,
+                )
+            except ImportFileError as exc:
+                record_audit_event(
+                    request=request,
+                    action_category=AuditActionCategory.IMPORT,
+                    action_type="import.upload",
+                    target_type="metering.ImportLog",
+                    summary="CSV import failed: file could not be read.",
+                    status=AuditEventStatus.FAILED,
+                    metadata={"error": str(exc), "filename": file.name, "source": source},
+                )
+                return Response({"error": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
         else:
             zev_id = request.data.get("zev_id")
             try:

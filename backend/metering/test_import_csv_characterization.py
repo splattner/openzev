@@ -1,20 +1,18 @@
-"""Characterization tests pinning CSV/Excel import behaviour.
+"""Behavioural tests for the CSV/Excel metering import.
 
-These exist to make the upcoming pandas removal safe. The existing suite in
-``test_import_csv.py`` does not cover the paths production actually uses: the
-frontend defaults to ``format_profile=daily_15min`` with
+Written as characterization tests to make the pandas removal safe, and kept
+afterwards as the regression suite for the parser. They cover the paths the rest
+of the suite misses: the frontend defaults to ``format_profile=daily_15min`` with
 ``timestamp_format='%d.%m.%Y'`` (see ``frontend/src/pages/ImportsPage.tsx``), so
-real traffic goes through ``datetime.strptime`` while every existing test goes
-through ``pandas.to_datetime``. Excel is offered in the file picker and had no
-test at all.
+real traffic goes through ``datetime.strptime`` — and Excel, which is offered in
+the file picker, had no coverage at all.
 
-Each test below pins *current* behaviour so a reimplementation can be diffed
-against it. Where current behaviour is a bug, the test says so explicitly rather
-than quietly asserting the wrong thing.
+Several tests pin behaviour that is non-obvious but load-bearing (trailing vs
+mid-file blank rows, row numbering across blank lines, the missing-vs-empty cell
+distinction). Those assertions are deliberate, not incidental.
 """
 
 import io
-import unittest
 from datetime import date, datetime, timezone
 from decimal import Decimal
 
@@ -472,38 +470,13 @@ class CsvImportCharacterizationTests(TestCase):
             MeterReading.objects.filter(metering_point=self.numeric_metering_point).count(), 1
         )
 
-    def test_numeric_meter_id_column_with_a_blank_row_currently_reports_not_found(self):
-        """Pins the *current* (wrong) behaviour so the fix is visible as a diff.
-
-        A single empty cell forces the column to float64, so the valid meter id
-        1234 stringifies to '1234.0' and fails lookup with a misleading "not
-        found" error. Delete this test when the paired expectedFailure below is
-        flipped.
-        """
-        csv_bytes = (
-            b"meter_id,timestamp,energy_kwh\n"
-            b"1234,2026-07-02T00:00:00Z,1.0000\n"
-            b",2026-07-02T00:15:00Z,2.0000\n"
-        )
-
-        resp = self._upload("numeric-blank-current.csv", csv_bytes)
-
-        self.assertEqual(resp.status_code, 201)
-        self.assertEqual(resp.data["rows_imported"], 0)
-        self.assertTrue(
-            any("'1234.0' not found" in err["error"] for err in resp.data["errors"]),
-            resp.data["errors"],
-        )
-
-    @unittest.expectedFailure
     def test_numeric_meter_id_column_with_a_blank_row_still_matches(self):
-        """KNOWN BUG, pinned deliberately.
+        """Regression test for a bug pandas caused.
 
-        One empty cell forces the column to float64, so str() yields '1234.0'
-        and the meter lookup silently fails — a valid row is dropped with a
-        confusing "not found" error. Removing pandas fixes this; this test is
-        expected to fail now and will be flipped to a passing assertion in the
-        follow-up PR.
+        Under pandas a single empty cell forced the column to float64, so the
+        valid meter id 1234 stringified to '1234.0' and lookup failed with a
+        misleading "not found" — silently dropping a good row. Reading cells as
+        text keeps the id intact.
         """
         csv_bytes = (
             b"meter_id,timestamp,energy_kwh\n"
@@ -661,16 +634,94 @@ class CsvImportCharacterizationTests(TestCase):
         self.assertEqual(len(resp.data["errors"]), 1)
         self.assertIsNone(resp.data["errors"][0]["row"])
 
-    def test_import_of_unsupported_legacy_xls_is_not_silently_accepted(self):
-        """`.xls` is advertised by the file picker but xlrd is not installed, so
-        pandas cannot read it. Pinned as 'does not import anything' rather than
-        pinning the specific exception, since the rewrite replaces it with an
-        explicit error."""
+    # ── H. Unreadable files are rejected with 400, not a 500 ─────────────────
+
+    def test_legacy_xls_is_rejected_with_a_helpful_message(self):
+        """`.xls` was advertised by the file picker but never worked (xlrd is not
+        installed), so it surfaced as an opaque 500."""
         upload = SimpleUploadedFile(
             "legacy.xls", b"\xd0\xcf\x11\xe0\x00\x00\x00\x00", content_type="application/vnd.ms-excel"
         )
-        with self.assertRaises(Exception):
-            self.client.post(
-                "/api/v1/metering/import/csv/", {"file": upload}, format="multipart"
-            )
+
+        resp = self.client.post(
+            "/api/v1/metering/import/csv/", {"file": upload}, format="multipart"
+        )
+
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn(".xlsx", resp.data["error"])
         self.assertEqual(MeterReading.objects.count(), 0)
+
+    def test_multi_character_delimiter_is_rejected_with_a_helpful_message(self):
+        resp = self._upload(
+            "multidelim.csv",
+            b"meter_id;;timestamp;;energy_kwh\nCH-IMPORT-1;;2026-09-01T00:00:00Z;;1.0000\n",
+            delimiter=";;",
+        )
+
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn("single character", resp.data["error"])
+
+    def test_tab_delimiter_can_be_requested_as_a_backslash_escape(self):
+        resp = self._upload(
+            "tabs.csv",
+            b"meter_id\ttimestamp\tenergy_kwh\nCH-IMPORT-1\t2026-09-02T00:00:00Z\t1.0000\n",
+            delimiter="\\t",
+        )
+
+        self.assertEqual(resp.status_code, 201)
+        self.assertEqual(resp.data["rows_imported"], 1)
+
+    def test_non_utf8_file_is_rejected_with_a_helpful_message(self):
+        resp = self._upload(
+            "latin1.csv",
+            "meter_id,timestamp,energy_kwh,note\nCH-IMPORT-1,2026-09-03T00:00:00Z,1.0,Zürich\n".encode(
+                "latin-1"
+            ),
+        )
+
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn("UTF-8", resp.data["error"])
+
+    def test_preview_of_an_unreadable_file_is_rejected_with_400(self):
+        upload = SimpleUploadedFile(
+            "legacy.xls", b"\xd0\xcf\x11\xe0\x00\x00\x00\x00", content_type="application/vnd.ms-excel"
+        )
+
+        resp = self.client.post(
+            "/api/v1/metering/import/preview-csv/", {"file": upload}, format="multipart"
+        )
+
+        self.assertEqual(resp.status_code, 400)
+
+    # ── I. Ragged rows (previously a 500, or silent column misalignment) ──────
+
+    def test_row_with_extra_trailing_field_is_imported_without_misalignment(self):
+        """A trailing-comma export used to make pandas promote meter_id to the
+        index and shift every column left, then crash on the row numbering."""
+        csv_bytes = (
+            b"meter_id,timestamp,energy_kwh\n"
+            b"CH-IMPORT-1,2026-09-04T00:00:00Z,1.5000,EXTRA\n"
+        )
+
+        resp = self._upload("extrafield.csv", csv_bytes)
+
+        self.assertEqual(resp.status_code, 201)
+        self.assertEqual(resp.data["rows_imported"], 1)
+        reading = MeterReading.objects.get(metering_point=self.metering_point)
+        self.assertEqual(reading.energy_kwh, Decimal("1.5000"))
+        self.assertEqual(reading.timestamp, datetime(2026, 9, 4, 0, 0, tzinfo=timezone.utc))
+
+    def test_rows_of_differing_widths_are_handled_row_by_row(self):
+        csv_bytes = (
+            b"meter_id,timestamp,energy_kwh\n"
+            b"CH-IMPORT-1,2026-09-05T00:00:00Z,1.0000\n"
+            b"CH-IMPORT-1,2026-09-06T00:00:00Z,2.0000,EXTRA\n"
+            b"CH-IMPORT-1,2026-09-07T00:00:00Z\n"
+        )
+
+        resp = self._upload("ragged.csv", csv_bytes)
+
+        self.assertEqual(resp.status_code, 201)
+        self.assertEqual(resp.data["rows_imported"], 2)
+        self.assertEqual(resp.data["rows_skipped"], 1)
+        self.assertTrue(any("Missing numeric value" in err["error"] for err in resp.data["errors"]))

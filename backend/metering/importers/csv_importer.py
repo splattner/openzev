@@ -8,11 +8,15 @@ Supported formats:
 Both formats support header-based mapping and index-based mapping for headerless files.
 """
 
+import csv
+import io
 import uuid
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal, InvalidOperation
 
-import pandas as pd
+import openpyxl
+from dateutil import parser as dateutil_parser
 
 from metering.models import ImportLog, ImportSource, MeterReading
 from zev.models import MeteringPoint, Zev
@@ -26,6 +30,26 @@ DEFAULT_COLUMN_MAP = {
 }
 
 
+class ImportFileError(ValueError):
+    """The uploaded file could not be read at all (bad format, encoding or delimiter)."""
+
+
+@dataclass
+class Table:
+    """A parsed spreadsheet: column labels plus rows of raw cell values.
+
+    Rows are padded to ``width`` so positional access is always safe. Labels are
+    kept as read — strings for a headered file, integers for a headerless one.
+    """
+
+    columns: list = field(default_factory=list)
+    rows: list = field(default_factory=list)
+
+    @property
+    def width(self):
+        return len(self.columns)
+
+
 def _to_bool(value, default=True):
     if value is None:
         return default
@@ -34,36 +58,151 @@ def _to_bool(value, default=True):
     return str(value).strip().lower() in {"1", "true", "yes", "on"}
 
 
-def _read_dataframe(file, *, has_header=True, delimiter=","):
-    if hasattr(file, "name") and file.name.endswith((".xlsx", ".xls")):
-        return pd.read_excel(file, header=0 if has_header else None)
-    return pd.read_csv(file, sep=delimiter, header=0 if has_header else None)
+def _normalise_delimiter(delimiter):
+    if not delimiter:
+        return ","
+    # The UI exposes a free-text delimiter field, where a tab cannot be typed.
+    if delimiter == "\\t":
+        return "\t"
+    if len(delimiter) != 1:
+        raise ImportFileError(
+            f"Delimiter must be a single character (got {delimiter!r}). Use '\\t' for a tab."
+        )
+    return delimiter
 
 
-def _resolve_column(df, ref):
+def _build_table(raw_rows, *, has_header):
+    if not raw_rows:
+        return Table()
+    if has_header:
+        columns, data = list(raw_rows[0]), raw_rows[1:]
+    else:
+        # Like pandas, the column count is fixed by the first row.
+        columns, data = list(range(len(raw_rows[0]))), raw_rows
+    width = len(columns)
+    rows = [
+        list(row) + [None] * (width - len(row)) if len(row) < width else list(row)
+        for row in data
+    ]
+    return Table(columns=columns, rows=rows)
+
+
+def _read_csv_table(file, *, has_header, delimiter):
+    try:
+        text = file.read().decode("utf-8-sig")
+    except UnicodeDecodeError as exc:
+        raise ImportFileError(
+            "File is not valid UTF-8. Re-export it as UTF-8 (in Excel: 'CSV UTF-8') and try again."
+        ) from exc
+    reader = csv.reader(io.StringIO(text, newline=""), delimiter=delimiter)
+    # pandas skips blank lines *and* renumbers, so a blank line does not consume
+    # a row number. Rows of empty strings are data and are kept.
+    return _build_table([row for row in reader if row], has_header=has_header)
+
+
+def _read_xlsx_table(file, *, has_header):
+    try:
+        workbook = openpyxl.load_workbook(file, read_only=True, data_only=True, keep_links=False)
+    except Exception as exc:  # openpyxl raises a variety of types for bad files
+        raise ImportFileError(f"Could not read the Excel file: {exc}") from exc
+    try:
+        # pandas reads sheet index 0, which is not necessarily the sheet that was
+        # selected when the workbook was saved (openpyxl's ``active``).
+        raw_rows = [list(row) for row in workbook.worksheets[0].iter_rows(values_only=True)]
+    finally:
+        workbook.close()
+
+    # pandas trims trailing all-empty rows but keeps mid-file ones.
+    while raw_rows and all(cell is None for cell in raw_rows[-1]):
+        raw_rows.pop()
+    return _build_table(raw_rows, has_header=has_header)
+
+
+def _read_table(file, *, has_header=True, delimiter=","):
+    name = (getattr(file, "name", "") or "").lower()
+    if name.endswith(".xls"):
+        raise ImportFileError(
+            "Legacy .xls files are not supported. Please save the file as .xlsx or CSV."
+        )
+    if name.endswith(".xlsx"):
+        return _read_xlsx_table(file, has_header=has_header)
+    return _read_csv_table(
+        file, has_header=has_header, delimiter=_normalise_delimiter(delimiter)
+    )
+
+
+def _is_missing(value):
+    """True for cells pandas would have reported as NA.
+
+    Note that whitespace-only cells are *not* missing: callers distinguish an
+    absent value from a blank one (``Missing`` vs ``Empty`` errors).
+    """
+    if value is None:
+        return True
+    if isinstance(value, str):
+        return value == ""
+    return isinstance(value, float) and value != value
+
+
+def _cell(row, position):
+    """Positional access that returns None on a miss, like ``Series.get``."""
+    if position is None or position < 0 or position >= len(row):
+        return None
+    return row[position]
+
+
+def _parse_flexible(text, *, dayfirst=False):
+    """Parse a date/datetime string, preferring ISO-8601 then falling back to dateutil."""
+    if not dayfirst:
+        try:
+            return datetime.fromisoformat(text)
+        except ValueError:
+            pass
+    return dateutil_parser.parse(text, dayfirst=dayfirst)
+
+
+def _parse_datetime_utc(raw_value):
+    parsed = _parse_flexible(str(raw_value).strip())
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
+def _resolve_column(table, ref):
+    """Resolve a column reference to a *position*.
+
+    A reference is either a literal column label or a decimal index. Returning a
+    position rather than a label keeps row access uniform for both the named
+    columns and the positional interval slots.
+    """
     if ref is None:
         return None
     key = str(ref).strip()
     if not key:
         return None
-    if key in df.columns:
-        return key
+    if key in table.columns:
+        return table.columns.index(key)
     if key.isdigit():
         idx = int(key)
-        if idx < 0 or idx >= len(df.columns):
-            raise KeyError(f"Column index {idx} is out of range (0..{len(df.columns)-1}).")
-        return df.columns[idx]
+        if idx < 0 or idx >= table.width:
+            raise KeyError(f"Column index {idx} is out of range (0..{table.width - 1}).")
+        return idx
     raise KeyError(f"Column '{key}' not found.")
 
 
 def _parse_decimal(raw_value):
-    if pd.isna(raw_value):
+    if _is_missing(raw_value):
         raise InvalidOperation("Missing numeric value")
     value_str = str(raw_value).strip()
     if not value_str:
         raise InvalidOperation("Empty numeric value")
     value_str = value_str.replace(",", ".")
-    return Decimal(value_str).quantize(Decimal("0.0001"))
+    value = Decimal(value_str).quantize(Decimal("0.0001"))
+    # Decimal happily accepts "nan"/"NaN", which would otherwise reach the
+    # database as a non-finite value. ("inf" already fails in quantize.)
+    if not value.is_finite():
+        raise InvalidOperation("Invalid numeric value")
+    return value
 
 
 def _infer_direction_and_energy(meter_type, energy, explicit_direction=None):
@@ -88,7 +227,7 @@ def _meter_queryset_for_user(user, zev=None):
     return qs.none()
 
 
-def _resolve_columns(df, col, required_keys):
+def _resolve_columns(table, col, required_keys):
     missing_mapping_keys = [key for key in required_keys if key not in col or not col.get(key)]
     if missing_mapping_keys:
         return None, f"Missing required column mappings for: {', '.join(missing_mapping_keys)}"
@@ -96,13 +235,13 @@ def _resolve_columns(df, col, required_keys):
     resolved_cols = {}
     try:
         for key in required_keys:
-            resolved_cols[key] = _resolve_column(df, col[key])
+            resolved_cols[key] = _resolve_column(table, col[key])
     except KeyError as exc:
         return None, str(exc)
 
     try:
         direction_ref = col.get("direction")
-        resolved_cols["direction"] = _resolve_column(df, direction_ref) if direction_ref else None
+        resolved_cols["direction"] = _resolve_column(table, direction_ref) if direction_ref else None
     except KeyError:
         resolved_cols["direction"] = None
 
@@ -116,10 +255,8 @@ def _build_day_start(raw_day, timestamp_format):
         raw_day_str = str(raw_day).strip()
         # Preserve unambiguous ISO dates; fall back to day-first parsing for
         # European CSV exports such as 07.01.2026 or 07/01/2026.
-        if raw_day_str[:10].count("-") == 2 and raw_day_str[:4].isdigit():
-            day_dt = pd.to_datetime(raw_day_str, dayfirst=False).to_pydatetime()
-        else:
-            day_dt = pd.to_datetime(raw_day_str, dayfirst=True).to_pydatetime()
+        iso_like = raw_day_str[:10].count("-") == 2 and raw_day_str[:4].isdigit()
+        day_dt = _parse_flexible(raw_day_str, dayfirst=not iso_like)
     return datetime(day_dt.year, day_dt.month, day_dt.day, tzinfo=timezone.utc)
 
 
@@ -148,13 +285,13 @@ def preview_csv(
 ):
     col = {**DEFAULT_COLUMN_MAP, **(column_map or {})}
     has_header = _to_bool(has_header, default=True)
-    df = _read_dataframe(file, has_header=has_header, delimiter=delimiter or ",")
+    table = _read_table(file, has_header=has_header, delimiter=delimiter)
 
     required_keys = ["meter_id", "timestamp", "energy_kwh"] if format_profile == "standard" else ["meter_id", "timestamp", "energy_start"]
-    resolved_cols, column_error = _resolve_columns(df, col, required_keys)
+    resolved_cols, column_error = _resolve_columns(table, col, required_keys)
     if column_error:
         return {
-            "rows_total": len(df),
+            "rows_total": len(table.rows),
             "preview_rows": [],
             "summary": {"existing_metering_points": 0, "missing_metering_points": 0, "rows_previewed": 0},
             "errors": [{"row": None, "error": column_error}],
@@ -165,9 +302,9 @@ def preview_csv(
     existing_mps = 0
     missing_mps = 0
 
-    for idx, row in df.head(max_rows).iterrows():
+    for idx, row in enumerate(table.rows[:max_rows]):
         row_number = idx + (2 if has_header else 1)
-        meter_id = None if pd.isna(row[resolved_cols["meter_id"]]) else str(row[resolved_cols["meter_id"]]).strip()
+        meter_id = None if _is_missing(row[resolved_cols["meter_id"]]) else str(row[resolved_cols["meter_id"]]).strip()
         mp = meter_lookup.get(meter_id or "")
         exists = mp is not None
         if exists:
@@ -178,7 +315,7 @@ def preview_csv(
         if format_profile == "daily_15min":
             date_value = None
             existing_data = False
-            if exists and not pd.isna(row[resolved_cols["timestamp"]]):
+            if exists and not _is_missing(row[resolved_cols["timestamp"]]):
                 try:
                     day_start = _build_day_start(row[resolved_cols["timestamp"]], timestamp_format)
                     day_end = day_start + timedelta(days=1)
@@ -190,7 +327,7 @@ def preview_csv(
                     date_value = day_start.date().isoformat()
                 except Exception:
                     date_value = str(row[resolved_cols["timestamp"]])
-            elif not pd.isna(row[resolved_cols["timestamp"]]):
+            elif not _is_missing(row[resolved_cols["timestamp"]]):
                 date_value = str(row[resolved_cols["timestamp"]])
 
             preview_rows.append(
@@ -207,8 +344,8 @@ def preview_csv(
             )
             continue
 
-        timestamp_value = None if pd.isna(row[resolved_cols["timestamp"]]) else str(row[resolved_cols["timestamp"]])
-        energy_value = None if pd.isna(row[resolved_cols["energy_kwh"]]) else str(row[resolved_cols["energy_kwh"]])
+        timestamp_value = None if _is_missing(row[resolved_cols["timestamp"]]) else str(row[resolved_cols["timestamp"]])
+        energy_value = None if _is_missing(row[resolved_cols["energy_kwh"]]) else str(row[resolved_cols["energy_kwh"]])
         preview_rows.append(
             {
                 "row": row_number,
@@ -221,7 +358,7 @@ def preview_csv(
         )
 
     return {
-        "rows_total": len(df),
+        "rows_total": len(table.rows),
         "preview_rows": preview_rows,
         "summary": {
             "existing_metering_points": existing_mps,
@@ -252,7 +389,7 @@ def import_csv(
 
     has_header = _to_bool(has_header, default=True)
     overwrite_existing = _to_bool(overwrite_existing, default=False)
-    df = _read_dataframe(file, has_header=has_header, delimiter=delimiter or ",")
+    table = _read_table(file, has_header=has_header, delimiter=delimiter)
 
     log = ImportLog.objects.create(
         batch_id=batch_id,
@@ -260,14 +397,14 @@ def import_csv(
         imported_by=user,
         source=ImportSource.CSV,
         filename=getattr(file, "name", "upload"),
-        rows_total=len(df),
+        rows_total=len(table.rows),
     )
 
     required_keys = ["meter_id", "timestamp", "energy_kwh"] if format_profile == "standard" else ["meter_id", "timestamp", "energy_start"]
-    resolved_cols, column_error = _resolve_columns(df, col, required_keys)
+    resolved_cols, column_error = _resolve_columns(table, col, required_keys)
     if column_error:
         log.rows_imported = 0
-        log.rows_skipped = len(df)
+        log.rows_skipped = len(table.rows)
         log.errors = [{"row": None, "error": column_error}]
         log.save()
         return log
@@ -280,10 +417,10 @@ def import_csv(
     errors = []
     touched_metering_points = set()
 
-    for idx, row in df.iterrows():
+    for idx, row in enumerate(table.rows):
         row_number = idx + (2 if has_header else 1)
         try:
-            if pd.isna(row[resolved_cols["meter_id"]]):
+            if _is_missing(row[resolved_cols["meter_id"]]):
                 skipped += 1
                 errors.append({"row": row_number, "error": "Missing meter_id value."})
                 continue
@@ -309,17 +446,17 @@ def import_csv(
 
             if format_profile == "daily_15min":
                 raw_day = row[resolved_cols["timestamp"]]
-                if pd.isna(raw_day):
+                if _is_missing(raw_day):
                     skipped += 1
                     errors.append({"row": row_number, "error": "Missing date value for daily profile."})
                     continue
 
                 day_start = _build_day_start(raw_day, timestamp_format)
-                start_pos = list(df.columns).index(resolved_cols["energy_start"])
+                start_pos = resolved_cols["energy_start"]
 
                 for slot in range(values_count):
                     col_pos = start_pos + slot
-                    if col_pos >= len(df.columns):
+                    if col_pos >= table.width:
                         skipped += 1
                         errors.append(
                             {
@@ -332,8 +469,8 @@ def import_csv(
                         )
                         continue
 
-                    raw_energy = row.iloc[col_pos]
-                    if pd.isna(raw_energy) or str(raw_energy).strip() == "":
+                    raw_energy = row[col_pos]
+                    if _is_missing(raw_energy) or str(raw_energy).strip() == "":
                         continue
 
                     energy_raw = _parse_decimal(raw_energy)
@@ -382,7 +519,7 @@ def import_csv(
                 continue
 
             raw_ts = row[resolved_cols["timestamp"]]
-            if pd.isna(raw_ts):
+            if _is_missing(raw_ts):
                 skipped += 1
                 errors.append({"row": row_number, "error": "Missing timestamp value."})
                 continue
@@ -392,15 +529,15 @@ def import_csv(
             elif isinstance(raw_ts, datetime):
                 ts = raw_ts if raw_ts.tzinfo else raw_ts.replace(tzinfo=timezone.utc)
             else:
-                ts = pd.to_datetime(raw_ts, utc=True).to_pydatetime()
+                ts = _parse_datetime_utc(raw_ts)
 
             energy_raw = _parse_decimal(row[resolved_cols["energy_kwh"]])
 
             explicit_direction = None
             direction_col = resolved_cols.get("direction")
             if direction_col is not None:
-                raw_direction = row.get(direction_col)
-                if not pd.isna(raw_direction):
+                raw_direction = _cell(row, direction_col)
+                if not _is_missing(raw_direction):
                     explicit_direction = str(raw_direction).strip().lower()
                     if explicit_direction and explicit_direction not in {"in", "out"}:
                         skipped += 1
@@ -450,7 +587,7 @@ def import_csv(
                             "error": "Duplicate reading for metering_point + timestamp + direction.",
                         }
                     )
-        except (KeyError, InvalidOperation, ValueError) as exc:
+        except (KeyError, InvalidOperation, TypeError, ValueError) as exc:
             errors.append({"row": row_number, "error": str(exc)})
             skipped += 1
 

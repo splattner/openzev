@@ -479,7 +479,7 @@ export function ImportsPage() {
                                 <input
                                     type="file"
                                     onChange={(event) => setFile(event.target.files?.[0] ?? null)}
-                                    accept={source === 'csv' ? '.csv,.xlsx,.xls' : '.xml'}
+                                    accept={source === 'csv' ? '.csv,.xlsx' : '.xml'}
                                 />
                             </label>
 

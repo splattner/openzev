@@ -126,7 +126,8 @@ touched meters belong to the same ZEV, that ZEV is stored; otherwise `null`.
 
 ### 4.1 CSV / Excel importer
 
-**Supported file types:** `.csv`, `.xlsx`, `.xls` (via pandas).
+**Supported file types:** `.csv` (stdlib `csv`), `.xlsx` (`openpyxl`). Legacy `.xls`
+is rejected with an explicit error asking for `.xlsx` or CSV.
 
 **Format profiles:**
 
@@ -163,6 +164,25 @@ touched meters belong to the same ZEV, that ZEV is stored; otherwise `null`.
 **Column resolution:** columns are resolved by name first; if the reference is
 a numeric string, it is used as a zero-based column index.  Out-of-range
 indices raise a column error that terminates the import with all rows skipped.
+Internally a reference resolves to a column *position*, so named columns and the
+positional `daily_15min` interval slots are read the same way.
+
+**Parsing semantics:**
+
+| Aspect | Behaviour |
+|---|---|
+| Encoding | UTF-8, BOM tolerated (`utf-8-sig`). Anything else is rejected with a 400 asking for a UTF-8 re-export |
+| Delimiter | Exactly one character. `\t` may be written as the two-character escape, since the UI field is free text. Multi-character delimiters are rejected with a 400 |
+| Blank lines | CSV blank lines are skipped and do **not** consume a row number |
+| Excel blank rows | Trailing all-empty rows are dropped; mid-file blank rows are kept and reported as rows with a missing `meter_id` |
+| Excel sheet | The first sheet is read, regardless of which sheet was active when the workbook was saved |
+| Ragged rows | Short rows are padded; extra trailing fields are ignored |
+| Missing values | An absent cell reports "Missing …"; a whitespace-only cell reports "Empty …" |
+| Numbers | Comma decimal separators are accepted. Non-finite values (`nan`, `inf`) are rejected |
+| Timestamps | `timestamp_format` (a `strptime` string) wins if supplied and is interpreted as UTC. Otherwise ISO-8601 is parsed first, falling back to a lenient parser; naive values are assumed UTC. For `daily_15min`, non-ISO dates are parsed day-first to suit European exports |
+
+Unreadable files (wrong format, bad encoding, invalid delimiter) return **400**
+before any `ImportLog` row is created, so a failed read leaves no orphan log.
 
 **Direction inference logic:**
 
