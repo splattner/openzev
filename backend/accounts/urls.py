@@ -6,12 +6,17 @@ from .views import (
     VatRateListCreateView, VatRateDetailView,
     feature_flags_list, feature_flag_update,
     register, verify_email, set_initial_password,
-    # OAuth
-    OAuthProviderListCreateView, OAuthProviderDetailView,
+)
+from .views_oauth import (
+    OAuthProviderDetailView,
+    OAuthProviderListCreateView,
+    oauth_callback,
+    oauth_link_initiate,
+    oauth_login_initiate,
     oauth_providers_public,
-    oauth_login_initiate, oauth_link_initiate,
-    oauth_callback, oauth_token_exchange,
-    social_accounts_list, social_account_delete,
+    oauth_token_exchange,
+    social_account_delete,
+    social_accounts_list,
 )
 from .views_impersonation import ImpersonateParticipantView, StopImpersonationView
 
