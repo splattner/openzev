@@ -427,3 +427,205 @@ class SocialAccountTests(OAuthTestCase):
         self.client.credentials()
 
         self.assertEqual(self.client.get(SOCIAL_ACCOUNTS).status_code, 401)
+
+
+class ProviderConfigAuditTests(OAuthTestCase):
+    """Provider configuration is the highest-leverage thing an admin can change
+    here: repointing token_url or userinfo_url redirects authentication itself.
+    It is audited under GOVERNANCE, like the other admin-only config endpoints.
+    """
+
+    def setUp(self):
+        super().setUp()
+        auth(self.client, make_user("prov_admin", UserRole.ADMIN))
+
+    def _payload(self, **overrides):
+        payload = {
+            "name": "newidp",
+            "display_name": "New IdP",
+            "client_id": "new-client",
+            "client_secret": "new-secret",
+            "authorization_url": "https://new.example/authorize",
+            "token_url": "https://new.example/token",
+            "userinfo_url": "https://new.example/userinfo",
+            "redirect_url": "https://app.example/callback",
+            "scope": "openid email",
+            "enabled": True,
+        }
+        payload.update(overrides)
+        return payload
+
+    def test_creating_a_provider_is_audited(self):
+        resp = self.client.post(PROVIDERS_CONFIG, self._payload(), format="json")
+
+        self.assertEqual(resp.status_code, 201)
+        event = AuditEvent.objects.get(action_type="oauth_provider.create")
+        self.assertEqual(event.action_category, AuditActionCategory.GOVERNANCE)
+        self.assertEqual(event.target_display, "newidp")
+        self.assertEqual(event.changes_json["token_url"]["after"], "https://new.example/token")
+
+    def test_a_created_providers_secret_is_never_stored_in_the_event(self):
+        self.client.post(PROVIDERS_CONFIG, self._payload(), format="json")
+
+        event = AuditEvent.objects.get(action_type="oauth_provider.create")
+        self.assertNotIn("new-secret", json.dumps(event.changes_json))
+        self.assertNotIn("new-secret", json.dumps(event.metadata_json))
+
+    def test_repointing_the_token_url_shows_before_and_after(self):
+        url = f"{PROVIDERS_CONFIG}{self.provider.pk}/"
+
+        resp = self.client.patch(url, {"token_url": "https://attacker.example/token"}, format="json")
+
+        self.assertEqual(resp.status_code, 200)
+        event = AuditEvent.objects.get(action_type="oauth_provider.update")
+        self.assertEqual(
+            event.changes_json["token_url"],
+            {"before": "https://idp.example/token", "after": "https://attacker.example/token"},
+        )
+
+    def test_a_secret_rotation_is_recorded_as_a_flag_not_a_value(self):
+        """The secret must not reach the audit trail, but rotating it is
+        exactly the kind of change worth being able to see after the fact."""
+        url = f"{PROVIDERS_CONFIG}{self.provider.pk}/"
+
+        self.client.patch(url, {"client_secret": "rotated-secret"}, format="json")
+
+        event = AuditEvent.objects.get(action_type="oauth_provider.update")
+        self.assertTrue(event.metadata_json["client_secret_rotated"])
+        self.assertNotIn("rotated-secret", json.dumps(event.metadata_json))
+        self.assertNotIn("rotated-secret", json.dumps(event.changes_json))
+
+    def test_an_unrelated_edit_does_not_claim_the_secret_rotated(self):
+        url = f"{PROVIDERS_CONFIG}{self.provider.pk}/"
+
+        self.client.patch(url, {"scope": "openid"}, format="json")
+
+        self.assertFalse(AuditEvent.objects.get(action_type="oauth_provider.update")
+                         .metadata_json["client_secret_rotated"])
+
+    def test_deleting_a_provider_records_how_many_links_it_took_with_it(self):
+        user = make_user("linked_to_doomed", UserRole.PARTICIPANT)
+        SocialAccount.objects.create(provider=self.provider, uid="doomed", user=user)
+
+        resp = self.client.delete(f"{PROVIDERS_CONFIG}{self.provider.pk}/")
+
+        self.assertEqual(resp.status_code, 204)
+        event = AuditEvent.objects.get(action_type="oauth_provider.delete")
+        self.assertEqual(event.action_category, AuditActionCategory.GOVERNANCE)
+        self.assertEqual(event.target_display, "testidp")
+        self.assertEqual(event.metadata_json["unlinked_social_accounts"], 1)
+
+
+class OAuthFlowAuditTests(OAuthTestCase):
+    def _event(self, action_type):
+        return AuditEvent.objects.get(action_type=action_type)
+
+    def test_a_successful_login_is_audited(self):
+        user = make_user("audit_login", UserRole.ZEV_OWNER)
+        SocialAccount.objects.create(provider=self.provider, uid="uid-login", user=user)
+        self.start_state("s")
+
+        with fake_provider_http({"access_token": "at"}, {"sub": "uid-login", "email": user.email}):
+            self.callback(code="c", state="s")
+
+        event = self._event("oauth.login")
+        self.assertEqual(event.action_category, AuditActionCategory.AUTH)
+        self.assertEqual(event.status, AuditEventStatus.SUCCESS)
+        self.assertEqual(event.target_id, str(user.pk))
+        self.assertEqual(event.metadata_json["provider"], "testidp")
+
+    def test_provisioning_a_new_account_is_audited_separately_from_the_login(self):
+        """Account creation deserves its own event — it is the moment a new
+        principal appears, not just a session."""
+        self.start_state("s")
+
+        with fake_provider_http({"access_token": "at"}, {"sub": "uid-p", "email": "brand@example.com"}):
+            self.callback(code="c", state="s")
+
+        provision = self._event("oauth.provision")
+        self.assertEqual(provision.metadata_json["role"], UserRole.PARTICIPANT)
+        self.assertEqual(provision.target_display, "brand@example.com")
+        self.assertTrue(AuditEvent.objects.filter(action_type="oauth.login").exists())
+
+    def test_claiming_an_existing_account_with_a_verified_email_is_audited_as_a_link(self):
+        user = make_user("audit_claim", UserRole.ZEV_OWNER)
+        self.start_state("s")
+
+        with fake_provider_http(
+            {"access_token": "at"},
+            {"sub": "uid-claim", "email": user.email, "email_verified": True},
+        ):
+            self.callback(code="c", state="s")
+
+        self.assertEqual(self._event("oauth.link").metadata_json["matched_by"], "verified_email")
+
+    def test_an_invalid_state_is_audited_as_a_failure(self):
+        """The clearest CSRF/replay signal the flow produces."""
+        self.callback(code="c", state="forged")
+
+        event = self._event("oauth.login_failed")
+        self.assertEqual(event.status, AuditEventStatus.FAILED)
+        self.assertEqual(event.metadata_json["reason"], "invalid_state")
+
+    def test_an_inactive_account_is_audited_against_that_account(self):
+        user = make_user("audit_inactive", UserRole.PARTICIPANT)
+        User.objects.filter(pk=user.pk).update(is_active=False)
+        SocialAccount.objects.create(provider=self.provider, uid="uid-inactive", user=user)
+        self.start_state("s")
+
+        with fake_provider_http({"access_token": "at"}, {"sub": "uid-inactive", "email": user.email}):
+            self.callback(code="c", state="s")
+
+        event = self._event("oauth.login_failed")
+        self.assertEqual(event.status, AuditEventStatus.DENIED)
+        self.assertEqual(event.target_id, str(user.pk))
+        self.assertEqual(event.metadata_json["reason"], "account_inactive")
+
+    def test_a_token_exchange_failure_is_audited(self):
+        self.start_state("s")
+
+        def explode(request, timeout=None):
+            raise OSError("boom")
+
+        with patch("urllib.request.urlopen", explode):
+            self.callback(code="c", state="s")
+
+        self.assertEqual(self._event("oauth.login_failed").metadata_json["reason"],
+                         "token_exchange_failed")
+
+    def test_normal_user_cancellation_is_not_audited(self):
+        """Declining consent at the provider, and bare GETs from crawlers, are
+        ordinary traffic — auditing them would bury the real signals."""
+        self.callback(error="access_denied")
+        self.callback()
+
+        self.assertFalse(AuditEvent.objects.exists())
+
+    def test_linking_and_unlinking_are_audited(self):
+        user = make_user("audit_link", UserRole.PARTICIPANT)
+        self.start_state("s", user=user)
+        with fake_provider_http({"access_token": "at"}, {"sub": "uid-l", "email": user.email}):
+            self.callback(code="c", state="s")
+        self.assertEqual(self._event("oauth.link").target_id, str(user.pk))
+
+        auth(self.client, user)
+        account = SocialAccount.objects.get(uid="uid-l")
+        self.client.delete(f"{SOCIAL_ACCOUNTS}{account.pk}/")
+
+        unlink = self._event("oauth.unlink")
+        self.assertEqual(unlink.target_id, str(user.pk))
+        self.assertEqual(unlink.metadata_json["provider"], "testidp")
+
+    def test_linking_an_identity_owned_by_someone_else_is_audited_as_denied(self):
+        holder = make_user("audit_holder", UserRole.PARTICIPANT)
+        SocialAccount.objects.create(provider=self.provider, uid="uid-held", user=holder)
+        claimer = make_user("audit_claimer", UserRole.PARTICIPANT)
+        self.start_state("s", user=claimer)
+
+        with fake_provider_http({"access_token": "at"}, {"sub": "uid-held", "email": claimer.email}):
+            self.callback(code="c", state="s")
+
+        event = self._event("oauth.link_refused")
+        self.assertEqual(event.status, AuditEventStatus.DENIED)
+        self.assertEqual(event.target_id, str(claimer.pk))
+        self.assertEqual(event.metadata_json["reason"], "already_linked_other")

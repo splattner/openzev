@@ -27,7 +27,7 @@ from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from audit.models import AuditActionCategory, AuditEventStatus
-from audit.services import record_audit_event
+from audit.services import build_diff, record_audit_event
 
 from .cookies import set_auth_cookies
 from .models import (
@@ -46,6 +46,88 @@ from .serializers import (
 )
 
 logger = logging.getLogger(__name__)
+
+#: Provider config fields worth diffing on update. ``client_secret`` is
+#: deliberately absent — ``redact_metadata`` would strip it from the diff
+#: anyway, so a rotation is reported as a boolean instead of a redacted key
+#: that silently vanishes.
+PROVIDER_TRACKED_FIELDS = (
+    "name",
+    "client_id",
+    "authorization_url",
+    "token_url",
+    "userinfo_url",
+    "redirect_url",
+    "scope",
+    "enabled",
+)
+
+
+def _provider_snapshot(provider: OAuthProvider) -> dict:
+    return {field: getattr(provider, field) for field in PROVIDER_TRACKED_FIELDS}
+
+
+def _record_auth_event(request, *, action_type, summary, event_status=AuditEventStatus.SUCCESS,
+                       user=None, metadata=None):
+    """Record an OAuth flow event.
+
+    The callback is an unauthenticated view, so ``request.user`` is anonymous
+    for most of these; the account the flow concerns is passed explicitly and
+    becomes the target rather than the actor.
+    """
+    record_audit_event(
+        request=request,
+        action_category=AuditActionCategory.AUTH,
+        action_type=action_type,
+        target_type="accounts.User",
+        target=user,
+        target_id=str(user.pk) if user else "",
+        target_display=(user.email or user.username) if user else "",
+        summary=summary,
+        status=event_status,
+        metadata=metadata,
+    )
+
+
+def _record_login_failure(request, provider_slug: str, reason: str) -> None:
+    """Record a callback that could not be resolved to a session.
+
+    Only failures that carry signal are recorded. A ``provider_error`` (the
+    user declined consent at the provider) and ``missing_params`` (a bare GET
+    at the callback URL, which any crawler produces) are normal traffic and
+    would drown the AUTH trail; everything else here means a replayed or forged
+    state, a misconfigured provider, or a provider returning an unusable
+    profile.
+    """
+    _record_auth_event(
+        request,
+        action_type="oauth.login_failed",
+        summary=f"OAuth login via {provider_slug} failed: {reason}.",
+        event_status=AuditEventStatus.FAILED,
+        metadata={"provider": provider_slug, "reason": reason},
+    )
+
+
+def _record_provider_event(request, *, action_type, provider, summary, changes=None, metadata=None):
+    """Record a change to an identity provider's configuration.
+
+    GOVERNANCE rather than AUTH, matching how the other admin-only
+    configuration endpoints are audited: repointing ``token_url`` or rotating
+    ``client_secret`` redirects authentication itself, so it belongs in the
+    same trail as the other privileged config changes.
+    """
+    record_audit_event(
+        request=request,
+        action_category=AuditActionCategory.GOVERNANCE,
+        action_type=action_type,
+        target_type="accounts.OAuthProvider",
+        target=provider,
+        target_id=str(provider.pk),
+        target_display=provider.name,
+        summary=summary,
+        changes=changes,
+        metadata=metadata,
+    )
 
 
 def _make_jwt_for_user(user: User) -> dict:
@@ -112,12 +194,51 @@ class OAuthProviderListCreateView(generics.ListCreateAPIView):
     serializer_class = OAuthProviderSerializer
     permission_classes = [IsAdmin]
 
+    def perform_create(self, serializer):
+        provider = serializer.save()
+        _record_provider_event(
+            self.request,
+            action_type="oauth_provider.create",
+            provider=provider,
+            summary=f"Created OAuth provider {provider.name}.",
+            changes=build_diff({}, _provider_snapshot(provider), PROVIDER_TRACKED_FIELDS),
+        )
+
 
 class OAuthProviderDetailView(generics.RetrieveUpdateDestroyAPIView):
     """Admin: retrieve, update or delete an OAuth provider configuration."""
     queryset = OAuthProvider.objects.all()
     serializer_class = OAuthProviderSerializer
     permission_classes = [IsAdmin]
+
+    def perform_update(self, serializer):
+        before = _provider_snapshot(self.get_object())
+        old_secret = self.get_object().client_secret
+        provider = serializer.save()
+        _record_provider_event(
+            self.request,
+            action_type="oauth_provider.update",
+            provider=provider,
+            summary=f"Updated OAuth provider {provider.name}.",
+            changes=build_diff(before, _provider_snapshot(provider), PROVIDER_TRACKED_FIELDS),
+            metadata={"client_secret_rotated": provider.client_secret != old_secret},
+        )
+
+    def perform_destroy(self, instance):
+        provider_id = str(instance.pk)
+        name = instance.name
+        linked_accounts = instance.social_accounts.count()
+        instance.delete()
+        record_audit_event(
+            request=self.request,
+            action_category=AuditActionCategory.GOVERNANCE,
+            action_type="oauth_provider.delete",
+            target_type="accounts.OAuthProvider",
+            target_id=provider_id,
+            target_display=name,
+            summary=f"Deleted OAuth provider {name}.",
+            metadata={"unlinked_social_accounts": linked_accounts},
+        )
 
 
 # ── public provider list ──────────────────────────────────────────────────────
@@ -196,10 +317,14 @@ def oauth_callback(request, provider_slug: str):
             state=state_value, provider__name=provider_slug
         )
     except OAuthState.DoesNotExist:
+        # No matching in-flight request: a replayed, forged or cross-provider
+        # state. The clearest CSRF signal this flow produces.
+        _record_login_failure(request, provider_slug, "invalid_state")
         return HttpResponseRedirect(f"{frontend_url}/login?oauth_error=invalid_state")
 
     if not state_obj.is_valid():
         state_obj.delete()
+        _record_login_failure(request, provider_slug, "state_expired")
         return HttpResponseRedirect(f"{frontend_url}/login?oauth_error=state_expired")
 
     linking_user = state_obj.user
@@ -213,11 +338,13 @@ def oauth_callback(request, provider_slug: str):
         user_info = _fetch_user_info(provider, token_data["access_token"])
     except Exception:
         logger.exception("OAuth token exchange failed for provider %s", provider_slug)
+        _record_login_failure(request, provider_slug, "token_exchange_failed")
         return HttpResponseRedirect(f"{frontend_url}/login?oauth_error=token_exchange_failed")
 
     # Derive a stable identifier for the provider account
     provider_uid = str(user_info.get("sub") or user_info.get("id") or "")
     if not provider_uid:
+        _record_login_failure(request, provider_slug, "missing_uid")
         return HttpResponseRedirect(f"{frontend_url}/login?oauth_error=missing_uid")
 
     email = (user_info.get("email") or "").strip().lower()
@@ -226,14 +353,30 @@ def oauth_callback(request, provider_slug: str):
         # ── Link flow: attach to the (already authenticated) user ────────
         if SocialAccount.objects.filter(provider=provider, uid=provider_uid).exclude(user=linking_user).exists():
             # The provider account is already linked to a different user
+            _record_auth_event(
+                request,
+                action_type="oauth.link_refused",
+                summary=f"Refused to link an OAuth identity to {linking_user.email or linking_user.username}: already linked to another account.",
+                event_status=AuditEventStatus.DENIED,
+                user=linking_user,
+                metadata={"provider": provider_slug, "reason": "already_linked_other"},
+            )
             return HttpResponseRedirect(
                 f"{frontend_url}/account?oauth_error=already_linked_other"
             )
-        SocialAccount.objects.get_or_create(
+        _social, created = SocialAccount.objects.get_or_create(
             provider=provider,
             uid=provider_uid,
             defaults={"user": linking_user, "extra_data": user_info},
         )
+        if created:
+            _record_auth_event(
+                request,
+                action_type="oauth.link",
+                summary=f"Linked OAuth identity from {provider_slug} to {linking_user.email or linking_user.username}.",
+                user=linking_user,
+                metadata={"provider": provider_slug},
+            )
         return HttpResponseRedirect(f"{frontend_url}/account?oauth_linked=true")
 
     # ── Login flow: find or create the local user ─────────────────────────
@@ -243,7 +386,9 @@ def oauth_callback(request, provider_slug: str):
         )
         user = social.user
     except SocialAccount.DoesNotExist:
+        provisioned = False
         if not email:
+            _record_login_failure(request, provider_slug, "no_email")
             return HttpResponseRedirect(f"{frontend_url}/login?oauth_error=no_email")
 
         try:
@@ -261,6 +406,7 @@ def oauth_callback(request, provider_slug: str):
                 is_active=True,
                 role=UserRole.PARTICIPANT,
             )
+            provisioned = True
         else:
             # A provider identity we have never seen is claiming an account
             # that already exists — and inheriting it means inheriting its
@@ -272,16 +418,17 @@ def oauth_callback(request, provider_slug: str):
                     "Refused OAuth account takeover: provider %s asserted unverified email for an existing user",
                     provider_slug,
                 )
-                record_audit_event(
-                    action_category=AuditActionCategory.AUTH,
+                _record_auth_event(
+                    request,
                     action_type="oauth.link_refused",
-                    target_type="accounts.User",
-                    target=user,
-                    target_id=str(user.pk),
-                    target_display=user.email or user.username,
                     summary="Refused to link an OAuth identity to an existing account: email not verified by the provider.",
-                    status=AuditEventStatus.DENIED,
-                    metadata={"provider": provider_slug, "email_verified": user_info.get("email_verified")},
+                    event_status=AuditEventStatus.DENIED,
+                    user=user,
+                    metadata={
+                        "provider": provider_slug,
+                        "reason": "email_not_verified",
+                        "email_verified": user_info.get("email_verified"),
+                    },
                 )
                 return HttpResponseRedirect(f"{frontend_url}/login?oauth_error=email_not_verified")
 
@@ -291,13 +438,45 @@ def oauth_callback(request, provider_slug: str):
             user=user,
             extra_data=user_info,
         )
+        if provisioned:
+            _record_auth_event(
+                request,
+                action_type="oauth.provision",
+                summary=f"Provisioned a new account for {user.email} from {provider_slug}.",
+                user=user,
+                metadata={"provider": provider_slug, "role": user.role},
+            )
+        else:
+            _record_auth_event(
+                request,
+                action_type="oauth.link",
+                summary=f"Linked OAuth identity from {provider_slug} to existing account {user.email or user.username}.",
+                user=user,
+                metadata={"provider": provider_slug, "matched_by": "verified_email"},
+            )
 
     if not user.is_active:
+        # Valid provider credentials presented for a disabled account.
+        _record_auth_event(
+            request,
+            action_type="oauth.login_failed",
+            summary=f"OAuth login refused for {user.email or user.username}: account is inactive.",
+            event_status=AuditEventStatus.DENIED,
+            user=user,
+            metadata={"provider": provider_slug, "reason": "account_inactive"},
+        )
         return HttpResponseRedirect(f"{frontend_url}/login?oauth_error=account_inactive")
 
     # Issue a short-lived exchange code for the frontend to convert to JWT
     exchange_code = secrets.token_urlsafe(32)
     OAuthExchangeCode.objects.create(code=exchange_code, user=user)
+    _record_auth_event(
+        request,
+        action_type="oauth.login",
+        summary=f"OAuth login succeeded for {user.email or user.username} via {provider_slug}.",
+        user=user,
+        metadata={"provider": provider_slug},
+    )
     return HttpResponseRedirect(f"{frontend_url}/oauth/callback?code={exchange_code}")
 
 
@@ -353,5 +532,13 @@ def social_accounts_list(request):
 def social_account_delete(request, pk: int):
     """Unlink a social account from the current user."""
     account = get_object_or_404(SocialAccount, pk=pk, user=request.user)
+    provider_name = account.provider.name
     account.delete()
+    _record_auth_event(
+        request,
+        action_type="oauth.unlink",
+        summary=f"Unlinked OAuth identity from {provider_name} for {request.user.email or request.user.username}.",
+        user=request.user,
+        metadata={"provider": provider_name},
+    )
     return Response(status=status.HTTP_204_NO_CONTENT)
