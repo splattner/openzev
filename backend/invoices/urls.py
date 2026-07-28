@@ -7,6 +7,11 @@ from .contract_pdf import CONTRACT_TEMPLATE_NAME
 from .pdf import TEMPLATE_NAME
 from .views import InvoiceViewSet
 from .views_dashboard import InvoiceDashboardView
+from .views_reports import (
+    AnnualStatementsZipView,
+    AnnualStatementView,
+    FinancialSummaryView,
+)
 from .views_templates import (
     EmailTemplateListView,
     EmailTemplateView,
@@ -23,6 +28,9 @@ router.register("invoices", InvoiceViewSet, basename="invoice")
 # the router generated for them.
 extracted_urlpatterns = [
     path("invoices/dashboard/", InvoiceDashboardView.as_view(), name="invoice-dashboard"),
+    path("invoices/annual-statement/", AnnualStatementView.as_view(), name="invoice-annual-statement"),
+    path("invoices/annual-statements-zip/", AnnualStatementsZipView.as_view(), name="invoice-annual-statements-zip"),
+    path("invoices/financial-summary/", FinancialSummaryView.as_view(), name="invoice-financial-summary"),
     path(
         "invoices/pdf-template/",
         PdfTemplateView.as_view(template_name=TEMPLATE_NAME, audit_action_prefix="template.invoice_pdf"),
