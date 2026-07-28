@@ -8,7 +8,6 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from django.http import HttpResponse
 from accounts.permissions import IsZevOwnerOrAdmin
-from django.db.models import Count, Q, Sum
 from zev.models import Zev, Participant
 from zev.scoping import ZevScopedQuerySetMixin
 from .models import Invoice, InvoiceStatus, EmailLog
@@ -719,74 +718,3 @@ class InvoiceViewSet(
         filename = f"financial-summary-{year}-{participant.last_name}.pdf"
         response["Content-Disposition"] = f'attachment; filename="{filename}"'
         return response
-
-    @action(detail=False, methods=["get"], permission_classes=[IsAuthenticated])
-    def dashboard(self, request):
-        """Get dashboard statistics (admin only)."""
-        if not request.user.is_admin:
-            return Response({"error": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
-
-        # ZEV statistics
-        total_zevs = Zev.objects.count()
-        total_participants = Participant.objects.count()
-        
-        # Invoice statistics
-        invoice_stats = Invoice.objects.filter(~Q(status=InvoiceStatus.CANCELLED)).aggregate(
-            draft_count=Count('id', filter=Q(status=InvoiceStatus.DRAFT)),
-            approved_count=Count('id', filter=Q(status=InvoiceStatus.APPROVED)),
-            sent_count=Count('id', filter=Q(status=InvoiceStatus.SENT)),
-            paid_count=Count('id', filter=Q(status=InvoiceStatus.PAID)),
-            cancelled_count=Count('id', filter=Q(status=InvoiceStatus.CANCELLED)),
-            total_revenue=Sum('total_chf', filter=Q(status__in=[InvoiceStatus.SENT, InvoiceStatus.PAID])),
-        )
-        
-        # Ensure total_revenue is a Decimal, not None
-        total_revenue = invoice_stats['total_revenue'] or 0
-        
-        # Recent invoices
-        recent_invoices = Invoice.objects.select_related("participant", "zev").order_by("-created_at")[:10]
-        recent_data = [
-            {
-                "invoice_number": inv.invoice_number,
-                "participant_name": inv.participant.full_name,
-                "zev_name": inv.zev.name,
-                "total_chf": float(inv.total_chf),
-                "status": inv.status,
-                "created_at": inv.created_at.isoformat(),
-            }
-            for inv in recent_invoices
-        ]
-        
-        # Email statistics
-        email_stats = EmailLog.objects.aggregate(
-            total_emails=Count('id'),
-            sent_emails=Count('id', filter=Q(status=EmailLog.Status.SENT)),
-            failed_emails=Count('id', filter=Q(status=EmailLog.Status.FAILED)),
-            pending_emails=Count('id', filter=Q(status=EmailLog.Status.PENDING)),
-        )
-        
-        return Response({
-            "zevs": {
-                "total": total_zevs,
-            },
-            "participants": {
-                "total": total_participants,
-            },
-            "invoices": {
-                "draft": invoice_stats['draft_count'] or 0,
-                "approved": invoice_stats['approved_count'] or 0,
-                "sent": invoice_stats['sent_count'] or 0,
-                "paid": invoice_stats['paid_count'] or 0,
-                "cancelled": invoice_stats['cancelled_count'] or 0,
-                "total_revenue": float(total_revenue),
-            },
-            "emails": {
-                "total": email_stats['total_emails'],
-                "sent": email_stats['sent_emails'],
-                "failed": email_stats['failed_emails'],
-                "pending": email_stats['pending_emails'],
-            },
-            "recent_invoices": recent_data,
-        })
-
-

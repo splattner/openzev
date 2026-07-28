@@ -6,6 +6,7 @@ from .annual_statement import ANNUAL_STATEMENT_TEMPLATE
 from .contract_pdf import CONTRACT_TEMPLATE_NAME
 from .pdf import TEMPLATE_NAME
 from .views import InvoiceViewSet
+from .views_dashboard import InvoiceDashboardView
 from .views_templates import (
     EmailTemplateListView,
     EmailTemplateView,
@@ -16,11 +17,12 @@ from .views_templates import (
 router = DefaultRouter()
 router.register("invoices", InvoiceViewSet, basename="invoice")
 
-# The template-administration endpoints used to be @action methods on
-# InvoiceViewSet. They are listed explicitly here — ahead of router.urls, so
-# they win over the viewset's `invoices/<pk>/` detail route — which keeps their
-# URLs byte-identical to what the router generated for them.
-template_urlpatterns = [
+# These endpoints used to be @action methods on InvoiceViewSet. They are listed
+# explicitly here — ahead of router.urls, so they win over the viewset's
+# `invoices/<pk>/` detail route — which keeps their URLs byte-identical to what
+# the router generated for them.
+extracted_urlpatterns = [
+    path("invoices/dashboard/", InvoiceDashboardView.as_view(), name="invoice-dashboard"),
     path(
         "invoices/pdf-template/",
         PdfTemplateView.as_view(template_name=TEMPLATE_NAME, audit_action_prefix="template.invoice_pdf"),
@@ -49,4 +51,4 @@ template_urlpatterns = [
 
 # format_suffix_patterns restores the `.json`/`.api` variants the router used to
 # generate for these endpoints, so the extraction removes no URL at all.
-urlpatterns = format_suffix_patterns(template_urlpatterns) + router.urls
+urlpatterns = format_suffix_patterns(extracted_urlpatterns) + router.urls
