@@ -9,21 +9,17 @@ from rest_framework.response import Response
 from django.http import HttpResponse
 from accounts.permissions import IsZevOwnerOrAdmin
 from django.db.models import Count, Q, Sum
-from django.conf import settings
-from django.template import Template, Context
 from zev.models import Zev, Participant
 from zev.scoping import ZevScopedQuerySetMixin
-from .models import Invoice, InvoiceStatus, EmailLog, PdfTemplate, EmailTemplate, EMAIL_TEMPLATE_DEFAULTS
+from .models import Invoice, InvoiceStatus, EmailLog
 from .serializers import (
     InvoiceSerializer, GenerateInvoiceSerializer, GenerateZevInvoicesSerializer
 )
 from .engine import generate_invoice
-from .pdf import TEMPLATE_NAME, save_invoice_pdf
-from .contract_pdf import CONTRACT_TEMPLATE_NAME
-from .annual_statement import generate_annual_statement_pdf, ANNUAL_STATEMENT_TEMPLATE
+from .pdf import save_invoice_pdf
+from .annual_statement import generate_annual_statement_pdf
 from .financial_summary import generate_financial_summary_pdf
 from .tasks import send_invoice_email_task, generate_zev_invoices_task, generate_zev_pdfs_task
-from .template_context import build_sample_invoice_context, build_sample_contract_context, build_sample_annual_statement_context
 from .period_overview import compute_period_overview
 from .workflow import (
     InvoiceWorkflowError,
@@ -35,13 +31,6 @@ from .workflow import (
 )
 from audit.models import AuditActionCategory, AuditEventStatus
 from audit.services import build_diff, record_audit_event
-
-
-def _read_default_template(template_name: str) -> str:
-    """Read the on-disk (default) content for a template."""
-    path = settings.BASE_DIR / "templates" / template_name
-    return path.read_text(encoding="utf-8")
-
 
 
 def _invoice_target_display(invoice: Invoice) -> str:
@@ -800,199 +789,4 @@ class InvoiceViewSet(
             "recent_invoices": recent_data,
         })
 
-    def _handle_pdf_template(self, request, template_name: str, audit_action_prefix: str):
-        """Shared GET/PATCH/DELETE handler for all three PDF template endpoints."""
-        if not request.user.is_admin:
-            record_audit_event(
-                request=request,
-                action_category=AuditActionCategory.GOVERNANCE,
-                action_type=f"{audit_action_prefix}.update",
-                target_type="invoices.PdfTemplate",
-                target_id=template_name,
-                target_display=template_name,
-                summary=f"Denied PDF template mutation by non-admin ({template_name}).",
-                status=AuditEventStatus.DENIED,
-            )
-            return Response({"error": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
-
-        if request.method == "GET":
-            record = PdfTemplate.objects.filter(template_name=template_name).first()
-            content = record.content if record else _read_default_template(template_name)
-            return Response({"template_name": template_name, "content": content, "is_customized": record is not None})
-
-        if request.method == "PATCH":
-            content = request.data.get("content")
-            if not isinstance(content, str) or not content.strip():
-                return Response({"error": "Template content is required."}, status=status.HTTP_400_BAD_REQUEST)
-            PdfTemplate.objects.update_or_create(template_name=template_name, defaults={"content": content})
-            record_audit_event(
-                request=request,
-                action_category=AuditActionCategory.GOVERNANCE,
-                action_type=f"{audit_action_prefix}.update",
-                target_type="invoices.PdfTemplate",
-                target_id=template_name,
-                target_display=template_name,
-                summary=f"Updated PDF template {template_name}.",
-            )
-            return Response({"template_name": template_name, "content": content, "is_customized": True, "detail": "PDF template updated successfully."})
-
-        # DELETE — revert to default
-        PdfTemplate.objects.filter(template_name=template_name).delete()
-        record_audit_event(
-            request=request,
-            action_category=AuditActionCategory.GOVERNANCE,
-            action_type=f"{audit_action_prefix}.reset",
-            target_type="invoices.PdfTemplate",
-            target_id=template_name,
-            target_display=template_name,
-            summary=f"Reset PDF template {template_name} to default.",
-        )
-        return Response({"template_name": template_name, "content": _read_default_template(template_name), "is_customized": False, "detail": "PDF template reset to default."})
-
-    @action(detail=False, methods=["get", "patch", "delete"], url_path="pdf-template", permission_classes=[IsAuthenticated])
-    def pdf_template(self, request):
-        """Admin-only read/write/reset for the invoice PDF HTML template."""
-        return self._handle_pdf_template(request, TEMPLATE_NAME, "template.invoice_pdf")
-
-    @action(detail=False, methods=["get", "patch", "delete"], url_path="contract-pdf-template", permission_classes=[IsAuthenticated])
-    def contract_pdf_template(self, request):
-        """Admin-only read/write/reset for the contract PDF HTML template."""
-        return self._handle_pdf_template(request, CONTRACT_TEMPLATE_NAME, "template.contract_pdf")
-
-    @action(detail=False, methods=["get", "patch", "delete"], url_path="annual-statement-pdf-template", permission_classes=[IsAuthenticated])
-    def annual_statement_pdf_template(self, request):
-        """Admin-only read/write/reset for the annual statement PDF HTML template."""
-        return self._handle_pdf_template(request, ANNUAL_STATEMENT_TEMPLATE, "template.annual_statement_pdf")
-
-    @action(detail=False, methods=["post"], url_path="preview-pdf-template", permission_classes=[IsAuthenticated])
-    def preview_pdf_template(self, request):
-        """Render a PDF template with sample data and return the HTML preview.
-
-        POST body: { "content": "<html>...", "template_type": "invoice" | "contract" }
-        Returns: { "html": "<rendered html>" }
-        """
-        if not request.user.is_admin:
-            return Response({"error": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
-
-        content = request.data.get("content")
-        template_type = request.data.get("template_type", "invoice")
-
-        if not isinstance(content, str) or not content.strip():
-            return Response({"error": "Template content is required."}, status=status.HTTP_400_BAD_REQUEST)
-
-        if template_type == "contract":
-            context = build_sample_contract_context()
-        elif template_type == "annual_statement":
-            context = build_sample_annual_statement_context()
-        else:
-            context = build_sample_invoice_context()
-
-        try:
-            rendered = Template(content).render(Context(context))
-        except Exception as exc:
-            return Response(
-                {"error": f"Template rendering error: {exc}"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        return Response({"html": rendered})
-
-    @action(detail=False, methods=["get"], url_path="email-templates", permission_classes=[IsAuthenticated])
-    def email_templates(self, request):
-        """Admin-only: list all email templates with current content (DB override or hardcoded default)."""
-        if not request.user.is_admin:
-            return Response({"error": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
-
-        overrides = {et.template_key: et for et in EmailTemplate.objects.all()}
-        result = []
-        for key, defaults in EMAIL_TEMPLATE_DEFAULTS.items():
-            override = overrides.get(key)
-            result.append({
-                "template_key": key,
-                "subject": override.subject if override else defaults["subject"],
-                "body": override.body if override else defaults["body"],
-                "is_customized": override is not None,
-            })
-        return Response(result)
-
-    @action(detail=False, methods=["get", "patch", "delete"], url_path="email-template/(?P<template_key>[a-z_]+)", permission_classes=[IsAuthenticated])
-    def email_template(self, request, template_key=None):
-        """Admin-only read/write/reset access to a single email template.
-
-        GET    — returns current subject+body (DB override if present, else hardcoded default).
-        PATCH  — saves subject/body to the database.
-        DELETE — removes the DB override, reverting to the hardcoded default.
-        """
-        if not request.user.is_admin:
-            record_audit_event(
-                request=request,
-                action_category=AuditActionCategory.GOVERNANCE,
-                action_type="template.email.update",
-                target_type="invoices.EmailTemplate",
-                target_id=str(template_key or ""),
-                target_display=str(template_key or ""),
-                summary="Denied email template mutation by non-admin.",
-                status=AuditEventStatus.DENIED,
-            )
-            return Response({"error": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
-
-        defaults = EMAIL_TEMPLATE_DEFAULTS.get(template_key)
-        if not defaults:
-            return Response({"error": "Unknown template key."}, status=status.HTTP_404_NOT_FOUND)
-
-        if request.method == "GET":
-            record = EmailTemplate.objects.filter(template_key=template_key).first()
-            return Response({
-                "template_key": template_key,
-                "subject": record.subject if record else defaults["subject"],
-                "body": record.body if record else defaults["body"],
-                "is_customized": record is not None,
-            })
-
-        if request.method == "PATCH":
-            subject = request.data.get("subject")
-            body = request.data.get("body")
-            if not isinstance(subject, str) or not subject.strip():
-                return Response({"error": "Subject is required."}, status=status.HTTP_400_BAD_REQUEST)
-            if not isinstance(body, str) or not body.strip():
-                return Response({"error": "Body is required."}, status=status.HTTP_400_BAD_REQUEST)
-            EmailTemplate.objects.update_or_create(
-                template_key=template_key,
-                defaults={"subject": subject, "body": body},
-            )
-            record_audit_event(
-                request=request,
-                action_category=AuditActionCategory.GOVERNANCE,
-                action_type="template.email.update",
-                target_type="invoices.EmailTemplate",
-                target_id=template_key,
-                target_display=template_key,
-                summary=f"Updated email template {template_key}.",
-            )
-            return Response({
-                "template_key": template_key,
-                "subject": subject,
-                "body": body,
-                "is_customized": True,
-                "detail": "Email template updated successfully.",
-            })
-
-        # DELETE — revert to default
-        EmailTemplate.objects.filter(template_key=template_key).delete()
-        record_audit_event(
-            request=request,
-            action_category=AuditActionCategory.GOVERNANCE,
-            action_type="template.email.reset",
-            target_type="invoices.EmailTemplate",
-            target_id=template_key,
-            target_display=template_key,
-            summary=f"Reset email template {template_key} to default.",
-        )
-        return Response({
-            "template_key": template_key,
-            "subject": defaults["subject"],
-            "body": defaults["body"],
-            "is_customized": False,
-            "detail": "Email template reset to default.",
-        })
 
