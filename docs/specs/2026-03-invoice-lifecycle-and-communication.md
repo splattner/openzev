@@ -180,7 +180,7 @@ Engine regeneration operates inside `@transaction.atomic`.  The match key is
 
 ## 5. API endpoints
 
-All invoice endpoints are routed under `/api/v1/invoices/invoices/` via a DRF `ModelViewSet` + custom actions.
+All invoice endpoints are routed under `/api/v1/invoices/invoices/` via a DRF `GenericViewSet` (list/retrieve/destroy mixins) + custom actions.
 
 ### 5.1 CRUD
 
@@ -479,7 +479,7 @@ Returns all invoice fields plus:
 - `participant_name`: derived from `participant.full_name`.
 - `pdf_url`: absolute URL to PDF file (or `null`).
 
-Read-only fields: `id`, `invoice_number`, `created_at`, `updated_at`, `pdf_file`.
+Read-only fields: `id`, `invoice_number`, `created_at`, `updated_at`, `pdf_file`, plus all billing-engine/workflow fields that never come from client input: `status`, `total_local_kwh`, `total_grid_kwh`, `total_feed_in_kwh`, `subtotal_chf`, `vat_rate`, `vat_chf`, `total_chf`, `period_start`, `period_end`, `zev`, `participant`, `sent_at`, `due_date`. Generic create/update/partial_update endpoints are not exposed; creation happens only via `generate`/`generate-all`, mutations only via the workflow actions.
 
 ### 9.2 InvoiceItemSerializer
 
@@ -532,7 +532,7 @@ Strips legacy period suffixes from `description` on serialization.
 
 | Test class | Validates |
 |---|---|
-| `InvoiceRBACTests` | §6: admin sees all, owner sees own ZEV, participant sees own invoices; participant cannot approve/cancel; PDF template access restricted to admin; deletion rules by role and status |
+| `InvoiceRBACTests` | §6: admin sees all, owner sees own ZEV, participant sees own invoices; participant cannot approve/cancel; PDF template access restricted to admin; deletion rules by role and status; generic POST create returns 405 (creation only via generate); serializer ignores forged billing/workflow fields |
 | `InvoiceWorkflowTests` | §4.2: approve draft ✓, approve non-draft ✗, mark-sent from approved ✓, mark-sent from draft ✗, mark-paid from sent ✓, mark-paid from draft ✗, cancel from draft/approved/sent ✓, cancel from paid ✗, cancel already-cancelled ✗ |
 | `InvoiceEngineGuardTests` | §4.4: regenerate approved/paid → 409, regenerate draft/cancelled → success |
 | `InvoiceBillingIntegrationTests` | §5.2: end-to-end generation via API with metering data |

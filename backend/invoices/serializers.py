@@ -38,7 +38,28 @@ class InvoiceSerializer(serializers.ModelSerializer):
     class Meta:
         model = Invoice
         fields = "__all__"
-        read_only_fields = ["id", "invoice_number", "created_at", "updated_at", "pdf_file"]
+        read_only_fields = [
+            "id",
+            "invoice_number",
+            "created_at",
+            "updated_at",
+            "pdf_file",
+            # Managed by workflow actions / billing engine, never by client input:
+            "status",
+            "total_local_kwh",
+            "total_grid_kwh",
+            "total_feed_in_kwh",
+            "subtotal_chf",
+            "vat_rate",
+            "vat_chf",
+            "total_chf",
+            "period_start",
+            "period_end",
+            "zev",
+            "participant",
+            "sent_at",
+            "due_date",
+        ]
 
     def get_pdf_url(self, obj):
         if obj.pdf_file:

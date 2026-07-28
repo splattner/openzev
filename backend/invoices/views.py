@@ -52,7 +52,6 @@ def _record_invoice_event(*, invoice: Invoice | None = None, target_id: str = ""
 
 class InvoiceViewSet(
     ZevScopedQuerySetMixin,
-    mixins.CreateModelMixin,
     mixins.ListModelMixin,
     mixins.RetrieveModelMixin,
     mixins.DestroyModelMixin,
@@ -60,10 +59,10 @@ class InvoiceViewSet(
 ):
     """Invoices are mutated only through the dedicated workflow actions below
     (generate/approve/mark-sent/mark-paid/cancel etc.), each of which is
-    permission-checked and audit-logged. Generic update/partial_update is
-    intentionally not exposed — it would let any caller with read access to
-    an invoice overwrite status, totals, or participant/zev directly, bypassing
-    those workflow guards and leaving no audit trail.
+    permission-checked and audit-logged. Generic create/update/partial_update
+    are intentionally not exposed — they would let any caller with read access
+    to an invoice overwrite status, totals, or participant/zev directly,
+    bypassing those workflow guards and leaving no audit trail.
     """
 
     serializer_class = InvoiceSerializer

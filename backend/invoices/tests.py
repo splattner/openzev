@@ -249,6 +249,55 @@ class InvoiceRBACTests(TestCase):
         self.assertEqual(resp.status_code, 400)
         self.assertTrue(Invoice.objects.filter(pk=inv.pk).exists())
 
+    def test_generic_create_returns_405(self):
+        """The generic POST create endpoint is removed; only generate() creates invoices."""
+        auth(self.client, self.admin)
+        resp = self.client.post(
+            "/api/v1/invoices/invoices/",
+            {"zev": str(self.zev1.pk), "participant": str(self.p1.pk)},
+        )
+        self.assertEqual(resp.status_code, 405)
+
+    def test_participant_cannot_create_invoice_via_generic_endpoint(self):
+        """Participants get 405 (endpoint doesn't exist) rather than a 403."""
+        auth(self.client, self.puser)
+        resp = self.client.post(
+            "/api/v1/invoices/invoices/",
+            {"zev": str(self.zev1.pk), "participant": str(self.p1.pk)},
+        )
+        self.assertEqual(resp.status_code, 405)
+
+    def test_serializer_ignores_forged_billing_fields(self):
+        """Defense-in-depth: billing/workflow fields are read-only on the serializer."""
+        from invoices.serializers import InvoiceSerializer
+
+        s = InvoiceSerializer(
+            data={
+                "zev": str(self.zev1.pk),
+                "participant": str(self.p1.pk),
+                "status": InvoiceStatus.PAID,
+                "total_chf": "9999.99",
+                "subtotal_chf": "9999.99",
+                "vat_chf": "0.00",
+                "period_start": "2026-01-01",
+                "period_end": "2026-01-31",
+                "notes": "legit note",
+            }
+        )
+        self.assertTrue(s.is_valid(), s.errors)
+        for field in (
+            "zev",
+            "participant",
+            "status",
+            "total_chf",
+            "subtotal_chf",
+            "vat_chf",
+            "period_start",
+            "period_end",
+        ):
+            self.assertNotIn(field, s.validated_data)
+        self.assertEqual(s.validated_data.get("notes"), "legit note")
+
 class InvoiceBillingIntegrationTests(TestCase):
     def setUp(self):
         self.client = APIClient()
