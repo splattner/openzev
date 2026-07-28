@@ -8,7 +8,6 @@ reports across *every* tenant: a ZEV owner reaching it would see every other
 owner's revenue.
 """
 
-import unittest
 from decimal import Decimal
 
 from django.test import TestCase
@@ -137,11 +136,9 @@ class DashboardStatisticsTests(TestCase):
         self.assertEqual(data["zevs"]["total"], 2)
         self.assertEqual(data["invoices"]["draft"], 2)
 
-    @unittest.expectedFailure
     def test_cancelled_invoices_are_counted(self):
-        """Pins the bug this extraction inherited: the aggregate runs over a
-        queryset that has already excluded cancelled invoices, so the cancelled
-        count it reports is unconditionally 0. Fixed in the next commit."""
+        """The aggregate used to run over a queryset that had already excluded
+        cancelled invoices, so this count was unconditionally 0."""
         make_invoice(self.zev, self.participant, InvoiceStatus.CANCELLED)
         make_invoice(self.zev, self.participant, InvoiceStatus.CANCELLED)
         make_invoice(self.zev, self.participant, InvoiceStatus.DRAFT)

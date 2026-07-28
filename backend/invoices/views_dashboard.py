@@ -31,7 +31,10 @@ class InvoiceDashboardView(APIView):
     permission_classes = [IsAdmin]
 
     def get(self, request, *args, **kwargs):
-        invoice_stats = Invoice.objects.filter(~Q(status=InvoiceStatus.CANCELLED)).aggregate(
+        # Aggregate over every invoice: each count carries its own status
+        # filter, so pre-filtering the queryset only ever suppressed the
+        # cancelled count (the other statuses are disjoint from CANCELLED).
+        invoice_stats = Invoice.objects.aggregate(
             draft_count=Count("id", filter=Q(status=InvoiceStatus.DRAFT)),
             approved_count=Count("id", filter=Q(status=InvoiceStatus.APPROVED)),
             sent_count=Count("id", filter=Q(status=InvoiceStatus.SENT)),
