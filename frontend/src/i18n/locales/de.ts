@@ -50,6 +50,8 @@ export const de = {
             errors: {
                 title: 'Anmeldung fehlgeschlagen',
                 generic: 'OAuth-Fehler: {{code}}',
+                email_not_verified:
+                    "Ihr Identitätsanbieter hat diese E-Mail-Adresse nicht verifiziert. Sie kann daher nicht für die Anmeldung an einem bestehenden Konto verwendet werden. Melden Sie sich mit Ihrem Passwort an und verknüpfen Sie den Anbieter auf Ihrer Kontoseite.",
                 missingCode: 'Fehlender Autorisierungscode.',
                 exchangeFailed: 'Anmeldung konnte nicht abgeschlossen werden. Bitte versuchen Sie es erneut.',
                 initFailed: 'OAuth-Anmeldung konnte nicht gestartet werden. Bitte versuchen Sie es erneut.',

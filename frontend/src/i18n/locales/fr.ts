@@ -58,6 +58,8 @@ export const fr = {
             errors: {
                 title: 'Échec de la connexion',
                 generic: 'Erreur OAuth : {{code}}',
+                email_not_verified:
+                    "Votre fournisseur d'identité n'a pas vérifié cette adresse e-mail ; elle ne peut donc pas servir à se connecter à un compte existant. Connectez-vous avec votre mot de passe, puis liez le fournisseur depuis votre page de compte.",
                 missingCode: 'Code d\'autorisation manquant.',
                 exchangeFailed: 'La connexion n\'a pas pu être complétée. Veuillez réessayer.',
                 initFailed: 'Impossible de lancer la connexion OAuth. Veuillez réessayer.',

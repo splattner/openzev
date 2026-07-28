@@ -58,6 +58,8 @@ export const it = {
             errors: {
                 title: 'Accesso non riuscito',
                 generic: 'Errore OAuth: {{code}}',
+                email_not_verified:
+                    "Il tuo provider di identità non ha verificato questo indirizzo e-mail, quindi non può essere usato per accedere a un account esistente. Accedi con la tua password e collega il provider dalla pagina del tuo account.",
                 missingCode: 'Codice di autorizzazione mancante.',
                 exchangeFailed: 'Impossibile completare l\'accesso. Riprova.',
                 initFailed: 'Impossibile avviare l\'accesso OAuth. Riprova.',

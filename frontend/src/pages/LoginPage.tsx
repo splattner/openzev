@@ -1,7 +1,7 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import AppFooter from '../components/AppFooter'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '../lib/auth'
 import { fetchFeatureFlags, fetchOAuthProviders, oauthLoginInitiate, register as apiRegister } from '../lib/api/auth'
@@ -41,6 +41,24 @@ export function LoginPage() {
     )?.enabled ?? true
 
     const oauthProviders = oauthProvidersQuery.data ?? []
+
+    // A failed OAuth login redirects back here with ?oauth_error=<slug>. Until
+    // this ran, every one of those slugs was dropped silently and the user was
+    // returned to the login form with no explanation at all.
+    const [searchParams, setSearchParams] = useSearchParams()
+    const handledOauthError = useRef(false)
+    useEffect(() => {
+        if (handledOauthError.current) return
+        const oauthError = searchParams.get('oauth_error')
+        if (!oauthError) return
+        handledOauthError.current = true
+        const key = `auth.oauth.errors.${oauthError}`
+        const translated = t(key)
+        setError(translated === key ? t('auth.oauth.errors.generic', { code: oauthError }) : translated)
+        const next = new URLSearchParams(searchParams)
+        next.delete('oauth_error')
+        setSearchParams(next, { replace: true })
+    }, [searchParams, setSearchParams, t])
 
     async function handleSubmit(event: FormEvent<HTMLFormElement>) {
         event.preventDefault()

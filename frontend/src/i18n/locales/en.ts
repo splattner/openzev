@@ -51,6 +51,8 @@ export const en = {
             errors: {
                 title: 'Sign-in failed',
                 generic: 'OAuth error: {{code}}',
+                email_not_verified:
+                    "Your identity provider has not verified this email address, so it cannot be used to sign in to an existing account. Sign in with your password and link the provider from your account page.",
                 missingCode: 'Missing authorisation code.',
                 exchangeFailed: 'Failed to complete sign-in. Please try again.',
                 initFailed: 'Failed to initiate OAuth login. Please try again.',
