@@ -11,6 +11,7 @@ Algorithm:
 import logging
 from datetime import date, datetime, timezone as tz, timedelta
 from decimal import Decimal, ROUND_HALF_UP
+from typing import NamedTuple
 
 from django.db import models, transaction
 
@@ -21,6 +22,68 @@ from metering.models import MeterReading, ReadingDirection
 from .models import Invoice, InvoiceItem, InvoiceStatus
 
 logger = logging.getLogger(__name__)
+
+
+# ─── Allocation ───────────────────────────────────────────────────────────────
+#
+# How the community's solar output is divided between its members at a single
+# timestamp. Pure arithmetic, deliberately free of the ORM: this is the part of
+# the engine that decides who pays for what, and it should be readable and
+# testable without building a metering fixture.
+
+
+class ConsumptionSplit(NamedTuple):
+    local_kwh: Decimal
+    grid_kwh: Decimal
+
+
+class ProductionSplit(NamedTuple):
+    local_sold_kwh: Decimal
+    exported_kwh: Decimal
+
+
+def split_consumption(
+    participant_kwh: Decimal,
+    zev_consumption_kwh: Decimal,
+    zev_production_kwh: Decimal,
+) -> ConsumptionSplit:
+    """Divide one consumer's draw into a solar part and a grid part.
+
+    The community can only share what it both produced *and* consumed in the
+    interval; that pool is handed out in proportion to each member's share of
+    total consumption, and whatever is left over is drawn from the grid.
+
+    The ``min`` against ``participant_kwh`` can only ever tie, never bite —
+    the pool is itself capped at total consumption, so a member's proportional
+    slice cannot exceed their own draw. It is kept as a guard against a caller
+    passing inconsistent totals.
+    """
+    local_pool = min(zev_production_kwh, zev_consumption_kwh)
+    if zev_consumption_kwh > 0 and local_pool > 0:
+        participant_share = participant_kwh / zev_consumption_kwh
+        local_kwh = min(participant_kwh, local_pool * participant_share)
+    else:
+        local_kwh = Decimal("0")
+    return ConsumptionSplit(local_kwh, max(participant_kwh - local_kwh, Decimal("0")))
+
+
+def split_production(
+    produced_kwh: Decimal,
+    zev_production_kwh: Decimal,
+    zev_consumption_kwh: Decimal,
+) -> ProductionSplit:
+    """Divide one producer's output into what the community used and what was exported.
+
+    Both pools are shared on the producer's contribution to total production,
+    so a member who supplied 30% of the solar earns 30% of the local sales and
+    carries 30% of the export.
+    """
+    if zev_production_kwh <= 0:
+        return ProductionSplit(Decimal("0"), Decimal("0"))
+    local_pool = min(zev_production_kwh, zev_consumption_kwh)
+    export_pool = max(zev_production_kwh - zev_consumption_kwh, Decimal("0"))
+    producer_share = produced_kwh / zev_production_kwh
+    return ProductionSplit(local_pool * producer_share, export_pool * producer_share)
 
 
 def _period_to_dt(d: date) -> datetime:
@@ -430,14 +493,10 @@ def generate_invoice(participant: Participant, period_start: date, period_end: d
         participant_kwh = reading.energy_kwh
         zev_consumption_at_ts = zev_consumption_by_ts.get(ts, Decimal("0"))
         zev_production_at_ts = zev_production_by_ts.get(ts, Decimal("0"))
-        local_pool_at_ts = min(zev_production_at_ts, zev_consumption_at_ts)
 
-        if zev_consumption_at_ts > 0 and local_pool_at_ts > 0:
-            participant_share = participant_kwh / zev_consumption_at_ts
-            r_local = min(participant_kwh, local_pool_at_ts * participant_share)
-        else:
-            r_local = Decimal("0")
-        r_grid = max(participant_kwh - r_local, Decimal("0"))
+        r_local, r_grid = split_consumption(
+            participant_kwh, zev_consumption_at_ts, zev_production_at_ts
+        )
 
         local_kwh_acc += r_local
         grid_kwh_acc += r_grid
@@ -482,16 +541,10 @@ def generate_invoice(participant: Participant, period_start: date, period_end: d
 
         zev_production_at_ts = zev_production_by_ts.get(ts, Decimal("0"))
         zev_consumption_at_ts = zev_consumption_by_ts.get(ts, Decimal("0"))
-        local_pool_at_ts = min(zev_production_at_ts, zev_consumption_at_ts)
-        export_pool_at_ts = max(zev_production_at_ts - zev_consumption_at_ts, Decimal("0"))
 
-        if zev_production_at_ts > 0:
-            producer_share = produced_kwh / zev_production_at_ts
-            local_sold_kwh = local_pool_at_ts * producer_share
-            exported_kwh = export_pool_at_ts * producer_share
-        else:
-            local_sold_kwh = Decimal("0")
-            exported_kwh = Decimal("0")
+        local_sold_kwh, exported_kwh = split_production(
+            produced_kwh, zev_production_at_ts, zev_consumption_at_ts
+        )
 
         exported_kwh_acc += exported_kwh
 
