@@ -153,6 +153,9 @@ class StopImpersonationView(APIView):
     *impersonated* user's token, so requiring admin would make it impossible to
     get back. The authority comes from the backup cookies, which are httpOnly
     and only ever written by :class:`ImpersonateParticipantView`.
+
+    Ending a session is audited so the impersonation window can be bounded; a
+    no-op call with no backup pair is not, since it changes nothing.
     """
 
     permission_classes = [IsAuthenticated]
@@ -165,6 +168,25 @@ class StopImpersonationView(APIView):
                 {"detail": "No active impersonation session."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+
+        # request.user here is the *impersonated* user; the admin behind the
+        # session is only recoverable from the claim the issuing view stamped
+        # on the token.
+        impersonated = request.user
+        display = impersonated.email or impersonated.username
+        impersonator_id = request.auth.get("impersonated_by") if request.auth is not None else None
+
+        record_audit_event(
+            request=request,
+            action_category=AuditActionCategory.AUTH,
+            action_type="impersonation.end",
+            target_type="accounts.User",
+            target=impersonated,
+            target_id=str(impersonated.pk),
+            target_display=display,
+            summary=f"Ended impersonation of {display}.",
+            metadata={"impersonated_by": impersonator_id} if impersonator_id else None,
+        )
 
         response = Response({"detail": "Impersonation ended."})
         set_auth_cookies(response, access=admin_access, refresh=admin_refresh)

@@ -234,3 +234,48 @@ class StopImpersonationTests(TestCase):
         self.client.credentials()
 
         self.assertEqual(self.client.post(STOP).status_code, 401)
+
+    def test_a_no_op_stop_is_not_audited(self):
+        """Nothing changed, so there is nothing to record — keeps the AUTH
+        trail free of noise from double-clicks and stale tabs."""
+        auth(self.client, make_user("stop_noop", UserRole.ADMIN))
+
+        self.client.post(STOP)
+
+        self.assertFalse(AuditEvent.objects.filter(action_type="impersonation.end").exists())
+
+
+class StopImpersonationAuditTests(TestCase):
+    """Starting an impersonation was audited three ways; ending one was not
+    recorded at all, so the trail showed a session opening and never closing."""
+
+    def setUp(self):
+        self.client = APIClient()
+        self.admin = make_user("end_admin", UserRole.ADMIN)
+        self.target = make_user("end_target", UserRole.PARTICIPANT)
+
+    def test_ending_a_session_is_recorded_against_the_impersonated_user(self):
+        self.client.post(TOKEN, {"username": self.admin.username, "password": "pass1234"})
+        self.client.post(impersonate_url(self.target.pk))
+        AuditEvent.objects.all().delete()
+
+        resp = self.client.post(STOP)
+
+        self.assertEqual(resp.status_code, 200)
+        event = AuditEvent.objects.get()
+        self.assertEqual(event.action_category, AuditActionCategory.AUTH)
+        self.assertEqual(event.action_type, "impersonation.end")
+        self.assertEqual(event.status, AuditEventStatus.SUCCESS)
+        self.assertEqual(event.target_id, str(self.target.pk))
+        self.assertEqual(event.summary, f"Ended impersonation of {self.target.email}.")
+
+    def test_the_admin_behind_the_session_is_recoverable(self):
+        """request.user is the impersonated user by this point, so the only
+        record of who was driving is the claim stamped on the token."""
+        self.client.post(TOKEN, {"username": self.admin.username, "password": "pass1234"})
+        self.client.post(impersonate_url(self.target.pk))
+        AuditEvent.objects.all().delete()
+
+        self.client.post(STOP)
+
+        self.assertEqual(AuditEvent.objects.get().metadata_json["impersonated_by"], self.admin.pk)
