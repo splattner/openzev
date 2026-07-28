@@ -1,3 +1,5 @@
+from functools import partial
+
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -9,42 +11,27 @@ from .models import Tariff, TariffPeriod
 from zev.scoping import ZevScopedQuerySetMixin
 from .serializers import TariffSerializer, TariffPeriodSerializer
 from audit.models import AuditActionCategory, AuditEventStatus
-from audit.services import build_diff, record_audit_event
+from audit.mixins import AuditedUpdateMixin
+from audit.services import record_audit_event
 
 
-def _record_tariff_event(
-    *,
-    request,
-    action_type: str,
-    target_type: str,
-    summary: str,
-    target=None,
-    target_id: str = "",
-    target_display: str = "",
-    status: str = AuditEventStatus.SUCCESS,
-    changes: dict | None = None,
-    metadata: dict | None = None,
-):
-    record_audit_event(
-        request=request,
-        action_category=AuditActionCategory.TARIFF,
-        action_type=action_type,
-        target_type=target_type,
-        target=target,
-        target_id=target_id,
-        target_display=target_display,
-        summary=summary,
-        status=status,
-        changes=changes,
-        metadata=metadata,
-    )
+# Every audit event in this module is a tariff event; bind the category once.
+_record_tariff_event = partial(record_audit_event, action_category=AuditActionCategory.TARIFF)
 
 
-class TariffViewSet(ZevScopedQuerySetMixin, viewsets.ModelViewSet):
+class TariffViewSet(AuditedUpdateMixin, ZevScopedQuerySetMixin, viewsets.ModelViewSet):
     serializer_class = TariffSerializer
     permission_classes = [IsAuthenticated, IsZevOwnerOrAdmin]
     zev_owner_filter = "zev__owner"
     participant_filter = None
+
+    audit_action_category = AuditActionCategory.TARIFF
+    audit_action_type = "tariff.update"
+    audit_target_type = "tariffs.Tariff"
+    audit_target_label = "tariff"
+
+    def get_audit_target_display(self, instance):
+        return instance.name
 
     def get_queryset(self):
         return self.scope_queryset(Tariff.objects.all())
@@ -60,49 +47,6 @@ class TariffViewSet(ZevScopedQuerySetMixin, viewsets.ModelViewSet):
             target_display=tariff.name,
             summary=f"Created tariff {tariff.name}.",
             metadata={"zev_id": str(tariff.zev_id), "category": tariff.category},
-        )
-
-    TARIFF_TRACKED_FIELDS = [
-        "zev",
-        "name",
-        "category",
-        "billing_mode",
-        "energy_type",
-        "fixed_price_chf",
-        "percentage",
-        "valid_from",
-        "valid_to",
-        "notes",
-    ]
-
-    def _tariff_snapshot(self, tariff):
-        return {
-            "zev": str(tariff.zev_id) if tariff.zev_id else None,
-            "name": tariff.name,
-            "category": tariff.category,
-            "billing_mode": tariff.billing_mode,
-            "energy_type": tariff.energy_type,
-            "fixed_price_chf": tariff.fixed_price_chf,
-            "percentage": tariff.percentage,
-            "valid_from": tariff.valid_from,
-            "valid_to": tariff.valid_to,
-            "notes": tariff.notes,
-        }
-
-    def perform_update(self, serializer):
-        tariff = self.get_object()
-        before = self._tariff_snapshot(tariff)
-        tariff = serializer.save()
-        after = self._tariff_snapshot(tariff)
-        _record_tariff_event(
-            request=self.request,
-            action_type="tariff.update",
-            target_type="tariffs.Tariff",
-            target=tariff,
-            target_id=str(tariff.pk),
-            target_display=tariff.name,
-            summary=f"Updated tariff {tariff.name}.",
-            changes=build_diff(before, after, self.TARIFF_TRACKED_FIELDS),
         )
 
     def perform_destroy(self, instance):
@@ -297,11 +241,21 @@ class TariffViewSet(ZevScopedQuerySetMixin, viewsets.ModelViewSet):
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
-class TariffPeriodViewSet(ZevScopedQuerySetMixin, viewsets.ModelViewSet):
+class TariffPeriodViewSet(AuditedUpdateMixin, ZevScopedQuerySetMixin, viewsets.ModelViewSet):
     serializer_class = TariffPeriodSerializer
     permission_classes = [IsAuthenticated, IsZevOwnerOrAdmin]
     zev_owner_filter = "tariff__zev__owner"
     participant_filter = None
+
+    audit_action_category = AuditActionCategory.TARIFF
+    audit_action_type = "tariff_period.update"
+    audit_target_type = "tariffs.TariffPeriod"
+
+    def get_audit_target_display(self, instance):
+        return instance.period_type
+
+    def get_audit_summary(self, instance):
+        return f"Updated tariff period {instance.period_type} for tariff {instance.tariff.name}."
 
     def get_queryset(self):
         return self.scope_queryset(TariffPeriod.objects.all())
@@ -317,34 +271,6 @@ class TariffPeriodViewSet(ZevScopedQuerySetMixin, viewsets.ModelViewSet):
             target_display=period.period_type,
             summary=f"Created tariff period {period.period_type} for tariff {period.tariff.name}.",
             metadata={"tariff_id": str(period.tariff_id)},
-        )
-
-    TARIFF_PERIOD_TRACKED_FIELDS = ["tariff", "period_type", "price_chf_per_kwh", "time_from", "time_to", "weekdays"]
-
-    def _tariff_period_snapshot(self, period):
-        return {
-            "tariff": str(period.tariff_id) if period.tariff_id else None,
-            "period_type": period.period_type,
-            "price_chf_per_kwh": period.price_chf_per_kwh,
-            "time_from": period.time_from,
-            "time_to": period.time_to,
-            "weekdays": period.weekdays,
-        }
-
-    def perform_update(self, serializer):
-        period = self.get_object()
-        before = self._tariff_period_snapshot(period)
-        period = serializer.save()
-        after = self._tariff_period_snapshot(period)
-        _record_tariff_event(
-            request=self.request,
-            action_type="tariff_period.update",
-            target_type="tariffs.TariffPeriod",
-            target=period,
-            target_id=str(period.pk),
-            target_display=period.period_type,
-            summary=f"Updated tariff period {period.period_type} for tariff {period.tariff.name}.",
-            changes=build_diff(before, after, self.TARIFF_PERIOD_TRACKED_FIELDS),
         )
 
     def perform_destroy(self, instance):

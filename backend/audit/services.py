@@ -97,6 +97,23 @@ def build_diff(before: dict[str, Any] | None, after: dict[str, Any] | None, allo
     return diff
 
 
+def build_instance_snapshot(instance: Any, fields: Iterable[str]) -> dict[str, Any]:
+    """Capture ``fields`` off a model instance for use with :func:`build_diff`.
+
+    Foreign keys are read from their ``<field>_id`` attribute so the snapshot
+    stays a plain scalar and no related row has to be fetched.
+    """
+    snapshot: dict[str, Any] = {}
+    for field in fields:
+        fk_attr = f"{field}_id"
+        if hasattr(instance, fk_attr):
+            fk_value = getattr(instance, fk_attr)
+            snapshot[field] = str(fk_value) if fk_value is not None else None
+        else:
+            snapshot[field] = getattr(instance, field, None)
+    return snapshot
+
+
 def infer_zev(target: Any):
     if target is None:
         return None

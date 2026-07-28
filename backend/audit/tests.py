@@ -12,7 +12,14 @@ from tariffs.models import Tariff, TariffCategory, BillingMode
 from zev.models import MeteringPoint, MeteringPointAssignment, MeteringPointType, Participant, Zev
 
 from audit.models import AuditActionCategory, AuditEvent, AuditEventStatus
-from audit.services import build_diff, infer_zev, record_audit_event, redact_metadata
+from audit.services import (
+    build_diff,
+    build_instance_snapshot,
+    infer_zev,
+    record_audit_event,
+    redact_metadata,
+)
+from zev.serializers import ParticipantSerializer
 
 
 from testing.helpers import authenticate as auth
@@ -126,6 +133,39 @@ class AuditEventModelTests(TestCase):
             allowed_fields=["status", "total"],
         )
         self.assertEqual(diff, {"status": {"before": "draft", "after": "approved"}})
+
+    def test_build_instance_snapshot_reads_fks_without_extra_queries(self):
+        participant = Participant.objects.create(
+            zev=self.zev,
+            first_name="Snap",
+            last_name="Shot",
+            email="snap@example.com",
+            valid_from=timezone.localdate(),
+        )
+        # Re-fetch so the FK is not already cached on the instance.
+        participant = Participant.objects.get(pk=participant.pk)
+
+        with self.assertNumQueries(0):
+            snapshot = build_instance_snapshot(participant, ["zev", "first_name", "user"])
+
+        self.assertEqual(snapshot["zev"], str(self.zev.pk))
+        self.assertEqual(snapshot["first_name"], "Snap")
+        self.assertIsNone(snapshot["user"])
+
+    def test_audited_update_mixin_tracks_every_writable_serializer_field(self):
+        """The mixin derives tracked fields from the serializer rather than a
+        hand-written list, so a newly added writable field is audited without
+        anyone remembering to update a second list."""
+        from zev.views import ParticipantViewSet
+
+        view = ParticipantViewSet()
+        serializer = ParticipantSerializer()
+        tracked = set(view.get_audit_tracked_fields(serializer))
+        writable = {name for name, field in serializer.fields.items() if not field.read_only}
+
+        self.assertEqual(tracked, writable)
+        # Spot-check the fields whose absence caused the original bug.
+        self.assertTrue({"phone", "address_line1", "postal_code", "city", "notes"} <= tracked)
 
     def test_infer_zev_resolves_nested_objects(self):
         participant = Participant.objects.create(

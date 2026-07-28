@@ -48,35 +48,19 @@ def _invoice_target_display(invoice: Invoice) -> str:
     return invoice.invoice_number or str(invoice.pk)
 
 
-def _record_invoice_event(
-    *,
-    request,
-    action_type: str,
-    summary: str,
-    status: str = AuditEventStatus.SUCCESS,
-    invoice: Invoice | None = None,
-    target_type: str = "invoices.Invoice",
-    target_id: str = "",
-    target_display: str = "",
-    changes: dict | None = None,
-    metadata: dict | None = None,
-    reason: str = "",
-):
-    resolved_target_id = target_id or (str(invoice.pk) if invoice else "")
-    resolved_target_display = target_display or (_invoice_target_display(invoice) if invoice else "")
+def _record_invoice_event(*, invoice: Invoice | None = None, target_id: str = "", target_display: str = "", **kwargs):
+    """Record an invoice audit event, defaulting the target to ``invoice``.
+
+    Unlike the other apps this wrapper earns its keep: callers pass the invoice
+    itself and get target/id/display derived from it.
+    """
     record_audit_event(
-        request=request,
         action_category=AuditActionCategory.INVOICE,
-        action_type=action_type,
-        target_type=target_type,
+        target_type=kwargs.pop("target_type", "invoices.Invoice"),
         target=invoice,
-        target_id=resolved_target_id,
-        target_display=resolved_target_display,
-        summary=summary,
-        status=status,
-        changes=changes,
-        metadata=metadata,
-        reason=reason,
+        target_id=target_id or (str(invoice.pk) if invoice else ""),
+        target_display=target_display or (_invoice_target_display(invoice) if invoice else ""),
+        **kwargs,
     )
 
 

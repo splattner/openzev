@@ -26,33 +26,6 @@ from audit.models import AuditActionCategory, AuditEventStatus
 from audit.services import record_audit_event
 
 
-def _record_metering_event(
-    *,
-    request,
-    action_category: str,
-    action_type: str,
-    target_type: str,
-    summary: str,
-    target=None,
-    target_id: str = "",
-    target_display: str = "",
-    status: str = AuditEventStatus.SUCCESS,
-    metadata: dict | None = None,
-):
-    record_audit_event(
-        request=request,
-        action_category=action_category,
-        action_type=action_type,
-        target_type=target_type,
-        target=target,
-        target_id=target_id,
-        target_display=target_display,
-        summary=summary,
-        status=status,
-        metadata=metadata,
-    )
-
-
 class MeterReadingViewSet(ZevScopedQuerySetMixin, viewsets.ModelViewSet):
     serializer_class = MeterReadingSerializer
     permission_classes = [IsAuthenticated, IsZevOwnerOrAdmin]
@@ -361,7 +334,7 @@ class ImportLogViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
         result = self._delete_import_logs(self.get_queryset().filter(pk=instance.pk))
-        _record_metering_event(
+        record_audit_event(
             request=request,
             action_category=AuditActionCategory.METERING,
             action_type="import_log.delete",
@@ -395,7 +368,7 @@ class ImportLogViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.
 
         result = self._delete_import_logs(queryset)
         result["mode"] = mode
-        _record_metering_event(
+        record_audit_event(
             request=request,
             action_category=AuditActionCategory.METERING,
             action_type="import_log.bulk_delete",
@@ -429,7 +402,7 @@ class ImportView(viewsets.ViewSet):
     def preview_csv_import(self, request):
         file = request.FILES.get("file")
         if not file:
-            _record_metering_event(
+            record_audit_event(
                 request=request,
                 action_category=AuditActionCategory.IMPORT,
                 action_type="import.preview_csv",
@@ -462,7 +435,7 @@ class ImportView(viewsets.ViewSet):
                 values_count=values_count,
             )
         except Exception as exc:
-            _record_metering_event(
+            record_audit_event(
                 request=request,
                 action_category=AuditActionCategory.IMPORT,
                 action_type="import.preview_csv",
@@ -473,7 +446,7 @@ class ImportView(viewsets.ViewSet):
             )
             raise
 
-        _record_metering_event(
+        record_audit_event(
             request=request,
             action_category=AuditActionCategory.IMPORT,
             action_type="import.preview_csv",
@@ -491,7 +464,7 @@ class ImportView(viewsets.ViewSet):
     def _do_import(self, request, source):
         file = request.FILES.get("file")
         if not file:
-            _record_metering_event(
+            record_audit_event(
                 request=request,
                 action_category=AuditActionCategory.IMPORT,
                 action_type="import.upload",
@@ -533,7 +506,7 @@ class ImportView(viewsets.ViewSet):
             try:
                 zev = Zev.objects.get(pk=zev_id)
             except Zev.DoesNotExist:
-                _record_metering_event(
+                record_audit_event(
                     request=request,
                     action_category=AuditActionCategory.IMPORT,
                     action_type="import.upload",
@@ -547,7 +520,7 @@ class ImportView(viewsets.ViewSet):
                 return Response({"error": "ZEV not found."}, status=status.HTTP_404_NOT_FOUND)
 
             if not request.user.is_admin and zev.owner != request.user:
-                _record_metering_event(
+                record_audit_event(
                     request=request,
                     action_category=AuditActionCategory.IMPORT,
                     action_type="import.upload",
@@ -563,7 +536,7 @@ class ImportView(viewsets.ViewSet):
 
             log = import_sdatch(file, zev, request.user)
 
-        _record_metering_event(
+        record_audit_event(
             request=request,
             action_category=AuditActionCategory.IMPORT,
             action_type="import.upload",
