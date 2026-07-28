@@ -34,7 +34,6 @@ from .serializers import (
 )
 from .models import AppSettings, FeatureFlag, VatRate
 from .cookies import (
-    ACCESS_COOKIE,
     ADMIN_ACCESS_COOKIE,
     ADMIN_REFRESH_COOKIE,
     REFRESH_COOKIE,
@@ -397,110 +396,6 @@ def feature_flag_update(request, pk: int):
         changes=build_diff(before, {"enabled": updated.enabled}, ["enabled"]),
     )
     return Response(serializer.data)
-
-
-@api_view(["POST"])
-@permission_classes([IsAuthenticated])
-def impersonate_participant(request, user_id: int):
-    if not request.user.is_admin:
-        record_audit_event(
-            request=request,
-            action_category=AuditActionCategory.AUTH,
-            action_type="impersonation.issue_token",
-            target_type="accounts.User",
-            target_id=str(user_id),
-            target_display=str(user_id),
-            summary="Denied impersonation token issuance by non-admin.",
-            status=AuditEventStatus.DENIED,
-        )
-        raise PermissionDenied("Only admins can impersonate participants.")
-
-    try:
-        target_user = User.objects.get(pk=user_id)
-    except User.DoesNotExist:
-        record_audit_event(
-            request=request,
-            action_category=AuditActionCategory.AUTH,
-            action_type="impersonation.issue_token",
-            target_type="accounts.User",
-            target_id=str(user_id),
-            target_display=str(user_id),
-            summary=f"Impersonation target user {user_id} not found.",
-            status=AuditEventStatus.FAILED,
-        )
-        return Response({"detail": "User not found."}, status=status.HTTP_404_NOT_FOUND)
-
-    if target_user.role not in (UserRole.PARTICIPANT, UserRole.ZEV_OWNER):
-        record_audit_event(
-            request=request,
-            action_category=AuditActionCategory.AUTH,
-            action_type="impersonation.issue_token",
-            target_type="accounts.User",
-            target=target_user,
-            target_id=str(target_user.pk),
-            target_display=target_user.email or target_user.username,
-            summary=f"Denied impersonation for {target_user.email or target_user.username} due to role guard.",
-            status=AuditEventStatus.DENIED,
-            metadata={"role": target_user.role},
-        )
-        return Response({"detail": "Only participant or ZEV owner users can be impersonated."}, status=status.HTTP_400_BAD_REQUEST)
-
-    refresh = RefreshToken.for_user(target_user)
-    refresh["role"] = target_user.role
-    refresh["email"] = target_user.email
-    refresh["full_name"] = target_user.get_full_name()
-    refresh["must_change_password"] = target_user.must_change_password
-    refresh["impersonated_by"] = request.user.id
-
-    record_audit_event(
-        request=request,
-        action_category=AuditActionCategory.AUTH,
-        action_type="impersonation.issue_token",
-        target_type="accounts.User",
-        target=target_user,
-        target_id=str(target_user.pk),
-        target_display=target_user.email or target_user.username,
-        summary=f"Issued impersonation token for {target_user.email or target_user.username}.",
-        metadata={"impersonated_by": request.user.id},
-    )
-
-    response = Response(
-        {
-            "impersonated_user": UserSerializer(target_user).data,
-            "impersonator": UserSerializer(request.user).data,
-        },
-        status=status.HTTP_200_OK,
-    )
-    # Preserve the current admin tokens in backup cookies so they can be
-    # restored when impersonation ends, then overwrite main cookies with the
-    # impersonation tokens.
-    current_access = request.COOKIES.get(ACCESS_COOKIE, "")
-    current_refresh = request.COOKIES.get(REFRESH_COOKIE, "")
-    if current_access and current_refresh:
-        set_auth_cookies(
-            response,
-            access=current_access,
-            refresh=current_refresh,
-            access_cookie=ADMIN_ACCESS_COOKIE,
-            refresh_cookie=ADMIN_REFRESH_COOKIE,
-        )
-    set_auth_cookies(response, access=str(refresh.access_token), refresh=str(refresh))
-    return response
-
-
-@api_view(["POST"])
-@permission_classes([IsAuthenticated])
-def stop_impersonation(request):
-    """Restore the original admin tokens after ending an impersonation session."""
-    admin_access = request.COOKIES.get(ADMIN_ACCESS_COOKIE)
-    admin_refresh = request.COOKIES.get(ADMIN_REFRESH_COOKIE)
-    if not admin_access or not admin_refresh:
-        return Response({"detail": "No active impersonation session."}, status=status.HTTP_400_BAD_REQUEST)
-
-    response = Response({"detail": "Impersonation ended."})
-    set_auth_cookies(response, access=admin_access, refresh=admin_refresh)
-    clear_auth_cookies(response, access_cookie=ADMIN_ACCESS_COOKIE, refresh_cookie=ADMIN_REFRESH_COOKIE)
-    return response
 
 
 @api_view(["POST"])

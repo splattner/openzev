@@ -2,7 +2,7 @@ from django.urls import path
 from .views import (
     CustomTokenObtainPairView, CookieTokenRefreshView, logout_view,
     UserListCreateView,
-    UserDetailView, me, change_password, impersonate_participant, stop_impersonation, app_settings,
+    UserDetailView, me, change_password, app_settings,
     VatRateListCreateView, VatRateDetailView,
     feature_flags_list, feature_flag_update,
     register, verify_email, set_initial_password,
@@ -13,6 +13,7 @@ from .views import (
     oauth_callback, oauth_token_exchange,
     social_accounts_list, social_account_delete,
 )
+from .views_impersonation import ImpersonateParticipantView, StopImpersonationView
 
 urlpatterns = [
     path("token/", CustomTokenObtainPairView.as_view(), name="token_obtain_pair"),
@@ -22,8 +23,8 @@ urlpatterns = [
     path("verify-email/", verify_email, name="verify-email"),
     path("users/", UserListCreateView.as_view(), name="user-list-create"),
     path("users/<int:pk>/", UserDetailView.as_view(), name="user-detail"),
-    path("users/<int:user_id>/impersonate/", impersonate_participant, name="impersonate-participant"),
-    path("users/stop-impersonation/", stop_impersonation, name="stop-impersonation"),
+    path("users/<int:user_id>/impersonate/", ImpersonateParticipantView.as_view(), name="impersonate-participant"),
+    path("users/stop-impersonation/", StopImpersonationView.as_view(), name="stop-impersonation"),
     path("me/", me, name="me"),
     path("me/change-password/", change_password, name="change-password"),
     path("me/set-initial-password/", set_initial_password, name="set-initial-password"),
