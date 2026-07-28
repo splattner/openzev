@@ -4,6 +4,7 @@ All sensitive values are read from environment variables (or a .env file).
 """
 from pathlib import Path
 import environ
+from django.core.exceptions import ImproperlyConfigured
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -12,9 +13,18 @@ env = environ.Env(
 )
 environ.Env.read_env(BASE_DIR / ".env")
 
-SECRET_KEY = env("SECRET_KEY", default="dev-insecure-key-change-in-production")
+SECRET_KEY = env("SECRET_KEY", default="change-me-in-production-use-a-long-random-string")
 DEBUG = env("DEBUG")
 ALLOWED_HOSTS = env.list("ALLOWED_HOSTS", default=["localhost", "127.0.0.1"])
+
+# Fail fast if the insecure placeholder reaches a DEBUG=False deployment.
+_INSECURE_SECRET_KEY = "change-me-in-production-use-a-long-random-string"  # default above, .env.example & Helm
+if not DEBUG and SECRET_KEY == _INSECURE_SECRET_KEY:
+    raise ImproperlyConfigured(
+        "SECRET_KEY is an insecure placeholder; generate a long random key "
+        '(e.g. python -c "import secrets; print(secrets.token_urlsafe(64))") '
+        "and set it in the environment when DEBUG=False."
+    )
 
 # ── Applications ─────────────────────────────────────────────────────────────
 INSTALLED_APPS = [

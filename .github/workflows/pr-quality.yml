@@ -76,6 +76,9 @@ jobs:
             - name: Lint
               run: ruff check .
 
+            - name: Create .env from example
+              run: cp .env.example .env
+
             - name: Django system check
               run: python manage.py check
 
