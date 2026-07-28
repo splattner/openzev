@@ -11,7 +11,7 @@ Algorithm:
 import logging
 from datetime import date, datetime, timezone as tz, timedelta
 from decimal import Decimal, ROUND_HALF_UP
-from typing import NamedTuple
+from typing import Iterable, NamedTuple
 
 from django.db import models, transaction
 
@@ -84,6 +84,93 @@ def split_production(
     export_pool = max(zev_production_kwh - zev_consumption_kwh, Decimal("0"))
     producer_share = produced_kwh / zev_production_kwh
     return ProductionSplit(local_pool * producer_share, export_pool * producer_share)
+
+
+# ─── Pricing state ────────────────────────────────────────────────────────────
+
+
+class TariffResolver:
+    """Answers "which tariffs apply on this day" without rescanning the list.
+
+    The pricing loops ask that question once per reading, so the tariffs are
+    bucketed by billing mode and energy type up front and the per-day validity
+    filter is memoised. Only the two energy-priced modes are bucketed; fixed
+    fees are handled separately and once, not per reading.
+    """
+
+    def __init__(self, tariffs: Iterable[Tariff]):
+        self._energy: dict[str, list[Tariff]] = {}
+        self._percentage: dict[str, list[Tariff]] = {}
+        for tariff in tariffs:
+            if tariff.billing_mode == BillingMode.ENERGY:
+                self._energy.setdefault(tariff.energy_type, []).append(tariff)
+            elif tariff.billing_mode == BillingMode.PERCENTAGE_OF_ENERGY and tariff.percentage:
+                self._percentage.setdefault(tariff.energy_type, []).append(tariff)
+        self._active_cache: dict[tuple[str, str, date], list[Tariff]] = {}
+
+    def _active(self, bucket: str, buckets: dict, energy_type: str, day: date) -> list[Tariff]:
+        key = (bucket, energy_type, day)
+        if key not in self._active_cache:
+            self._active_cache[key] = [
+                tariff for tariff in buckets.get(energy_type, []) if _tariff_is_active(tariff, day)
+            ]
+        return self._active_cache[key]
+
+    def energy(self, energy_type: str, day: date) -> list[Tariff]:
+        """Tariffs priced per kWh of ``energy_type`` and valid on ``day``."""
+        return self._active("energy", self._energy, energy_type, day)
+
+    def percentage(self, energy_type: str, day: date) -> list[Tariff]:
+        """Tariffs charging a percentage of the grid rate, valid on ``day``."""
+        return self._active("pct", self._percentage, energy_type, day)
+
+
+class ItemAccumulator:
+    """Collects priced quantities per tariff until the invoice is written.
+
+    One tariff can produce more than one invoice line: a participant with a
+    bidirectional meter is charged for what they drew and credited for what
+    they sold under the same tariff, which is what ``bucket`` separates.
+
+    Iteration yields entries in the order they were first seen, which the
+    caller's stable sort relies on to break ties.
+    """
+
+    def __init__(self):
+        self._entries: dict[str, dict] = {}
+
+    def add(
+        self,
+        *,
+        tariff: Tariff,
+        quantity: Decimal,
+        total: Decimal,
+        unit: str,
+        base_total: Decimal | None = None,
+        bucket: str = "default",
+    ) -> None:
+        if quantity == 0 and total == 0:
+            return
+        key = f"{tariff.id}:{bucket}"
+        entry = self._entries.get(key)
+        if entry is None:
+            entry = self._entries[key] = {
+                "tariff": tariff,
+                "quantity": Decimal("0"),
+                "total": Decimal("0"),
+                "unit": unit,
+                "base_total": Decimal("0"),
+            }
+        entry["quantity"] += quantity
+        entry["total"] += total
+        if base_total is not None:
+            entry["base_total"] += base_total
+
+    def __iter__(self):
+        return iter(self._entries.values())
+
+    def __len__(self) -> int:
+        return len(self._entries)
 
 
 def _period_to_dt(d: date) -> datetime:
@@ -430,63 +517,12 @@ def generate_invoice(participant: Participant, period_start: date, period_end: d
     tariffs_list = list(
         Tariff.objects.filter(zev=zev).prefetch_related("periods")
     )
-    # Pre-bucket tariffs by billing mode + energy type so the per-reading
-    # loops below don't re-filter the full tariff list for every timestamp.
-    energy_tariffs_by_type: dict[str, list[Tariff]] = {}
-    pct_tariffs_by_type: dict[str, list[Tariff]] = {}
-    for t in tariffs_list:
-        if t.billing_mode == BillingMode.ENERGY:
-            energy_tariffs_by_type.setdefault(t.energy_type, []).append(t)
-        elif t.billing_mode == BillingMode.PERCENTAGE_OF_ENERGY and t.percentage:
-            pct_tariffs_by_type.setdefault(t.energy_type, []).append(t)
-
-    _active_cache: dict[tuple[str, str, date], list[Tariff]] = {}
-
-    def active_energy_tariffs_for(energy_type: str, day: date) -> list[Tariff]:
-        key = ("energy", energy_type, day)
-        if key not in _active_cache:
-            _active_cache[key] = [
-                t for t in energy_tariffs_by_type.get(energy_type, []) if _tariff_is_active(t, day)
-            ]
-        return _active_cache[key]
-
-    def active_pct_tariffs_for(energy_type: str, day: date) -> list[Tariff]:
-        key = ("pct", energy_type, day)
-        if key not in _active_cache:
-            _active_cache[key] = [
-                t for t in pct_tariffs_by_type.get(energy_type, []) if _tariff_is_active(t, day)
-            ]
-        return _active_cache[key]
+    tariffs = TariffResolver(tariffs_list)
     # ─── 7. Per-reading HT/NT-aware pricing with timestamp allocation ─────
     local_kwh_acc = Decimal("0")
     grid_kwh_acc = Decimal("0")
 
-    item_accumulators: dict[str, dict[str, Decimal | str | Tariff]] = {}
-
-    def accumulate_item(
-        *,
-        tariff: Tariff,
-        quantity: Decimal,
-        total: Decimal,
-        unit: str,
-        base_total: Decimal | None = None,
-        bucket: str = "default",
-    ) -> None:
-        if quantity == 0 and total == 0:
-            return
-        key = f"{tariff.id}:{bucket}"
-        if key not in item_accumulators:
-            item_accumulators[key] = {
-                "tariff": tariff,
-                "quantity": Decimal("0"),
-                "total": Decimal("0"),
-                "unit": unit,
-                "base_total": Decimal("0"),
-            }
-        item_accumulators[key]["quantity"] += quantity
-        item_accumulators[key]["total"] += total
-        if base_total is not None:
-            item_accumulators[key]["base_total"] += base_total
+    items_accumulator = ItemAccumulator()
 
     for reading in participant_readings.order_by("timestamp").iterator():
         ts = reading.timestamp
@@ -506,15 +542,15 @@ def generate_invoice(participant: Participant, period_start: date, period_end: d
         # what a participant would normally pay for grid energy.
         grid_base_price_sum = sum(
             (_get_tariff_price(t, ts) or Decimal("0"))
-            for t in active_energy_tariffs_for(EnergyType.GRID, ts.date())
+            for t in tariffs.energy(EnergyType.GRID, ts.date())
         )
 
         for energy_type, quantity in ((EnergyType.LOCAL, r_local), (EnergyType.GRID, r_grid)):
             if quantity <= 0:
                 continue
-            for tariff in active_energy_tariffs_for(energy_type, ts.date()):
+            for tariff in tariffs.energy(energy_type, ts.date()):
                 price = _get_tariff_price(tariff, ts) or Decimal("0")
-                accumulate_item(
+                items_accumulator.add(
                     tariff=tariff,
                     quantity=quantity,
                     total=quantity * price,
@@ -523,9 +559,9 @@ def generate_invoice(participant: Participant, period_start: date, period_end: d
 
             # Percentage-of-energy tariffs: base is always the GRID rate sum,
             # applied to whichever energy_type the tariff is configured for.
-            for tariff in active_pct_tariffs_for(energy_type, ts.date()):
+            for tariff in tariffs.percentage(energy_type, ts.date()):
                 effective_price = grid_base_price_sum * (tariff.percentage / Decimal("100"))
-                accumulate_item(
+                items_accumulator.add(
                     tariff=tariff,
                     quantity=quantity,
                     total=quantity * effective_price,
@@ -550,13 +586,13 @@ def generate_invoice(participant: Participant, period_start: date, period_end: d
 
         grid_base_price_sum = sum(
             (_get_tariff_price(t, ts) or Decimal("0"))
-            for t in active_energy_tariffs_for(EnergyType.GRID, ts.date())
+            for t in tariffs.energy(EnergyType.GRID, ts.date())
         )
 
         if local_sold_kwh > 0:
-            for tariff in active_energy_tariffs_for(EnergyType.LOCAL, ts.date()):
+            for tariff in tariffs.energy(EnergyType.LOCAL, ts.date()):
                 price = _get_tariff_price(tariff, ts) or Decimal("0")
-                accumulate_item(
+                items_accumulator.add(
                     tariff=tariff,
                     quantity=local_sold_kwh,
                     total=-(local_sold_kwh * price),
@@ -564,9 +600,9 @@ def generate_invoice(participant: Participant, period_start: date, period_end: d
                     bucket="producer_credit",
                 )
 
-            for tariff in active_pct_tariffs_for(EnergyType.LOCAL, ts.date()):
+            for tariff in tariffs.percentage(EnergyType.LOCAL, ts.date()):
                 effective_price = grid_base_price_sum * (tariff.percentage / Decimal("100"))
-                accumulate_item(
+                items_accumulator.add(
                     tariff=tariff,
                     quantity=local_sold_kwh,
                     total=-(local_sold_kwh * effective_price),
@@ -576,9 +612,9 @@ def generate_invoice(participant: Participant, period_start: date, period_end: d
                 )
 
         if exported_kwh > 0:
-            for tariff in active_energy_tariffs_for(EnergyType.FEED_IN, ts.date()):
+            for tariff in tariffs.energy(EnergyType.FEED_IN, ts.date()):
                 price = _get_tariff_price(tariff, ts) or Decimal("0")
-                accumulate_item(
+                items_accumulator.add(
                     tariff=tariff,
                     quantity=exported_kwh,
                     total=-(exported_kwh * price),
@@ -608,7 +644,7 @@ def generate_invoice(participant: Participant, period_start: date, period_end: d
                 continue
             unit_price = (tariff.fixed_price_chf or Decimal("0")) / Decimal("12")
 
-        accumulate_item(
+        items_accumulator.add(
             tariff=tariff,
             quantity=quantity,
             total=quantity * unit_price,
@@ -621,7 +657,7 @@ def generate_invoice(participant: Participant, period_start: date, period_end: d
 
     item_payloads = []
     subtotal = Decimal("0")
-    for accumulator in item_accumulators.values():
+    for accumulator in items_accumulator:
         tariff = accumulator["tariff"]
         quantity = Decimal(accumulator["quantity"])
         total = Decimal(accumulator["total"])
