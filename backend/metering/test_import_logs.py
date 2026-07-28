@@ -7,14 +7,10 @@ from decimal import Decimal
 from django.test import TestCase
 from rest_framework.test import APIClient
 
-from accounts.models import User, UserRole
+from accounts.models import UserRole
 from metering.models import ImportLog, ImportSource, MeterReading, ReadingDirection, ReadingResolution
-from testing.helpers import authenticate as auth
+from testing.helpers import authenticate as auth, make_user
 from zev.models import MeteringPoint, MeteringPointType, Participant, Zev
-
-
-def make_user(username, role, password="pass1234"):
-    return User.objects.create_user(username=username, password=password, role=role)
 
 
 class ImportLogDeletionTests(TestCase):

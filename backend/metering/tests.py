@@ -4,16 +4,12 @@ from decimal import Decimal
 from django.test import TestCase
 from rest_framework.test import APIClient
 
-from accounts.models import User, UserRole
+from accounts.models import UserRole
 from metering.models import MeterReading, ReadingDirection, ReadingResolution
 from zev.models import Zev, Participant, MeteringPoint, MeteringPointAssignment, MeteringPointType
 
 
-from testing.helpers import authenticate as auth
-
-
-def make_user(username, role, password="pass1234"):
-	return User.objects.create_user(username=username, password=password, role=role)
+from testing.helpers import authenticate as auth, make_user
 
 
 class DashboardSummaryAlignmentTests(TestCase):

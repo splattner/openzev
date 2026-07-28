@@ -10,10 +10,10 @@ from django.test import TestCase
 from django.utils import timezone
 from rest_framework.test import APIClient
 
-from accounts.models import User, UserRole
+from accounts.models import UserRole
 from audit.models import AuditEvent
 from tariffs.models import BillingMode, Tariff, TariffCategory
-from testing.helpers import authenticate as auth
+from testing.helpers import authenticate as auth, make_user
 from zev.models import (
     MeteringPoint,
     MeteringPointAssignment,
@@ -21,12 +21,6 @@ from zev.models import (
     Participant,
     Zev,
 )
-
-
-def make_user(username: str, role: str) -> User:
-    return User.objects.create_user(
-        username=username, email=f"{username}@example.com", password="pass1234", role=role
-    )
 
 
 class AuditSummaryParityTests(TestCase):

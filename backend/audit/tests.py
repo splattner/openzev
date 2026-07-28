@@ -5,7 +5,7 @@ from django.test import TestCase
 from django.utils import timezone
 from rest_framework.test import APIClient
 
-from accounts.models import FeatureFlag, User, UserRole
+from accounts.models import FeatureFlag, UserRole
 from metering.models import MeterReading
 from invoices.models import Invoice, InvoiceStatus
 from tariffs.models import Tariff, TariffCategory, BillingMode
@@ -22,11 +22,7 @@ from audit.services import (
 from zev.serializers import ParticipantSerializer
 
 
-from testing.helpers import authenticate as auth
-
-
-def make_user(username: str, role: str) -> User:
-    return User.objects.create_user(username=username, email=f"{username}@example.com", password="pass1234", role=role)
+from testing.helpers import authenticate as auth, make_user
 
 
 class AuditEventModelTests(TestCase):

@@ -6,17 +6,13 @@ from django.core import mail
 from django.test import override_settings
 from rest_framework.test import APIClient
 
-from accounts.models import User, UserRole
+from accounts.models import UserRole
 from zev.management.commands.seed_demo import previous_quarter, quarter_start
 from metering.models import MeterReading
 from zev.models import MeteringPoint, MeteringPointAssignment, MeteringPointType, Participant, Zev
 
 
-from testing.helpers import authenticate as auth
-
-
-def make_user(username, role, password="pass1234"):
-	return User.objects.create_user(username=username, password=password, role=role)
+from testing.helpers import authenticate as auth, make_user
 
 
 class ParticipantEndpointRestrictionTests(TestCase):
