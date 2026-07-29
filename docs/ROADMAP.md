@@ -96,6 +96,7 @@ PVshare Cockpit is a closed, subscription-based SaaS (CHF ~30/participant/year) 
 | Batch approve / cancel / delete invoices | `shipped` | — | — |
 | Invoice PDF generation with Swiss QR-Rechnung, savings chart, and hourly profile | `shipped` | — | [spec](specs/2026-03-invoice-lifecycle-and-communication.md) |
 | DB-stored PDF template with admin editor and revert-to-default | `shipped` | — | [spec](specs/2026-03-invoice-lifecycle-and-communication.md) |
+| Invoice bulk export — ZIP download of all period PDFs (`POST /invoices/invoices/download-pdfs/`) | `shipped` | — | [spec](specs/2026-03-invoice-lifecycle-and-communication.md) |
 | Asynchronous invoice email delivery via Celery (3 retries, `EmailLog`) | `shipped` | — | [spec](specs/2026-03-invoice-lifecycle-and-communication.md) |
 | Email retry for failed `EmailLog` entries | `shipped` | — | — |
 | Per-ZEV customizable email subject/body templates with 6 interpolation variables | `shipped` | — | [spec](specs/2026-03-invoice-lifecycle-and-communication.md) |
@@ -112,7 +113,6 @@ PVshare Cockpit is a closed, subscription-based SaaS (CHF ~30/participant/year) 
 | vZEV feasibility / profitability calculator (aggregate or per-participant, energy-flow topology, self-consumption & internal-price sensitivity, payback/ROI/NPV, prefill of a real ZEV's participants, measured self-consumption, and all-in tariffs) | `shipped` | — | [guide](user-guide/13-feasibility-calculator.md) |
 | Scheduled invoice auto-generation (cron-triggered, per-ZEV billing interval) | `idea` | `medium` | Would remove the manual "generate all" step each month |
 | Payment reference number / ESR reference on invoice | `idea` | `medium` | Needed for automated bank reconciliation in Swiss setup |
-| Invoice bulk export — ZIP of all PDFs for a period | `idea` | `medium` | Useful for accountants and year-end archival |
 | Invoice data export — CSV export of invoice line items | `idea` | `low` | Useful for external accounting software |
 | Mark invoice as disputed / on-hold state | `idea` | `low` | Would require an extra lifecycle state and guard |
 | Credit note / corrective invoice generation | `idea` | `low` | Complex billing edge case; needs dedicated spec |

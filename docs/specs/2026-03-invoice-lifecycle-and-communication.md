@@ -223,6 +223,9 @@ the same module.
 | `POST` | `/invoices/{id}/generate-pdf/` | `IsZevOwnerOrAdmin` | Generate/regenerate PDF; returns `{pdf_url}` |
 | `POST` | `/invoices/{id}/send-email/` | `IsZevOwnerOrAdmin` | Queue email to participant (optional `email` override); returns `{detail}` |
 | `POST` | `/invoices/{id}/retry-email/{email_log_id}/` | `IsZevOwnerOrAdmin` | Re-queue a failed email; `400` if already sent |
+| `POST` | `/invoices/approve-all/` | `IsZevOwnerOrAdmin` | Approve all draft invoices for a ZEV period (`zev_id`, `period_start`, `period_end`); returns `{approved}`; audit-logged (`invoice.approve_all`) |
+| `POST` | `/invoices/send-all/` | `IsZevOwnerOrAdmin` | Queue emails for all approved invoices in a ZEV period; returns `{queued, skipped}`; audit-logged (`invoice.send_all`, status `queued`) |
+| `POST` | `/invoices/download-pdfs/` | `IsZevOwnerOrAdmin` | Download all period invoice PDFs as a single ZIP (`{invoice_number}.pdf` entries); `404` when the period has no PDFs |
 
 ### 5.5 Period overview
 
