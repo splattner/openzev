@@ -3,6 +3,7 @@ from datetime import date
 from django.db import models
 from django.conf import settings
 from django.core.exceptions import ValidationError
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.utils import timezone
 
 DEFAULT_EMAIL_SUBJECT_TEMPLATE = "Invoice {invoice_number} \u2013 {zev_name}"
@@ -60,6 +61,11 @@ class Zev(models.Model):
         default=InvoiceLanguage.DE,
         help_text="Language used when generating invoice PDFs",
     )
+    payment_term_days = models.PositiveIntegerField(
+        default=30,
+        validators=[MinValueValidator(1), MaxValueValidator(365)],
+        help_text="Number of days after invoice generation (issue date) until payment is due",
+    )
     bank_iban = models.CharField(max_length=34, blank=True, help_text="IBAN for QR-Rechnung")
     bank_name = models.CharField(max_length=200, blank=True)
     vat_number = models.CharField(max_length=50, blank=True)
@@ -72,7 +78,7 @@ class Zev(models.Model):
             "Subject line template for invoice emails. "
             "Leave blank to use the system default. "
             "Available variables: {invoice_number}, {zev_name}, {participant_name}, "
-            "{period_start}, {period_end}, {total_chf}."
+            "{period_start}, {period_end}, {due_date}, {total_chf}."
         ),
     )
     email_body_template = models.TextField(
@@ -82,7 +88,7 @@ class Zev(models.Model):
             "Body template for invoice emails. "
             "Leave blank to use the system default. "
             "Available variables: {invoice_number}, {zev_name}, {participant_name}, "
-            "{period_start}, {period_end}, {total_chf}."
+            "{period_start}, {period_end}, {due_date}, {total_chf}."
         ),
     )
     local_tariff_notes = models.TextField(

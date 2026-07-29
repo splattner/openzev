@@ -81,6 +81,7 @@ export interface Zev {
     billing_interval: string
     invoice_prefix?: string
     invoice_language?: 'de' | 'fr' | 'it' | 'en'
+    payment_term_days?: number
     bank_iban?: string
     bank_name?: string
     vat_number?: string
@@ -101,6 +102,7 @@ export interface ZevInput {
     billing_interval: 'monthly' | 'quarterly' | 'semi_annual' | 'annual'
     invoice_prefix?: string
     invoice_language?: 'de' | 'fr' | 'it' | 'en'
+    payment_term_days?: number
     bank_iban?: string
     bank_name?: string
     vat_number?: string

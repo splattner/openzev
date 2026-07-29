@@ -1,4 +1,5 @@
 from accounts.models import AppSettings, UserRole
+from datetime import date
 from django.core import mail
 from django.core.files.base import ContentFile
 from django.test import TestCase
@@ -49,3 +50,37 @@ class InvoiceEmailFormattingTests(TestCase):
         self.assertEqual(mail.outbox[0].subject, f"[{zev.name}] Invoice {invoice.invoice_number}")
         self.assertIn(f"Hello {participant.full_name}", mail.outbox[0].body)
         self.assertIn("total", mail.outbox[0].body)
+
+    def test_email_includes_due_date_variable(self):
+        owner = make_user("email_due_owner", UserRole.ZEV_OWNER)
+        zev = make_zev(owner, "Due Date ZEV")
+        zev.email_body_template = "Due: {due_date}"
+        zev.save(update_fields=["email_body_template"])
+
+        participant = make_participant(zev, first="Due", last="Date")
+        invoice = make_invoice(zev, participant, InvoiceStatus.APPROVED)
+        invoice.due_date = date(2026, 2, 15)
+        invoice.save(update_fields=["due_date"])
+        invoice.pdf_file.save("invoice_test.pdf", ContentFile(b"PDF"), save=True)
+
+        send_invoice_email_task.run(str(invoice.pk), "recipient@example.com")
+
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn("Due: 15.02.2026", mail.outbox[0].body)
+
+    def test_email_due_date_empty_when_not_set(self):
+        owner = make_user("email_due_none_owner", UserRole.ZEV_OWNER)
+        zev = make_zev(owner, "No Due ZEV")
+        zev.email_body_template = "Due: [{due_date}]"
+        zev.save(update_fields=["email_body_template"])
+
+        participant = make_participant(zev, first="No", last="Due")
+        invoice = make_invoice(zev, participant, InvoiceStatus.APPROVED)
+        invoice.due_date = None
+        invoice.save(update_fields=["due_date"])
+        invoice.pdf_file.save("invoice_test.pdf", ContentFile(b"PDF"), save=True)
+
+        send_invoice_email_task.run(str(invoice.pk), "recipient@example.com")
+
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn("Due: []", mail.outbox[0].body)

@@ -1,7 +1,8 @@
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 
 from django.test import TestCase
+from django.utils.timezone import localdate
 
 from accounts.models import User, UserRole
 from metering.models import MeterReading, ReadingDirection
@@ -92,6 +93,14 @@ class InvoiceEngineTests(TestCase):
         self.assertEqual(invoice.subtotal_chf, Decimal("1.00"))
         self.assertEqual(invoice.total_chf, Decimal("1.00"))
         self.assertEqual(invoice.items.count(), 3)
+
+    def test_generate_invoice_sets_due_date_from_zev_payment_term(self):
+        self.zev.payment_term_days = 14
+        self.zev.save(update_fields=["payment_term_days"])
+
+        invoice = generate_invoice(self.participant, date(2026, 1, 1), date(2026, 1, 31))
+
+        self.assertEqual(invoice.due_date, localdate() + timedelta(days=14))
 
     def test_generate_invoice_separates_categories_and_fixed_fees(self):
         grid_tariff = Tariff.objects.create(

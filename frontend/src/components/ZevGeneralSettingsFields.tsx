@@ -81,6 +81,20 @@ export function ZevGeneralSettingsFields({ form, onChange }: ZevGeneralSettingsF
                             <option value="en">English</option>
                         </select>
                     </label>
+                    <label>
+                        <span>{t('pages.zevSettings.fields.paymentTermDays')}</span>
+                        <input
+                            type="number"
+                            min={1}
+                            max={365}
+                            step={1}
+                            value={form.payment_term_days ?? 30}
+                            onChange={(event) => {
+                                const raw = event.target.value
+                                onChange({ payment_term_days: raw === '' ? undefined : Number(raw) })
+                            }}
+                        />
+                    </label>
                 </div>
             </div>
 

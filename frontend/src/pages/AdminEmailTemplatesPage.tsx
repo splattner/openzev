@@ -156,6 +156,7 @@ export function AdminEmailTemplatesPage() {
         { variable: '{participant_name}', description: t('admin.emailTemplates.fields.participantName') },
         { variable: '{period_start}', description: t('admin.emailTemplates.fields.periodStart') },
         { variable: '{period_end}', description: t('admin.emailTemplates.fields.periodEnd') },
+        { variable: '{due_date}', description: t('admin.emailTemplates.fields.dueDate') },
         { variable: '{total_chf}', description: t('admin.emailTemplates.fields.totalChf') },
     ]
 

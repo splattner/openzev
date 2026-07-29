@@ -3,6 +3,7 @@ from unittest import mock
 
 from django.test import TestCase
 from django.core import mail
+from django.core.exceptions import ValidationError
 from django.test import override_settings
 from rest_framework.test import APIClient
 
@@ -13,6 +14,48 @@ from zev.models import MeteringPoint, MeteringPointAssignment, MeteringPointType
 
 
 from testing.helpers import authenticate as auth, make_user
+
+
+class ZevPaymentTermTests(TestCase):
+	def setUp(self):
+		self.client = APIClient()
+		self.admin = make_user("payterm_admin", UserRole.ADMIN)
+		self.owner = make_user("payterm_owner", UserRole.ZEV_OWNER)
+		self.zev = Zev.objects.create(name="PayTerm ZEV", owner=self.owner)
+
+	def test_payment_term_days_defaults_to_30(self):
+		self.assertEqual(self.zev.payment_term_days, 30)
+
+	def test_payment_term_days_validators_reject_out_of_range(self):
+		for invalid in (0, 366):
+			self.zev.payment_term_days = invalid
+			with self.assertRaises(ValidationError):
+				self.zev.full_clean()
+		self.zev.payment_term_days = 14
+		self.zev.full_clean()  # in range - should not raise
+
+	def test_api_patch_accepts_valid_payment_term(self):
+		auth(self.client, self.admin)
+		resp = self.client.patch(
+			f"/api/v1/zev/zevs/{self.zev.id}/",
+			{"payment_term_days": 14},
+			format="json",
+		)
+		self.assertEqual(resp.status_code, 200)
+		self.zev.refresh_from_db()
+		self.assertEqual(self.zev.payment_term_days, 14)
+
+	def test_api_patch_rejects_out_of_range_payment_term(self):
+		auth(self.client, self.admin)
+		for invalid in (0, 366):
+			resp = self.client.patch(
+				f"/api/v1/zev/zevs/{self.zev.id}/",
+				{"payment_term_days": invalid},
+				format="json",
+			)
+			self.assertEqual(resp.status_code, 400)
+		self.zev.refresh_from_db()
+		self.assertEqual(self.zev.payment_term_days, 30)
 
 
 class ParticipantEndpointRestrictionTests(TestCase):

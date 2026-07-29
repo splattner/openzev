@@ -69,7 +69,7 @@ lifecycle from scratch.
 | `total_chf` | `Decimal(10,2)` | `subtotal_chf + vat_chf` |
 | `pdf_file` | `FileField` | Uploaded PDF path (`invoices/pdf/`) |
 | `sent_at` | `DateTimeField` (nullable) | Timestamp of most recent email send |
-| `due_date` | `DateField` (nullable) | Payment due date |
+| `due_date` | `DateField` (nullable) | Payment due date. Set at generation to the generation date + `Zev.payment_term_days` (per-ZEV, default 30, min 1) |
 | `notes` | `TextField` | Free text |
 | `created_at` | `DateTimeField` (auto) | Creation timestamp |
 | `updated_at` | `DateTimeField` (auto) | Last modification timestamp |
@@ -198,7 +198,7 @@ All invoice endpoints are routed under `/api/v1/invoices/invoices/` via a DRF `G
 | `POST` | `/invoices/generate-all/` | `IsZevOwnerOrAdmin` | `{zev_id, period_start, period_end}` | `202` with `{detail, queued: true, participant_count}` — generation runs asynchronously via Celery (`generate_zev_invoices_task`); failures (e.g. locked invoices) are recorded as audit events with `source = celery` |
 | `POST` | `/invoices/generate-pdfs-all/` | `IsZevOwnerOrAdmin` | `{zev_id, period_start, period_end}` | `202` with `{detail, queued: true, invoice_count}` — PDF rendering runs asynchronously via Celery (`generate_zev_pdfs_task`) |
 
-Validation: `period_start` must be before `period_end`.
+Validation: `period_start` must be before `period_end`. On creation the engine also sets `due_date = generation date + Zev.payment_term_days` (per-ZEV, default 30, min 1; see the admin-governance spec §4.3).
 
 ### 5.3 Lifecycle transitions
 
@@ -356,6 +356,7 @@ Email subjects and bodies use customizable templates stored on the `Zev` model:
 | `{participant_name}` | Participant's full name |
 | `{period_start}` | Formatted per `AppSettings.date_format_short` |
 | `{period_end}` | Formatted per `AppSettings.date_format_short` |
+| `{due_date}` | Payment due date, formatted per `AppSettings.date_format_short`; empty string if the invoice has no `due_date` |
 | `{total_chf}` | Invoice total amount |
 
 If custom template rendering fails (e.g. `KeyError`), the system falls back to

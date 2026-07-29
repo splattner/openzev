@@ -14,6 +14,7 @@ from decimal import Decimal, ROUND_HALF_UP
 from typing import Iterable, NamedTuple
 
 from django.db import models, transaction
+from django.utils import timezone
 
 from accounts.models import VatRate
 from zev.models import Zev, Participant, MeteringPoint, MeteringPointType, MeteringPointAssignment
@@ -878,6 +879,7 @@ def generate_invoice(participant: Participant, period_start: date, period_end: d
         vat_rate=vat_rate,
         vat_chf=vat_chf,
         total_chf=total_chf,
+        due_date=timezone.localdate() + timedelta(days=zev.payment_term_days),
     )
 
     # ─── 9. Create line items ─────────────────────────────────────────────

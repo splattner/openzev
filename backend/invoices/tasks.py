@@ -56,6 +56,7 @@ def send_invoice_email_task(self, invoice_id: str, recipient_email: str = None):
     app_settings = AppSettings.load()
     formatted_period_start = _format_date_value(invoice.period_start, app_settings.date_format_short)
     formatted_period_end = _format_date_value(invoice.period_end, app_settings.date_format_short)
+    formatted_due_date = _format_date_value(invoice.due_date, app_settings.date_format_short) if invoice.due_date else ""
 
     from zev.models import DEFAULT_EMAIL_SUBJECT_TEMPLATE, DEFAULT_EMAIL_BODY_TEMPLATE
     from .models import EmailTemplate
@@ -67,6 +68,7 @@ def send_invoice_email_task(self, invoice_id: str, recipient_email: str = None):
         "period_start": formatted_period_start,
         "period_end": formatted_period_end,
         "total_chf": invoice.total_chf,
+        "due_date": formatted_due_date,
     }
 
     # Resolution order: per-ZEV override → admin global override → hardcoded default

@@ -115,6 +115,7 @@ Singleton pattern with `pk=1` enforced by `save()` plus a `singleton_enforcer = 
 | `invoice_prefix` | CharField(10) | `INV` | Used in `next_invoice_number()` |
 | `invoice_counter` | PositiveIntegerField | `1` | Auto-incremented atomically via `F()` expression |
 | `invoice_language` | CharField(2) | `de` | Choices: `de`, `fr`, `it`, `en` (from `InvoiceLanguage` TextChoices). Used for PDF + contract translation lookups. |
+| `payment_term_days` | PositiveIntegerField | `30` | Days after invoice generation (issue date) until payment is due. Validators: min 1, max 365. The engine uses it to set `Invoice.due_date` at generation. |
 | `bank_iban` | CharField(34) | blank | For QR-Rechnung generation |
 | `bank_name` | CharField(200) | blank | |
 | `vat_number` | CharField(50) | blank | If non-empty, VAT is applied to invoices |
@@ -219,7 +220,7 @@ interface PdfTemplateResponse {
 |---|---|---|---|
 | `/api/v1/zev/zevs/{id}/` | PATCH | `IsAdmin` or `IsZevOwner` | Partial update of any Zev field including billing, email templates, contract notes |
 
-Handled by `ZevViewSet` with `ZevSerializer`. All Zev fields (billing_interval, invoice_prefix, invoice_language, bank_iban, bank_name, vat_number, email_subject_template, email_body_template, local_tariff_notes, additional_contract_notes, notes) are writable.
+Handled by `ZevViewSet` with `ZevSerializer`. All Zev fields (billing_interval, invoice_prefix, invoice_language, payment_term_days, bank_iban, bank_name, vat_number, email_subject_template, email_body_template, local_tariff_notes, additional_contract_notes, notes) are writable.
 
 ---
 
