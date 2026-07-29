@@ -28,7 +28,7 @@ This file gives coding agents the minimum project-specific context needed to wor
 From `backend/`:
 
 - Activate venv: `source ../.venv/bin/activate`
-- Run tests: `python -m pytest metering/ accounts/ invoices/ -q`
+- Run tests: `python -m pytest -q`
 - Run invoice tests only: `python -m pytest invoices/tests.py -q`
 
 ### Frontend
@@ -101,8 +101,8 @@ For detailed guidance, see `docs/specs/README.md` and `docs/adr/README.md`.
 
 After relevant changes:
 
-- Backend: run `python -m pytest metering/ accounts/ invoices/ -q`
-- Frontend: run `npm run build`
+- Backend: run `python -m pytest -q`
+- Frontend: run `npm run test:unit` and `npm run build`
 
 ## Safe Editing Guidance
 

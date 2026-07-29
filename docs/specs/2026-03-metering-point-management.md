@@ -406,7 +406,7 @@ Tests are distributed across `metering/tests.py` and the invoice test suite.
 
 Test commands:
 ```
-python -m pytest metering/ accounts/ invoices/ -q
+python -m pytest -q
 ```
 
 ### Frontend
