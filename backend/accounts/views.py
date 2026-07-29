@@ -146,6 +146,20 @@ class UserDetailView(AuditedUpdateMixin, generics.RetrieveUpdateDestroyAPIView):
         return instance.email or instance.username
 
     def perform_destroy(self, instance):
+        user_display = instance.email or instance.username
+        if instance.is_admin and not User.objects.filter(role=UserRole.ADMIN).exclude(pk=instance.pk).exists():
+            record_audit_event(
+                request=self.request,
+                action_category=AuditActionCategory.AUTH,
+                action_type="user.delete",
+                target_type="accounts.User",
+                target=instance,
+                target_id=str(instance.pk),
+                target_display=user_display,
+                summary=f"Denied deletion of last admin {user_display}.",
+                status=AuditEventStatus.DENIED,
+            )
+            raise PermissionDenied("Cannot delete the last admin account.")
         if instance.participations.exists():
             record_audit_event(
                 request=self.request,
@@ -154,14 +168,14 @@ class UserDetailView(AuditedUpdateMixin, generics.RetrieveUpdateDestroyAPIView):
                 target_type="accounts.User",
                 target=instance,
                 target_id=str(instance.pk),
-                target_display=instance.email or instance.username,
-                summary=f"Denied deletion of linked user {instance.email or instance.username}.",
+                target_display=user_display,
+                summary=f"Denied deletion of linked user {user_display}.",
                 status=AuditEventStatus.DENIED,
             )
             raise PermissionDenied("Linked participant accounts cannot be deleted.")
-        user_display = instance.email or instance.username
         user_id = str(instance.pk)
-        instance.delete()
+        # Record before delete so the actor FK is valid;
+        # on_delete=SET_NULL nullifies it when the user row goes.
         record_audit_event(
             request=self.request,
             action_category=AuditActionCategory.AUTH,
@@ -171,6 +185,7 @@ class UserDetailView(AuditedUpdateMixin, generics.RetrieveUpdateDestroyAPIView):
             target_display=user_display,
             summary=f"Deleted user {user_display}.",
         )
+        instance.delete()
 
 
 class VatRateListCreateView(generics.ListCreateAPIView):

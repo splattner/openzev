@@ -32,7 +32,7 @@ const defaultEditUserForm: UserInput = {
 
 export function AdminAccountsPage() {
     const queryClient = useQueryClient()
-    const { user: currentUser, startImpersonation } = useAuth()
+    const { user: currentUser, startImpersonation, logout } = useAuth()
     const { pushToast } = useToast()
     const { t } = useTranslation()
     const { dialog, confirm, handleConfirm, handleCancel, isLoading: dialogLoading } = useConfirmDialog()
@@ -118,8 +118,12 @@ export function AdminAccountsPage() {
 
     const deleteUserMutation = useMutation({
         mutationFn: (userId: number) => deleteUser(userId),
-        onSuccess: () => {
+        onSuccess: (_data, deletedUserId) => {
             pushToast(t('pages.accounts.feedback.deleteSuccess'), 'success')
+            if (deletedUserId === currentUser?.id) {
+                logout()
+                return
+            }
             void queryClient.invalidateQueries({ queryKey: queryKeys.auth.users() })
             void queryClient.invalidateQueries({ queryKey: queryKeys.zev.participants() })
         },

@@ -330,9 +330,16 @@ Admin only. Passwords must match. Created via `User.objects.create_user()`.
 - PATCH: `UserSerializer` partial update. Role-change safety:
   - Admin cannot change own role away from admin.
   - Non-admin cannot change any role.
-- DELETE: blocked if user has linked participant records
-  (`instance.participations.exists()` → 403 "Linked participant accounts
-  cannot be deleted.").
+- DELETE: two guards:
+  1. **Last-admin guard** — blocked if the target `is_admin` and no other
+     user with `role=admin` exists (→ 403 "Cannot delete the last admin
+     account."). Self-deletion is allowed when another admin remains.
+  2. **Linked-account guard** — blocked if user has linked participant records
+     (→ 403 "Linked participant accounts cannot be deleted.").
+
+  Success audit is recorded before `instance.delete()` so the actor FK is
+  valid; `on_delete=SET_NULL` nullifies `actor_user` on self-deletion while
+  preserving `actor_display` and `target_id`.
 
 ---
 
@@ -547,7 +554,7 @@ The sidebar (`Layout.tsx`) shows sections conditionally:
 | POST | `/me/change-password/` | IsAuthenticated | Change password (requires old password) |
 | POST | `/me/set-initial-password/` | IsAuthenticated | Set password for first time (verification flow) |
 | GET / POST | `/users/` | IsAuthenticated (create: admin only) | List users (scoped by role) / Create user |
-| GET / PATCH / DELETE | `/users/{id}/` | IsAdmin | User detail (delete blocked if linked) |
+| GET / PATCH / DELETE | `/users/{id}/` | IsAdmin | User detail (delete blocked if linked or last admin) |
 | POST | `/users/{user_id}/impersonate/` | IsAuthenticated (admin only) | Impersonate participant/owner |
 | GET / PATCH | `/app-settings/` | IsAuthenticated (update: admin only) | Application settings singleton |
 | GET / POST | `/vat-rates/` | IsAdmin | VAT rate management |
@@ -754,10 +761,10 @@ interface ParticipantAccountCreateResult { participant: Participant; account: Us
 
 | Class | Tests | Description |
 |---|---|---|
-| `UserModelTests` | 1 | Role helper properties (`is_admin`, `is_zev_owner`) |
+| `UserModelTests` | 3 | Role helper properties; superuser creation sets `role=ADMIN`; superuser creation rejects non-admin role |
 | `PasswordChangeFlagTests` | 1 | `must_change_password` cleared on password change |
 | `ImpersonationTests` | 4 | Admin can impersonate participant/owner; non-admin blocked; admin cannot impersonate admin |
-| `LinkedAccountSafetyTests` | 5 | Admin can edit linked account; cannot delete linked; can delete unlinked; cannot change own role (via both detail and me endpoints) |
+| `LinkedAccountSafetyTests` | 8 | Admin can edit linked account; cannot delete linked; can delete unlinked; cannot delete last admin (with audit-denied assertion); can delete self when other admin exists (with audit actor SET_NULL assertion); can delete other admin when multiple exist; cannot change own role (via both detail and me endpoints) |
 | `AppSettingsTests` | 3 | Authenticated user reads settings; admin updates; non-admin cannot update |
 | `VatRateSettingsTests` | 4 | Admin CRUD; non-admin blocked; overlap rejection; valid_to validation |
 | `RbacEndpointMatrixTests` | 6 | Full list/create/update/action-delete/unauthenticated matrix across all endpoints |
@@ -809,7 +816,8 @@ interface ParticipantAccountCreateResult { participant: Participant; account: Us
 8. Participant creation auto-provisions a linked user account with temporary
    password.
 9. Account linking is admin-only; unlink demotes to `guest`; delete blocked for
-   linked accounts.
+   linked accounts and for the last admin. `create_superuser` enforces
+   `role=ADMIN`, so the `role` column is the canonical admin count.
 10. ZEV creation wizard atomically creates ZEV + owner user + owner participant
     + metering points + assignments.
 11. Owner transfer promotes new owner and demotes previous owner if they no

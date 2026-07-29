@@ -16,6 +16,7 @@ from .models import (
 	UserRole,
 	VatRate,
 )
+from audit.models import AuditEvent
 from invoices.models import Invoice, InvoiceStatus
 from zev.models import MeteringPoint, MeteringPointAssignment, MeteringPointType, Participant, Zev
 from datetime import date, timedelta
@@ -55,6 +56,7 @@ class UserModelTests(TestCase):
 				password="super-secret",
 				role=UserRole.PARTICIPANT,
 			)
+
 
 
 def _cookie_auth(client, username, password="pass1234"):
@@ -345,6 +347,38 @@ class LinkedAccountSafetyTests(TestCase):
 
 		self.assertEqual(update_resp.status_code, 200)
 		self.assertEqual(delete_resp.status_code, 204)
+
+	def test_admin_cannot_delete_last_admin(self):
+		resp = self.client.delete(f"/api/v1/auth/users/{self.admin.id}/")
+		self.assertEqual(resp.status_code, 403)
+		self.assertTrue(User.objects.filter(pk=self.admin.pk).exists())
+		self.assertTrue(
+			AuditEvent.objects.filter(
+				action_type="user.delete",
+				status="denied",
+				target_id=str(self.admin.pk),
+			).exists()
+		)
+
+	def test_admin_can_delete_self_when_other_admin_exists(self):
+		User.objects.create_user(username="admin_two", password="pass1234", role=UserRole.ADMIN)
+		admin_pk = self.admin.pk
+		admin_display = self.admin.email or self.admin.username
+		resp = self.client.delete(f"/api/v1/auth/users/{admin_pk}/")
+		self.assertEqual(resp.status_code, 204)
+		self.assertFalse(User.objects.filter(pk=admin_pk).exists())
+		# Audit event survives self-deletion; actor FK is SET_NULL.
+		event = AuditEvent.objects.get(
+			action_type="user.delete", target_id=str(admin_pk), status="success",
+		)
+		self.assertEqual(event.target_display, admin_display)
+		self.assertIsNone(event.actor_user)
+
+	def test_admin_can_delete_other_admin_when_multiple_exist(self):
+		admin2 = User.objects.create_user(username="admin_two", password="pass1234", role=UserRole.ADMIN)
+		resp = self.client.delete(f"/api/v1/auth/users/{admin2.id}/")
+		self.assertEqual(resp.status_code, 204)
+		self.assertFalse(User.objects.filter(pk=admin2.pk).exists())
 
 	def test_admin_cannot_change_own_role_via_user_detail(self):
 		resp = self.client.patch(
