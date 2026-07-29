@@ -1,7 +1,9 @@
 import axios from 'axios'
 import MockAdapter from 'axios-mock-adapter'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { api } from '../src/lib/api/client'
+import { api, API_BASE_URL } from '../src/lib/api/client'
+
+const REFRESH_URL = `${API_BASE_URL}/auth/token/refresh/`
 
 describe('api refresh interceptor', () => {
   let apiMock: MockAdapter
@@ -24,19 +26,19 @@ describe('api refresh interceptor', () => {
       .onGet('/protected')
       .reply(200, { ok: true })
 
-    axiosMock.onPost('/api/v1/auth/token/refresh/').reply(200)
+    axiosMock.onPost(REFRESH_URL).reply(200)
 
     const response = await api.get('/protected')
 
     expect(response.data.ok).toBe(true)
     // The refresh endpoint is called exactly once, with no body (the httpOnly cookie carries the token).
     expect(axiosMock.history.post).toHaveLength(1)
-    expect(axiosMock.history.post[0].url).toBe('/api/v1/auth/token/refresh/')
+    expect(axiosMock.history.post[0].url).toBe(REFRESH_URL)
   })
 
   it('propagates the error when the refresh request fails', async () => {
     apiMock.onGet('/protected').replyOnce(401)
-    axiosMock.onPost('/api/v1/auth/token/refresh/').reply(401)
+    axiosMock.onPost(REFRESH_URL).reply(401)
 
     await expect(api.get('/protected')).rejects.toBeDefined()
   })
@@ -52,7 +54,7 @@ describe('api refresh interceptor', () => {
   it('reuses one refresh request for concurrent 401 responses', async () => {
     apiMock.onGet('/protected-a').replyOnce(401).onGet('/protected-a').reply(200, { ok: 'a' })
     apiMock.onGet('/protected-b').replyOnce(401).onGet('/protected-b').reply(200, { ok: 'b' })
-    axiosMock.onPost('/api/v1/auth/token/refresh/').reply(200)
+    axiosMock.onPost(REFRESH_URL).reply(200)
 
     const [responseA, responseB] = await Promise.all([api.get('/protected-a'), api.get('/protected-b')])
 
