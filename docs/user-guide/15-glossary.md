@@ -57,7 +57,7 @@ Energy produced by a participant (e.g., from solar panels) that is fed back to t
 Price per kWh credited for participant production fed back.
 
 **Fixed Fee**
-Flat monthly, quarterly, or annual charge (not energy-based). Examples: community admin fee, meter maintenance fee. See [Tariff Configuration](07-tariff-configuration.md).
+Flat monthly, quarterly, or annual charge (not energy-based). Examples: community admin fee, meter maintenance fee. Charged to each participant, per metering point, or divided between participants — see **Shared Fee** and [Tariff Configuration](07-tariff-configuration.md).
 
 **Flat Rate**
 Constant price per kWh throughout the day/period. Contrast with HT/NT (time-of-use).
@@ -146,10 +146,13 @@ The fraction of local energy vs. total consumption. Example: 60 kWh local ÷ 100
 **Sent Invoice**
 Invoice delivered to participant (email sent). Status: `Sent`. See [Invoice Management](09-invoice-management.md).
 
+**Shared Fee**
+A fixed fee where the configured amount is what the **whole community** pays, divided between the participants active in each billed month — rather than what each participant pays. Used for jointly carried costs such as a caretaker contract or insurance. See [Tariff Configuration](07-tariff-configuration.md#shared-fees).
+
 ## T
 
 **Tariff**
-Pricing rule for energy or fixed fees. Can be energy tariff (per kWh) or fixed fee (monthly/yearly). See [Tariff Configuration](07-tariff-configuration.md).
+Pricing rule for energy or fixed fees. Can be energy tariff (per kWh) or fixed fee (monthly/yearly, per metering point, or shared). See [Tariff Configuration](07-tariff-configuration.md).
 
 **Tariff Period**
 Time-of-day subdivision of a tariff (e.g., HT 06:00–22:00, NT 22:00–06:00). See [Tariff Configuration](07-tariff-configuration.md).

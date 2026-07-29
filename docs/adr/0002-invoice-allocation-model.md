@@ -14,6 +14,8 @@ Adopt timestamp-level allocation as the core billing model.
 - Compute participant allocations from metering data at fine-grained timestamps.
 - Apply tariff logic on top of allocated energy according to tariff category and billing mode.
 - For per-metering-point recurring fees, count only assignment-backed metering points active in the billing period.
+- For shared (community-split) recurring fees, divide the community-wide amount by the participants active in **each billed month**, and charge a participant only for the months they were a member. Both sides are evaluated per month so that the fee reconciles across a full ZEV run regardless of mid-period membership changes.
+- Allocation is never force-balanced. Where a share does not divide evenly — an indivisible local-energy pool, or a fee that does not split into whole centimes — the remainder stays where it falls rather than being reassigned to a chosen participant.
 
 ## Consequences
 

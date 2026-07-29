@@ -34,7 +34,7 @@ re-implement the engine from scratch.
 | Timestamp-level allocation | Local vs. grid energy split per 15-min / hourly reading |
 | Consumer pricing | Energy tariffs, percentage-of-energy tariffs |
 | Producer credits | Local-energy revenue credit and feed-in compensation |
-| Fixed-fee billing | Monthly, yearly, per-metering-point monthly, per-metering-point yearly |
+| Fixed-fee billing | Monthly, yearly, per-metering-point monthly/yearly, shared monthly/yearly |
 | Rounding | kWh precision, CHF precision, unit-price precision |
 | VAT | Conditional application, rate resolution |
 | Invoice construction | Line items, sort order, description templates, subtotals |
@@ -109,6 +109,13 @@ OpenZEV rejects overlapping validity windows for the same tuple of:
 | `yearly_fee` | Number of billable months | `fixed_price_chf / 12` | `month` |
 | `per_metering_point_monthly_fee` | Sum of metering-point-months | `fixed_price_chf` | `month` |
 | `per_metering_point_yearly_fee` | Sum of metering-point-months | `fixed_price_chf / 12` | `month` |
+| `shared_monthly_fee` | Number of charged months (see §4.6.3) | Derived: `fixed_price_chf` divided per month by that month's participant count | `month` |
+| `shared_yearly_fee` | Number of charged months (see §4.6.3) | Derived: `fixed_price_chf / 12` divided per month by that month's participant count | `month` |
+
+> **`fixed_price_chf` changes meaning for the two shared modes.** For every
+> other fixed fee it is the amount *one participant* pays. For `shared_*` it is
+> the amount the *whole community* pays, which the engine divides between its
+> members. Their unit price is therefore derived rather than configured.
 
 ### 3.5 Invoice and InvoiceItem
 
@@ -278,6 +285,8 @@ Months are **not prorated**: touching any day in a month counts the full month.
 | `yearly_fee` | `billable_months` | `fixed_price_chf / 12` |
 | `per_metering_point_monthly_fee` | `metering_point_months` (see below) | `fixed_price_chf` |
 | `per_metering_point_yearly_fee` | `metering_point_months` (see below) | `fixed_price_chf / 12` |
+| `shared_monthly_fee` | `charged_months` (see §4.6.3) | derived — see §4.6.3 |
+| `shared_yearly_fee` | `charged_months` (see §4.6.3) | derived — see §4.6.3 |
 
 **Metering-point-months:** for each billable calendar month in the tariff overlap, count the number of **distinct active metering points** assigned to the participant during that month. A metering point counts for a month if:
 - It has an active assignment to the participant overlapping that month.
@@ -286,6 +295,71 @@ Months are **not prorated**: touching any day in a month counts the full month.
 Sum across all months to get the total metering-point-months.
 
 If `metering_point_months = 0`, the tariff produces no line item.
+
+#### 4.6.3 Shared fees
+
+For `shared_monthly_fee` and `shared_yearly_fee`, `fixed_price_chf` is the
+amount the **community** pays, not the amount each participant pays.  The
+engine divides it between the participants active in each billed month:
+
+```
+monthly_amount = fixed_price_chf / 12  if shared_yearly_fee else fixed_price_chf
+
+total = 0
+charged_months = 0
+for each billable month M in the tariff overlap:
+    billed_from, billed_to = M clamped to [overlap_start, overlap_end]
+    N = participants of the ZEV whose validity overlaps [billed_from, billed_to]
+    if N == 0:                       # nobody to share it with
+        continue
+    if this participant's validity does not overlap [billed_from, billed_to]:
+        continue                     # not a member that month
+    total += monthly_amount / N
+    charged_months += 1
+
+quantity   = charged_months
+unit_price = total / quantity        # derived; the average monthly share
+```
+
+If `charged_months = 0`, the tariff produces no line item.
+
+**Both sides are evaluated per month.**  The denominator `N` is community-wide;
+the months summed are only those this participant was a member of.  Getting
+either wrong breaks reconciliation:
+
+- Computing `N` once over the whole period would let a member joining in
+  February retroactively dilute January's share.
+- Summing every month the *tariff* was live, rather than every month the
+  *participant* was a member, would bill a mid-period joiner for months before
+  they arrived and over-recover the fee.
+
+**Membership is tested against the billed part of the month**, not the whole
+calendar month.  A period opening on Jan 15 therefore excludes a participant
+whose validity ended Jan 10 — they receive no invoice for the period, so
+counting them into `N` would leave the community short.
+
+**Participant count source.**  `N` is derived from the ZEV's participants, not
+from which invoices happen to exist.  Generating a single participant's invoice
+in isolation therefore yields the same share as a full ZEV run.
+
+**Reconciliation property.**  Across a full
+`generate_invoices_for_zev(zev, period_start, period_end)` run, each billed
+month's `monthly_amount` is recovered exactly once, regardless of how membership
+changed during the period — subject to the rounding shortfall below.
+
+**Rounding.**  Line totals are rounded to the centime independently
+(§6), so a fee that does not divide evenly leaves the community short by up to
+`N - 1` centimes per month: CHF 100 across 3 participants bills 33.33 each and
+recovers 99.99.  This is deliberate.  The alternative — assigning the leftover
+centimes to one participant by a deterministic order — couples every invoice to
+the others and reconciles only when every participant is actually invoiced.
+Consistent with the treatment of an indivisible local-energy pool, where the
+unallocated remainder likewise stays where it falls rather than being
+force-balanced (`ADR-0002`, §4.3).
+
+**Owner participation.**  No special-casing: `N` counts every active
+`Participant` row, and a ZEV owner who holds one is counted like any other
+member.
 
 ### 4.7 Item accumulation
 
@@ -357,7 +431,7 @@ ELSE:
 |---|---|---|
 | `name` | string | |
 | `category` | string | `energy`, `grid_fees`, `levies`, `metering` |
-| `billing_mode` | string | One of the 6 billing modes |
+| `billing_mode` | string | One of the 8 billing modes |
 | `energy_type` | string \| null | `local`, `grid`, `feed_in`, or `null` |
 | `fixed_price_chf` | string \| null | Decimal as string, `null` when N/A |
 | `percentage` | string \| null | Decimal as string, populated for `percentage_of_energy` |
@@ -482,8 +556,15 @@ Descriptions are **localized** using the ZEV's `invoice_language` (de/fr/it/en).
 | `yearly_fee` | `"{tariff.name} ({n} monatliche Rate(n) der Jahresgebühr)"` |
 | `per_metering_point_monthly_fee` | `"{tariff.name} ({n} Messpunkt-Monat(e))"` |
 | `per_metering_point_yearly_fee` | `"{tariff.name} ({n} monatliche Rate(n) pro Messpunkt)"` |
+| `shared_monthly_fee` | `"{tariff.name} ({n} Monat/Monate, Gemeinschaftskosten anteilig)"` |
+| `shared_yearly_fee` | `"{tariff.name} ({n} monatliche Rate(n) der Jahresgebühr, Gemeinschaftskosten anteilig)"` |
 
 Singular vs. plural forms are selected based on `quantity == 1`.
+
+The shared modes carry **no participant count** in the description: the
+denominator is per month and can differ between the months covered by a single
+line, so no one figure would be truthful.  The derived `unit_price` column
+carries the participant's average monthly share instead.
 
 ### 7.3 Sort order
 
@@ -501,6 +582,8 @@ sort_order = category_rank + energy_type_rank + billing_mode_rank
 | (other) | 900 | | (none) | 40 | | `yearly_fee` | 3 |
 | | | | | | | `per_mp_monthly` | 4 |
 | | | | | | | `per_mp_yearly` | 5 |
+| | | | | | | `shared_monthly_fee` | 6 |
+| | | | | | | `shared_yearly_fee` | 7 |
 
 Within the same sort order, items are sorted by `tariff.name` (case-insensitive).
 
@@ -614,6 +697,34 @@ Per-MP monthly: 4 × 3.00  = 12.00 CHF
 Per-MP yearly:  4 × (120.00 / 12) = 4 × 10.00 = 40.00 CHF
 ```
 
+### 8.4a Shared fee with changing membership
+
+**Setup:**
+- Period: Jan 1 – Mar 31, 2026
+- Shared monthly fee: 60.00 CHF/month for the community (valid from Jan 1)
+- Participants: Alice and Bob (whole period), Carol (from Feb 1), Dave (until Jan 31)
+
+**Per-month denominators:**
+```
+January:  Alice, Bob, Dave    → N = 3
+February: Alice, Bob, Carol   → N = 3
+March:    Alice, Bob, Carol   → N = 3
+```
+
+**Per-participant computation:**
+```
+Alice: 60/3 + 60/3 + 60/3 = 60.00 CHF   (3 months)
+Bob:   60/3 + 60/3 + 60/3 = 60.00 CHF   (3 months)
+Carol:      —  + 60/3 + 60/3 = 40.00 CHF   (2 months)
+Dave:  60/3 +  —  +  —     = 20.00 CHF   (1 month)
+```
+
+**Reconciliation:** 60.00 + 60.00 + 40.00 + 20.00 = 180.00 = 3 months × 60.00.
+
+Note Dave is invoiced at all — `generate_invoices_for_zev` invoices anyone
+active at *any* point in the period — and is charged only for the month he was
+a member of.
+
 ### 8.5 Percentage-of-energy tariff
 
 **Setup (extends §8.1):**
@@ -668,6 +779,8 @@ The description renders as: `"Surcharge 50% (50% von CHF 0.32/kWh)"` (German).
 | Rounding/VAT discrepancies | Medium | Currency rounding tests and explicit VAT selection tests |
 | Zero-production timestamps causing division by zero | Medium | Guard clause: `if zev_production_at_ts > 0` before share computation |
 | Overlapping tariff validity windows | Medium | Tariff matching applies **all** active tariffs (no conflict — they accumulate) |
+| `fixed_price_chf` entered per-participant on a shared fee | Medium | Field label and form hint state "total for the community"; §3.4 and §4.6.3 call out the changed meaning |
+| Shared fee over- or under-recovering after a membership change | Medium | Denominator and charged months both evaluated per month (§4.6.3); reconciliation asserted across a full ZEV run |
 
 ---
 
@@ -683,6 +796,20 @@ The description renders as: `"Surcharge 50% (50% von CHF 0.32/kWh)"` (German).
 | Per-metering-point monthly and yearly fees | §4.6.2 MP-month accumulation |
 | Percentage-of-energy billing mode | §4.4.2 base-rate computation, symmetric consumer/producer |
 | Multi-producer with export | §4.5 producer share allocation, feed-in credits |
+
+### Backend (`invoices/test_shared_fee.py`)
+
+| Test case | Validates |
+|---|---|
+| Per-month participant counter: stable membership, joiner, leaver, member gone before the window opens, months outside tariff validity, month with nobody active | §4.6.3 denominator, including the billed-window clamp and the absent-rather-than-zero rule |
+| Sole participant carries the whole fee; three carry a third each | §4.6.3 basic split |
+| Shared yearly fee is a twelfth per month | §4.6.3 `monthly_amount` |
+| Joiner's line spans only their own months | §4.6.3 charged-months rule (numerator) |
+| Participant with no readings still charged | Fixed fees are independent of metering |
+| Negative shared amount produces a credit item | §7.1 item type |
+| Reconciliation across a full ZEV run, with and without membership changes | §4.6.3 reconciliation property; worked example §8.4a |
+| CHF 100 across 3 participants recovers 99.99 | §4.6.3 documented rounding shortfall |
+| Description text and average-share unit price | §7.2 |
 
 ### Backend (`tariffs/tests.py`) — export/import
 
@@ -706,9 +833,11 @@ The description renders as: `"Surcharge 50% (50% von CHF 0.32/kWh)"` (German).
 ## 14. Acceptance criteria
 
 - [ ] Timestamp-level allocation matches the formulas in §4.3
-- [ ] All six billing modes produce correct quantities and totals per §4.4–4.6
+- [ ] All eight billing modes produce correct quantities and totals per §4.4–4.6
 - [ ] Producer credits are symmetric with consumer charges for local energy
 - [ ] Fixed fees count billable months without proration (§4.6.1)
+- [ ] Shared fees divide by the participant count of each billed month, and charge only the months the participant was a member (§4.6.3)
+- [ ] A full ZEV run recovers each shared-fee month exactly once, up to the documented rounding shortfall (§4.6.3)
 - [ ] Rounding matches §5 for all output fields
 - [ ] VAT is applied only when `zev.vat_number` is set (§4.8)
 - [ ] Worked examples (§8) pass as automated tests

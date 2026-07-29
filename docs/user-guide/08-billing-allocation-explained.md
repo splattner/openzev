@@ -141,6 +141,7 @@ Non-energy tariffs follow special rules:
 - **Monthly fee:** Charged once per billing month in the invoice period
 - **Yearly fee:** Charged as 1/12 per billing month (CHF price ÷ 12)
 - **Per-metering-point fee:** Charged for each *active meter* per month
+- **Shared fee:** One community-wide amount *divided* between the participants
 
 Exact invoice engine keys used for fixed-fee tariffs:
 
@@ -148,15 +149,50 @@ Exact invoice engine keys used for fixed-fee tariffs:
 - `yearly_fee`: monthly installment (`fixed_price_chf / 12`) per intersecting month
 - `per_metering_point_monthly_fee`: charged per active metering point per intersecting month
 - `per_metering_point_yearly_fee`: monthly installment (`fixed_price_chf / 12`) per active metering point per intersecting month
+- `shared_monthly_fee`: `fixed_price_chf` divided by the number of participants active in each intersecting month
+- `shared_yearly_fee`: monthly installment (`fixed_price_chf / 12`) divided the same way
 
 Negative fixed prices are represented as credit invoice items.
 
 **Example:** ZEV with 3 participants, each with 1 meter
 
-January invoice:
-- Monthly admin fee (all): 3 × CHF 50 = CHF 150
-- Meter fee (per meter): 3 × CHF 5 = CHF 15
-- Total fixed: CHF 165 (split among 3 invoices)
+January, per participant:
+- Monthly admin fee: CHF 50 → **CHF 50 each**
+- Meter fee (1 meter each): CHF 5 → **CHF 5 each**
+- Shared caretaker fee, CHF 90 for the community → **CHF 30 each**
+
+So each January invoice carries CHF 85 of fixed fees, and the ZEV collects
+3 × 50 + 3 × 5 + 90 = **CHF 255**.
+
+Note the difference: a **monthly fee** of CHF 50 is CHF 50 *per participant*
+(CHF 150 collected), while a **shared** fee of CHF 90 is CHF 90 for the
+community however many members it has.
+
+### Shared Fees and Changing Membership
+
+A shared fee is divided **per month**, so the split follows membership as it
+changes. Each participant is charged only for the months they were a member,
+and each month's amount is collected exactly once.
+
+**Example — CHF 60/month shared, billed January to March:**
+
+| | Jan | Feb | Mar | Total |
+|---|---|---|---|---|
+| Alice (whole period) | 20.00 | 20.00 | 20.00 | 60.00 |
+| Bob (whole period) | 20.00 | 20.00 | 20.00 | 60.00 |
+| Carol (joins Feb 1) | — | 20.00 | 20.00 | 40.00 |
+| Dave (leaves Jan 31) | 20.00 | — | — | 20.00 |
+| **Collected** | 60.00 | 60.00 | 60.00 | **180.00** |
+
+Dave still receives an invoice for the period — anyone active at any point in it
+does — and pays for the single month he was a member of. January is divided
+three ways because Dave was there; February and March are divided three ways
+because Carol has replaced him.
+
+If the amount does not divide evenly, each invoice rounds to the centime on its
+own, so the community may end up a centime or two short: CHF 100 across 3
+participants bills 33.33 each and collects CHF 99.99. See
+[Rounding and VAT](#rounding-and-vat) below.
 
 ## Rounding and VAT
 

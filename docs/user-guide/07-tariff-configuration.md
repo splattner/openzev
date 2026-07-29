@@ -111,16 +111,64 @@ This is useful when you want to set local energy prices as a fraction of the gri
 Flat monthly, quarterly, or annual charges (not energy-dependent).
 
 **Charge types:**
-- **Monthly fee** — CHF X per month
-- **Yearly fee** — CHF X per year (paid monthly as CHF X/12)
+- **Monthly fee** — CHF X per month, charged to *each* participant
+- **Yearly fee** — CHF X per year, charged to each participant (paid monthly as CHF X/12)
 - **Per-metering-point fee** — CHF Y per active meter per month
+- **Shared monthly fee** — CHF X per month for the *whole community*, divided between the participants
+- **Shared yearly fee** — CHF X per year for the whole community, divided and paid monthly
 
 Example:
 ```
 Fixed Fees 2026
-├─ Community admin fee: CHF 50/month
-├─ Meter maintenance: CHF 5 per meter/month
+├─ Community admin fee: CHF 50/month     (each participant pays 50)
+├─ Meter maintenance:   CHF 5 per meter/month
+├─ Caretaker contract:  CHF 90/month shared  (3 participants → 30 each)
 ```
+
+### Shared Fees
+
+Use a shared fee for a cost the community carries **jointly** — a caretaker
+contract, an insurance premium, the ZEV's own administration — rather than one
+attributable to a participant's consumption or meters.
+
+> **The price you enter means something different here.** For every other fixed
+> fee, the amount is what *one participant* pays. For a shared fee it is what
+> the **whole community** pays. Entering CHF 20 intending "per person" will bill
+> the community CHF 20 in total, not CHF 20 each.
+
+**How the split works:**
+
+- The amount is divided between the participants **active in each billed month**.
+- The division is recalculated every month, so somebody joining in February does
+  not change what January cost.
+- Each participant is charged only for the months they were actually a member.
+
+**Example — a community fee of CHF 60/month, billed January to March:**
+
+| | January | February | March | Invoice total |
+|---|---|---|---|---|
+| Alice (whole period) | 60 ÷ 3 = 20.00 | 20.00 | 20.00 | **60.00** |
+| Bob (whole period) | 20.00 | 20.00 | 20.00 | **60.00** |
+| Carol (joins Feb 1) | — | 20.00 | 20.00 | **40.00** |
+| Dave (leaves Jan 31) | 20.00 | — | — | **20.00** |
+| **Collected** | 60.00 | 60.00 | 60.00 | **180.00** |
+
+Every month's CHF 60 is collected exactly once, no matter how membership moved.
+Dave still receives an invoice for the period and pays for the one month he was
+a member; Carol pays for the two months she was.
+
+> **Rounding:** if the amount does not divide evenly, each invoice is rounded to
+> the centime on its own, so the community can end up a centime or two short —
+> CHF 100 across 3 participants bills 33.33 each and collects 99.99. Choose
+> amounts divisible by your participant count if this matters to your
+> bookkeeping.
+
+**A note on the ZEV owner:** the owner is counted like anyone else, provided
+they have a participant record in the ZEV. If the owner is not a participant,
+they are not counted and not charged.
+
+**Credits:** enter a negative amount to distribute a community-wide *rebate*
+across the participants. It appears on invoices as a credit line.
 
 ## Tariff Periods
 
@@ -153,7 +201,8 @@ Most ZEVs use multiple tariffs simultaneously:
 | Grid Energy (HT) | External grid, daytime | CHF 0.28/kWh |
 | Grid Energy (NT) | External grid, night | CHF 0.18/kWh |
 | Feed-in | Participant solar credits | CHF 0.08/kWh |
-| Fixed Fee | Monthly admin cost | CHF 50/month |
+| Fixed Fee | Monthly admin cost, per participant | CHF 50/month |
+| Shared Fee | Joint community cost, divided between participants | CHF 90/month total |
 
 During billing, OpenZEV automatically selects the right tariff for each timestamp and energy type.
 
