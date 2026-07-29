@@ -1,9 +1,9 @@
+from accounts.models import AppSettings, UserRole
 from django.core import mail
 from django.core.files.base import ContentFile
 from django.test import TestCase
 from django.test.utils import override_settings
 
-from accounts.models import AppSettings, UserRole
 from invoices.models import InvoiceStatus
 from invoices.tasks import send_invoice_email_task
 from invoices.test_helpers import make_invoice, make_participant, make_user, make_zev
@@ -11,7 +11,6 @@ from invoices.test_helpers import make_invoice, make_participant, make_user, mak
 
 @override_settings(
     EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
-    MEDIA_ROOT="/tmp/openzev_test_media",
 )
 class InvoiceEmailFormattingTests(TestCase):
     def test_email_uses_configured_short_date_format(self):

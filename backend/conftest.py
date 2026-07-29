@@ -11,10 +11,24 @@ fixtures are additive and only apply to pytest-style test functions.
 from __future__ import annotations
 
 import pytest
+from django.test import override_settings
 from rest_framework.test import APIClient
-
 from testing import factories
 from testing.helpers import authenticate
+
+
+@pytest.fixture(autouse=True, scope="session")
+def _isolated_media(tmp_path_factory):
+    """Redirect MEDIA_ROOT to a temporary directory for the entire test run.
+
+    Prevents tests that call ``FileField.save()`` from writing into the
+    project's ``media/`` directory.  The directory is removed after all tests
+    finish.  ``override_settings`` (rather than direct assignment) fires the
+    ``setting_changed`` signal so cached storage locations are reset.
+    """
+    tmp = tmp_path_factory.mktemp("media")
+    with override_settings(MEDIA_ROOT=str(tmp)):
+        yield
 
 
 @pytest.fixture
