@@ -35,6 +35,18 @@ echo "Using compose command: $COMPOSE_CMD_RESOLVED"
 echo "Starting OpenZEV demo stack..."
 (cd "$ROOT_DIR" && sh -lc "$COMPOSE_CMD_RESOLVED up -d --build")
 
+echo "Waiting for database migrations to finish..."
+attempts=0
+until (cd "$ROOT_DIR" && sh -lc "$COMPOSE_CMD_RESOLVED exec -T backend python manage.py migrate --check >/dev/null 2>&1"); do
+    attempts=$((attempts + 1))
+    if [ "$attempts" -ge 60 ]; then
+        echo "Timed out waiting for migrations to finish; last probe output:" >&2
+        (cd "$ROOT_DIR" && sh -lc "$COMPOSE_CMD_RESOLVED exec -T backend python manage.py migrate --check") >&2 || true
+        exit 1
+    fi
+    sleep 2
+done
+
 echo "Seeding demo data..."
 (cd "$ROOT_DIR" && sh -lc "$COMPOSE_CMD_RESOLVED exec -T backend python manage.py seed_demo")
 
