@@ -1,10 +1,11 @@
 import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
-import { fetchAuditEvent, fetchAuditEvents } from '../lib/api/audit'
+import { fetchAuditEvents } from '../lib/api/audit'
 import { queryKeys } from '../lib/api/queryKeys'
 import { formatDateTime, useAppSettings } from '../lib/appSettings'
 import { useAuth } from '../lib/auth'
+import { AuditEventDrawer } from '../features/audit/AuditEventDrawer'
 import type { AuditActionCategory, AuditEvent, AuditEventFilters, AuditEventStatus } from '../types/api'
 
 type AuditLogsScope = 'admin' | 'owner'
@@ -56,10 +57,6 @@ function statusBadgeClass(status: AuditEventStatus): string {
     return 'badge badge-neutral'
 }
 
-function formatJsonBlock(value: Record<string, unknown>): string {
-    return JSON.stringify(value, null, 2)
-}
-
 export function AuditLogsPage({ scope }: AuditLogsPageProps) {
     const { t } = useTranslation()
     const { settings } = useAppSettings()
@@ -87,12 +84,6 @@ export function AuditLogsPage({ scope }: AuditLogsPageProps) {
     const eventsQuery = useQuery({
         queryKey: queryKeys.admin.auditEvents(apiFilters),
         queryFn: () => fetchAuditEvents(apiFilters),
-    })
-
-    const selectedEventQuery = useQuery({
-        queryKey: queryKeys.admin.auditEvent(selectedEventId ?? ''),
-        queryFn: () => fetchAuditEvent(selectedEventId ?? ''),
-        enabled: Boolean(selectedEventId),
     })
 
     const events = eventsQuery.data?.results ?? []
@@ -241,46 +232,11 @@ export function AuditLogsPage({ scope }: AuditLogsPageProps) {
                 )}
             </section>
 
-            {selectedEventId && (
-                <section className="card page-stack">
-                    <h3>{t('pages.auditLogs.detail.title')}</h3>
-                    {selectedEventQuery.isLoading && <p>{t('pages.auditLogs.detail.loading')}</p>}
-                    {selectedEventQuery.isError && <p className="text-error">{t('pages.auditLogs.detail.loadError')}</p>}
-                    {selectedEventQuery.data && (
-                        <>
-                            <div className="form-grid">
-                                <div><strong>{t('pages.auditLogs.detail.id')}</strong><div><code>{selectedEventQuery.data.id}</code></div></div>
-                                <div><strong>{t('pages.auditLogs.detail.createdAt')}</strong><div>{formatDateTime(selectedEventQuery.data.created_at, settings)}</div></div>
-                                <div><strong>{t('pages.auditLogs.detail.category')}</strong><div>{t(`pages.auditLogs.categories.${selectedEventQuery.data.action_category}`)}</div></div>
-                                <div><strong>{t('pages.auditLogs.detail.action')}</strong><div><code>{selectedEventQuery.data.action_type}</code></div></div>
-                                <div><strong>{t('pages.auditLogs.detail.status')}</strong><div><span className={statusBadgeClass(selectedEventQuery.data.status)}>{t(`pages.auditLogs.statuses.${selectedEventQuery.data.status}`)}</span></div></div>
-                                <div><strong>{t('pages.auditLogs.detail.source')}</strong><div><code>{selectedEventQuery.data.source}</code></div></div>
-                                <div><strong>{t('pages.auditLogs.detail.actor')}</strong><div>{selectedEventQuery.data.actor_display || '—'}</div></div>
-                                <div><strong>{t('pages.auditLogs.detail.target')}</strong><div>{selectedEventQuery.data.target_display || `${selectedEventQuery.data.target_type}:${selectedEventQuery.data.target_id || '-'}`}</div></div>
-                                <div><strong>{t('pages.auditLogs.detail.requestId')}</strong><div><code>{selectedEventQuery.data.request_id || '—'}</code></div></div>
-                                <div><strong>{t('pages.auditLogs.detail.correlationId')}</strong><div><code>{selectedEventQuery.data.correlation_id || '—'}</code></div></div>
-                            </div>
-
-                            {selectedEventQuery.data.reason && (
-                                <div>
-                                    <strong>{t('pages.auditLogs.detail.reason')}</strong>
-                                    <p style={{ marginTop: '0.5rem' }}>{selectedEventQuery.data.reason}</p>
-                                </div>
-                            )}
-
-                            <div>
-                                <strong>{t('pages.auditLogs.detail.changes')}</strong>
-                                <pre style={{ overflowX: 'auto' }}>{formatJsonBlock(selectedEventQuery.data.changes_json)}</pre>
-                            </div>
-
-                            <div>
-                                <strong>{t('pages.auditLogs.detail.metadata')}</strong>
-                                <pre style={{ overflowX: 'auto' }}>{formatJsonBlock(selectedEventQuery.data.metadata_json)}</pre>
-                            </div>
-                        </>
-                    )}
-                </section>
-            )}
+            <AuditEventDrawer
+                eventId={selectedEventId}
+                onClose={() => setSelectedEventId(null)}
+                statusBadgeClass={statusBadgeClass}
+            />
         </div>
     )
 }

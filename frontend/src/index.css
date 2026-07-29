@@ -2330,3 +2330,105 @@ h3 {
 .feature-toggle-state.is-off {
   color: #475569;
 }
+/* ── Audit log detail drawer ─────────────────────────────────────────────── */
+
+.audit-drawer {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: #f8fafc;
+}
+
+.audit-drawer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.1rem 1.4rem;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.28);
+  background: rgba(255, 255, 255, 0.92);
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.audit-drawer-header h3 {
+  margin: 0;
+}
+
+.audit-drawer-body {
+  padding: 1.3rem 1.4rem 2rem;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.audit-drawer-summary {
+  margin: 0;
+  font-size: 1.05rem;
+  line-height: 1.45;
+}
+
+.audit-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.9rem 1.2rem;
+}
+
+.audit-detail-field {
+  min-width: 0;
+}
+
+.audit-detail-field strong {
+  display: block;
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #64748b;
+  margin-bottom: 0.2rem;
+}
+
+.audit-detail-field > div {
+  overflow-wrap: anywhere;
+}
+
+/* Diff table: before/after per changed field. */
+.audit-diff {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.audit-diff th {
+  text-align: left;
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #64748b;
+  padding: 0.35rem 0.55rem;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.28);
+}
+
+.audit-diff td {
+  padding: 0.4rem 0.55rem;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.16);
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+
+.audit-diff-before {
+  color: #b91c1c;
+  background: rgba(248, 113, 113, 0.08);
+  text-decoration: line-through;
+  text-decoration-color: rgba(185, 28, 28, 0.45);
+}
+
+.audit-diff-after {
+  color: #15803d;
+  background: rgba(74, 222, 128, 0.1);
+}
+
+@media (max-width: 640px) {
+  .audit-detail-grid {
+    grid-template-columns: 1fr;
+  }
+}

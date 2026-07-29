@@ -487,6 +487,11 @@ export const it = {
                 reason: 'Motivo',
                 changes: 'Modifiche',
                 metadata: 'Metadati',
+                close: 'Chiudi dettagli',
+                noChanges: 'Nessuna modifica di campo registrata per questo evento.',
+                diffField: 'Campo',
+                diffBefore: 'Prima',
+                diffAfter: 'Dopo',
             },
         },
         feasibility: {

@@ -481,6 +481,11 @@ export const en = {
                 reason: 'Reason',
                 changes: 'Changes',
                 metadata: 'Metadata',
+                close: 'Close details',
+                noChanges: 'No field changes recorded for this event.',
+                diffField: 'Field',
+                diffBefore: 'Before',
+                diffAfter: 'After',
             },
         },
         feasibility: {
