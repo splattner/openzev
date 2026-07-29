@@ -8,7 +8,9 @@ vi.mock('../src/lib/appSettings', async () => {
 })
 
 const { ZevGeneralSettingsFields } = await import('../src/components/ZevGeneralSettingsFields')
+const { DateLocaleProvider } = await import('../src/components/DateLocaleProvider')
 const { getDefaultZevForm } = await import('../src/lib/zevForm')
+await import('../src/i18n')
 
 /**
  * Guards the screenshot suite's PII blur for the ZEV settings page.
@@ -29,8 +31,14 @@ describe('screenshot PII blur selector', () => {
             bank_iban: 'CH00 1234 5678',
         }
 
+        // Mirrors the app root: the date picker inside the fields inherits the
+        // app-level LocalizationProvider from DateLocaleProvider (main.tsx).
         document.body.innerHTML = renderToStaticMarkup(
-            createElement(ZevGeneralSettingsFields, { form, onChange: () => {} }),
+            createElement(
+                DateLocaleProvider,
+                null,
+                createElement(ZevGeneralSettingsFields, { form, onChange: () => {} }),
+            ),
         )
 
         const matched = Array.from(document.querySelectorAll<HTMLInputElement>(BLUR_SELECTOR))

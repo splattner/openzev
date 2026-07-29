@@ -362,7 +362,7 @@ redirect to the matching tab on this page.
 
 - Query: `useQuery({ queryKey: ['vat-rates'], queryFn: fetchVatRates })`.
 - **Summary cards:** three `StatCard` components above the form — configured rate count, today's active rate (percentage, or the translated "none" label), and count of scheduled rates with `valid_from` in the future.
-- **Create/Edit form:** 3 fields (rate %, valid_from date, valid_to date optional). Default rate: `8.1`. The frontend converts percentage to fraction before sending (`(percentage / 100).toFixed(4)`).
+- **Create/Edit form:** 3 fields (rate %, valid_from DatePicker with app-settings format, valid_to DatePicker optional). Default rate: `8.1`. The frontend converts percentage to fraction before sending (`(percentage / 100).toFixed(4)`). Date pickers are MUI X `DatePicker` components inheriting the app-level `LocalizationProvider` supplied by `DateLocaleProvider` (`frontend/src/components/DateLocaleProvider.tsx`, mounted in `main.tsx`): `adapterLocale` (dayjs calendar names/format) and `localeText` (picker UI text such as "Choose date", from `@mui/x-date-pickers/locales` de/fr/it bundles, mirroring `lib/dataGridLocale.ts`) both follow the active UI language. Submitting an empty valid_from is rejected client-side with a toast (`adminVatSettings.messages.missingValidFrom`).
 - **Rate table:** displays rate as percentage (`(rate × 100).toFixed(2)%`), valid_from (formatted), valid_to (formatted or "Open"), with Edit/Delete buttons.
 - **Delete:** Uses `ConfirmDialog` component for destructive confirmation.
 - **Validation feedback:** API errors (overlap, invalid range) displayed via toast.

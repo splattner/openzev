@@ -1651,6 +1651,7 @@ export const it = {
             saveFailed: 'Impossibile salvare l\'aliquota IVA.',
             deleteFailed: 'Impossibile eliminare l\'aliquota IVA.',
             invalidRate: 'L\'aliquota deve essere una percentuale valida tra 0 e 100.',
+            missingValidFrom: 'La data di inizio validità è obbligatoria.',
         },
     },
     adminInvoices: {

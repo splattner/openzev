@@ -1644,6 +1644,7 @@ export const de = {
             saveFailed: 'MwSt.-Satz konnte nicht gespeichert werden.',
             deleteFailed: 'MwSt.-Satz konnte nicht gelöscht werden.',
             invalidRate: 'Der Satz muss ein gültiger Prozentsatz zwischen 0 und 100 sein.',
+            missingValidFrom: 'Das Gültig-ab-Datum ist erforderlich.',
         },
     },
     adminInvoices: {

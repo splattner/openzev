@@ -1,7 +1,5 @@
 import dayjs from 'dayjs'
 import { DatePicker } from '@mui/x-date-pickers/DatePicker'
-import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs'
-import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider'
 import { type Dispatch, type FormEvent, type SetStateAction } from 'react'
 import { useTranslation } from 'react-i18next'
 import { FormModal } from '../../components/FormModal'
@@ -56,25 +54,21 @@ export function MeteringAssignmentFormModal({
 
         <label>
           <span>{t('pages.meteringPoints.assignForm.validFrom')}</span>
-          <LocalizationProvider dateAdapter={AdapterDayjs}>
-            <DatePicker
-              format={toDayJsDateFormat(settings.date_format_short)}
-              value={form.valid_from ? dayjs(form.valid_from) : null}
-              onChange={(value) => setForm((previous) => ({ ...previous, valid_from: value ? value.format('YYYY-MM-DD') : '' }))}
-              slotProps={{ textField: { required: true, size: 'small' } }}
-            />
-          </LocalizationProvider>
+          <DatePicker
+            format={toDayJsDateFormat(settings.date_format_short)}
+            value={form.valid_from ? dayjs(form.valid_from) : null}
+            onChange={(value) => setForm((previous) => ({ ...previous, valid_from: value ? value.format('YYYY-MM-DD') : '' }))}
+            slotProps={{ textField: { required: true, size: 'small' } }}
+          />
         </label>
         <label>
           <span>{t('pages.meteringPoints.assignForm.validTo')}</span>
-          <LocalizationProvider dateAdapter={AdapterDayjs}>
-            <DatePicker
-              format={toDayJsDateFormat(settings.date_format_short)}
-              value={form.valid_to ? dayjs(form.valid_to) : null}
-              onChange={(value) => setForm((previous) => ({ ...previous, valid_to: value ? value.format('YYYY-MM-DD') : null }))}
-              slotProps={{ textField: { size: 'small' } }}
-            />
-          </LocalizationProvider>
+          <DatePicker
+            format={toDayJsDateFormat(settings.date_format_short)}
+            value={form.valid_to ? dayjs(form.valid_to) : null}
+            onChange={(value) => setForm((previous) => ({ ...previous, valid_to: value ? value.format('YYYY-MM-DD') : null }))}
+            slotProps={{ textField: { size: 'small' } }}
+          />
         </label>
 
         <p className="muted" style={{ gridColumn: '1 / -1', margin: 0, fontSize: '0.82rem' }}>

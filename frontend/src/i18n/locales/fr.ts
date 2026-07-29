@@ -1651,6 +1651,7 @@ export const fr = {
             saveFailed: 'Impossible d\'enregistrer le taux TVA.',
             deleteFailed: 'Impossible de supprimer le taux TVA.',
             invalidRate: 'Le taux doit être un pourcentage valide entre 0 et 100.',
+            missingValidFrom: 'La date de début de validité est requise.',
         },
     },
     adminInvoices: {

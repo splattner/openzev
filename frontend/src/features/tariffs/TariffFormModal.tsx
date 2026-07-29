@@ -3,8 +3,6 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faCheck, faXmark } from '@fortawesome/free-solid-svg-icons'
 import dayjs from 'dayjs'
 import { DatePicker } from '@mui/x-date-pickers/DatePicker'
-import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs'
-import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider'
 import { Controller, useForm, useWatch } from 'react-hook-form'
 import { useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -129,37 +127,33 @@ export function TariffFormModal({
 
         <label>
           <span>{t('pages.tariffs.form.validFrom')}</span>
-          <LocalizationProvider dateAdapter={AdapterDayjs}>
-            <Controller
-              control={form.control}
-              name="valid_from"
-              render={({ field }) => (
-                <DatePicker
-                  format={toDayJsDateFormat(settings.date_format_short)}
-                  value={field.value ? dayjs(field.value) : null}
-                  onChange={(val) => field.onChange(val ? val.format('YYYY-MM-DD') : '')}
-                  slotProps={{ textField: { size: 'small', fullWidth: true } }}
-                />
-              )}
-            />
-          </LocalizationProvider>
+          <Controller
+            control={form.control}
+            name="valid_from"
+            render={({ field }) => (
+              <DatePicker
+                format={toDayJsDateFormat(settings.date_format_short)}
+                value={field.value ? dayjs(field.value) : null}
+                onChange={(val) => field.onChange(val ? val.format('YYYY-MM-DD') : '')}
+                slotProps={{ textField: { size: 'small', fullWidth: true } }}
+              />
+            )}
+          />
         </label>
         <label>
           <span>{t('pages.tariffs.form.validTo')}</span>
-          <LocalizationProvider dateAdapter={AdapterDayjs}>
-            <Controller
-              control={form.control}
-              name="valid_to"
-              render={({ field }) => (
-                <DatePicker
-                  format={toDayJsDateFormat(settings.date_format_short)}
-                  value={field.value ? dayjs(field.value) : null}
-                  onChange={(val) => field.onChange(val ? val.format('YYYY-MM-DD') : '')}
-                  slotProps={{ textField: { size: 'small', fullWidth: true } }}
-                />
-              )}
-            />
-          </LocalizationProvider>
+          <Controller
+            control={form.control}
+            name="valid_to"
+            render={({ field }) => (
+              <DatePicker
+                format={toDayJsDateFormat(settings.date_format_short)}
+                value={field.value ? dayjs(field.value) : null}
+                onChange={(val) => field.onChange(val ? val.format('YYYY-MM-DD') : '')}
+                slotProps={{ textField: { size: 'small', fullWidth: true } }}
+              />
+            )}
+          />
         </label>
         <label>
           <span>{t('pages.tariffs.form.notes')}</span>

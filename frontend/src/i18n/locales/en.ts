@@ -1616,6 +1616,7 @@ export const en = {
             saveFailed: 'Failed to save VAT rate.',
             deleteFailed: 'Failed to delete VAT rate.',
             invalidRate: 'Rate must be a valid percentage between 0 and 100.',
+            missingValidFrom: 'Valid from date is required.',
         },
     },
     adminInvoices: {

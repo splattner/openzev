@@ -1,7 +1,5 @@
 import dayjs from 'dayjs'
 import { DatePicker } from '@mui/x-date-pickers/DatePicker'
-import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs'
-import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider'
 import { useTranslation } from 'react-i18next'
 import { toDayJsDateFormat, useAppSettings } from '../lib/appSettings'
 import type { ZevInput } from '../types/api'
@@ -32,16 +30,14 @@ export function ZevGeneralSettingsFields({ form, onChange }: ZevGeneralSettingsF
                     </label>
                     <label>
                         <span>{t('pages.zevSettings.fields.startDate')}</span>
-                        <LocalizationProvider dateAdapter={AdapterDayjs}>
-                            <DatePicker
-                                format={toDayJsDateFormat(settings.date_format_short)}
-                                value={form.start_date ? dayjs(form.start_date) : null}
-                                onChange={(newValue) =>
-                                    onChange({ start_date: newValue ? newValue.format('YYYY-MM-DD') : '' })
-                                }
-                                slotProps={{ textField: { required: true, size: 'small' } }}
-                            />
-                        </LocalizationProvider>
+                        <DatePicker
+                            format={toDayJsDateFormat(settings.date_format_short)}
+                            value={form.start_date ? dayjs(form.start_date) : null}
+                            onChange={(newValue) =>
+                                onChange({ start_date: newValue ? newValue.format('YYYY-MM-DD') : '' })
+                            }
+                            slotProps={{ textField: { required: true, size: 'small' } }}
+                        />
                     </label>
                     <label>
                         <span>{t('pages.zevSettings.fields.zevType')}</span>

@@ -2,10 +2,12 @@ import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faCheck, faPen, faPlus, faTrash, faXmark } from '@fortawesome/free-solid-svg-icons'
+import dayjs from 'dayjs'
+import { DatePicker } from '@mui/x-date-pickers/DatePicker'
 import { createVatRate, deleteVatRate, fetchVatRates, updateVatRate } from '../lib/api/auth'
 import { formatApiError } from '../lib/api/errors'
 import { queryKeys } from '../lib/api/queryKeys'
-import { formatShortDate, useAppSettings } from '../lib/appSettings'
+import { formatShortDate, toDayJsDateFormat, useAppSettings } from '../lib/appSettings'
 import { useTranslation } from 'react-i18next'
 import { useToast } from '../lib/toast'
 import { ConfirmDialog, useConfirmDialog } from '../components/ConfirmDialog'
@@ -85,6 +87,10 @@ export function AdminVatSettingsPage() {
             pushToast(t('adminVatSettings.messages.invalidRate'), 'error')
             return null
         }
+        if (!values.valid_from) {
+            pushToast(t('adminVatSettings.messages.missingValidFrom'), 'error')
+            return null
+        }
         return {
             rate: (percentage / 100).toFixed(4),
             valid_from: values.valid_from,
@@ -145,20 +151,25 @@ export function AdminVatSettingsPage() {
                         </label>
                         <label>
                             <span>{t('adminVatSettings.form.validFrom')}</span>
-                            <input
-                                type="date"
-                                value={form.valid_from}
-                                onChange={(event) => setForm((prev) => ({ ...prev, valid_from: event.target.value }))}
-                                required
+                            <DatePicker
+                                format={toDayJsDateFormat(settings.date_format_short)}
+                                value={form.valid_from ? dayjs(form.valid_from) : null}
+                                onChange={(newValue) =>
+                                    setForm((prev) => ({ ...prev, valid_from: newValue ? newValue.format('YYYY-MM-DD') : '' }))
+                                }
+                                slotProps={{ textField: { required: true, size: 'small' } }}
                             />
                             <small className="muted">{t('adminVatSettings.form.validFromHint')}</small>
                         </label>
                         <label>
                             <span>{t('adminVatSettings.form.validTo')}</span>
-                            <input
-                                type="date"
-                                value={form.valid_to ?? ''}
-                                onChange={(event) => setForm((prev) => ({ ...prev, valid_to: event.target.value || null }))}
+                            <DatePicker
+                                format={toDayJsDateFormat(settings.date_format_short)}
+                                value={form.valid_to ? dayjs(form.valid_to) : null}
+                                onChange={(newValue) =>
+                                    setForm((prev) => ({ ...prev, valid_to: newValue ? newValue.format('YYYY-MM-DD') : null }))
+                                }
+                                slotProps={{ textField: { size: 'small' } }}
                             />
                             <small className="muted">{t('adminVatSettings.form.validToHint')}</small>
                         </label>
