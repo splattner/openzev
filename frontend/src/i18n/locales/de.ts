@@ -901,6 +901,9 @@ export const de = {
                 yearlyFee: 'Jahresgebühr (CHF)',
                 mpMonthlyFee: 'Monatliche Gebühr pro Zählpunkt (CHF)',
                 mpYearlyFee: 'Jahresgebühr pro Zählpunkt (CHF)',
+                sharedMonthlyFee: 'Geteilte Monatsgebühr, Gesamtbetrag der Gemeinschaft (CHF)',
+                sharedYearlyFee: 'Geteilte Jahresgebühr, Gesamtbetrag der Gemeinschaft (CHF)',
+                sharedFeeHint: 'Gesamtbetrag erfassen, den die Gemeinschaft bezahlt. Er wird gleichmässig auf die in jedem abgerechneten Monat aktiven Teilnehmenden aufgeteilt.',
                 percentage: 'Prozentsatz (%)',
                 tariff: 'Tarif',
                 periodType: 'Periodentyp',
@@ -924,6 +927,8 @@ export const de = {
                 yearly_fee: 'Jahresgebühr auf Monatsbasis',
                 per_metering_point_monthly_fee: 'Monatliche Gebühr pro Zählpunkt',
                 per_metering_point_yearly_fee: 'Jahresgebühr pro Zählpunkt auf Monatsbasis',
+                shared_monthly_fee: 'Monatsgebühr, auf die Teilnehmenden aufgeteilt',
+                shared_yearly_fee: 'Jahresgebühr, auf die Teilnehmenden aufgeteilt, auf Monatsbasis',
             },
             energyTypes: {
                 local: 'Intern',

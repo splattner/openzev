@@ -63,6 +63,51 @@ class TariffPermissionTests(TestCase):
 		}, format="json")
 		self.assertEqual(resp.status_code, 201)
 
+	def test_owner_can_create_shared_fee_tariff(self):
+		"""The shared modes fall into the serializer's generic fixed-fee branch,
+		so they require a price and have their energy type cleared without the
+		serializer needing to know about them."""
+		client = APIClient()
+		owner = User.objects.create_user(
+			username="tariff_owner_shared",
+			password="pass1234",
+			role=UserRole.ZEV_OWNER,
+		)
+		zev = Zev.objects.create(name="Tariff ZEV Shared", owner=owner, zev_type="vzev")
+		auth(client, owner)
+
+		resp = client.post("/api/v1/tariffs/tariffs/", {
+			"zev": str(zev.id),
+			"name": "Shared admin fee",
+			"category": TariffCategory.GRID_FEES,
+			"billing_mode": BillingMode.SHARED_MONTHLY_FEE,
+			"energy_type": "local",
+			"fixed_price_chf": "90.00",
+			"valid_from": "2026-01-01",
+		}, format="json")
+		self.assertEqual(resp.status_code, 201)
+		self.assertIsNone(Tariff.objects.get(name="Shared admin fee").energy_type)
+
+	def test_shared_fee_tariff_requires_a_price(self):
+		client = APIClient()
+		owner = User.objects.create_user(
+			username="tariff_owner_shared_2",
+			password="pass1234",
+			role=UserRole.ZEV_OWNER,
+		)
+		zev = Zev.objects.create(name="Tariff ZEV Shared 2", owner=owner, zev_type="vzev")
+		auth(client, owner)
+
+		resp = client.post("/api/v1/tariffs/tariffs/", {
+			"zev": str(zev.id),
+			"name": "Shared yearly fee",
+			"category": TariffCategory.GRID_FEES,
+			"billing_mode": BillingMode.SHARED_YEARLY_FEE,
+			"valid_from": "2026-01-01",
+		}, format="json")
+		self.assertEqual(resp.status_code, 400)
+		self.assertIn("fixed_price_chf", resp.data)
+
 	def test_owner_can_export_tariffs_as_json(self):
 		client = APIClient()
 		owner = User.objects.create_user(

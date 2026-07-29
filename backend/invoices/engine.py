@@ -402,7 +402,76 @@ def _count_billable_metering_points_by_month(participant: Participant, tariff: T
     return total_metering_points
 
 
+def _overlaps(valid_from: date, valid_to: date | None, start: date, end: date) -> bool:
+    """Whether a ``valid_from``/``valid_to`` window touches ``start``..``end``."""
+    return valid_from <= end and (valid_to is None or valid_to >= start)
+
+
+def _billable_months(tariff: Tariff, period_start: date, period_end: date):
+    """Yield ``(month, billed_from, billed_to)`` for each month the fee covers.
+
+    ``month`` is the first of the month and identifies it; the other two are
+    clamped to the part of it that is actually billed, which is what membership
+    is tested against. A period opening mid-month bills only from that day.
+    """
+    overlap_start = max(period_start, tariff.valid_from)
+    overlap_end = min(period_end, tariff.valid_to or period_end)
+    if overlap_start > overlap_end:
+        return
+
+    cursor = _month_start(overlap_start)
+    last_month = _month_start(overlap_end)
+    while cursor <= last_month:
+        next_month = _next_month(cursor)
+        yield (
+            cursor,
+            max(cursor, overlap_start),
+            min(next_month - timedelta(days=1), overlap_end),
+        )
+        cursor = next_month
+
+
+def _count_active_participants_by_month(zev: Zev, tariff: Tariff, period_start: date, period_end: date) -> dict[date, int]:
+    """How many participants each billed month is shared between.
+
+    Keyed by the first day of the month. A month with nobody active is absent
+    rather than zero, so the caller cannot divide by it.
+
+    Counted per month, not once over the period: somebody joining in February
+    must not retroactively dilute January's share. This is also what makes the
+    fee reconcile against ``generate_invoices_for_zev``, which invoices anyone
+    active at *any* point in the period — a member who left in January is
+    charged for January alone, and the months after that are divided between
+    the members who remain.
+
+    The count comes from the ZEV rather than from whichever invoices happen to
+    exist, so generating one participant's invoice on its own yields the same
+    share as a full run.
+    """
+    # Single fetch, then month-by-month in Python — same shape as the
+    # per-metering-point count above.
+    windows = list(
+        Participant.objects.filter(zev=zev).values_list("valid_from", "valid_to")
+    )
+
+    counts: dict[date, int] = {}
+    for month, billed_from, billed_to in _billable_months(tariff, period_start, period_end):
+        # Membership is tested against the billed part of the month, so someone
+        # who left before the period opened is not counted into the first
+        # month's denominator — they receive no invoice, and counting them
+        # would leave the community short.
+        active = sum(
+            1 for valid_from, valid_to in windows
+            if _overlaps(valid_from, valid_to, billed_from, billed_to)
+        )
+        if active:
+            counts[month] = active
+
+    return counts
+
+
 _ENERGY_BILLING_MODES = {BillingMode.ENERGY, BillingMode.PERCENTAGE_OF_ENERGY}
+_SHARED_BILLING_MODES = {BillingMode.SHARED_MONTHLY_FEE, BillingMode.SHARED_YEARLY_FEE}
 
 
 def _get_item_type(tariff: Tariff) -> str:
@@ -427,6 +496,10 @@ DESCRIPTION_TRANSLATIONS: dict[str, dict] = {
         "mp_monthly_pl": "Messpunkt-Monate",
         "monthly_sg": "Monat",
         "monthly_pl": "Monate",
+        "shared_monthly_sg": "Monat, Gemeinschaftskosten anteilig",
+        "shared_monthly_pl": "Monate, Gemeinschaftskosten anteilig",
+        "shared_yearly_sg": "monatliche Rate der Jahresgebühr, Gemeinschaftskosten anteilig",
+        "shared_yearly_pl": "monatliche Raten der Jahresgebühr, Gemeinschaftskosten anteilig",
         "pct_of": "von CHF",
     },
     "fr": {
@@ -438,6 +511,10 @@ DESCRIPTION_TRANSLATIONS: dict[str, dict] = {
         "mp_monthly_pl": "mois-points de mesure",
         "monthly_sg": "mois",
         "monthly_pl": "mois",
+        "shared_monthly_sg": "mois, quote-part des frais communs",
+        "shared_monthly_pl": "mois, quote-part des frais communs",
+        "shared_yearly_sg": "mensualité de la redevance annuelle, quote-part des frais communs",
+        "shared_yearly_pl": "mensualités de la redevance annuelle, quote-part des frais communs",
         "pct_of": "de CHF",
     },
     "it": {
@@ -449,6 +526,10 @@ DESCRIPTION_TRANSLATIONS: dict[str, dict] = {
         "mp_monthly_pl": "mesi-punto di misurazione",
         "monthly_sg": "mese",
         "monthly_pl": "mesi",
+        "shared_monthly_sg": "mese, quota dei costi comuni",
+        "shared_monthly_pl": "mesi, quota dei costi comuni",
+        "shared_yearly_sg": "rata mensile della tariffa annuale, quota dei costi comuni",
+        "shared_yearly_pl": "rate mensili della tariffa annuale, quota dei costi comuni",
         "pct_of": "di CHF",
     },
     "en": {
@@ -460,6 +541,10 @@ DESCRIPTION_TRANSLATIONS: dict[str, dict] = {
         "mp_monthly_pl": "metering-point months",
         "monthly_sg": "month",
         "monthly_pl": "months",
+        "shared_monthly_sg": "month, share of community costs",
+        "shared_monthly_pl": "months, share of community costs",
+        "shared_yearly_sg": "monthly installment of annual fee, share of community costs",
+        "shared_yearly_pl": "monthly installments of annual fee, share of community costs",
         "pct_of": "of CHF",
     },
 }
@@ -501,6 +586,17 @@ def _build_description(
         suffix = t["mp_monthly_sg"] if months == 1 else t["mp_monthly_pl"]
         return f"{tariff.name} ({months} {suffix})"
 
+    # The shared modes carry no participant count in the text: the denominator
+    # is per month and can differ between the months on one line. The unit
+    # price column already shows the average share.
+    if tariff.billing_mode == BillingMode.SHARED_MONTHLY_FEE:
+        suffix = t["shared_monthly_sg"] if months == 1 else t["shared_monthly_pl"]
+        return f"{tariff.name} ({months} {suffix})"
+
+    if tariff.billing_mode == BillingMode.SHARED_YEARLY_FEE:
+        suffix = t["shared_yearly_sg"] if months == 1 else t["shared_yearly_pl"]
+        return f"{tariff.name} ({months} {suffix})"
+
     suffix = t["monthly_sg"] if months == 1 else t["monthly_pl"]
     return f"{tariff.name} ({months} {suffix})"
 
@@ -515,6 +611,8 @@ def _build_sort_order(tariff: Tariff) -> int:
         BillingMode.YEARLY_FEE: 3,
         BillingMode.PER_METERING_POINT_MONTHLY_FEE: 4,
         BillingMode.PER_METERING_POINT_YEARLY_FEE: 5,
+        BillingMode.SHARED_MONTHLY_FEE: 6,
+        BillingMode.SHARED_YEARLY_FEE: 7,
     }.get(tariff.billing_mode, 9)
     return category_rank + energy_rank + mode_rank
 
@@ -526,6 +624,10 @@ def _price_fixed_fees(participant, tariffs, period_start, period_end, accumulato
     calendar month the period touches, and the per-metering-point variants
     multiply that by how many points the participant held in those months.
     Yearly fees are charged as twelfths.
+
+    The shared variants divide one community-wide amount between the members
+    active in each month, so their total is built month by month rather than as
+    ``quantity * unit_price``.
     """
     for tariff in tariffs:
         if tariff.billing_mode in _ENERGY_BILLING_MODES:
@@ -538,9 +640,11 @@ def _price_fixed_fees(participant, tariffs, period_start, period_end, accumulato
             BillingMode.PER_METERING_POINT_MONTHLY_FEE,
             BillingMode.PER_METERING_POINT_YEARLY_FEE,
         )
+        shared = tariff.billing_mode in _SHARED_BILLING_MODES
         yearly = tariff.billing_mode in (
             BillingMode.YEARLY_FEE,
             BillingMode.PER_METERING_POINT_YEARLY_FEE,
+            BillingMode.SHARED_YEARLY_FEE,
         )
 
         if per_metering_point:
@@ -555,10 +659,36 @@ def _price_fixed_fees(participant, tariffs, period_start, period_end, accumulato
         if yearly:
             unit_price = unit_price / Decimal("12")
 
+        if shared:
+            shares = _count_active_participants_by_month(
+                participant.zev, tariff, period_start, period_end)
+            total = Decimal("0")
+            charged_months = 0
+            for month, billed_from, billed_to in _billable_months(tariff, period_start, period_end):
+                count = shares.get(month)
+                # Only the months this participant was actually a member of:
+                # the denominator is community-wide, but the numerator is not.
+                # Charging every month the fee was live would bill a mid-period
+                # joiner for the months before they arrived.
+                if not count or not _overlaps(
+                    participant.valid_from, participant.valid_to, billed_from, billed_to
+                ):
+                    continue
+                total += unit_price / count
+                charged_months += 1
+            if charged_months == 0:
+                continue
+            # Quantity is the months this participant is charged for, so the
+            # line reads "2 months" and the derived unit price comes out as
+            # their average monthly share — the figure they want to see.
+            quantity = Decimal(charged_months)
+        else:
+            total = quantity * unit_price
+
         accumulator.add(
             tariff=tariff,
             quantity=quantity,
-            total=quantity * unit_price,
+            total=total,
             unit="month",
         )
 

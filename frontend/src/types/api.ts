@@ -320,7 +320,7 @@ export interface DataQualityStatusResponse {
     metering_points: MeteringPointDataQuality[]
 }
 
-export type TariffBillingMode = 'energy' | 'percentage_of_energy' | 'monthly_fee' | 'yearly_fee' | 'per_metering_point_monthly_fee' | 'per_metering_point_yearly_fee'
+export type TariffBillingMode = 'energy' | 'percentage_of_energy' | 'monthly_fee' | 'yearly_fee' | 'per_metering_point_monthly_fee' | 'per_metering_point_yearly_fee' | 'shared_monthly_fee' | 'shared_yearly_fee'
 
 export interface Tariff {
     id: string

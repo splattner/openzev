@@ -908,6 +908,9 @@ export const it = {
                 yearlyFee: 'Canone annuale (CHF)',
                 mpMonthlyFee: 'Canone mensile per punto di misura (CHF)',
                 mpYearlyFee: 'Canone annuale per punto di misura (CHF)',
+                sharedMonthlyFee: 'Canone mensile condiviso, importo totale della comunità (CHF)',
+                sharedYearlyFee: 'Canone annuale condiviso, importo totale della comunità (CHF)',
+                sharedFeeHint: 'Indicare l\'importo totale pagato dalla comunità. Viene suddiviso in parti uguali tra i partecipanti attivi in ogni mese fatturato.',
                 percentage: 'Percentuale (%)',
                 tariff: 'Tariffa',
                 periodType: 'Tipo di periodo',
@@ -931,6 +934,8 @@ export const it = {
                 yearly_fee: 'Canone annuale ripartito per mese',
                 per_metering_point_monthly_fee: 'Canone mensile per punto di misura',
                 per_metering_point_yearly_fee: 'Canone annuale per punto di misura ripartito per mese',
+                shared_monthly_fee: 'Canone mensile ripartito tra i partecipanti',
+                shared_yearly_fee: 'Canone annuale ripartito tra i partecipanti, per mese',
             },
             energyTypes: {
                 local: 'Locale',

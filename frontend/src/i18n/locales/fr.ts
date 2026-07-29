@@ -908,6 +908,9 @@ export const fr = {
                 yearlyFee: 'Frais annuels (CHF)',
                 mpMonthlyFee: 'Frais mensuels par point de mesure (CHF)',
                 mpYearlyFee: 'Frais annuels par point de mesure (CHF)',
+                sharedMonthlyFee: 'Frais mensuels partagés, montant total de la communauté (CHF)',
+                sharedYearlyFee: 'Frais annuels partagés, montant total de la communauté (CHF)',
+                sharedFeeHint: 'Saisissez le montant total payé par la communauté. Il est réparti à parts égales entre les participants actifs durant chaque mois facturé.',
                 percentage: 'Pourcentage (%)',
                 tariff: 'Tarif',
                 periodType: 'Type de période',
@@ -931,6 +934,8 @@ export const fr = {
                 yearly_fee: 'Frais annuels répartis par mois',
                 per_metering_point_monthly_fee: 'Frais mensuels par point de mesure',
                 per_metering_point_yearly_fee: 'Frais annuels par point de mesure répartis par mois',
+                shared_monthly_fee: 'Frais mensuels répartis entre les participants',
+                shared_yearly_fee: 'Frais annuels répartis entre les participants, par mois',
             },
             energyTypes: {
                 local: 'Local',

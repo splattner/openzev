@@ -10,7 +10,7 @@ import { useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { FormModal } from '../../components/FormModal'
 import { toDayJsDateFormat } from '../../lib/appSettings'
-import type { AppSettings, Tariff, TariffInput } from '../../types/api'
+import type { AppSettings, Tariff, TariffBillingMode, TariffInput } from '../../types/api'
 import {
   defaultTariffFormValues,
   mapTariffFormValuesToInput,
@@ -18,6 +18,18 @@ import {
   tariffFormSchema,
   type TariffFormValues,
 } from './useTariffForms'
+
+/** Label for the fixed-price field, per billing mode that has one. */
+const FIXED_PRICE_LABELS: Partial<Record<TariffBillingMode, string>> = {
+  monthly_fee: 'pages.tariffs.form.monthlyFee',
+  yearly_fee: 'pages.tariffs.form.yearlyFee',
+  per_metering_point_monthly_fee: 'pages.tariffs.form.mpMonthlyFee',
+  per_metering_point_yearly_fee: 'pages.tariffs.form.mpYearlyFee',
+  shared_monthly_fee: 'pages.tariffs.form.sharedMonthlyFee',
+  shared_yearly_fee: 'pages.tariffs.form.sharedYearlyFee',
+}
+
+const SHARED_FEE_MODES: TariffBillingMode[] = ['shared_monthly_fee', 'shared_yearly_fee']
 
 type TariffFormModalProps = {
   isOpen: boolean
@@ -51,6 +63,7 @@ export function TariffFormModal({
     control: form.control,
     name: 'billing_mode',
   })
+  const isSharedFee = SHARED_FEE_MODES.includes(billingMode)
 
   useEffect(() => {
     form.reset(initialTariff ? mapTariffToFormValues(initialTariff) : defaultTariffFormValues)
@@ -85,6 +98,8 @@ export function TariffFormModal({
             <option value="yearly_fee">{t('pages.tariffs.billingModes.yearly_fee')}</option>
             <option value="per_metering_point_monthly_fee">{t('pages.tariffs.billingModes.per_metering_point_monthly_fee')}</option>
             <option value="per_metering_point_yearly_fee">{t('pages.tariffs.billingModes.per_metering_point_yearly_fee')}</option>
+            <option value="shared_monthly_fee">{t('pages.tariffs.billingModes.shared_monthly_fee')}</option>
+            <option value="shared_yearly_fee">{t('pages.tariffs.billingModes.shared_yearly_fee')}</option>
           </select>
         </label>
 
@@ -106,16 +121,9 @@ export function TariffFormModal({
           </label>
         ) : billingMode !== 'energy' ? (
           <label>
-            <span>
-              {billingMode === 'monthly_fee'
-                ? t('pages.tariffs.form.monthlyFee')
-                : billingMode === 'yearly_fee'
-                  ? t('pages.tariffs.form.yearlyFee')
-                  : billingMode === 'per_metering_point_monthly_fee'
-                    ? t('pages.tariffs.form.mpMonthlyFee')
-                    : t('pages.tariffs.form.mpYearlyFee')}
-            </span>
+            <span>{t(FIXED_PRICE_LABELS[billingMode] ?? 'pages.tariffs.form.monthlyFee')}</span>
             <input type="number" step="0.01" {...form.register('fixed_price_chf')} required />
+            {isSharedFee && <small className="muted">{t('pages.tariffs.form.sharedFeeHint')}</small>}
           </label>
         ) : null}
 

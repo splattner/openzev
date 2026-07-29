@@ -25,6 +25,11 @@ class BillingMode(models.TextChoices):
     YEARLY_FEE = "yearly_fee", "Yearly fee"
     PER_METERING_POINT_MONTHLY_FEE = "per_metering_point_monthly_fee", "Per metering point monthly fee"
     PER_METERING_POINT_YEARLY_FEE = "per_metering_point_yearly_fee", "Per metering point yearly fee"
+    # For the two shared modes ``fixed_price_chf`` is the amount the *community*
+    # pays per month (or per year), not the amount each participant pays: it is
+    # divided by the number of participants active in each billed month.
+    SHARED_MONTHLY_FEE = "shared_monthly_fee", "Shared monthly fee (split across participants)"
+    SHARED_YEARLY_FEE = "shared_yearly_fee", "Shared yearly fee (split across participants)"
 
 
 class PeriodType(models.TextChoices):

@@ -872,6 +872,9 @@ export const en = {
                 yearlyFee: 'Yearly fee (CHF)',
                 mpMonthlyFee: 'Per metering point monthly fee (CHF)',
                 mpYearlyFee: 'Per metering point yearly fee (CHF)',
+                sharedMonthlyFee: 'Shared monthly fee, total for the community (CHF)',
+                sharedYearlyFee: 'Shared yearly fee, total for the community (CHF)',
+                sharedFeeHint: 'Enter the total amount the community pays. It is divided equally between the participants active in each billed month.',
                 percentage: 'Percentage (%)',
                 tariff: 'Tariff',
                 periodType: 'Period type',
@@ -895,6 +898,8 @@ export const en = {
                 yearly_fee: 'Yearly fee split by month',
                 per_metering_point_monthly_fee: 'Per metering point monthly fee',
                 per_metering_point_yearly_fee: 'Per metering point yearly fee split by month',
+                shared_monthly_fee: 'Monthly fee shared between participants',
+                shared_yearly_fee: 'Yearly fee shared between participants, split by month',
             },
             energyTypes: {
                 local: 'Local',

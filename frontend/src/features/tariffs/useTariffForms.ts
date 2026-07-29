@@ -32,6 +32,8 @@ export const tariffFormSchema = z
       'yearly_fee',
       'per_metering_point_monthly_fee',
       'per_metering_point_yearly_fee',
+      'shared_monthly_fee',
+      'shared_yearly_fee',
       'percentage_of_energy',
     ]),
     energy_type: z.enum(['local', 'grid', 'feed_in']),

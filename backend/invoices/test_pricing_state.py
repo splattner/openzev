@@ -102,12 +102,20 @@ def test_a_percentage_tariff_without_a_percentage_is_ignored():
     assert resolver.percentage(EnergyType.LOCAL, JAN) == []
 
 
-def test_fixed_fee_tariffs_are_not_bucketed_at_all():
+@pytest.mark.parametrize("billing_mode", [
+    BillingMode.MONTHLY_FEE,
+    BillingMode.YEARLY_FEE,
+    BillingMode.PER_METERING_POINT_MONTHLY_FEE,
+    BillingMode.PER_METERING_POINT_YEARLY_FEE,
+    BillingMode.SHARED_MONTHLY_FEE,
+    BillingMode.SHARED_YEARLY_FEE,
+])
+def test_fixed_fee_tariffs_are_not_bucketed_at_all(billing_mode):
     """They are billed once per period, not per reading, so the per-reading
     loops must never see them."""
     zev = factories.ZevFactory()
     fee = factories.TariffFactory(
-        zev=zev, category=TariffCategory.METERING, billing_mode=BillingMode.MONTHLY_FEE,
+        zev=zev, category=TariffCategory.METERING, billing_mode=billing_mode,
         fixed_price_chf=Decimal("5.00"), valid_from=date(2026, 1, 1),
     )
 
