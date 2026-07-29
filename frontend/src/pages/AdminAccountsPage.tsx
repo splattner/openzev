@@ -4,6 +4,7 @@ import { faCheck, faCopy, faEllipsis, faLink, faPen, faPlus, faTrash, faUser, fa
 import { useState, type FormEvent } from 'react'
 import { ActionMenu } from '../components/ActionMenu'
 import { ConfirmDialog, useConfirmDialog } from '../components/ConfirmDialog'
+import { StatCard } from '../components/StatCard'
 import { FormModal } from '../components/FormModal'
 import {
     createParticipantAccount,
@@ -254,18 +255,9 @@ export function AdminAccountsPage() {
             </header>
 
             <section style={{ display: 'grid', gap: '1rem', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
-                <article className="stat-card">
-                    <div className="muted">{t('pages.accounts.stats.totalParticipants')}</div>
-                    <h3>{participants.length}</h3>
-                </article>
-                <article className="stat-card">
-                    <div className="muted">{t('pages.accounts.stats.linkedParticipants')}</div>
-                    <h3>{linkedParticipantsCount}</h3>
-                </article>
-                <article className="stat-card">
-                    <div className="muted">{t('pages.accounts.stats.standaloneAccounts')}</div>
-                    <h3>{standaloneAccountsCount}</h3>
-                </article>
+                <StatCard label={t('pages.accounts.stats.totalParticipants')} value={participants.length} />
+                <StatCard label={t('pages.accounts.stats.linkedParticipants')} value={linkedParticipantsCount} />
+                <StatCard label={t('pages.accounts.stats.standaloneAccounts')} value={standaloneAccountsCount} />
             </section>
 
             {credentialsNotice && (

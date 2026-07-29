@@ -361,6 +361,7 @@ redirect to the matching tab on this page.
 **File:** `frontend/src/pages/AdminVatSettingsPage.tsx`
 
 - Query: `useQuery({ queryKey: ['vat-rates'], queryFn: fetchVatRates })`.
+- **Summary cards:** three `StatCard` components above the form — configured rate count, today's active rate (percentage, or the translated "none" label), and count of scheduled rates with `valid_from` in the future.
 - **Create/Edit form:** 3 fields (rate %, valid_from date, valid_to date optional). Default rate: `8.1`. The frontend converts percentage to fraction before sending (`(percentage / 100).toFixed(4)`).
 - **Rate table:** displays rate as percentage (`(rate × 100).toFixed(2)%`), valid_from (formatted), valid_to (formatted or "Open"), with Edit/Delete buttons.
 - **Delete:** Uses `ConfirmDialog` component for destructive confirmation.

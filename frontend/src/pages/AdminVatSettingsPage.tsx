@@ -9,6 +9,7 @@ import { formatShortDate, useAppSettings } from '../lib/appSettings'
 import { useTranslation } from 'react-i18next'
 import { useToast } from '../lib/toast'
 import { ConfirmDialog, useConfirmDialog } from '../components/ConfirmDialog'
+import { StatCard } from '../components/StatCard'
 import type { VatRateInput } from '../types/api'
 
 type VatRateFormState = {
@@ -108,20 +109,12 @@ export function AdminVatSettingsPage() {
                     gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
                 }}
             >
-                <article className="stat-card">
-                    <span className="eyebrow">{t('adminVatSettings.stats.total')}</span>
-                    <strong>{vatRates.length}</strong>
-                </article>
-                <article className="stat-card">
-                    <span className="eyebrow">{t('adminVatSettings.stats.active')}</span>
-                    <strong>
-                        {activeVatRate ? `${(Number(activeVatRate.rate) * 100).toFixed(2)}%` : t('adminVatSettings.stats.none')}
-                    </strong>
-                </article>
-                <article className="stat-card">
-                    <span className="eyebrow">{t('adminVatSettings.stats.scheduled')}</span>
-                    <strong>{futureVatRatesCount}</strong>
-                </article>
+                <StatCard label={t('adminVatSettings.stats.total')} value={vatRates.length} />
+                <StatCard
+                    label={t('adminVatSettings.stats.active')}
+                    value={activeVatRate ? `${(Number(activeVatRate.rate) * 100).toFixed(2)}%` : t('adminVatSettings.stats.none')}
+                />
+                <StatCard label={t('adminVatSettings.stats.scheduled')} value={futureVatRatesCount} />
             </section>
 
             <section className="card page-stack" style={{ maxWidth: 860 }}>

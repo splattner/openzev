@@ -42,7 +42,7 @@ in the frontend.
 | Action hierarchy | Primary, secondary, overflow, destructive, modal footer actions |
 | Icon treatment | Font Awesome icon + label buttons, fixed-width icon alignment |
 | Page grouping patterns | When to use sections, nested cards, tables, DataGrid, or tabs |
-| Shared primitives | `ActionMenu`, `ConfirmDialog`, `FormModal`, `BillingPeriodSelector` |
+| Shared primitives | `ActionMenu`, `ConfirmDialog`, `FormModal`, `BillingPeriodSelector`, `StatCard` |
 | I18n constraints | User-facing text in locale files only; translated labels must not encode visual symbols |
 | Responsive behaviour | Management pages must remain usable on mobile and reduced-width layouts |
 | Reference pages | `ParticipantsPage`, `MeteringPointsPage`, `InvoicesPage`, `ImportsPage`, `TariffsPage` |
@@ -93,6 +93,7 @@ defined by shared frontend primitives and CSS contracts.
 | `frontend/src/components/ConfirmDialog.tsx` | `useConfirmDialog`, `ConfirmDialog` | Required wrapper for destructive or high-impact actions. Supports `title`, `message`, `confirmText`, `cancelText`, `isDangerous`, and async confirm handlers. |
 | `frontend/src/components/FormModal.tsx` | `FormModal` | Generic modal shell for CRUD forms and small workflow dialogs. |
 | `frontend/src/components/BillingPeriodSelector.tsx` | `BillingPeriodSelector` | Specialized period-navigation control for invoice workflows; uses the same button language as management-page actions. |
+| `frontend/src/components/StatCard.tsx` | `StatCard` | Summary-stat card for page-level counts and metrics. Renders a `stat-label`, an `h3` value, and an optional muted `hint`. Pages must use it instead of hand-rolled `.stat-card` markup so summary stats stay visually consistent. |
 
 ### 4.2 CSS contracts
 
