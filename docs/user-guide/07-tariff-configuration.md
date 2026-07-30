@@ -206,27 +206,65 @@ Most ZEVs use multiple tariffs simultaneously:
 
 During billing, OpenZEV automatically selects the right tariff for each timestamp and energy type.
 
-## Seasonal and Quarterly Tariffs
+## Tariff Versions
 
-Create version-specific tariffs for seasonal changes:
+Prices change — usually every year. Rather than creating a new tariff each time,
+add a **version** to the existing one.
 
-**Example: Summer vs. Winter**
+All versions of a tariff share its **name**. That is what makes them versions:
+the name identifies the tariff, and the validity windows say which version
+applied when.
 
 ```
-Tariff: Local Energy HT "Spring/Summer 2026-04-01"
-  Valid From: 2026-04-01
-  Valid To: 2026-09-30
-  HT Price: CHF 0.10/kWh
-  NT Price: CHF 0.05/kWh
-
-Tariff: Local Energy HT "Fall/Winter 2026-10-01"
-  Valid From: 2026-10-01
-  Valid To: 2027-03-31
-  HT Price: CHF 0.12/kWh (higher winter demand)
-  NT Price: CHF 0.06/kWh
+Local Energy                                    ← one tariff, three versions
+├─ 2025-01-01 → 2025-12-31   0.10 CHF/kWh
+├─ 2026-01-01 → 2026-12-31   0.11 CHF/kWh
+└─ 2027-01-01 → (open)       0.12 CHF/kWh       ← active
 ```
 
-OpenZEV automatically applies the correct tariff based on each invoice period's end date.
+### Adding a New Version
+
+1. Find the tariff and click **New version**
+2. Enter the date the new prices take effect
+3. Adjust the prices (pre-filled from the current version)
+4. Click **Create**
+
+OpenZEV **closes the previous version automatically** on the day before, so the
+timeline stays continuous. You never set an end date by hand.
+
+> **Why this matters:** if a day falls between two versions, OpenZEV has no price
+> for it. The energy still appears on the invoice but is **charged at nothing** —
+> a whole month can be given away without any warning. Letting OpenZEV compute
+> the end date removes the off-by-one that causes this. Any series that already
+> has a gap is flagged on the tariff card.
+
+You can also insert a version *between* two existing ones; OpenZEV bounds it on
+both sides.
+
+### Comparing Versions
+
+Expand a tariff to see its full history, with each version's window and prices.
+This is also where price changes over time are charted, so you can see how a
+rate has moved across years.
+
+### Renaming
+
+Renaming is done for the **whole tariff**, not per version — the name is what
+holds the versions together, so renaming just one would split it into two
+unrelated tariffs.
+
+### Duplicating
+
+Use **Duplicate** to create a *different* tariff starting from an existing one's
+numbers. It asks for a new name and leaves the original untouched. (Use **New
+version** instead when the prices of the *same* tariff have changed.)
+
+### Which Version Gets Billed
+
+OpenZEV picks the version that was valid **on each individual reading's
+timestamp** — not the one valid at the end of the invoice period. So an invoice
+covering a price change is priced correctly on both sides of it: a January–March
+invoice uses the old price for January and the new one from February.
 
 ## Tariff Validation
 
@@ -301,6 +339,12 @@ Edit **future** tariffs freely:
 4. Click **Save**
 
 Changes apply to **new invoices only**. Past invoices keep original tariffs.
+
+> **Prices changed from a certain date?** Use **New version** instead of editing.
+> Editing rewrites what the *current* version has always charged; a new version
+> records the change, keeps the old prices on the record, and lets invoices
+> spanning the switch bill each part correctly. See
+> [Tariff Versions](#tariff-versions).
 
 ### Deactivating a Tariff
 

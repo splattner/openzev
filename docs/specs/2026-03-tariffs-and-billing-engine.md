@@ -69,6 +69,62 @@ re-implement the engine from scratch.
 
 A tariff is **active on day `d`** iff `valid_from ≤ d` and (`valid_to IS NULL` or `valid_to ≥ d`).
 
+### 3.1.1 Tariff series (versioning)
+
+Every tariff in a ZEV sharing a `name` is a **version** of one **series**.  This
+is not a convention layered on the data — it follows from the overlap rule
+below: versions of a series form a non-overlapping timeline by construction, and
+§4.4.1 already selects the right one because tariff resolution is evaluated
+**per day**, not once per invoice.
+
+There is no separate series table.  The series is derived from `(zev, name)`;
+helpers live in `tariffs/series.py`.
+
+Every version of one series must agree on `category`, `billing_mode`, and
+`energy_type` (`SERIES_FIELDS`), enforced in `Tariff.clean()`.  Without that,
+"the same tariff over time" would be meaningless and comparing versions could
+compare a local-energy rate against a grid fee.
+
+**Prices are not on the tariff.**  For `energy` mode they live on
+`TariffPeriod`; for fixed-fee modes on `fixed_price_chf`; a
+`percentage_of_energy` tariff has no own price at all.  Any operation that
+copies a version must therefore copy its price bands too, or the copy prices
+nothing.
+
+#### Gaps are a billing hazard
+
+A day covered by **no** version of a series is not an error anywhere today, and
+its consequences are silent: §4.4.1 prices energy only against tariffs active on
+that day, so the allocated kWh still appear on the invoice while no line item is
+produced.
+
+Measured on a 3-month invoice with a one-month gap and 500 kWh consumed inside
+it:
+
+```
+grid kWh on the invoice: 500.0000
+line items:              0
+subtotal CHF:            0.00
+```
+
+`find_gaps()` reports interior gaps so callers can surface them.  Only interior
+gaps count: the stretch before a series begins, and the stretch after an
+end-dated last version, are simply periods the series does not cover.
+
+#### Version window arithmetic
+
+`plan_new_version(versions, valid_from)` decides how a new version slots in:
+
+- The **predecessor** (greatest `valid_from` below the new one) is truncated to
+  `valid_from − 1 day`, but **only** if it would otherwise overlap.  A
+  predecessor that already ends earlier is left alone — extending a closed
+  window would change what that period bills, and the gap may be deliberate.
+- The new version is capped at `successor.valid_from − 1 day` when a later
+  version exists, so a mid-chain insert is bounded on **both** sides.  Without
+  the upper bound the new version would swallow its successor's window and be
+  rejected by the overlap guard for reasons the caller cannot see.
+- Two versions of one series may not share a `valid_from`.
+
 OpenZEV rejects overlapping validity windows for two tariffs of the same
 `(zev, name)` — regardless of billing mode.
 
@@ -469,6 +525,56 @@ ELSE:
 Stripped fields: `id`, `zev`, `created_at`, `updated_at` are excluded so the
 preset is portable across ZEVs.
 
+### 6.1a Tariff series and version endpoints
+
+All four are `IsAuthenticated`, `IsZevOwnerOrAdmin`, and ZEV-scoped through
+`ZevScopedQuerySetMixin` — a caller cannot reach another owner's tariff (404).
+
+| Method | URL | Purpose |
+|---|---|---|
+| `GET` | `/tariffs/tariffs/series/` | Tariffs grouped into series. Optional `?zev_id=`. |
+| `POST` | `/tariffs/tariffs/{id}/new-version/` | Add a version to this series, closing the previous one. |
+| `POST` | `/tariffs/tariffs/{id}/duplicate/` | Copy under a new name as a separate series. |
+| `POST` | `/tariffs/tariffs/{id}/rename-series/` | Rename every version at once. |
+
+**`GET series/`** returns one object per series, sorted by `(category, name)`:
+
+| Field | Notes |
+|---|---|
+| `name`, `category`, `billing_mode`, `energy_type` | Invariant across the series (§3.1.1) |
+| `version_count` | |
+| `active_version_id` | `null` when today falls in a gap, or the series has been retired |
+| `gaps` | `[{start, end}]`, inclusive, interior only |
+| `versions` | Full `TariffSerializer` payloads, **newest first** |
+
+**`POST new-version/`** — body `{valid_from, fixed_price_chf?, percentage?, periods?}`.
+Copies the source version's configuration, applies the overrides, and copies the
+source's price bands unless `periods` is supplied.  Prices are overridable in the
+same request because a new version almost always exists *because* the price
+changed; requiring a second call would make the common case two steps.
+Truncation of the predecessor happens **before** the insert, since saving while
+the predecessor still covers the date would trip the overlap guard.
+`400` if a version already starts on that date.
+
+**`POST duplicate/`** — body `{name, valid_from?, fixed_price_chf?, percentage?, periods?}`.
+Does not touch the source's timeline.  `400` if `name` is blank or equal to the
+source's — the latter request means "another version", which has different
+timeline semantics and its own endpoint.
+
+**`POST rename-series/`** — body `{name}`.  Renames every version via
+`bulk_update`, deliberately bypassing `full_clean()`: renaming the whole series
+preserves every invariant, but validating each row against its not-yet-renamed
+siblings would report a false name clash.  `400` if another series in the ZEV
+already holds that name.
+
+Renaming is only offered series-wide.  Because the name *is* the series
+identity, renaming one version would fork the chain and leave a hole in the
+original timeline, so `name` is not editable per version.
+
+**Audit events:** `tariff.new_version`, `tariff.duplicate`,
+`tariff.rename_series` (all `AuditActionCategory.TARIFF`).  The rename records a
+`name` before/after diff.
+
 ### 6.2 Tariff preset import
 
 **Endpoint:** `POST /api/v1/tariffs/tariffs/import/`
@@ -836,6 +942,27 @@ The description renders as: `"Surcharge 50% (50% von CHF 0.32/kWh)"` (German).
 | `test_import_accepts_several_simultaneous_components_in_one_category` | §3.1: multiple per-kWh components sharing category/mode/energy type import cleanly |
 | `test_import_reports_every_rejected_tariff_and_saves_nothing` | §6.2: every rejected entry reported by position and name in one response; valid entries rolled back with them |
 | `test_import_rejects_invalid_period_payload` | §6.2: nested period errors surface per entry |
+
+### Backend (`tariffs/test_series.py`) — version arithmetic (no DB)
+
+| Test case | Validates |
+|---|---|
+| `active_version` across both inclusive bounds, open-ended, and inside a gap | §3.1.1 day resolution |
+| `find_gaps`: contiguous, one missing month, **one missing day**, several interior gaps, leading/trailing stretches ignored, input order irrelevant | §3.1.1 gap detection |
+| `plan_new_version`: append onto open-ended, truncate an over-long predecessor, mid-chain insert bounding both sides, predecessor already ending earlier left alone, prepend, first version of a series, only the immediate predecessor touched | §3.1.1 window arithmetic |
+
+### Backend (`tariffs/test_versioning.py`) — series API
+
+| Test case | Validates |
+|---|---|
+| Versions collapse into one series, newest first, active version identified, retired series has none | §6.1a `GET series/` |
+| Gaps reported / absent; series scoped to the caller's ZEVs; `?zev_id=` filter | §6.1a |
+| New version closes the predecessor the day before and leaves no gap | §3.1.1 |
+| New version copies HT/NT bands including times; can set new prices in one call; fixed-fee amount overridable | §6.1a |
+| Mid-chain insert is capped against its successor | §3.1.1 |
+| Duplicate starts a separate series without touching the source; refuses a blank or identical name | §6.1a |
+| Rename renames every version; refuses a name already in use; identical name is a no-op | §6.1a |
+| A version cannot change the series' category/billing mode/energy type | §3.1.1 |
 
 ### Backend (`tariffs/tests.py`) — validity windows
 

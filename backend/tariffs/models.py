@@ -4,6 +4,8 @@ from django.core.exceptions import ValidationError
 from django.db import models
 from zev.models import Zev
 
+from .series import SERIES_FIELDS
+
 
 class EnergyType(models.TextChoices):
     LOCAL = "local", "Local (Solar/ZEV)"
@@ -93,6 +95,25 @@ class Tariff(models.Model):
                     "validity period. Close the previous one with a valid_to date, or give this "
                     "one a different name if both should apply at the same time."
                 )
+
+            # Tariffs sharing a name are versions of one another, so they must
+            # agree on what the tariff *is*. Letting these drift would make the
+            # series incoherent: comparing versions would compare a local-energy
+            # rate against a grid fee, and the engine would bucket the same
+            # "tariff" differently from one year to the next.
+            sibling = Tariff.objects.exclude(pk=self.pk).filter(
+                zev_id=self.zev_id, name=self.name
+            ).first()
+            if sibling is not None:
+                for field in SERIES_FIELDS:
+                    mine, theirs = getattr(self, field), getattr(sibling, field)
+                    if mine != theirs:
+                        errors[field] = (
+                            f'Other versions of "{self.name}" in this ZEV use '
+                            f"{field}={theirs!r}. Every version of a tariff must agree on its "
+                            "category, billing mode, and energy type — use a different name to "
+                            "create a separate tariff instead."
+                        )
 
         if errors:
             raise ValidationError(errors)
