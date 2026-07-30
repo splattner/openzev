@@ -962,6 +962,18 @@ export const fr = {
             },
             allWeekdays: 'tous',
             chfPerKwh: 'CHF/kWh',
+            priceHistory: {
+                title: 'Historique des prix',
+                derivedNote: 'Calcul\u00e9 \u00e0 partir des tarifs r\u00e9seau en vigueur \u00e0 l\u2019\u00e9poque : il change donc aussi lorsque ceux-ci changent.',
+                noPrice: 'aucun prix \u2014 p\u00e9riode non couverte',
+                bands: {
+                    flat: 'Tarif unique',
+                    high: 'Tarif haut (HT)',
+                    low: 'Tarif bas (NT)',
+                    amount: 'Montant',
+                    effective: 'Prix effectif',
+                },
+            },
             versions: {
                 count_one: '{{count}} version',
                 count_other: '{{count}} versions',

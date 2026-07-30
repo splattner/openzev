@@ -926,6 +926,18 @@ export const en = {
             },
             allWeekdays: 'all',
             chfPerKwh: 'CHF/kWh',
+            priceHistory: {
+                title: 'Price history',
+                derivedNote: 'Calculated from the grid tariffs in force at the time, so it also changes when those do.',
+                noPrice: 'no price \u2014 uncovered period',
+                bands: {
+                    flat: 'Flat',
+                    high: 'High (HT)',
+                    low: 'Low (NT)',
+                    amount: 'Amount',
+                    effective: 'Effective price',
+                },
+            },
             versions: {
                 count_one: '{{count}} version',
                 count_other: '{{count}} versions',

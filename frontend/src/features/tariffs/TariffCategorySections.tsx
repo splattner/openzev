@@ -21,6 +21,7 @@ import type {
     TariffVersion,
 } from '../../types/api'
 import { todayIso, validityState, type ValidityState } from './validity'
+import { TariffPriceHistoryChart } from './TariffPriceHistoryChart'
 
 type TariffSeriesSection = {
     category: Tariff['category']
@@ -37,6 +38,8 @@ const VALIDITY_BADGE_CLASS: Record<ValidityState, string> = {
 
 type TariffCategorySectionsProps = {
     tariffSections: TariffSeriesSection[]
+    /** Every series in scope — percentage tariffs derive their price from the grid ones. */
+    allSeries: TariffSeries[]
     percentageBasePricing: Map<string, number>
     settings: AppSettings
     deleteTariffDisabled: boolean
@@ -53,6 +56,7 @@ type TariffCategorySectionsProps = {
 
 export function TariffCategorySections({
     tariffSections,
+    allSeries,
     percentageBasePricing,
     settings,
     deleteTariffDisabled,
@@ -346,6 +350,14 @@ export function TariffCategorySections({
                                                     })}
                                                 </div>
                                             </div>
+
+                                            {series.version_count > 1 && (
+                                                <TariffPriceHistoryChart
+                                                    series={series}
+                                                    allSeries={allSeries}
+                                                    settings={settings}
+                                                />
+                                            )}
 
                                             {notes && (
                                                 <div className="tariff-card-details">

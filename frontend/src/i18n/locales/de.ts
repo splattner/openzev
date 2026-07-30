@@ -955,6 +955,18 @@ export const de = {
             },
             allWeekdays: 'alle',
             chfPerKwh: 'CHF/kWh',
+            priceHistory: {
+                title: 'Preisverlauf',
+                derivedNote: 'Berechnet aus den damals g\u00fcltigen Netztarifen \u2014 \u00e4ndert sich also auch, wenn diese sich \u00e4ndern.',
+                noPrice: 'kein Preis \u2014 nicht abgedeckter Zeitraum',
+                bands: {
+                    flat: 'Einheitstarif',
+                    high: 'Hochtarif (HT)',
+                    low: 'Niedertarif (NT)',
+                    amount: 'Betrag',
+                    effective: 'Effektiver Preis',
+                },
+            },
             versions: {
                 count_one: '{{count}} Version',
                 count_other: '{{count}} Versionen',

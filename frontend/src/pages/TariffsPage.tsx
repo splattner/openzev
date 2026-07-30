@@ -303,6 +303,7 @@ export function TariffsPage() {
             ) : (
                 <TariffCategorySections
                     tariffSections={tariffSections}
+                    allSeries={allSeries}
                     percentageBasePricing={percentageBasePricing}
                     settings={settings}
                     deleteTariffDisabled={deleteTariffPending || dialogLoading}
