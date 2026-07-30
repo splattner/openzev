@@ -2,7 +2,7 @@ import { useMutation, type QueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { createTariffVersion, duplicateTariff, renameTariffSeries } from '../../lib/api/tariffs'
 import { formatApiError } from '../../lib/api/errors'
-import { queryKeys } from '../../lib/api/queryKeys'
+import { invalidateTariffQueries } from './invalidate'
 import type { TariffSeries, TariffVersion, TariffVersionInput } from '../../types/api'
 
 /** Which dialog the versioning flow currently has open, and against what. */
@@ -22,14 +22,7 @@ type Params = {
 export function useTariffVersions({ selectedZevId, queryClient, pushToast, t }: Params) {
   const [dialog, setDialog] = useState<VersionDialog>(null)
 
-  // Every one of these can reshape a whole series — new-version also edits the
-  // predecessor's end date, and rename touches every row — so the series query
-  // is refetched wholesale rather than patched.
-  function invalidate() {
-    void queryClient.invalidateQueries({ queryKey: queryKeys.tariffs.series(selectedZevId || undefined) })
-    void queryClient.invalidateQueries({ queryKey: queryKeys.tariffs.list(selectedZevId || undefined) })
-    void queryClient.invalidateQueries({ queryKey: queryKeys.tariffs.periods() })
-  }
+  const invalidate = () => invalidateTariffQueries(queryClient, selectedZevId)
 
   const newVersionMutation = useMutation({
     mutationFn: ({ id, payload }: { id: string, payload: TariffVersionInput }) =>

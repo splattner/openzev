@@ -981,6 +981,7 @@ export const fr = {
                 renameTitle: 'Renommer \u00ab {{name}} \u00bb',
                 renameHint_one: 'Le changement de nom concerne la seule version de ce tarif.',
                 renameHint_other: 'Le changement de nom concerne les {{count}} versions \u2014 le nom est ce qui les relie.',
+                editVersion: 'Modifier cette version',
                 deleteVersion: 'Supprimer cette version',
                 viewingOldVersion: 'Version ant\u00e9rieure affich\u00e9e',
                 gapBadge_one: '{{count}} lacune',

@@ -945,6 +945,7 @@ export const en = {
                 renameTitle: 'Rename "{{name}}"',
                 renameHint_one: 'Renaming applies to the single version of this tariff.',
                 renameHint_other: 'Renaming applies to all {{count}} versions — the name is what keeps them together.',
+                editVersion: 'Edit this version',
                 deleteVersion: 'Delete this version',
                 viewingOldVersion: 'Viewing an older version',
                 gapBadge_one: '{{count}} gap',

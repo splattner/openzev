@@ -2,7 +2,7 @@ import { useMutation, type QueryClient } from '@tanstack/react-query'
 import { useState, type ChangeEvent } from 'react'
 import { exportTariffs, importTariffs } from '../../lib/api/tariffs'
 import { formatApiError } from '../../lib/api/errors'
-import { queryKeys } from '../../lib/api/queryKeys'
+import { invalidateTariffQueries } from './invalidate'
 import type { TariffPreset } from '../../types/api'
 
 type TariffTransferParams = {
@@ -49,8 +49,7 @@ export function useTariffTransfer({ selectedZevId, queryClient, pushToast, t }: 
     mutationFn: ({ zevId, tariffs }: { zevId: string; tariffs: TariffPreset[] }) => importTariffs(zevId, tariffs),
     onSuccess: (result) => {
       setShowImportModal(false)
-      void queryClient.invalidateQueries({ queryKey: queryKeys.tariffs.list(selectedZevId || undefined) })
-      void queryClient.invalidateQueries({ queryKey: queryKeys.tariffs.periods() })
+      invalidateTariffQueries(queryClient, selectedZevId)
       pushToast(t('pages.tariffs.messages.imported', { count: result.created }), 'success')
     },
     onError: (error) => pushToast(formatApiError(error, t('pages.tariffs.messages.importFailed')), 'error'),

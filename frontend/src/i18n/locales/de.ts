@@ -974,6 +974,7 @@ export const de = {
                 renameTitle: '\u00ab{{name}}\u00bb umbenennen',
                 renameHint_one: 'Die Umbenennung betrifft die einzige Version dieses Tarifs.',
                 renameHint_other: 'Die Umbenennung betrifft alle {{count}} Versionen \u2014 der Name h\u00e4lt sie zusammen.',
+                editVersion: 'Diese Version bearbeiten',
                 deleteVersion: 'Diese Version l\u00f6schen',
                 viewingOldVersion: '\u00c4ltere Version angezeigt',
                 gapBadge_one: '{{count}} L\u00fccke',

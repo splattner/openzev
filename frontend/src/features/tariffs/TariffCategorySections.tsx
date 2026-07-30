@@ -317,11 +317,26 @@ export function TariffCategorySections({
                                                                     </span>
                                                                     <strong>{priceSummary(series, version)}</strong>
                                                                 </button>
+                                                                {/* Edit sits on the row, not only in the header:
+                                                                    correcting a superseded version's end date is a
+                                                                    normal follow-up to adding a new one, and going
+                                                                    through "select the row, then use the header
+                                                                    button" made it look unsupported. */}
+                                                                <button
+                                                                    className="button button-secondary button-compact"
+                                                                    type="button"
+                                                                    onClick={() => onEditTariff(version)}
+                                                                    title={t('pages.tariffs.versions.editVersion')}
+                                                                    aria-label={t('pages.tariffs.versions.editVersion')}
+                                                                >
+                                                                    <FontAwesomeIcon icon={faPen} fixedWidth />
+                                                                </button>
                                                                 <button
                                                                     className="button button-danger button-compact"
                                                                     type="button"
                                                                     disabled={deleteTariffDisabled}
                                                                     onClick={() => onDeleteTariff(version)}
+                                                                    title={t('pages.tariffs.versions.deleteVersion')}
                                                                     aria-label={t('pages.tariffs.versions.deleteVersion')}
                                                                 >
                                                                     <FontAwesomeIcon icon={faTrash} fixedWidth />

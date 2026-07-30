@@ -9,7 +9,7 @@ import {
   updateTariffPeriod,
 } from '../../lib/api/tariffs'
 import { formatApiError } from '../../lib/api/errors'
-import { queryKeys } from '../../lib/api/queryKeys'
+import { invalidateTariffQueries } from './invalidate'
 import type { Tariff, TariffInput, TariffPeriod, TariffPeriodInput } from '../../types/api'
 
 type ConfirmOptions = {
@@ -77,7 +77,7 @@ export function useTariffCrud({
         variables.id ? t('pages.tariffs.messages.updated') : t('pages.tariffs.messages.created'),
         'success',
       )
-      void queryClient.invalidateQueries({ queryKey: queryKeys.tariffs.list(selectedZevId || undefined) })
+      invalidateTariffQueries(queryClient, selectedZevId)
     },
     onError: (error) => pushToast(formatApiError(error, t('pages.tariffs.messages.saveFailed')), 'error'),
   })
@@ -86,8 +86,7 @@ export function useTariffCrud({
     mutationFn: deleteTariff,
     onSuccess: () => {
       pushToast(t('pages.tariffs.messages.deleted'), 'success')
-      void queryClient.invalidateQueries({ queryKey: queryKeys.tariffs.list(selectedZevId || undefined) })
-      void queryClient.invalidateQueries({ queryKey: queryKeys.tariffs.periods() })
+      invalidateTariffQueries(queryClient, selectedZevId)
     },
     onError: (error) => pushToast(formatApiError(error, t('pages.tariffs.messages.deleteFailed')), 'error'),
   })
@@ -107,7 +106,7 @@ export function useTariffCrud({
         variables.id ? t('pages.tariffs.messages.periodUpdated') : t('pages.tariffs.messages.periodCreated'),
         'success',
       )
-      void queryClient.invalidateQueries({ queryKey: queryKeys.tariffs.periods() })
+      invalidateTariffQueries(queryClient, selectedZevId)
     },
     onError: (error) => pushToast(formatApiError(error, t('pages.tariffs.messages.periodSaveFailed')), 'error'),
   })
@@ -116,7 +115,7 @@ export function useTariffCrud({
     mutationFn: deleteTariffPeriod,
     onSuccess: () => {
       pushToast(t('pages.tariffs.messages.periodDeleted'), 'success')
-      void queryClient.invalidateQueries({ queryKey: queryKeys.tariffs.periods() })
+      invalidateTariffQueries(queryClient, selectedZevId)
     },
     onError: (error) => pushToast(formatApiError(error, t('pages.tariffs.messages.periodDeleteFailed')), 'error'),
   })
