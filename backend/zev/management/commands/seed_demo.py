@@ -59,6 +59,19 @@ def previous_quarter(day: date) -> tuple[date, date]:
     return quarter_start(previous_end), previous_end
 
 
+def years_before(day: date, years: int) -> date:
+    """``day`` shifted back whole years, clamping 29 February to the 28th.
+
+    Tariff history is anchored to the seed window's start, which is a quarter
+    boundary by default — so the clamp only comes into play for a hand-passed
+    ``--start-date`` of 29 February, where ``replace`` would otherwise raise.
+    """
+    try:
+        return day.replace(year=day.year - years)
+    except ValueError:
+        return day.replace(year=day.year - years, day=28)
+
+
 class Command(BaseCommand):
     help = "Seed the database with a reusable OpenZEV demo environment"
 
@@ -258,6 +271,8 @@ class Command(BaseCommand):
                         f"ZEV: {zev.name}",
                         f"Metering period: {start_date} -> {end_date}",
                         f"Invoice period: {invoice_period_start} -> {invoice_period_end}",
+                        f"Tariffs: {zev.tariffs.count()} versions across "
+                        f"{zev.tariffs.values('name').distinct().count()} tariffs",
                         f"Invoices created: {len(seeded_invoices)}",
                         f"Deleted existing demo readings: {deleted_readings}",
                         f"Production total: {production_total} kWh",
@@ -401,6 +416,10 @@ class Command(BaseCommand):
                         "weekdays": "",
                     }
                 ],
+                "price_history": [
+                    {"prices": [Decimal("0.15000")]},
+                    {"prices": [Decimal("0.16500")]},
+                ],
             },
             {
                 "name": "Grid Energy HT/NT",
@@ -425,6 +444,13 @@ class Command(BaseCommand):
                         "time_to": None,
                         "weekdays": "",
                     },
+                ],
+                # HT and NT both rise, but HT faster, so the chart shows the
+                # spread widening (0.050 -> 0.060 -> 0.070) rather than two
+                # parallel lines that could just as well be one.
+                "price_history": [
+                    {"prices": [Decimal("0.24500"), Decimal("0.19500")]},
+                    {"prices": [Decimal("0.27000"), Decimal("0.21000")]},
                 ],
             },
             {
@@ -454,6 +480,13 @@ class Command(BaseCommand):
                 "percentage": Decimal("18.00"),
                 "notes": "Sample levy priced as a percentage of the grid base tariff.",
                 "periods": [],
+                # A percentage version carries no price of its own, so its chart
+                # is the *derived* effective price — it moves both when the
+                # percentage changes and when the grid tariffs it references do.
+                "price_history": [
+                    {"percentage": Decimal("15.00")},
+                    {"percentage": Decimal("16.50")},
+                ],
             },
             {
                 "name": "Metering Service Fee",
@@ -467,43 +500,76 @@ class Command(BaseCommand):
             },
         ]
 
-        for spec in tariff_specs:
-            # Look up by name only. Keying on valid_from as well would create a
-            # second tariff whenever the seed window moves, and the two would be
-            # rejected as overlapping windows.
-            tariff, _ = Tariff.objects.get_or_create(
-                zev=zev,
-                name=spec["name"],
-                defaults={
-                    "category": spec["category"],
-                    "billing_mode": spec["billing_mode"],
-                    "energy_type": spec["energy_type"],
-                    "fixed_price_chf": spec["fixed_price_chf"],
-                    "percentage": spec["percentage"],
-                    "notes": spec["notes"],
-                    "valid_from": valid_from,
-                },
-            )
-            tariff.category = spec["category"]
-            tariff.billing_mode = spec["billing_mode"]
-            tariff.energy_type = spec["energy_type"]
-            tariff.fixed_price_chf = spec["fixed_price_chf"]
-            tariff.percentage = spec["percentage"]
-            tariff.valid_from = valid_from
-            tariff.valid_to = None
-            tariff.notes = spec["notes"]
-            tariff.save()
+        # Rebuild the seeded series rather than upserting into it. A tariff with
+        # history is a *timeline*, and the timeline is anchored to a seed window
+        # that moves every quarter: an upsert keyed on name alone cannot tell
+        # which of several versions it should be updating, and one keyed on
+        # (name, valid_from) would leave last quarter's versions behind to
+        # collide with this quarter's under the overlap guard. Deleting is safe
+        # because nothing references a Tariff — invoice items copy the price and
+        # description they were billed at — and filtering on the seeded names
+        # leaves any tariff added by hand alone.
+        Tariff.objects.filter(zev=zev, name__in=[spec["name"] for spec in tariff_specs]).delete()
 
-            tariff.periods.all().delete()
-            for period in spec["periods"]:
-                TariffPeriod.objects.create(
-                    tariff=tariff,
-                    period_type=period["period_type"],
-                    price_chf_per_kwh=period["price_chf_per_kwh"],
-                    time_from=period["time_from"],
-                    time_to=period["time_to"],
-                    weekdays=period["weekdays"],
+        for spec in tariff_specs:
+            history = spec.get("price_history", [])
+
+            # Oldest first, one year per historical version, each closed on the
+            # day before the next begins so the timeline has no gap. The final
+            # version starts at valid_from, stays open-ended, and keeps the
+            # spec's own prices — so the seeded invoices bill exactly what they
+            # billed before any of this history existed.
+            for index, prices in enumerate(history):
+                remaining = len(history) - index
+                self._create_tariff_version(
+                    zev,
+                    spec,
+                    prices,
+                    valid_from=years_before(valid_from, remaining),
+                    valid_to=years_before(valid_from, remaining - 1) - timedelta(days=1),
                 )
+
+            self._create_tariff_version(zev, spec, {}, valid_from=valid_from, valid_to=None)
+
+    def _create_tariff_version(
+        self,
+        zev: Zev,
+        spec: dict,
+        prices: dict,
+        valid_from: date,
+        valid_to: date | None,
+    ) -> Tariff:
+        """One version of a seeded tariff.
+
+        ``prices`` overrides just the price-carrying fields; empty means "use the
+        spec's own", which is how the current version is built. Historical
+        versions reuse the spec's band *structure* — the HT window and weekdays
+        rarely change when a price does — and override only the rates.
+        """
+        tariff = Tariff.objects.create(
+            zev=zev,
+            name=spec["name"],
+            category=spec["category"],
+            billing_mode=spec["billing_mode"],
+            energy_type=spec["energy_type"],
+            fixed_price_chf=prices.get("fixed_price_chf", spec["fixed_price_chf"]),
+            percentage=prices.get("percentage", spec["percentage"]),
+            notes=spec["notes"],
+            valid_from=valid_from,
+            valid_to=valid_to,
+        )
+
+        band_prices = prices.get("prices")
+        for band, period in enumerate(spec["periods"]):
+            TariffPeriod.objects.create(
+                tariff=tariff,
+                period_type=period["period_type"],
+                price_chf_per_kwh=band_prices[band] if band_prices else period["price_chf_per_kwh"],
+                time_from=period["time_from"],
+                time_to=period["time_to"],
+                weekdays=period["weekdays"],
+            )
+        return tariff
 
     def _seed_invoices(self, zev: Zev, period_start: date, period_end: date) -> list[Invoice]:
         """Generate invoices for the last complete billing period.

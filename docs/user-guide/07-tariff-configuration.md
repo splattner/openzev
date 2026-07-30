@@ -31,7 +31,9 @@ Tariffs are **activity-based**:
    - **Valid From** — Start date
    - **Valid To** — End date (leave blank for ongoing)
 
-   > **Tip:** Tariffs are versioned by validity—you can have multiple tariffs of the same type with different periods.
+   > **Tip:** Leave **Valid To** blank. When the price later changes, use **New
+   > version** rather than editing or creating a second tariff — see
+   > [Tariff Versions](#tariff-versions).
 
 4. Configure pricing (depends on type; see below)
 
@@ -225,12 +227,13 @@ Local Energy                                    ← one tariff, three versions
 ### Adding a New Version
 
 1. Find the tariff and click **New version**
-2. Enter the date the new prices take effect
+2. Enter the date the new prices take effect (defaults to today)
 3. Adjust the prices (pre-filled from the current version)
 4. Click **Create**
 
 OpenZEV **closes the previous version automatically** on the day before, so the
-timeline stays continuous. You never set an end date by hand.
+timeline stays continuous. You never set an end date by hand — the dialog names
+the closing date it will use as you pick the start date.
 
 > **Why this matters:** if a day falls between two versions, OpenZEV has no price
 > for it. The energy still appears on the invoice but is **charged at nothing** —
@@ -243,21 +246,49 @@ both sides.
 
 ### Comparing Versions
 
-Expand a tariff to see its full history, with each version's window and prices.
-This is also where price changes over time are charted, so you can see how a
-rate has moved across years.
+The Tariffs page shows **one card per tariff**, displaying what it costs *today*
+rather than a card per version. A badge tells you how many versions it has. Click
+**Show details** for the rest.
+
+**Version history** lists every version with its window and price. Click one to
+make the card show that version — its price bands and periods switch to the ones
+in force then, and a **Viewing an older version** badge appears so you can't
+mistake a historical rate for the current one. Click the active version to go
+back.
+
+Each row has its own edit and delete buttons, because correcting a superseded
+version's end date is a normal follow-up to adding a new one.
+
+![Tariff version history and price chart](screenshots/07b-tariff-versions.png)
+
+### Price History
+
+Once a tariff has **more than one version**, expanding it also charts how its
+price moved over time.
+
+- The line is **stepped**, not sloped — a price holds for its whole window and
+  then jumps. A sloped line would suggest it drifted between two Januaries.
+- HT and NT are **separate lines**, so you can see the spread widen or narrow.
+- **Uncovered stretches are shaded red** and the line breaks: nothing was billed
+  there. This is the same problem the gap badge reports, shown on a timeline.
+- For a **percentage tariff** the chart shows the *effective* price it worked out
+  to, derived from the grid tariffs in force at each point — so it moves when
+  those move, even in months this tariff itself did not change. A note under the
+  title says so.
 
 ### Renaming
 
 Renaming is done for the **whole tariff**, not per version — the name is what
 holds the versions together, so renaming just one would split it into two
-unrelated tariffs.
+unrelated tariffs. **Rename** sits in the version history header, and tells you
+how many versions it will affect.
 
 ### Duplicating
 
-Use **Duplicate** to create a *different* tariff starting from an existing one's
-numbers. It asks for a new name and leaves the original untouched. (Use **New
-version** instead when the prices of the *same* tariff have changed.)
+Use **Duplicate** (also in the version history header) to create a *different*
+tariff starting from an existing one's numbers. It asks for a new name and leaves
+the original untouched. (Use **New version** instead when the prices of the
+*same* tariff have changed.)
 
 ### Which Version Gets Billed
 
@@ -274,6 +305,7 @@ When saving a tariff, OpenZEV checks:
 | --- | --- |
 | **Valid From ≤ Valid To** | Validity period must be in order |
 | **No overlapping windows for the same name** | Two tariffs *called the same thing* can't both be valid on the same date — see below |
+| **Versions agree on identity** | All versions of a name share one category, billing mode and energy type |
 | **Price format** | Numeric, up to 5 decimals (e.g., `0.12345` CHF/kWh) |
 | **Mandatory fields** | Name, type, validity period, prices |
 
@@ -299,21 +331,27 @@ All four apply at once, and each becomes its own line on the invoice, so
 participants see what they are paying for rather than one merged figure.
 
 The **only** thing OpenZEV blocks is two tariffs with the **same name** whose
-validity windows overlap — because that is nearly always a forgotten end date:
+validity windows overlap — because same name means same tariff, so an overlap
+means two prices claim the same day:
 
 ```
 ✗ Local Energy   2026-01-01 → (open)      ← old version, never closed
   Local Energy   2026-04-01 → (open)      ← new version
     Both apply. Every participant is billed twice.
 
-✓ Local Energy   2026-01-01 → 2026-03-31  ← closed first
+✓ Local Energy   2026-01-01 → 2026-03-31  ← closed automatically
   Local Energy   2026-04-01 → (open)
 ```
 
-So when you introduce a new version of a tariff, set **Valid To** on the old one
-first. If two tariffs really are meant to apply together, give them different
-names — which you would want anyway, since the name is what appears on the
-invoice line.
+Use **New version** and you never hit this: OpenZEV closes the old window for
+you. You only see this error when editing validity dates by hand. If two tariffs
+really are meant to apply together, give them different names — which you would
+want anyway, since the name is what appears on the invoice line.
+
+Because a shared name makes two tariffs versions of each other, they must also
+**agree on what the tariff is** — same category, same billing mode, same energy
+type. OpenZEV rejects a version that disagrees and tells you which value the
+others use. If you meant a genuinely different tariff, give it a different name.
 
 ## Importing Several Tariffs at Once
 
@@ -340,6 +378,12 @@ Edit **future** tariffs freely:
 
 Changes apply to **new invoices only**. Past invoices keep original tariffs.
 
+**Edit** works on one **version**. The four fields that identify the tariff —
+name, category, billing mode, energy type — are therefore shown as values rather
+than inputs: they are shared by every version, so changing them on one alone
+would break the series. Use **Rename** for the name; for a different category,
+billing mode or energy type, create a separate tariff.
+
 > **Prices changed from a certain date?** Use **New version** instead of editing.
 > Editing rewrites what the *current* version has always charged; a new version
 > records the change, keeps the old prices on the record, and lets invoices
@@ -356,6 +400,11 @@ Set **Valid To** to exclude from future invoices:
 4. Click **Save**
 
 > **Important:** Never delete a tariff—always set Valid To instead. This preserves invoice audit trail.
+
+This applies to the delete button on a **version** row too. Deleting a version
+removes the prices that applied in its window, which leaves a gap: energy in
+those days is then billed at nothing. Reserve it for a version created by
+mistake — one you have not billed against.
 
 ## Tariff Application During Billing
 

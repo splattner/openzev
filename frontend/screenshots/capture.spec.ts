@@ -451,6 +451,20 @@ test.describe('User Guide Screenshots', () => {
     await screenshot(page, '07-tariffs')
   })
 
+  // 07b — A tariff's version history and price chart, both behind the expander
+  test('07b-tariff-versions', async ({ page }) => {
+    await navigateTo(page, '/tariffs')
+    const card = page.locator('article.tariff-card').filter({ hasText: 'Grid Energy HT/NT' }).first()
+    await card.waitFor({ timeout: 10_000 })
+    // The expander is the only button on the card carrying aria-expanded.
+    await card.getByRole('button', { expanded: false }).click()
+    // Waiting on the chart rather than the history: it renders only for a series
+    // with more than one version, so it also asserts the seed still has them.
+    await card.locator('.tariff-price-history').waitFor({ timeout: 10_000 })
+    await page.waitForTimeout(1000)  // let Recharts finish laying out
+    await screenshot(page, '07b-tariff-versions')
+  })
+
   // 08 — Invoices (period overview)
   test('08-invoices', async ({ page }) => {
     await navigateTo(page, '/invoices')

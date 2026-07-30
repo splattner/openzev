@@ -1,4 +1,5 @@
-from datetime import date, datetime, timezone
+from datetime import date, datetime, time, timezone
+from decimal import Decimal
 from unittest import mock
 
 from django.test import TestCase
@@ -8,8 +9,10 @@ from django.test import override_settings
 from rest_framework.test import APIClient
 
 from accounts.models import UserRole
-from zev.management.commands.seed_demo import previous_quarter, quarter_start
+from zev.management.commands.seed_demo import Command as SeedDemoCommand, previous_quarter, quarter_start, years_before
 from metering.models import MeterReading
+from tariffs.models import BillingMode, PeriodType, Tariff
+from tariffs.series import active_version, find_gaps
 from zev.models import MeteringPoint, MeteringPointAssignment, MeteringPointType, Participant, Zev
 
 
@@ -798,3 +801,113 @@ class SeedDemoPeriodHelpersTests(TestCase):
 
 	def test_previous_quarter_handles_a_leap_day(self):
 		self.assertEqual(previous_quarter(date(2024, 2, 29)), (date(2023, 10, 1), date(2023, 12, 31)))
+
+	def test_years_before_steps_back_whole_years(self):
+		self.assertEqual(years_before(date(2026, 4, 1), 1), date(2025, 4, 1))
+		self.assertEqual(years_before(date(2026, 4, 1), 2), date(2024, 4, 1))
+		self.assertEqual(years_before(date(2026, 1, 1), 0), date(2026, 1, 1))
+
+	def test_years_before_clamps_a_leap_day_onto_a_common_year(self):
+		"""Reachable only via --start-date; date.replace would raise instead."""
+		self.assertEqual(years_before(date(2024, 2, 29), 1), date(2023, 2, 28))
+
+
+class SeedDemoTariffVersionTests(TestCase):
+	"""The demo ZEV carries versioned tariffs, so the Tariffs page shows the
+	version history and the price chart at all — both need more than one version
+	to appear, and the previous seed produced exactly one per name."""
+
+	def setUp(self):
+		self.owner = make_user("seed_tariffs_owner", UserRole.ZEV_OWNER)
+		self.zev = Zev.objects.create(name="Seed Tariffs ZEV", owner=self.owner)
+		self.valid_from = date(2026, 4, 1)
+
+	def _seed(self, valid_from=None):
+		SeedDemoCommand()._seed_tariffs(self.zev, valid_from or self.valid_from)
+
+	def _versions(self, name):
+		return list(Tariff.objects.filter(zev=self.zev, name=name).order_by("valid_from"))
+
+	def test_seeds_several_versions_of_a_tariff(self):
+		self._seed()
+		self.assertEqual(len(self._versions("Grid Energy HT/NT")), 3)
+		self.assertEqual(len(self._versions("Local Solar Energy")), 3)
+		self.assertEqual(len(self._versions("Levies on Grid Energy")), 3)
+
+	def test_leaves_a_single_version_tariff_for_contrast(self):
+		self._seed()
+		self.assertEqual(len(self._versions("Feed-in Credit")), 1)
+		self.assertEqual(len(self._versions("Metering Service Fee")), 1)
+
+	def test_the_version_timeline_is_continuous(self):
+		"""A gap bills the energy inside it at nothing, so demo data must not
+		ship one — the point of the versioning UI is to prevent them."""
+		self._seed()
+		for name in ("Local Solar Energy", "Grid Energy HT/NT", "Levies on Grid Energy"):
+			with self.subTest(name=name):
+				self.assertEqual(find_gaps(self._versions(name)), [])
+
+	def test_only_the_newest_version_is_open_ended(self):
+		self._seed()
+		versions = self._versions("Grid Energy HT/NT")
+		self.assertEqual([version.valid_from for version in versions], [
+			date(2024, 4, 1), date(2025, 4, 1), date(2026, 4, 1),
+		])
+		self.assertEqual([version.valid_to for version in versions], [
+			date(2025, 3, 31), date(2026, 3, 31), None,
+		])
+
+	def test_the_active_version_carries_the_current_prices(self):
+		"""History is added behind the billed window, so invoices generated from
+		the seed bill exactly what they billed before it existed."""
+		self._seed()
+		active = self._versions("Grid Energy HT/NT")[-1]
+		prices = {period.period_type: period.price_chf_per_kwh for period in active.periods.all()}
+		self.assertEqual(prices[PeriodType.HIGH], Decimal("0.29500"))
+		self.assertEqual(prices[PeriodType.LOW], Decimal("0.22500"))
+
+	def test_historical_versions_reuse_the_band_structure_at_older_prices(self):
+		self._seed()
+		oldest = self._versions("Grid Energy HT/NT")[0]
+		bands = {period.period_type: period for period in oldest.periods.all()}
+		self.assertEqual(bands[PeriodType.HIGH].price_chf_per_kwh, Decimal("0.24500"))
+		self.assertEqual(bands[PeriodType.LOW].price_chf_per_kwh, Decimal("0.19500"))
+		# The HT window itself does not change when its price does.
+		self.assertEqual(bands[PeriodType.HIGH].weekdays, "0,1,2,3,4")
+		self.assertEqual(bands[PeriodType.HIGH].time_from, time(7, 0))
+
+	def test_a_percentage_tariff_versions_its_percentage(self):
+		self._seed()
+		versions = self._versions("Levies on Grid Energy")
+		self.assertEqual(versions[0].billing_mode, BillingMode.PERCENTAGE_OF_ENERGY)
+		self.assertEqual(
+			[version.percentage for version in versions],
+			[Decimal("15.00"), Decimal("16.50"), Decimal("18.00")],
+		)
+
+	def test_re_seeding_the_same_window_is_idempotent(self):
+		self._seed()
+		self._seed()
+		self.assertEqual(len(self._versions("Grid Energy HT/NT")), 3)
+		self.assertEqual(active_version(self._versions("Grid Energy HT/NT"), date(2026, 5, 1)).valid_to, None)
+
+	def test_re_seeding_after_the_window_moves_does_not_collide(self):
+		"""The seed window advances a quarter at a time and the history is
+		anchored to it, so the second run's windows overlap the first run's. The
+		overlap guard raises on save, so the old versions have to go first."""
+		self._seed(date(2026, 1, 1))
+		self._seed(date(2026, 4, 1))
+		versions = self._versions("Grid Energy HT/NT")
+		self.assertEqual([version.valid_from for version in versions], [
+			date(2024, 4, 1), date(2025, 4, 1), date(2026, 4, 1),
+		])
+
+	def test_re_seeding_leaves_a_hand_added_tariff_alone(self):
+		self._seed()
+		Tariff.objects.create(
+			zev=self.zev, name="Hand Added Levy", category="levies",
+			billing_mode=BillingMode.MONTHLY_FEE, fixed_price_chf=Decimal("3.00"),
+			valid_from=date(2026, 4, 1),
+		)
+		self._seed()
+		self.assertTrue(Tariff.objects.filter(zev=self.zev, name="Hand Added Levy").exists())
