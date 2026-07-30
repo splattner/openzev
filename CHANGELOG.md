@@ -1,5 +1,31 @@
 # Changelog
 
+## [1.6.0](https://github.com/splattner/openzev/compare/v1.5.1...v1.6.0) (2026-07-30)
+
+
+### Features
+
+* **accounts:** audit the OAuth flows and provider configuration ([#342](https://github.com/splattner/openzev/issues/342)) ([03adef4](https://github.com/splattner/openzev/commit/03adef412e95508f6fc89ce1307b3507c9913a51))
+* **audit:** show event details in a side drawer with a real diff ([#362](https://github.com/splattner/openzev/issues/362)) ([2f2626a](https://github.com/splattner/openzev/commit/2f2626aa8515c93d8fc78a0c46d4f9a491126c60))
+* **tariffs:** add shared fee billing modes split across participants ([#356](https://github.com/splattner/openzev/issues/356)) ([cdfd200](https://github.com/splattner/openzev/commit/cdfd2009d374162713e8d411ff6e7be45b49351c))
+* **tariffs:** chart the price history of a versioned tariff ([#371](https://github.com/splattner/openzev/issues/371)) ([d3a0034](https://github.com/splattner/openzev/commit/d3a0034cd3d157ffc63b878c32ce4e279ea3d306))
+* **tariffs:** collapse tariff versions into one card per tariff ([#370](https://github.com/splattner/openzev/issues/370)) ([ca98544](https://github.com/splattner/openzev/commit/ca98544466c5dfbce8d434b605028a2aab7b6719))
+* **tariffs:** show tariff validity as a badge on the card header ([#367](https://github.com/splattner/openzev/issues/367)) ([1839223](https://github.com/splattner/openzev/commit/1839223655fffb58c350b0a23450c58062ad00e3))
+* **tariffs:** version tariffs by name with gap detection ([#369](https://github.com/splattner/openzev/issues/369)) ([d01afd2](https://github.com/splattner/openzev/commit/d01afd2ecce6b6b8da8da53a216b37954eca642d))
+* **zev:** configurable invoice payment term and due date ([#365](https://github.com/splattner/openzev/issues/365)) ([6a284e4](https://github.com/splattner/openzev/commit/6a284e430ecc0f73f00ee49728d62ccd75a0e87e))
+
+
+### Bug Fixes
+
+* **accounts:** make IsZevOwnerOrAdmin check admin role explicitly ([#351](https://github.com/splattner/openzev/issues/351)) ([5d95337](https://github.com/splattner/openzev/commit/5d95337775e1049d6edc4bfc79631ef413eb298d))
+* **accounts:** prevent deletion of the last admin ([#364](https://github.com/splattner/openzev/issues/364)) ([b5e8f49](https://github.com/splattner/openzev/commit/b5e8f49e5ad5022bd83248748cca67de830c6714))
+* **accounts:** stop exposing feature flags to anonymous callers ([#353](https://github.com/splattner/openzev/issues/353)) ([b3b9257](https://github.com/splattner/openzev/commit/b3b9257b76b5f6a8c0033d9f241b4ae4c249b3c1))
+* **frontend:** localize date pickers via app-level LocalizationProvider ([#363](https://github.com/splattner/openzev/issues/363)) ([413024e](https://github.com/splattner/openzev/commit/413024e593f055aa7578961a7f115029e9579502))
+* **invoices:** close unauthorized invoice creation via generic POST endpoint ([#352](https://github.com/splattner/openzev/issues/352)) ([ab4e9d3](https://github.com/splattner/openzev/commit/ab4e9d3622b6110a85988e7745522469eb9d8116))
+* **invoices:** make the PDF payment-terms line follow Zev.payment_term_days ([#373](https://github.com/splattner/openzev/issues/373)) ([ca81913](https://github.com/splattner/openzev/commit/ca81913a5625b9d068d208d41056311ce3447e4a))
+* **settings:** reject insecure SECRET_KEY placeholders in production ([#349](https://github.com/splattner/openzev/issues/349)) ([a8c1148](https://github.com/splattner/openzev/commit/a8c11483759daf5b2542d1c2cef256067f36fb17))
+* **tariffs:** key the overlap guard on tariff name, not category tuple ([#368](https://github.com/splattner/openzev/issues/368)) ([5be37ae](https://github.com/splattner/openzev/commit/5be37aeb983a40723d5d19289e5258d5fcd1083f))
+
 ## [1.5.1](https://github.com/splattner/openzev/compare/v1.5.0...v1.5.1) (2026-07-26)
 
 
