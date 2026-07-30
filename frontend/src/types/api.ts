@@ -361,6 +361,46 @@ export interface TariffPeriod {
     weekdays?: string
 }
 
+/** One version of a tariff, as returned nested inside a series. */
+export interface TariffVersion extends Tariff {
+    periods: TariffPeriod[]
+}
+
+/** An uncovered stretch between two versions. Both bounds inclusive. */
+export interface TariffGap {
+    start: string
+    end: string
+}
+
+/**
+ * Every tariff in a ZEV sharing a name, treated as versions of one tariff. The
+ * identity fields are invariant across versions, so they live on the series.
+ */
+export interface TariffSeries {
+    zev: string
+    name: string
+    category: Tariff['category']
+    billing_mode: TariffBillingMode
+    energy_type?: Tariff['energy_type']
+    version_count: number
+    /** `null` when today falls in a gap, or the tariff has been retired. */
+    active_version_id: string | null
+    gaps: TariffGap[]
+    /** Newest first. */
+    versions: TariffVersion[]
+}
+
+/**
+ * Body for new-version / duplicate. Prices are optional: omitting them copies
+ * the source version's, which is what a pure validity shift wants.
+ */
+export interface TariffVersionInput {
+    valid_from: string
+    fixed_price_chf?: string | null
+    percentage?: string | null
+    periods?: Array<Omit<TariffPeriodInput, 'tariff'>>
+}
+
 export interface TariffPeriodInput {
     tariff: string
     period_type: 'flat' | 'high' | 'low'

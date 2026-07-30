@@ -10,11 +10,10 @@ import { TariffImportModal } from '../features/tariffs/TariffImportModal'
 import { TariffPeriodFormModal } from '../features/tariffs/TariffPeriodFormModal'
 import { TariffToolbar, type TariffValidityFilter } from '../features/tariffs/TariffToolbar'
 import { useTariffTransfer } from '../features/tariffs/useTariffTransfer'
+import { TariffVersionModal } from '../features/tariffs/TariffVersionModal'
+import { useTariffVersions } from '../features/tariffs/useTariffVersions'
 import { isTariffCurrentlyValid, todayIso } from '../features/tariffs/validity'
-import {
-    fetchTariffPeriods,
-    fetchTariffs,
-} from '../lib/api/tariffs'
+import { fetchTariffSeries } from '../lib/api/tariffs'
 import { queryKeys } from '../lib/api/queryKeys'
 import { useAppSettings } from '../lib/appSettings'
 import { useAuth } from '../lib/auth'
@@ -39,22 +38,30 @@ export function TariffsPage() {
     // can never disagree about whether a tariff is in force.
     const today = useMemo(() => todayIso(), [])
 
-    const tariffsQuery = useQuery({
-        queryKey: queryKeys.tariffs.list(selectedZevId || undefined),
-        queryFn: fetchTariffs,
+    // One query, not three: the series endpoint already groups versions, names
+    // the active one, detects gaps, and nests each version's price bands. The
+    // flat lists below are derived from it so nothing can drift out of step
+    // after a mutation.
+    const seriesQuery = useQuery({
+        queryKey: queryKeys.tariffs.series(selectedZevId || undefined),
+        queryFn: () => fetchTariffSeries(isManagedScope ? selectedZevId || undefined : undefined),
     })
-    const periodsQuery = useQuery({ queryKey: queryKeys.tariffs.periods(), queryFn: fetchTariffPeriods })
 
-    const tariffs = useMemo(
-        () => (tariffsQuery.data?.results || []).filter((tariff) => !isManagedScope || !selectedZevId || tariff.zev === selectedZevId),
-        [tariffsQuery.data?.results, isManagedScope, selectedZevId],
+    const allSeries = useMemo(
+        () => (seriesQuery.data ?? []).filter(
+            (series) => !isManagedScope || !selectedZevId || series.zev === selectedZevId,
+        ),
+        [seriesQuery.data, isManagedScope, selectedZevId],
     )
 
-    const allowedTariffIds = useMemo(() => new Set(tariffs.map((tariff) => tariff.id)), [tariffs])
+    const tariffs = useMemo<Tariff[]>(
+        () => allSeries.flatMap((series) => series.versions),
+        [allSeries],
+    )
 
     const periods = useMemo(
-        () => (periodsQuery.data?.results || []).filter((period) => allowedTariffIds.has(period.tariff)),
-        [periodsQuery.data?.results, allowedTariffIds],
+        () => allSeries.flatMap((series) => series.versions.flatMap((version) => version.periods)),
+        [allSeries],
     )
 
     const periodsByTariff = useMemo(() => {
@@ -129,9 +136,17 @@ export function TariffsPage() {
         [tariffs, periodsByTariff],
     )
 
-    const visibleTariffs = useMemo(
-        () => (validityFilter === 'all' ? tariffs : tariffs.filter((tariff) => isTariffCurrentlyValid(tariff, today))),
-        [tariffs, validityFilter, today],
+    // "Valid only" now hides whole series that have no version in force, which is
+    // what collapses a pile of superseded tariffs down to what is current.
+    // Resolved client-side with the same helper the validity badge uses, so the
+    // filter and the badge cannot disagree.
+    const visibleSeries = useMemo(
+        () => (validityFilter === 'all'
+            ? allSeries
+            : allSeries.filter((series) => series.versions.some(
+                (version) => isTariffCurrentlyValid(version, today),
+            ))),
+        [allSeries, validityFilter, today],
     )
 
     const tariffSections = useMemo(
@@ -139,10 +154,10 @@ export function TariffsPage() {
             tariffCategoryOrder
                 .map((category) => ({
                     category,
-                    tariffs: visibleTariffs.filter((tariff) => tariff.category === category),
+                    series: visibleSeries.filter((series) => series.category === category),
                 }))
-                .filter((section) => section.tariffs.length > 0),
-        [visibleTariffs],
+                .filter((section) => section.series.length > 0),
+        [visibleSeries],
     )
 
     const {
@@ -196,11 +211,13 @@ export function TariffsPage() {
         t,
     })
 
-    if (tariffsQuery.isLoading || periodsQuery.isLoading) {
+    const versions = useTariffVersions({ selectedZevId, queryClient, pushToast, t })
+
+    if (seriesQuery.isLoading) {
         return <div className="card">{t('common.loading')}</div>
     }
 
-    if (tariffsQuery.isError || periodsQuery.isError) {
+    if (seriesQuery.isError) {
         return <div className="card error-banner">{t('common.error')}</div>
     }
 
@@ -247,6 +264,16 @@ export function TariffsPage() {
                 isPending={tariffPending}
             />
 
+            <TariffVersionModal
+                dialog={versions.dialog}
+                settings={settings}
+                isPending={versions.isPending}
+                onClose={versions.closeDialog}
+                onSubmitNewVersion={versions.submitNewVersion}
+                onSubmitDuplicate={versions.submitDuplicate}
+                onSubmitRename={versions.submitRename}
+            />
+
             <TariffPeriodFormModal
                 isOpen={showPeriodModal}
                 title={editingPeriodId ? t('pages.tariffs.editPeriodTitle') : t('pages.tariffs.createPeriodTitle')}
@@ -263,7 +290,7 @@ export function TariffsPage() {
                     onOpenCreateTariffModal={openCreateTariffModal}
                     onOpenImportModal={openImportModal}
                 />
-            ) : visibleTariffs.length === 0 ? (
+            ) : visibleSeries.length === 0 ? (
                 <section className="card" style={{ display: 'grid', gap: '0.75rem' }}>
                     <h3 style={{ margin: 0 }}>{t('pages.tariffs.noResults.title')}</h3>
                     <p className="muted" style={{ margin: 0 }}>{t('pages.tariffs.noResults.description')}</p>
@@ -276,7 +303,6 @@ export function TariffsPage() {
             ) : (
                 <TariffCategorySections
                     tariffSections={tariffSections}
-                    periodsByTariff={periodsByTariff}
                     percentageBasePricing={percentageBasePricing}
                     settings={settings}
                     deleteTariffDisabled={deleteTariffPending || dialogLoading}
@@ -286,6 +312,9 @@ export function TariffsPage() {
                     onOpenCreatePeriodModal={openCreatePeriodModal}
                     onEditPeriod={startPeriodEdit}
                     onDeletePeriod={confirmDeletePeriod}
+                    onNewVersion={versions.openNewVersion}
+                    onDuplicate={versions.openDuplicate}
+                    onRenameSeries={versions.openRename}
                 />
             )}
 

@@ -5,11 +5,43 @@ import type {
   TariffPeriod,
   TariffPeriodInput,
   TariffPreset,
+  TariffSeries,
+  TariffVersionInput,
 } from '../../types/api'
 import { api } from './client'
 
 export async function fetchTariffs(): Promise<PaginatedResponse<Tariff>> {
   const { data } = await api.get<PaginatedResponse<Tariff>>('/tariffs/tariffs/')
+  return data
+}
+
+/**
+ * Tariffs grouped into series (same name = versions of one tariff), each with
+ * its active version and any gaps in its timeline already worked out by the
+ * backend. Not paginated: the payload is one entry per tariff, not per version.
+ */
+export async function fetchTariffSeries(zevId?: string): Promise<TariffSeries[]> {
+  const { data } = await api.get<TariffSeries[]>('/tariffs/tariffs/series/', {
+    params: zevId ? { zev_id: zevId } : undefined,
+  })
+  return data
+}
+
+/** Add a version to the tariff's series, closing the previous one. */
+export async function createTariffVersion(id: string, payload: TariffVersionInput): Promise<Tariff> {
+  const { data } = await api.post<Tariff>(`/tariffs/tariffs/${id}/new-version/`, payload)
+  return data
+}
+
+/** Copy a tariff under a new name, leaving the source's timeline untouched. */
+export async function duplicateTariff(id: string, payload: TariffVersionInput & { name: string }): Promise<Tariff> {
+  const { data } = await api.post<Tariff>(`/tariffs/tariffs/${id}/duplicate/`, payload)
+  return data
+}
+
+/** Rename every version at once — the name is what groups them. */
+export async function renameTariffSeries(id: string, name: string): Promise<Tariff> {
+  const { data } = await api.post<Tariff>(`/tariffs/tariffs/${id}/rename-series/`, { name })
   return data
 }
 

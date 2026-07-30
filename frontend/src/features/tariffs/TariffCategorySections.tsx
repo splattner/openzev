@@ -2,19 +2,29 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import {
     faChevronDown,
     faChevronUp,
+    faClone,
+    faLayerGroup,
     faPen,
     faPlus,
+    faTag,
     faTrash,
+    faTriangleExclamation,
 } from '@fortawesome/free-solid-svg-icons'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { formatShortDate } from '../../lib/appSettings'
-import type { AppSettings, Tariff, TariffPeriod } from '../../types/api'
+import type {
+    AppSettings,
+    Tariff,
+    TariffPeriod,
+    TariffSeries,
+    TariffVersion,
+} from '../../types/api'
 import { todayIso, validityState, type ValidityState } from './validity'
 
-type TariffSection = {
+type TariffSeriesSection = {
     category: Tariff['category']
-    tariffs: Tariff[]
+    series: TariffSeries[]
 }
 
 // Amber rather than blue for scheduled: blue is already the billing-mode badge
@@ -26,8 +36,7 @@ const VALIDITY_BADGE_CLASS: Record<ValidityState, string> = {
 }
 
 type TariffCategorySectionsProps = {
-    tariffSections: TariffSection[]
-    periodsByTariff: Map<string, TariffPeriod[]>
+    tariffSections: TariffSeriesSection[]
     percentageBasePricing: Map<string, number>
     settings: AppSettings
     deleteTariffDisabled: boolean
@@ -37,11 +46,13 @@ type TariffCategorySectionsProps = {
     onOpenCreatePeriodModal: (tariffId: string) => void
     onEditPeriod: (period: TariffPeriod) => void
     onDeletePeriod: (period: TariffPeriod) => void
+    onNewVersion: (series: TariffSeries, source: TariffVersion) => void
+    onDuplicate: (series: TariffSeries, source: TariffVersion) => void
+    onRenameSeries: (series: TariffSeries, source: TariffVersion) => void
 }
 
 export function TariffCategorySections({
     tariffSections,
-    periodsByTariff,
     percentageBasePricing,
     settings,
     deleteTariffDisabled,
@@ -51,21 +62,59 @@ export function TariffCategorySections({
     onOpenCreatePeriodModal,
     onEditPeriod,
     onDeletePeriod,
+    onNewVersion,
+    onDuplicate,
+    onRenameSeries,
 }: TariffCategorySectionsProps) {
     const { t } = useTranslation()
-    const [expandedTariffIds, setExpandedTariffIds] = useState<Set<string>>(new Set())
+    const [expandedSeries, setExpandedSeries] = useState<Set<string>>(new Set())
+    // Which version a card is showing. Defaults to the active one, so a card
+    // reads as "what this tariff costs now" until you deliberately look back.
+    const [shownVersionBySeries, setShownVersionBySeries] = useState<Record<string, string>>({})
     const today = todayIso()
 
-    const toggleExpanded = (tariffId: string) => {
-        setExpandedTariffIds((current) => {
+    const toggleExpanded = (key: string) => {
+        setExpandedSeries((current) => {
             const next = new Set(current)
-            if (next.has(tariffId)) {
-                next.delete(tariffId)
+            if (next.has(key)) {
+                next.delete(key)
             } else {
-                next.add(tariffId)
+                next.add(key)
             }
             return next
         })
+    }
+
+    function validityBadge(version: Tariff) {
+        const state = validityState(version, today)
+        const validFrom = formatShortDate(version.valid_from, settings)
+        const validTo = version.valid_to ? formatShortDate(version.valid_to, settings) : null
+        const label = state === 'scheduled'
+            ? t('pages.tariffs.validity.starts', { date: validFrom })
+            : state === 'expired'
+                ? t('pages.tariffs.validity.ended', { date: validTo })
+                : validTo
+                    ? t('pages.tariffs.validity.until', { date: validTo })
+                    : t('pages.tariffs.validity.since', { date: validFrom })
+        return {
+            className: VALIDITY_BADGE_CLASS[state],
+            label,
+            tooltip: `${validFrom} - ${validTo ?? t('pages.tariffs.openEnded')}`,
+        }
+    }
+
+    /** A one-line price summary for a version, whatever it is priced by. */
+    function priceSummary(series: TariffSeries, version: TariffVersion): string {
+        if (series.billing_mode === 'energy') {
+            const prices = version.periods.map((period) => `${period.price_chf_per_kwh}`)
+            return prices.length
+                ? `CHF ${prices.join(' / ')}/kWh`
+                : t('pages.tariffs.noPeriods')
+        }
+        if (series.billing_mode === 'percentage_of_energy') {
+            return `${version.percentage ?? '0'}%`
+        }
+        return `CHF ${version.fixed_price_chf || '0.00'}`
     }
 
     return (
@@ -78,90 +127,100 @@ export function TariffCategorySections({
                     <div className="tariff-category-header">
                         <div className="tariff-category-title-row">
                             <h3>{t(`pages.tariffs.categories.${section.category}` as Parameters<typeof t>[0])}</h3>
-                            <span className="badge badge-neutral">{section.tariffs.length}</span>
+                            <span className="badge badge-neutral">{section.series.length}</span>
                         </div>
                     </div>
 
                     <div className="tariff-card-list">
-                        {section.tariffs.map((tariff) => {
-                            const tariffPeriods = periodsByTariff.get(tariff.id) ?? []
-                            const usesPeriods = tariff.billing_mode === 'energy'
-                            const energyTypeLabel = t(`pages.tariffs.energyTypes.${tariff.energy_type || 'local'}` as Parameters<typeof t>[0])
-                            const basePrice = percentageBasePricing.get(tariff.id)
-                            const pricingLabel = tariff.billing_mode === 'energy'
+                        {section.series.map((series) => {
+                            const seriesKey = `${series.zev}:${series.name}`
+                            const versions = series.versions
+                            const shownId = shownVersionBySeries[seriesKey]
+                                ?? series.active_version_id
+                                ?? versions[0].id
+                            const shown = versions.find((version) => version.id === shownId) ?? versions[0]
+                            const isShowingActive = shown.id === series.active_version_id
+
+                            const usesPeriods = series.billing_mode === 'energy'
+                            const shownPeriods = shown.periods
+                            const energyTypeLabel = t(`pages.tariffs.energyTypes.${series.energy_type || 'local'}` as Parameters<typeof t>[0])
+                            const basePrice = percentageBasePricing.get(shown.id)
+                            const pricingLabel = series.billing_mode === 'energy'
                                 ? energyTypeLabel
-                                : tariff.billing_mode === 'percentage_of_energy'
+                                : series.billing_mode === 'percentage_of_energy'
                                     ? basePrice
-                                        ? `${tariff.percentage ?? '0'}% · ${energyTypeLabel} · ${t('pages.tariffs.approxPrice', { price: (basePrice * Number(tariff.percentage ?? 0) / 100).toFixed(3) })}`
-                                        : `${tariff.percentage ?? '0'}% · ${energyTypeLabel}`
-                                    : `CHF ${tariff.fixed_price_chf || '0.00'}`
-                            const pricingTooltip = tariff.billing_mode === 'percentage_of_energy' && basePrice
+                                        ? `${shown.percentage ?? '0'}% · ${energyTypeLabel} · ${t('pages.tariffs.approxPrice', { price: (basePrice * Number(shown.percentage ?? 0) / 100).toFixed(3) })}`
+                                        : `${shown.percentage ?? '0'}% · ${energyTypeLabel}`
+                                    : `CHF ${shown.fixed_price_chf || '0.00'}`
+                            const pricingTooltip = series.billing_mode === 'percentage_of_energy' && basePrice
                                 ? t('pages.tariffs.approxPriceTooltip', {
-                                    percentage: tariff.percentage ?? '0',
+                                    percentage: shown.percentage ?? '0',
                                     basePrice: basePrice.toFixed(3),
-                                    effectivePrice: (basePrice * Number(tariff.percentage ?? 0) / 100).toFixed(3),
+                                    effectivePrice: (basePrice * Number(shown.percentage ?? 0) / 100).toFixed(3),
                                 })
                                 : undefined
-                            const notes = tariff.notes?.trim()
-                            const isExpanded = expandedTariffIds.has(tariff.id)
-
-                            // The badge names the date that matters for the
-                            // tariff's current state, so the state is carried by
-                            // the wording as well as the colour. The full window
-                            // stays available as a tooltip.
-                            const validity = validityState(tariff, today)
-                            const validFrom = formatShortDate(tariff.valid_from, settings)
-                            const validTo = tariff.valid_to ? formatShortDate(tariff.valid_to, settings) : null
-                            const validityLabel = validity === 'scheduled'
-                                ? t('pages.tariffs.validity.starts', { date: validFrom })
-                                : validity === 'expired'
-                                    ? t('pages.tariffs.validity.ended', { date: validTo })
-                                    : validTo
-                                        ? t('pages.tariffs.validity.until', { date: validTo })
-                                        : t('pages.tariffs.validity.since', { date: validFrom })
-                            const validityTooltip = `${validFrom} - ${validTo ?? t('pages.tariffs.openEnded')}`
+                            const notes = shown.notes?.trim()
+                            const isExpanded = expandedSeries.has(seriesKey)
+                            const badge = validityBadge(shown)
 
                             return (
-                                <article key={tariff.id} className="tariff-card">
+                                <article key={seriesKey} className="tariff-card">
                                     <div className="tariff-card-header">
                                         <div className="tariff-card-title">
                                             <div className="tariff-card-heading">
-                                                <strong>{tariff.name}</strong>
+                                                <strong>{series.name}</strong>
                                                 <div className="tariff-name-badges">
                                                     <span className="badge badge-info">
-                                                        {t(`pages.tariffs.billingModes.${tariff.billing_mode}` as Parameters<typeof t>[0], { defaultValue: tariff.billing_mode })}
+                                                        {t(`pages.tariffs.billingModes.${series.billing_mode}` as Parameters<typeof t>[0], { defaultValue: series.billing_mode })}
                                                     </span>
-                                                    {tariff.energy_type && (
+                                                    {series.energy_type && (
                                                         <span className="badge badge-success">
-                                                            {t(`pages.tariffs.energyTypes.${tariff.energy_type}` as Parameters<typeof t>[0])}
+                                                            {t(`pages.tariffs.energyTypes.${series.energy_type}` as Parameters<typeof t>[0])}
                                                         </span>
                                                     )}
-                                                    <span className={VALIDITY_BADGE_CLASS[validity]} title={validityTooltip}>
-                                                        {validityLabel}
+                                                    <span className={badge.className} title={badge.tooltip}>
+                                                        {badge.label}
                                                     </span>
+                                                    {series.version_count > 1 && (
+                                                        <span
+                                                            className="badge badge-neutral"
+                                                            title={t('pages.tariffs.versions.countTooltip')}
+                                                        >
+                                                            <FontAwesomeIcon icon={faLayerGroup} fixedWidth />{' '}
+                                                            {t('pages.tariffs.versions.count', { count: series.version_count })}
+                                                        </span>
+                                                    )}
+                                                    {series.gaps.length > 0 && (
+                                                        <span
+                                                            className="badge badge-danger"
+                                                            title={t('pages.tariffs.versions.gapTooltip')}
+                                                        >
+                                                            <FontAwesomeIcon icon={faTriangleExclamation} fixedWidth />{' '}
+                                                            {t('pages.tariffs.versions.gapBadge', { count: series.gaps.length })}
+                                                        </span>
+                                                    )}
                                                 </div>
                                             </div>
                                         </div>
 
                                         <div className="tariff-card-actions">
-                                            <button className="button button-primary button-compact" type="button" onClick={() => onEditTariff(tariff)}>
+                                            <button
+                                                className="button button-primary button-compact"
+                                                type="button"
+                                                onClick={() => onNewVersion(series, shown)}
+                                            >
+                                                <FontAwesomeIcon icon={faPlus} fixedWidth />
+                                                {t('pages.tariffs.versions.newVersion')}
+                                            </button>
+                                            <button className="button button-secondary button-compact" type="button" onClick={() => onEditTariff(shown)}>
                                                 <FontAwesomeIcon icon={faPen} fixedWidth />
                                                 {t('common.edit')}
-                                            </button>
-                                            <button
-                                                className="button button-danger button-compact"
-                                                type="button"
-                                                disabled={deleteTariffDisabled}
-                                                onClick={() => onDeleteTariff(tariff)}
-                                            >
-                                                <FontAwesomeIcon icon={faTrash} fixedWidth />
-                                                {t('common.delete')}
                                             </button>
                                             <button
                                                 className="button button-secondary button-compact"
                                                 type="button"
                                                 aria-expanded={isExpanded}
-                                                onClick={() => toggleExpanded(tariff.id)}
+                                                onClick={() => toggleExpanded(seriesKey)}
                                             >
                                                 <FontAwesomeIcon icon={isExpanded ? faChevronUp : faChevronDown} fixedWidth />
                                                 {isExpanded ? t('common.hideDetails') : t('common.showDetails')}
@@ -178,15 +237,101 @@ export function TariffCategorySections({
                                         )}
                                         {usesPeriods && (
                                             <span className="badge badge-neutral">
-                                                {t('pages.tariffs.periodCountSummary', { count: tariffPeriods.length })}
+                                                {t('pages.tariffs.periodCountSummary', { count: shownPeriods.length })}
+                                            </span>
+                                        )}
+                                        {!isShowingActive && (
+                                            <span className="badge badge-warning">
+                                                {t('pages.tariffs.versions.viewingOldVersion')}
                                             </span>
                                         )}
                                     </div>
 
+                                    {series.gaps.length > 0 && (
+                                        <div className="tariff-gap-warning">
+                                            <FontAwesomeIcon icon={faTriangleExclamation} fixedWidth />
+                                            <div>
+                                                <strong>{t('pages.tariffs.versions.gapWarningTitle')}</strong>
+                                                <p>
+                                                    {series.gaps.map((gap) => (
+                                                        `${formatShortDate(gap.start, settings)} – ${formatShortDate(gap.end, settings)}`
+                                                    )).join(', ')}
+                                                </p>
+                                                <p className="muted">{t('pages.tariffs.versions.gapWarningBody')}</p>
+                                            </div>
+                                        </div>
+                                    )}
+
                                     {isExpanded && (
                                         <>
-                                            {/* Validity moved to a badge on the header; notes are all
-                                                that is left here, so the block is skipped when empty. */}
+                                            <div className="tariff-version-section">
+                                                <div className="tariff-period-section-header">
+                                                    <div className="tariff-period-section-title-row">
+                                                        <h4>{t('pages.tariffs.versions.history')}</h4>
+                                                        <span className="badge badge-neutral">{series.version_count}</span>
+                                                    </div>
+                                                    <div className="actions-row">
+                                                        <button
+                                                            className="button button-secondary button-compact"
+                                                            type="button"
+                                                            onClick={() => onRenameSeries(series, shown)}
+                                                        >
+                                                            <FontAwesomeIcon icon={faTag} fixedWidth />
+                                                            {t('pages.tariffs.versions.rename')}
+                                                        </button>
+                                                        <button
+                                                            className="button button-secondary button-compact"
+                                                            type="button"
+                                                            onClick={() => onDuplicate(series, shown)}
+                                                        >
+                                                            <FontAwesomeIcon icon={faClone} fixedWidth />
+                                                            {t('pages.tariffs.versions.duplicate')}
+                                                        </button>
+                                                    </div>
+                                                </div>
+
+                                                <div className="tariff-version-list">
+                                                    {versions.map((version) => {
+                                                        const versionBadge = validityBadge(version)
+                                                        const isShown = version.id === shown.id
+                                                        return (
+                                                            <div
+                                                                key={version.id}
+                                                                className={`tariff-version-row${isShown ? ' is-shown' : ''}`}
+                                                            >
+                                                                <button
+                                                                    type="button"
+                                                                    className="tariff-version-select"
+                                                                    aria-pressed={isShown}
+                                                                    onClick={() => setShownVersionBySeries((current) => ({
+                                                                        ...current,
+                                                                        [seriesKey]: version.id,
+                                                                    }))}
+                                                                >
+                                                                    <span className={versionBadge.className}>{versionBadge.label}</span>
+                                                                    <span className="tariff-version-window">
+                                                                        {formatShortDate(version.valid_from, settings)} –{' '}
+                                                                        {version.valid_to
+                                                                            ? formatShortDate(version.valid_to, settings)
+                                                                            : t('pages.tariffs.openEnded')}
+                                                                    </span>
+                                                                    <strong>{priceSummary(series, version)}</strong>
+                                                                </button>
+                                                                <button
+                                                                    className="button button-danger button-compact"
+                                                                    type="button"
+                                                                    disabled={deleteTariffDisabled}
+                                                                    onClick={() => onDeleteTariff(version)}
+                                                                    aria-label={t('pages.tariffs.versions.deleteVersion')}
+                                                                >
+                                                                    <FontAwesomeIcon icon={faTrash} fixedWidth />
+                                                                </button>
+                                                            </div>
+                                                        )
+                                                    })}
+                                                </div>
+                                            </div>
+
                                             {notes && (
                                                 <div className="tariff-card-details">
                                                     <div className="tariff-detail-card tariff-detail-card-wide">
@@ -201,25 +346,31 @@ export function TariffCategorySections({
                                                     <div className="tariff-period-section-header">
                                                         <div className="tariff-period-section-title-row">
                                                             <h4>{t('pages.tariffs.tariffPeriods')}</h4>
-                                                            {tariffPeriods.length > 0 && (
-                                                                <span className="badge badge-neutral">{tariffPeriods.length}</span>
+                                                            {shownPeriods.length > 0 && (
+                                                                <span className="badge badge-neutral">{shownPeriods.length}</span>
                                                             )}
+                                                            <span className="muted">
+                                                                {formatShortDate(shown.valid_from, settings)} –{' '}
+                                                                {shown.valid_to
+                                                                    ? formatShortDate(shown.valid_to, settings)
+                                                                    : t('pages.tariffs.openEnded')}
+                                                            </span>
                                                         </div>
                                                         <button
                                                             className="button button-secondary button-compact"
                                                             type="button"
-                                                            onClick={() => onOpenCreatePeriodModal(tariff.id)}
+                                                            onClick={() => onOpenCreatePeriodModal(shown.id)}
                                                         >
                                                             <FontAwesomeIcon icon={faPlus} fixedWidth />
                                                             {t('pages.tariffs.addPeriod')}
                                                         </button>
                                                     </div>
 
-                                                    {tariffPeriods.length === 0 ? (
+                                                    {shownPeriods.length === 0 ? (
                                                         <p className="muted tariff-period-empty">{t('pages.tariffs.noPeriods')}</p>
                                                     ) : (
                                                         <div className="tariff-period-list">
-                                                            {tariffPeriods.map((period) => (
+                                                            {shownPeriods.map((period) => (
                                                                 <div key={period.id} className="tariff-period-row">
                                                                     <div className="tariff-period-main">
                                                                         <div className="tariff-period-line">

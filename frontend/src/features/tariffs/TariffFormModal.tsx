@@ -62,6 +62,9 @@ export function TariffFormModal({
     name: 'billing_mode',
   })
   const isSharedFee = SHARED_FEE_MODES.includes(billingMode)
+  // An existing tariff is one version of a series; its identity fields are
+  // fixed. Creating a new tariff still sets them freely.
+  const isVersion = Boolean(initialTariff)
 
   useEffect(() => {
     form.reset(initialTariff ? mapTariffToFormValues(initialTariff) : defaultTariffFormValues)
@@ -74,42 +77,76 @@ export function TariffFormModal({
   return (
     <FormModal isOpen={isOpen} title={title} onClose={onClose}>
       <form onSubmit={form.handleSubmit(submit)} className="form-grid">
-        <label>
-          <span>{t('pages.tariffs.form.name')}</span>
-          <input {...form.register('name')} required />
-        </label>
-        <label>
-          <span>{t('pages.tariffs.form.category')}</span>
-          <select {...form.register('category')}>
-            <option value="energy">{t('pages.tariffs.categories.energy')}</option>
-            <option value="grid_fees">{t('pages.tariffs.categories.grid_fees')}</option>
-            <option value="levies">{t('pages.tariffs.categories.levies')}</option>
-            <option value="metering">{t('pages.tariffs.categories.metering')}</option>
-          </select>
-        </label>
-        <label>
-          <span>{t('pages.tariffs.form.billingMode')}</span>
-          <select {...form.register('billing_mode')}>
-            <option value="energy">{t('pages.tariffs.billingModes.energy')}</option>
-            <option value="percentage_of_energy">{t('pages.tariffs.billingModes.percentage_of_energy')}</option>
-            <option value="monthly_fee">{t('pages.tariffs.billingModes.monthly_fee')}</option>
-            <option value="yearly_fee">{t('pages.tariffs.billingModes.yearly_fee')}</option>
-            <option value="per_metering_point_monthly_fee">{t('pages.tariffs.billingModes.per_metering_point_monthly_fee')}</option>
-            <option value="per_metering_point_yearly_fee">{t('pages.tariffs.billingModes.per_metering_point_yearly_fee')}</option>
-            <option value="shared_monthly_fee">{t('pages.tariffs.billingModes.shared_monthly_fee')}</option>
-            <option value="shared_yearly_fee">{t('pages.tariffs.billingModes.shared_yearly_fee')}</option>
-          </select>
-        </label>
-
-        {(billingMode === 'energy' || billingMode === 'percentage_of_energy') && (
-          <label>
-            <span>{t('pages.tariffs.form.energyType')}</span>
-            <select {...form.register('energy_type')}>
-              <option value="local">{t('pages.tariffs.energyTypes.local')}</option>
-              <option value="grid">{t('pages.tariffs.energyTypes.grid')}</option>
-              <option value="feed_in">{t('pages.tariffs.energyTypes.feed_in')}</option>
-            </select>
-          </label>
+        {/* Editing an existing tariff means editing one *version* of it. The name
+            groups versions, and category/billing mode/energy type must match
+            across them, so the four identity fields are shown as values rather
+            than inputs. Rendering them instead of disabling them is deliberate:
+            react-hook-form treats a disabled registered field as undefined, which
+            would quietly blank the name on save. The values still reach the
+            payload from the form state seeded by reset(). */}
+        {isVersion ? (
+          <div className="tariff-identity-summary" style={{ gridColumn: '1 / -1' }}>
+            <div>
+              <span className="tariff-detail-label">{t('pages.tariffs.form.name')}</span>
+              <strong>{initialTariff?.name}</strong>
+            </div>
+            <div>
+              <span className="tariff-detail-label">{t('pages.tariffs.form.category')}</span>
+              <span>{t(`pages.tariffs.categories.${initialTariff!.category}` as Parameters<typeof t>[0])}</span>
+            </div>
+            <div>
+              <span className="tariff-detail-label">{t('pages.tariffs.form.billingMode')}</span>
+              <span>{t(`pages.tariffs.billingModes.${initialTariff!.billing_mode}` as Parameters<typeof t>[0], { defaultValue: initialTariff!.billing_mode })}</span>
+            </div>
+            {initialTariff?.energy_type && (
+              <div>
+                <span className="tariff-detail-label">{t('pages.tariffs.form.energyType')}</span>
+                <span>{t(`pages.tariffs.energyTypes.${initialTariff.energy_type}` as Parameters<typeof t>[0])}</span>
+              </div>
+            )}
+            <p className="muted" style={{ gridColumn: '1 / -1', margin: 0 }}>
+              {t('pages.tariffs.form.identityLockedHint')}
+            </p>
+          </div>
+        ) : (
+          <>
+            <label>
+              <span>{t('pages.tariffs.form.name')}</span>
+              <input {...form.register('name')} required />
+            </label>
+            <label>
+              <span>{t('pages.tariffs.form.category')}</span>
+              <select {...form.register('category')}>
+                <option value="energy">{t('pages.tariffs.categories.energy')}</option>
+                <option value="grid_fees">{t('pages.tariffs.categories.grid_fees')}</option>
+                <option value="levies">{t('pages.tariffs.categories.levies')}</option>
+                <option value="metering">{t('pages.tariffs.categories.metering')}</option>
+              </select>
+            </label>
+            <label>
+              <span>{t('pages.tariffs.form.billingMode')}</span>
+              <select {...form.register('billing_mode')}>
+                <option value="energy">{t('pages.tariffs.billingModes.energy')}</option>
+                <option value="percentage_of_energy">{t('pages.tariffs.billingModes.percentage_of_energy')}</option>
+                <option value="monthly_fee">{t('pages.tariffs.billingModes.monthly_fee')}</option>
+                <option value="yearly_fee">{t('pages.tariffs.billingModes.yearly_fee')}</option>
+                <option value="per_metering_point_monthly_fee">{t('pages.tariffs.billingModes.per_metering_point_monthly_fee')}</option>
+                <option value="per_metering_point_yearly_fee">{t('pages.tariffs.billingModes.per_metering_point_yearly_fee')}</option>
+                <option value="shared_monthly_fee">{t('pages.tariffs.billingModes.shared_monthly_fee')}</option>
+                <option value="shared_yearly_fee">{t('pages.tariffs.billingModes.shared_yearly_fee')}</option>
+              </select>
+            </label>
+            {(billingMode === 'energy' || billingMode === 'percentage_of_energy') && (
+              <label>
+                <span>{t('pages.tariffs.form.energyType')}</span>
+                <select {...form.register('energy_type')}>
+                  <option value="local">{t('pages.tariffs.energyTypes.local')}</option>
+                  <option value="grid">{t('pages.tariffs.energyTypes.grid')}</option>
+                  <option value="feed_in">{t('pages.tariffs.energyTypes.feed_in')}</option>
+                </select>
+              </label>
+            )}
+          </>
         )}
 
         {billingMode === 'percentage_of_energy' ? (

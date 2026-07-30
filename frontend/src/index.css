@@ -2432,3 +2432,101 @@ h3 {
     grid-template-columns: 1fr;
   }
 }
+
+/* ── Tariff versions ─────────────────────────────────────────────────────── */
+
+.tariff-version-section {
+  margin-top: 1.1rem;
+  padding-top: 1rem;
+  border-top: 1px solid rgba(148, 163, 184, 0.24);
+}
+
+.tariff-version-list {
+  display: grid;
+  gap: 0.4rem;
+  margin-top: 0.7rem;
+}
+
+.tariff-version-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: 0.7rem;
+  padding: 0.15rem 0.5rem 0.15rem 0.15rem;
+  background: rgba(255, 255, 255, 0.6);
+}
+
+.tariff-version-row.is-shown {
+  border-color: rgba(56, 189, 248, 0.55);
+  background: rgba(224, 242, 254, 0.55);
+}
+
+/* The whole row is the selector, so the click target matches the affordance. */
+.tariff-version-select {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  background: none;
+  border: 0;
+  padding: 0.5rem;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  border-radius: 0.5rem;
+}
+
+.tariff-version-select:hover {
+  background: rgba(148, 163, 184, 0.12);
+}
+
+.tariff-version-window {
+  color: #475569;
+  font-variant-numeric: tabular-nums;
+}
+
+.tariff-gap-warning {
+  display: flex;
+  gap: 0.7rem;
+  align-items: flex-start;
+  margin-top: 0.8rem;
+  padding: 0.75rem 0.9rem;
+  border: 1px solid #fecaca;
+  border-radius: 0.7rem;
+  background: #fef2f2;
+  color: #991b1b;
+}
+
+.tariff-gap-warning p {
+  margin: 0.15rem 0 0;
+}
+
+.tariff-gap-warning .muted {
+  color: #b45309;
+}
+
+.tariff-version-price-list {
+  display: grid;
+  gap: 0.5rem;
+  margin-top: 0.6rem;
+}
+
+.tariff-version-price-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.tariff-identity-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 0.7rem 1.1rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  border-radius: 0.7rem;
+  background: rgba(241, 245, 249, 0.7);
+}
