@@ -36,7 +36,8 @@ INVOICE_TRANSLATIONS: dict[str, dict[str, str]] = {
         "vat": "MwSt.",
         "total": "Total",
         "payment_terms_label": "Zahlungsbedingungen:",
-        "payment_terms_text": "Zahlbar innert 30 Tagen ab Rechnungsdatum",
+        "payment_terms_text_sg": "Zahlbar innert {days} Tag ab Rechnungsdatum",
+        "payment_terms_text_pl": "Zahlbar innert {days} Tagen ab Rechnungsdatum",
         "bank_details": "Bankverbindung:",
         "currency": "W\u00e4hrung: CHF",
         "reference_prefix": "Referenz: Rechnung",
@@ -95,7 +96,8 @@ INVOICE_TRANSLATIONS: dict[str, dict[str, str]] = {
         "vat": "TVA",
         "total": "Total",
         "payment_terms_label": "Conditions de paiement\u202f:",
-        "payment_terms_text": "Payable dans les 30 jours \u00e0 compter de la date de facturation",
+        "payment_terms_text_sg": "Payable dans un jour à compter de la date de facturation",
+        "payment_terms_text_pl": "Payable dans les {days} jours \u00e0 compter de la date de facturation",
         "bank_details": "Coordonn\u00e9es bancaires\u202f:",
         "currency": "Devise\u202f: CHF",
         "reference_prefix": "R\u00e9f\u00e9rence\u202f: Facture",
@@ -154,7 +156,8 @@ INVOICE_TRANSLATIONS: dict[str, dict[str, str]] = {
         "vat": "IVA",
         "total": "Totale",
         "payment_terms_label": "Condizioni di pagamento:",
-        "payment_terms_text": "Pagabile entro 30 giorni dalla data fattura",
+        "payment_terms_text_sg": "Pagabile entro {days} giorno dalla data fattura",
+        "payment_terms_text_pl": "Pagabile entro {days} giorni dalla data fattura",
         "bank_details": "Coordinate bancarie:",
         "currency": "Valuta: CHF",
         "reference_prefix": "Riferimento: Fattura",
@@ -213,7 +216,8 @@ INVOICE_TRANSLATIONS: dict[str, dict[str, str]] = {
         "vat": "VAT",
         "total": "Total",
         "payment_terms_label": "Payment Terms:",
-        "payment_terms_text": "Due within 30 days of invoice date",
+        "payment_terms_text_sg": "Due within {days} day of invoice date",
+        "payment_terms_text_pl": "Due within {days} days of invoice date",
         "bank_details": "Bank Details:",
         "currency": "Currency: CHF",
         "reference_prefix": "Reference: Invoice",
@@ -1247,7 +1251,14 @@ def _build_template_context(invoice) -> dict:
     owner_participant = invoice.zev.participants.filter(user=invoice.zev.owner).first()
     creditor_city = _normalize_text(owner_participant.city if owner_participant else "")
     lang = invoice.zev.invoice_language or "de"
-    tr = INVOICE_TRANSLATIONS.get(lang, INVOICE_TRANSLATIONS["de"])
+    # Copied rather than used in place: INVOICE_TRANSLATIONS is a module-level
+    # constant shared by every invoice, and payment_terms_text is resolved
+    # per-ZEV below — writing it back into the shared dict would leak one
+    # ZEV's payment term into every other invoice rendered afterwards.
+    tr = dict(INVOICE_TRANSLATIONS.get(lang, INVOICE_TRANSLATIONS["de"]))
+    payment_term_days = invoice.zev.payment_term_days
+    template = tr["payment_terms_text_sg"] if payment_term_days == 1 else tr["payment_terms_text_pl"]
+    tr["payment_terms_text"] = template.format(days=payment_term_days)
 
     return {
         "invoice": invoice,

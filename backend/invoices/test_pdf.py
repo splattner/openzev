@@ -151,3 +151,83 @@ class InvoicePdfQrTests(TestCase):
         first_item = first_group["items"][0]
 
         self.assertEqual(first_item["description"], "Solar Work Tariff")
+
+    def test_payment_terms_text_follows_the_zevs_configured_term(self):
+        """Regression: this line used to always read 'payable within 30 days'
+        regardless of Zev.payment_term_days (#365 follow-up)."""
+        self.zev.payment_term_days = 45
+        self.zev.save(update_fields=["payment_term_days"])
+        invoice = self._invoice()
+
+        context = _build_template_context(invoice)
+
+        self.assertEqual(
+            context["tr"]["payment_terms_text"],
+            "Zahlbar innert 45 Tagen ab Rechnungsdatum",
+        )
+
+    def test_payment_terms_text_uses_the_default_thirty_days(self):
+        invoice = self._invoice()
+
+        context = _build_template_context(invoice)
+
+        self.assertEqual(
+            context["tr"]["payment_terms_text"],
+            "Zahlbar innert 30 Tagen ab Rechnungsdatum",
+        )
+
+    def test_payment_terms_text_is_grammatically_singular_for_one_day(self):
+        self.zev.payment_term_days = 1
+        self.zev.save(update_fields=["payment_term_days"])
+        invoice = self._invoice()
+
+        context = _build_template_context(invoice)
+
+        self.assertEqual(
+            context["tr"]["payment_terms_text"],
+            "Zahlbar innert 1 Tag ab Rechnungsdatum",
+        )
+
+    def test_payment_terms_text_is_translated_per_zev_invoice_language(self):
+        self.zev.payment_term_days = 45
+        self.zev.invoice_language = "en"
+        self.zev.save(update_fields=["payment_term_days", "invoice_language"])
+        invoice = self._invoice()
+
+        context = _build_template_context(invoice)
+
+        self.assertEqual(context["tr"]["payment_terms_text"], "Due within 45 days of invoice date")
+
+    def test_building_one_invoices_context_does_not_leak_into_another(self):
+        """The translation dict is a module-level constant shared by every
+        invoice; resolving payment_terms_text must copy it, not mutate it in
+        place, or one ZEV's term would bleed into every invoice rendered
+        afterwards in the same process."""
+        self.zev.payment_term_days = 45
+        self.zev.save(update_fields=["payment_term_days"])
+        first_invoice = self._invoice()
+        _build_template_context(first_invoice)
+
+        other_owner = User.objects.create_user(
+            username="pdf_owner_other", password="pass1234", role=UserRole.ZEV_OWNER,
+        )
+        other_zev = Zev.objects.create(
+            name="Other ZEV", owner=other_owner, zev_type="vzev",
+        )
+        other_participant = Participant.objects.create(
+            zev=other_zev, first_name="Bob", last_name="Muster",
+            email="bob@example.com", address_line1="Weg 1",
+            postal_code="4000", city="Basel", valid_from=date(2026, 1, 1),
+        )
+        second_invoice = Invoice.objects.create(
+            invoice_number="Q-00002", zev=other_zev, participant=other_participant,
+            period_start=date(2026, 1, 1), period_end=date(2026, 1, 31),
+            total_chf=Decimal("10.00"),
+        )
+
+        context = _build_template_context(second_invoice)
+
+        self.assertEqual(
+            context["tr"]["payment_terms_text"],
+            "Zahlbar innert 30 Tagen ab Rechnungsdatum",
+        )

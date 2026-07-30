@@ -55,7 +55,8 @@ CONTRACT_TRANSLATIONS: dict[str, dict] = {
         ),
         "billing_interval_label": "Abrechnungsintervall",
         "payment_terms_label": "Zahlungskonditionen",
-        "payment_terms_unit": "Tage ab Rechnungsdatum",
+        "payment_terms_unit_sg": "Tag ab Rechnungsdatum",
+        "payment_terms_unit_pl": "Tage ab Rechnungsdatum",
         "vat_label": "MwSt.",
         "vat_not_required": "Nicht pflichtig",
         "vat_required": "MwSt. pflichtig",
@@ -196,7 +197,8 @@ CONTRACT_TRANSLATIONS: dict[str, dict] = {
         "local_tariff_note_placeholder": "",
         "billing_interval_label": "Intervalle de facturation",
         "payment_terms_label": "Conditions de paiement",
-        "payment_terms_unit": "jours à compter de la date de facturation",
+        "payment_terms_unit_sg": "jour à compter de la date de facturation",
+        "payment_terms_unit_pl": "jours à compter de la date de facturation",
         "vat_label": "TVA",
         "vat_not_required": "Non assujetti",
         "vat_required": "Assujetti à la TVA",
@@ -334,7 +336,8 @@ CONTRACT_TRANSLATIONS: dict[str, dict] = {
         "local_tariff_note_placeholder": "",
         "billing_interval_label": "Intervallo di fatturazione",
         "payment_terms_label": "Condizioni di pagamento",
-        "payment_terms_unit": "giorni dalla data della fattura",
+        "payment_terms_unit_sg": "giorno dalla data della fattura",
+        "payment_terms_unit_pl": "giorni dalla data della fattura",
         "vat_label": "IVA",
         "vat_not_required": "Non soggetto",
         "vat_required": "Soggetto IVA",
@@ -472,7 +475,8 @@ CONTRACT_TRANSLATIONS: dict[str, dict] = {
         "local_tariff_note_placeholder": "",
         "billing_interval_label": "Billing interval",
         "payment_terms_label": "Payment terms",
-        "payment_terms_unit": "days from invoice date",
+        "payment_terms_unit_sg": "day from invoice date",
+        "payment_terms_unit_pl": "days from invoice date",
         "vat_label": "VAT",
         "vat_not_required": "Not liable",
         "vat_required": "VAT liable",
@@ -686,7 +690,14 @@ def _build_contract_context(participant) -> dict:
 
     zev = participant.zev
     lang = zev.invoice_language or "de"
-    tr = CONTRACT_TRANSLATIONS.get(lang, CONTRACT_TRANSLATIONS["de"])
+    # Copied rather than used in place: CONTRACT_TRANSLATIONS is a module-level
+    # constant shared by every contract, and payment_terms_unit is resolved
+    # per-ZEV below — writing it back into the shared dict would leak one
+    # ZEV's payment term into every other contract rendered afterwards.
+    tr = dict(CONTRACT_TRANSLATIONS.get(lang, CONTRACT_TRANSLATIONS["de"]))
+    tr["payment_terms_unit"] = (
+        tr["payment_terms_unit_sg"] if zev.payment_term_days == 1 else tr["payment_terms_unit_pl"]
+    )
 
     # ZEV owner as participant (for address details)
     owner_participant = zev.participants.filter(user=zev.owner).first()
