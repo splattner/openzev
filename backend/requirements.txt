@@ -53,7 +53,7 @@ python-stdnum==2.2
 PyYAML==6.0.3
 qrbill==1.2.0
 qrcode==8.2
-redis==8.0.1
+redis==8.1.0
 referencing==0.37.0
 rpds-py==0.30.0
 ruff==0.16.0
