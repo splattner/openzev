@@ -118,7 +118,9 @@ export function TariffPriceHistoryChart({ series, allSeries, settings }: Props) 
                         ]}
                         contentStyle={{ fontSize: '0.82rem', borderRadius: 6 }}
                     />
-                    {history.bands.length > 1 && <Legend fontSize={11} />}
+                    {history.bands.length > 1 && (
+                        <Legend wrapperStyle={{ fontSize: '0.72rem' }} />
+                    )}
                     {history.bands.map((band) => (
                         <Line
                             key={band}
