@@ -857,6 +857,12 @@ export const en = {
             },
             approxPrice: '≈ CHF {{price}}/kWh',
             approxPriceTooltip: '{{percentage}}% of the active grid tariff (CHF {{basePrice}}/kWh) = CHF {{effectivePrice}}/kWh',
+            validity: {
+                since: 'Since {{date}}',
+                until: 'Until {{date}}',
+                starts: 'Starts {{date}}',
+                ended: 'Ended {{date}}',
+            },
             periodCol: {
                 tariff: 'Tariff',
                 type: 'Type',

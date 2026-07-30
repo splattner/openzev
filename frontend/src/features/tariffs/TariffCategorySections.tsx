@@ -10,10 +10,19 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { formatShortDate } from '../../lib/appSettings'
 import type { AppSettings, Tariff, TariffPeriod } from '../../types/api'
+import { todayIso, validityState, type ValidityState } from './validity'
 
 type TariffSection = {
     category: Tariff['category']
     tariffs: Tariff[]
+}
+
+// Amber rather than blue for scheduled: blue is already the billing-mode badge
+// sitting right next to it, and two adjacent blue badges read as one group.
+const VALIDITY_BADGE_CLASS: Record<ValidityState, string> = {
+    active: 'badge badge-success',
+    scheduled: 'badge badge-warning',
+    expired: 'badge badge-neutral',
 }
 
 type TariffCategorySectionsProps = {
@@ -45,6 +54,7 @@ export function TariffCategorySections({
 }: TariffCategorySectionsProps) {
     const { t } = useTranslation()
     const [expandedTariffIds, setExpandedTariffIds] = useState<Set<string>>(new Set())
+    const today = todayIso()
 
     const toggleExpanded = (tariffId: string) => {
         setExpandedTariffIds((current) => {
@@ -95,6 +105,22 @@ export function TariffCategorySections({
                             const notes = tariff.notes?.trim()
                             const isExpanded = expandedTariffIds.has(tariff.id)
 
+                            // The badge names the date that matters for the
+                            // tariff's current state, so the state is carried by
+                            // the wording as well as the colour. The full window
+                            // stays available as a tooltip.
+                            const validity = validityState(tariff, today)
+                            const validFrom = formatShortDate(tariff.valid_from, settings)
+                            const validTo = tariff.valid_to ? formatShortDate(tariff.valid_to, settings) : null
+                            const validityLabel = validity === 'scheduled'
+                                ? t('pages.tariffs.validity.starts', { date: validFrom })
+                                : validity === 'expired'
+                                    ? t('pages.tariffs.validity.ended', { date: validTo })
+                                    : validTo
+                                        ? t('pages.tariffs.validity.until', { date: validTo })
+                                        : t('pages.tariffs.validity.since', { date: validFrom })
+                            const validityTooltip = `${validFrom} - ${validTo ?? t('pages.tariffs.openEnded')}`
+
                             return (
                                 <article key={tariff.id} className="tariff-card">
                                     <div className="tariff-card-header">
@@ -110,6 +136,9 @@ export function TariffCategorySections({
                                                             {t(`pages.tariffs.energyTypes.${tariff.energy_type}` as Parameters<typeof t>[0])}
                                                         </span>
                                                     )}
+                                                    <span className={VALIDITY_BADGE_CLASS[validity]} title={validityTooltip}>
+                                                        {validityLabel}
+                                                    </span>
                                                 </div>
                                             </div>
                                         </div>
@@ -156,20 +185,16 @@ export function TariffCategorySections({
 
                                     {isExpanded && (
                                         <>
-                                            <div className="tariff-card-details">
-                                                <div className="tariff-detail-card">
-                                                    <span className="tariff-detail-label">{t('pages.tariffs.col.validity')}</span>
-                                                    <span className="tariff-detail-value">
-                                                        {formatShortDate(tariff.valid_from, settings)} - {tariff.valid_to ? formatShortDate(tariff.valid_to, settings) : t('pages.tariffs.openEnded')}
-                                                    </span>
-                                                </div>
-                                                {notes && (
+                                            {/* Validity moved to a badge on the header; notes are all
+                                                that is left here, so the block is skipped when empty. */}
+                                            {notes && (
+                                                <div className="tariff-card-details">
                                                     <div className="tariff-detail-card tariff-detail-card-wide">
                                                         <span className="tariff-detail-label">{t('pages.tariffs.form.notes')}</span>
                                                         <span className="tariff-detail-value">{notes}</span>
                                                     </div>
-                                                )}
-                                            </div>
+                                                </div>
+                                            )}
 
                                             {usesPeriods && (
                                                 <div className="tariff-period-section">

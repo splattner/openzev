@@ -893,6 +893,12 @@ export const fr = {
             },
             approxPrice: '≈ CHF {{price}}/kWh',
             approxPriceTooltip: '{{percentage}} % du tarif réseau actif (CHF {{basePrice}}/kWh) = CHF {{effectivePrice}}/kWh',
+            validity: {
+                since: 'Depuis le {{date}}',
+                until: "Jusqu'au {{date}}",
+                starts: 'Dès le {{date}}',
+                ended: 'Terminé le {{date}}',
+            },
             periodCol: {
                 tariff: 'Tarif',
                 type: 'Type',

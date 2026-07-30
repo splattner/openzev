@@ -10,6 +10,7 @@ import { TariffImportModal } from '../features/tariffs/TariffImportModal'
 import { TariffPeriodFormModal } from '../features/tariffs/TariffPeriodFormModal'
 import { TariffToolbar, type TariffValidityFilter } from '../features/tariffs/TariffToolbar'
 import { useTariffTransfer } from '../features/tariffs/useTariffTransfer'
+import { isTariffCurrentlyValid, todayIso } from '../features/tariffs/validity'
 import {
     fetchTariffPeriods,
     fetchTariffs,
@@ -24,12 +25,6 @@ import type { Tariff, TariffPeriod } from '../types/api'
 
 const tariffCategoryOrder: Tariff['category'][] = ['energy', 'grid_fees', 'levies', 'metering']
 
-function isTariffCurrentlyValid(tariff: Tariff, todayIso: string): boolean {
-    if (tariff.valid_from > todayIso) return false
-    if (tariff.valid_to && tariff.valid_to < todayIso) return false
-    return true
-}
-
 export function TariffsPage() {
     const queryClient = useQueryClient()
     const { pushToast } = useToast()
@@ -40,7 +35,9 @@ export function TariffsPage() {
     const { t } = useTranslation()
     const isManagedScope = user?.role === 'admin' || user?.role === 'zev_owner'
     const [validityFilter, setValidityFilter] = useState<TariffValidityFilter>('valid')
-    const todayIso = useMemo(() => new Date().toISOString().slice(0, 10), [])
+    // Shared with the validity badge on each card, so the filter and the badge
+    // can never disagree about whether a tariff is in force.
+    const today = useMemo(() => todayIso(), [])
 
     const tariffsQuery = useQuery({
         queryKey: queryKeys.tariffs.list(selectedZevId || undefined),
@@ -133,8 +130,8 @@ export function TariffsPage() {
     )
 
     const visibleTariffs = useMemo(
-        () => (validityFilter === 'all' ? tariffs : tariffs.filter((tariff) => isTariffCurrentlyValid(tariff, todayIso))),
-        [tariffs, validityFilter, todayIso],
+        () => (validityFilter === 'all' ? tariffs : tariffs.filter((tariff) => isTariffCurrentlyValid(tariff, today))),
+        [tariffs, validityFilter, today],
     )
 
     const tariffSections = useMemo(
