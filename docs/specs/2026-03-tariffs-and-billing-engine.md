@@ -69,9 +69,25 @@ re-implement the engine from scratch.
 
 A tariff is **active on day `d`** iff `valid_from ≤ d` and (`valid_to IS NULL` or `valid_to ≥ d`).
 
-For energy-based tariffs (`billing_mode ∈ {energy, percentage_of_energy}`),
-OpenZEV rejects overlapping validity windows for the same tuple of:
-`(zev, category, billing_mode, energy_type)`.
+OpenZEV rejects overlapping validity windows for two tariffs of the same
+`(zev, name)` — regardless of billing mode.
+
+The rule is deliberately keyed on **name**, not on
+`(category, billing_mode, energy_type)`.  A ZEV normally carries several
+simultaneous per-kWh components inside one category — grid fees are
+*Netznutzung* **and** *Systemdienstleistung*; levies are the *Netzzuschlag*
+**and** a cantonal charge — and §4.4.1 accumulates them into separate invoice
+lines by design (see also the risk table in §12).  Keying the check on the
+category tuple made that ordinary structure unrepresentable.
+
+What the check does catch is the case that is almost always a mistake:
+a new seasonal version of a tariff created without closing the previous one,
+where both windows stay open and every participant is billed twice with nothing
+to signal it.
+
+The check covers fixed-fee modes too.  It previously applied only to
+`energy` and `percentage_of_energy`, so a duplicated monthly fee was charged
+twice unguarded.
 
 ### 3.2 TariffPeriod (price bands within a tariff)
 
@@ -817,6 +833,18 @@ The description renders as: `"Surcharge 50% (50% von CHF 0.32/kWh)"` (German).
 |---|---|
 | `test_owner_can_export_tariffs_as_json` | §6.1: export returns preset array, strips `id`/`zev`, includes nested periods without `tariff` FK |
 | `test_owner_can_import_tariffs_from_json` | §6.2: import creates tariff + periods in target ZEV, returns 201 with created count |
+| `test_import_accepts_several_simultaneous_components_in_one_category` | §3.1: multiple per-kWh components sharing category/mode/energy type import cleanly |
+| `test_import_reports_every_rejected_tariff_and_saves_nothing` | §6.2: every rejected entry reported by position and name in one response; valid entries rolled back with them |
+| `test_import_rejects_invalid_period_payload` | §6.2: nested period errors surface per entry |
+
+### Backend (`tariffs/tests.py`) — validity windows
+
+| Test case | Validates |
+|---|---|
+| `test_rejects_overlapping_tariffs_with_the_same_name` | §3.1: the forgotten-`valid_to` double-billing case is blocked |
+| `test_allows_overlapping_tariffs_with_different_names` | §3.1: distinct simultaneous components are permitted |
+| `test_allows_the_same_name_in_consecutive_windows` | §3.1: seasonal versioning with the old window closed |
+| `test_rejects_overlapping_fixed_fees_with_the_same_name` | §3.1: the check covers fixed-fee modes, not only energy modes |
 
 ### Frontend
 

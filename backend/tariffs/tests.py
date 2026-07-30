@@ -248,7 +248,24 @@ class TariffPermissionTests(TestCase):
 		self.assertEqual(str(roundtripped.percentage), "7.25")
 		self.assertIsNone(roundtripped.fixed_price_chf)
 
-	def test_rejects_overlapping_energy_tariffs_for_same_scope(self):
+	def _post_tariff(self, client, zev, name, *, valid_from, valid_to=None,
+	                 category=TariffCategory.ENERGY, billing_mode=BillingMode.ENERGY,
+	                 energy_type="local", **extra):
+		payload = {
+			"zev": str(zev.id),
+			"name": name,
+			"category": category,
+			"billing_mode": billing_mode,
+			"energy_type": energy_type,
+			"valid_from": valid_from,
+			"valid_to": valid_to,
+			**extra,
+		}
+		return client.post("/api/v1/tariffs/tariffs/", payload, format="json")
+
+	def test_rejects_overlapping_tariffs_with_the_same_name(self):
+		"""A second version of a tariff created without closing the first would
+		apply both at once and double-bill every participant."""
 		client = APIClient()
 		owner = User.objects.create_user(
 			username="tariff_overlap_owner",
@@ -258,37 +275,79 @@ class TariffPermissionTests(TestCase):
 		zev = Zev.objects.create(name="Tariff Overlap ZEV", owner=owner, zev_type="vzev")
 		auth(client, owner)
 
-		first_resp = client.post(
-			"/api/v1/tariffs/tariffs/",
-			{
-				"zev": str(zev.id),
-				"name": "Base Local Energy",
-				"category": TariffCategory.ENERGY,
-				"billing_mode": BillingMode.ENERGY,
-				"energy_type": "local",
-				"valid_from": "2026-01-01",
-				"valid_to": "2026-12-31",
-			},
-			format="json",
-		)
-		self.assertEqual(first_resp.status_code, 201)
+		first = self._post_tariff(client, zev, "Local Energy", valid_from="2026-01-01", valid_to="2026-12-31")
+		self.assertEqual(first.status_code, 201)
 
-		second_resp = client.post(
-			"/api/v1/tariffs/tariffs/",
-			{
-				"zev": str(zev.id),
-				"name": "Overlapping Local Energy",
-				"category": TariffCategory.ENERGY,
-				"billing_mode": BillingMode.ENERGY,
-				"energy_type": "local",
-				"valid_from": "2026-06-01",
-				"valid_to": "2027-05-31",
-			},
-			format="json",
-		)
+		second = self._post_tariff(client, zev, "Local Energy", valid_from="2026-06-01", valid_to="2027-05-31")
 
-		self.assertEqual(second_resp.status_code, 400)
-		self.assertIn("valid_from", second_resp.data)
+		self.assertEqual(second.status_code, 400)
+		self.assertIn("valid_from", second.data)
+		self.assertIn("Local Energy", str(second.data["valid_from"]))
+
+	def test_allows_overlapping_tariffs_with_different_names(self):
+		"""Distinct per-kWh components of one category coexist by design — grid
+		fees are Netznutzung *and* SDL — and the engine accumulates them into
+		separate invoice lines."""
+		client = APIClient()
+		owner = User.objects.create_user(
+			username="tariff_components_owner",
+			password="pass1234",
+			role=UserRole.ZEV_OWNER,
+		)
+		zev = Zev.objects.create(name="Tariff Components ZEV", owner=owner, zev_type="vzev")
+		auth(client, owner)
+
+		first = self._post_tariff(
+			client, zev, "Netznutzung Arbeit", valid_from="2026-01-01",
+			category=TariffCategory.GRID_FEES, energy_type="grid")
+		second = self._post_tariff(
+			client, zev, "Systemdienstleistung SDL", valid_from="2026-01-01",
+			category=TariffCategory.GRID_FEES, energy_type="grid")
+
+		self.assertEqual(first.status_code, 201)
+		self.assertEqual(second.status_code, 201)
+		self.assertEqual(Tariff.objects.filter(zev=zev, category=TariffCategory.GRID_FEES).count(), 2)
+
+	def test_allows_the_same_name_in_consecutive_windows(self):
+		"""Seasonal versioning done properly: the old window is closed first."""
+		client = APIClient()
+		owner = User.objects.create_user(
+			username="tariff_seasonal_owner",
+			password="pass1234",
+			role=UserRole.ZEV_OWNER,
+		)
+		zev = Zev.objects.create(name="Tariff Seasonal ZEV", owner=owner, zev_type="vzev")
+		auth(client, owner)
+
+		first = self._post_tariff(client, zev, "Local Energy", valid_from="2026-01-01", valid_to="2026-03-31")
+		second = self._post_tariff(client, zev, "Local Energy", valid_from="2026-04-01")
+
+		self.assertEqual(first.status_code, 201)
+		self.assertEqual(second.status_code, 201)
+
+	def test_rejects_overlapping_fixed_fees_with_the_same_name(self):
+		"""The guard used to skip fixed fees entirely, so a duplicated monthly
+		fee was charged twice with nothing to catch it."""
+		client = APIClient()
+		owner = User.objects.create_user(
+			username="tariff_fee_overlap_owner",
+			password="pass1234",
+			role=UserRole.ZEV_OWNER,
+		)
+		zev = Zev.objects.create(name="Tariff Fee Overlap ZEV", owner=owner, zev_type="vzev")
+		auth(client, owner)
+
+		first = self._post_tariff(
+			client, zev, "Metering Fee", valid_from="2026-01-01",
+			category=TariffCategory.METERING, billing_mode=BillingMode.MONTHLY_FEE,
+			energy_type=None, fixed_price_chf="5.00")
+		second = self._post_tariff(
+			client, zev, "Metering Fee", valid_from="2026-06-01",
+			category=TariffCategory.METERING, billing_mode=BillingMode.MONTHLY_FEE,
+			energy_type=None, fixed_price_chf="6.00")
+
+		self.assertEqual(first.status_code, 201)
+		self.assertEqual(second.status_code, 400)
 
 	def test_allows_adjacent_non_overlapping_energy_tariffs(self):
 		client = APIClient()

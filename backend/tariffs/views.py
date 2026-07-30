@@ -2,8 +2,10 @@ from functools import partial
 
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
+from rest_framework.exceptions import ValidationError as DRFValidationError
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
 from accounts.permissions import IsZevOwnerOrAdmin
 from zev.models import Zev
@@ -17,6 +19,53 @@ from audit.services import record_audit_event
 
 # Every audit event in this module is a tariff event; bind the category once.
 _record_tariff_event = partial(record_audit_event, action_category=AuditActionCategory.TARIFF)
+
+
+def _normalise_validation_errors(exc) -> dict:
+    """Flatten a DRF or Django ValidationError into ``{field: [messages]}``.
+
+    The two exception types expose their contents differently, and nested
+    serializer errors arrive as lists of dicts; callers want one predictable
+    shape they can render.
+    """
+    if isinstance(exc, DjangoValidationError):
+        return {
+            field: [str(message) for message in messages]
+            for field, messages in (
+                exc.message_dict if hasattr(exc, 'message_dict')
+                else {'non_field_errors': exc.messages}
+            ).items()
+        }
+
+    detail = exc.detail
+    if not isinstance(detail, dict):
+        return {'non_field_errors': [str(item) for item in (detail if isinstance(detail, list) else [detail])]}
+    return {
+        field: [str(message) for message in (messages if isinstance(messages, list) else [messages])]
+        for field, messages in detail.items()
+    }
+
+
+def _describe_failure(failure: dict) -> str:
+    fields = '; '.join(
+        f"{field}: {' '.join(messages)}" for field, messages in failure['errors'].items()
+    )
+    label = f'"{failure["name"]}"' if failure['name'] else 'unnamed'
+    return f'#{failure["position"]} {label} — {fields}'
+
+
+class _TariffImportFailed(Exception):
+    """Raised to roll the import back once every entry has been checked."""
+
+    def __init__(self, failures: list[dict], *, attempted: int):
+        self.failures = failures
+        self.attempted = attempted
+        details = ' | '.join(_describe_failure(failure) for failure in failures)
+        self.summary = (
+            f'{len(failures)} of {attempted} tariffs could not be imported, '
+            f'so nothing was saved: {details}'
+        )
+        super().__init__(self.summary)
 
 
 class TariffViewSet(AuditedUpdateMixin, ZevScopedQuerySetMixin, viewsets.ModelViewSet):
@@ -179,36 +228,16 @@ class TariffViewSet(AuditedUpdateMixin, ZevScopedQuerySetMixin, viewsets.ModelVi
 
         try:
             with transaction.atomic():
-                created_tariffs = []
-                for tariff_data in tariffs_data:
-                    tariff_data = dict(tariff_data)
-                    # Extract periods before creating tariff
-                    periods_data = tariff_data.pop('periods', [])
-                    tariff_data.pop('id', None)
-                    tariff_data.pop('zev', None)
-                    tariff_data.pop('created_at', None)
-                    tariff_data.pop('updated_at', None)
-                    # Set the ZEV ID
-                    tariff_data['zev'] = str(zev.id)
+                created_tariffs, failures = self._import_tariff_batch(zev, tariffs_data)
 
-                    # Create tariff
-                    tariff_serializer = TariffSerializer(data=tariff_data)
-                    if not tariff_serializer.is_valid():
-                        raise Exception(f"Invalid tariff data: {tariff_serializer.errors}")
-                    tariff = tariff_serializer.save()
-
-                    # Create periods
-                    for period_data in periods_data:
-                        period_data = dict(period_data)
-                        period_data.pop('id', None)
-                        period_data.pop('tariff', None)
-                        period_data['tariff'] = str(tariff.id)
-                        period_serializer = TariffPeriodSerializer(data=period_data)
-                        if not period_serializer.is_valid():
-                            raise Exception(f"Invalid period data: {period_serializer.errors}")
-                        period_serializer.save()
-
-                    created_tariffs.append(tariff_serializer.data)
+                if failures:
+                    # Every entry is reported in one response rather than only the
+                    # first, so a preset with several problems takes one round trip
+                    # to fix instead of one per problem. The import stays
+                    # all-or-nothing: a partially applied tariff set would price
+                    # invoices against an incomplete structure, which is worse than
+                    # importing nothing.
+                    raise _TariffImportFailed(failures, attempted=len(tariffs_data))
 
                 _record_tariff_event(
                     request=request,
@@ -226,6 +255,24 @@ class TariffViewSet(AuditedUpdateMixin, ZevScopedQuerySetMixin, viewsets.ModelVi
                     status=status.HTTP_201_CREATED
                 )
 
+        except _TariffImportFailed as failure:
+            _record_tariff_event(
+                request=request,
+                action_type="tariff.import",
+                target_type="zev.Zev",
+                target=zev,
+                target_id=str(zev.id),
+                target_display=zev.name,
+                summary=f"Tariff import failed for ZEV {zev.name}: {failure.summary}",
+                status=AuditEventStatus.FAILED,
+                metadata={"attempted": failure.attempted, "rejected": len(failure.failures)},
+            )
+            # ``detail`` carries the human-readable summary; ``errors`` keeps the
+            # per-entry breakdown for API consumers.
+            return Response(
+                {'detail': failure.summary, 'errors': failure.failures},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         except Exception as e:
             _record_tariff_event(
                 request=request,
@@ -239,6 +286,51 @@ class TariffViewSet(AuditedUpdateMixin, ZevScopedQuerySetMixin, viewsets.ModelVi
                 metadata={"error": str(e)},
             )
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    def _import_tariff_batch(self, zev, tariffs_data):
+        """Create every tariff in ``tariffs_data``, collecting failures as it goes.
+
+        Each entry runs in its own savepoint so one rejection cannot poison the
+        surrounding transaction, letting the remaining entries still be checked.
+        The caller decides what to do with the failures.
+        """
+        created_tariffs = []
+        failures = []
+
+        for index, raw in enumerate(tariffs_data):
+            payload = dict(raw)
+            periods_data = payload.pop('periods', [])
+            for ignored in ('id', 'zev', 'created_at', 'updated_at'):
+                payload.pop(ignored, None)
+            payload['zev'] = str(zev.id)
+
+            try:
+                with transaction.atomic():  # savepoint
+                    tariff_serializer = TariffSerializer(data=payload)
+                    tariff_serializer.is_valid(raise_exception=True)
+                    # The overlap guard lives in the model's full_clean(), which
+                    # the serializer only reaches on save() — so this can raise
+                    # even though is_valid() passed.
+                    tariff = tariff_serializer.save()
+
+                    for period_data in periods_data:
+                        period_payload = dict(period_data)
+                        period_payload.pop('id', None)
+                        period_payload['tariff'] = str(tariff.id)
+                        period_serializer = TariffPeriodSerializer(data=period_payload)
+                        period_serializer.is_valid(raise_exception=True)
+                        period_serializer.save()
+            except (DRFValidationError, DjangoValidationError) as exc:
+                failures.append({
+                    'position': index + 1,
+                    'name': str(raw.get('name') or ''),
+                    'errors': _normalise_validation_errors(exc),
+                })
+                continue
+
+            created_tariffs.append(tariff_serializer.data)
+
+        return created_tariffs, failures
 
 
 class TariffPeriodViewSet(AuditedUpdateMixin, ZevScopedQuerySetMixin, viewsets.ModelViewSet):

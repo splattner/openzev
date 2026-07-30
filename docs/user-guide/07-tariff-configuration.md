@@ -235,11 +235,59 @@ When saving a tariff, OpenZEV checks:
 | Check | Requirement |
 | --- | --- |
 | **Valid From ≤ Valid To** | Validity period must be in order |
-| **No overlapping periods (same type)** | Can't have two "Local Energy" tariffs for the same date |
+| **No overlapping windows for the same name** | Two tariffs *called the same thing* can't both be valid on the same date — see below |
 | **Price format** | Numeric, up to 5 decimals (e.g., `0.12345` CHF/kWh) |
 | **Mandatory fields** | Name, type, validity period, prices |
 
 If validation fails, you'll see a clear error message. Fix and retry.
+
+### Several Tariffs at Once Is Normal
+
+You can have **as many tariffs applying simultaneously as you need**, including
+in the same category, with the same billing mode and the same energy type. This
+is the usual shape of a Swiss tariff sheet:
+
+```
+Grid Fees
+├─ Netznutzung Arbeit         0.09000 CHF/kWh
+└─ Systemdienstleistung SDL   0.00750 CHF/kWh
+
+Levies
+├─ Netzzuschlag               0.02300 CHF/kWh
+└─ Kantonale Abgabe           0.00500 CHF/kWh
+```
+
+All four apply at once, and each becomes its own line on the invoice, so
+participants see what they are paying for rather than one merged figure.
+
+The **only** thing OpenZEV blocks is two tariffs with the **same name** whose
+validity windows overlap — because that is nearly always a forgotten end date:
+
+```
+✗ Local Energy   2026-01-01 → (open)      ← old version, never closed
+  Local Energy   2026-04-01 → (open)      ← new version
+    Both apply. Every participant is billed twice.
+
+✓ Local Energy   2026-01-01 → 2026-03-31  ← closed first
+  Local Energy   2026-04-01 → (open)
+```
+
+So when you introduce a new version of a tariff, set **Valid To** on the old one
+first. If two tariffs really are meant to apply together, give them different
+names — which you would want anyway, since the name is what appears on the
+invoice line.
+
+## Importing Several Tariffs at Once
+
+**Import JSON** applies all or nothing. If any entry is rejected, nothing is
+saved and the error names **every** problem entry by its position in the file and
+its name, so you can fix them all in one pass:
+
+```
+2 of 7 tariffs could not be imported, so nothing was saved:
+  #3 "Kantonale Abgabe" — valid_from: Another tariff named "Kantonale Abgabe" …
+  #5 "Local Energy" — energy_type: Energy tariffs require an energy type.
+```
 
 ## Editing and Deactivating Tariffs
 

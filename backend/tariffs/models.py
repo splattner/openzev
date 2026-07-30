@@ -71,25 +71,27 @@ class Tariff(models.Model):
         if self.billing_mode in {BillingMode.ENERGY, BillingMode.PERCENTAGE_OF_ENERGY} and not self.energy_type:
             errors["energy_type"] = "Energy-based tariffs require an energy type."
 
-        if (
-            self.zev_id
-            and self.energy_type
-            and self.valid_from
-            and self.billing_mode in {BillingMode.ENERGY, BillingMode.PERCENTAGE_OF_ENERGY}
-        ):
+        # A ZEV legitimately carries several simultaneous per-kWh components in
+        # one category — grid fees are Netznutzung *and* SDL, levies are the
+        # Netzzuschlag *and* the cantonal charge — and the engine is built to
+        # accumulate them into separate invoice lines. So overlapping windows
+        # are only rejected for tariffs sharing a *name*, which is the case that
+        # is almost certainly a mistake: a new seasonal version created without
+        # closing the previous one, which would double-bill every participant.
+        if self.zev_id and self.name and self.valid_from:
             candidate_end = self.valid_to or date.max
             overlaps = Tariff.objects.exclude(pk=self.pk).filter(
                 zev_id=self.zev_id,
-                category=self.category,
-                billing_mode=self.billing_mode,
-                energy_type=self.energy_type,
+                name=self.name,
                 valid_from__lte=candidate_end,
             ).filter(
                 models.Q(valid_to__isnull=True) | models.Q(valid_to__gte=self.valid_from)
             )
             if overlaps.exists():
                 errors["valid_from"] = (
-                    "Overlapping tariff windows are not allowed for the same ZEV, category, billing mode, and energy type."
+                    f'Another tariff named "{self.name}" in this ZEV already covers part of this '
+                    "validity period. Close the previous one with a valid_to date, or give this "
+                    "one a different name if both should apply at the same time."
                 )
 
         if errors:

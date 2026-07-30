@@ -187,7 +187,93 @@ class TariffActionTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 400)
-        self.assertIn("Invalid period data", response.data["error"])
+        self.assertIn("period_type", str(response.data["errors"]))
+        self.assertEqual(response.data["errors"][0]["position"], 1)
+        self.assertEqual(response.data["errors"][0]["name"], "Invalid period tariff")
+        self.assertIn("1 of 1 tariffs could not be imported", response.data["detail"])
+
+    def test_import_accepts_several_simultaneous_components_in_one_category(self):
+        """The real-world shape of a Swiss tariff sheet: grid fees and levies each
+        consist of several per-kWh components that all apply at once."""
+        owner = self.make_owner("tariff_components_import_owner")
+        zev = Zev.objects.create(name="Components import ZEV", owner=owner, zev_type="vzev")
+        client = self.make_client(owner)
+
+        def component(name, category, price):
+            return {
+                "name": name,
+                "category": category,
+                "billing_mode": BillingMode.ENERGY,
+                "energy_type": EnergyType.GRID,
+                "valid_from": "2026-01-01",
+                "periods": [{"period_type": "flat", "price_chf_per_kwh": price}],
+            }
+
+        response = client.post(
+            "/api/v1/tariffs/tariffs/import/",
+            {
+                "zev_id": str(zev.id),
+                "tariffs": [
+                    component("Netznutzung Arbeit", TariffCategory.GRID_FEES, "0.09000"),
+                    component("Systemdienstleistung SDL", TariffCategory.GRID_FEES, "0.00750"),
+                    component("Netzzuschlag", TariffCategory.LEVIES, "0.02300"),
+                    component("Kantonale Abgabe", TariffCategory.LEVIES, "0.00500"),
+                ],
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertEqual(response.data["created"], 4)
+        self.assertEqual(Tariff.objects.filter(zev=zev).count(), 4)
+
+    def test_import_reports_every_rejected_tariff_and_saves_nothing(self):
+        """A preset with several problems is fully diagnosed in one response, so
+        it takes one round trip to fix rather than one per problem."""
+        owner = self.make_owner("tariff_multi_error_owner")
+        zev = Zev.objects.create(name="Multi error ZEV", owner=owner, zev_type="vzev")
+        client = self.make_client(owner)
+
+        response = client.post(
+            "/api/v1/tariffs/tariffs/import/",
+            {
+                "zev_id": str(zev.id),
+                "tariffs": [
+                    {
+                        "name": "Valid Local Energy",
+                        "category": TariffCategory.ENERGY,
+                        "billing_mode": BillingMode.ENERGY,
+                        "energy_type": EnergyType.LOCAL,
+                        "valid_from": "2026-01-01",
+                    },
+                    {
+                        # Energy mode with no energy_type.
+                        "name": "Missing Energy Type",
+                        "category": TariffCategory.ENERGY,
+                        "billing_mode": BillingMode.ENERGY,
+                        "valid_from": "2026-01-01",
+                    },
+                    {
+                        # Duplicate of the first entry's name and window.
+                        "name": "Valid Local Energy",
+                        "category": TariffCategory.ENERGY,
+                        "billing_mode": BillingMode.ENERGY,
+                        "energy_type": EnergyType.LOCAL,
+                        "valid_from": "2026-06-01",
+                    },
+                ],
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        # Both bad entries reported, identified by position, not just the first.
+        self.assertEqual([failure["position"] for failure in response.data["errors"]], [2, 3])
+        self.assertIn("energy_type", response.data["errors"][0]["errors"])
+        self.assertIn("valid_from", response.data["errors"][1]["errors"])
+        self.assertIn("2 of 3 tariffs could not be imported", response.data["detail"])
+        # All-or-nothing: the valid first entry is rolled back too.
+        self.assertEqual(Tariff.objects.filter(zev=zev).count(), 0)
 
     def test_periods_are_rejected_for_fixed_fee_tariffs(self):
         owner = self.make_owner("tariff_fixed_fee_owner")
