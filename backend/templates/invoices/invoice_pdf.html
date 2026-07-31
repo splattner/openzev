@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="{{ invoice.zev.invoice_language|default:'en' }}">
 
 <head>
     <meta charset="UTF-8">
@@ -11,596 +11,1070 @@
             padding: 0;
         }
 
+        :root {
+            --ink: #0f172a;
+            --ink-soft: #334155;
+            --muted: #64748b;
+            --line: #e2e8f0;
+            --line-subtle: #f1f5f9;
+            --surface: #f8faf7;
+            --brand: #143828;
+            --brand-deep: #0d2b1d;
+            --brand-mid: #1f5c3a;
+            --brand-pale: #e8f0ec;
+            --brand-glow: #d4e0d7;
+            --gold: #bfa05a;
+            --brand-accent: #9ec3ac;
+            --brand-light: #d6ead9;
+            --brand-muted: #c8dccf;
+            --zebra: #f3f6f2;
+            --chart-surface: #fbfcfb;
+            --subtotal-color: #24352c;
+        }
+
         body {
             font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
-            font-size: 10pt;
-            color: #222;
+            font-size: 9.5pt;
+            color: var(--ink);
+            line-height: 1.4;
         }
 
-        .page {
-            padding: 13mm 16mm 16mm;
+        .invoice-page {
+            padding: 12mm 16mm;
         }
 
-        /* Header */
-        .header {
+        /* ── Header ─────────────────────────────────────────────── */
+        .document-header {
             display: flex;
             justify-content: space-between;
             align-items: flex-start;
-            margin-bottom: 6mm;
+            padding-bottom: 4mm;
+            border-bottom: 0.5pt solid var(--line);
+            position: relative;
+        }
+
+        .document-header::after {
+            content: "";
+            position: absolute;
+            bottom: -0.5pt;
+            left: 0;
+            width: 40mm;
+            height: 1.5pt;
+            background: var(--brand-mid);
+            border-radius: 1pt;
+        }
+
+        .brand-row {
+            display: flex;
+            align-items: center;
+            gap: 2.5mm;
+            margin-bottom: 2mm;
+        }
+
+        .brand-mark {
+            width: 6mm;
+            height: 6mm;
+            background: var(--brand-deep);
+            border-radius: 50%;
+            flex-shrink: 0;
         }
 
         .company-name {
-            font-size: 13pt;
-            font-weight: bold;
-            color: #2c5f2e;
+            color: var(--brand-deep);
+            font-size: 15pt;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+            line-height: 1.1;
+            white-space: nowrap;
         }
 
-        .company-meta {
+        .company-address {
+            margin-top: 1.5mm;
+            color: var(--ink-soft);
             font-size: 8pt;
-            color: #555;
-            margin-top: 1mm;
+            line-height: 1.4;
         }
 
-        /* Invoice title */
-        .invoice-title {
-            font-size: 14pt;
-            font-weight: bold;
-            margin-bottom: 3mm;
-        }
-
-        .invoice-meta {
-            display: flex;
-            gap: 10mm;
-            margin-bottom: 4mm;
-        }
-
-        .meta-block dt {
+        .document-label {
+            color: var(--muted);
             font-size: 7pt;
-            color: #888;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-        }
-
-        .meta-block dd {
-            font-size: 9pt;
-            font-weight: 600;
-        }
-
-        /* Address blocks */
-        .address-row {
-            display: flex;
-            gap: 10mm;
-            margin-bottom: 4mm;
-        }
-
-        .address-block {
-            flex: 1;
-        }
-
-        .address-block h3 {
-            font-size: 7pt;
-            color: #888;
+            font-weight: 700;
+            letter-spacing: 0.1em;
+            text-align: right;
             text-transform: uppercase;
             margin-bottom: 1mm;
         }
 
-        /* Line items table */
-        .category-section {
-            margin-bottom: 3mm;
-        }
-
-        .category-title {
-            font-size: 9pt;
-            font-weight: bold;
-            color: #2c5f2e;
-            margin: 0 0 1mm;
-        }
-
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-bottom: 3mm;
-        }
-
-        thead th {
-            background: #2c5f2e;
-            color: #fff;
-            padding: 2mm 2mm;
-            text-align: left;
-            font-size: 8pt;
-        }
-
-        thead th.right {
+        .document-number {
+            color: var(--ink);
+            font-size: 22pt;
+            font-weight: 300;
+            letter-spacing: -0.03em;
             text-align: right;
+            line-height: 1;
         }
 
-        tbody tr:nth-child(even) {
-            background: #f7f7f7;
+        .document-number strong {
+            font-weight: 700;
         }
 
-        tbody td {
-            padding: 1.5mm 2mm;
-            font-size: 9pt;
-            border-bottom: 1px solid #eee;
-            vertical-align: top;
-        }
-
-        tbody td.right {
-            text-align: right;
-        }
-
-        .category-subtotal td {
-            font-weight: bold;
-            background: #eef6ef;
-        }
-
-        /* Totals */
-        .totals {
-            margin-left: auto;
-            width: 75mm;
-        }
-
-        .totals table {
-            margin: 0;
-        }
-
-        .totals td {
-            padding: 1mm 2mm;
-            font-size: 9pt;
-        }
-
-        .totals .subtotal td {
-            border-top: 1px solid #ccc;
-        }
-
-        .totals .grand-total td {
-            border-top: 2px solid #2c5f2e;
-            font-weight: bold;
-            font-size: 11pt;
-        }
-
-        /* Notes */
-        .notes {
-            margin-top: 4mm;
-            font-size: 8pt;
-            color: #555;
-            border-top: 1px solid #eee;
-            padding-top: 2mm;
-        }
-
-        /* Charts page wrapper */
-        .charts-page {
-            page-break-before: always;
-        }
-
-        /* Energy chart section */
-        .chart-section {
-            margin-top: 4mm;
-            padding-top: 3mm;
-            border-top: 1px solid #eee;
-        }
-
-        .chart-section h3 {
-            font-size: 9pt;
-            font-weight: bold;
-            color: #2c5f2e;
-            margin-bottom: 1mm;
-        }
-
-        .chart-section p {
+        .document-status {
+            display: inline-block;
+            color: var(--brand-mid);
             font-size: 7pt;
-            color: #6b7280;
-            margin-bottom: 2mm;
-        }
-
-        /* Savings section */
-        .savings-section {
-            margin-top: 5mm;
-            padding-top: 3mm;
-            border-top: 1px solid #d1fae5;
-        }
-
-        .savings-section h3 {
-            font-size: 9pt;
-            font-weight: bold;
-            color: #2c5f2e;
-            margin-bottom: 2mm;
-        }
-
-        .savings-table {
-            border-collapse: collapse;
-            font-size: 8.5pt;
-            min-width: 280px;
-        }
-
-        .savings-table th {
-            font-size: 7.5pt;
-            font-weight: bold;
-            color: #ffffff;
-            text-align: left;
-            padding: 2mm 2mm;
-            border-bottom: 1px solid #d1fae5;
-        }
-
-        .savings-table td {
-            padding: 1.5mm 2mm;
-            border-bottom: 1px solid #f0fdf4;
-            vertical-align: middle;
-            font-size: 9pt;
-        }
-
-        .savings-table td.num {
+            font-weight: 700;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
             text-align: right;
-            font-variant-numeric: tabular-nums;
-            padding-right: 0;
+            margin-top: 2mm;
+            padding: 0.8mm 2.2mm;
+            background: var(--brand-pale);
+            border-radius: 3mm;
+            border: 0.5pt solid var(--brand-glow);
         }
 
-        .savings-highlight td {
-            background: #f0fdf4;
-            font-weight: bold;
-            border-bottom: none;
-        }
-
-        /* Hourly profile chart section */
-        .hourly-chart-section {
-            margin-top: 5mm;
-            padding-top: 3mm;
-            border-top: 1px solid #e5e7eb;
-        }
-
-        .hourly-chart-section h3 {
-            font-size: 9pt;
-            font-weight: bold;
-            color: #2c5f2e;
-            margin-bottom: 1mm;
-        }
-
-        .hourly-chart-section p {
-            font-size: 7.5pt;
-            color: #6b7280;
-            margin-bottom: 2mm;
-        }
-
-        /* Payment section */
-        .payment-section {
-            margin-top: 4mm;
-            padding: 2.5mm 4mm;
-            background: #f9f9f9;
-            border-left: 3px solid #2c5f2e;
-            font-size: 8pt;
-            page-break-before: always;
-        }
-
-        .payment-section dt {
-            font-weight: bold;
-            color: #2c5f2e;
-        }
-
-        .payment-section dd {
-            margin-bottom: 1mm;
-        }
-
-        /* Detachable slip */
-        .slip-separator {
-            margin: 6mm 0 0 0;
-            border-top: 2px dashed #999;
-            padding-top: 5mm;
-            font-size: 8pt;
-        }
-
-        .slip-header {
-            text-align: right;
-            font-weight: bold;
-            margin-bottom: 2mm;
-            color: #666;
-        }
-
-        .slip-content {
+        /* ── Summary band ───────────────────────────────────────── */
+        .invoice-summary {
             display: flex;
             gap: 10mm;
             justify-content: space-between;
-            font-size: 8pt;
+            align-items: flex-start;
+            margin: 6mm 0 5mm;
         }
 
-        .slip-block {
-            flex: 0 0 45%;
+        .recipient-block {
+            flex: 1 1 auto;
+            min-width: 0;
         }
 
-        .slip-block strong {
+        .eyebrow,
+        .fact dt {
+            color: var(--muted);
+            font-size: 6.8pt;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+
+        .recipient-block .eyebrow {
+            color: var(--brand-mid);
+            margin-bottom: 1.5mm;
+        }
+
+        .recipient-name {
             display: block;
+            font-size: 12pt;
+            font-weight: 700;
+            letter-spacing: -0.015em;
+            line-height: 1.15;
+            color: var(--ink);
             margin-bottom: 1mm;
         }
 
-        .slip-info {
-            font-size: 7pt;
-            color: #666;
+        .recipient-address {
+            color: var(--ink-soft);
+            font-size: 9pt;
+            line-height: 1.35;
+        }
+
+        .recipient-email {
+            color: var(--muted);
+            font-size: 7.5pt;
+            margin-top: 1.5mm;
+        }
+
+        .facts {
+            display: flex;
+            flex: 0 0 42mm;
+            flex-direction: column;
+            justify-content: space-between;
+            align-self: stretch;
+            text-align: right;
+        }
+
+        .fact + .fact {
+            margin-top: 1.5mm;
+        }
+
+        .fact dd {
+            font-size: 9pt;
+            font-weight: 600;
+            line-height: 1.15;
+            margin-top: 0.4mm;
+            color: var(--ink);
+            letter-spacing: -0.01em;
+            white-space: nowrap;
+        }
+
+        .amount-card {
+            background-color: var(--brand-deep);
+            background-image: linear-gradient(160deg, var(--brand) 0%, var(--brand-deep) 100%);
+            border-radius: 4mm;
+            color: #fff;
+            flex: 0 0 48mm;
+            padding: 3mm 4mm;
+            box-shadow: 0 4px 20px rgba(13, 43, 29, 0.2), inset 0 1px 0 rgba(255,255,255,0.08);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .amount-card-shine {
+            position: absolute;
+            top: -10mm;
+            right: -10mm;
+            width: 50mm;
+            height: 50mm;
+            background: #ffffff;
+            opacity: 0.08;
+            border-radius: 50%;
+            pointer-events: none;
+        }
+
+        .amount-card .eyebrow {
+            color: var(--brand-accent);
+            font-size: 6.5pt;
+            font-weight: 700;
+            letter-spacing: 0.06em;
+            line-height: 1.4;
+        }
+
+        .amount-card .eyebrow strong {
+            color: #fff;
+            font-weight: 700;
+            font-size: 8pt;
+        }
+
+        .amount-card .amount {
+            display: block;
+            font-size: 18pt;
+            font-weight: 700;
+            letter-spacing: -0.03em;
+            line-height: 1;
+            white-space: nowrap;
+            margin-top: 1.5mm;
+        }
+
+        /* Savings breakdown inside card */
+        .savings-breakdown {
+            margin-top: 2mm;
+            padding-top: 1.5mm;
+            border-top: 0.5pt solid rgba(255,255,255,0.15);
+        }
+
+        .savings-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            gap: 2mm;
+            margin-bottom: 1mm;
+        }
+
+        .savings-label {
+            font-size: 6pt;
+            color: var(--brand-accent);
+            font-weight: 600;
+            letter-spacing: 0.04em;
+            line-height: 1.3;
+        }
+
+        .savings-value {
+            font-size: 8pt;
+            font-weight: 500;
+            color: #fff;
+            letter-spacing: -0.01em;
+            text-align: right;
+            white-space: nowrap;
+        }
+
+        .savings-row.highlight {
             margin-top: 1mm;
         }
 
-        .ocr-line {
-            font-family: "Courier New", monospace;
-            font-size: 7pt;
-            margin-top: 3mm;
-            letter-spacing: 1px;
-            word-break: break-all;
-            color: #333;
-            background: #fff;
-            border: 1px solid #ddd;
-            padding: 1.5mm;
+        .savings-row.highlight .savings-label {
+            color: #fff;
+            font-weight: 700;
         }
 
-        /* QR-Rechnung section */
+        .savings-row.highlight .savings-value {
+            color: var(--gold);
+            font-size: 9pt;
+            font-weight: 900;
+        }
+
+        /* Savings comparison bars */
+        .savings-bar-track {
+            display: flex;
+            height: 1pt;
+            border-radius: 0.5pt;
+            background: rgba(255,255,255,0.15);
+            overflow: hidden;
+            margin: 0.5mm 0;
+        }
+
+        .savings-bar-fill {
+            height: 100%;
+            flex: 0 0 auto;
+            background: rgba(255,255,255,0.85);
+        }
+
+        .savings-bar-fill--gold {
+            background: var(--gold);
+        }
+
+        .savings-value--muted {
+            color: rgba(255,255,255,0.45);
+        }
+
+        /* ── Line items ─────────────────────────────────────────── */
+        .line-items {
+            border-collapse: separate;
+            border-spacing: 0;
+            table-layout: fixed;
+            width: 100%;
+        }
+
+        .line-items col.category { width: 15%; }
+        .line-items col.description { width: 40%; }
+        .line-items col.quantity { width: 12%; }
+        .line-items col.price { width: 18%; }
+        .line-items col.amount { width: 15%; }
+
+        .line-items thead {
+            display: table-header-group;
+        }
+
+        .line-items thead th {
+            background: var(--brand-deep);
+            color: #fff;
+            font-size: 7pt;
+            font-weight: 700;
+            padding: 1.5mm 2.5mm;
+            text-align: left;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+        }
+
+        .line-items thead th:first-child {
+            border-top-left-radius: 1.5mm;
+        }
+
+        .line-items thead th:last-child {
+            border-top-right-radius: 1.5mm;
+        }
+
+        .line-items .numeric {
+            text-align: right;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .line-items .quantity-cell {
+            white-space: nowrap;
+        }
+
+        .line-items td {
+            border-bottom: 0.5pt solid var(--line);
+            font-size: 8.2pt;
+            padding: 1.2mm 2.5mm;
+            vertical-align: top;
+            color: var(--ink-soft);
+            font-variant-numeric: tabular-nums;
+        }
+
+        .line-items tbody tr.even td {
+            background: var(--zebra);
+        }
+
+        /* Side category label panel. Same type size as the items so the
+           hierarchy reads: header > items > label, not label < subtotal. */
+        .line-items .category-label-cell {
+            background: var(--brand-glow);
+            border-bottom: 0.5pt solid var(--brand-mid);
+            color: var(--brand-deep);
+            font-size: 8pt;
+            font-weight: 700;
+            letter-spacing: 0.02em;
+            line-height: 1.25;
+            padding: 1.2mm 2mm;
+            text-align: left;
+            vertical-align: top;
+        }
+
+        /* Subtotal: visually distinct via background + weight. */
+        .line-items .subtotal-row td {
+            background: var(--surface);
+            color: var(--subtotal-color);
+            font-size: 8.2pt;
+            font-weight: 700;
+            padding: 1.2mm 2.5mm;
+            border-bottom: 0.5pt solid var(--line);
+        }
+
+        /* Single-item group: only the amount cell is bold, matching the
+           visual weight a subtotal row would carry. */
+        .line-items .single-item-row td:last-child {
+            font-weight: 700;
+            color: var(--subtotal-color);
+        }
+
+        /* Each category is its own <tbody> rowgroup: this resets zebra parity
+           per group and lets the side-label panel close cleanly at the group's
+           bottom edge. */
+        .line-items .item-group:first-child {
+            border-top: 0;
+        }
+
+        .line-items .item-group {
+            border-top: 1pt solid var(--line);
+            break-inside: avoid;
+        }
+
+        .line-items tr {
+            break-inside: avoid;
+        }
+
+        /* Rounded bottom corners on the last row of the table.
+           Suppress the label cell's own bottom border here so it doesn't
+           draw a straight line across the radius. */
+        .line-items .item-group:last-child tr:last-child td:first-child,
+        .line-items .item-group:last-child tr:last-child th:first-child {
+            border-bottom-left-radius: 1.5mm;
+            border-bottom: none;
+        }
+
+        .line-items .item-group:last-child tr:last-child td:last-child {
+            border-bottom-right-radius: 1.5mm;
+            border-bottom: none;
+        }
+
+        /* Visually hidden but screen-reader accessible. */
+        .visually-hidden {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+            border: 0;
+        }
+
+        /* ── Closing / totals ───────────────────────────────────── */
+        .invoice-closing {
+            display: flex;
+            gap: 8mm;
+            justify-content: flex-end;
+            align-items: flex-start;
+            margin-top: 3mm;
+        }
+
+        .notes {
+            flex: 1 1 auto;
+            max-width: 95mm;
+            color: var(--ink-soft);
+            font-size: 8pt;
+            line-height: 1.45;
+            padding-top: 1mm;
+        }
+
+        .notes-label {
+            color: var(--ink);
+            font-size: 6.8pt;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            margin-bottom: 1.2mm;
+        }
+
+        .totals {
+            flex: 0 0 45mm;
+            background: var(--brand-pale);
+            border-radius: 2mm;
+            padding: 1.5mm 2.5mm 2.5mm 2.5mm;
+        }
+
+        .totals table {
+            border-collapse: collapse;
+            width: 100%;
+        }
+
+        .totals td {
+            border-bottom: 0.5pt solid var(--line-subtle);
+            font-size: 8.5pt;
+            padding: 1mm 0.5mm;
+            text-align: right;
+            color: var(--ink-soft);
+            white-space: nowrap;
+        }
+
+        .totals td:first-child {
+            text-align: left;
+            color: var(--ink);
+            font-weight: 500;
+        }
+
+        .totals .numeric {
+            font-variant-numeric: tabular-nums;
+            font-weight: 600;
+            color: var(--ink);
+        }
+
+        .totals .grand-total td {
+            background: var(--brand-glow);
+            border-bottom: 0;
+            border-top: 1.5pt solid var(--brand-mid);
+            color: var(--brand-deep);
+            font-size: 11pt;
+            font-weight: 700;
+            padding: 2.4mm 1.2mm;
+            letter-spacing: -0.015em;
+        }
+
+        .notes .thank-you {
+            margin-top: 2mm;
+            font-style: italic;
+            color: var(--muted);
+        }
+
+        /* ── Inline QR page ─────────────────────────────────────── */
+        /* Reserve the full Swiss payment-part height at the bottom so the
+           QR-Rechnung sits on the same page as short invoices.
+           Uses @page margin-bottom + position: running() so content
+           physically cannot enter the slip zone. */
+        .invoice-with-inline-qr {
+            min-height: 179mm; /* 297 -12 -106 */
+            page: invoice-payment;
+        }
+
+        .invoice-with-inline-qr .invoice-body {
+            position: relative;
+            z-index: 1;
+        }
+
+        /* ── Insights page ──────────────────────────────────────── */
+        .insights-page {
+            break-before: page;
+            page: insights;
+            padding: 10mm 16mm 0;
+        }
+
+        .page-heading {
+            color: var(--brand-deep);
+            font-size: 15pt;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+            line-height: 1.1;
+            margin-bottom: 1mm;
+        }
+
+        .page-intro {
+            color: var(--muted);
+            font-size: 8.5pt;
+            margin-bottom: 5mm;
+            max-width: 150mm;
+            line-height: 1.4;
+        }
+
+        .kpi-row {
+            display: flex;
+            gap: 2.5mm;
+            margin-bottom: 4mm;
+        }
+
+        .kpi-card {
+            flex: 1 1 0;
+            background: var(--surface);
+            border: 0.5pt solid var(--line);
+            border-radius: 2mm;
+            padding: 2.5mm 3mm;
+            min-width: 0;
+        }
+
+        .kpi-card .kpi-label {
+            color: var(--muted);
+            font-size: 6.5pt;
+            font-weight: 700;
+            letter-spacing: 0.07em;
+            text-transform: uppercase;
+            margin-bottom: 1mm;
+        }
+
+        .kpi-card .kpi-value {
+            color: var(--brand-deep);
+            font-size: 12pt;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+            line-height: 1.1;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .kpi-card .kpi-unit {
+            color: var(--muted);
+            font-size: 8pt;
+            font-weight: 500;
+            margin-left: 0.8mm;
+        }
+
+        .kpi-card .kpi-hint {
+            color: var(--ink-soft);
+            font-size: 7pt;
+            margin-top: 1mm;
+        }
+
+        .kpi-card--accent {
+            background: var(--brand-deep);
+            border-color: var(--brand-deep);
+        }
+
+        .kpi-card--accent .kpi-label {
+            color: var(--brand-accent);
+        }
+
+        .kpi-card--accent .kpi-value {
+            color: #ffffff;
+            font-weight: 900;
+        }
+
+        .kpi-card--accent .kpi-unit {
+            color: var(--brand-light);
+        }
+
+        .kpi-card--accent .kpi-hint {
+            color: var(--brand-muted);
+        }
+
+        .chart-section {
+            break-inside: avoid;
+            border-top: 1.2pt solid var(--brand-pale);
+            padding-top: 2.5mm;
+            margin-bottom: 3mm;
+        }
+
+        .chart-section h3 {
+            color: var(--brand-deep);
+            font-size: 9.5pt;
+            font-weight: 700;
+            margin-bottom: 1.5mm;
+            letter-spacing: -0.01em;
+        }
+
+        .chart-section h3::before {
+            content: "";
+            display: inline-block;
+            width: 2.2mm;
+            height: 2.2mm;
+            background: var(--brand-mid);
+            border-radius: 50%;
+            margin-right: 2mm;
+            vertical-align: middle;
+            position: relative;
+            top: -0.3mm;
+        }
+
+        .chart-description {
+            color: var(--muted);
+            font-size: 7.5pt;
+            margin-bottom: 2mm;
+            line-height: 1.35;
+        }
+
+        .chart {
+            margin: 0 auto;
+            width: 100%;
+            background: var(--chart-surface);
+            border: 0.5pt solid var(--line-subtle);
+            border-radius: 2mm;
+            padding: 1.5mm 1mm;
+        }
+
+        .chart svg {
+            display: block;
+            height: auto;
+            width: 100%;
+        }
+
+        /* ── Consistent 3-col meta ── */
+        .page-meta {
+            width: 210mm;
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            color: var(--muted);
+            font-size: 7pt;
+            font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+        }
+
+        .page-meta-inner {
+            margin: 0 16mm;
+            padding: 2.5mm 0 2mm 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 4mm;
+        }
+
+        .page-meta--footer .page-meta-inner {
+            border-top: 0.5pt solid var(--line);
+        }
+
+        .page-meta--header .page-meta-inner {
+            border-bottom: 0.5pt solid var(--line);
+        }
+
+        .page-meta .meta-left::before {
+            content: "";
+            display: inline-block;
+            width: 2.5mm;
+            height: 2.5mm;
+            background: var(--brand-mid);
+            border-radius: 50%;
+            margin-right: 2mm;
+            vertical-align: middle;
+            position: relative;
+            top: -0.2mm;
+        }
+        .page-meta .meta-center { text-align: center; flex: 0 0 auto; }
+        .page-meta .meta-left { text-align: left; flex: 1; }
+        .page-meta .meta-right { text-align: right; flex: 1; }
+        .page-meta .meta-center::after { content: counter(page) " / " counter(pages); }
+
+        /* ── Dedicated payment page ─────────────────────────────── */
+        .payment-page {
+            break-before: page;
+            page: payment;
+            position: relative;
+            height: 285mm; /* 297 -12 */
+        }
+
+        .payment-notice {
+            color: var(--muted);
+            font-size: 8.5pt;
+            left: 16mm;
+            position: absolute;
+            top: 14mm;
+            max-width: 170mm;
+            line-height: 1.4;
+        }
+
+        .payment-notice strong {
+            color: var(--brand-deep);
+        }
+
         .qr-section {
-            margin-top: 6mm;
-            border-top: 2px dashed #aaa;
-            padding-top: 3mm;
+            width: 210mm;
+        }
+
+        .payment-page .qr-section {
+            position: absolute;
+            left: 0;
+            bottom: 0;
         }
 
         .qr-section svg {
-            max-width: 100%;
+            display: block;
+            height: 106mm;
+            width: 210mm;
         }
 
-        /* Footer */
         @page {
             size: A4;
-            margin: 0 0 10mm 0;
-
+            margin: 0 0 12mm 0;
+            @top-center { content: none; }
             @bottom-center {
-                content: "{{ tr.page_label }} " counter(page) " {{ tr.page_of }} " counter(pages);
-                font-size: 8pt;
-                color: #6b7280;
+                content: element(footer-meta);
+                width: 210mm;
             }
+        }
+
+        @page payment {
+            size: A4;
+            margin: 12mm 0 0 0;
+            @top-center {
+                content: element(header-meta);
+                width: 210mm;
+            }
+            @bottom-center { content: none; }
+        }
+
+        @page insights {
+            size: A4;
+            margin: 0 0 12mm 0;
+            @top-center { content: none; }
+            @bottom-center {
+                content: element(footer-meta);
+                width: 210mm;
+            }
+        }
+
+        @page invoice-payment {
+            size: A4;
+            margin: 12mm 0 106mm 0;
+            @top-center {
+                content: element(header-meta);
+                width: 210mm;
+            }
+            @bottom-center {
+                content: element(qr-slip);
+                width: 210mm;
+            }
+        }
+
+        @page invoice-payment:first {
+            margin-top: 0;
+            @top-center { content: none; }
         }
     </style>
 </head>
 
 <body>
-    <div class="page">
+    {% if inline_qr_payment %}
+    <div style="position: running(qr-slip)">{{ qr_svg|safe }}</div>
+    {% endif %}
 
-        <!-- ── Header ─────────────────────────── -->
-        <div class="header">
-            <div>
-                <div class="company-name">{{ zev.name }}</div>
-                <div class="company-meta">
-                    {% if owner_participant %}{{ owner_participant.full_name }}<br>
-                    {{ owner_participant.address_line1 }}{% if owner_participant.address_line2 %}, {{ owner_participant.address_line2 }}{% endif %}<br>
-                    {{ owner_participant.postal_code }}{% if owner_participant.city %} {{ owner_participant.city }}{% endif %}<br>
-                    {% endif %}{% if zev.vat_number %}VAT: {{ zev.vat_number }}{% endif %}
+    {% if qr_svg %}
+    <div style="position: running(header-meta)" class="page-meta page-meta--header">
+      <div class="page-meta-inner">
+        <span class="meta-left">{{ zev.name }} · {{ tr.invoice_label }} {{ invoice.invoice_number }}</span>
+        <span class="meta-center"></span>
+        <span class="meta-right">{{ formatted_dates.period_start }} – {{ formatted_dates.period_end }}</span>
+      </div>
+    </div>
+    {% endif %}
+
+    <div style="position: running(footer-meta)" class="page-meta page-meta--footer">
+      <div class="page-meta-inner">
+        <span class="meta-left">{{ zev.name }} · {{ tr.invoice_label }} {{ invoice.invoice_number }}</span>
+        <span class="meta-center"></span>
+        <span class="meta-right">{{ formatted_dates.period_start }} – {{ formatted_dates.period_end }}</span>
+      </div>
+    </div>
+
+    <main class="invoice-page{% if inline_qr_payment %} invoice-with-inline-qr{% endif %}">
+        <div class="invoice-body">
+            <header class="document-header">
+                <div>
+                    <div class="brand-row">
+                        <div class="brand-mark" aria-hidden="true"></div>
+                        <div class="company-name">{{ zev.name }}</div>
+                    </div>
+                    <div class="company-address">
+                        {% if owner_participant %}
+                        {{ owner_participant.full_name }}<br>
+                        {{ owner_participant.address_line1 }}{% if owner_participant.address_line2 %}, {{ owner_participant.address_line2 }}{% endif %}<br>
+                        {{ owner_participant.postal_code }}{% if owner_participant.city %} {{ owner_participant.city }}{% endif %}<br>
+                        {% endif %}
+                        {% if zev.vat_number %}VAT: {{ zev.vat_number }}{% endif %}
+                    </div>
                 </div>
-            </div>
-            <div style="text-align:right">
-                <div style="font-size:10pt; color:#888">{{ tr.invoice_label }}</div>
-            </div>
-        </div>
+                <div>
+                    <div class="document-label">{{ tr.invoice_label }}</div>
+                    <div class="document-number">{{ invoice_number_prefix }}<strong>{{ invoice_number_suffix }}</strong></div>
+                    <div class="document-status">{{ tr.status }}: {{ status_display }}</div>
+                </div>
+            </header>
 
-        <!-- ── Invoice title & metadata ─────────── -->
-        <div class="invoice-title">{{ tr.invoice_label }} {{ invoice.invoice_number }}</div>
-        <div class="invoice-meta">
-            <dl class="meta-block">
-                <dt>{{ tr.invoice_date }}</dt>
-                <dd>{{ formatted_dates.invoice_date }}</dd>
-            </dl>
-            <dl class="meta-block">
-                <dt>{{ tr.billing_period }}</dt>
-                <dd>{{ formatted_dates.period_start }} – {{ formatted_dates.period_end }}</dd>
-            </dl>
-            <dl class="meta-block">
-                <dt>{{ tr.status }}</dt>
-                <dd>{{ invoice.get_status_display }}</dd>
-            </dl>
-            {% if invoice.due_date %}
-            <dl class="meta-block">
-                <dt>{{ tr.due_date }}</dt>
-                <dd>{{ formatted_dates.due_date }}</dd>
-            </dl>
-            {% endif %}
-        </div>
+            <section class="invoice-summary">
+                <div class="recipient-block">
+                    <div class="eyebrow">{{ tr.to }}</div>
+                    <strong class="recipient-name">{{ participant.full_name }}</strong>
+                    <div class="recipient-address">
+                        {{ participant.address_line1 }}<br>
+                        {{ participant.postal_code }} {{ participant.city }}
+                    </div>
+                    {% if participant.email %}
+                    <div class="recipient-email">{{ participant.email }}</div>
+                    {% endif %}
+                </div>
+                <dl class="facts">
+                    <div class="fact">
+                        <dt>{{ tr.billing_period }}</dt>
+                        <dd>{{ formatted_dates.period_start }} – {{ formatted_dates.period_end }}</dd>
+                    </div>
+                    <div class="fact">
+                        <dt>{{ tr.invoice_date }}</dt>
+                        <dd>{{ formatted_dates.invoice_date }}</dd>
+                    </div>
+                    <div class="fact">
+                        <dt>{{ tr.due_date }}</dt>
+                        <dd>{{ formatted_dates.due_date }}</dd>
+                    </div>
+                </dl>
+                {% if savings_data %}
+                <aside class="amount-card amount-card--savings" aria-label="{{ tr.savings_title }}">
+                    <div class="amount-card-shine" aria-hidden="true"></div>
+                    <div class="eyebrow">
+                        {{ tr.savings_from }}
+                        <strong>{{ savings_data.local_kwh }} kWh</strong>
+                        {{ tr.savings_solar_energy }}
+                    </div>
+                    <div class="savings-breakdown">
+                        <div class="savings-row">
+                            <span class="savings-label">{{ tr.savings_local_label }}</span>
+                            <span class="savings-value">CHF {{ savings_data.local_chf }}</span>
+                        </div>
+                        <div class="savings-row">
+                            <span class="savings-label">{{ tr.savings_grid_label }}</span>
+                            <span class="savings-value savings-value--muted">CHF {{ savings_data.hypothetical_chf }}</span>
+                        </div>
+                        <div class="savings-bar-track"><span class="savings-bar-fill" style="width:{{ savings_data.bar_pct }}%"></span><span class="savings-bar-fill savings-bar-fill--gold" style="width:{{ savings_data.savings_bar_pct }}%"></span></div>
+                        <div class="savings-row highlight">
+                            <span class="savings-label">{{ tr.savings_saved_label }}</span>
+                            <span class="savings-value">CHF {{ savings_data.saved_chf }}</span>
+                        </div>
+                    </div>
+                </aside>
+                {% else %}
+                <div class="amount-card">
+                    <div class="amount-card-shine" aria-hidden="true"></div>
+                    <div class="eyebrow">{{ tr.total }}</div>
+                    <span class="amount">CHF {{ invoice.total_chf|floatformat:2 }}</span>
+                </div>
+                {% endif %}
+            </section>
 
-        <!-- ── Address blocks ─────────────────── -->
-        <div class="address-row">
-            <div class="address-block">
-                <h3>{{ tr.from }}</h3>
-                <strong>{% if owner_participant %}{{ owner_participant.full_name }}{% else %}{{ zev.name }}{% endif %}</strong><br>
-                {% if owner_participant %}{{ owner_participant.address_line1 }}{% if owner_participant.address_line2 %}<br>{{ owner_participant.address_line2 }}{% endif %}<br>
-                {{ owner_participant.postal_code }}{% if owner_participant.city %} {{ owner_participant.city }}{% endif %}{% endif %}
-            </div>
-            <div class="address-block">
-                <h3>{{ tr.to }}</h3>
-                <strong>{{ participant.full_name }}</strong><br>
-                {{ participant.address_line1 }}<br>
-                {{ participant.postal_code }} {{ participant.city }}
-            </div>
-        </div>
-
-        <!-- ── Line items ─────────────────────── -->
-        {% for group in grouped_items %}
-        <div class="category-section">
-            <div class="category-title">{{ group.label }}</div>
-            <table>
+            <table class="line-items">
+                <colgroup>
+                    <col class="category">
+                    <col class="description">
+                    <col class="quantity">
+                    <col class="price">
+                    <col class="amount">
+                </colgroup>
                 <thead>
                     <tr>
+                        <th><span class="visually-hidden">{{ tr.category }}</span></th>
                         <th>{{ tr.description }}</th>
-                        <th class="right">{{ tr.qty }}</th>
-                        <th>{{ tr.unit }}</th>
-                        <th class="right">{{ tr.unit_price }}</th>
-                        <th class="right">{{ tr.amount }}</th>
+                        <th class="numeric">{{ tr.qty }}</th>
+                        <th class="numeric">{{ tr.unit_price }}</th>
+                        <th class="numeric">{{ tr.amount }}</th>
                     </tr>
                 </thead>
-                <tbody>
+                {% for group in grouped_items %}
+                {% with item_count=group.items|length %}
+                <tbody class="item-group">
                     {% for item in group.items %}
-                    <tr>
+                    <tr class="{% if forloop.counter0|divisibleby:2 %}even{% endif %}{% if item_count == 1 %} single-item-row{% endif %}">
+                        {% if forloop.first %}
+                        {% if item_count > 1 %}
+                        <th class="category-label-cell" rowspan="{{ item_count|add:1 }}" scope="rowgroup">{{ group.label }}</th>
+                        {% else %}
+                        <th class="category-label-cell" rowspan="1" scope="rowgroup">{{ group.label }}</th>
+                        {% endif %}
+                        {% endif %}
                         <td>{{ item.description }}</td>
-                        <td class="right">{{ item.quantity_kwh|floatformat:2 }}</td>
-                        <td>{% if item.unit == "month" %}{{ tr.unit_month }}{% else %}{{ item.unit }}{% endif %}</td>
-                        <td class="right">{{ item.unit_price_chf|floatformat:5 }}</td>
-                        <td class="right">{{ item.total_chf|floatformat:2 }}</td>
+                        <td class="numeric quantity-cell">{{ item.quantity_kwh|floatformat:2 }} {{ item.unit_label }}</td>
+                        <td class="numeric">{{ item.unit_price_chf|floatformat:5 }}</td>
+                        <td class="numeric">{{ item.total_chf|floatformat:2 }}</td>
                     </tr>
                     {% endfor %}
-                    <tr class="category-subtotal">
-                        <td colspan="4">{{ group.label }} {{ tr.subtotal }}</td>
-                        <td class="right">{{ group.subtotal|floatformat:2 }}</td>
+                    {% if item_count > 1 %}
+                    <tr class="subtotal-row">
+                        <td colspan="3"></td>
+                        <td class="numeric">{{ group.subtotal|floatformat:2 }}</td>
                     </tr>
+                    {% endif %}
                 </tbody>
+                {% endwith %}
+                {% endfor %}
             </table>
-        </div>
-        {% endfor %}
 
-        <!-- ── Totals ─────────────────────────── -->
-        <div class="totals">
-            <table>
-                <tr class="subtotal">
-                    <td>{{ tr.subtotal }}</td>
-                    <td style="text-align:right">CHF {{ invoice.subtotal_chf|floatformat:2 }}</td>
-                </tr>
-                {% if invoice.vat_rate > 0 %}
-                <tr>
-                    <td>{{ tr.vat }} ({{ invoice.vat_rate|floatformat:1 }}%)</td>
-                    <td style="text-align:right">CHF {{ invoice.vat_chf|floatformat:2 }}</td>
-                </tr>
-                {% endif %}
-                <tr class="grand-total">
-                    <td>{{ tr.total }}</td>
-                    <td style="text-align:right">CHF {{ invoice.total_chf|floatformat:2 }}</td>
-                </tr>
-            </table>
-        </div>
-
-        <!-- ── Notes ──────────────────────────── -->
-        {% if invoice.notes %}
-        <div class="notes">
-            {% if invoice.notes %}<div>{{ invoice.notes }}</div>{% endif %}
-        </div>
-        {% endif %}
-
-        {% if energy_flow_svg or energy_chart_svg or hourly_profile_chart_svg %}
-        <div class="charts-page">
-
-        <!-- ── Energy Flow Chart ─────────────────── -->
-        {% if energy_flow_svg %}
-        <div class="chart-section">
-            <h3>{{ tr.flow_title }}</h3>
-            <p>{{ tr.flow_description }}</p>
-            <div style="max-width: 520px; margin: 0 auto;">
-                {{ energy_flow_svg|safe }}
-            </div>
-        </div>
-        {% endif %}
-
-        <!-- ── Energy Consumption Chart ─────────── -->
-        {% if energy_chart_svg %}
-        <div class="chart-section">
-            <h3>{{ tr.chart_title }}</h3>
-            <p>{{ tr.chart_description }}</p>
-            <div style="max-width: 520px; margin: 0 auto;">
-                {{ energy_chart_svg|safe }}
-            </div>
-        </div>
-        {% endif %}
-
-        <!-- ── Hourly energy profile chart ───────────────────────── -->
-        {% if hourly_profile_chart_svg %}
-        <div class="hourly-chart-section">
-            <h3>{{ tr.hourly_chart_title }}</h3>
-            <p>{{ tr.hourly_chart_description }}</p>
-            <div style="max-width: 520px; margin: 0 auto;">
-                {{ hourly_profile_chart_svg|safe }}
-            </div>
-        </div>
-        {% endif %}
-
-        </div>
-        {% endif %}
-
-        <!-- ── Savings section ────────────────────── -->
-        {% if savings_data %}
-        <div class="savings-section">
-            <h3>{{ tr.savings_title }}</h3>
-            <table class="savings-table">
-                <thead>
-                    <tr>
-                        <th></th>
-                        <th style="text-align:right">Rp/kWh</th>
-                        <th style="text-align:right; padding-left:8mm">CHF</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td>{{ tr.savings_local_label }} ({{ savings_data.local_kwh }}&thinsp;kWh)</td>
-                        <td class="num">{{ savings_data.local_rp }}</td>
-                        <td class="num" style="padding-left:8mm">{{ savings_data.local_chf }}</td>
-                    </tr>
-                    <tr>
-                        <td>{{ tr.savings_grid_label }} ({{ savings_data.local_kwh }}&thinsp;kWh)</td>
-                        <td class="num">{{ savings_data.grid_rp }}</td>
-                        <td class="num" style="padding-left:8mm">{{ savings_data.hypothetical_chf }}</td>
-                    </tr>
-                    <tr class="savings-highlight">
-                        <td>{{ tr.savings_saved_label }}</td>
-                        <td class="num">{{ savings_data.saved_rp }}</td>
-                        <td class="num" style="padding-left:8mm">CHF {{ savings_data.saved_chf }}</td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-        {% endif %}
-
-        <!-- ── Payment Terms & Bank Details ──────────────────────────── -->
-        <div class="payment-section">
-            <dl>
-                <dt>{{ tr.payment_terms_label }}</dt>
-                <dd>{{ tr.payment_terms_text }}</dd>
-
-                {% if zev.bank_iban %}
-                <dt style="margin-top: 2mm;">{{ tr.bank_details }}</dt>
-                <dd>{% if owner_participant %}{{ owner_participant.full_name }}{% else %}{{ zev.name }}{% endif %}</dd>
-                <dd>IBAN: {{ zev.bank_iban }}</dd>
-                <dd>{{ tr.currency }}</dd>
-                <dd class="slip-info">{{ tr.reference_prefix }} {{ invoice.invoice_number }}</dd>
-                {% endif %}
-            </dl>
-        </div>
-
-        <!-- ── Detachable Slip ─────────────────────────── -->
-        <div class="slip-separator">
-            <div class="slip-header">{{ tr.slip_header }}</div>
-            <div class="slip-content">
-                <div class="slip-block">
-                    <strong>{{ tr.slip_invoice_details }}</strong>
-                    {{ tr.slip_invoice_nr }} {{ invoice.invoice_number }}<br>
-                    {{ tr.slip_date }} {{ formatted_dates.invoice_date }}<br>
-                    {{ tr.slip_period }} {{ formatted_dates.period_start }} – {{ formatted_dates.period_end }}<br>
-                    <strong style="margin-top: 3mm;">{{ tr.slip_amount_due }} {{ invoice.total_chf|floatformat:2 }}</strong>
+            <section class="invoice-closing">
+                <div class="notes">
+                    <div class="notes-label">{{ tr.notes_label }}</div>
+                    {% if invoice.notes %}{{ invoice.notes }}{% else %}{{ tr.notes_default }}<br>{{ tr.notes_question }}{% endif %}
+                    <div class="thank-you">{{ tr.thank_you }}</div>
                 </div>
-                <div class="slip-block">
-                    <strong>{{ tr.slip_participant }}</strong>
-                    {{ participant.full_name }}<br>
-                    {{ participant.address_line1 }}<br>
-                    {{ participant.postal_code }} {{ participant.city }}<br>
-                    {% if participant.email %}{{ tr.slip_email }} {{ participant.email }}<br>{% endif %}
+                <div class="totals">
+                    <table>
+                        <tr>
+                            <td>{{ tr.subtotal }}</td>
+                            <td class="numeric">CHF {{ invoice.subtotal_chf|floatformat:2 }}</td>
+                        </tr>
+                        {% if invoice.vat_rate > 0 %}
+                        <tr>
+                            <td>{{ tr.vat }} ({{ invoice.vat_rate|floatformat:1 }}%)</td>
+                            <td class="numeric">CHF {{ invoice.vat_chf|floatformat:2 }}</td>
+                        </tr>
+                        {% endif %}
+                        <tr class="grand-total">
+                            <td>{{ tr.total }}</td>
+                            <td class="numeric">CHF {{ invoice.total_chf|floatformat:2 }}</td>
+                        </tr>
+                    </table>
                 </div>
-                <div class="slip-block">
-                    <strong>{{ tr.slip_remit_to }}</strong>
-                    {% if owner_participant %}{{ owner_participant.full_name }}{% else %}{{ zev.name }}{% endif %}<br>
-                    {% if owner_participant %}{{ owner_participant.address_line1 }}<br>
-                    {{ owner_participant.postal_code }}{% if owner_participant.city %} {{ owner_participant.city }}{% endif %}<br>
-                    {% endif %}{% if zev.bank_iban %}<strong style="margin-top: 2mm; display: block;">IBAN: {{zev.bank_iban }}</strong>{% endif %}
-                </div>
+            </section>
+        </div>
+    </main>
+
+    {# ── QR payment slip: always page 2 when it is a separate page ── #}
+    {% if qr_svg and not inline_qr_payment %}
+    <section class="payment-page">
+        <div class="payment-notice">
+            <strong>{{ tr.payment_page_title }}</strong><br>
+            {{ tr.payment_page_intro }}
+        </div>
+        <div class="qr-section">{{ qr_svg|safe }}</div>
+    </section>
+    {% endif %}
+
+    {% if energy_summary or energy_chart_svg or hourly_profile_chart_svg or energy_flow_svg %}
+    <section class="insights-page">
+        <h2 class="page-heading">{{ tr.insights_page_title }}</h2>
+        <p class="page-intro">{{ tr.insights_page_intro }}</p>
+
+        {% if energy_summary %}
+        <div class="kpi-row">
+            <div class="kpi-card">
+                <div class="kpi-label">{{ tr.kpi_local_energy }}</div>
+                <div class="kpi-value">{{ energy_summary.local_kwh }}<span class="kpi-unit">kWh</span></div>
+                <div class="kpi-hint">{{ tr.kpi_local_hint }}</div>
             </div>
-            {% if zev.bank_iban %}
-            <div class="ocr-line" style="margin-top: 6mm;">
-                {{ tr.slip_ocr }} {{ invoice.invoice_number|upper }} {{ invoice.total_chf|stringformat:"05d" }}
+            <div class="kpi-card">
+                <div class="kpi-label">{{ tr.kpi_grid_energy }}</div>
+                <div class="kpi-value">{{ energy_summary.grid_kwh }}<span class="kpi-unit">kWh</span></div>
+                <div class="kpi-hint">{{ tr.kpi_grid_hint }}</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-label">{{ tr.kpi_share }}</div>
+                <div class="kpi-value">{{ energy_summary.local_share_pct }}<span class="kpi-unit">%</span></div>
+                <div class="kpi-hint">{{ tr.kpi_share_hint }}</div>
+            </div>
+            {% if savings_data %}
+            <div class="kpi-card kpi-card--accent">
+                <div class="kpi-label">{{ tr.savings_saved_label }}</div>
+                <div class="kpi-value"><span class="kpi-unit">CHF</span> {{ savings_data.saved_chf }}</div>
+                <div class="kpi-hint">{{ tr.kpi_savings_hint }}</div>
             </div>
             {% endif %}
         </div>
-
-        <!-- ── QR-Rechnung ─────────────────────── -->
-        {% if qr_svg %}
-        <div class="qr-section">
-            {{ qr_svg|safe }}
-        </div>
         {% endif %}
 
-    </div>
+        {% if energy_chart_svg %}
+        <section class="chart-section">
+            <h3>{{ tr.chart_title }}</h3>
+            <p class="chart-description">{{ tr.chart_description }}</p>
+            <div class="chart">{{ energy_chart_svg|safe }}</div>
+        </section>
+        {% endif %}
+
+        {% if hourly_profile_chart_svg %}
+        <section class="chart-section">
+            <h3>{{ tr.hourly_chart_title }}</h3>
+            <p class="chart-description">{{ tr.hourly_chart_description }}</p>
+            <div class="chart">{{ hourly_profile_chart_svg|safe }}</div>
+        </section>
+        {% endif %}
+
+        {% if energy_flow_svg %}
+        <section class="chart-section">
+            <h3>{{ tr.flow_title }}</h3>
+            <p class="chart-description">{{ tr.flow_description }}</p>
+            <div class="chart">{{ energy_flow_svg|safe }}</div>
+        </section>
+        {% endif %}
+    </section>
+    {% endif %}
+
 </body>
 
 </html>

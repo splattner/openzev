@@ -34,7 +34,7 @@ lifecycle from scratch.
 | State transitions | Allowed/forbidden transition matrix with error handling |
 | Regeneration and locking | Draft/cancelled replacement; locked-state protection |
 | Deletion rules | Role-gated deletion with status constraints |
-| PDF generation | WeasyPrint rendering, QR-Rechnung, savings chart, hourly profile |
+| PDF generation | WeasyPrint rendering to PDF/A-3b, QR-Rechnung, savings chart, hourly profile, energy-flow diagram |
 | Email delivery | Celery async task, template resolution, retry, audit log |
 | Period overview | Per-participant metering completeness and invoice readiness |
 | Dashboard | Admin-only aggregated statistics |
@@ -116,6 +116,18 @@ Ordering: `["-created_at"]`.
 | `updated_at` | `DateTimeField` (auto) | Last modification timestamp |
 
 A row exists only when the template has been customized via the admin API. When no row is present, the on-disk default file is used. Deleting the row reverts to the default.
+
+### 3.5 EmailTemplate
+
+| Field | Type | Description |
+|---|---|-|
+| `id` | `BigAutoField` (PK) | Auto-generated |
+| `template_key` | `CharField(100)`, unique | Email type key: `invoice_email`, `participant_invitation`, or `email_verification` |
+| `subject` | `CharField(500)` | Customized subject template |
+| `body` | `TextField` | Customized body template |
+| `updated_at` | `DateTimeField` (auto) | Last modification timestamp |
+
+A row exists only when an admin has customized the template via the admin API (§7.4). Hardcoded defaults live in `EMAIL_TEMPLATE_DEFAULTS` (`invoices/models.py`); deleting the row reverts to them.
 
 ---
 
@@ -275,7 +287,7 @@ the same module.
 
 ### 5.7 PDF template management
 
-Both the invoice and contract PDF templates are editable via the admin API. Templates are stored in the database (`PdfTemplate` model) when customized; on-disk files serve as immutable defaults and are never modified.
+The invoice, contract, and annual-statement PDF templates are editable via the admin API. Templates are stored in the database (`PdfTemplate` model) when customized; on-disk files serve as immutable defaults and are never modified. All three template endpoints are served by `PdfTemplateView` (`views_templates.py`), a subclass of the shared `_AdminTemplateView` base (`permission_classes = [IsAdmin]`); mutations are audit-logged (`template.invoice_pdf.*`, `template.contract_pdf.*`, `template.annual_statement_pdf.*`), and non-admin mutation attempts are audit-logged as `DENIED`.
 
 #### Invoice PDF template
 
@@ -292,6 +304,22 @@ Both the invoice and contract PDF templates are editable via the admin API. Temp
 | `GET` | `/invoices/invoices/contract-pdf-template/` | `admin` only | Return current content + `is_customized` flag |
 | `PATCH` | `/invoices/invoices/contract-pdf-template/` | `admin` only | Save content to database |
 | `DELETE` | `/invoices/invoices/contract-pdf-template/` | `admin` only | Remove DB override; reverts to on-disk default |
+
+#### Annual statement PDF template
+
+| Method | URL | Permission | Description |
+|---|---|---|---|
+| `GET` | `/invoices/invoices/annual-statement-pdf-template/` | `admin` only | Return current content + `is_customized` flag |
+| `PATCH` | `/invoices/invoices/annual-statement-pdf-template/` | `admin` only | Save content to database |
+| `DELETE` | `/invoices/invoices/annual-statement-pdf-template/` | `admin` only | Remove DB override; reverts to on-disk default |
+
+#### Template preview
+
+| Method | URL | Permission | Description |
+|---|---|---|---|
+| `POST` | `/invoices/invoices/preview-pdf-template/` | `admin` only | Render submitted template content with sample data and return the rendered HTML |
+
+Request body: `{ "content": "<html>...", "template_type": "invoice" | "contract" | "annual_statement" }` (defaults to `invoice`). The sample context comes from `build_sample_invoice_context()`, `build_sample_contract_context()`, or `build_sample_annual_statement_context()` in `invoices/template_context.py`. Response: `{ "html": "<rendered html>" }`. Template rendering errors return `400` with `{ "error": "Template rendering error: ..." }`; missing/blank content returns `400`.
 
 **Response shape (GET and PATCH):**
 
@@ -343,12 +371,11 @@ in generate, generate-all, and period-overview.
 
 ### 7.1 Email template resolution
 
-Email subjects and bodies use customizable templates stored on the `Zev` model:
+Email subjects and bodies resolve through a three-tier fallback chain:
 
-| Field | Fallback |
-|---|---|
-| `zev.email_subject_template` | `"Invoice {invoice_number} – {zev_name}"` |
-| `zev.email_body_template` | Default multi-line body with period, total, and greeting |
+1. **Per-ZEV override** — `zev.email_subject_template` / `zev.email_body_template`.
+2. **Global admin override** — `EmailTemplate` row with `template_key = "invoice_email"` (§3.5, §7.4).
+3. **Hardcoded default** — `DEFAULT_EMAIL_SUBJECT_TEMPLATE` / `DEFAULT_EMAIL_BODY_TEMPLATE` in `zev.models` (subject like `"Invoice {invoice_number} – {zev_name}"`, multi-line body with period, total, and greeting).
 
 **Template variables** (available in both subject and body):
 
@@ -362,8 +389,7 @@ Email subjects and bodies use customizable templates stored on the `Zev` model:
 | `{due_date}` | Payment due date, formatted per `AppSettings.date_format_short`; empty string if the invoice has no `due_date` |
 | `{total_chf}` | Invoice total amount |
 
-If custom template rendering fails (e.g. `KeyError`), the system falls back to
-the default templates and logs a warning.
+If custom template rendering fails (e.g. `KeyError` or `ValueError` from `format_map`), the system falls back to the **hardcoded** defaults (tier 3) and logs a warning.
 
 ### 7.2 Celery task: `send_invoice_email_task`
 
@@ -392,6 +418,17 @@ The `retry-email` endpoint re-queues a Celery task for a specific failed
 `EmailLog` entry. If the log's status is already `"sent"`, the retry is
 rejected (HTTP `400`). The retried send creates a **new** `EmailLog` entry.
 
+### 7.4 System email template management
+
+Admin-only endpoints manage the global `EmailTemplate` overrides (§3.5) for the three template keys defined in `EMAIL_TEMPLATE_DEFAULTS`: `invoice_email`, `participant_invitation`, `email_verification`. Mutations are audit-logged; non-admin attempts return `403` and are audit-logged as `DENIED`.
+
+| Method | URL | Description |
+|---|---|---|
+| `GET` | `/invoices/invoices/email-templates/` | List all template keys with current `subject`, `body`, and `is_customized` (DB override if present, else hardcoded default) |
+| `GET` | `/invoices/invoices/email-template/{key}/` | Single template: `{template_key, subject, body, is_customized}`; `404` for unknown keys |
+| `PATCH` | `/invoices/invoices/email-template/{key}/` | Save `subject`/`body` to the database (`template.email.update`); blank or non-string values → `400` |
+| `DELETE` | `/invoices/invoices/email-template/{key}/` | Remove the DB override, reverting to the hardcoded default (`template.email.reset`) |
+
 ---
 
 ## 8. PDF generation
@@ -402,7 +439,7 @@ rejected (HTTP `400`). The retried send creates a **new** `EmailLog` entry.
 2. Look up `PdfTemplate` by `template_name` in the database.
    - If a DB record exists: render using `django.template.Template(content).render(Context(context))`.
    - Otherwise: render from the on-disk default using `render_to_string(template_name, context)`.
-3. Convert HTML → PDF via WeasyPrint.
+3. Convert HTML → PDF via WeasyPrint through `render_pdf()` in `invoices/pdf_render.py`, which emits **PDF/A-3b** (`PDF_VARIANT = "pdf/a-3b"`) — a long-term archival format suitable for Swiss GeBüV retention, with WeasyPrint adding the XMP identification, sRGB OutputIntent, and font subsets. The same helper renders contract, annual statement, and financial summary PDFs.
 4. Save PDF to `invoice.pdf_file` (`invoices/pdf/invoice_{number}.pdf`).
 
 ### 8.2 Template context
@@ -412,29 +449,35 @@ The invoice PDF template receives:
 | Key | Description |
 |---|---|
 | `invoice` | Invoice model instance |
-| `items` | All `InvoiceItem`s |
 | `grouped_items` | Items grouped by `TariffCategory` (energy → grid_fees → levies → metering), each with category subtotal |
 | `zev` | ZEV model instance |
 | `owner_participant` | Participant record of the ZEV owner (for creditor address) |
-| `creditor_city` | Owner's city (for payment slip) |
 | `participant` | Billed participant |
 | `qr_svg` | Swiss QR-Rechnung SVG (or `None`) |
 | `energy_chart_svg` | Period-comparison stacked bar chart SVG (or `None`) |
-| `hourly_profile_chart_svg` | Average daily consumption profile chart SVG (or `None`) |
+| `hourly_profile_chart_svg` | Average hourly consumption profile chart SVG (or `None`) |
+| `energy_flow_svg` | Sankey-style energy-flow diagram SVG (or `None`) |
 | `savings_data` | Local-vs-grid savings breakdown (or `None`) |
-| `tr` | Translation dictionary for the ZEV's `invoice_language` |
+| `energy_summary` | KPI dict with `local_kwh`, `grid_kwh`, `total_kwh`, `local_share_pct` (or `None`) |
+| `inline_qr_payment` | `true` when the QR slip shares page 1 with the invoice: requires `qr_svg`, no invoice `notes`, and a content-height estimate ≤ 176 mm (header + summary + line-item rows + closing, derived from template CSS). This is a fast *pre-filter* only — the estimate assumes single-line table rows, so wrapping descriptions can make the real layout taller. `generate_pdf()` re-checks the rendered PDF and forces `false` (dedicated payment page) if the slip would otherwise land on more than one page (see §8.4) |
+| `invoice_number_prefix` | Invoice number up to and including the last hyphen (e.g. `"INV-2026-"`); the full number when it contains no hyphen |
+| `invoice_number_suffix` | Portion after the last hyphen (e.g. `"001"`), bolded in the template; empty when there is no hyphen |
+| `tr` | Translation dictionary for the ZEV's `invoice_language`; `notes_question` is pre-formatted with `DEFAULT_FROM_EMAIL` |
+| `status_display` | Localized status label from `tr["status_values"]`; falls back to the raw status value |
 | `formatted_dates` | `invoice_date`, `period_start`, `period_end`, `due_date` formatted per `AppSettings.date_format_short` |
 
 ### 8.3 Localization
 
 PDF content is rendered in the ZEV's `invoice_language` (de/fr/it/en).
-Translation dictionaries provide all labels, headers, chart text, and payment
-terms. Each language has ~40 translation keys covering invoice structure,
-payment slip, charts, category names, and savings display.
+Translation dictionaries provide all labels, headers, chart text, and page
+titles. Each language covers invoice structure,
+payment and insights page titles, KPI labels, charts, category names,
+energy-flow labels, and savings display, plus a nested
+`status_values` dict mapping the five invoice statuses to localized labels.
 
 ### 8.4 Swiss QR-Rechnung
 
-A QR payment slip SVG is generated when:
+A QR-Rechnung SVG is generated when:
 - `zev.bank_iban` is present.
 - **Creditor** address (from owner's participant record): `name`, `address_line1`, `postal_code`, `city` — all non-empty.
 - **Debtor** address (from billed participant): same fields — all non-empty.
@@ -442,19 +485,49 @@ A QR payment slip SVG is generated when:
 If any required field is missing, QR generation is skipped (logged as warning).
 The `qrbill` Python library generates the SVG.
 
+When the invoice content is short enough (`inline_qr_payment` is `true`), the
+QR slip is placed into the 106 mm bottom-margin area of the invoice page via a
+CSS running element (`position: running(qr-slip)` +
+`@page invoice-payment { margin-bottom: 106mm; @bottom-center { content: element(qr-slip) } }`),
+so invoice and payment slip share page 1 and content physically cannot enter
+the slip zone. Otherwise it renders on a dedicated final payment page
+(`@page payment`).
+
+**Render-time guard against slip duplication.** The inline layout reserves the
+slip in the bottom margin of *every* page the invoice body spans, so it is only
+valid when the body fits on a single page. The §8.2 height estimate can
+under-count when line-item descriptions wrap onto multiple lines; in that case
+the body overflows to a second page and the running slip would be printed on
+both pages (with a gap above it on page 1). To prevent this, `generate_pdf()`
+renders once, then inspects the PDF content stream (via `_count_qr_slips()`,
+which reuses the same `_find_qr_clip_rect()` clip-rect detection as the tests)
+and counts pages carrying a slip. If `inline_qr_payment` was `true` but more
+than one slip is present, it flips the flag to `false` and re-renders, moving
+the slip to a clean dedicated final page. The estimate therefore stays a cheap
+optimisation while the layout engine is the source of truth for correctness.
+
 ### 8.5 Energy comparison chart
 
 An SVG stacked bar chart compares local-ZEV vs grid kWh for the current period
 against equivalent periods from prior years (matched by month/day pattern).
 Returns `None` if all data is zero.
 
-### 8.6 Hourly consumption profile chart
+### 8.6 Energy flow diagram
 
-An SVG grouped bar chart showing average hourly local/grid energy profile over
+An SVG Sankey-style diagram shows the period energy flow from producers to
+total production, then to local consumption / grid export, and finally to the
+billed participant plus aggregated other consumers. It is rendered on the
+supplemental invoice information page when production or consumption data is
+available.
+
+### 8.7 Hourly consumption profile chart
+
+An SVG stacked bar chart (one bar per hour, local ZEV energy below grid
+energy) showing the average hourly consumption profile over
 the billing period. Only rendered when sub-daily metering data is available
 (15-min or hourly resolution). Returns `None` for daily-only data.
 
-### 8.7 Savings calculation
+### 8.8 Savings calculation
 
 Computes how much the participant saved by consuming local ZEV energy vs grid:
 
@@ -464,7 +537,7 @@ Computes how much the participant saved by consuming local ZEV energy vs grid:
 - Returns `None` if: no local energy, no grid energy, local rate ≥ grid rate, or either total is ≤ 0.
 - Otherwise: `saved_chf = local_kwh × (avg_grid_rp - avg_local_rp) / 100`.
 
-### 8.8 Description cleanup
+### 8.9 Description cleanup
 
 Line-item descriptions may contain legacy period suffixes (e.g. `"Grid fee 2026-01-01 – 2026-01-31"`).
 Both the PDF rendering and the API serializer strip these suffixes using
@@ -512,7 +585,7 @@ Strips legacy period suffixes from `description` on serialization.
 
 - State machine changes require migration and transition compatibility checks.
 - Rollback plan includes safe handling of in-flight async send tasks.
-- Invoice PDF template can be hot-updated via admin API (§5.7) without deployment. Templates are stored in the database and survive container restarts.
+- Invoice, contract, and annual-statement PDF templates can be hot-updated via admin API (§5.7) without deployment. Templates are stored in the database and survive container restarts.
 
 ---
 
@@ -526,36 +599,41 @@ Strips legacy period suffixes from `description` on serialization.
 | QR-Rechnung generation failure | Low | Graceful skip with log warning; invoice renders without QR section |
 | PDF template corruption via admin API | Medium | Templates stored in DB; on-disk default always intact and recoverable via DELETE endpoint |
 | Contract template corruption via admin API | Medium | Same DB-backed recovery mechanism applies |
+| Annual statement template corruption via admin API | Medium | Same DB-backed recovery mechanism applies |
 | Orphaned pending email logs | Low | Status persisted before send attempt; failed tasks retry or surface in UI |
 
 ---
 
 ## 13. Test plan
 
-### Backend (`invoices/tests.py`)
+### Backend (invoice tests other than PDF)
 
-| Test class | Validates |
-|---|---|
-| `InvoiceRBACTests` | §6: admin sees all, owner sees own ZEV, participant sees own invoices; participant cannot approve/cancel; PDF template access restricted to admin; deletion rules by role and status; generic POST create returns 405 (creation only via generate); serializer ignores forged billing/workflow fields |
-| `InvoiceWorkflowTests` | §4.2: approve draft ✓, approve non-draft ✗, mark-sent from approved ✓, mark-sent from draft ✗, mark-paid from sent ✓, mark-paid from draft ✗, cancel from draft/approved/sent ✓, cancel from paid ✗, cancel already-cancelled ✗ |
-| `InvoiceEngineGuardTests` | §4.4: regenerate approved/paid → 409, regenerate draft/cancelled → success |
-| `InvoiceBillingIntegrationTests` | §5.2: end-to-end generation via API with metering data |
-| `InvoicePeriodOverviewTests` | §5.5: metering completeness, missing-day detection, partial-assignment windows, no-assignment exclusion, cross-ZEV permission denial |
-| `InvoiceMathEdgeCaseTests` | Edge cases: monthly fee month-boundary counting, tariff validity windows, zero/negative fees, rounding |
-| `InvoiceVatRateSelectionTests` | VAT rate active at period_end, zero VAT when no vat_number |
-| `InvoiceEmailFormattingTests` | §7.1-7.2: date format in email body, custom ZEV templates, auto-transition to sent |
-| `InvoiceDescriptionSerializationTests` | §8.8: period suffix stripping in serializer |
+| File | Test class | Validates |
+|---|---|---|
+| `tests.py` | `InvoiceRBACTests` | §6: admin sees all, owner sees own ZEV, participant sees own invoices; participant cannot approve/cancel; PDF template access restricted to admin; deletion rules by role and status; generic POST create returns 405 (creation only via generate); serializer ignores forged billing/workflow fields |
+| `tests.py` | `InvoiceBillingIntegrationTests` | §5.2: end-to-end generation via API with metering data |
+| `test_workflow.py` | `InvoiceWorkflowTests` | §4.2: approve draft ✓, approve non-draft ✗, mark-sent from approved ✓, mark-sent from draft ✗, mark-paid from sent ✓, mark-paid from draft ✗, cancel from draft/approved/sent ✓, cancel from paid ✗, cancel already-cancelled ✗ |
+| `test_workflow.py` | `InvoiceEngineGuardTests` | §4.4: regenerate approved/paid → 409, regenerate draft/cancelled → success |
+| `test_period_overview.py` | `InvoicePeriodOverviewTests` | §5.5: metering completeness, missing-day detection, partial-assignment windows, no-assignment exclusion, cross-ZEV permission denial |
+| `test_period_overview_unit.py` | `ComputePeriodOverviewTests` (10 tests) | §5.5 unit level: complete/incomplete participants, single missing day, exclusion without assignment, partial-assignment required-day windows and gaps, invoice period matching, row ordering, multiple-metering-point counts |
+| `test_engine_edge_cases.py` | `InvoiceMathEdgeCaseTests` | Edge cases: monthly fee month-boundary counting, tariff validity windows, zero/negative fees, rounding |
+| `test_engine_edge_cases.py` | `InvoiceVatRateSelectionTests` | VAT rate active at period_end, zero VAT when no vat_number |
+| `test_email_formatting.py` | `InvoiceEmailFormattingTests` | §7.1–7.2: date format in email body, custom ZEV templates, auto-transition to sent |
+| `test_email_task.py` | 5 function-based tests | §7.2: missing invoice no-ops, no recipient skips with failed log, success records sent log and transitions status, failure marks log failed and retries, draft stays draft after send |
+| `test_batch_actions.py` | `TestInvoiceBatchActions`, `TestBulkGenerationTasks`, `TestInvoiceRetryEmailAction` | §5.4: approve-all approves only period drafts, send-all queues only approved invoices with recipient, cross-owner ZEV rejection, download-pdfs 404/ZIP; §5.2: generate-all / generate-pdfs-all queue background tasks; §7.3: retry-email rejects sent logs and other invoices' logs, queues failed recipient |
+| `test_serializers.py` | `InvoiceDescriptionSerializationTests` | §8.9: period suffix stripping in serializer |
+| `test_template_context.py` | `BuildSampleInvoiceContextTests`, `BuildSampleContractContextTests`, `BuildSampleAnnualStatementContextTests` | §5.7 preview: sample context required keys, invoice number/totals, `grouped_items` structure, formatted dates, annual-statement monthly data and chart |
+| `test_pdfa.py` | `RenderPdfVariantTests`, `InvoicePdfaTests` | §8.1: `render_pdf` emits PDF/A-3b (XMP `pdfaid` + OutputIntent); generated invoice PDFs are PDF/A |
 
 ### Backend (`invoices/test_pdf.py`)
 
-| Test case | Validates |
+| Test class | Validates |
 |---|---|
-| QR SVG skip on missing debtor data | §8.4 graceful skip |
-| QR SVG generation with valid data | §8.4 success path |
-| QR SVG text/binary writer compatibility | §8.4 cross-library compat |
-| QR SVG skip on `qrbill` rejection | §8.4 error handling |
-| Template context uses AppSettings dates | §8.2 date formatting |
-| Template context strips period suffix | §8.8 description cleanup |
+| `InvoicePdfQrTests` | §8.4: QR skip on missing debtor data, success path, text/binary writer compatibility, skip on `qrbill` rejection, QR built in all four languages. §8.2: context uses AppSettings date formats, invoice-number prefix/suffix split (hyphen, long prefix, no hyphen), translation dict is not mutated by context building, period-suffix stripping from item descriptions (§8.9), `status_display` translation, empty `due_date` formatting, `inline_qr_payment` enabled for small invoices and disabled for long invoices / invoices with notes / missing IBAN, sample invoice context exposes every key the default template uses. §8.5: energy comparison rendered with and without a prior period. §8.6: energy-flow SVG returns `None` without readings and renders with valid data; energy summary local-share computation and `None` case. §8.7: hourly profile buckets by local time (not UTC) and returns `None` for daily-only resolution. §8.8: savings `None` cases (no local energy, local rate ≥ grid rate) and bar-percentage computation. Default template structural layout checks (dedicated invoice/payment layouts) |
+| `InvoicePdfRenderingTests` | Full WeasyPrint rendering: short invoice → 2 pages, long invoice → 3 pages, savings + many items → 3 pages, all four languages render without error; inline QR and separate payment slip geometry (106 mm height, bottom-aligned with page bottom) via PDF content-stream inspection; no QR clip rect on the insights page. Regression coverage for the render-time guard: wrapping multi-line descriptions that overflow the inline height estimate still produce exactly one slip (`_count_qr_slips`), and a long dedicated-payment invoice keeps a single bottom-aligned slip on its final page; a realistic EVU-style invoice with ~5 Abgaben across all four cost categories (energy, grid fees, levies, metering) paginates to ≥3 pages with exactly one slip |
+| `TranslationParityTests` | §8.3: all four locales have identical, non-empty translation keys and identical `status_values` keys |
+| `PaletteConsistencyTests` | Chart color constants in `pdf_charts.py` match the CSS variables in the default template |
+| `StatusTranslationTests` | §8.2: `status_display` is localized from `tr["status_values"]` in the template context |
 
 ### Frontend
 
@@ -583,9 +661,12 @@ Strips legacy period suffixes from `description` on serialization.
 - [ ] Email audit trail records every attempt with status and error detail (§7.2)
 - [ ] Auto-transition from approved → sent on successful email delivery (§4.3)
 - [ ] PDF includes localized content, QR-Rechnung (when data is complete), and charts (§8)
+- [ ] PDF uses an inline QR payment layout for short invoices and a dedicated payment page as fallback (§8.2, §8.4)
 - [ ] Period overview correctly computes metering completeness per assignment window (§5.5)
 - [ ] Participants with no active assignment are excluded from period overview (§5.5)
 - [ ] Role-scoped queryset filtering is enforced server-side (§6.1)
 - [ ] PDF template is hot-updatable by admin only; changes persist to DB and survive restarts (§5.7)
 - [ ] Contract PDF template is hot-updatable by admin only via the same mechanism (§5.7)
+- [ ] Annual statement PDF template is hot-updatable by admin only via the same mechanism (§5.7)
+- [ ] Template preview renders submitted content with sample data for all three template types (§5.7)
 - [ ] Reset-to-default DELETE reverts to on-disk file without modifying it (§5.7)

@@ -7,9 +7,9 @@ preview endpoints in views.py. They have no side effects and no Django
 request dependency, so they live here rather than in views.py.
 """
 
-from .pdf import INVOICE_TRANSLATIONS
-from .contract_pdf import CONTRACT_TRANSLATIONS
 from .annual_statement import ANNUAL_TRANSLATIONS, _build_monthly_chart_svg
+from .contract_pdf import CONTRACT_TRANSLATIONS
+from .pdf_translations import INVOICE_TRANSLATIONS
 
 
 class _Obj:
@@ -31,7 +31,8 @@ class _Obj:
 
 
 def build_sample_invoice_context() -> dict:
-    tr = INVOICE_TRANSLATIONS.get("en", INVOICE_TRANSLATIONS["de"])
+    tr = dict(INVOICE_TRANSLATIONS.get("en", INVOICE_TRANSLATIONS["de"]))
+    tr["notes_question"] = tr["notes_question"].format(email="info@example.com")
     return {
         "invoice": _Obj(
             invoice_number="INV-2026-001",
@@ -42,7 +43,6 @@ def build_sample_invoice_context() -> dict:
             total_chf="486.45",
             notes="Sample invoice for template preview.",
         ),
-        "items": [],
         "grouped_items": [
             {
                 "key": "energy",
@@ -74,7 +74,6 @@ def build_sample_invoice_context() -> dict:
             postal_code="8000",
             city="Zürich",
         ),
-        "creditor_city": "Zürich",
         "participant": _Obj(
             full_name="Hans Beispiel",
             address_line1="Musterstrasse 42",
@@ -85,6 +84,16 @@ def build_sample_invoice_context() -> dict:
         "qr_svg": None,
         "energy_chart_svg": None,
         "hourly_profile_chart_svg": None,
+        "energy_flow_svg": None,
+        "energy_summary": {
+            "local_kwh": "320.50",
+            "grid_kwh": "180.00",
+            "total_kwh": "500.50",
+            "local_share_pct": "64.1",
+        },
+        "invoice_number_prefix": "INV-2026-",
+        "invoice_number_suffix": "001",
+        "inline_qr_payment": False,
         "savings_data": {
             "local_kwh": "320.50",
             "local_chf": "57.69",
@@ -93,8 +102,11 @@ def build_sample_invoice_context() -> dict:
             "saved_rp": "4.00",
             "hypothetical_chf": "70.51",
             "saved_chf": "12.82",
+            "bar_pct": "81.8",
+            "savings_bar_pct": "18.2",
         },
         "tr": tr,
+        "status_display": tr["status_values"]["draft"],
         "formatted_dates": {
             "invoice_date": "15.01.2026",
             "period_start": "01.01.2026",

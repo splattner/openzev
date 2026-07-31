@@ -41,6 +41,7 @@ prompt_toolkit==3.0.53
 psycopg2-binary==2.9.12
 pycparser==3.0
 pydyf==0.12.1
+pypdf==6.14.2
 Pygments==2.20.0
 PyJWT==2.13.0
 pyphen==0.17.2

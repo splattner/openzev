@@ -31,7 +31,7 @@ Global settings (date formats, VAT rates) and ZEV-level configuration (billing i
 | VAT rate table | Non-overlapping validity windows, `active_for_day()` lookup |
 | Admin dashboard | ZEV, participant, invoice, and email statistics |
 | User account management | Admin-only CRUD with linked-account safety |
-| Invoice PDF template | Read/edit the server-side HTML template file |
+| Invoice PDF template | DB-backed override of the on-disk HTML templates (invoice, contract, annual statement) with preview and reset |
 | ZEV-level settings | Billing interval, invoice prefix/counter/language, banking, email templates, contract notes |
 | Contract PDF generation | Multi-language participation agreement using ZEV config |
 
@@ -54,7 +54,7 @@ Global settings (date formats, VAT rates) and ZEV-level configuration (billing i
 
 "Read only" for AppSettings means GET `/api/v1/auth/app-settings/` is allowed for any authenticated user; the frontend `AppSettingsProvider` loads it at boot for date formatting everywhere.
 
-All admin-only surfaces are wrapped in `<ProtectedRoute allowedRoles={['admin']}>` on the frontend. On the backend, VAT rate endpoints use the `IsAdmin` permission class directly, while `app_settings`, `dashboard`, and `pdf_template` use `IsAuthenticated` with a manual `request.user.is_admin` check in the view body.
+All admin-only surfaces are wrapped in `<ProtectedRoute allowedRoles={['admin']}>` on the frontend. On the backend, VAT rate endpoints, the invoice `dashboard`, and the PDF/email template endpoints use the `IsAdmin` permission class directly, while `app_settings` uses `IsAuthenticated` with a manual `request.user.is_admin` check in the view body.
 
 ---
 
@@ -175,7 +175,7 @@ DEFAULT_EMAIL_BODY_TEMPLATE = (
 
 | Endpoint | Method | Permission | Behaviour |
 |---|---|---|---|
-| `/api/v1/invoices/invoices/dashboard/` | GET | `IsAuthenticated` + `is_admin` check | Aggregated platform statistics |
+| `/api/v1/invoices/invoices/dashboard/` | GET | `IsAdmin` | Aggregated platform statistics |
 
 **Response shape (`DashboardStats`):**
 ```json
@@ -194,23 +194,30 @@ DEFAULT_EMAIL_BODY_TEMPLATE = (
 }
 ```
 
-**Implementation:** Custom `@action(detail=False, methods=["get"])` on `InvoiceViewSet`. Aggregates using Django ORM `Count` and `Sum` with `Q` filters. Invoice stats exclude cancelled invoices from count. Revenue = `Sum('total_chf', filter=Q(status__in=[SENT, PAID]))`.
+**Implementation:** `InvoiceDashboardView(APIView)` in `views_dashboard.py` (`permission_classes = [IsAdmin]`). Aggregates using Django ORM `Count` and `Sum` with `Q` filters. Invoice stats exclude cancelled invoices from count. Revenue = `Sum('total_chf', filter=Q(status__in=[SENT, PAID]))`.
 
-### 5.4 Invoice PDF Template
+### 5.4 PDF Templates (invoice, contract, annual statement)
+
+All three PDF template endpoints are served by `PdfTemplateView` (`views_templates.py`), a subclass of the shared `_AdminTemplateView` base (`permission_classes = [IsAdmin]`). Templates are stored in the `PdfTemplate` model (unique `template_name`); the on-disk Django template files serve as immutable defaults and are never written to. Non-admin mutation attempts return `403` and are audit-logged with status `DENIED`.
 
 | Endpoint | Method | Permission | Behaviour |
 |---|---|---|---|
-| `/api/v1/invoices/invoices/pdf-template/` | GET | `IsAuthenticated` + `is_admin` check | Returns `{ template_name, content }` — reads the HTML file from disk |
-| `/api/v1/invoices/invoices/pdf-template/` | PATCH | `IsAuthenticated` + `is_admin` check | Writes new content to the template file on disk. Returns `{ template_name, content, detail }` |
+| `/api/v1/invoices/invoices/pdf-template/` | GET | `IsAdmin` | Returns `{ template_name, content, is_customized }` — DB override if present, else the on-disk default |
+| `/api/v1/invoices/invoices/pdf-template/` | PATCH | `IsAdmin` | `update_or_create` of the `PdfTemplate` row; audit-logged (`template.invoice_pdf.update`). Returns `{ template_name, content, is_customized: true, detail }`. Blank/non-string content → `400` |
+| `/api/v1/invoices/invoices/pdf-template/` | DELETE | `IsAdmin` | Deletes the DB override (reverts to on-disk default); audit-logged (`template.invoice_pdf.reset`). Returns `{ template_name, content, is_customized: false, detail }` with the default content |
+| `/api/v1/invoices/invoices/contract-pdf-template/` | GET/PATCH/DELETE | same | Same behaviour for `invoices/contract_pdf.html` (audit prefix `template.contract_pdf`) |
+| `/api/v1/invoices/invoices/annual-statement-pdf-template/` | GET/PATCH/DELETE | same | Same behaviour for `invoices/annual_statement_pdf.html` (audit prefix `template.annual_statement_pdf`) |
+| `/api/v1/invoices/invoices/preview-pdf-template/` | POST | `IsAdmin` | Renders submitted `content` with sample data (`template_type`: `invoice` (default) / `contract` / `annual_statement`) and returns `{ html }`. Render errors or missing content → `400` |
 
-**Implementation:** Custom `@action` on `InvoiceViewSet`. Template path is resolved via `_get_invoice_template_path()` which points to the Django template file at `TEMPLATE_NAME = "invoices/invoice_pdf.html"`. Content is read/written as UTF-8 text directly from/to the filesystem.
+**Implementation:** The default content is read from the Django template loader via `_read_default_template(template_name)`. PDF rendering prefers the DB override (`invoices.pdf._render_template`); see §8.
 
 **Response type (`PdfTemplateResponse`):**
 ```typescript
 interface PdfTemplateResponse {
     template_name: string   // e.g. "invoices/invoice_pdf.html"
     content: string         // raw HTML
-    detail?: string         // success message on PATCH
+    is_customized: boolean  // true when a DB override exists
+    detail?: string         // success message on PATCH/DELETE
 }
 ```
 
@@ -287,9 +294,9 @@ Template: `TEMPLATE_NAME = "invoices/invoice_pdf.html"` — editable by admins v
 - Loads `AppSettings.load()` for date formatting
 - Language: `invoice.zev.invoice_language or "de"`, uses `INVOICE_TRANSLATIONS[lang]`
 - Dates formatted as `_format_date_value(date, app_settings.date_format_short)` for invoice_date, period_start, period_end, due_date
-- Includes: invoice, items (grouped by category), zev, participant, owner_participant, QR-Rechnung SVG, energy chart SVG, hourly profile chart SVG, savings data
+- Includes: invoice, items grouped by category (`grouped_items`), zev, participant, owner_participant, QR-Rechnung SVG, `inline_qr_payment` flag, invoice-number prefix/suffix split, localized `status_display`, energy comparison chart SVG, hourly profile chart SVG, energy-flow Sankey SVG, energy summary KPIs, savings data, and the translation dict (`tr`)
 
-`generate_pdf(invoice)` renders HTML via `render_to_string()` and converts to PDF with WeasyPrint.
+`generate_pdf(invoice)` renders HTML via `_render_template()`, which prefers a DB `PdfTemplate` override (rendered with `Template(content).render(Context(context))`) and falls back to `render_to_string()` for the on-disk default, then converts to PDF/A-3b via `render_pdf()` (`invoices/pdf_render.py`, shared with contract/annual-statement/financial-summary rendering).
 `save_invoice_pdf(invoice)` generates and attaches as `invoice_{number}.pdf`.
 
 ---
@@ -316,7 +323,7 @@ All admin routes are nested under `/admin/*` and wrapped with `<ProtectedRoute a
 | `/admin` | `AdminDashboardPage` | Platform statistics dashboard |
 | `/admin/system-settings` | `AdminSystemSettingsPage` | Tabbed system settings for date formats, feature flags, and OAuth providers |
 | `/admin/settings/vat` | `AdminVatSettingsPage` | VAT rate CRUD |
-| `/admin/pdf-templates` | `AdminPdfTemplatesPage` | Invoice HTML template editor |
+| `/admin/pdf-templates` | `AdminPdfTemplatesPage` | Invoice, contract, and annual-statement HTML template editor |
 | `/admin/accounts` | `AdminAccountsPage` | User account management |
 | `/admin/zevs` | `ZevListPage` | ZEV list management |
 
@@ -372,10 +379,12 @@ redirect to the matching tab on this page.
 
 **File:** `frontend/src/pages/AdminPdfTemplatesPage.tsx`
 
-- Query: `useQuery({ queryKey: ['admin-pdf-template'], queryFn: fetchInvoicePdfTemplate })`.
-- Displays template name (e.g. `invoices/invoice_pdf.html`) and a large `<textarea>` (24 rows, monospace) for editing the raw HTML.
-- Save mutation sends the content string to `updateInvoicePdfTemplate(content)`.
-- Success toast displays the `detail` message from the response.
+- Tabbed editor with three tabs: invoice (`fetchInvoicePdfTemplate`), contract (`fetchContractPdfTemplate`), and annual statement (`fetchAnnualStatementPdfTemplate`); each tab has its own query, save mutation, and reset mutation.
+- Each tab shows the template name, an `is_customized` badge when a DB override exists, and a large monospace `TemplateTextarea` with an overlay that highlights `{{ }}`/`{% %}` template variables and shows field-description tooltips on hover.
+- A `FieldReference` sidebar lists the available context variables per template type (invoice, participant, ZEV, owner, line-item loops, charts/savings, translations).
+- **Preview:** `previewPdfTemplate(content, templateType)` POSTs the current editor content to `preview-pdf-template/` and renders the returned HTML in an iframe (new-window option available); render errors show an error banner.
+- **Save** sends the content string to the matching update endpoint; success toast displays the `detail` message from the response.
+- **Reset to default** (visible only when `is_customized`) calls the DELETE endpoint, reverts the editor to the on-disk default, and toasts the result.
 
 ### 9.7 ZevSettingsPage (per-community)
 
@@ -451,13 +460,14 @@ interface DashboardStats {
 interface PdfTemplateResponse {
     template_name: string
     content: string
+    is_customized: boolean
     detail?: string
 }
 ```
 
 ### 9.9 API client functions
 
-**File:** `frontend/src/lib/api.ts`
+**File:** `frontend/src/lib/api/invoices.ts` (settings/auth functions live in `frontend/src/lib/api/auth.ts`)
 
 | Function | Method | Endpoint |
 |---|---|---|
@@ -470,6 +480,14 @@ interface PdfTemplateResponse {
 | `fetchDashboardStats()` | GET | `/invoices/invoices/dashboard/` |
 | `fetchInvoicePdfTemplate()` | GET | `/invoices/invoices/pdf-template/` |
 | `updateInvoicePdfTemplate(content)` | PATCH | `/invoices/invoices/pdf-template/` |
+| `resetInvoicePdfTemplate()` | DELETE | `/invoices/invoices/pdf-template/` |
+| `fetchContractPdfTemplate()` | GET | `/invoices/invoices/contract-pdf-template/` |
+| `updateContractPdfTemplate(content)` | PATCH | `/invoices/invoices/contract-pdf-template/` |
+| `resetContractPdfTemplate()` | DELETE | `/invoices/invoices/contract-pdf-template/` |
+| `fetchAnnualStatementPdfTemplate()` | GET | `/invoices/invoices/annual-statement-pdf-template/` |
+| `updateAnnualStatementPdfTemplate(content)` | PATCH | `/invoices/invoices/annual-statement-pdf-template/` |
+| `resetAnnualStatementPdfTemplate()` | DELETE | `/invoices/invoices/annual-statement-pdf-template/` |
+| `previewPdfTemplate(content, templateType)` | POST | `/invoices/invoices/preview-pdf-template/` |
 
 ---
 
@@ -537,7 +555,7 @@ Tests cover dashboard access (`test_invoice_dashboard_is_admin_only`) confirming
 
 - AdminSystemSettingsPage: tab selector switches between regional settings, feature flags, and OAuth providers. Regional format selector renders all 4 options per format type, preview updates live, and save mutation calls `updateAppSettings`.
 - AdminVatSettingsPage: form validates percentage 0–100, converts to fraction, create/edit/delete flows work. Overlap errors display as toast.
-- AdminPdfTemplatesPage: textarea loads server content, save sends updated content.
+- AdminPdfTemplatesPage: three template tabs (invoice/contract/annual statement) load server content, save sends updated content, preview renders sample-data HTML, reset-to-default reverts customized templates.
 - AdminDashboardPage: stats display, auto-refresh at 30s interval.
 - ZevSettingsPage: general settings + email template sections both submit via `updateZev`. Reset buttons clear custom templates. Template variable reference is visible.
 
