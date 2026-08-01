@@ -527,6 +527,14 @@ energy) showing the average hourly consumption profile over
 the billing period. Only rendered when sub-daily metering data is available
 (15-min or hourly resolution). Returns `None` for daily-only data.
 
+Readings are attributed per timestamp (ADR 0013): a reading only counts while
+the participant held the metering point on the reading's UTC date.
+Pre-assignment and gap readings are excluded from the profile, so a
+mid-period transfer leaves the outgoing holder's profile shaped only by their
+own readings. The profile arithmetic is `Decimal` end to end; values are
+converted to floats only at SVG serialization (same billing contract as §4.3
+of the tariffs-and-billing-engine spec).
+
 ### 8.8 Savings calculation
 
 Computes how much the participant saved by consuming local ZEV energy vs grid:
@@ -629,7 +637,9 @@ Strips legacy period suffixes from `description` on serialization.
 
 | Test class | Validates |
 |---|---|
-| `InvoicePdfQrTests` | §8.4: QR skip on missing debtor data, success path, text/binary writer compatibility, skip on `qrbill` rejection, QR built in all four languages. §8.2: context uses AppSettings date formats, invoice-number prefix/suffix split (hyphen, long prefix, no hyphen), translation dict is not mutated by context building, period-suffix stripping from item descriptions (§8.9), `status_display` translation, empty `due_date` formatting, `inline_qr_payment` enabled for small invoices and disabled for long invoices / invoices with notes / missing IBAN, sample invoice context exposes every key the default template uses. §8.5: energy comparison rendered with and without a prior period. §8.6: energy-flow SVG returns `None` without readings and renders with valid data; energy summary local-share computation and `None` case. §8.7: hourly profile buckets by local time (not UTC) and returns `None` for daily-only resolution. §8.8: savings `None` cases (no local energy, local rate ≥ grid rate) and bar-percentage computation. Default template structural layout checks (dedicated invoice/payment layouts) |
+| `InvoicePdfQrTests` | §8.4: QR skip on missing debtor data, success path, text/binary writer compatibility, skip on `qrbill` rejection, QR built in all four languages. §8.2: context uses AppSettings date formats, invoice-number prefix/suffix split (hyphen, long prefix, no hyphen), translation dict is not mutated by context building, period-suffix stripping from item descriptions (§8.9), `status_display` translation, empty `due_date` formatting, `inline_qr_payment` enabled for small invoices and disabled for long invoices / invoices with notes / missing IBAN, sample invoice context exposes every key the default template uses. §8.5: energy comparison rendered with and without a prior period. §8.6: energy-flow SVG returns `None` without readings and renders with valid data; energy summary local-share computation and `None` case. §8.7: hourly profile buckets by local time (not UTC), returns `None` for daily-only resolution, and skips readings outside the participant's assignment window (ADR 0013). §8.8: savings `None` cases (no local energy, local rate ≥ grid rate) and bar-percentage computation. Default template structural layout checks (dedicated invoice/payment layouts) |
+| `PeriodParticipantStatsTests` | §8.6: per-timestamp participant stats — mid-period transfer splits readings between both holders, gap readings appear on no participant, stats reconcile with engine invoice totals |
+| `AnnualStatementMonthlyDataTests` | Annual-statement monthly data: per-timestamp attribution across assignment changes, gap readings excluded |
 | `InvoicePdfRenderingTests` | Full WeasyPrint rendering: short invoice → 2 pages, long invoice → 3 pages, savings + many items → 3 pages, all four languages render without error; inline QR and separate payment slip geometry (106 mm height, bottom-aligned with page bottom) via PDF content-stream inspection; no QR clip rect on the insights page. Regression coverage for the render-time guard: wrapping multi-line descriptions that overflow the inline height estimate still produce exactly one slip (`_count_qr_slips`), and a long dedicated-payment invoice keeps a single bottom-aligned slip on its final page; a realistic EVU-style invoice with ~5 Abgaben across all four cost categories (energy, grid fees, levies, metering) paginates to ≥3 pages with exactly one slip |
 | `TranslationParityTests` | §8.3: all four locales have identical, non-empty translation keys and identical `status_values` keys |
 | `PaletteConsistencyTests` | Chart color constants in `pdf_charts.py` match the CSS variables in the default template |

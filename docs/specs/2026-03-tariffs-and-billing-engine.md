@@ -245,6 +245,14 @@ assignment.valid_from ≤ period_end
 AND (assignment.valid_to IS NULL OR assignment.valid_to ≥ period_start)
 ```
 
+The overlap condition only *selects* metering points and the ZEV-wide pools.
+Attribution of individual readings to a participant is **per timestamp** (ADR
+0013): a reading is billed to the participant whose assignment is active on
+`reading.timestamp.date()`. Assignments are date-granular (ADR 0001) — a
+reading at 00:30 on `valid_from` day belongs to the new holder, and a reading
+on the last day `valid_to` belongs to the outgoing holder. Readings in an
+assignment gap belong to nobody.
+
 ### 4.2 Collect readings
 
 | Reading set | Metering points | Direction | Time window |
@@ -262,6 +270,8 @@ For **each** consumption reading (ordered by timestamp):
 
 ```
 ts                    = reading.timestamp
+IF participant_at(metering_point_id, ts) != participant.id:
+    SKIP this reading            (pre-assignment, post-transfer, or gap reading)
 participant_kwh       = reading.energy_kwh
 zev_consumption_at_ts = sum of all IN readings at ts across ZEV
 zev_production_at_ts  = sum of all OUT readings at ts across ZEV
@@ -269,14 +279,22 @@ local_pool_at_ts      = min(zev_production_at_ts, zev_consumption_at_ts)
 
 IF zev_consumption_at_ts > 0 AND local_pool_at_ts > 0:
     participant_share  = participant_kwh / zev_consumption_at_ts
-    r_local            = min(participant_kwh, local_pool_at_ts × participant_share)
+    r_local            = local_pool_at_ts × participant_share
 ELSE:
     r_local = 0
 
-r_grid = max(participant_kwh − r_local, 0)
+r_grid = participant_kwh − r_local
 ```
 
-**Key invariant:** at every timestamp, each participant's consumption is split into a **local** portion (energy sourced from ZEV production) and a **grid** portion (energy from the public grid).  The local pool is capped at the lesser of total production and total consumption.
+**Key invariant:** at every timestamp, each participant's consumption is split into a **local** portion (energy sourced from ZEV production) and a **grid** portion (energy from the public grid).  The local pool is capped at the lesser of total production and total consumption.  Skipped readings are **excluded from every bill** (ADR 0013): they are not charged to the previous holder, the new holder, or the community; the ZEV-wide pool totals still include them.
+
+**Pool coverage:** the pool is physical — `zev_consumption_at_ts`/`zev_production_at_ts` sum over **every** metering point of the ZEV, with or without an assignment in the period (a never-assigned meter feeds the pool but is billed to nobody). This matches the dashboards and the PDFs (ADR 0013 pool decision).
+
+**Assignment matching** uses the *UTC civil date* of the reading's timestamp (`ts.date()`), consistent with period, tariff, and completeness conventions (ADR 0007 — all timestamps are stored and queried in UTC). A reading at 22:30 UTC on the day an assignment ends still belongs to that day's holder even though Zurich is already on the next civil day.
+
+**Fail-fast contracts** (implemented in `allocation/split.py`): all inputs must be `Decimal` (`TypeError` otherwise) and non-negative (`ValueError`); a participant's draw above the community's total consumption, a producer's output above the community's total production, or a participant's share above the total in `proportional_share`, raises `ValueError` — with consistent data these are impossible (the total includes the participant's own reading), so they indicate duplicate readings or the wrong metering-point scope. No arithmetic is clamped silently.
+
+**Gap visibility:** the engine counts skipped readings and their kWh (consumption and production separately) and logs a warning when any exist, so unattributed energy does not vanish unnoticed.
 
 ### 4.4 Consumer energy pricing (per timestamp)
 
@@ -306,6 +324,8 @@ For **each** production (feed-in) reading:
 
 ```
 ts                    = reading.timestamp
+IF participant_at(metering_point_id, ts) != participant.id:
+    SKIP this reading            (pre-assignment, post-transfer, or gap reading)
 produced_kwh          = reading.energy_kwh
 zev_production_at_ts  = sum of all OUT readings at ts
 zev_consumption_at_ts = sum of all IN readings at ts
@@ -320,6 +340,8 @@ ELSE:
     local_sold_kwh = 0
     exported_kwh   = 0
 ```
+
+Same assignment matching (UTC civil date), fail-fast contracts, and gap logging as §4.3.
 
 #### 4.5.1 Local energy credit
 
@@ -919,6 +941,37 @@ The description renders as: `"Surcharge 50% (50% von CHF 0.32/kWh)"` (German).
 | Percentage-of-energy billing mode | §4.4.2 base-rate computation, symmetric consumer/producer |
 | Multi-producer with export | §4.5 producer share allocation, feed-in credits |
 
+### Backend (`invoices/test_engine_allocation.py`)
+
+| Test case | Validates |
+|---|---|
+| Mid-period transfer splits the period's readings between both holders | §4.1 per-timestamp attribution (ADR 0013) |
+| Reading on the transfer boundary date belongs to the outgoing holder | §4.1 inclusive `valid_to` (ADR 0001) |
+| Gap readings are billed to nobody | §4.1 gap exclusion (ADR 0013) |
+| Producer transfer attributes output per timestamp | §4.1/§4.5 producer side |
+
+### Backend (`invoices/test_allocation_reconciliation.py`)
+
+| Test case | Validates |
+|---|---|
+| Engine bills each holder exactly their readings, gap excluded | §4.1/§4.3 gap exclusion |
+| PDF stats reconcile with engine invoices | PDF stats == billed totals on the same fixture |
+| Owner dashboard reconciles with engine invoices | Dashboard == billed totals, gap only in physical totals |
+| Analytics and PDF stats agree on participant splits | Charting consumers are mutually consistent |
+| Multi-meter fixture: two consumption meters, two producers, a bidirectional meter, producer-meter transfer, two transfers of one meter, never-assigned meter | §4.3/§4.5 allocation and pool coverage on a mixed fixture; all comparisons at the 0.0001 kWh settlement quantum |
+
+### Backend (`allocation/tests.py`)
+
+| Test case | Validates |
+|---|---|
+| Split/proportional-share arithmetic | §4.3/§4.5 formulas, shared service (ADR 0013) |
+| Assignment windows: overlap handling, boundary dates, gaps | §4.1 attribution index |
+| Non-`Decimal` input, negative inputs, totals above the community total | §4.3 fail-fast contracts |
+| Overlapping assignment windows raise; adjacent (non-overlapping) windows pass | Fail-fast on direct-DB corruption |
+| UTC civil-date matching at 22:30/00:30 boundaries, incl. a Zurich-tz timestamp | §4.3 UTC-date assignment matching |
+| Conservation invariants (Σ local == pool; producer sold == consumer local) | §4.3 pool conservation |
+| Exact Decimal arithmetic where floats would drift | §4.3/5 Decimal end-to-end billing contract |
+
 ### Backend (`invoices/test_shared_fee.py`)
 
 | Test case | Validates |
@@ -988,6 +1041,7 @@ The description renders as: `"Surcharge 50% (50% von CHF 0.32/kWh)"` (German).
 ## 14. Acceptance criteria
 
 - [ ] Timestamp-level allocation matches the formulas in §4.3
+- [ ] Mid-period assignment transfers attribute every reading to the holder active at its timestamp (§4.1), and gap readings appear on no bill
 - [ ] All eight billing modes produce correct quantities and totals per §4.4–4.6
 - [ ] Producer credits are symmetric with consumer charges for local energy
 - [ ] Fixed fees count billable months without proration (§4.6.1)

@@ -331,6 +331,21 @@ MeteringPointAssignment.objects.filter(
 Only assignments overlapping the billing period are included.  The engine reads
 `MeterReading` data for those meters within the period window.
 
+**Per-timestamp attribution (ADR 0013):** the overlap filter above only selects
+metering points. Each reading is then attributed to the participant whose
+assignment is active on the reading's UTC date (`ts.date()` — timestamps are
+always UTC, ADR 0007 — falling inside an assignment's `[valid_from, valid_to]`),
+so a mid-period transfer splits the period's readings between both holders.
+Readings dated in an assignment gap belong to nobody and are excluded from
+every bill, the invoice PDF stats, the annual statement, and the dashboards —
+while ZEV-wide pool totals still include them. Assignments are date-granular:
+a reading at 00:30 on `valid_from` belongs to the new holder; a reading on
+`valid_to` belongs to the outgoing holder. The `AssignmentWindows` index
+fails fast on overlapping assignments for one metering point
+(`OverlappingAssignmentWindowsError`), which model validation already
+forbids; callers check `participant_at(metering_point_id, ts) != participant.id`
+rather than a provenance-dependent "active" helper.
+
 ### 8.2 Period overview
 
 The invoice period-overview endpoint (see `SPEC-2026-invoice-lifecycle-comms`)

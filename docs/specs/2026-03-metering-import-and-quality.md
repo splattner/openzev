@@ -394,15 +394,24 @@ participant's readings and the response includes `selected_participant_name`.
 
 For each timestamp $t$:
 
+0. Attribute the reading to the participant whose assignment is active on
+   $t$'s UTC civil date (`ts.date()`, ADR 0013/0007 — timestamps are always
+   UTC, so the UTC date is also the period and tariff day). Readings with no
+   active assignment (gap readings) are excluded from per-participant totals
+   and the timeline, but remain in the ZEV-level aggregates (§"ZEV-level
+   aggregates" below).
 1. $\text{local\_pool}(t) = \min(\text{total\_produced}(t),\; \text{total\_consumed}(t))$
 2. If $\text{total\_consumed}(t) > 0$ and $\text{local\_pool}(t) > 0$:
 
-$$\text{from\_zev}_i(t) = \min\!\left(\text{consumed}_i(t),\; \text{local\_pool}(t) \times \frac{\text{consumed}_i(t)}{\text{total\_consumed}(t)}\right)$$
+$$\text{from\_zev}_i(t) = \text{local\_pool}(t) \times \frac{\text{consumed}_i(t)}{\text{total\_consumed}(t)}$$
 
-3. $\text{from\_grid}_i(t) = \max(\text{consumed}_i(t) - \text{from\_zev}_i(t),\; 0)$
+3. $\text{from\_grid}_i(t) = \text{consumed}_i(t) - \text{from\_zev}_i(t)$
 
 This is identical to the billing engine's proportional allocation but computed
-at dashboard queryuery time rather than per-billing-period.
+at dashboard query time rather than per-billing-period. All arithmetic is
+`Decimal` end to end (fail-fast on non-`Decimal`, negative, or inconsistent
+totals — see the billing-engine spec §4.3); floats appear only at JSON
+serialization (hourly profile values are rounded to 4 decimals).
 
 **ZEV-level aggregates:**
 
@@ -410,7 +419,9 @@ For each timestamp $t$:
 - $\text{imported}(t) = \max(\text{consumed}(t) - \text{produced}(t),\; 0)$
 - $\text{exported}(t) = \max(\text{produced}(t) - \text{consumed}(t),\; 0)$
 
-These are aggregated per bucket for the timeline.
+These are aggregated per bucket for the timeline. They are physical pool
+totals over every reading in the range — gap readings are included here even
+though no participant is charged for them.
 
 **ZEV selection logic:**
 - If `zev_id` provided → validate ownership for non-admin users.
@@ -719,6 +730,7 @@ type MeteringDashboardSummary =
 | Test class | Validates |
 |---|---|
 | `DashboardSummaryAlignmentTests` | §5.4: timestamp-level local/grid split for participant view; owner participant-filter produces correct totals; multi-participant filtering exclusion |
+| `DashboardMidPeriodTransferTests` | §5.4: readings attributed per assignment timestamp for owner stats, participant totals/timeline, ZEV-wide stats, and the hourly profile; post-transfer readings excluded |
 | `ParticipantImportRestrictionTests` | §6.2: participant cannot list import logs, preview CSV, or upload CSV (all 403) |
 | `ImportParserRobustnessTests` | §4.1: malformed CSV reported without crash; malformed SDAT-CH reported without crash; timezone offset normalized to UTC; duplicate rows skipped; idempotent re-import; overwrite mode updates value without creating new row |
 | `MeteringRawDataEndpointTests` | §5.3: owner gets daily-grouped raw rows with correct direction sums; participant can read own metering point's raw data |
@@ -757,6 +769,7 @@ type MeteringDashboardSummary =
 - [ ] Chart data endpoint returns direction-pivoted aggregates with configurable time buckets (§5.2)
 - [ ] Raw data endpoint returns daily-grouped individual readings (§5.3)
 - [ ] Dashboard summary returns role-differentiated response with correct local/grid split (§5.4)
+- [ ] Dashboard readings are attributed per assignment timestamp; gap readings appear in ZEV aggregates but on no participant's totals (§5.4)
 - [ ] Data quality status returns per-metering-point gap detection with severity thresholds (§5.5)
 - [ ] All date queries use explicit UTC boundary construction (§7)
 - [ ] Participants cannot import or access import logs (§6.2)

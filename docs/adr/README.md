@@ -16,6 +16,7 @@ This directory captures key architectural decisions for OpenZEV.
 - [0010: Centralized audit event stream for high-risk operational workflows](0010-centralized-audit-event-stream.md)
 - [0011: Asynchronous bulk invoice and PDF generation](0011-async-bulk-invoice-generation.md)
 - [0012: Participant address geocoding via public Nominatim, cached not persisted](0012-participant-geocoding-via-nominatim.md)
+- [0013: Extract shared local-pool allocation service](0013-shared-allocation-service.md)
 
 ## Conventions
 
