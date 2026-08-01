@@ -207,6 +207,94 @@ class TestBulkGenerationTasks:
         assert save_pdf.call_args[0][0].pk == invoice.pk
 
 
+class TestPdfsAreProducedWithTheInvoice:
+    """A PDF is part of producing an invoice, not a later step the operator has
+    to remember: without one the invoice cannot be reviewed, downloaded or
+    emailed, and the missing-PDF state was a rung on the batch action ladder."""
+
+    def test_bulk_generation_renders_a_pdf_for_every_invoice(self):
+        from invoices.tasks import generate_zev_invoices_task
+
+        owner = OwnerFactory()
+        zev = ZevFactory(owner=owner)
+        participant = ParticipantFactory(zev=zev)
+        invoices = [
+            _invoice(participant),
+            _invoice(participant, period_start=date(2026, 2, 1), period_end=date(2026, 2, 28)),
+        ]
+
+        with mock.patch("invoices.engine.generate_invoices_for_zev", return_value=invoices):
+            with mock.patch("invoices.pdf.save_invoice_pdf") as save_pdf:
+                generate_zev_invoices_task(str(zev.id), "2026-01-01", "2026-01-31")
+
+        assert save_pdf.call_count == 2
+        assert {call[0][0].pk for call in save_pdf.call_args_list} == {i.pk for i in invoices}
+
+    def test_one_failing_pdf_does_not_cost_the_others_theirs(self):
+        from invoices.tasks import generate_zev_invoices_task
+
+        owner = OwnerFactory()
+        zev = ZevFactory(owner=owner)
+        participant = ParticipantFactory(zev=zev)
+        invoices = [
+            _invoice(participant),
+            _invoice(participant, period_start=date(2026, 2, 1), period_end=date(2026, 2, 28)),
+            _invoice(participant, period_start=date(2026, 3, 1), period_end=date(2026, 3, 31)),
+        ]
+
+        with mock.patch("invoices.engine.generate_invoices_for_zev", return_value=invoices):
+            with mock.patch(
+                "invoices.pdf.save_invoice_pdf",
+                side_effect=[ValueError("bad debtor address"), None, None],
+            ) as save_pdf:
+                generate_zev_invoices_task(str(zev.id), "2026-01-01", "2026-01-31")
+
+        assert save_pdf.call_count == 3
+
+    def test_single_generate_queues_the_pdf_instead_of_blocking_the_response(self):
+        """Rendering takes seconds; the caller only needs the invoice back."""
+        owner = OwnerFactory()
+        zev = ZevFactory(owner=owner)
+        participant = ParticipantFactory(zev=zev)
+        client = _owner_client(owner)
+
+        with mock.patch("invoices.views.generate_invoice_pdf_task.delay") as queued:
+            with mock.patch("invoices.views.generate_invoice", return_value=_invoice(participant)) as engine:
+                response = client.post(
+                    "/api/v1/invoices/invoices/generate/",
+                    {"participant_id": str(participant.id), **PERIOD_PAYLOAD},
+                    format="json",
+                )
+
+        assert response.status_code == 201
+        engine.assert_called_once()
+        queued.assert_called_once()
+
+    def test_generate_invoice_pdf_task_renders_the_named_invoice(self):
+        from invoices.tasks import generate_invoice_pdf_task
+
+        owner = OwnerFactory()
+        zev = ZevFactory(owner=owner)
+        participant = ParticipantFactory(zev=zev)
+        invoice = _invoice(participant)
+
+        with mock.patch("invoices.pdf.save_invoice_pdf") as save_pdf:
+            generate_invoice_pdf_task(str(invoice.pk))
+
+        save_pdf.assert_called_once()
+        assert save_pdf.call_args[0][0].pk == invoice.pk
+
+    def test_generate_invoice_pdf_task_tolerates_a_deleted_invoice(self):
+        from invoices.tasks import generate_invoice_pdf_task
+
+        import uuid
+
+        with mock.patch("invoices.pdf.save_invoice_pdf") as save_pdf:
+            generate_invoice_pdf_task(str(uuid.uuid4()))
+
+        save_pdf.assert_not_called()
+
+
 class TestInvoiceRetryEmailAction:
     def test_retry_email_rejects_already_sent_log(self):
         owner = OwnerFactory()

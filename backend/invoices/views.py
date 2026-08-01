@@ -16,7 +16,12 @@ from .serializers import (
 )
 from .engine import generate_invoice
 from .pdf import save_invoice_pdf
-from .tasks import send_invoice_email_task, generate_zev_invoices_task, generate_zev_pdfs_task
+from .tasks import (
+    generate_invoice_pdf_task,
+    generate_zev_invoices_task,
+    generate_zev_pdfs_task,
+    send_invoice_email_task,
+)
 from .period_overview import compute_period_overview
 from .workflow import (
     InvoiceWorkflowError,
@@ -161,6 +166,10 @@ class InvoiceViewSet(
                 {"error": "Invoice generation failed. The invoice may already exist in a non-regenerable state."},
                 status=status.HTTP_409_CONFLICT,
             )
+        # Queued rather than rendered inline: a render takes seconds, and the
+        # caller only needs the invoice back. The PDF follows on its own so it
+        # is never something the operator has to ask for.
+        generate_invoice_pdf_task.delay(str(invoice.pk))
         _record_invoice_event(
             request=request,
             action_type="invoice.generate",

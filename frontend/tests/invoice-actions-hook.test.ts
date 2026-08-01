@@ -5,7 +5,10 @@ import { useInvoiceActions } from '../src/features/invoices/useInvoiceActions'
 
 const pushToast = vi.fn()
 const invalidateQueries = vi.fn()
-const t = (key: string) => key
+// Appends the interpolated count so tests can assert the scope a label claims,
+// not just which label was chosen.
+const t = (key: string, opts?: { count?: number }) =>
+  opts?.count === undefined ? key : `${key}:${opts.count}`
 
 const mutationInstances: Array<{
   mutate: ReturnType<typeof vi.fn>
@@ -53,7 +56,7 @@ vi.mock('../src/lib/api/invoices', () => ({
   sendInvoiceEmail: vi.fn(),
 }))
 
-function createHarness() {
+function createHarness(rowsOverride?: unknown[]) {
   const latestResult = { current: null as ReturnType<typeof useInvoiceActions> | null }
 
   function Harness() {
@@ -63,7 +66,7 @@ function createHarness() {
         period_start: '2026-05-01',
         period_end: '2026-05-31',
       },
-      rows: [
+      rows: rowsOverride ?? [
         {
           participant_id: 'participant-1',
           invoice: null,
@@ -161,7 +164,8 @@ describe('useInvoiceActions hook', () => {
     expect(draftAction?.label).toBe('pages.invoices.approve')
     expect(approvedAction?.label).toBe('pages.invoices.sendEmail')
     expect(sentAction?.label).toBe('pages.invoices.markPaid')
-    expect(result!.recommendedBatchAction?.label).toBe('pages.invoices.batch.approveAll')
+    // participant-1 has no invoice yet, so generation outranks approval.
+    expect(result!.recommendedBatchAction?.label).toBe('pages.invoices.batch.generateAllCount:1')
     expect(result!.getRowMenuItems({ participant_id: 'participant-4', invoice: { id: 'invoice-sent', status: 'sent', pdf_url: '/pdf/invoice-sent.pdf', email_logs: [], invoice_number: 'INV-003' } as any } as any)).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ key: 'regenerate-pdf' }),
@@ -197,5 +201,77 @@ describe('useInvoiceActions hook', () => {
     })
 
     expect(getResult()!.retiringEmailId).toBeNull()
+  })
+})
+
+/**
+ * The recommendation must follow the workflow — generate, then approve, then
+ * send. Recommending approval while participants still lack an invoice skips
+ * them silently: approve-all only touches drafts, so the button reports success
+ * and leaves the late joiner unbilled.
+ */
+describe('recommendedBatchAction ordering', () => {
+  let container: HTMLDivElement
+  let root: ReturnType<typeof createRoot>
+
+  beforeEach(() => {
+    ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
+    mutationInstances.length = 0
+    container = document.createElement('div')
+    document.body.appendChild(container)
+    root = createRoot(container)
+  })
+
+  afterEach(() => {
+    act(() => {
+      root.unmount()
+    })
+    container.remove()
+  })
+
+  function recommend(rows: unknown[]) {
+    const { Harness, getResult } = createHarness(rows)
+    act(() => {
+      root.render(createElement(Harness))
+    })
+    return getResult()!.recommendedBatchAction
+  }
+
+  const noInvoice = (id: string) => ({ participant_id: id, invoice: null })
+  const withStatus = (id: string, status: string) => ({
+    participant_id: id,
+    invoice: { id: `invoice-${id}`, status, pdf_url: null, email_logs: [], invoice_number: id },
+  })
+
+  it('recommends generation before approval when a participant has no invoice', () => {
+    expect(recommend([noInvoice('p1'), withStatus('p2', 'draft'), withStatus('p3', 'draft')])?.label).toBe(
+      'pages.invoices.batch.generateAllCount:1',
+    )
+  })
+
+  it('recommends approval once every participant has an invoice', () => {
+    expect(recommend([withStatus('p1', 'draft'), withStatus('p2', 'draft')])?.label).toBe(
+      'pages.invoices.batch.approveAllCount:2',
+    )
+  })
+
+  it('recommends sending once nothing is left in draft', () => {
+    expect(recommend([withStatus('p1', 'approved'), withStatus('p2', 'approved')])?.label).toBe(
+      'pages.invoices.batch.sendAllCount:2',
+    )
+  })
+
+  it('recommends nothing once every invoice has been sent', () => {
+    expect(recommend([withStatus('p1', 'sent'), withStatus('p2', 'paid')])).toBeNull()
+  })
+
+  it('counts a cancelled invoice as needing regeneration', () => {
+    expect(recommend([withStatus('p1', 'cancelled'), withStatus('p2', 'sent')])?.label).toBe(
+      'pages.invoices.batch.generateAllCount:1',
+    )
+  })
+
+  it('no longer recommends a PDF pass — PDFs arrive with the invoice', () => {
+    expect(recommend([withStatus('p1', 'sent'), withStatus('p2', 'sent')])).toBeNull()
   })
 })

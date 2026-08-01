@@ -1,6 +1,8 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   endOfBillingPeriod,
+  getPreviousBillingPeriod,
+  isBillingAlignedPeriod,
   shiftBillingPeriod,
   startOfBillingPeriod,
   toIsoDate,
@@ -37,5 +39,49 @@ describe('invoice period utilities', () => {
       from: '2026-07-01',
       to: '2026-09-30',
     })
+  })
+})
+
+/**
+ * The invoices page opens on the last complete period. The current one is still
+ * running, so it carries partial metering data and no invoices — defaulting to
+ * it made every billing run begin by stepping back one period.
+ */
+describe('getPreviousBillingPeriod', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('returns the period before the one containing today', () => {
+    vi.setSystemTime(new Date(2026, 4, 8)) // 8 May 2026, mid-period
+
+    expect(getPreviousBillingPeriod('monthly')).toEqual({ from: '2026-04-01', to: '2026-04-30' })
+    expect(getPreviousBillingPeriod('quarterly')).toEqual({ from: '2026-01-01', to: '2026-03-31' })
+    expect(getPreviousBillingPeriod('semi_annual')).toEqual({ from: '2025-07-01', to: '2025-12-31' })
+    expect(getPreviousBillingPeriod('annual')).toEqual({ from: '2025-01-01', to: '2025-12-31' })
+  })
+
+  it('crosses the year boundary', () => {
+    vi.setSystemTime(new Date(2026, 0, 5)) // 5 January 2026
+
+    expect(getPreviousBillingPeriod('monthly')).toEqual({ from: '2025-12-01', to: '2025-12-31' })
+    expect(getPreviousBillingPeriod('quarterly')).toEqual({ from: '2025-10-01', to: '2025-12-31' })
+  })
+
+  it('returns the period just ended on its first day', () => {
+    vi.setSystemTime(new Date(2026, 6, 1)) // 1 July 2026, first day of Q3
+
+    expect(getPreviousBillingPeriod('quarterly')).toEqual({ from: '2026-04-01', to: '2026-06-30' })
+  })
+
+  it('yields a range the period selector treats as navigable', () => {
+    vi.setSystemTime(new Date(2026, 4, 8))
+
+    const previous = getPreviousBillingPeriod('quarterly')
+    expect(isBillingAlignedPeriod(previous.from, previous.to, 'quarterly')).toBe(true)
   })
 })

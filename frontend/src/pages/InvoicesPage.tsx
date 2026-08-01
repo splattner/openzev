@@ -7,7 +7,7 @@ import { InvoiceDeleteModal } from '../features/invoices/InvoiceDeleteModal'
 import { InvoicesEmptyState } from '../features/invoices/InvoicesEmptyState'
 import { useInvoiceActions } from '../features/invoices/useInvoiceActions'
 import { PeriodSelector } from '../components/PeriodSelector'
-import { getCurrentBillingPeriod, type BillingInterval } from '../lib/billingPeriod'
+import { getPreviousBillingPeriod, type BillingInterval } from '../lib/billingPeriod'
 import {
     fetchEmailLogs,
     fetchInvoicePeriodOverview,
@@ -40,8 +40,11 @@ export function InvoicesPage() {
             setPeriod({ period_start: '', period_end: '' })
             return
         }
-        const current = getCurrentBillingPeriod(interval)
-        setPeriod({ period_start: current.from, period_end: current.to })
+        // The last *complete* period, not the current one: invoices can only be
+        // generated once a period has ended, so opening on the running period
+        // shows an empty table and makes every billing run start by stepping back.
+        const billable = getPreviousBillingPeriod(interval)
+        setPeriod({ period_start: billable.from, period_end: billable.to })
     }, [selectedZevId, interval])
 
     const periodOverviewQuery = useQuery({

@@ -43,7 +43,6 @@ export interface InvoiceActionStats {
     approvedCount: number
     pdfCount: number
     generationCandidateCount: number
-    pdfMissingCount: number
 }
 
 export function getLatestEmailLog(invoice: { email_logs?: Array<{ created_at: string; recipient: string; status: string; id: string }> } | null) {
@@ -322,57 +321,47 @@ export function useInvoiceActions({
         () => rows.filter((row) => !row.invoice || row.invoice.status === 'cancelled').length,
         [rows],
     )
-    const pdfMissingCount = useMemo(
-        () => rows.filter((row) => row.invoice && !row.invoice.pdf_url).length,
-        [rows],
-    )
-
     const stats: InvoiceActionStats = {
         invoiceCount,
         draftCount,
         approvedCount,
         pdfCount,
         generationCandidateCount,
-        pdfMissingCount,
     }
 
     // ── Recommended batch action ──────────────────────────────────────────────
 
+    // Ordered by the workflow itself — generate, then approve, then send.
+    // Recommending approval first would skip participants who have no invoice
+    // yet (a late joiner, or a generation that failed), because approve-all only
+    // touches drafts: the button would report success and silently leave them
+    // unbilled. PDFs are not a rung — they are produced with the invoice.
     const recommendedBatchAction: ActionMenuItem | null = useMemo(() => {
+        if (generationCandidateCount > 0) {
+            return {
+                key: 'generate-all',
+                label: t('pages.invoices.batch.generateAllCount', { count: generationCandidateCount }),
+                icon: <FontAwesomeIcon icon={faFileInvoice} fixedWidth />,
+                onClick: () => generateAllMutation.mutate(),
+                disabled: anyBatchPending,
+            }
+        }
         if (draftCount > 0) {
             return {
                 key: 'approve-all',
-                label: t('pages.invoices.batch.approveAll'),
+                label: t('pages.invoices.batch.approveAllCount', { count: draftCount }),
                 icon: <FontAwesomeIcon icon={faCheckDouble} fixedWidth />,
                 onClick: () => approveAllMutation.mutate(),
-                disabled: anyBatchPending || draftCount === 0,
+                disabled: anyBatchPending,
             }
         }
         if (approvedCount > 0) {
             return {
                 key: 'send-all',
-                label: t('pages.invoices.batch.sendAll'),
+                label: t('pages.invoices.batch.sendAllCount', { count: approvedCount }),
                 icon: <FontAwesomeIcon icon={faPaperPlane} fixedWidth />,
                 onClick: () => sendAllMutation.mutate(),
-                disabled: anyBatchPending || approvedCount === 0,
-            }
-        }
-        if (generationCandidateCount > 0) {
-            return {
-                key: 'generate-all',
-                label: t('pages.invoices.batch.generateAll'),
-                icon: <FontAwesomeIcon icon={faFileInvoice} fixedWidth />,
-                onClick: () => generateAllMutation.mutate(),
-                disabled: anyBatchPending || generationCandidateCount === 0,
-            }
-        }
-        if (pdfMissingCount > 0) {
-            return {
-                key: 'generate-all-pdfs',
-                label: t('pages.invoices.batch.generateAllPdfs'),
-                icon: <FontAwesomeIcon icon={faFilePdf} fixedWidth />,
-                onClick: () => generateAllPdfsMutation.mutate(),
-                disabled: anyBatchPending || pdfMissingCount === 0,
+                disabled: anyBatchPending,
             }
         }
         return null
@@ -382,9 +371,7 @@ export function useInvoiceActions({
         approvedCount,
         draftCount,
         generateAllMutation,
-        generateAllPdfsMutation,
         generationCandidateCount,
-        pdfMissingCount,
         sendAllMutation,
         t,
     ])

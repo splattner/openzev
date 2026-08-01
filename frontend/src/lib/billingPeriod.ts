@@ -58,3 +58,16 @@ export function shiftBillingPeriod(
         to: toIsoDate(endOfBillingPeriod(shiftedStart, interval)),
     }
 }
+
+/**
+ * The most recent *complete* billing period.
+ *
+ * Billing pages open here rather than on the current period, which is still
+ * running: it has partial metering data and no invoices, so opening on it means
+ * every billing run starts by stepping back one period. Mirrors
+ * ``previous_quarter`` in the backend's seed_demo command.
+ */
+export function getPreviousBillingPeriod(interval: BillingInterval): { from: string; to: string } {
+    const currentStart = startOfBillingPeriod(new Date(), interval)
+    return shiftBillingPeriod(toIsoDate(currentStart), interval, -1)
+}

@@ -657,9 +657,17 @@ export const en = {
             batch: {
                 title: 'Batch actions:',
                 generateAll: 'Generate all',
-                generateAllPdfs: 'Generate all PDFs',
+                generateAllPdfs: 'Regenerate all PDFs',
                 approveAll: 'Approve all',
                 sendAll: 'Send all',
+                // The recommended action names its scope: it acts on a subset of
+                // the period, and "all" alone does not say how many.
+                generateAllCount_one: 'Generate {{count}} invoice',
+                generateAllCount_other: 'Generate {{count}} invoices',
+                approveAllCount_one: 'Approve {{count}} invoice',
+                approveAllCount_other: 'Approve {{count}} invoices',
+                sendAllCount_one: 'Send {{count}} invoice',
+                sendAllCount_other: 'Send {{count}} invoices',
                 downloadAll: 'Download all PDFs',
                 summaryInvoices: 'Invoices',
                 summaryDrafts: 'Drafts',

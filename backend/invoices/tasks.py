@@ -149,6 +149,54 @@ def send_invoice_email_task(self, invoice_id: str, recipient_email: str = None):
         raise self.retry(exc=exc, countdown=60)
 
 
+def _render_pdfs(invoices) -> int:
+    """Render each invoice's PDF, returning how many failed.
+
+    Failures are isolated per invoice: one participant with an address the QR
+    library rejects must not cost the rest of the period its documents. The
+    invoice still exists, and re-rendering it is a one-click repair.
+    """
+    from .pdf import save_invoice_pdf
+
+    failed = 0
+    for invoice in invoices:
+        try:
+            save_invoice_pdf(invoice)
+        except Exception as exc:
+            failed += 1
+            logger.error("PDF generation failed for invoice %s: %s", invoice.invoice_number, exc)
+    return failed
+
+
+@shared_task(bind=True, max_retries=1)
+def generate_invoice_pdf_task(self, invoice_id: str):
+    """Render one invoice's PDF off the request thread.
+
+    A render takes seconds, so the single-invoice generate endpoint queues this
+    rather than holding the response open for it.
+    """
+    from .models import Invoice
+
+    try:
+        invoice = Invoice.objects.select_related("participant", "zev").get(pk=invoice_id)
+    except Invoice.DoesNotExist:
+        logger.error("Invoice %s not found for PDF generation", invoice_id)
+        return
+
+    if _render_pdfs([invoice]):
+        record_audit_event(
+            action_category=AuditActionCategory.INVOICE,
+            action_type="invoice.generate_pdf",
+            target_type="invoices.Invoice",
+            target=invoice,
+            target_id=str(invoice.pk),
+            target_display=invoice.invoice_number,
+            summary=f"PDF generation failed for invoice {invoice.invoice_number}.",
+            status=AuditEventStatus.FAILED,
+            source=AuditEventSource.CELERY,
+        )
+
+
 @shared_task(bind=True, max_retries=1)
 def generate_zev_invoices_task(self, zev_id: str, period_start: str, period_end: str):
     """Generate invoices for all participants of a ZEV in the background."""
@@ -193,7 +241,13 @@ def generate_zev_invoices_task(self, zev_id: str, period_start: str, period_end:
         )
         return
 
-    logger.info("Generated %d invoices for ZEV %s", len(invoices), zev.name)
+    # The PDF is part of producing an invoice, not a later step the operator has
+    # to remember: an invoice without one cannot be reviewed, downloaded or
+    # emailed. Rendering here costs the batch a few seconds per invoice but is
+    # strictly less work than the separate pass it replaces.
+    pdf_failed = _render_pdfs(invoices)
+
+    logger.info("Generated %d invoices for ZEV %s (%d PDFs failed)", len(invoices), zev.name, pdf_failed)
     record_audit_event(
         action_category=AuditActionCategory.INVOICE,
         action_type="invoice.generate_all",
@@ -202,22 +256,26 @@ def generate_zev_invoices_task(self, zev_id: str, period_start: str, period_end:
         target_id=str(zev.id),
         target_display=zev.name,
         summary=f"Generated {len(invoices)} invoices for ZEV {zev.name}.",
-        status=AuditEventStatus.SUCCESS,
+        status=AuditEventStatus.SUCCESS if pdf_failed == 0 else AuditEventStatus.FAILED,
         source=AuditEventSource.CELERY,
         metadata={
             "period_start": period_start,
             "period_end": period_end,
             "invoice_count": len(invoices),
+            "pdf_failed": pdf_failed,
         },
     )
 
 
 @shared_task(bind=True, max_retries=1)
 def generate_zev_pdfs_task(self, zev_id: str, period_start: str, period_end: str):
-    """Generate PDFs for all invoices of a ZEV period in the background."""
+    """Re-render PDFs for every invoice of a ZEV period.
+
+    Invoices already carry a PDF from generation; this exists to pick up a
+    changed PDF template across a whole period, not to fill gaps.
+    """
     from zev.models import Zev
     from .models import Invoice
-    from .pdf import save_invoice_pdf
 
     try:
         zev = Zev.objects.get(pk=zev_id)
@@ -241,15 +299,8 @@ def generate_zev_pdfs_task(self, zev_id: str, period_start: str, period_end: str
         period_end=period_end,
     ).select_related("participant", "zev")
 
-    count = 0
-    failed = 0
-    for invoice in invoices:
-        try:
-            save_invoice_pdf(invoice)
-            count += 1
-        except Exception as exc:
-            failed += 1
-            logger.error("PDF generation failed for invoice %s: %s", invoice.invoice_number, exc)
+    failed = _render_pdfs(invoices)
+    count = len(invoices) - failed
 
     logger.info("Generated %d invoice PDFs for ZEV %s (%d failed)", count, zev.name, failed)
     record_audit_event(
