@@ -503,11 +503,14 @@ def _build_hourly_profile_chart_svg(invoice, tr: dict) -> str | None:
 
     from decimal import Decimal as _Dec
     from django.db import models as _dj
+    from allocation.read_model import (
+        CONSUMPTION_METER_TYPES as _CONS_METER_TYPES,
+        community_totals_by_timestamp,
+    )
     from allocation.split import split_consumption
     from allocation.windows import AssignmentWindows
     from metering.models import MeterReading, ReadingDirection, ReadingResolution
     from zev.models import MeteringPoint as _MP
-    from zev.models import MeteringPointType as _MPT
 
     ps = invoice.period_start
     pe = invoice.period_end
@@ -520,7 +523,7 @@ def _build_hourly_profile_chart_svg(invoice, tr: dict) -> str | None:
     # ── Participant consumption readings ────────────────────────────────────
     consumption_mps = _MP.objects.filter(
         zev=zev,
-        meter_type__in=[_MPT.CONSUMPTION, _MPT.BIDIRECTIONAL],
+        meter_type__in=_CONS_METER_TYPES,
         assignments__participant=participant,
         assignments__valid_from__lte=pe,
     ).filter(
@@ -547,32 +550,7 @@ def _build_hourly_profile_chart_svg(invoice, tr: dict) -> str | None:
     # ── ZEV-level production and consumption by timestamp ───────────────────
     # The pool covers every metering point of the ZEV regardless of assignment
     # (ADR 0013), matching the engine and the dashboards.
-    all_prod_mps = _MP.objects.filter(
-        zev=zev,
-        meter_type__in=[_MPT.PRODUCTION, _MPT.BIDIRECTIONAL],
-    )
-    zev_prod_by_ts = {
-        row["timestamp"]: row["total_kwh"] or _Dec("0")
-        for row in MeterReading.objects.filter(
-            metering_point__in=all_prod_mps,
-            timestamp__gte=start_dt,
-            timestamp__lt=end_dt,
-            direction=ReadingDirection.OUT,
-        ).values("timestamp").annotate(total_kwh=_dj.Sum("energy_kwh"))
-    }
-    all_cons_mps = _MP.objects.filter(
-        zev=zev,
-        meter_type__in=[_MPT.CONSUMPTION, _MPT.BIDIRECTIONAL],
-    )
-    zev_cons_by_ts = {
-        row["timestamp"]: row["total_kwh"] or _Dec("0")
-        for row in MeterReading.objects.filter(
-            metering_point__in=all_cons_mps,
-            timestamp__gte=start_dt,
-            timestamp__lt=end_dt,
-            direction=ReadingDirection.IN,
-        ).values("timestamp").annotate(total_kwh=_dj.Sum("energy_kwh"))
-    }
+    zev_cons_by_ts, zev_prod_by_ts = community_totals_by_timestamp(zev, start_dt, end_dt)
 
     # ── Accumulate local/grid per local-hour-of-day ─────────────────────────
     # Decimal arithmetic end to end (the billing contract); floats only enter

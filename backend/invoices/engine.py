@@ -19,9 +19,14 @@ from django.utils import timezone
 from billiard.exceptions import SoftTimeLimitExceeded
 
 from accounts.models import VatRate
+from allocation.read_model import (
+    CONSUMPTION_METER_TYPES,
+    PRODUCTION_METER_TYPES,
+    community_totals_by_timestamp,
+)
 from allocation.split import split_consumption, split_production
 from allocation.windows import AssignmentWindows
-from zev.models import Zev, Participant, MeteringPoint, MeteringPointType, MeteringPointAssignment
+from zev.models import Zev, Participant, MeteringPoint, MeteringPointAssignment
 from tariffs.models import BillingMode, EnergyType, PeriodType, Tariff, TariffCategory
 from metering.models import MeterReading, ReadingDirection
 from .models import Invoice, InvoiceItem, InvoiceStatus
@@ -37,10 +42,6 @@ logger = logging.getLogger(__name__)
 
 
 # ─── Gathering ────────────────────────────────────────────────────────────────
-
-
-CONSUMPTION_METER_TYPES = [MeteringPointType.CONSUMPTION, MeteringPointType.BIDIRECTIONAL]
-PRODUCTION_METER_TYPES = [MeteringPointType.PRODUCTION, MeteringPointType.BIDIRECTIONAL]
 
 
 class PeriodReadings(NamedTuple):
@@ -92,14 +93,6 @@ def _readings_in_period(metering_points, start_dt, end_dt, direction):
     )
 
 
-def _totals_by_timestamp(readings) -> dict:
-    """Sum ``readings`` per timestamp, so a share can be worked out per interval."""
-    return {
-        row["timestamp"]: row["total_kwh"] or Decimal("0")
-        for row in readings.values("timestamp").annotate(total_kwh=models.Sum("energy_kwh"))
-    }
-
-
 def _gather_period_readings(participant, period_start, period_end) -> PeriodReadings:
     """Fetch the participant's own readings and the community-wide totals."""
     zev = participant.zev
@@ -112,21 +105,20 @@ def _gather_period_readings(participant, period_start, period_end) -> PeriodRead
             participant=participant,
         )
 
-    def community_points(meter_types):
-        # The pool covers every metering point of the ZEV regardless of
-        # assignment (ADR 0013): a never-assigned meter still feeds the
-        # community pool, even though its readings are billed to nobody.
-        return MeteringPoint.objects.filter(zev=zev, meter_type__in=meter_types)
+    # Physical community pool totals per timestamp — every metering point of
+    # the ZEV regardless of assignment (ADR 0013): a never-assigned meter still
+    # feeds the community pool, even though its readings are billed to nobody.
+    zev_consumption_by_ts, zev_production_by_ts = community_totals_by_timestamp(
+        zev, start_dt, end_dt
+    )
 
     return PeriodReadings(
         participant_consumption=_readings_in_period(
             own_points(CONSUMPTION_METER_TYPES), start_dt, end_dt, ReadingDirection.IN),
         participant_production=_readings_in_period(
             own_points(PRODUCTION_METER_TYPES), start_dt, end_dt, ReadingDirection.OUT),
-        zev_consumption_by_ts=_totals_by_timestamp(_readings_in_period(
-            community_points(CONSUMPTION_METER_TYPES), start_dt, end_dt, ReadingDirection.IN)),
-        zev_production_by_ts=_totals_by_timestamp(_readings_in_period(
-            community_points(PRODUCTION_METER_TYPES), start_dt, end_dt, ReadingDirection.OUT)),
+        zev_consumption_by_ts=zev_consumption_by_ts,
+        zev_production_by_ts=zev_production_by_ts,
         assignment_windows=AssignmentWindows.for_participant(participant, period_start, period_end),
     )
 
