@@ -172,6 +172,156 @@ class DashboardSummaryAlignmentTests(TestCase):
 		self.assertAlmostEqual(float(unfiltered.data["totals"]["consumed_kwh"]), 40.0, places=6)
 
 
+class DashboardMidPeriodTransferTests(TestCase):
+	def setUp(self):
+		self.client = APIClient()
+		self.owner = make_user("transfer_owner", UserRole.ZEV_OWNER)
+		self.alice_user = make_user("transfer_alice", UserRole.PARTICIPANT)
+		self.bob_user = make_user("transfer_bob", UserRole.PARTICIPANT)
+
+		self.zev = Zev.objects.create(name="Transfer ZEV", owner=self.owner, zev_type="vzev", invoice_prefix="T")
+		self.alice = Participant.objects.create(
+			zev=self.zev, user=self.alice_user, first_name="Alice", last_name="A",
+			email="alice.t@example.com", valid_from=date(2026, 1, 1),
+		)
+		self.bob = Participant.objects.create(
+			zev=self.zev, user=self.bob_user, first_name="Bob", last_name="B",
+			email="bob.t@example.com", valid_from=date(2026, 1, 1),
+		)
+
+		self.consumption_mp = MeteringPoint.objects.create(
+			zev=self.zev, meter_id="CH-TCONS-1", meter_type=MeteringPointType.CONSUMPTION,
+		)
+		self.production_mp = MeteringPoint.objects.create(
+			zev=self.zev, meter_id="CH-TPROD-1", meter_type=MeteringPointType.PRODUCTION,
+		)
+		MeteringPointAssignment.objects.create(
+			metering_point=self.consumption_mp, participant=self.alice,
+			valid_from=date(2026, 1, 1), valid_to=date(2026, 1, 15),
+		)
+		MeteringPointAssignment.objects.create(
+			metering_point=self.consumption_mp, participant=self.bob,
+			valid_from=date(2026, 1, 16),
+		)
+		MeteringPointAssignment.objects.create(
+			metering_point=self.production_mp, participant=self.alice,
+			valid_from=date(2026, 1, 1), valid_to=date(2026, 1, 15),
+		)
+		MeteringPointAssignment.objects.create(
+			metering_point=self.production_mp, participant=self.bob,
+			valid_from=date(2026, 1, 16),
+		)
+
+		# Alice: 10 kWh consumed + 10 kWh produced on Jan 10
+		MeterReading.objects.create(
+			metering_point=self.consumption_mp,
+			timestamp=datetime(2026, 1, 10, 0, 0, tzinfo=timezone.utc),
+			energy_kwh=Decimal("10.0000"), direction=ReadingDirection.IN,
+			resolution=ReadingResolution.FIFTEEN_MIN,
+		)
+		MeterReading.objects.create(
+			metering_point=self.production_mp,
+			timestamp=datetime(2026, 1, 10, 0, 0, tzinfo=timezone.utc),
+			energy_kwh=Decimal("10.0000"), direction=ReadingDirection.OUT,
+			resolution=ReadingResolution.FIFTEEN_MIN,
+		)
+		# Bob: 20 kWh consumed on Jan 20 (production stays 0)
+		MeterReading.objects.create(
+			metering_point=self.consumption_mp,
+			timestamp=datetime(2026, 1, 20, 0, 0, tzinfo=timezone.utc),
+			energy_kwh=Decimal("20.0000"), direction=ReadingDirection.IN,
+			resolution=ReadingResolution.FIFTEEN_MIN,
+		)
+
+	def test_owner_dashboard_attributes_readings_per_assignment_window(self):
+		auth(self.client, self.owner)
+		resp = self.client.get(
+			"/api/v1/metering/readings/dashboard-summary/",
+			{
+				"zev_id": str(self.zev.id),
+				"date_from": "2026-01-01",
+				"date_to": "2026-01-31",
+				"bucket": "day",
+			},
+		)
+
+		self.assertEqual(resp.status_code, 200)
+		stats = {s["participant_id"]: s for s in resp.data["participant_stats"]}
+		self.assertAlmostEqual(float(stats[str(self.alice.id)]["total_consumed_kwh"]), 10.0, places=6)
+		self.assertAlmostEqual(float(stats[str(self.alice.id)]["total_produced_kwh"]), 10.0, places=6)
+		self.assertAlmostEqual(float(stats[str(self.bob.id)]["total_consumed_kwh"]), 20.0, places=6)
+		self.assertAlmostEqual(float(stats[str(self.bob.id)]["total_produced_kwh"]), 0.0, places=6)
+		# Alice's 10 kWh self-consume fully from ZEV on Jan 10; Bob imports all 20 kWh.
+		self.assertAlmostEqual(float(stats[str(self.alice.id)]["from_zev_kwh"]), 10.0, places=6)
+		self.assertAlmostEqual(float(stats[str(self.alice.id)]["from_grid_kwh"]), 0.0, places=6)
+		self.assertAlmostEqual(float(stats[str(self.bob.id)]["from_zev_kwh"]), 0.0, places=6)
+		self.assertAlmostEqual(float(stats[str(self.bob.id)]["from_grid_kwh"]), 20.0, places=6)
+
+	def test_participant_dashboard_ignores_pre_assignment_and_post_transfer_readings(self):
+		auth(self.client, self.alice_user)
+		resp = self.client.get(
+			"/api/v1/metering/readings/dashboard-summary/",
+			{
+				"zev_id": str(self.zev.id),
+				"date_from": "2026-01-01",
+				"date_to": "2026-01-31",
+				"bucket": "day",
+			},
+		)
+
+		self.assertEqual(resp.status_code, 200)
+		totals = resp.data["totals"]
+		self.assertAlmostEqual(float(totals["total_consumed_kwh"]), 10.0, places=6)
+		self.assertAlmostEqual(float(totals["consumed_from_zev_kwh"]), 10.0, places=6)
+		self.assertAlmostEqual(float(totals["imported_from_grid_kwh"]), 0.0, places=6)
+		# Bob's 20 kWh must not leak into Alice's totals.
+		self.assertEqual(len(resp.data["timeline"]), 1)
+		self.assertAlmostEqual(float(resp.data["timeline"][0]["total_consumed_kwh"]), 10.0, places=6)
+
+	def test_participant_dashboard_zev_wide_stats_split_per_timestamp(self):
+		auth(self.client, self.bob_user)
+		resp = self.client.get(
+			"/api/v1/metering/readings/dashboard-summary/",
+			{
+				"zev_id": str(self.zev.id),
+				"date_from": "2026-01-01",
+				"date_to": "2026-01-31",
+				"bucket": "day",
+			},
+		)
+
+		self.assertEqual(resp.status_code, 200)
+		stats = {s["participant_id"]: s for s in resp.data["zev_participant_stats"]}
+		self.assertAlmostEqual(float(stats[str(self.alice.id)]["total_consumed_kwh"]), 10.0, places=6)
+		self.assertAlmostEqual(float(stats[str(self.alice.id)]["from_zev_kwh"]), 10.0, places=6)
+		self.assertAlmostEqual(float(stats[str(self.alice.id)]["from_grid_kwh"]), 0.0, places=6)
+		self.assertAlmostEqual(float(stats[str(self.bob.id)]["total_consumed_kwh"]), 20.0, places=6)
+		self.assertAlmostEqual(float(stats[str(self.bob.id)]["from_zev_kwh"]), 0.0, places=6)
+		self.assertAlmostEqual(float(stats[str(self.bob.id)]["from_grid_kwh"]), 20.0, places=6)
+
+	def test_hourly_profile_only_counts_readings_within_assignment(self):
+		auth(self.client, self.alice_user)
+		resp = self.client.get(
+			"/api/v1/metering/readings/hourly-profile/",
+			{
+				"zev_id": str(self.zev.id),
+				"date_from": "2026-01-01",
+				"date_to": "2026-01-31",
+			},
+		)
+
+		self.assertEqual(resp.status_code, 200)
+		profile = resp.data["hourly_profile"]
+		self.assertEqual(len(profile), 24)
+		# Only Alice's Jan 10 00:00 reading (10 kWh) shapes the profile;
+		# Bob's post-transfer Jan 20 reading must be excluded. 31 days avg.
+		self.assertAlmostEqual(float(profile[0]["from_zev_kwh"]), round(10.0 / 31, 4), places=4)
+		self.assertAlmostEqual(float(profile[0]["from_grid_kwh"]), 0.0, places=4)
+		for h in range(1, 24):
+			self.assertEqual(float(profile[h]["from_zev_kwh"]), 0.0)
+			self.assertEqual(float(profile[h]["from_grid_kwh"]), 0.0)
+
+
 class ParticipantImportRestrictionTests(TestCase):
 	def setUp(self):
 		self.client = APIClient()
