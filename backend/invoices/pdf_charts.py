@@ -501,7 +501,10 @@ def _build_hourly_profile_chart_svg(invoice, tr: dict) -> str | None:
     """
     import datetime as _dt
 
+    from decimal import Decimal as _Dec
     from django.db import models as _dj
+    from allocation.split import split_consumption
+    from allocation.windows import AssignmentWindows
     from metering.models import MeterReading, ReadingDirection, ReadingResolution
     from zev.models import MeteringPoint as _MP
     from zev.models import MeteringPointType as _MPT
@@ -534,21 +537,22 @@ def _build_hourly_profile_chart_svg(invoice, tr: dict) -> str | None:
     if not participant_readings:
         return None
 
+    windows = AssignmentWindows.for_participant(participant, ps, pe)
+
     # Only show chart when sub-daily data is present
     resolutions = {r.resolution for r in participant_readings}
     if resolutions == {ReadingResolution.DAILY}:
         return None
 
     # ── ZEV-level production and consumption by timestamp ───────────────────
+    # The pool covers every metering point of the ZEV regardless of assignment
+    # (ADR 0013), matching the engine and the dashboards.
     all_prod_mps = _MP.objects.filter(
         zev=zev,
         meter_type__in=[_MPT.PRODUCTION, _MPT.BIDIRECTIONAL],
-        assignments__valid_from__lte=pe,
-    ).filter(
-        _dj.Q(assignments__valid_to__isnull=True) | _dj.Q(assignments__valid_to__gte=ps)
-    ).distinct()
+    )
     zev_prod_by_ts = {
-        row["timestamp"]: float(row["total_kwh"] or 0)
+        row["timestamp"]: row["total_kwh"] or _Dec("0")
         for row in MeterReading.objects.filter(
             metering_point__in=all_prod_mps,
             timestamp__gte=start_dt,
@@ -559,12 +563,9 @@ def _build_hourly_profile_chart_svg(invoice, tr: dict) -> str | None:
     all_cons_mps = _MP.objects.filter(
         zev=zev,
         meter_type__in=[_MPT.CONSUMPTION, _MPT.BIDIRECTIONAL],
-        assignments__valid_from__lte=pe,
-    ).filter(
-        _dj.Q(assignments__valid_to__isnull=True) | _dj.Q(assignments__valid_to__gte=ps)
-    ).distinct()
+    )
     zev_cons_by_ts = {
-        row["timestamp"]: float(row["total_kwh"] or 0)
+        row["timestamp"]: row["total_kwh"] or _Dec("0")
         for row in MeterReading.objects.filter(
             metering_point__in=all_cons_mps,
             timestamp__gte=start_dt,
@@ -574,22 +575,22 @@ def _build_hourly_profile_chart_svg(invoice, tr: dict) -> str | None:
     }
 
     # ── Accumulate local/grid per local-hour-of-day ─────────────────────────
-    hourly_local = [0.0] * 24
-    hourly_grid = [0.0] * 24
+    # Decimal arithmetic end to end (the billing contract); floats only enter
+    # at SVG serialization.
+    hourly_local = [_Dec("0")] * 24
+    hourly_grid = [_Dec("0")] * 24
 
     for reading in participant_readings:
         ts = reading.timestamp
+        if not windows.is_held_by(participant.id, reading.metering_point_id, ts):
+            # Reading predates this participant's assignment (or falls in an
+            # assignment gap): it must not shape their profile.
+            continue
         hour = ts.hour
-        p_kwh = float(reading.energy_kwh)
-        zev_cons = zev_cons_by_ts.get(ts, 0.0)
-        zev_prod = zev_prod_by_ts.get(ts, 0.0)
-        local_pool = min(zev_prod, zev_cons)
-
-        if zev_cons > 0 and local_pool > 0:
-            r_local = min(p_kwh, local_pool * p_kwh / zev_cons)
-        else:
-            r_local = 0.0
-        r_grid = max(p_kwh - r_local, 0.0)
+        p_kwh = reading.energy_kwh
+        zev_cons = zev_cons_by_ts.get(ts, _Dec("0"))
+        zev_prod = zev_prod_by_ts.get(ts, _Dec("0"))
+        r_local, r_grid = split_consumption(p_kwh, zev_cons, zev_prod)
 
         hourly_local[hour] += r_local
         hourly_grid[hour] += r_grid
@@ -611,8 +612,8 @@ def _build_hourly_profile_chart_svg(invoice, tr: dict) -> str | None:
     group_w = cw / 24
     bar_w = max(6.5, group_w * 0.74)
 
-    def s(v: float) -> float:
-        return ch * v / max_val
+    def s(v) -> float:
+        return ch * float(v) / float(max_val)
 
     svg: list[str] = []
     svg.append(
@@ -628,7 +629,7 @@ def _build_hourly_profile_chart_svg(invoice, tr: dict) -> str | None:
     for i in range(5):
         frac = i / 4
         gy = MT + ch - ch * frac
-        val = max_val * frac
+        val = float(max_val) * frac
         svg.append(
             f'<line x1="{ML}" y1="{gy:.1f}" x2="{ML + cw}" y2="{gy:.1f}"'
             f' stroke="{_CHART_GRIDLINE}" stroke-width="1"/>'

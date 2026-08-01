@@ -9,7 +9,9 @@ boundary: cross-tenant reads, self-service, and malformed input.
 
 import io
 import zipfile
-from datetime import date
+from datetime import date, datetime
+from datetime import timezone as dt_timezone
+from decimal import Decimal
 
 from django.test import TestCase
 from rest_framework.test import APIClient
@@ -273,3 +275,63 @@ class MalformedInputTests(ReportTestCase):
                 resp = self._get(ANNUAL_STATEMENT, self.admin, year=year,
                                  zev_id=str(self.zev.pk), participant_id=str(self.participant.pk))
                 self.assertEqual(resp.status_code, 400)
+
+
+class AnnualStatementMonthlyDataTests(TestCase):
+    """``_compute_monthly_data`` attributes readings per timestamp (ADR 0013):
+    a mid-year assignment transfer must not leak readings across holders."""
+
+    def setUp(self):
+        self.owner = make_user("as_owner", UserRole.ZEV_OWNER)
+        self.zev = make_zev(self.owner, "Annual ZEV")
+        self.participant = make_participant(self.zev, first="Pia", last="Muster")
+        from invoices.annual_statement import ANNUAL_TRANSLATIONS
+        self.tr = ANNUAL_TRANSLATIONS["de"]
+
+    def test_readings_before_the_assignment_start_are_excluded(self):
+        from invoices.annual_statement import _compute_monthly_data
+        from metering.models import MeterReading, ReadingDirection, ReadingResolution
+        from zev.models import MeteringPoint, MeteringPointAssignment, MeteringPointType
+
+        # Assignment only from Feb 1 — the January readings belong to nobody
+        # for this participant.
+        mp = MeteringPoint.objects.create(
+            zev=self.zev, meter_id="CH00000000000000000000000000REP01",
+            meter_type=MeteringPointType.CONSUMPTION)
+        MeteringPointAssignment.objects.create(
+            metering_point=mp, participant=self.participant,
+            valid_from=date(2026, 2, 1), valid_to=None)
+        for day in (date(2026, 1, 15), date(2026, 2, 15)):
+            MeterReading.objects.create(
+                metering_point=mp,
+                timestamp=datetime(day.year, day.month, day.day, 12, 0, tzinfo=dt_timezone.utc),
+                energy_kwh=Decimal("4"), direction=ReadingDirection.IN,
+                resolution=ReadingResolution.DAILY,
+            )
+        # Community production so January's excluded reading would be local if
+        # it leaked through.
+        prod_mp = MeteringPoint.objects.create(
+            zev=self.zev, meter_id="CH00000000000000000000000000REP02",
+            meter_type=MeteringPointType.PRODUCTION)
+        MeteringPointAssignment.objects.create(
+            metering_point=prod_mp, participant=self.participant,
+            valid_from=date(2026, 2, 1), valid_to=None)
+        for day in (date(2026, 1, 15), date(2026, 2, 15)):
+            MeterReading.objects.create(
+                metering_point=prod_mp,
+                timestamp=datetime(day.year, day.month, day.day, 12, 0, tzinfo=dt_timezone.utc),
+                energy_kwh=Decimal("10"), direction=ReadingDirection.OUT,
+                resolution=ReadingResolution.DAILY,
+            )
+
+        monthly, _totals = _compute_monthly_data(
+            self.participant, self.zev, 2026, self.tr)
+
+        jan = monthly[0]
+        feb = monthly[1]
+        # January must be empty for this participant despite the readings.
+        self.assertEqual(jan["consumed_kwh"], "0.00")
+        self.assertEqual(jan["from_zev_kwh"], "0.00")
+        # February shows the post-assignment reading, fully local.
+        self.assertEqual(feb["consumed_kwh"], "4.00")
+        self.assertEqual(feb["from_zev_kwh"], "4.00")

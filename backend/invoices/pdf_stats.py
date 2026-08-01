@@ -5,6 +5,9 @@ from decimal import Decimal
 
 from django.db import models as _dj
 
+from allocation.split import split_consumption
+from allocation.windows import AssignmentWindows
+
 from .engine import _period_to_dt
 
 
@@ -75,22 +78,24 @@ def _compute_period_participant_stats(invoice) -> tuple[dict, list[dict]]:
     start_dt = _period_to_dt(ps)
     end_dt = _period_to_dt(pe) + _dt.timedelta(days=1)
 
-    # All metering points in this ZEV
+    _participant_names = {
+        str(p.id): f"{p.first_name} {p.last_name}".strip()
+        for p in zev.participants.all()
+    }
+
+    # All metering points in this ZEV. The pool covers every meter regardless
+    # of assignment (ADR 0013): unassigned meters still feed the community
+    # pool, even though their readings are billed to nobody. Attribution to
+    # participants happens per timestamp below, not via this filter.
     cons_mps = _MP.objects.filter(
         zev=zev,
         meter_type__in=[_MPT.CONSUMPTION, _MPT.BIDIRECTIONAL],
-        assignments__valid_from__lte=pe,
-    ).filter(
-        _dj.Q(assignments__valid_to__isnull=True) | _dj.Q(assignments__valid_to__gte=ps)
-    ).distinct()
+    )
 
     prod_mps = _MP.objects.filter(
         zev=zev,
         meter_type__in=[_MPT.PRODUCTION, _MPT.BIDIRECTIONAL],
-        assignments__valid_from__lte=pe,
-    ).filter(
-        _dj.Q(assignments__valid_to__isnull=True) | _dj.Q(assignments__valid_to__gte=ps)
-    ).distinct()
+    )
 
     # ZEV-level aggregation by timestamp
     cons_by_ts: dict[_dt.datetime, Decimal] = {}
@@ -125,42 +130,42 @@ def _compute_period_participant_stats(invoice) -> tuple[dict, list[dict]]:
         totals["imported_kwh"] += max(c - p, Decimal("0"))
         totals["exported_kwh"] += max(p - c, Decimal("0"))
 
-    # Per-participant consumption with local-pool allocation
+    # Per-participant consumption with local-pool allocation.
+    # Readings are attributed to the participant whose assignment is active at
+    # the reading's timestamp (ADR 0013) — a period-level join would fan out
+    # every reading across every assignment overlapping the period and
+    # double-count transfers.
+    windows = AssignmentWindows.for_zev(zev, ps, pe)
+
     participant_rows = (
         MeterReading.objects.filter(
             metering_point__in=cons_mps,
             timestamp__gte=start_dt, timestamp__lt=end_dt,
             direction=ReadingDirection.IN,
         ).values(
-            "metering_point__assignments__participant_id",
-            "metering_point__assignments__participant__first_name",
-            "metering_point__assignments__participant__last_name",
+            "metering_point_id",
             "timestamp",
         ).annotate(consumed_kwh=_dj.Sum("energy_kwh"))
     )
 
     participant_map: dict[str, dict] = {}
     for row in participant_rows:
-        pid = str(row["metering_point__assignments__participant_id"])
+        pid = windows.participant_at(row["metering_point_id"], row["timestamp"])
+        if pid is None:
+            # Reading fell in an assignment gap: it belongs to no participant.
+            continue
+        pid = str(pid)
         ts = row["timestamp"]
         consumed = row["consumed_kwh"] or Decimal("0")
         total_consumed = cons_by_ts.get(ts, Decimal("0"))
         total_produced = prod_by_ts.get(ts, Decimal("0"))
-        local_pool = min(total_produced, total_consumed)
 
-        if total_consumed > 0 and local_pool > 0:
-            from_zev = min(consumed, local_pool * (consumed / total_consumed))
-        else:
-            from_zev = Decimal("0")
-        from_grid = max(consumed - from_zev, Decimal("0"))
+        from_zev, from_grid = split_consumption(consumed, total_consumed, total_produced)
 
         if pid not in participant_map:
             participant_map[pid] = {
                 "participant_id": pid,
-                "participant_name": (
-                    f"{row['metering_point__assignments__participant__first_name']} "
-                    f"{row['metering_point__assignments__participant__last_name']}"
-                ).strip(),
+                "participant_name": _participant_names.get(pid, ""),
                 "total_consumed_kwh": Decimal("0"),
                 "total_produced_kwh": Decimal("0"),
                 "from_zev_kwh": Decimal("0"),
@@ -170,27 +175,26 @@ def _compute_period_participant_stats(invoice) -> tuple[dict, list[dict]]:
         participant_map[pid]["from_zev_kwh"] += from_zev
         participant_map[pid]["from_grid_kwh"] += from_grid
 
-    # Per-participant production
+    # Per-participant production, attributed the same way.
     prod_rows = (
         MeterReading.objects.filter(
             metering_point__in=prod_mps,
             timestamp__gte=start_dt, timestamp__lt=end_dt,
             direction=ReadingDirection.OUT,
         ).values(
-            "metering_point__assignments__participant_id",
-            "metering_point__assignments__participant__first_name",
-            "metering_point__assignments__participant__last_name",
+            "metering_point_id",
+            "timestamp",
         ).annotate(produced_kwh=_dj.Sum("energy_kwh"))
     )
     for row in prod_rows:
-        pid = str(row["metering_point__assignments__participant_id"])
+        pid = windows.participant_at(row["metering_point_id"], row["timestamp"])
+        if pid is None:
+            continue
+        pid = str(pid)
         if pid not in participant_map:
             participant_map[pid] = {
                 "participant_id": pid,
-                "participant_name": (
-                    f"{row['metering_point__assignments__participant__first_name']} "
-                    f"{row['metering_point__assignments__participant__last_name']}"
-                ).strip(),
+                "participant_name": _participant_names.get(pid, ""),
                 "total_consumed_kwh": Decimal("0"),
                 "total_produced_kwh": Decimal("0"),
                 "from_zev_kwh": Decimal("0"),

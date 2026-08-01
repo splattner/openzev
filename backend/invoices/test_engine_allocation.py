@@ -87,6 +87,25 @@ def _local_credit(invoice) -> Decimal:
     )
 
 
+def _transfer_consumer(community, *, valid_from_a, valid_to_a, valid_from_b, meter_type=MeteringPointType.CONSUMPTION):
+    """A single metering point handed from participant A to participant B mid-period.
+
+    Returns (participant_a, participant_b, metering_point).
+    """
+    participant_a = factories.ParticipantFactory(
+        zev=community.zev, valid_from=PERIOD_START, valid_to=date(2026, 12, 31))
+    participant_b = factories.ParticipantFactory(
+        zev=community.zev, valid_from=valid_from_b, valid_to=date(2026, 12, 31))
+    metering_point = factories.MeteringPointFactory(zev=community.zev, meter_type=meter_type)
+    factories.MeteringPointAssignmentFactory(
+        metering_point=metering_point, participant=participant_a,
+        valid_from=valid_from_a, valid_to=valid_to_a)
+    factories.MeteringPointAssignmentFactory(
+        metering_point=metering_point, participant=participant_b,
+        valid_from=valid_from_b, valid_to=None)
+    return participant_a, participant_b, metering_point
+
+
 def test_two_consumers_split_a_scarce_local_pool_in_proportion_to_demand():
     """6 kWh of solar against 8 kWh of demand: each consumer gets solar in
     proportion to their share of that demand, not first-come-first-served."""
@@ -240,3 +259,105 @@ def test_producers_split_both_the_local_pool_and_the_export_in_proportion():
     # per-participant min() already clamps a too-large pool away.
     assert _local_credit(big_invoice) == Decimal("-0.30")
     assert _local_credit(small_invoice) == Decimal("-0.10")
+
+
+# ─── Mid-period assignment transfers (ADR 0013) ───────────────────────────────
+
+
+def test_a_mid_period_transfer_attributes_readings_to_each_holder():
+    """A metering point handed over on January 16 bills the old holder for the
+    first half and the new holder for the second half — readings are resolved
+    against the assignment active at each reading's timestamp, not the period
+    overlap."""
+    community = Community()
+    community.producer((T1, "10"), (T2, "10"))
+    holder_a, holder_b, metering_point = _transfer_consumer(
+        community, valid_from_a=PERIOD_START, valid_to_a=date(2026, 1, 15),
+        valid_from_b=date(2026, 1, 16))
+    MeterReading.objects.create(
+        metering_point=metering_point, timestamp=T1,
+        energy_kwh=Decimal("4"), direction=ReadingDirection.IN)
+    MeterReading.objects.create(
+        metering_point=metering_point, timestamp=T2,
+        energy_kwh=Decimal("6"), direction=ReadingDirection.IN)
+
+    a_invoice = community.invoice(holder_a)
+    b_invoice = community.invoice(holder_b)
+
+    # T1 (Jan 15) belongs to A, T2 (Jan 16) to B; solar covers both fully.
+    assert a_invoice.total_local_kwh == Decimal("4.0000")
+    assert a_invoice.total_grid_kwh == Decimal("0.0000")
+    assert b_invoice.total_local_kwh == Decimal("6.0000")
+    assert b_invoice.total_grid_kwh == Decimal("0.0000")
+
+
+def test_a_reading_on_the_assignments_first_day_belongs_to_the_new_holder():
+    """Assignment validity is date-granular: a reading at 00:30 on valid_from
+    already belongs to the new holder."""
+    community = Community()
+    boundary = datetime(2026, 1, 16, 0, 30, tzinfo=timezone.utc)
+    community.producer((boundary, "10"))
+    holder_a, holder_b, metering_point = _transfer_consumer(
+        community, valid_from_a=PERIOD_START, valid_to_a=date(2026, 1, 15),
+        valid_from_b=date(2026, 1, 16))
+    MeterReading.objects.create(
+        metering_point=metering_point, timestamp=boundary,
+        energy_kwh=Decimal("4"), direction=ReadingDirection.IN)
+
+    assert community.invoice(holder_a).total_local_kwh == Decimal("0.0000")
+    assert community.invoice(holder_b).total_local_kwh == Decimal("4.0000")
+
+
+def test_readings_in_an_assignment_gap_are_billed_to_nobody():
+    """Assignment A ends January 10, B starts January 20; the reading in between
+    belongs to no participant and must not land on either invoice, while the
+    community pool still counts it."""
+    community = Community()
+    community.producer((T1, "10"))
+    jan5 = datetime(2026, 1, 5, 12, 0, tzinfo=timezone.utc)
+    community.producer((jan5, "10"))
+    community.consumer((T1, "5"))  # keep the pool denominator honest at T1
+    holder_a, holder_b, metering_point = _transfer_consumer(
+        community, valid_from_a=PERIOD_START, valid_to_a=date(2026, 1, 10),
+        valid_from_b=date(2026, 1, 20))
+    for day in (date(2026, 1, 5), date(2026, 1, 15)):
+        MeterReading.objects.create(
+            metering_point=metering_point,
+            timestamp=datetime(day.year, day.month, day.day, 12, 0, tzinfo=timezone.utc),
+            energy_kwh=Decimal("2"), direction=ReadingDirection.IN)
+
+    a_invoice = community.invoice(holder_a)
+    b_invoice = community.invoice(holder_b)
+
+    # Only the Jan 5 reading (2 kWh, fully local) is billed to A.
+    assert a_invoice.total_local_kwh == Decimal("2.0000")
+    assert a_invoice.total_grid_kwh == Decimal("0.0000")
+    # The Jan 15 gap reading appears on neither invoice.
+    assert b_invoice.total_local_kwh == Decimal("0.0000")
+    assert b_invoice.total_grid_kwh == Decimal("0.0000")
+
+
+def test_a_producer_transferred_mid_period_keeps_its_export_credit():
+    """The production loop resolves the same way: a producer handing a metering
+    point over mid-period only earns credit for output while it held it."""
+    community = Community()
+    community.consumer((T1, "5"), (T2, "5"))
+    holder_a, holder_b, metering_point = _transfer_consumer(
+        community, valid_from_a=PERIOD_START, valid_to_a=date(2026, 1, 15),
+        valid_from_b=date(2026, 1, 16), meter_type=MeteringPointType.PRODUCTION)
+    MeterReading.objects.create(
+        metering_point=metering_point, timestamp=T1,
+        energy_kwh=Decimal("3"), direction=ReadingDirection.OUT)
+    MeterReading.objects.create(
+        metering_point=metering_point, timestamp=T2,
+        energy_kwh=Decimal("5"), direction=ReadingDirection.OUT)
+
+    a_invoice = community.invoice(holder_a)
+    b_invoice = community.invoice(holder_b)
+
+    assert a_invoice.total_feed_in_kwh == Decimal("0.0000")
+    assert a_invoice.total_local_kwh == Decimal("0.0000")
+    # 3 kWh at T1 (covered by demand) sold locally by A.
+    assert _local_credit(a_invoice) == Decimal("-0.30")
+    assert b_invoice.total_feed_in_kwh == Decimal("0.0000")
+    assert _local_credit(b_invoice) == Decimal("-0.50")

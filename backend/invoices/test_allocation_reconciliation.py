@@ -1,0 +1,441 @@
+"""Cross-consumer reconciliation: engine, PDF stats, and dashboards must agree.
+
+Every consumer of the per-timestamp local-pool allocation (ADR 0013) must
+attribute the same kWh to the same participant for the same fixture, including
+a metering point handed over mid-period. The engine is the source of truth —
+``pdf_stats`` feeds the period overview, ``analytics`` feeds the dashboards —
+so all three are compared here on shared scenarios.
+
+Energy values cross the analytics/PDF JSON boundary as floats, so comparisons
+are done at the settlement quantum (``0.0001`` kWh, the invoice precision):
+``Decimal(str(value))`` converted back, then compared exactly. That makes the
+reconciliation claim "equal to the billed amount at billing precision", not
+"approximately equal".
+"""
+
+from datetime import date, datetime, timezone as dt_timezone
+from decimal import Decimal
+
+from django.contrib.auth import get_user_model
+from django.db.models.functions import TruncDay
+from django.test import TestCase
+
+from accounts.models import UserRole
+from invoices.engine import generate_invoice
+from invoices.pdf_stats import _compute_period_participant_stats
+from metering.analytics import owner_dashboard_summary
+from metering.models import MeterReading, ReadingDirection
+from zev.models import MeteringPoint, MeteringPointAssignment, MeteringPointType, Participant, Zev
+
+User = get_user_model()
+
+PERIOD_START = date(2026, 1, 1)
+PERIOD_END = date(2026, 1, 31)
+
+ENERGY_QUANTUM = Decimal("0.0001")
+
+
+class _ReconciliationBase(TestCase):
+    """Shared fixture builders and consumers for reconciliation scenarios."""
+
+    def _participant(self, name, valid_from, valid_to=None):
+        first, last = name.split(" ", 1)
+        return Participant.objects.create(
+            zev=self.zev, first_name=first, last_name=last,
+            email=f"{name.replace(' ', '').lower()}@example.com",
+            valid_from=valid_from, valid_to=valid_to,
+        )
+
+    def _mp(self, meter_type, meter_id):
+        return MeteringPoint.objects.create(
+            zev=self.zev, meter_type=meter_type, meter_id=meter_id,
+        )
+
+    def _assign(self, metering_point, participant, valid_from, valid_to=None):
+        return MeteringPointAssignment.objects.create(
+            metering_point=metering_point, participant=participant,
+            valid_from=valid_from, valid_to=valid_to,
+        )
+
+    def _reading(self, metering_point, day, kwh, direction):
+        return MeterReading.objects.create(
+            metering_point=metering_point,
+            timestamp=datetime(day.year, day.month, day.day, 12, 0, tzinfo=dt_timezone.utc),
+            energy_kwh=Decimal(kwh),
+            direction=direction,
+        )
+
+    def _consumption(self, metering_point, day, kwh):
+        self._reading(metering_point, day, kwh, ReadingDirection.IN)
+
+    def _production(self, metering_point, day, kwh):
+        self._reading(metering_point, day, kwh, ReadingDirection.OUT)
+
+    def _invoices(self):
+        alice_invoice = generate_invoice(self.alice, PERIOD_START, PERIOD_END)
+        bob_invoice = generate_invoice(self.bob, PERIOD_START, PERIOD_END)
+        return alice_invoice, bob_invoice
+
+    @staticmethod
+    def _invoice_consumed(invoice) -> Decimal:
+        return invoice.total_local_kwh + invoice.total_grid_kwh
+
+    @staticmethod
+    def _invoice_produced(invoice) -> Decimal:
+        """Reconstruct metered production from invoice fields.
+
+        Returns ``total_local_kwh + total_feed_in_kwh``. This equals metered
+        production only for participants whose consumption-side local share
+        equals their production-side local-sold (true for sole participants
+        and producer-only participants). For a consumer-producer with
+        asymmetric consumption/production, the consumption-side local share
+        stored in ``total_local_kwh`` differs from the production-side
+        ``local_sold``, so this helper would undercount. The fixtures in this
+        module avoid that case.
+        """
+        return invoice.total_local_kwh + invoice.total_feed_in_kwh
+
+    def _pdf_stats(self, invoice):
+        _, stats = _compute_period_participant_stats(invoice)
+        return {s["participant_name"]: s for s in stats}
+
+    def _analytics(self):
+        from datetime import datetime as dt_cls, timezone
+
+        from metering.models import MeterReading as MR
+        qs = MR.objects.filter(
+            metering_point__zev_id=self.zev.id,
+            timestamp__gte=dt_cls(2026, 1, 1, tzinfo=timezone.utc),
+            timestamp__lt=dt_cls(2026, 2, 1, tzinfo=timezone.utc),
+        )
+        return owner_dashboard_summary(qs, TruncDay, None)
+
+    def _analytics_selected(self, participant):
+        from datetime import datetime as dt_cls, timezone
+
+        from metering.models import MeterReading as MR
+        qs = MR.objects.filter(
+            metering_point__zev_id=self.zev.id,
+            timestamp__gte=dt_cls(2026, 1, 1, tzinfo=timezone.utc),
+            timestamp__lt=dt_cls(2026, 2, 1, tzinfo=timezone.utc),
+        )
+        return owner_dashboard_summary(qs, TruncDay, str(participant.id))
+
+    def assertSameEnergy(self, expected, actual, msg=None):
+        """Assert two energy values are equal at the settlement quantum.
+
+        ``expected`` is a ``Decimal`` (invoice field); ``actual`` is a JSON
+        float from the analytics/PDF boundary, converted back to ``Decimal``
+        before the exact comparison."""
+        self.assertEqual(
+            Decimal(str(expected)).quantize(ENERGY_QUANTUM),
+            Decimal(str(actual)).quantize(ENERGY_QUANTUM),
+            msg=msg,
+        )
+
+
+class EnginePdfStatsAnalyticsReconciliationTests(_ReconciliationBase):
+    """One scenario, three consumers: mid-period transfer + gap reading.
+
+    Jan 5  – Alice consumes 4 kWh, the ZEV produces 6 kWh (Alice owns the
+             production metering point): Alice self-consumes 4 kWh.
+    Jan 15 – gap reading of 3 kWh (no assignment active): billed to nobody,
+             and must not appear in any consumer's stats.
+    Jan 20 – Bob (new holder from Jan 16) consumes 8 kWh, no production:
+             Bob imports all 8 kWh from the grid.
+    """
+
+    def setUp(self):
+        self.owner = User.objects.create_user(
+            username="recon_owner", password="pass1234", role=UserRole.ZEV_OWNER
+        )
+        self.zev = Zev.objects.create(
+            name="Recon ZEV",
+            owner=self.owner,
+            zev_type="vzev",
+            start_date=PERIOD_START,
+            billing_interval="monthly",
+            invoice_prefix="RC",
+        )
+        self.zev.refresh_from_db()
+        self.alice = self._participant("Alice Muster", PERIOD_START, date(2026, 1, 14))
+        self.bob = self._participant("Bob Beispiel", date(2026, 1, 16))
+
+        self.consumption_mp = self._mp(MeteringPointType.CONSUMPTION, "CH-RC-CONS-1")
+        self._assign(self.consumption_mp, self.alice, PERIOD_START, date(2026, 1, 14))
+        self._assign(self.consumption_mp, self.bob, date(2026, 1, 16))
+        self.production_mp = self._mp(MeteringPointType.PRODUCTION, "CH-RC-PROD-1")
+        self._assign(self.production_mp, self.alice, PERIOD_START)
+
+        self._consumption(self.consumption_mp, date(2026, 1, 5), "4")   # Alice
+        self._consumption(self.consumption_mp, date(2026, 1, 15), "3")  # gap
+        self._consumption(self.consumption_mp, date(2026, 1, 20), "8")  # Bob
+        self._production(self.production_mp, date(2026, 1, 5), "6")     # Alice
+
+    def test_engine_bills_each_holder_exactly_their_readings(self):
+        alice_invoice, bob_invoice = self._invoices()
+        # Gap reading (3 kWh) is billed to nobody.
+        self.assertSameEnergy(self._invoice_consumed(alice_invoice), "4")
+        self.assertSameEnergy(alice_invoice.total_local_kwh, "4")
+        self.assertSameEnergy(alice_invoice.total_grid_kwh, "0")
+        self.assertSameEnergy(self._invoice_consumed(bob_invoice), "8")
+        self.assertSameEnergy(bob_invoice.total_local_kwh, "0")
+        self.assertSameEnergy(bob_invoice.total_grid_kwh, "8")
+
+    def test_pdf_stats_reconcile_with_engine_invoices(self):
+        alice_invoice, bob_invoice = self._invoices()
+        alice_stats = self._pdf_stats(alice_invoice)
+        bob_stats = self._pdf_stats(bob_invoice)
+
+        row = alice_stats["Alice Muster"]
+        self.assertSameEnergy(self._invoice_consumed(alice_invoice), row["total_consumed_kwh"])
+        self.assertSameEnergy(self._invoice_produced(alice_invoice), row["total_produced_kwh"])
+        self.assertSameEnergy(alice_invoice.total_local_kwh, row["from_zev_kwh"])
+        self.assertSameEnergy(alice_invoice.total_grid_kwh, row["from_grid_kwh"])
+
+        row = bob_stats["Bob Beispiel"]
+        self.assertSameEnergy(self._invoice_consumed(bob_invoice), row["total_consumed_kwh"])
+        self.assertSameEnergy(bob_invoice.total_local_kwh, row["from_zev_kwh"])
+        self.assertSameEnergy(bob_invoice.total_grid_kwh, row["from_grid_kwh"])
+
+    def test_analytics_reconcile_with_engine_invoices(self):
+        alice_invoice, bob_invoice = self._invoices()
+        result = self._analytics()
+        by_id = {s["participant_id"]: s for s in result["participant_stats"]}
+
+        row = by_id[str(self.alice.id)]
+        self.assertSameEnergy(self._invoice_consumed(alice_invoice), row["total_consumed_kwh"])
+        self.assertSameEnergy(self._invoice_produced(alice_invoice), row["total_produced_kwh"])
+        self.assertSameEnergy(alice_invoice.total_local_kwh, row["from_zev_kwh"])
+        self.assertSameEnergy(alice_invoice.total_grid_kwh, row["from_grid_kwh"])
+
+        row = by_id[str(self.bob.id)]
+        self.assertSameEnergy(self._invoice_consumed(bob_invoice), row["total_consumed_kwh"])
+        self.assertSameEnergy(bob_invoice.total_local_kwh, row["from_zev_kwh"])
+        self.assertSameEnergy(bob_invoice.total_grid_kwh, row["from_grid_kwh"])
+
+        # ZEV-wide dashboard totals are physical pool totals: they still
+        # include the gap reading (3 kWh), which only the per-participant
+        # bills exclude (ADR 0013 decision).
+        self.assertSameEnergy(result["totals"]["consumed_kwh"], "15")
+        self.assertSameEnergy(result["totals"]["produced_kwh"], "6")
+        # Per-timestamp import: Jan 5 → 0, gap Jan 15 → 3, Jan 20 → 8.
+        self.assertSameEnergy(result["totals"]["imported_kwh"], "11")
+
+        # The selected-participant view must also reconcile exported (feed-in)
+        # with the invoice: Alice produces 6, community self-consumes 4 → bill 2.
+        selected = self._analytics_selected(self.alice)
+        self.assertSameEnergy(alice_invoice.total_feed_in_kwh, selected["totals"]["exported_kwh"])
+        self.assertEqual(len(selected["timeline"]), 1)
+        self.assertSameEnergy(
+            alice_invoice.total_feed_in_kwh,
+            selected["timeline"][0]["exported_kwh"],
+        )
+
+    def test_analytics_and_pdf_stats_agree_on_participant_splits(self):
+        alice_invoice, _ = self._invoices()
+        pdf = self._pdf_stats(alice_invoice)
+        analytics = {s["participant_name"]: s for s in self._analytics()["participant_stats"]}
+        for name in ("Alice Muster", "Bob Beispiel"):
+            for field in ("total_consumed_kwh", "total_produced_kwh", "from_zev_kwh", "from_grid_kwh"):
+                self.assertSameEnergy(
+                    pdf[name][field], analytics[name][field],
+                    msg=f"{name}.{field}",
+                )
+
+
+class MultiMeterBidirectionalReconciliationTests(_ReconciliationBase):
+    """Richer fixture: two consumption meters for one participant at one
+    timestamp, two producers (one a bidirectional meter), a producer-meter
+    transfer, two transfers of one consumption meter (Alice → Bob → Alice),
+    and an unassigned consumption meter that feeds the community pool and the
+    physical dashboard totals but is billed to nobody (ADR 0013 pool decision).
+
+    Jan  5 – Alice: CONS-1 IN 4 + CONS-2 IN 4; PROD-1 OUT 6.
+              Unassigned: CONS-3 IN 2.  Pool 6 (consumed 10 incl. CONS-3)
+              → Alice local 4.8, grid 3.2.
+    Jan 15 – CONS-3 IN 1 (unassigned, nobody billed).
+    Jan 20 – Bob: CONS-1 IN 4 + BI-1 IN 2; PROD-1 OUT 2 + BI-1 OUT 8.
+              Pool 6 → Bob local 6, grid 0; feed-in 4 (local-sold 6, export 4).
+    Jan 25 – Alice (second transfer of CONS-1 back): CONS-1 IN 3. No
+              production → grid 3.
+
+    Alice billed: consumed 11 (4.8 local / 6.2 grid), produced 6, feed-in 0.
+    Bob billed:   consumed 6 (6 local / 0 grid), produced 10, feed-in 4.
+    Physical:     consumed 20 (17 billed + 3 unassigned), produced 16,
+                  imported 8, exported 4.
+    """
+
+    def setUp(self):
+        self.owner = User.objects.create_user(
+            username="recon_multi", password="pass1234", role=UserRole.ZEV_OWNER
+        )
+        self.zev = Zev.objects.create(
+            name="Multi ZEV",
+            owner=self.owner,
+            zev_type="vzev",
+            start_date=PERIOD_START,
+            billing_interval="monthly",
+            invoice_prefix="MM",
+        )
+        self.zev.refresh_from_db()
+        self.alice = self._participant("Alice Muster", PERIOD_START)
+        self.bob = self._participant("Bob Beispiel", date(2026, 1, 16))
+
+        self.cons1 = self._mp(MeteringPointType.CONSUMPTION, "CH-MM-CONS-1")
+        self.cons2 = self._mp(MeteringPointType.CONSUMPTION, "CH-MM-CONS-2")
+        self.cons3 = self._mp(MeteringPointType.CONSUMPTION, "CH-MM-CONS-3")
+        self.prod1 = self._mp(MeteringPointType.PRODUCTION, "CH-MM-PROD-1")
+        self.bi1 = self._mp(MeteringPointType.BIDIRECTIONAL, "CH-MM-BI-1")
+
+        self._assign(self.cons1, self.alice, PERIOD_START, date(2026, 1, 14))
+        self._assign(self.cons1, self.bob, date(2026, 1, 16), date(2026, 1, 20))
+        self._assign(self.cons1, self.alice, date(2026, 1, 21))
+        self._assign(self.cons2, self.alice, PERIOD_START)
+        self._assign(self.prod1, self.alice, PERIOD_START, date(2026, 1, 14))
+        self._assign(self.prod1, self.bob, date(2026, 1, 16))
+        self._assign(self.bi1, self.bob, date(2026, 1, 16))
+
+        self._consumption(self.cons1, date(2026, 1, 5), "4")    # Alice
+        self._consumption(self.cons2, date(2026, 1, 5), "4")    # Alice
+        self._consumption(self.cons3, date(2026, 1, 5), "2")    # unassigned
+        self._consumption(self.cons3, date(2026, 1, 15), "1")   # unassigned
+        self._consumption(self.cons1, date(2026, 1, 20), "4")   # Bob
+        self._consumption(self.bi1, date(2026, 1, 20), "2")     # Bob
+        self._consumption(self.cons1, date(2026, 1, 25), "3")   # Alice again
+        self._production(self.prod1, date(2026, 1, 5), "6")     # Alice
+        self._production(self.prod1, date(2026, 1, 20), "2")    # Bob
+        self._production(self.bi1, date(2026, 1, 20), "8")      # Bob
+
+    def test_all_consumers_reconcile_on_the_multi_meter_scenario(self):
+        alice_invoice, bob_invoice = self._invoices()
+
+        # Engine: per-holder billed amounts (unassigned readings excluded,
+        # but their energy still shapes the pool). Feed-in is the exported
+        # part only: local-sold production is credited under the local energy
+        # type and has no stored kWh total.
+        self.assertSameEnergy(alice_invoice.total_local_kwh, "4.8")
+        self.assertSameEnergy(alice_invoice.total_grid_kwh, "6.2")
+        self.assertSameEnergy(self._invoice_consumed(alice_invoice), "11")
+        self.assertSameEnergy(alice_invoice.total_feed_in_kwh, "0")
+        self.assertSameEnergy(bob_invoice.total_local_kwh, "6")
+        self.assertSameEnergy(bob_invoice.total_grid_kwh, "0")
+        self.assertSameEnergy(self._invoice_consumed(bob_invoice), "6")
+        self.assertSameEnergy(bob_invoice.total_feed_in_kwh, "4")
+
+        # PDF stats match the engine exactly.
+        alice_pdf = self._pdf_stats(alice_invoice)["Alice Muster"]
+        bob_pdf = self._pdf_stats(bob_invoice)["Bob Beispiel"]
+        self.assertSameEnergy(alice_pdf["total_consumed_kwh"], "11")
+        self.assertSameEnergy(alice_pdf["from_zev_kwh"], "4.8")
+        self.assertSameEnergy(alice_pdf["from_grid_kwh"], "6.2")
+        self.assertSameEnergy(alice_pdf["total_produced_kwh"], "6")
+        self.assertSameEnergy(bob_pdf["total_consumed_kwh"], "6")
+        self.assertSameEnergy(bob_pdf["from_zev_kwh"], "6")
+        self.assertSameEnergy(bob_pdf["from_grid_kwh"], "0")
+        self.assertSameEnergy(bob_pdf["total_produced_kwh"], "10")
+
+        # Analytics match too.
+        result = self._analytics()
+        by_id = {s["participant_id"]: s for s in result["participant_stats"]}
+        alice_row = by_id[str(self.alice.id)]
+        bob_row = by_id[str(self.bob.id)]
+        self.assertSameEnergy(alice_row["total_consumed_kwh"], "11")
+        self.assertSameEnergy(alice_row["from_zev_kwh"], "4.8")
+        self.assertSameEnergy(alice_row["from_grid_kwh"], "6.2")
+        self.assertSameEnergy(alice_row["total_produced_kwh"], "6")
+        self.assertSameEnergy(bob_row["total_consumed_kwh"], "6")
+        self.assertSameEnergy(bob_row["from_zev_kwh"], "6")
+        self.assertSameEnergy(bob_row["from_grid_kwh"], "0")
+        self.assertSameEnergy(bob_row["total_produced_kwh"], "10")
+
+        # The unassigned meter is billed to nobody but feeds the pool and the
+        # physical totals: its 3 kWh (2 on Jan 5, 1 on Jan 15) lift the
+        # physical consumed above the sum of all billed consumption (17 kWh).
+        self.assertSameEnergy(result["totals"]["consumed_kwh"], "20")
+        self.assertSameEnergy(result["totals"]["produced_kwh"], "16")
+        self.assertSameEnergy(result["totals"]["imported_kwh"], "8")
+        self.assertSameEnergy(result["totals"]["exported_kwh"], "4")
+
+        # Selected view: Bob's exported energy reconciles with his invoice.
+        selected = self._analytics_selected(self.bob)
+        self.assertSameEnergy(selected["totals"]["exported_kwh"], "4")
+        self.assertEqual(len(selected["timeline"]), 1)
+
+
+class UnassignedProductionReconciliationTests(_ReconciliationBase):
+    """An unassigned production meter feeds the community pool but bills nobody.
+
+    Jan 5 – Alice: CONS-1 IN 10, PROD-1 OUT 4 (assigned).
+            Unassigned: PROD-2 OUT 6 (never assigned).
+
+    Without PROD-2 the pool would be min(4, 10) = 4 and Alice would draw
+    6 kWh from the grid.  With PROD-2 the physical pool is min(10, 10) = 10,
+    so Alice's entire consumption is local.  PROD-2's 6 kWh are billed to
+    nobody but lift the pool for every assigned consumer (ADR 0013 pool
+    decision — physical totals cover every meter regardless of assignment).
+
+    Alice billed: consumed 10 (10 local / 0 grid), produced 4, feed-in 0.
+    Physical:     consumed 10, produced 10 (4 assigned + 6 unassigned),
+                  imported 0, exported 0.
+    """
+
+    def setUp(self):
+        self.owner = User.objects.create_user(
+            username="recon_unprod", password="pass1234", role=UserRole.ZEV_OWNER
+        )
+        self.zev = Zev.objects.create(
+            name="Unprod ZEV",
+            owner=self.owner,
+            zev_type="vzev",
+            start_date=PERIOD_START,
+            billing_interval="monthly",
+            invoice_prefix="UP",
+        )
+        self.zev.refresh_from_db()
+        self.alice = self._participant("Alice Muster", PERIOD_START)
+        self.bob = self._participant("Bob Beispiel", PERIOD_START)
+
+        self.cons1 = self._mp(MeteringPointType.CONSUMPTION, "CH-UP-CONS-1")
+        self.prod1 = self._mp(MeteringPointType.PRODUCTION, "CH-UP-PROD-1")
+        self.prod2 = self._mp(MeteringPointType.PRODUCTION, "CH-UP-PROD-2")
+
+        self._assign(self.cons1, self.alice, PERIOD_START)
+        self._assign(self.prod1, self.alice, PERIOD_START)
+        # prod2 is never assigned — its production feeds the pool but bills nobody.
+
+        self._consumption(self.cons1, date(2026, 1, 5), "10")   # Alice
+        self._production(self.prod1, date(2026, 1, 5), "4")     # Alice
+        self._production(self.prod2, date(2026, 1, 5), "6")     # unassigned
+
+    def test_unassigned_production_lifts_the_pool_for_assigned_consumers(self):
+        alice_invoice, _bob_invoice = self._invoices()
+
+        # The unassigned 6 kWh lift the pool from 4 to 10, so Alice's entire
+        # consumption is local.  Without the physical-pool rule she would have
+        # local 4, grid 6.
+        self.assertSameEnergy(alice_invoice.total_local_kwh, "10")
+        self.assertSameEnergy(alice_invoice.total_grid_kwh, "0")
+        self.assertSameEnergy(alice_invoice.total_feed_in_kwh, "0")
+
+        # PDF stats agree with the engine.
+        pdf = self._pdf_stats(alice_invoice)["Alice Muster"]
+        self.assertSameEnergy(pdf["total_consumed_kwh"], "10")
+        self.assertSameEnergy(pdf["from_zev_kwh"], "10")
+        self.assertSameEnergy(pdf["from_grid_kwh"], "0")
+        self.assertSameEnergy(pdf["total_produced_kwh"], "4")
+
+        # Analytics agree too.
+        result = self._analytics()
+        by_id = {s["participant_id"]: s for s in result["participant_stats"]}
+        alice_row = by_id[str(self.alice.id)]
+        self.assertSameEnergy(alice_row["total_consumed_kwh"], "10")
+        self.assertSameEnergy(alice_row["from_zev_kwh"], "10")
+        self.assertSameEnergy(alice_row["from_grid_kwh"], "0")
+        self.assertSameEnergy(alice_row["total_produced_kwh"], "4")
+
+        # Physical totals include the unassigned production.
+        self.assertSameEnergy(result["totals"]["consumed_kwh"], "10")
+        self.assertSameEnergy(result["totals"]["produced_kwh"], "10")
+        self.assertSameEnergy(result["totals"]["imported_kwh"], "0")
+        self.assertSameEnergy(result["totals"]["exported_kwh"], "0")

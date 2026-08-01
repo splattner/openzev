@@ -17,6 +17,8 @@ from django.db import models, transaction
 from django.utils import timezone
 
 from accounts.models import VatRate
+from allocation.split import split_consumption, split_production
+from allocation.windows import AssignmentWindows
 from zev.models import Zev, Participant, MeteringPoint, MeteringPointType, MeteringPointAssignment
 from tariffs.models import BillingMode, EnergyType, PeriodType, Tariff, TariffCategory
 from metering.models import MeterReading, ReadingDirection
@@ -28,63 +30,8 @@ logger = logging.getLogger(__name__)
 # ─── Allocation ───────────────────────────────────────────────────────────────
 #
 # How the community's solar output is divided between its members at a single
-# timestamp. Pure arithmetic, deliberately free of the ORM: this is the part of
-# the engine that decides who pays for what, and it should be readable and
-# testable without building a metering fixture.
-
-
-class ConsumptionSplit(NamedTuple):
-    local_kwh: Decimal
-    grid_kwh: Decimal
-
-
-class ProductionSplit(NamedTuple):
-    local_sold_kwh: Decimal
-    exported_kwh: Decimal
-
-
-def split_consumption(
-    participant_kwh: Decimal,
-    zev_consumption_kwh: Decimal,
-    zev_production_kwh: Decimal,
-) -> ConsumptionSplit:
-    """Divide one consumer's draw into a solar part and a grid part.
-
-    The community can only share what it both produced *and* consumed in the
-    interval; that pool is handed out in proportion to each member's share of
-    total consumption, and whatever is left over is drawn from the grid.
-
-    The ``min`` against ``participant_kwh`` can only ever tie, never bite —
-    the pool is itself capped at total consumption, so a member's proportional
-    slice cannot exceed their own draw. It is kept as a guard against a caller
-    passing inconsistent totals.
-    """
-    local_pool = min(zev_production_kwh, zev_consumption_kwh)
-    if zev_consumption_kwh > 0 and local_pool > 0:
-        participant_share = participant_kwh / zev_consumption_kwh
-        local_kwh = min(participant_kwh, local_pool * participant_share)
-    else:
-        local_kwh = Decimal("0")
-    return ConsumptionSplit(local_kwh, max(participant_kwh - local_kwh, Decimal("0")))
-
-
-def split_production(
-    produced_kwh: Decimal,
-    zev_production_kwh: Decimal,
-    zev_consumption_kwh: Decimal,
-) -> ProductionSplit:
-    """Divide one producer's output into what the community used and what was exported.
-
-    Both pools are shared on the producer's contribution to total production,
-    so a member who supplied 30% of the solar earns 30% of the local sales and
-    carries 30% of the export.
-    """
-    if zev_production_kwh <= 0:
-        return ProductionSplit(Decimal("0"), Decimal("0"))
-    local_pool = min(zev_production_kwh, zev_consumption_kwh)
-    export_pool = max(zev_production_kwh - zev_consumption_kwh, Decimal("0"))
-    producer_share = produced_kwh / zev_production_kwh
-    return ProductionSplit(local_pool * producer_share, export_pool * producer_share)
+# timestamp lives in ``allocation.split`` (ADR 0013); the imports above keep
+# existing importers working.
 
 
 # ─── Gathering ────────────────────────────────────────────────────────────────
@@ -98,13 +45,17 @@ class PeriodReadings(NamedTuple):
     """Everything the pricing loops need to read, fetched once per invoice.
 
     The two ``*_by_ts`` maps are community-wide totals per timestamp; the two
-    querysets are the individual participant's own readings.
+    querysets are the individual participant's own readings. ``assignment_windows``
+    resolves which of those readings the participant actually held at their
+    timestamp (readings before an assignment started — or inside a gap — are
+    skipped by the pricing loops).
     """
 
     participant_consumption: models.QuerySet
     participant_production: models.QuerySet
     zev_consumption_by_ts: dict
     zev_production_by_ts: dict
+    assignment_windows: AssignmentWindows
 
 
 def _assigned_metering_points(zev, meter_types, period_start, period_end, participant=None):
@@ -153,21 +104,28 @@ def _gather_period_readings(participant, period_start, period_end) -> PeriodRead
     start_dt = _period_to_dt(period_start)
     end_dt = _period_to_dt(period_end) + timedelta(days=1)  # exclusive upper bound
 
-    def points(meter_types, *, own):
+    def own_points(meter_types):
         return _assigned_metering_points(
             zev, meter_types, period_start, period_end,
-            participant=participant if own else None,
+            participant=participant,
         )
+
+    def community_points(meter_types):
+        # The pool covers every metering point of the ZEV regardless of
+        # assignment (ADR 0013): a never-assigned meter still feeds the
+        # community pool, even though its readings are billed to nobody.
+        return MeteringPoint.objects.filter(zev=zev, meter_type__in=meter_types)
 
     return PeriodReadings(
         participant_consumption=_readings_in_period(
-            points(CONSUMPTION_METER_TYPES, own=True), start_dt, end_dt, ReadingDirection.IN),
+            own_points(CONSUMPTION_METER_TYPES), start_dt, end_dt, ReadingDirection.IN),
         participant_production=_readings_in_period(
-            points(PRODUCTION_METER_TYPES, own=True), start_dt, end_dt, ReadingDirection.OUT),
+            own_points(PRODUCTION_METER_TYPES), start_dt, end_dt, ReadingDirection.OUT),
         zev_consumption_by_ts=_totals_by_timestamp(_readings_in_period(
-            points(CONSUMPTION_METER_TYPES, own=False), start_dt, end_dt, ReadingDirection.IN)),
+            community_points(CONSUMPTION_METER_TYPES), start_dt, end_dt, ReadingDirection.IN)),
         zev_production_by_ts=_totals_by_timestamp(_readings_in_period(
-            points(PRODUCTION_METER_TYPES, own=False), start_dt, end_dt, ReadingDirection.OUT)),
+            community_points(PRODUCTION_METER_TYPES), start_dt, end_dt, ReadingDirection.OUT)),
+        assignment_windows=AssignmentWindows.for_participant(participant, period_start, period_end),
     )
 
 
@@ -753,10 +711,19 @@ def generate_invoice(participant: Participant, period_start: date, period_end: d
     local_kwh_acc = Decimal("0")
     grid_kwh_acc = Decimal("0")
 
+    skipped_consumption_readings = 0
+    skipped_consumption_kwh = Decimal("0")
+
     items_accumulator = ItemAccumulator()
 
     for reading in readings.participant_consumption.order_by("timestamp").iterator():
         ts = reading.timestamp
+        if not readings.assignment_windows.is_held_by(participant.id, reading.metering_point_id, ts):
+            # Reading predates this participant's assignment (or falls in an
+            # assignment gap): it belongs to nobody in this billing run.
+            skipped_consumption_readings += 1
+            skipped_consumption_kwh += reading.energy_kwh
+            continue
         participant_kwh = reading.energy_kwh
         zev_consumption_at_ts = zev_consumption_by_ts.get(ts, Decimal("0"))
         zev_production_at_ts = zev_production_by_ts.get(ts, Decimal("0"))
@@ -802,8 +769,15 @@ def generate_invoice(participant: Participant, period_start: date, period_end: d
 
     exported_kwh_acc = Decimal("0")
 
+    skipped_production_readings = 0
+    skipped_production_kwh = Decimal("0")
+
     for reading in readings.participant_production.order_by("timestamp").iterator():
         ts = reading.timestamp
+        if not readings.assignment_windows.is_held_by(participant.id, reading.metering_point_id, ts):
+            skipped_production_readings += 1
+            skipped_production_kwh += reading.energy_kwh
+            continue
         produced_kwh = reading.energy_kwh
 
         zev_production_at_ts = zev_production_by_ts.get(ts, Decimal("0"))
@@ -853,6 +827,20 @@ def generate_invoice(participant: Participant, period_start: date, period_end: d
                 )
 
     _price_fixed_fees(participant, tariffs_list, period_start, period_end, items_accumulator)
+
+    if skipped_consumption_readings or skipped_production_readings:
+        logger.warning(
+            "Invoice for participant %s (period %s..%s) excluded %d consumption "
+            "reading(s) / %s kWh and %d production reading(s) / %s kWh that fall "
+            "outside assignment windows (gaps or unassigned metering points)",
+            participant.id,
+            period_start,
+            period_end,
+            skipped_consumption_readings,
+            skipped_consumption_kwh,
+            skipped_production_readings,
+            skipped_production_kwh,
+        )
 
     local_kwh = local_kwh_acc.quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP)
     grid_kwh = grid_kwh_acc.quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP)

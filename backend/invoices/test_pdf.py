@@ -10,7 +10,8 @@ from django.conf import settings
 from django.test import TestCase
 from django.utils import timezone
 from tariffs.models import TariffCategory
-from zev.models import Participant, Zev
+from metering.models import MeterReading, ReadingDirection
+from zev.models import MeteringPoint, MeteringPointAssignment, MeteringPointType, Participant, Zev
 
 from .models import Invoice, InvoiceItem, InvoiceStatus
 from .pdf import (
@@ -422,6 +423,61 @@ class InvoicePdfQrTests(TestCase):
         # and no other hour may have a bar.
         hours_with_bars = set(re.findall(r'data-hour="(\d+)"', chart))
         self.assertEqual(hours_with_bars, {"23"})
+
+    def test_hourly_profile_skips_readings_outside_the_assignment_window(self):
+        """A mid-period transfer must not let the new holder's profile absorb
+        readings from before their assignment started (ADR 0013)."""
+        from metering.models import MeterReading, ReadingDirection, ReadingResolution
+        from zev.models import MeteringPoint, MeteringPointAssignment, MeteringPointType
+
+        invoice = self._invoice()
+        invoice.total_local_kwh = Decimal("10.00")
+        invoice.total_grid_kwh = Decimal("20.00")
+        invoice.save(update_fields=["total_local_kwh", "total_grid_kwh"])
+
+        mp = MeteringPoint.objects.create(
+            zev=self.zev,
+            meter_id="CH00000000000000000000000000TEST03",
+            meter_type=MeteringPointType.CONSUMPTION,
+        )
+        # The participant only holds the point from Jan 16 onward.
+        MeteringPointAssignment.objects.create(
+            metering_point=mp,
+            participant=self.participant,
+            valid_from=date(2026, 1, 16),
+        )
+        prod_mp = MeteringPoint.objects.create(
+            zev=self.zev,
+            meter_id="CH00000000000000000000000000TEST04",
+            meter_type=MeteringPointType.PRODUCTION,
+        )
+        MeteringPointAssignment.objects.create(
+            metering_point=prod_mp,
+            participant=self.participant,
+            valid_from=date(2026, 1, 1),
+        )
+        # One reading before the assignment (must be skipped), one after.
+        early = datetime(2026, 1, 15, 10, 0, tzinfo=dt_timezone.utc)
+        late = datetime(2026, 1, 20, 10, 0, tzinfo=dt_timezone.utc)
+        for ts in (early, late):
+            MeterReading.objects.create(
+                metering_point=mp, timestamp=ts, energy_kwh=Decimal("5.0000"),
+                direction=ReadingDirection.IN, resolution=ReadingResolution.HOURLY,
+            )
+            MeterReading.objects.create(
+                metering_point=prod_mp, timestamp=ts, energy_kwh=Decimal("9.0000"),
+                direction=ReadingDirection.OUT, resolution=ReadingResolution.HOURLY,
+            )
+
+        chart = _build_hourly_profile_chart_svg(invoice, INVOICE_TRANSLATIONS["de"])
+
+        self.assertIsNotNone(chart)
+        # Only the post-assignment reading contributes: exactly one bar at
+        # hour 10 (local), and no grid bar — the pre-assignment 5 kWh would
+        # otherwise produce a second, orange (grid) bar there.
+        self.assertIn('data-hour="10"', chart)
+        self.assertEqual(chart.count('data-hour="10"'), 1)
+        self.assertNotIn('fill="#c9891a" data-hour', chart)
 
     def test_period_window_uses_utc_not_local_tz(self):
         """pdf_stats and pdf_charts must query the same UTC range as the engine."""
@@ -1128,3 +1184,118 @@ class StatusTranslationTests(TestCase):
         self.assertNotEqual(ctx["status_display"], "Sent",
                             "status_display should be translated, not English")
         self.assertEqual(ctx["status_display"], "Versendet")
+
+
+
+class PeriodParticipantStatsTests(TestCase):
+    """``_compute_period_participant_stats`` attributes readings per timestamp
+    (ADR 0013) and must not double-count readings across assignments."""
+
+    PERIOD_START = date(2026, 1, 1)
+    PERIOD_END = date(2026, 1, 31)
+
+    def setUp(self):
+        self.zev = Zev.objects.create(
+            name="Stats ZEV",
+            owner=User.objects.create_user(
+                username="stats_owner", password="pass1234", role=UserRole.ZEV_OWNER),
+            zev_type="vzev",
+            start_date=self.PERIOD_START,
+            billing_interval="monthly",
+            invoice_prefix="ST",
+        )
+        self.zev.refresh_from_db()
+
+    def _participant(self, name, valid_from, valid_to=None):
+        first, last = name.split(" ", 1)
+        return Participant.objects.create(
+            zev=self.zev, first_name=first, last_name=last,
+            email=f"{name.replace(' ', '').lower()}@example.com",
+            valid_from=valid_from, valid_to=valid_to,
+        )
+
+    def _reading(self, metering_point, day, kwh):
+        return MeterReading.objects.create(
+            metering_point=metering_point,
+            timestamp=datetime(day.year, day.month, day.day, 12, 0, tzinfo=dt_timezone.utc),
+            energy_kwh=Decimal(kwh),
+            direction=ReadingDirection.IN,
+        )
+
+    def _stats(self):
+        from .pdf_stats import _compute_period_participant_stats
+        invoice = Invoice.objects.create(
+            invoice_number=f"ST-{Invoice.objects.count() + 1:05d}",
+            zev=self.zev,
+            participant=self.participant,
+            period_start=self.PERIOD_START,
+            period_end=self.PERIOD_END,
+            status=InvoiceStatus.DRAFT,
+        )
+        return _compute_period_participant_stats(invoice)
+
+    def test_mid_period_transfer_is_attributed_per_reading(self):
+        """A metering point handed over mid-period attributes each reading to
+        its holder without double-counting (join fan-out regression)."""
+        alice = self._participant("Alice Muster", self.PERIOD_START, date(2026, 1, 15))
+        bob = self._participant("Bob Beispiel", date(2026, 1, 16))
+        self.participant = alice
+        metering_point = MeteringPoint.objects.create(
+            zev=self.zev, meter_type=MeteringPointType.CONSUMPTION)
+        MeteringPointAssignment.objects.create(
+            metering_point=metering_point, participant=alice,
+            valid_from=self.PERIOD_START, valid_to=date(2026, 1, 15))
+        MeteringPointAssignment.objects.create(
+            metering_point=metering_point, participant=bob,
+            valid_from=date(2026, 1, 16), valid_to=None)
+        self._reading(metering_point, date(2026, 1, 5), "4")
+        self._reading(metering_point, date(2026, 1, 20), "6")
+
+        _, stats = self._stats()
+        by_name = {s["participant_name"]: s for s in stats}
+
+        assert by_name["Alice Muster"]["total_consumed_kwh"] == 4.0
+        assert by_name["Bob Beispiel"]["total_consumed_kwh"] == 6.0
+
+    def test_readings_in_an_assignment_gap_appear_in_no_participants_stats(self):
+        alice = self._participant("Alice Muster", self.PERIOD_START, date(2026, 1, 10))
+        bob = self._participant("Bob Beispiel", date(2026, 1, 20))
+        self.participant = alice
+        metering_point = MeteringPoint.objects.create(
+            zev=self.zev, meter_type=MeteringPointType.CONSUMPTION)
+        MeteringPointAssignment.objects.create(
+            metering_point=metering_point, participant=alice,
+            valid_from=self.PERIOD_START, valid_to=date(2026, 1, 10))
+        MeteringPointAssignment.objects.create(
+            metering_point=metering_point, participant=bob,
+            valid_from=date(2026, 1, 20), valid_to=None)
+        self._reading(metering_point, date(2026, 1, 5), "2")
+        self._reading(metering_point, date(2026, 1, 15), "3")  # gap
+
+        _, stats = self._stats()
+        by_name = {s["participant_name"]: s for s in stats}
+
+        # The gap reading never lands on anyone.
+        assert by_name["Alice Muster"]["total_consumed_kwh"] == 2.0
+        assert "Bob Beispiel" not in by_name
+
+    def test_stats_reconcile_with_the_engine_for_full_period_assignments(self):
+        """For unchanged data the PDF stats split matches the billed invoice
+        totals exactly."""
+        from .engine import generate_invoice
+        alice = self._participant("Alice Muster", self.PERIOD_START)
+        self.participant = alice
+        metering_point = MeteringPoint.objects.create(
+            zev=self.zev, meter_type=MeteringPointType.CONSUMPTION)
+        MeteringPointAssignment.objects.create(
+            metering_point=metering_point, participant=alice,
+            valid_from=self.PERIOD_START, valid_to=None)
+        for day in (5, 15, 25):
+            self._reading(metering_point, date(2026, 1, day), "2")
+
+        invoice = generate_invoice(alice, self.PERIOD_START, self.PERIOD_END)
+        _, stats = self._stats()
+        row = next(s for s in stats if s["participant_name"] == "Alice Muster")
+
+        assert float(invoice.total_local_kwh) == row["from_zev_kwh"]
+        assert float(invoice.total_grid_kwh) == row["from_grid_kwh"]

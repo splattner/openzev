@@ -12,6 +12,8 @@ from datetime import date, datetime, timezone as dt_timezone
 from decimal import Decimal, ROUND_HALF_UP
 
 from accounts.models import AppSettings
+from allocation.split import split_consumption
+from allocation.windows import AssignmentWindows
 from .pdf_render import render_pdf
 
 from metering.models import MeterReading, ReadingDirection
@@ -253,7 +255,7 @@ def _compute_monthly_data(participant, zev, year: int, tr: dict) -> tuple[list[d
             timestamp__gte=year_start_dt,
             timestamp__lt=year_end_dt,
         )
-        .values("timestamp")
+        .values("metering_point_id", "timestamp")
         .annotate(consumed_kwh=Sum("energy_kwh"))
         .order_by("timestamp")
     )
@@ -266,9 +268,18 @@ def _compute_monthly_data(participant, zev, year: int, tr: dict) -> tuple[list[d
             timestamp__gte=year_start_dt,
             timestamp__lt=year_end_dt,
         )
-        .values("timestamp")
+        .values("metering_point_id", "timestamp")
         .annotate(produced_kwh=Sum("energy_kwh"))
         .order_by("timestamp")
+    )
+
+    # ── Per-timestamp attribution windows (ADR 0013) ────────────────────────
+    # Readings are only counted for the participant while their assignment is
+    # active at the reading's timestamp — a mid-year transfer must not hand
+    # the new holder the old holder's readings.
+    windows = AssignmentWindows(
+        (a.metering_point_id, a.valid_from, a.valid_to, participant.id)
+        for a in assignments
     )
 
     # ── Accumulate per-timestamp, bucket into months ────────────────────────
@@ -279,19 +290,15 @@ def _compute_monthly_data(participant, zev, year: int, tr: dict) -> tuple[list[d
     # Consumption with local-pool allocation per timestamp
     for row in participant_consumption_rows:
         ts = row["timestamp"]
+        if not windows.is_held_by(participant.id, row["metering_point_id"], ts):
+            continue
         month_num = ts.month
         consumed = row["consumed_kwh"] or Decimal("0")
 
         zev_at_ts = zev_pivot.get(ts, {"consumed": Decimal("0"), "produced": Decimal("0")})
         zev_consumed = zev_at_ts["consumed"]
         zev_produced = zev_at_ts["produced"]
-        local_pool = min(zev_produced, zev_consumed)
-
-        if zev_consumed > 0 and local_pool > 0:
-            from_zev = min(consumed, local_pool * (consumed / zev_consumed))
-        else:
-            from_zev = Decimal("0")
-        from_grid = max(consumed - from_zev, Decimal("0"))
+        from_zev, from_grid = split_consumption(consumed, zev_consumed, zev_produced)
 
         month_acc[month_num]["consumed"] += consumed
         month_acc[month_num]["from_zev"] += from_zev
@@ -300,6 +307,8 @@ def _compute_monthly_data(participant, zev, year: int, tr: dict) -> tuple[list[d
     # Production (just sum per month, no allocation needed)
     for row in participant_production_rows:
         ts = row["timestamp"]
+        if not windows.is_held_by(participant.id, row["metering_point_id"], ts):
+            continue
         month_num = ts.month
         produced = row["produced_kwh"] or Decimal("0")
         month_acc[month_num]["produced"] += produced
