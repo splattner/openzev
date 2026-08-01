@@ -209,19 +209,20 @@ def _compute_monthly_data(participant, zev, year: int, tr: dict) -> tuple[list[d
         if a.metering_point.meter_type in [MeteringPointType.PRODUCTION, MeteringPointType.BIDIRECTIONAL]
     ]
 
-    # All consumption/production metering points in the ZEV for local-pool calculation
+    # All consumption/production metering points in the ZEV for the local-pool
+    # calculation. The pool is physical (ADR 0013): it covers every meter
+    # regardless of assignment or is_active, so an inactive meter's readings
+    # still feed the pool — matching the engine, PDF stats, and the dashboards.
     all_cons_mp_ids = list(
         MeteringPoint.objects.filter(
             zev=zev,
             meter_type__in=[MeteringPointType.CONSUMPTION, MeteringPointType.BIDIRECTIONAL],
-            is_active=True,
         ).values_list("id", flat=True)
     )
     all_prod_mp_ids = list(
         MeteringPoint.objects.filter(
             zev=zev,
             meter_type__in=[MeteringPointType.PRODUCTION, MeteringPointType.BIDIRECTIONAL],
-            is_active=True,
         ).values_list("id", flat=True)
     )
 

@@ -21,6 +21,7 @@ from django.db.models.functions import TruncDay
 from django.test import TestCase
 
 from accounts.models import UserRole
+from invoices.annual_statement import _compute_monthly_data
 from invoices.engine import generate_invoice
 from invoices.pdf_stats import _compute_period_participant_stats
 from metering.analytics import owner_dashboard_summary
@@ -545,3 +546,60 @@ class UnassignedProductionReconciliationTests(_ReconciliationBase):
         self.assertSameEnergy(result["totals"]["produced_kwh"], "10")
         self.assertSameEnergy(result["totals"]["imported_kwh"], "0")
         self.assertSameEnergy(result["totals"]["exported_kwh"], "0")
+
+
+class AnnualStatementPhysicalPoolTests(_ReconciliationBase):
+    """The annual statement's local pool must be *physical* — it includes
+    inactive metering points, exactly like the engine and the dashboards
+    (ADR 0013). An inactive meter is still a physical meter whose readings fed
+    the community pool during the year; dropping it shrinks the pool and makes
+    the annual statement disagree with the invoices for the same period.
+    """
+
+    def setUp(self):
+        self.owner = User.objects.create_user(
+            username="annual_pool_owner", password="pass1234", role=UserRole.ZEV_OWNER
+        )
+        self.zev = Zev.objects.create(
+            name="Annual Pool ZEV", owner=self.owner, zev_type="vzev",
+            start_date=PERIOD_START, billing_interval="monthly", invoice_prefix="AP",
+        )
+        self.zev.refresh_from_db()
+
+        self.alice = self._participant("Alice Muster", PERIOD_START)
+
+        self.consumption_mp = self._mp(MeteringPointType.CONSUMPTION, "CH-AP-CONS")
+        self._assign(self.consumption_mp, self.alice, PERIOD_START)
+        self.active_prod_mp = self._mp(MeteringPointType.PRODUCTION, "CH-AP-PROD-ACTIVE")
+        self._assign(self.active_prod_mp, self.alice, PERIOD_START)
+        # Inactive producer: decommissioned now, but its January readings are
+        # real physical energy that fed the pool during the year.
+        self.inactive_prod_mp = self._mp(MeteringPointType.PRODUCTION, "CH-AP-PROD-INACTIVE")
+        self.inactive_prod_mp.is_active = False
+        self.inactive_prod_mp.save()
+        self._assign(self.inactive_prod_mp, self.alice, PERIOD_START)
+
+        self._consumption(self.consumption_mp, date(2026, 1, 5), "10")
+        self._production(self.active_prod_mp, date(2026, 1, 5), "4")
+        self._production(self.inactive_prod_mp, date(2026, 1, 5), "6")
+
+    def test_annual_statement_pool_matches_the_engine_for_inactive_meters(self):
+        invoice = generate_invoice(self.alice, PERIOD_START, PERIOD_END)
+
+        tr = {"months": ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                        "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]}
+        _months, totals = _compute_monthly_data(self.alice, self.zev, 2026, tr)
+
+        # Physical pool on Jan 5: production 4 (active) + 6 (inactive) = 10,
+        # consumption 10 -> Alice's whole 10 kWh draw is local.
+        self.assertSameEnergy(invoice.total_local_kwh, "10")
+        self.assertSameEnergy(invoice.total_grid_kwh, "0")
+        # The annual statement must agree with the engine. Before the fix it
+        # reported from_zev 4 (it dropped the inactive producer from the pool).
+        self.assertSameEnergy(invoice.total_local_kwh, totals["from_zev_kwh"])
+        self.assertSameEnergy(invoice.total_grid_kwh, totals["from_grid_kwh"])
+        # The production side agrees with the engine invoice too: both producers
+        # (active 4 + inactive 6) are Alice's assigned meters. (Participant
+        # production never filtered on is_active — the fix touched only the pool
+        # queries — so this pins cross-consumer agreement, not the regression.)
+        self.assertSameEnergy(self._invoice_produced(invoice), totals["total_produced_kwh"])
