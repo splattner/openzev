@@ -270,6 +270,30 @@ class TestPdfsAreProducedWithTheInvoice:
         engine.assert_called_once()
         queued.assert_called_once()
 
+    def test_a_broker_outage_does_not_lose_the_generated_invoice(self):
+        """The invoice is the deliverable and it is already committed. Failing
+        the request because the queue is down would report an error for work
+        that succeeded, leaving the operator unaware the invoice exists — while
+        the PDF itself is recoverable (the email task renders one lazily, and
+        there is a per-invoice regenerate action)."""
+        owner = OwnerFactory()
+        zev = ZevFactory(owner=owner)
+        participant = ParticipantFactory(zev=zev)
+        client = _owner_client(owner)
+
+        with mock.patch(
+            "invoices.views.generate_invoice_pdf_task.delay",
+            side_effect=ConnectionError("Error 111 connecting to localhost:6379"),
+        ):
+            with mock.patch("invoices.views.generate_invoice", return_value=_invoice(participant)):
+                response = client.post(
+                    "/api/v1/invoices/invoices/generate/",
+                    {"participant_id": str(participant.id), **PERIOD_PAYLOAD},
+                    format="json",
+                )
+
+        assert response.status_code == 201
+
     def test_generate_invoice_pdf_task_renders_the_named_invoice(self):
         from invoices.tasks import generate_invoice_pdf_task
 

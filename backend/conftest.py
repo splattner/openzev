@@ -31,6 +31,21 @@ def _isolated_media(tmp_path_factory):
         yield
 
 
+@pytest.fixture(autouse=True)
+def _no_broker_calls(monkeypatch):
+    """Keep ``.delay()`` from reaching a real broker.
+
+    There is no Redis in CI, so a view that queues work would otherwise spend
+    the connection retry budget before failing — minutes of test time, and a
+    failure that says nothing about the code under test. Tests that care
+    whether something was queued patch the task themselves, and that patch
+    nests inside this one.
+    """
+    from invoices.tasks import generate_invoice_pdf_task
+
+    monkeypatch.setattr(generate_invoice_pdf_task, "delay", lambda *args, **kwargs: None)
+
+
 @pytest.fixture
 def api_client() -> APIClient:
     """An unauthenticated DRF test client."""
