@@ -12,7 +12,8 @@ for entering real numbers. Three independent approximations:
    guessed. It is the single biggest driver of the whole result, and for a
    ZEV that already has readings we can compute it exactly instead of asking
    the user for a number — using the same per-timestamp local-pool logic as
-   the dashboard (``metering.analytics``) and real invoices (``invoices.pdf``):
+   the dashboard (``metering.analytics``) and real invoices
+   (``allocation.split.local_pool_kwh``):
    self-consumed energy is ``Σ min(production_ts, consumption_ts)`` and the
    rate is ``self-consumed / produced``. Returns None when there isn't enough
    data to measure it (no production, or no consumption).
@@ -42,6 +43,7 @@ from decimal import Decimal
 
 from django.db.models import Max, Min, Q, Sum
 
+from allocation.split import local_pool_kwh
 from metering.models import MeterReading, ReadingDirection
 from tariffs.models import BillingMode, EnergyType, Tariff, TariffCategory
 from zev.models import MeteringPoint, MeteringPointType, Participant, Zev
@@ -197,11 +199,12 @@ def _measured_self_consumption_rate(zev: Zev) -> Decimal | None:
 
     Mirrors the canonical per-timestamp local-pool allocation used by the
     dashboard (``metering.analytics.owner_dashboard_summary``) and real
-    invoices (``invoices.pdf``): at each timestamp the locally self-consumed
-    energy is ``min(total production, total consumption)`` across every
-    metering point in the ZEV. Because it's a dimensionless ratio, it does
-    not matter that the per-participant kWh totals are separately
-    extrapolated to a year — the rate is the same over the raw period.
+    invoices (``allocation.split.local_pool_kwh``): at each timestamp the
+    locally self-consumed energy is ``min(total production, total
+    consumption)`` across every metering point in the ZEV. Because it's a
+    dimensionless ratio, it does not matter that the per-participant kWh
+    totals are separately extrapolated to a year — the rate is the same over
+    the raw period.
 
     Returns None when it can't be measured: no production (rate undefined),
     or no consumption at all (we'd otherwise report a misleading 0%).
@@ -226,7 +229,7 @@ def _measured_self_consumption_rate(zev: Zev) -> Decimal | None:
         consumed = entry.get(ReadingDirection.IN, Decimal("0"))
         total_produced += produced
         total_consumed += consumed
-        self_consumed += min(produced, consumed)
+        self_consumed += local_pool_kwh(produced, consumed)
 
     if total_produced <= 0 or total_consumed <= 0:
         return None

@@ -9,7 +9,7 @@ assumption, the self-consumption rate::
     self_consumption_rate (sigma) = self-consumed kWh / produced kWh
 
 which mirrors the per-timestamp local-pool allocation used for real invoices
-(``min(production, consumption)``, see ``invoices.pdf``) but collapsed to one
+(``allocation.split``: ``min(production, consumption)``) but collapsed to one
 annual assumption since no readings exist yet.
 
 Value created by the vZEV is proportional to self-consumed energy, priced at
@@ -24,6 +24,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from decimal import Decimal, ROUND_HALF_UP
+
+from allocation.split import proportional_share
 
 TWO_PLACES = Decimal("0.01")
 FIVE_PLACES = Decimal("0.00001")
@@ -159,8 +161,8 @@ class ParticipantResult:
     the group's aggregate self-consumed pool proportional to their share of
     total production (for what they contribute) and total consumption (for
     what they draw), exactly mirroring the per-timestamp local-pool
-    allocation used for real invoices (``invoices.pdf``), just collapsed to
-    one annual split since there's no metering data yet.
+    allocation from ``allocation.split`` (via ``proportional_share``), just
+    collapsed to one annual split since there's no metering data yet.
     """
 
     name: str
@@ -319,17 +321,13 @@ def _build_participant_results(inputs: FeasibilityInput, self_consumed_total: De
 
     results = []
     for participant in inputs.participants:
-        self_consumed_from_own = (
-            self_consumed_total * (participant.annual_production_kwh / total_production)
-            if total_production > 0
-            else Decimal("0")
+        self_consumed_from_own = proportional_share(
+            self_consumed_total, participant.annual_production_kwh, total_production
         )
         exported = participant.annual_production_kwh - self_consumed_from_own
 
-        from_local_pool = (
-            self_consumed_total * (participant.annual_consumption_kwh / total_consumption)
-            if total_consumption > 0
-            else Decimal("0")
+        from_local_pool = proportional_share(
+            self_consumed_total, participant.annual_consumption_kwh, total_consumption
         )
         from_grid = participant.annual_consumption_kwh - from_local_pool
 
