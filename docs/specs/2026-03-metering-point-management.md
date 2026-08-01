@@ -313,6 +313,11 @@ operational history must be preserved:
 - Setting `is_active = False` marks a meter as deactivated.
 - Deactivated meters remain visible in list views and are queryable.
 - Historical readings, assignments, and invoice references remain intact.
+- Deactivation does **not** affect energy allocation (`SPEC-2026-tariffs-billing`,
+  ADR 0013): a deactivated meter's readings are still attributed to their
+  assignment holder and still feed the physical community pool. `is_active` is
+  consulted only for per-metering-point fixed-fee counting and for list/admin
+  filtering.
 - Hard deletion (`DELETE`) is allowed but cascades to readings and assignments.
 
 **Guidance:** prefer soft deactivation when a meter has historical readings or
