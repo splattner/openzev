@@ -1,7 +1,7 @@
 # ADR 0013: Extract shared local-pool allocation service
 
-- Status: Proposed
-- Date: 2026-08-02
+- Status: Accepted
+- Date: 2026-08-03
 - Relates to: ADR 0002
 
 ## Context
@@ -115,6 +115,7 @@ Verification (at time of implementation):
 - Engine, PDF stats, PDF charts, annual statement, both dashboards, and the hourly profile attribute readings per timestamp
 - Feasibility calculator and prefill use the shared functions
 - Cross-consumer reconciliation: `invoices/test_allocation_reconciliation.py` proves engine, PDF stats, and owner dashboard agree on a mid-period transfer plus an assignment-gap reading
+- Golden-value franc assertions pin the billed amount on the mid-period transfer fixture (`invoices/test_engine_allocation.py`), so a regression to period-overlap attribution fails the suite
 - Fail-fast contracts covered in `allocation/tests.py`: non-`Decimal` input, negative inputs, inconsistent totals, overlapping assignment windows, UTC-date boundary, conservation invariants
 - The billing engine logs a warning when readings fall outside assignment windows (gap visibility), with counts and kWh for consumption and production
 - Reconciliation tests compare at the settlement quantum (0.0001 kWh) with `Decimal` rather than float tolerance; a multi-meter fixture covers two consumption meters per participant, two producers, a bidirectional meter, a producer-meter transfer, two transfers of one meter, and a never-assigned meter
@@ -129,3 +130,7 @@ Follow-ups from review (not this change):
 - **Gap-report feature**: surface excluded readings in the invoice document (not just the engine log) — product decision.
 - **Query-count tests**: the allocation service adds at most one query per consumer (windows fetch); pinning this with `assertNumQueries` is a follow-up.
 - **System-wide local-civil-date semantics**: if business wants assignment validity, periods, and tariffs on Zurich civil dates, it must be decided for the whole system together (ADR 0001/0007 territory), not per-feature.
+- **Holder-less meter visibility**: a metering point with no assignment overlapping the period counts in the physical pool but is billed to nobody, with no warning today. Surface such readings as a data-quality check next to the existing metering-quality checks, so an operator can assign the meter (e.g. to an *Allgemein* / community participant) or confirm the exclusion.
+- **Model-level overlap enforcement**: `MeteringPointAssignment.save()` does not call `full_clean()`, so the overlap guard runs only on the API/admin paths. Enforce it at the model level so programmatic writes cannot create overlapping windows.
+- **Allocation error taxonomy**: the `split.py` `ValueError`s and `OverlappingAssignmentWindowsError` currently surface as the invoice view's 409 "invoice may already exist". Give allocation failures their own exception so the API reports them accurately.
+- **Per-participant batch isolation**: `generate_invoices_for_zev` is a bare list comprehension — one bad metering point aborts the whole ZEV billing run. Isolate per participant (needs a product decision on what the operator sees for partial success).
