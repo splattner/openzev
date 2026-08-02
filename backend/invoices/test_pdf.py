@@ -1279,6 +1279,46 @@ class PeriodParticipantStatsTests(TestCase):
         assert by_name["Alice Muster"]["total_consumed_kwh"] == 2.0
         assert "Bob Beispiel" not in by_name
 
+    def test_a_holder_who_left_the_zev_keeps_their_name_in_the_period_stats(self):
+        """The stats are a historical document: a participant who held a meter
+        during the billed period but has since left the ZEV must still be
+        named — the lookup is keyed off the assignment windows, not the
+        current participant list."""
+        alice = self._participant("Alice Muster", self.PERIOD_START)
+        bob = self._participant("Bob Beispiel", self.PERIOD_START)
+        self.participant = bob
+        metering_point = MeteringPoint.objects.create(
+            zev=self.zev, meter_type=MeteringPointType.CONSUMPTION)
+        MeteringPointAssignment.objects.create(
+            metering_point=metering_point, participant=alice,
+            valid_from=self.PERIOD_START, valid_to=date(2026, 1, 15))
+        MeteringPointAssignment.objects.create(
+            metering_point=metering_point, participant=bob,
+            valid_from=date(2026, 1, 16), valid_to=None)
+        self._reading(metering_point, date(2026, 1, 5), "4")
+        self._reading(metering_point, date(2026, 1, 20), "6")
+
+        # Alice leaves the ZEV after the period: her assignments stay with the
+        # metering point, but she is no longer in zev.participants.
+        other_zev = Zev.objects.create(
+            name="Other ZEV",
+            owner=User.objects.create_user(
+                username="other_owner", password="pass1234", role=UserRole.ZEV_OWNER),
+            zev_type="vzev",
+            start_date=self.PERIOD_START,
+            billing_interval="monthly",
+            invoice_prefix="OT",
+        )
+        alice.zev = other_zev
+        alice.save()
+
+        _, stats = self._stats()
+        by_id = {s["participant_id"]: s for s in stats}
+
+        assert by_id[str(alice.id)]["participant_name"] == "Alice Muster"
+        assert by_id[str(alice.id)]["total_consumed_kwh"] == 4.0
+        assert by_id[str(bob.id)]["participant_name"] == "Bob Beispiel"
+
     def test_stats_reconcile_with_the_engine_for_full_period_assignments(self):
         """For unchanged data the PDF stats split matches the billed invoice
         totals exactly."""

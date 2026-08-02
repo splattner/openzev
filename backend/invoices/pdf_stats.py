@@ -7,6 +7,7 @@ from django.db import models as _dj
 
 from allocation.split import split_consumption
 from allocation.windows import AssignmentWindows
+from metering.analytics import _participant_names
 
 from .engine import _period_to_dt
 
@@ -78,11 +79,6 @@ def _compute_period_participant_stats(invoice) -> tuple[dict, list[dict]]:
     start_dt = _period_to_dt(ps)
     end_dt = _period_to_dt(pe) + _dt.timedelta(days=1)
 
-    _participant_names = {
-        str(p.id): f"{p.first_name} {p.last_name}".strip()
-        for p in zev.participants.all()
-    }
-
     # All metering points in this ZEV. The pool covers every meter regardless
     # of assignment (ADR 0013): unassigned meters still feed the community
     # pool, even though their readings are billed to nobody. Attribution to
@@ -137,6 +133,11 @@ def _compute_period_participant_stats(invoice) -> tuple[dict, list[dict]]:
     # double-count transfers.
     windows = AssignmentWindows.for_zev(zev, ps, pe)
 
+    # Names are keyed off the assignment windows, not the current participant
+    # list: the invoice is a historical document, and a holder who has since
+    # left the ZEV must keep their name in the period stats.
+    participant_names = _participant_names(windows.participant_ids)
+
     participant_rows = (
         MeterReading.objects.filter(
             metering_point__in=cons_mps,
@@ -165,7 +166,7 @@ def _compute_period_participant_stats(invoice) -> tuple[dict, list[dict]]:
         if pid not in participant_map:
             participant_map[pid] = {
                 "participant_id": pid,
-                "participant_name": _participant_names.get(pid, ""),
+                "participant_name": participant_names.get(pid, ""),
                 "total_consumed_kwh": Decimal("0"),
                 "total_produced_kwh": Decimal("0"),
                 "from_zev_kwh": Decimal("0"),
@@ -194,7 +195,7 @@ def _compute_period_participant_stats(invoice) -> tuple[dict, list[dict]]:
         if pid not in participant_map:
             participant_map[pid] = {
                 "participant_id": pid,
-                "participant_name": _participant_names.get(pid, ""),
+                "participant_name": participant_names.get(pid, ""),
                 "total_consumed_kwh": Decimal("0"),
                 "total_produced_kwh": Decimal("0"),
                 "from_zev_kwh": Decimal("0"),
