@@ -27,20 +27,8 @@ from datetime import date, datetime, timezone
 
 from django.db.models import Q
 
+from allocation.errors import OverlappingAssignmentWindowsError
 from zev.models import MeteringPointAssignment
-
-
-class OverlappingAssignmentWindowsError(ValueError):
-    """Two assignments for one metering point overlap in time."""
-
-    def __init__(self, metering_point_id, first, second):
-        self.metering_point_id = metering_point_id
-        self.first = first
-        self.second = second
-        super().__init__(
-            f"overlapping assignment windows for metering point {metering_point_id}: "
-            f"{first[0]}..{first[1]} vs {second[0]}..{second[1]}"
-        )
 
 
 class AssignmentWindows:

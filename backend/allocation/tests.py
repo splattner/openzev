@@ -16,13 +16,18 @@ from decimal import Decimal
 
 import pytest
 
+from allocation.errors import (
+    AllocationError,
+    InvalidAllocationInputError,
+    OverlappingAssignmentWindowsError,
+)
 from allocation.split import (
     local_pool_kwh,
     proportional_share,
     split_consumption,
     split_production,
 )
-from allocation.windows import AssignmentWindows, OverlappingAssignmentWindowsError
+from allocation.windows import AssignmentWindows
 
 
 def D(value) -> Decimal:
@@ -368,6 +373,25 @@ def test_matching_uses_the_utc_civil_date_of_the_timestamp():
     # still resolves to the UTC date (15 June) thanks to the defensive
     # astimezone(utc) conversion — participant 11, not 22.
     assert windows.participant_at("mp1", same_moment_in_zurich) == 11
+
+
+def test_allocation_failures_share_a_common_base():
+    """Billing callers catch ``AllocationError`` to distinguish allocation
+    failures from the engine's 'invoice already exists' ``ValueError``
+    (ADR 0013 follow-up); existing ``pytest.raises(ValueError)`` guards keep
+    working because the base class stays a ``ValueError``."""
+    assert issubclass(InvalidAllocationInputError, AllocationError)
+    assert issubclass(OverlappingAssignmentWindowsError, AllocationError)
+    assert issubclass(AllocationError, ValueError)
+
+    with pytest.raises(AllocationError):
+        split_consumption(D(5), D(4), D(1))  # participant exceeds total
+
+    with pytest.raises(AllocationError):
+        AssignmentWindows([
+            ("mp1", datetime.date(2026, 6, 1), datetime.date(2026, 6, 20), 11),
+            ("mp1", datetime.date(2026, 6, 15), None, 22),
+        ])
 
 
 def test_overlapping_windows_fail_fast():

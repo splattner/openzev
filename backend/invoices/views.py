@@ -9,6 +9,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from django.http import HttpResponse
 from accounts.permissions import IsZevOwnerOrAdmin
+from allocation.errors import AllocationError
 from zev.models import Zev, Participant
 from zev.scoping import ZevScopedQuerySetMixin
 from .models import Invoice, InvoiceStatus, EmailLog
@@ -165,6 +166,14 @@ class InvoiceViewSet(
                     "error": str(exc),
                 },
             )
+            if isinstance(exc, AllocationError):
+                # Misconfigured assignment data or inconsistent totals — not a
+                # duplicate invoice. Report the actual allocation failure
+                # instead of the 409 below (ADR 0013 follow-up).
+                return Response(
+                    {"error": f"Allocation error during invoice generation: {exc}"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
             return Response(
                 {"error": "Invoice generation failed. The invoice may already exist in a non-regenerable state."},
                 status=status.HTTP_409_CONFLICT,

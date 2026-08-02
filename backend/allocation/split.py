@@ -12,6 +12,8 @@ the feasibility calculator. Any formula change happens here and nowhere else.
 from decimal import Decimal
 from typing import NamedTuple
 
+from allocation.errors import InvalidAllocationInputError
+
 
 class ConsumptionSplit(NamedTuple):
     local_kwh: Decimal
@@ -27,7 +29,7 @@ def _require_non_negative(value: Decimal, name: str) -> None:
     if not isinstance(value, Decimal):
         raise TypeError(f"{name} must be a Decimal, got {type(value).__name__}")
     if value < 0:
-        raise ValueError(f"{name} must be non-negative, got {value}")
+        raise InvalidAllocationInputError(f"{name} must be non-negative, got {value}")
 
 
 def split_consumption(
@@ -45,7 +47,8 @@ def split_consumption(
     cannot exceed the community's total consumption (the ZEV total includes
     their own reading, so anything else indicates inconsistent inputs — a
     duplicate reading, or the wrong metering-point scope). Violations raise
-    ``ValueError`` instead of producing silently clamped arithmetic. With the
+    ``InvalidAllocationInputError`` (an ``AllocationError``, itself a
+    ``ValueError``) instead of producing silently clamped arithmetic. With the
     totals guaranteed consistent, the proportional slice can never exceed the
     member's own draw (the pool is capped at total consumption), so the local
     part needs no clamp and the grid part is exactly the remainder.
@@ -62,7 +65,7 @@ def split_consumption(
     _require_non_negative(zev_consumption_kwh, "zev_consumption_kwh")
     _require_non_negative(zev_production_kwh, "zev_production_kwh")
     if participant_kwh > zev_consumption_kwh:
-        raise ValueError(
+        raise InvalidAllocationInputError(
             "participant_kwh "
             f"({participant_kwh}) exceeds zev_consumption_kwh ({zev_consumption_kwh})"
         )
@@ -97,7 +100,7 @@ def split_production(
     _require_non_negative(zev_production_kwh, "zev_production_kwh")
     _require_non_negative(zev_consumption_kwh, "zev_consumption_kwh")
     if produced_kwh > zev_production_kwh:
-        raise ValueError(
+        raise InvalidAllocationInputError(
             f"produced_kwh ({produced_kwh}) exceeds zev_production_kwh ({zev_production_kwh})"
         )
     if zev_production_kwh <= 0:
@@ -138,7 +141,7 @@ def proportional_share(
     if total_kwh <= 0 or pool_kwh <= 0:
         return Decimal("0")
     if participant_kwh > total_kwh:
-        raise ValueError(
+        raise InvalidAllocationInputError(
             f"participant_kwh ({participant_kwh}) exceeds total_kwh ({total_kwh})"
         )
     return pool_kwh * (participant_kwh / total_kwh)

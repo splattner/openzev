@@ -206,7 +206,7 @@ All invoice endpoints are routed under `/api/v1/invoices/invoices/` via a DRF `G
 
 | Method | URL | Permission | Payload | Response |
 |---|---|---|---|---|
-| `POST` | `/invoices/generate/` | `IsZevOwnerOrAdmin` | `{participant_id, period_start, period_end}` | `201` with invoice JSON, or `409` if locked |
+| `POST` | `/invoices/generate/` | `IsZevOwnerOrAdmin` | `{participant_id, period_start, period_end}` | `201` with invoice JSON; `400` with the underlying error if the allocation fails (`AllocationError`, e.g. overlapping assignment windows); `409` if locked |
 | `POST` | `/invoices/generate-all/` | `IsZevOwnerOrAdmin` | `{zev_id, period_start, period_end}` | `202` with `{detail, queued: true, participant_count}` — generation runs asynchronously via Celery (`generate_zev_invoices_task`); failures (e.g. locked invoices) are recorded as audit events with `source = celery` |
 | `POST` | `/invoices/generate-pdfs-all/` | `IsZevOwnerOrAdmin` | `{zev_id, period_start, period_end}` | `202` with `{detail, queued: true, invoice_count}` — PDF rendering runs asynchronously via Celery (`generate_zev_pdfs_task`) |
 
@@ -619,7 +619,7 @@ Strips legacy period suffixes from `description` on serialization.
 | File | Test class | Validates |
 |---|---|---|
 | `tests.py` | `InvoiceRBACTests` | §6: admin sees all, owner sees own ZEV, participant sees own invoices; participant cannot approve/cancel; PDF template access restricted to admin; deletion rules by role and status; generic POST create returns 405 (creation only via generate); serializer ignores forged billing/workflow fields |
-| `tests.py` | `InvoiceBillingIntegrationTests` | §5.2: end-to-end generation via API with metering data |
+| `tests.py` | `InvoiceBillingIntegrationTests` | §5.2: end-to-end generation via API with metering data; allocation failures reported as 400, not the 409 duplicate-invoice message |
 | `test_workflow.py` | `InvoiceWorkflowTests` | §4.2: approve draft ✓, approve non-draft ✗, mark-sent from approved ✓, mark-sent from draft ✗, mark-paid from sent ✓, mark-paid from draft ✗, cancel from draft/approved/sent ✓, cancel from paid ✗, cancel already-cancelled ✗ |
 | `test_workflow.py` | `InvoiceEngineGuardTests` | §4.4: regenerate approved/paid → 409, regenerate draft/cancelled → success |
 | `test_period_overview.py` | `InvoicePeriodOverviewTests` | §5.5: metering completeness, missing-day detection, partial-assignment windows, no-assignment exclusion, cross-ZEV permission denial |

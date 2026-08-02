@@ -372,6 +372,35 @@ class InvoiceBillingIntegrationTests(TestCase):
 
         auth(self.client, self.owner)
 
+    def test_generate_reports_allocation_error_not_conflict(self):
+        """Overlapping assignment windows are an allocation error (400), not
+        the 409 'invoice may already exist' (ADR 0013 follow-up).
+
+        The overlap is inserted with ``bulk_create`` so it bypasses the
+        model's ``save()`` non-overlap guard: this simulates the corrupt
+        database state the runtime guard (``AssignmentWindows``) exists for.
+        """
+        MeteringPointAssignment.objects.bulk_create([
+            MeteringPointAssignment(
+                metering_point=self.consumption_mp,
+                participant=self.participant,
+                valid_from=date(2026, 1, 15),
+            )
+        ])
+
+        resp = self.client.post(
+            "/api/v1/invoices/invoices/generate/",
+            {
+                "participant_id": str(self.participant.id),
+                "period_start": "2026-01-01",
+                "period_end": "2026-01-31",
+            },
+        )
+
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn("allocation", resp.data["error"].lower())
+        self.assertNotIn("already exist", resp.data["error"].lower())
+
     def test_end_to_end_billing_generation_workflow_and_dashboard_consistency(self):
         generate_resp = self.client.post(
             "/api/v1/invoices/invoices/generate/",
