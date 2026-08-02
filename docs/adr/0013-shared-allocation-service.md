@@ -115,6 +115,7 @@ Verification (at time of implementation):
 - Engine, PDF stats, PDF charts, annual statement, both dashboards, and the hourly profile attribute readings per timestamp
 - Feasibility calculator and prefill use the shared functions
 - Cross-consumer reconciliation: `invoices/test_allocation_reconciliation.py` proves engine, PDF stats, and owner dashboard agree on a mid-period transfer plus an assignment-gap reading
+- Producer conservation: the negative local-energy CHF lines on producer invoices reconstruct exactly to the per-timestamp `split_production` local shares, and feed-in lines to the exported shares (`invoices/test_allocation_reconciliation.py`)
 - Golden-value franc assertions pin the billed amount on the mid-period transfer fixture (`invoices/test_engine_allocation.py`), so a regression to period-overlap attribution fails the suite
 - Fail-fast contracts covered in `allocation/tests.py`: non-`Decimal` input, negative inputs, inconsistent totals, overlapping assignment windows, UTC-date boundary, conservation invariants
 - The billing engine logs a warning when readings fall outside assignment windows (gap visibility), with counts and kWh for consumption and production

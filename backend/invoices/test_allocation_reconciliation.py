@@ -362,6 +362,112 @@ class MultiMeterBidirectionalReconciliationTests(_ReconciliationBase):
         self.assertSameEnergy(selected["totals"]["exported_kwh"], "4")
         self.assertEqual(len(selected["timeline"]), 1)
 
+    def _expected_producer_split(self, participant):
+        """Reconstruct a producer's per-timestamp ``split_production`` shares —
+
+        local-sold and exported — from raw meter data, independent of the
+        engine's priced line items."""
+        from collections import defaultdict
+
+        from allocation.split import split_production
+        from allocation.windows import AssignmentWindows
+
+        produced_at = defaultdict(Decimal)
+        consumed_at = defaultdict(Decimal)
+        for reading in MeterReading.objects.filter(metering_point__zev=self.zev):
+            if reading.direction == ReadingDirection.OUT:
+                produced_at[reading.timestamp] += reading.energy_kwh
+            else:
+                consumed_at[reading.timestamp] += reading.energy_kwh
+
+        windows = AssignmentWindows.for_zev(self.zev, PERIOD_START, PERIOD_END)
+        # Iterate the participant's distinct production meters rather than their
+        # assignment rows: a meter reassigned to the same participant in two
+        # ranges would otherwise re-fetch and re-count its readings.
+        meters = {}
+        for assignment in participant.metering_point_assignments.all():
+            meter = assignment.metering_point
+            if meter.meter_type in (
+                MeteringPointType.PRODUCTION,
+                MeteringPointType.BIDIRECTIONAL,
+            ):
+                meters.setdefault(meter.pk, meter)
+        local_sold = Decimal("0")
+        exported = Decimal("0")
+        for meter in meters.values():
+            for reading in MeterReading.objects.filter(
+                metering_point=meter, direction=ReadingDirection.OUT
+            ):
+                if not windows.is_held_by(participant.id, meter.id, reading.timestamp):
+                    continue
+                local, exported_share = split_production(
+                    reading.energy_kwh,
+                    produced_at[reading.timestamp],
+                    consumed_at[reading.timestamp],
+                )
+                local_sold += local
+                exported += exported_share
+        return local_sold, exported
+
+    def test_producer_local_credits_reconcile_with_the_per_timestamp_splits(self):
+        """A producer's local credit is the billed image of the allocation:
+        summing the negative local-energy lines back out must reproduce the
+        per-timestamp ``split_production`` local shares at the settlement
+        quantum, and the francs must match at the local tariff (ADR 0013
+        producer-conservation verification)."""
+        from invoices.models import InvoiceItem
+        from tariffs.models import EnergyType
+        from testing import factories
+
+        local_price = "0.20000"
+        factories.flat_tariff(self.zev, energy_type=EnergyType.LOCAL, price=local_price)
+        factories.flat_tariff(self.zev, energy_type=EnergyType.FEED_IN, price="0.08000")
+
+        alice_invoice, bob_invoice = self._invoices()
+
+        for participant, invoice in ((self.alice, alice_invoice), (self.bob, bob_invoice)):
+            expected_local, expected_exported = self._expected_producer_split(participant)
+
+            # Local-sold half: the negative local-energy lines reconstruct the
+            # per-timestamp local shares, in kWh and in CHF at the local tariff.
+            credit_items = list(
+                invoice.items.filter(
+                    item_type=InvoiceItem.ItemType.LOCAL_ENERGY,
+                    total_chf__lt=0,
+                )
+            )
+            reconstructed_kwh = sum(
+                (item.quantity_kwh for item in credit_items), Decimal("0")
+            )
+            self.assertSameEnergy(
+                expected_local, reconstructed_kwh,
+                msg=f"{participant.full_name}.local_sold_kwh",
+            )
+            reconstructed_chf = -sum(
+                (item.total_chf for item in credit_items), Decimal("0")
+            )
+            self.assertEqual(
+                reconstructed_chf,
+                (expected_local * Decimal(local_price)).quantize(Decimal("0.01")),
+                msg=f"{participant.full_name}.local_credit_chf",
+            )
+
+            # Exported half of the same split: the feed-in lines reconstruct the
+            # per-timestamp exported shares. A producer with nothing to export
+            # (Alice) gets no feed-in line at all.
+            feed_in_items = list(
+                invoice.items.filter(item_type=InvoiceItem.ItemType.FEED_IN)
+            )
+            self.assertSameEnergy(
+                expected_exported,
+                sum((item.quantity_kwh for item in feed_in_items), Decimal("0")),
+                msg=f"{participant.full_name}.feed_in_kwh",
+            )
+            if expected_exported == 0:
+                self.assertEqual(
+                    feed_in_items, [], msg=f"{participant.full_name}.feed_in_lines",
+                )
+
 
 class UnassignedProductionReconciliationTests(_ReconciliationBase):
     """An unassigned production meter feeds the community pool but bills nobody.
