@@ -374,6 +374,11 @@ Returns role-differentiated response shapes:
 
 When `participant_id` is provided, `totals` and `timeline` are narrowed to that
 participant's readings and the response includes `selected_participant_name`.
+The narrowed `totals.exported_kwh` is the participant's true grid export — the
+surplus fed to the grid (`exported(t) = max(produced − consumed, 0)`, see
+"ZEV-level aggregates" below) — not their total production. (Earlier revisions
+reported total production here; corrected alongside the per-holder attribution
+routing, ADR 0013.)
 
 **Participant response:**
 
