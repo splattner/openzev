@@ -18,7 +18,7 @@ from decimal import Decimal
 from math import exp, pi, sin
 
 from django.contrib.auth import get_user_model
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 from django.db.models import Sum
 
@@ -582,7 +582,11 @@ class Command(BaseCommand):
         """
         Invoice.objects.filter(zev=zev).delete()
 
-        invoices = generate_invoices_for_zev(zev, period_start, period_end)
+        invoices, failures = generate_invoices_for_zev(zev, period_start, period_end)
+        if failures:
+            raise CommandError(
+                f"invoice seeding failed for {len(failures)} participant(s): {failures}"
+            )
         invoices.sort(key=lambda invoice: invoice.invoice_number)
 
         # First stays DRAFT; the rest advance so the list shows a realistic mix.

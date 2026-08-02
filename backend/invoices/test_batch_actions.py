@@ -34,13 +34,15 @@ def _period_payload(zev):
     return {"zev_id": str(zev.id), **PERIOD_PAYLOAD}
 
 
-def _invoice(participant, *, status=InvoiceStatus.DRAFT, period_start=date(2026, 1, 1), period_end=date(2026, 1, 31)):
+def _invoice(participant, *, status=InvoiceStatus.DRAFT, period_start=date(2026, 1, 1), period_end=date(2026, 1, 31), invoice_number=None):
+    kwargs = {"invoice_number": invoice_number} if invoice_number else {}
     return InvoiceFactory(
         zev=participant.zev,
         participant=participant,
         status=status,
         period_start=period_start,
         period_end=period_end,
+        **kwargs,
     )
 
 
@@ -181,7 +183,7 @@ class TestBulkGenerationTasks:
         owner = OwnerFactory()
         zev = ZevFactory(owner=owner)
 
-        with mock.patch("invoices.engine.generate_invoices_for_zev", return_value=[]) as engine:
+        with mock.patch("invoices.engine.generate_invoices_for_zev", return_value=([], [])) as engine:
             generate_zev_invoices_task(str(zev.id), "2026-01-01", "2026-01-31")
 
         engine.assert_called_once_with(zev, date(2026, 1, 1), date(2026, 1, 31))
@@ -223,7 +225,7 @@ class TestPdfsAreProducedWithTheInvoice:
             _invoice(participant, period_start=date(2026, 2, 1), period_end=date(2026, 2, 28)),
         ]
 
-        with mock.patch("invoices.engine.generate_invoices_for_zev", return_value=invoices):
+        with mock.patch("invoices.engine.generate_invoices_for_zev", return_value=(invoices, [])):
             with mock.patch("invoices.pdf.save_invoice_pdf") as save_pdf:
                 generate_zev_invoices_task(str(zev.id), "2026-01-01", "2026-01-31")
 
@@ -242,7 +244,7 @@ class TestPdfsAreProducedWithTheInvoice:
             _invoice(participant, period_start=date(2026, 3, 1), period_end=date(2026, 3, 31)),
         ]
 
-        with mock.patch("invoices.engine.generate_invoices_for_zev", return_value=invoices):
+        with mock.patch("invoices.engine.generate_invoices_for_zev", return_value=(invoices, [])):
             with mock.patch(
                 "invoices.pdf.save_invoice_pdf",
                 side_effect=[ValueError("bad debtor address"), None, None],
@@ -317,6 +319,49 @@ class TestPdfsAreProducedWithTheInvoice:
             generate_invoice_pdf_task(str(uuid.uuid4()))
 
         save_pdf.assert_not_called()
+
+
+class TestBulkGenerationIsolatesPerParticipantFailures:
+    """One participant's failure must not cost the rest of the ZEV its
+    billing run — the invoice batch mirrors the PDF batch isolation
+    (``_render_pdfs``)."""
+
+    def test_one_locked_invoice_does_not_abort_the_batch(self):
+        from invoices.engine import generate_invoices_for_zev
+
+        owner = OwnerFactory()
+        zev = ZevFactory(owner=owner)
+        blocked = ParticipantFactory(zev=zev)
+        ok = ParticipantFactory(zev=zev)
+        _invoice(blocked, status=InvoiceStatus.APPROVED, invoice_number="INV-90001")
+
+        result = generate_invoices_for_zev(zev, date(2026, 1, 1), date(2026, 1, 31))
+
+        assert [invoice.participant_id for invoice in result.invoices] == [ok.id]
+        assert len(result.failures) == 1
+        assert result.failures[0]["participant_id"] == str(blocked.id)
+        assert result.failures[0]["participant_name"] == blocked.full_name
+        assert "cannot be regenerated" in result.failures[0]["error"].lower()
+
+    def test_task_reports_partial_success_in_the_audit_event(self):
+        from audit.models import AuditEvent, AuditEventStatus
+        from invoices.tasks import generate_zev_invoices_task
+
+        owner = OwnerFactory()
+        zev = ZevFactory(owner=owner)
+        blocked = ParticipantFactory(zev=zev)
+        ParticipantFactory(zev=zev)
+        _invoice(blocked, status=InvoiceStatus.APPROVED, invoice_number="INV-90001")
+
+        with mock.patch("invoices.pdf.save_invoice_pdf"):
+            generate_zev_invoices_task(str(zev.id), "2026-01-01", "2026-01-31")
+
+        event = AuditEvent.objects.filter(action_type="invoice.generate_all").latest("created_at")
+        assert event.status == AuditEventStatus.FAILED
+        assert event.metadata_json["invoice_count"] == 1
+        assert len(event.metadata_json["failures"]) == 1
+        assert event.metadata_json["failures"][0]["participant_id"] == str(blocked.id)
+        assert "1 participant(s) failed" in event.summary
 
 
 class TestInvoiceRetryEmailAction:

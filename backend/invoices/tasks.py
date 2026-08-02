@@ -223,23 +223,9 @@ def generate_zev_invoices_task(self, zev_id: str, period_start: str, period_end:
 
     start = date.fromisoformat(period_start)
     end = date.fromisoformat(period_end)
-    try:
-        invoices = generate_invoices_for_zev(zev, start, end)
-    except ValueError as exc:
-        logger.error("Bulk invoice generation failed for ZEV %s: %s", zev.name, exc)
-        record_audit_event(
-            action_category=AuditActionCategory.INVOICE,
-            action_type="invoice.generate_all",
-            target_type="zev.Zev",
-            target=zev,
-            target_id=str(zev.id),
-            target_display=zev.name,
-            summary=f"Bulk invoice generation failed for ZEV {zev.name}.",
-            status=AuditEventStatus.FAILED,
-            source=AuditEventSource.CELERY,
-            metadata={"period_start": period_start, "period_end": period_end, "error": str(exc)},
-        )
-        return
+    # generate_invoices_for_zev isolates per-participant failures itself, so
+    # nothing here needs to catch them (see engine.generate_invoices_for_zev).
+    invoices, failures = generate_invoices_for_zev(zev, start, end)
 
     # The PDF is part of producing an invoice, not a later step the operator has
     # to remember: an invoice without one cannot be reviewed, downloaded or
@@ -247,7 +233,15 @@ def generate_zev_invoices_task(self, zev_id: str, period_start: str, period_end:
     # strictly less work than the separate pass it replaces.
     pdf_failed = _render_pdfs(invoices)
 
-    logger.info("Generated %d invoices for ZEV %s (%d PDFs failed)", len(invoices), zev.name, pdf_failed)
+    logger.info(
+        "Generated %d invoices for ZEV %s (%d participant(s) failed, %d PDFs failed)",
+        len(invoices), zev.name, len(failures), pdf_failed,
+    )
+    summary = (
+        f"Generated {len(invoices)} invoices for ZEV {zev.name}"
+        + (f"; {len(failures)} participant(s) failed" if failures else "")
+        + "."
+    )
     record_audit_event(
         action_category=AuditActionCategory.INVOICE,
         action_type="invoice.generate_all",
@@ -255,13 +249,14 @@ def generate_zev_invoices_task(self, zev_id: str, period_start: str, period_end:
         target=zev,
         target_id=str(zev.id),
         target_display=zev.name,
-        summary=f"Generated {len(invoices)} invoices for ZEV {zev.name}.",
-        status=AuditEventStatus.SUCCESS if pdf_failed == 0 else AuditEventStatus.FAILED,
+        summary=summary,
+        status=AuditEventStatus.SUCCESS if not failures and pdf_failed == 0 else AuditEventStatus.FAILED,
         source=AuditEventSource.CELERY,
         metadata={
             "period_start": period_start,
             "period_end": period_end,
             "invoice_count": len(invoices),
+            "failures": failures,
             "pdf_failed": pdf_failed,
         },
     )

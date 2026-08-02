@@ -895,11 +895,35 @@ def generate_invoice(participant: Participant, period_start: date, period_end: d
     return invoice
 
 
-def generate_invoices_for_zev(zev: Zev, period_start: date, period_end: date) -> list:
-    """Generate invoices for ALL active participants in a ZEV."""
+class BulkGenerationResult(NamedTuple):
+    """Outcome of a ZEV-wide invoice run: the invoices generated plus one
+    entry per participant whose invoice failed."""
+
+    invoices: list[Invoice]
+    failures: list[dict]
+
+
+def generate_invoices_for_zev(zev: Zev, period_start: date, period_end: date) -> BulkGenerationResult:
+    """Generate invoices for ALL active participants in a ZEV.
+
+    Failures are isolated per participant (see ADR 0011) and returned in
+    ``failures`` as ``{"participant_id": ..., "participant_name": ..., "error": ...}``.
+    """
     participants = zev.participants.filter(
         valid_from__lte=period_end,
     ).filter(
         models.Q(valid_to__isnull=True) | models.Q(valid_to__gte=period_start)
     )
-    return [generate_invoice(p, period_start, period_end) for p in participants]
+    invoices = []
+    failures = []
+    for participant in participants:
+        try:
+            invoices.append(generate_invoice(participant, period_start, period_end))
+        except Exception as exc:
+            logger.exception("Invoice generation failed for participant %s", participant.full_name)
+            failures.append({
+                "participant_id": str(participant.id),
+                "participant_name": participant.full_name,
+                "error": str(exc),
+            })
+    return BulkGenerationResult(invoices, failures)

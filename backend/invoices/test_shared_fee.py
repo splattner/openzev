@@ -269,8 +269,9 @@ def test_a_full_run_recovers_the_community_amount():
     participants(zev, 4)
     shared_tariff(zev, price="240.00")
 
-    invoices = generate_invoices_for_zev(zev, JAN, MAR_END)
+    invoices, failures = generate_invoices_for_zev(zev, JAN, MAR_END)
 
+    assert failures == []
     assert len(invoices) == 4
     assert sum(fee_line(inv).total_chf for inv in invoices) == Decimal("720.00")  # 3 x 240
 
@@ -284,8 +285,9 @@ def test_a_full_run_reconciles_even_as_membership_changes():
     participants(zev, 1, valid_to=JAN_END)
     shared_tariff(zev, price="60.00")
 
-    invoices = generate_invoices_for_zev(zev, JAN, MAR_END)
+    invoices, failures = generate_invoices_for_zev(zev, JAN, MAR_END)
 
+    assert failures == []
     assert len(invoices) == 4
     assert sum(fee_line(inv).total_chf for inv in invoices) == Decimal("180.00")  # 3 x 60
 
