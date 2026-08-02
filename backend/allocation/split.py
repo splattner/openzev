@@ -52,8 +52,11 @@ def split_consumption(
 
     ``zev_consumption_kwh`` and ``zev_production_kwh`` must be *physical*
     totals — every meter in the ZEV, including meters with no active
-    assignment at this timestamp (ADR 0013 pool decision). Restricting them
-    to assigned meters would shrink the pool and under-credit consumers.
+    assignment at this timestamp (ADR 0013 pool decision). Because the
+    consumption total is the denominator of each member's share, restricting
+    it to assigned meters would shrink that denominator and silently inflate
+    every assigned consumer's local share — the opposite of under-crediting
+    them — and diverge from the physical totals the dashboards report.
     """
     _require_non_negative(participant_kwh, "participant_kwh")
     _require_non_negative(zev_consumption_kwh, "zev_consumption_kwh")

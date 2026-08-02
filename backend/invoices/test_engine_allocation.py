@@ -290,6 +290,15 @@ def test_a_mid_period_transfer_attributes_readings_to_each_holder():
     assert b_invoice.total_local_kwh == Decimal("6.0000")
     assert b_invoice.total_grid_kwh == Decimal("0.0000")
 
+    # Golden franc values (local tariff 0.10 CHF/kWh, no fees, no VAT): the
+    # transfer must move money, not just kWh. Holder A pays only for the
+    # pre-transfer reading (4 kWh) and holder B only for the post-transfer one
+    # (6 kWh). A regression to period-overlap attribution would bill holder A
+    # for the whole meter and change these totals — the number a ZEV owner
+    # actually phones about.
+    assert a_invoice.total_chf == Decimal("0.40")
+    assert b_invoice.total_chf == Decimal("0.60")
+
 
 def test_a_reading_on_the_assignments_first_day_belongs_to_the_new_holder():
     """Assignment validity is date-granular: a reading at 00:30 on valid_from
