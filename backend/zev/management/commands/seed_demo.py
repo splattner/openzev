@@ -386,16 +386,16 @@ class Command(BaseCommand):
         return meter
 
     def _ensure_assignment(self, meter: MeteringPoint, participant: Participant, valid_from: date) -> None:
-        assignment, _ = MeteringPointAssignment.objects.get_or_create(
-            metering_point=meter,
-            participant=participant,
-            valid_from=valid_from,
-            defaults={"valid_to": None},
-        )
-        if assignment.valid_to is not None:
-            assignment.valid_to = None
-            assignment.save(update_fields=["valid_to", "updated_at"])
-        MeteringPointAssignment.objects.filter(metering_point=meter).exclude(pk=assignment.pk).delete()
+        # The seed window moves every quarter. Drop the prior open-ended window
+        # first so the new one cannot trip the model's non-overlap guard on save.
+        with transaction.atomic():
+            MeteringPointAssignment.objects.filter(metering_point=meter).delete()
+            MeteringPointAssignment.objects.create(
+                metering_point=meter,
+                participant=participant,
+                valid_from=valid_from,
+                valid_to=None,
+            )
 
     def _seed_tariffs(self, zev: Zev, valid_from: date) -> None:
         tariff_specs = [

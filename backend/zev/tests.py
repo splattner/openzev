@@ -656,6 +656,131 @@ class MeteringPointAssignmentValidationTests(TestCase):
 		self.assertEqual(resp.status_code, 200)
 
 
+class AssignmentSaveOverlapGuardTests(TestCase):
+	"""The non-overlap rule runs on save(), not only where full_clean() is
+	invoked (API/admin), so programmatic writes cannot create overlapping
+	windows (ADR 0013 follow-up)."""
+
+	def setUp(self):
+		self.owner = make_user("ovguard_owner", UserRole.ZEV_OWNER)
+		self.zev = Zev.objects.create(name="OV ZEV", owner=self.owner, zev_type="vzev", invoice_prefix="OV")
+		self.participant = Participant.objects.create(
+			zev=self.zev,
+			user=make_user("ovguard_p1", UserRole.PARTICIPANT),
+			first_name="Anna",
+			last_name="One",
+			email="anna@example.com",
+			valid_from=date(2026, 1, 1),
+		)
+		self.participant2 = Participant.objects.create(
+			zev=self.zev,
+			user=make_user("ovguard_p2", UserRole.PARTICIPANT),
+			first_name="Beat",
+			last_name="Two",
+			email="beat@example.com",
+			valid_from=date(2026, 1, 1),
+		)
+		self.mp = MeteringPoint.objects.create(
+			zev=self.zev,
+			meter_id="CH-OV-001",
+			meter_type=MeteringPointType.CONSUMPTION,
+		)
+
+	def test_save_rejects_overlapping_assignment(self):
+		MeteringPointAssignment.objects.create(
+			metering_point=self.mp,
+			participant=self.participant,
+			valid_from=date(2026, 3, 1),
+		)
+		with self.assertRaises(ValidationError):
+			MeteringPointAssignment.objects.create(
+				metering_point=self.mp,
+				participant=self.participant2,
+				valid_from=date(2026, 6, 1),
+			)
+
+	def test_save_allows_adjacent_windows(self):
+		MeteringPointAssignment.objects.create(
+			metering_point=self.mp,
+			participant=self.participant,
+			valid_from=date(2026, 3, 1),
+			valid_to=date(2026, 5, 31),
+		)
+		second = MeteringPointAssignment.objects.create(
+			metering_point=self.mp,
+			participant=self.participant2,
+			valid_from=date(2026, 6, 1),
+			valid_to=date(2026, 10, 31),
+		)
+		self.assertIsNotNone(second.pk)
+
+	def test_save_allows_updating_own_window(self):
+		assignment = MeteringPointAssignment.objects.create(
+			metering_point=self.mp,
+			participant=self.participant,
+			valid_from=date(2026, 3, 1),
+		)
+		assignment.valid_to = date(2026, 12, 31)
+		assignment.save()  # must not flag itself
+		assignment.refresh_from_db()
+		self.assertEqual(assignment.valid_to, date(2026, 12, 31))
+
+	def test_save_rejects_update_that_creates_an_overlap(self):
+		first = MeteringPointAssignment.objects.create(
+			metering_point=self.mp,
+			participant=self.participant,
+			valid_from=date(2026, 3, 1),
+			valid_to=date(2026, 5, 31),
+		)
+		MeteringPointAssignment.objects.create(
+			metering_point=self.mp,
+			participant=self.participant2,
+			valid_from=date(2026, 6, 1),
+			valid_to=date(2026, 10, 31),
+		)
+		first.valid_to = date(2026, 12, 31)  # now overlaps the second window
+		with self.assertRaises(ValidationError):
+			first.save()
+
+	def test_validate_no_overlap_tolerates_a_half_built_instance(self):
+		# The guard mirrors clean()'s early return so a half-built instance
+		# does not reach the overlap query with incomplete state.
+		assignment = MeteringPointAssignment()
+		assignment._validate_no_overlap()  # must not raise or query
+
+
+class SeedDemoAssignmentReseedTests(TestCase):
+	"""Running ``seed_demo`` again must not trip the assignment non-overlap
+	guard: the seed window moves every quarter, and ``_ensure_assignment``
+	drops the prior open-ended window before creating the next one."""
+
+	def setUp(self):
+		self.owner = make_user("seed_assign_owner", UserRole.ZEV_OWNER)
+		self.zev = Zev.objects.create(name="Seed Assign ZEV", owner=self.owner, zev_type="vzev", invoice_prefix="SA")
+		self.participant = Participant.objects.create(
+			zev=self.zev,
+			user=make_user("seed_assign_p1", UserRole.PARTICIPANT),
+			first_name="Cara",
+			last_name="Three",
+			email="cara@example.com",
+			valid_from=date(2026, 1, 1),
+		)
+		self.mp = MeteringPoint.objects.create(
+			zev=self.zev,
+			meter_id="CH-SA-001",
+			meter_type=MeteringPointType.CONSUMPTION,
+		)
+
+	def test_reseed_moves_the_window_without_overlapping(self):
+		command = SeedDemoCommand()
+		command._ensure_assignment(self.mp, self.participant, date(2026, 4, 1))
+		command._ensure_assignment(self.mp, self.participant, date(2026, 7, 1))
+		windows = list(MeteringPointAssignment.objects.filter(metering_point=self.mp))
+		self.assertEqual(len(windows), 1)
+		self.assertEqual(windows[0].valid_from, date(2026, 7, 1))
+		self.assertIsNone(windows[0].valid_to)
+
+
 class MeteringPointReadingsDeletionTests(TestCase):
 	def setUp(self):
 		self.admin_client = APIClient()

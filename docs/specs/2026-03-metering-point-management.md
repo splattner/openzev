@@ -150,6 +150,13 @@ overlap check (`exclude(pk=self.pk)`).
 
 Violation → `"A metering point can only have one active assignment at a time."`
 
+**Enforcement:** the check lives in `_validate_no_overlap()`, called from
+`clean()` (via `full_clean()` in the API serializer and admin) **and** from
+`save()`, so programmatic writes (ORM creates in jobs, seeding, shell)
+cannot create overlapping windows either. The allocation runtime
+(`AssignmentWindows`, ADR 0013) still refuses to resolve overlaps as
+defense-in-depth against direct database edits.
+
 #### Rule 4 — Participant validity containment
 
 Assignment dates must fall within the participant's own validity window:
@@ -396,7 +403,7 @@ direction when no explicit direction column is present.
 
 | Risk | Impact | Mitigation |
 |---|---|---|
-| Overlapping assignment windows causing double-counting in billing | High | Non-overlap constraint in model `clean()` + serializer `validate()` with exact overlap query (§3.4 rule 3) |
+| Overlapping assignment windows causing double-counting in billing | High | Non-overlap constraint in model `clean()` + `save()` + serializer `validate()` with exact overlap query (§3.4 rule 3) |
 | Cross-ZEV assignment or data exposure | High | ZEV-scope checks in permissions + queryset scoping + serializer validation (§3.4 rule 1) |
 | Hard-deleting meters breaks historical billing/import traceability | High | Soft-deactivation via `is_active` flag; CASCADE only on explicit delete (§7) |
 | Assignment dates outside participant validity window | Medium | Containment check in serializer `validate()` (§3.4 rule 4) |
@@ -447,7 +454,7 @@ python -m pytest -q
 
 - [ ] Metering-point CRUD is fully ZEV-scope-safe for `admin` and `zev_owner` (§5)
 - [ ] Participants can read their assigned metering points but cannot mutate (§5.3)
-- [ ] Assignment overlap is rejected by both model and serializer validation (§3.4 rule 3)
+- [ ] Assignment overlap is rejected by model validation (`clean()` and `save()`) and serializer validation (§3.4 rule 3)
 - [ ] Cross-ZEV participant-to-meter assignment is rejected (§3.4 rule 1)
 - [ ] Assignment dates must fall within participant validity window (§3.4 rule 4)
 - [ ] Soft deactivation preserves historical readings, assignments, and invoice references (§7)

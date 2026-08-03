@@ -245,7 +245,20 @@ class MeteringPointAssignment(models.Model):
         if errors:
             raise ValidationError(errors)
 
-        # Do not allow overlapping assignments for a metering point.
+        self._validate_no_overlap()
+
+    def _validate_no_overlap(self):
+        """Reject assignment windows that overlap another assignment of the
+        same metering point.
+
+        Called from ``clean()`` (full validation on the API/admin paths) and
+        from ``save()`` (single-object ORM writes). Overlapping windows would
+        make per-timestamp holder attribution ambiguous, so they are rejected
+        at write time rather than left for the allocation runtime to refuse
+        (ADR 0013).
+        """
+        if not self.metering_point_id or not self.valid_from:
+            return
         existing = MeteringPointAssignment.objects.filter(metering_point=self.metering_point)
         if self.pk:
             existing = existing.exclude(pk=self.pk)
@@ -254,6 +267,17 @@ class MeteringPointAssignment(models.Model):
         ).exists()
         if overlap_exists:
             raise ValidationError("A metering point can only have one active assignment at a time.")
+
+    def save(self, *args, **kwargs):
+        """Enforce the non-overlap rule on single-object ORM writes.
+
+        Only the overlap rule runs here: the other ``clean()`` rules
+        (cross-ZEV participant, participant validity containment,
+        ``valid_to >= valid_from``) still require ``full_clean()``, so they
+        are enforced on the API/admin paths.
+        """
+        self._validate_no_overlap()
+        super().save(*args, **kwargs)
 
     def __str__(self):
         valid_to = self.valid_to.isoformat() if self.valid_to else "open"
