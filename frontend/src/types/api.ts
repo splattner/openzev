@@ -182,6 +182,28 @@ export interface SocialAccount {
     created_at: string
 }
 
+export interface ApiKey {
+    id: string
+    name: string
+    prefix: string
+    read_only: boolean
+    created_at: string
+    expires_at: string | null
+    last_used_at: string | null
+    is_expired: boolean
+}
+
+/** The one response that carries the secret. It is never retrievable again. */
+export interface ApiKeyWithSecret extends ApiKey {
+    key: string
+}
+
+export interface ApiKeyInput {
+    name: string
+    read_only: boolean
+    expires_at?: string | null
+}
+
 export interface OAuthLoginInitiateResponse {
     redirect_url: string
 }

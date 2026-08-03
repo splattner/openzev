@@ -7,6 +7,7 @@ import { useToast } from '../lib/toast'
 import { changePassword, deleteSocialAccount, fetchOAuthProviders, fetchSocialAccounts, oauthLinkInitiate, updateProfile } from '../lib/api/auth'
 import { queryKeys } from '../lib/api/queryKeys'
 import { ConfirmDialog, useConfirmDialog } from '../components/ConfirmDialog'
+import { ApiKeysSection } from '../features/account/ApiKeysSection'
 
 export function AccountProfilePage() {
     const { t } = useTranslation()
@@ -296,6 +297,12 @@ export function AccountProfilePage() {
                             {passwordMutation.isPending ? t('common.saving') : t('account.changePassword')}
                         </button>
                     </form>
+                    {/* Stated rather than left to be discovered: both answers
+                        are defensible, and the one nobody tells you about is
+                        the one that surprises somebody. */}
+                    <small style={{ color: '#6b7280', marginTop: '1rem', display: 'block' }}>
+                        {t('account.apiKeys.passwordChangeNote')}
+                    </small>
                 </div>
                 {/* Linked Accounts Section */}
                 <div className="card">
@@ -358,6 +365,18 @@ export function AccountProfilePage() {
                         )
                     })}
                 </div>
+
+                <ApiKeysSection
+                    onRevoke={({ name, onConfirm }) =>
+                        confirm({
+                            title: t('account.apiKeys.revokeConfirmTitle'),
+                            message: t('account.apiKeys.revokeConfirmMessage', { name }),
+                            confirmText: t('account.apiKeys.revoke'),
+                            isDangerous: true,
+                            onConfirm,
+                        })
+                    }
+                />
             </div>
 
             {dialog && (

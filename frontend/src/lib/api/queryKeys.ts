@@ -8,6 +8,7 @@ export const queryKeys = {
     vatRates: () => ['auth', 'vat-rates'] as const,
     oauthProviders: () => ['auth', 'oauth-providers'] as const,
     socialAccounts: () => ['auth', 'social-accounts'] as const,
+    apiKeys: () => ['auth', 'api-keys'] as const,
     oauthProviderConfigs: () => ['auth', 'oauth-provider-configs'] as const,
   },
   zev: {

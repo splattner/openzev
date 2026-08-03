@@ -1,4 +1,7 @@
 import type {
+  ApiKey,
+  ApiKeyInput,
+  ApiKeyWithSecret,
   AppSettings,
   AppSettingsInput,
   FeatureFlag,
@@ -169,4 +172,24 @@ export async function updateOAuthProviderConfig(id: number, payload: Partial<OAu
 
 export async function deleteOAuthProviderConfig(id: number): Promise<void> {
   await api.delete(`/auth/oauth/providers/config/${id}/`)
+}
+
+export async function fetchApiKeys(): Promise<ApiKey[]> {
+  const { data } = await api.get<ApiKey[] | PaginatedResponse<ApiKey>>('/auth/me/api-keys/')
+  return Array.isArray(data) ? data : data.results
+}
+
+/**
+ * Creates a key and returns it *with* its secret.
+ *
+ * This is the only time the secret exists outside the caller's machine — the
+ * backend stores a hash. Show it once; do not cache it.
+ */
+export async function createApiKey(payload: ApiKeyInput): Promise<ApiKeyWithSecret> {
+  const { data } = await api.post<ApiKeyWithSecret>('/auth/me/api-keys/', payload)
+  return data
+}
+
+export async function revokeApiKey(id: string): Promise<void> {
+  await api.delete(`/auth/me/api-keys/${id}/`)
 }
