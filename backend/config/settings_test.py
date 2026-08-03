@@ -19,3 +19,9 @@ CACHES = {
         "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
     }
 }
+
+# Throttle counters live in that cache and survive between tests, so a suite
+# that reuses one API key would start failing once it crossed the hourly limit —
+# in whichever test happened to be the 601st. Tests that exercise throttling
+# override the rate themselves.
+REST_FRAMEWORK = {**REST_FRAMEWORK, "DEFAULT_THROTTLE_RATES": {"api_key": None}}  # noqa: F405

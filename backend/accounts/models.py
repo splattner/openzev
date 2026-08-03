@@ -1,3 +1,4 @@
+import uuid
 from datetime import date, timedelta
 
 from django.contrib.auth.models import AbstractUser, UserManager
@@ -44,6 +45,50 @@ class User(AbstractUser):
 
     def __str__(self):
         return f"{self.get_full_name() or self.username} <{self.email}>"
+
+
+class ApiKey(models.Model):
+    """A long-lived, revocable credential a user creates for themselves.
+
+    The key inherits its owner's role permissions; ``read_only`` narrows it to
+    safe HTTP methods. Only the hash is stored — the secret is shown once at
+    creation and is not retrievable afterwards.
+    """
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="api_keys")
+    name = models.CharField(max_length=100, help_text="What this key is used for.")
+    # Stored in clear: it identifies the key, it is not a secret. Indexed so a
+    # request costs one indexed lookup rather than hashing every row.
+    prefix = models.CharField(max_length=16, unique=True, db_index=True)
+    hashed_key = models.CharField(max_length=64)
+    read_only = models.BooleanField(
+        default=False,
+        help_text="Restrict this key to GET/HEAD/OPTIONS requests.",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField(null=True, blank=True)
+    last_used_at = models.DateTimeField(null=True, blank=True)
+    revoked_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [models.Index(fields=["user", "-created_at"], name="apikey_user_created_idx")]
+
+    def __str__(self):
+        return f"{self.name} ({self.prefix})"
+
+    @property
+    def is_expired(self) -> bool:
+        return self.expires_at is not None and timezone.now() >= self.expires_at
+
+    @property
+    def is_revoked(self) -> bool:
+        return self.revoked_at is not None
+
+    @property
+    def is_active(self) -> bool:
+        return not self.is_revoked and not self.is_expired
 
 
 class EmailVerificationToken(models.Model):

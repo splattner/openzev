@@ -272,7 +272,9 @@ def me(request):
     if request.method == "GET":
         data = UserSerializer(request.user).data
         token = request.auth
-        if token is not None:
+        # An API key authenticates as exactly one user and carries no
+        # impersonation state, so only JWTs are inspected for the claim.
+        if token is not None and (hasattr(token, "get") or hasattr(token, "payload")):
             impersonator_id = token.get("impersonated_by") if hasattr(token, "get") else token.payload.get("impersonated_by")
             if impersonator_id:
                 try:

@@ -122,10 +122,19 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
         "accounts.authentication.CookieJWTAuthentication",
+        "accounts.authentication.ApiKeyAuthentication",
     ],
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.IsAuthenticated",
     ],
+    "DEFAULT_THROTTLE_CLASSES": [
+        "accounts.throttling.ApiKeyRateThrottle",
+    ],
+    "DEFAULT_THROTTLE_RATES": {
+        # Only applies to key-authenticated requests; cookie sessions return a
+        # null cache key and are not throttled.
+        "api_key": env("API_KEY_THROTTLE_RATE", default="600/hour"),
+    },
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 50,
@@ -138,6 +147,16 @@ SIMPLE_JWT = {
     "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
     "ROTATE_REFRESH_TOKENS": True,
 }
+
+# ── API keys ──────────────────────────────────────────────────────────────────
+# Applied when a key is created without an explicit expiry. Set to 0 for keys
+# that never expire by default (not recommended).
+API_KEY_DEFAULT_EXPIRY_DAYS = env.int("API_KEY_DEFAULT_EXPIRY_DAYS", default=365)
+# How stale ``last_used_at`` may be before it is rewritten. Bounds the write
+# amplification of key authentication; see ApiKeyAuthentication._touch.
+API_KEY_LAST_USED_RESOLUTION = timedelta(
+    minutes=env.int("API_KEY_LAST_USED_RESOLUTION_MINUTES", default=5)
+)
 
 # ── CORS ──────────────────────────────────────────────────────────────────────
 CORS_ALLOWED_ORIGINS = env.list(

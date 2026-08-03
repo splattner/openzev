@@ -26,6 +26,10 @@ class AuditEventStatus(models.TextChoices):
 
 class AuditEventSource(models.TextChoices):
     API = "api", "API"
+    # A request authenticated with an API key. Distinct from ``API`` so an
+    # action taken by a script is traceable to the credential that took it,
+    # not only to the person who owns it.
+    API_KEY = "api_key", "API key"
     CELERY = "celery", "Celery"
     SYSTEM = "system", "System"
     MANAGEMENT_COMMAND = "management_command", "Management command"

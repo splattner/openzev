@@ -185,6 +185,17 @@ def record_audit_event(
         if user is None:
             user = getattr(request, "user", None)
 
+        # An action taken with an API key is attributed to the credential as
+        # well as the person, so a leaked key's blast radius is reconstructable
+        # without correlating timestamps by hand.
+        api_key = getattr(request, "api_key", None)
+        if api_key is not None:
+            metadata = {
+                **(metadata or {}),
+                "api_key_id": str(api_key.pk),
+                "api_key_name": api_key.name,
+            }
+
     actor_snapshot = snapshot_actor(user)
 
     resolved_zev = zev or infer_zev(target)
