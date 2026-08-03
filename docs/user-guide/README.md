@@ -33,6 +33,10 @@ Welcome to the OpenZEV user documentation. This guide covers everything you need
 
 - **[Admin Console](14-admin-console.md)** — ZEV management, regional settings, VAT, PDF templates, email templates, feature flags
 
+## Automation
+
+- **[API Keys](16-api-keys.md)** — Long-lived credentials for calling the API from a script
+
 ## Reference
 
 - **[Troubleshooting](12-troubleshooting.md)** — Common issues and solutions
