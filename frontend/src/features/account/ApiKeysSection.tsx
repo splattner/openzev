@@ -21,7 +21,7 @@ interface Props {
 
 export function ApiKeysSection({ onRevoke }: Props) {
     const { t } = useTranslation()
-    const settings = useAppSettings()
+    const { settings } = useAppSettings()
     const { pushToast } = useToast()
     const queryClient = useQueryClient()
 
