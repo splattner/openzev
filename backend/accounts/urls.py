@@ -1,5 +1,6 @@
 from django.urls import path
 from .views import (
+    ApiKeyDetailView, ApiKeyListCreateView,
     CustomTokenObtainPairView, CookieTokenRefreshView, logout_view,
     UserListCreateView,
     UserDetailView, me, change_password, app_settings,
@@ -33,6 +34,10 @@ urlpatterns = [
     path("me/", me, name="me"),
     path("me/change-password/", change_password, name="change-password"),
     path("me/set-initial-password/", set_initial_password, name="set-initial-password"),
+    # Deliberately absent from ACCOUNTS_API_KEY_ALLOWLIST: a key that can issue
+    # or revoke keys makes revoking a leaked one pointless.
+    path("me/api-keys/", ApiKeyListCreateView.as_view(), name="api-key-list-create"),
+    path("me/api-keys/<uuid:pk>/", ApiKeyDetailView.as_view(), name="api-key-detail"),
     path("me/social-accounts/", social_accounts_list, name="social-accounts-list"),
     path("me/social-accounts/<int:pk>/", social_account_delete, name="social-account-delete"),
     path("app-settings/", app_settings, name="app-settings"),

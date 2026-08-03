@@ -10,6 +10,7 @@ change a password, impersonate somebody or issue further keys.
 from datetime import timedelta
 from unittest import mock
 
+from django.conf import settings
 from django.core.cache import cache
 from django.test import TestCase
 from django.test.utils import override_settings
@@ -17,9 +18,7 @@ from django.utils import timezone
 from rest_framework.test import APIClient
 
 from audit.models import AuditEvent, AuditEventSource
-from testing.helpers import make_user
-
-from .throttling import ApiKeyRateThrottle
+from testing.helpers import authenticate, make_user
 
 from .api_keys import (
     KEY_NAMESPACE,
@@ -30,6 +29,7 @@ from .api_keys import (
     verify_secret,
 )
 from .models import ApiKey, UserRole
+from .throttling import ApiKeyRateThrottle
 
 
 def create_api_key(user, **overrides) -> tuple[ApiKey, str]:
@@ -183,8 +183,6 @@ class ApiKeyAuthenticationTests(TestCase):
         self.assertEqual(str(known_prefix.data["detail"]), str(unknown_prefix.data["detail"]))
 
     def test_bearer_tokens_still_work_alongside_key_auth(self):
-        from testing.helpers import authenticate
-
         authenticate(self.client, self.user)
         self.assertEqual(self.client.get("/api/v1/auth/me/").status_code, 200)
 
@@ -388,8 +386,6 @@ class ApiKeyScopeTests(TestCase):
 
     def test_a_cookie_session_is_unaffected_by_the_scope_rules(self):
         """The rules bound API keys, not people."""
-        from testing.helpers import authenticate
-
         session_client = APIClient()
         authenticate(session_client, self.admin)
 
@@ -439,8 +435,6 @@ class ApiKeyAuditTests(TestCase):
         self.assertEqual(event.metadata_json["api_key_name"], "nightly job")
 
     def test_a_cookie_session_is_still_recorded_as_plain_api(self):
-        from testing.helpers import authenticate
-
         session_client = APIClient()
         authenticate(session_client, self.admin)
         session_client.post(
@@ -491,8 +485,6 @@ class ApiKeyThrottleTests(TestCase):
         self.assertEqual(self.client.get("/api/v1/auth/me/").status_code, 200)
 
     def test_a_cookie_session_is_not_throttled(self):
-        from testing.helpers import authenticate
-
         for _ in range(3):
             self.client.get("/api/v1/auth/me/")
         self.assertEqual(self.client.get("/api/v1/auth/me/").status_code, 429)
@@ -501,3 +493,166 @@ class ApiKeyThrottleTests(TestCase):
         authenticate(session_client, self.user)
         for _ in range(5):
             self.assertEqual(session_client.get("/api/v1/auth/me/").status_code, 200)
+
+
+class ApiKeyCrudTests(TestCase):
+    """Creating, listing and revoking keys through the API."""
+
+    LIST_URL = "/api/v1/auth/me/api-keys/"
+
+    def setUp(self):
+        self.user = make_user("owner", UserRole.PARTICIPANT)
+        self.client = APIClient()
+        authenticate(self.client, self.user)
+
+    def create(self, **payload):
+        payload.setdefault("name", "my script")
+        return self.client.post(self.LIST_URL, payload, format="json")
+
+    def test_create_returns_the_secret_exactly_once(self):
+        response = self.create()
+
+        self.assertEqual(response.status_code, 201)
+        secret = response.data["key"]
+        self.assertTrue(secret.startswith(f"{KEY_NAMESPACE}{SEPARATOR}"))
+
+        listed = self.client.get(self.LIST_URL)
+        self.assertEqual(len(listed.data["results"]), 1)
+        self.assertNotIn("key", listed.data["results"][0])
+        self.assertNotIn("hashed_key", listed.data["results"][0])
+
+    def test_the_created_key_authenticates(self):
+        secret = self.create().data["key"]
+
+        key_client = APIClient()
+        key_client.credentials(HTTP_AUTHORIZATION=f"Api-Key {secret}")
+        self.assertEqual(key_client.get("/api/v1/auth/me/").status_code, 200)
+
+    def test_the_plaintext_secret_is_not_stored(self):
+        secret = self.create().data["key"]
+        _, plaintext = split_key(secret)
+
+        stored = ApiKey.objects.get()
+        self.assertNotEqual(stored.hashed_key, plaintext)
+        self.assertNotIn(plaintext, stored.hashed_key)
+
+    def test_a_name_is_required(self):
+        self.assertEqual(self.client.post(self.LIST_URL, {"name": "   "}, format="json").status_code, 400)
+
+    def test_default_expiry_is_applied(self):
+        response = self.create()
+
+        self.assertIsNotNone(response.data["expires_at"])
+        expires_at = ApiKey.objects.get().expires_at
+        self.assertAlmostEqual(
+            (expires_at - timezone.now()).days,
+            settings.API_KEY_DEFAULT_EXPIRY_DAYS,
+            delta=1,
+        )
+
+    @override_settings(API_KEY_DEFAULT_EXPIRY_DAYS=0)
+    def test_expiry_can_be_switched_off_by_configuration(self):
+        self.create()
+        self.assertIsNone(ApiKey.objects.get().expires_at)
+
+    def test_an_explicit_expiry_wins(self):
+        chosen = (timezone.now() + timedelta(days=7)).isoformat()
+
+        self.create(expires_at=chosen)
+
+        self.assertLess((ApiKey.objects.get().expires_at - timezone.now()).days, 8)
+
+    def test_an_expiry_in_the_past_is_refused(self):
+        response = self.create(expires_at=(timezone.now() - timedelta(days=1)).isoformat())
+
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(ApiKey.objects.exists())
+
+    def test_read_only_flag_is_persisted(self):
+        self.create(read_only=True)
+        self.assertTrue(ApiKey.objects.get().read_only)
+
+    def test_a_user_only_sees_their_own_keys(self):
+        other = make_user("stranger", UserRole.ADMIN)
+        create_api_key(other, name="not yours")
+        self.create()
+
+        response = self.client.get(self.LIST_URL)
+
+        self.assertEqual(len(response.data["results"]), 1)
+        self.assertEqual(response.data["results"][0]["name"], "my script")
+
+    def test_an_admin_cannot_read_another_users_keys(self):
+        """Admins can already act as anybody; reading their credential list is
+        a different power, and one nothing here needs."""
+        create_api_key(self.user, name="private")
+        admin_client = APIClient()
+        authenticate(admin_client, make_user("nosy-admin", UserRole.ADMIN))
+
+        response = admin_client.get(self.LIST_URL)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["results"], [])
+
+    def test_revoking_takes_effect_on_the_next_request(self):
+        secret = self.create().data["key"]
+        key_id = ApiKey.objects.get().pk
+        key_client = APIClient()
+        key_client.credentials(HTTP_AUTHORIZATION=f"Api-Key {secret}")
+        self.assertEqual(key_client.get("/api/v1/auth/me/").status_code, 200)
+
+        self.assertEqual(self.client.delete(f"{self.LIST_URL}{key_id}/").status_code, 204)
+
+        self.assertEqual(key_client.get("/api/v1/auth/me/").status_code, 401)
+
+    def test_a_revoked_key_leaves_the_list_but_stays_in_the_table(self):
+        """The row is what lets an audit event still resolve the key's name."""
+        self.create()
+        key_id = ApiKey.objects.get().pk
+
+        self.client.delete(f"{self.LIST_URL}{key_id}/")
+
+        self.assertEqual(self.client.get(self.LIST_URL).data["results"], [])
+        self.assertTrue(ApiKey.objects.filter(pk=key_id).exists())
+
+    def test_a_user_cannot_revoke_somebody_elses_key(self):
+        other = make_user("target", UserRole.PARTICIPANT)
+        victim_key, _ = create_api_key(other)
+
+        response = self.client.delete(f"{self.LIST_URL}{victim_key.pk}/")
+
+        self.assertEqual(response.status_code, 404)
+        victim_key.refresh_from_db()
+        self.assertIsNone(victim_key.revoked_at)
+
+    def test_key_management_needs_authentication(self):
+        self.assertEqual(APIClient().get(self.LIST_URL).status_code, 401)
+
+    def test_a_key_cannot_manage_keys(self):
+        """Otherwise revoking a leaked key achieves nothing: the holder mints
+        a replacement first."""
+        _, secret = create_api_key(self.user)
+        key_client = APIClient()
+        key_client.credentials(HTTP_AUTHORIZATION=f"Api-Key {secret}")
+
+        self.assertEqual(key_client.get(self.LIST_URL).status_code, 403)
+        self.assertEqual(key_client.post(self.LIST_URL, {"name": "x"}, format="json").status_code, 403)
+
+    def test_creation_and_revocation_are_audited(self):
+        self.create(name="nightly export")
+        key_id = ApiKey.objects.get().pk
+        self.client.delete(f"{self.LIST_URL}{key_id}/")
+
+        actions = list(
+            AuditEvent.objects.filter(target_type="accounts.ApiKey")
+            .order_by("created_at")
+            .values_list("action_type", flat=True)
+        )
+        self.assertEqual(actions, ["api_key.create", "api_key.revoke"])
+
+    def test_the_audit_trail_never_carries_the_secret(self):
+        secret = self.create().data["key"]
+
+        event = AuditEvent.objects.get(action_type="api_key.create")
+        self.assertNotIn(secret, str(event.metadata_json))
+        self.assertNotIn(split_key(secret)[1], str(event.metadata_json))

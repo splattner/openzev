@@ -77,3 +77,21 @@ def split_key(raw_key: str) -> tuple[str, str] | None:
     if namespace != KEY_NAMESPACE or not prefix or not secret:
         return None
     return prefix, secret
+
+
+def default_api_key_expiry():
+    """Expiry applied to a key created without an explicit one.
+
+    Optional-with-a-default only helps if the default is visible: the list shows
+    ``expires_at`` on every key precisely so this does not turn into silent
+    breakage a year from now.
+    """
+    from datetime import timedelta
+
+    from django.conf import settings
+    from django.utils import timezone
+
+    days = settings.API_KEY_DEFAULT_EXPIRY_DAYS
+    if not days:
+        return None
+    return timezone.now() + timedelta(days=days)

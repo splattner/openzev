@@ -16,15 +16,17 @@ from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.serializers import TokenRefreshSerializer
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView
+from .api_keys import default_api_key_expiry, generate_key
 from .models import User, UserRole, EmailVerificationToken
 from .serializers import (
     UserSerializer, UserCreateSerializer,
     ChangePasswordSerializer, CustomTokenObtainPairSerializer,
+    ApiKeySerializer, ApiKeyCreateSerializer,
     AppSettingsSerializer,
     FeatureFlagSerializer,
     VatRateSerializer,
 )
-from .models import AppSettings, FeatureFlag, VatRate
+from .models import ApiKey, AppSettings, FeatureFlag, VatRate
 from .cookies import (
     ADMIN_ACCESS_COOKIE,
     ADMIN_REFRESH_COOKIE,
@@ -595,3 +597,93 @@ def set_initial_password(request):
     response = Response({"detail": "Password set successfully."})
     set_auth_cookies(response, access=str(refresh.access_token), refresh=str(refresh))
     return response
+
+
+class ApiKeyListCreateView(generics.ListCreateAPIView):
+    """A user's own API keys.
+
+    Scoped to ``request.user`` with no way to widen it — not even for an admin.
+    An admin can already act as anybody through the existing endpoints; being
+    able to *read another person's credentials list* is a different power, and
+    one nothing here needs.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def get_serializer_class(self):
+        return ApiKeyCreateSerializer if self.request.method == "POST" else ApiKeySerializer
+
+    def get_queryset(self):
+        # Revoked keys stay in the table so audit events can still resolve
+        # api_key_id to a name; they just leave the list.
+        return ApiKey.objects.filter(user=self.request.user, revoked_at__isnull=True)
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        full_key, prefix, hashed_key = generate_key()
+        expires_at = serializer.validated_data.get("expires_at") or default_api_key_expiry()
+
+        api_key = ApiKey.objects.create(
+            user=request.user,
+            name=serializer.validated_data["name"],
+            read_only=serializer.validated_data.get("read_only", False),
+            prefix=prefix,
+            hashed_key=hashed_key,
+            expires_at=expires_at,
+        )
+
+        record_audit_event(
+            request=request,
+            action_category=AuditActionCategory.AUTH,
+            action_type="api_key.create",
+            target_type="accounts.ApiKey",
+            target=api_key,
+            target_id=str(api_key.pk),
+            target_display=api_key.name,
+            summary=f"Created API key '{api_key.name}'.",
+            metadata={
+                "prefix": api_key.prefix,
+                "read_only": api_key.read_only,
+                "expires_at": api_key.expires_at,
+            },
+        )
+
+        # The only response that carries the secret. It is not stored anywhere
+        # and cannot be retrieved again.
+        data = ApiKeySerializer(api_key).data
+        data["key"] = full_key
+        return Response(data, status=status.HTTP_201_CREATED)
+
+
+class ApiKeyDetailView(generics.DestroyAPIView):
+    """Revoke a key.
+
+    DELETE revokes rather than deleting: the row is what lets an audit event's
+    ``api_key_id`` still resolve to a name months later, which is the whole
+    point of recording it. Revocation takes effect on the next request — the
+    authentication path reads the row every time and nothing is cached.
+    """
+
+    permission_classes = [IsAuthenticated]
+    serializer_class = ApiKeySerializer
+
+    def get_queryset(self):
+        return ApiKey.objects.filter(user=self.request.user, revoked_at__isnull=True)
+
+    def perform_destroy(self, instance):
+        instance.revoked_at = timezone.now()
+        instance.save(update_fields=["revoked_at"])
+
+        record_audit_event(
+            request=self.request,
+            action_category=AuditActionCategory.AUTH,
+            action_type="api_key.revoke",
+            target_type="accounts.ApiKey",
+            target=instance,
+            target_id=str(instance.pk),
+            target_display=instance.name,
+            summary=f"Revoked API key '{instance.name}'.",
+            metadata={"prefix": instance.prefix},
+        )

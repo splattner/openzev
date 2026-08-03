@@ -5,7 +5,7 @@ from django.utils.text import slugify
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from urllib.parse import urlparse
-from .models import AppSettings, FeatureFlag, OAuthProvider, SocialAccount, User, UserRole, VatRate
+from .models import ApiKey, AppSettings, FeatureFlag, OAuthProvider, SocialAccount, User, UserRole, VatRate
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -219,3 +219,45 @@ class VatRateInputSerializer(serializers.ModelSerializer):
     class Meta:
         model = VatRate
         fields = ["rate", "valid_from", "valid_to"]
+
+
+class ApiKeySerializer(serializers.ModelSerializer):
+    """A key as it appears in the list — never including the secret."""
+
+    is_expired = serializers.BooleanField(read_only=True)
+
+    class Meta:
+        model = ApiKey
+        fields = [
+            "id", "name", "prefix", "read_only",
+            "created_at", "expires_at", "last_used_at", "is_expired",
+        ]
+        read_only_fields = fields
+
+
+class ApiKeyCreateSerializer(serializers.ModelSerializer):
+    """Input for creating a key.
+
+    ``expires_at`` is optional: left out, the key gets
+    ``API_KEY_DEFAULT_EXPIRY_DAYS``. An expiry that has already passed is
+    refused rather than silently accepted — a key that is dead on arrival is
+    always a mistake, and the failure would otherwise look like a broken
+    credential rather than a bad request.
+    """
+
+    class Meta:
+        model = ApiKey
+        fields = ["name", "read_only", "expires_at"]
+
+    def validate_name(self, value):
+        value = value.strip()
+        if not value:
+            raise serializers.ValidationError("A name is required so the key can be recognised later.")
+        return value
+
+    def validate_expires_at(self, value):
+        from django.utils import timezone
+
+        if value is not None and value <= timezone.now():
+            raise serializers.ValidationError("Expiry must be in the future.")
+        return value
