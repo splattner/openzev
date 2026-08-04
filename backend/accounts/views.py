@@ -713,7 +713,7 @@ class AdminApiKeyListView(generics.ListAPIView):
 
         user_id = self.request.query_params.get("user")
         if user_id:
-            if not user_id.isdigit():
+            if not (user_id.isascii() and user_id.isdigit()):
                 raise ValidationError({"user": ["Not a valid user id."]})
             queryset = queryset.filter(user_id=user_id)
 

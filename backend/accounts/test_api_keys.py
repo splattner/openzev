@@ -741,6 +741,12 @@ class AdminApiKeyManagementTests(TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertIn("user", response.json())
 
+    def test_a_unicode_digit_user_filter_is_refused_not_a_server_error(self):
+        response = self.client.get(self.LIST_URL, {"user": "١٢٣"})
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("user", response.json())
+
     # ── revoking ─────────────────────────────────────────────────────────
 
     def test_admin_can_revoke_another_users_key(self):
