@@ -266,8 +266,8 @@ class ApiKeyCreateSerializer(serializers.ModelSerializer):
 class AdminApiKeySerializer(serializers.ModelSerializer):
     """A key as an admin sees it: the same fields plus who owns it.
 
-    Deliberately never exposes ``hashed_key``. There is no admin path to a
-    key's secret — none exists to expose, since only the hash is stored.
+    Deliberately never exposes ``hashed_key`` — there is no admin path to a
+    key's secret.
     """
 
     username = serializers.CharField(source="user.username", read_only=True)

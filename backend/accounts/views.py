@@ -706,15 +706,22 @@ class AdminApiKeyListView(generics.ListAPIView):
 
     permission_classes = [IsAdmin]
     serializer_class = AdminApiKeySerializer
+    _VALID_STATUSES = ("active", "revoked")
 
     def get_queryset(self):
         queryset = ApiKey.objects.select_related("user").order_by("-created_at")
 
         user_id = self.request.query_params.get("user")
         if user_id:
+            if not user_id.isdigit():
+                raise ValidationError({"user": ["Not a valid user id."]})
             queryset = queryset.filter(user_id=user_id)
 
         status_filter = self.request.query_params.get("status")
+        if status_filter not in (None, *self._VALID_STATUSES):
+            raise ValidationError(
+                {"status": [f"Unknown status '{status_filter}'. Expected one of: {', '.join(self._VALID_STATUSES)}."]}
+            )
         if status_filter == "active":
             queryset = queryset.filter(revoked_at__isnull=True)
         elif status_filter == "revoked":

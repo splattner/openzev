@@ -158,7 +158,7 @@ export function AdminApiKeysPage() {
                                         <td>{key.name}</td>
                                         <td>
                                             {key.user_email || key.username}
-                                            <small style={{ display: 'block', color: '#6b7280' }}>{key.user_role}</small>
+                                            <small className="muted" style={{ display: 'block' }}>{key.user_role}</small>
                                         </td>
                                         <td><code>{key.prefix}</code></td>
                                         <td>

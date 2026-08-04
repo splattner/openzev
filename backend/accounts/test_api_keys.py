@@ -661,11 +661,8 @@ class ApiKeyCrudTests(TestCase):
 class AdminApiKeyManagementTests(TestCase):
     """Admin console: see every key, revoke any of them.
 
-    This deliberately widens what an admin can reach — the original endpoints
-    were scoped to the owner. The reason is operational: offboarding somebody,
-    or responding to a leak, needs a way to find and kill a credential without
-    knowing whose it is. What stays closed is *creating* a key for somebody
-    else, which would be a durable credential in their name.
+    What stays closed is *creating* a key for somebody else, which would be a
+    durable credential in their name.
     """
 
     LIST_URL = "/api/v1/auth/api-keys/"
@@ -708,8 +705,6 @@ class AdminApiKeyManagementTests(TestCase):
             self.assertNotIn("key", row)
 
     def test_revoked_keys_are_listed_too(self):
-        """An admin opening this page is usually mid-incident; 'was it revoked,
-        and when' is the question being asked."""
         self.owner_key.revoked_at = timezone.now()
         self.owner_key.save(update_fields=["revoked_at"])
 
@@ -733,6 +728,18 @@ class AdminApiKeyManagementTests(TestCase):
 
         self.assertNotIn("owner nightly", {r["name"] for r in active.data["results"]})
         self.assertEqual([r["name"] for r in revoked.data["results"]], ["owner nightly"])
+
+    def test_an_unknown_status_is_refused_not_silently_ignored(self):
+        response = self.client.get(self.LIST_URL, {"status": "expired"})
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("status", response.json())
+
+    def test_a_non_numeric_user_filter_is_refused_not_a_server_error(self):
+        response = self.client.get(self.LIST_URL, {"user": "not-a-number"})
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("user", response.json())
 
     # ── revoking ─────────────────────────────────────────────────────────
 
