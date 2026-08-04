@@ -1644,6 +1644,8 @@ export const de = {
         severityYellow: 'Teilweise',
         severityRed: 'Fehlend',
         moreGaps: 'weitere Lücken',
+        unassignedWarning: '{{readings}} Messwerte an {{days}} Tagen ohne Zuordnung — nicht verrechnet',
+        assignmentOverlapWarning: 'Überlappende Zuordnungsfenster — betroffenen Zähler neu zuweisen',
     },
     features: {
         eyebrow: 'Admin-Konsole',

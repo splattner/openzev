@@ -535,6 +535,16 @@ export function MeteringChartPage() {
                                                             >
                                                                 {t(`meteringDataQuality.severity${mp.severity.charAt(0).toUpperCase() + mp.severity.slice(1)}`)}
                                                             </span>
+                                                            {mp.assignment_overlap && (
+                                                                <div className="metering-dq-warning">
+                                                                    {t('meteringDataQuality.assignmentOverlapWarning')}
+                                                                </div>
+                                                            )}
+                                                            {mp.unassigned_readings > 0 && (
+                                                                <div className="metering-dq-warning">
+                                                                    {t('meteringDataQuality.unassignedWarning', { readings: mp.unassigned_readings, days: mp.unassigned_days })}
+                                                                </div>
+                                                            )}
                                                         </td>
                                                         <td style={{ fontSize: '0.875rem' }}>
                                                             {mp.gaps.length === 0 ? (

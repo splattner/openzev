@@ -1651,6 +1651,8 @@ export const it = {
         severityYellow: 'Parziale',
         severityRed: 'Mancante',
         moreGaps: 'altre lacune',
+        unassignedWarning: '{{readings}} letture su {{days}} giorni senza assegnazione — non fatturate',
+        assignmentOverlapWarning: 'Finestre di assegnazione sovrapposte — riassegnare il contatore interessato',
     },
     features: {
         eyebrow: 'Console di amministrazione',

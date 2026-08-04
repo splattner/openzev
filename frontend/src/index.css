@@ -1862,6 +1862,13 @@ h3 {
   text-decoration: underline;
 }
 
+.metering-dq-warning {
+  margin-top: 0.25rem;
+  font-size: 0.75rem;
+  color: #b45309;
+  max-width: 220px;
+}
+
 /* Responsive form grids — inline 2-col grids that collapse on mobile */
 .form-grid {
   display: grid;

@@ -5,11 +5,13 @@ These functions receive pre-filtered querysets / parameters and return plain
 dicts that views can hand straight to Response().  No HTTP or permission logic
 lives here, which makes the calculations independently unit-testable.
 """
+from collections import defaultdict
 from datetime import date as date_type, datetime, timedelta, timezone as dt_timezone
 from decimal import Decimal, ROUND_HALF_UP
 
 from django.db.models import Max, Min, Q, Sum
 
+from allocation.errors import OverlappingAssignmentWindowsError
 from allocation.split import split_consumption, split_production
 from allocation.windows import AssignmentWindows
 from zev.models import (
@@ -640,11 +642,21 @@ def compute_hourly_profile(selected_zev_id, participant_ids, start_dt, end_dt, p
 
 def compute_data_quality_status(metering_points, date_from, date_to, today):
     """
-    Detect missing daily readings per metering point.
+    Detect missing daily readings per metering point, and readings that have
+    no assignment holder at their timestamp.
 
     metering_points – MeteringPoint queryset.
     date_from / date_to – date objects defining the inspection window.
     today           – date object (passed in so callers can control "now").
+
+    A reading whose metering point has no assignment active at the reading's
+    UTC civil date is billed to nobody but still inflates the ZEV pool (ADR
+    0013); that is always a misconfiguration, so such readings are counted
+    per metering point as ``unassigned_readings`` / ``unassigned_days``.
+    Holders are resolved once per distinct day (assignment validity is
+    date-granular), and the per-meter ``assignment_overlap`` flag marks
+    metering points whose windows overlap, so one corrupt meter degrades to
+    one bad row instead of failing the whole status page.
 
     Returns a list of status dicts, one per metering point.
     """
@@ -654,15 +666,45 @@ def compute_data_quality_status(metering_points, date_from, date_to, today):
         all_days.add(current)
         current += timedelta(days=1)
 
+    assignment_rows = MeteringPointAssignment.objects.filter(
+        metering_point__in=metering_points,
+        valid_from__lte=date_to,
+    ).filter(
+        Q(valid_to__isnull=True) | Q(valid_to__gte=date_from)
+    ).values_list("metering_point_id", "valid_from", "valid_to", "participant_id")
+
+    windows_by_mp: dict = {}
+    for row in assignment_rows:
+        windows_by_mp.setdefault(row[0], []).append(row)
+
+    current_holders = {}
+    for assignment in MeteringPointAssignment.objects.filter(
+        metering_point__in=metering_points,
+        valid_from__lte=today,
+    ).filter(
+        Q(valid_to__isnull=True) | Q(valid_to__gte=today)
+    ).order_by("-valid_from").select_related("participant"):
+        current_holders.setdefault(assignment.metering_point_id, assignment.participant.full_name)
+
     result = []
     for mp in metering_points:
+        try:
+            windows = AssignmentWindows(windows_by_mp.get(mp.id, ()))
+        except OverlappingAssignmentWindowsError:
+            windows = None
+
         readings_ts = MeterReading.objects.filter(
             metering_point=mp,
             timestamp__gte=datetime.combine(date_from, datetime.min.time(), tzinfo=dt_timezone.utc),
             timestamp__lt=datetime.combine(date_to, datetime.min.time(), tzinfo=dt_timezone.utc) + timedelta(days=1),
         ).values_list("timestamp", flat=True)
 
-        days_with_data = {ts.date() for ts in readings_ts}
+        days_with_data = set()
+        readings_per_day = defaultdict(int)
+        for ts in readings_ts:
+            day = ts.astimezone(dt_timezone.utc).date()
+            days_with_data.add(day)
+            readings_per_day[day] += 1
 
         missing_days = sorted(all_days - days_with_data)
         gaps = []
@@ -692,23 +734,26 @@ def compute_data_quality_status(metering_points, date_from, date_to, today):
         else:
             severity = "red"
 
-        assignment = (
-            mp.assignments.filter(valid_from__lte=today)
-            .filter(Q(valid_to__isnull=True) | Q(valid_to__gte=today))
-            .order_by("-valid_from")
-            .first()
-        )
-        participant_name = assignment.participant.full_name if assignment else "Unassigned"
+        unassigned_days = set()
+        unassigned_readings = 0
+        if windows is not None:
+            for day in days_with_data:
+                if windows.participant_on(mp.id, day) is None:
+                    unassigned_days.add(day)
+                    unassigned_readings += readings_per_day[day]
 
         result.append({
             "id": str(mp.id),
             "meter_id": mp.meter_id,
-            "participant_name": participant_name,
+            "participant_name": current_holders.get(mp.id, "Unassigned"),
             "severity": severity,
             "data_completeness": data_completeness,
             "days_with_data": len(days_with_data),
             "total_days": len(all_days),
             "gaps": gaps,
+            "unassigned_days": len(unassigned_days),
+            "unassigned_readings": unassigned_readings,
+            "assignment_overlap": windows is None,
         })
 
     return result

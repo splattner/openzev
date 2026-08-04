@@ -460,7 +460,10 @@ though no participant is charged for them.
           "end_date": "2026-01-17",
           "duration_days": 3
         }
-      ]
+      ],
+      "unassigned_days": 0,
+      "unassigned_readings": 0,
+      "assignment_overlap": false
     }
   ]
 }
@@ -483,9 +486,37 @@ though no participant is charged for them.
 | 50–99% | `yellow` |
 | 0–49% | `red` |
 
+`severity` reflects daily *completeness* only. Holder-less readings and
+overlapping assignment windows are surfaced by the amber row warnings below,
+not by the severity cell: a fully-complete meter with no holder is still
+`green` on completeness while its warning says its readings are unbilled.
+
 **Participant resolution:** the current participant assignment (active today)
-is looked up for display; meters with no current assignment show
-`"Unassigned"`.
+is looked up for display (one batched query); meters with no current
+assignment show `"Unassigned"`.
+
+**Unassigned-holder detection:** a reading whose metering point has no
+assignment active at the reading's UTC civil date is billed to nobody but
+still inflates the ZEV pool (ADR 0013); that is always a misconfiguration,
+not a valid state. Such readings are counted per metering point as
+`unassigned_readings` plus the distinct `unassigned_days` they fall on, so
+an operator can assign the meter (e.g. to an *Allgemein* / community
+participant) or confirm the exclusion. Holders are resolved through the
+shared `AssignmentWindows` with the same UTC-civil-date semantics as billing
+(`AssignmentWindows.participant_on`), once per distinct day rather than once
+per reading — assignment validity is date-granular, so day-level resolution
+is exactly equivalent. `unassigned_readings` counts reading *rows*: a
+bidirectional meter with `in` and `out` readings at one timestamp
+contributes 2.
+
+**Overlapping-window flagging:** `AssignmentWindows` fails fast on
+overlapping windows (only possible via direct-DB edits once the model
+`save()` guard rejects them). The status check catches that per metering
+point, so one corrupt meter degrades to one flagged row
+(`assignment_overlap: true`) while every other meter still reports — the
+page never 400s wholesale. For a flagged meter, `unassigned_days` /
+`unassigned_readings` are 0 (holders cannot be resolved); gap detection and
+severity are unaffected.
 
 ### 5.6 Import endpoints
 
@@ -739,7 +770,7 @@ type MeteringDashboardSummary =
 | `ParticipantImportRestrictionTests` | §6.2: participant cannot list import logs, preview CSV, or upload CSV (all 403) |
 | `ImportParserRobustnessTests` | §4.1: malformed CSV reported without crash; malformed SDAT-CH reported without crash; timezone offset normalized to UTC; duplicate rows skipped; idempotent re-import; overwrite mode updates value without creating new row |
 | `MeteringRawDataEndpointTests` | §5.3: owner gets daily-grouped raw rows with correct direction sums; participant can read own metering point's raw data |
-| `DataQualityStatusTests` | §5.5: owner sees gaps and severity; participant sees own meters; default 30-day range |
+| `DataQualityStatusTests` | §5.5: owner sees gaps and severity; participant sees own meters; default 30-day range; fully assigned readings report no unassigned; holder-less meter flags every reading; assignment-gap readings flagged unassigned; overlapping windows flag only the corrupt meter (others still report) |
 
 ### Frontend
 
@@ -748,6 +779,11 @@ type MeteringDashboardSummary =
 - Dashboard summary role-differentiated behavior
 - Data quality severity indicators and gap display
 - Build and type checks: `npm run build`
+
+The unassigned-holder and overlapping-window warning renders are conditional
+JSX in `MeteringChartPage` backed by the `MeteringPointDataQuality` type; they
+are covered by backend tests plus the manual check below (no frontend
+component test infra exists).
 
 ### Manual verification
 
@@ -761,6 +797,12 @@ type MeteringDashboardSummary =
   split matches timestamp-level calculation.
 - Verify data quality severity thresholds: 100% → green, 50–99% → yellow,
   0–49% → red.
+- Create a metering point with no assignment and import readings; verify the
+  Data Quality table shows the amber "no assignment holder" warning with the
+  reading/day counts.
+- Inject overlapping assignment windows via the DB (bypassing the model
+  guard); verify only the affected meter shows the overlap warning and all
+  other meters still report.
 
 ---
 
@@ -776,6 +818,7 @@ type MeteringDashboardSummary =
 - [ ] Dashboard summary returns role-differentiated response with correct local/grid split (§5.4)
 - [ ] Dashboard readings are attributed per assignment timestamp; gap readings appear in ZEV aggregates but on no participant's totals (§5.4)
 - [ ] Data quality status returns per-metering-point gap detection with severity thresholds (§5.5)
+- [ ] Data quality status flags holder-less readings and overlapping windows per metering point without failing the whole response (§5.5)
 - [ ] All date queries use explicit UTC boundary construction (§7)
 - [ ] Participants cannot import or access import logs (§6.2)
 - [ ] Metering data filters and date ranges behave consistently across all endpoints (§7)

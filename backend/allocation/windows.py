@@ -92,6 +92,19 @@ class AssignmentWindows:
             for _valid_from, _valid_to, participant_id in mp_windows
         }
 
+    def participant_on(self, metering_point_id, day: date):
+        """Participant id holding ``metering_point_id`` on ``day``, or ``None``.
+
+        Assignment validity is date-granular, so matching a day directly is
+        equivalent to matching any timestamp that falls on it. Callers that
+        only need the day (e.g. data-quality checks) should resolve once per
+        distinct day instead of once per reading.
+        """
+        for valid_from, valid_to, participant_id in self.active_windows(metering_point_id):
+            if valid_from <= day and (valid_to is None or valid_to >= day):
+                return participant_id
+        return None
+
     def participant_at(self, metering_point_id, ts: datetime):
         """Participant id holding ``metering_point_id`` at ``ts``, or ``None``.
 
@@ -103,10 +116,7 @@ class AssignmentWindows:
         datetime cannot silently shift the civil date.
         """
         day = ts.astimezone(timezone.utc).date()
-        for valid_from, valid_to, participant_id in self.active_windows(metering_point_id):
-            if valid_from <= day and (valid_to is None or valid_to >= day):
-                return participant_id
-        return None
+        return self.participant_on(metering_point_id, day)
 
     def is_held_by(self, participant_id, metering_point_id, ts: datetime) -> bool:
         """Whether ``participant_id`` holds ``metering_point_id`` at ``ts``.

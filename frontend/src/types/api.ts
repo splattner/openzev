@@ -336,6 +336,9 @@ export interface MeteringPointDataQuality {
     days_with_data: number
     total_days: number
     gaps: MeteringPointGap[]
+    unassigned_days: number
+    unassigned_readings: number
+    assignment_overlap: boolean
 }
 
 export interface DataQualityStatusResponse {

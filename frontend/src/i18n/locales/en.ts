@@ -1618,6 +1618,8 @@ export const en = {
         severityYellow: 'Partial',
         severityRed: 'Missing',
         moreGaps: 'more gaps',
+        unassignedWarning: '{{readings}} readings over {{days}} days with no assignment holder — not billed',
+        assignmentOverlapWarning: 'Overlapping assignment windows — reassign the affected meter',
     },
     features: {
         eyebrow: 'Admin Console',

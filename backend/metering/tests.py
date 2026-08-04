@@ -542,6 +542,151 @@ class DataQualityStatusTests(TestCase):
 		self.assertIn("date_from", resp.data)
 		self.assertIn("date_to", resp.data)
 
+	def test_fully_assigned_readings_report_no_unassigned(self):
+		"""Readings covered by an active assignment are not flagged."""
+		auth(self.client, self.owner)
+
+		MeterReading.objects.create(
+			metering_point=self.metering_point,
+			timestamp=datetime(2026, 1, 2, 12, 0, tzinfo=timezone.utc),
+			energy_kwh=Decimal("10.0"),
+			direction=ReadingDirection.IN,
+			resolution=ReadingResolution.DAILY,
+		)
+
+		resp = self.client.get(
+			"/api/v1/metering/readings/data-quality-status/",
+			{"date_from": "2026-01-01", "date_to": "2026-01-07"},
+		)
+
+		self.assertEqual(resp.status_code, 200)
+		mp_status = resp.data["metering_points"][0]
+		self.assertEqual(mp_status["unassigned_readings"], 0)
+		self.assertEqual(mp_status["unassigned_days"], 0)
+
+	def test_holderless_meter_flags_every_reading(self):
+		"""A metering point with no assignment flags all of its readings (ADR 0013)."""
+		auth(self.client, self.owner)
+
+		holderless = MeteringPoint.objects.create(
+			zev=self.zev,
+			meter_id="CH-DQ-002",
+			meter_type=MeteringPointType.CONSUMPTION,
+		)
+		MeterReading.objects.create(
+			metering_point=self.metering_point,
+			timestamp=datetime(2026, 1, 2, 12, 0, tzinfo=timezone.utc),
+			energy_kwh=Decimal("10.0"),
+			direction=ReadingDirection.IN,
+			resolution=ReadingResolution.DAILY,
+		)
+		for day in (2, 3):
+			MeterReading.objects.create(
+				metering_point=holderless,
+				timestamp=datetime(2026, 1, day, 12, 0, tzinfo=timezone.utc),
+				energy_kwh=Decimal("5.0"),
+				direction=ReadingDirection.IN,
+				resolution=ReadingResolution.DAILY,
+			)
+
+		resp = self.client.get(
+			"/api/v1/metering/readings/data-quality-status/",
+			{"date_from": "2026-01-01", "date_to": "2026-01-07"},
+		)
+
+		self.assertEqual(resp.status_code, 200)
+		by_meter = {mp["meter_id"]: mp for mp in resp.data["metering_points"]}
+		self.assertEqual(by_meter["CH-DQ-002"]["unassigned_readings"], 2)
+		self.assertEqual(by_meter["CH-DQ-002"]["unassigned_days"], 2)
+		self.assertEqual(by_meter["CH-DQ-001"]["unassigned_readings"], 0)
+
+	def test_assignment_gap_readings_are_flagged_unassigned(self):
+		"""Readings after an assignment ends have no holder and are flagged."""
+		auth(self.client, self.owner)
+
+		assignment = MeteringPointAssignment.objects.get(metering_point=self.metering_point)
+		assignment.valid_to = date(2026, 1, 3)
+		assignment.save()
+
+		MeterReading.objects.create(
+			metering_point=self.metering_point,
+			timestamp=datetime(2026, 1, 2, 12, 0, tzinfo=timezone.utc),
+			energy_kwh=Decimal("10.0"),
+			direction=ReadingDirection.IN,
+			resolution=ReadingResolution.DAILY,
+		)
+		MeterReading.objects.create(
+			metering_point=self.metering_point,
+			timestamp=datetime(2026, 1, 5, 12, 0, tzinfo=timezone.utc),
+			energy_kwh=Decimal("12.0"),
+			direction=ReadingDirection.IN,
+			resolution=ReadingResolution.DAILY,
+		)
+
+		resp = self.client.get(
+			"/api/v1/metering/readings/data-quality-status/",
+			{"date_from": "2026-01-01", "date_to": "2026-01-07"},
+		)
+
+		self.assertEqual(resp.status_code, 200)
+		mp_status = resp.data["metering_points"][0]
+		self.assertEqual(mp_status["unassigned_readings"], 1)
+		self.assertEqual(mp_status["unassigned_days"], 1)
+
+	def test_overlapping_windows_flag_only_the_corrupt_meter(self):
+		"""One corrupt meter degrades to one flagged row; the rest still report.
+
+		Inserted via ``bulk_create`` so it bypasses the model's ``save()``
+		non-overlap guard, mirroring a direct-DB corrupt write.
+		"""
+		auth(self.client, self.owner)
+
+		MeteringPointAssignment.objects.bulk_create([
+			MeteringPointAssignment(
+				metering_point=self.metering_point,
+				participant=self.participant,
+				valid_from=date(2026, 1, 3),
+			)
+		])
+
+		healthy = MeteringPoint.objects.create(
+			zev=self.zev,
+			meter_id="CH-DQ-003",
+			meter_type=MeteringPointType.CONSUMPTION,
+		)
+		MeteringPointAssignment.objects.create(
+			metering_point=healthy,
+			participant=self.participant,
+			valid_from=date(2026, 1, 1),
+		)
+		for mp in (self.metering_point, healthy):
+			for day in (2, 5):
+				MeterReading.objects.create(
+					metering_point=mp,
+					timestamp=datetime(2026, 1, day, 12, 0, tzinfo=timezone.utc),
+					energy_kwh=Decimal("10.0"),
+					direction=ReadingDirection.IN,
+					resolution=ReadingResolution.DAILY,
+				)
+
+		resp = self.client.get(
+			"/api/v1/metering/readings/data-quality-status/",
+			{"date_from": "2026-01-01", "date_to": "2026-01-07"},
+		)
+
+		self.assertEqual(resp.status_code, 200)
+		by_meter = {mp["meter_id"]: mp for mp in resp.data["metering_points"]}
+		corrupt = by_meter["CH-DQ-001"]
+		self.assertTrue(corrupt["assignment_overlap"])
+		self.assertEqual(corrupt["unassigned_readings"], 0)
+		self.assertEqual(corrupt["unassigned_days"], 0)
+		self.assertEqual(corrupt["data_completeness"], 28)
+		self.assertEqual(len(corrupt["gaps"]), 3)
+		healthy_status = by_meter["CH-DQ-003"]
+		self.assertFalse(healthy_status["assignment_overlap"])
+		self.assertEqual(healthy_status["unassigned_readings"], 0)
+		self.assertEqual(healthy_status["data_completeness"], 28)
+
 class ChartDataEndpointTests(TestCase):
 	"""Regression cover for /metering/readings/chart-data/.
 

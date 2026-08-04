@@ -317,6 +317,18 @@ def test_gap_readings_resolve_to_no_participant():
     assert windows.participant_at("mp1", TS.replace(month=6, day=20)) is None
 
 
+def test_participant_on_matches_the_same_date_as_participant_at():
+    """Day-level resolution is equivalent to timestamp-level resolution."""
+    windows = AssignmentWindows([
+        ("mp1", datetime.date(2026, 6, 1), datetime.date(2026, 6, 15), 11),
+        ("mp1", datetime.date(2026, 6, 16), None, 22),
+    ])
+
+    assert windows.participant_on("mp1", datetime.date(2026, 6, 15)) == 11
+    assert windows.participant_on("mp1", datetime.date(2026, 6, 20)) == 22
+    assert windows.participant_on("mp1", datetime.date(2026, 5, 31)) is None
+
+
 def test_open_ended_assignment_covers_everything_after_valid_from():
     windows = AssignmentWindows([("mp1", datetime.date(2026, 6, 1), None, 11)])
 
