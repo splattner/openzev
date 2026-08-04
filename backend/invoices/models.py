@@ -42,12 +42,8 @@ class Invoice(models.Model):
     class Meta:
         ordering = ["-period_end", "participant"]
         constraints = [
-            # Numbering is per-ZEV by design: ``Zev.next_invoice_number()`` reads
-            # ``invoice_prefix``/``invoice_counter`` off the ZEV row, so two
-            # communities each counting from 1 is the intended model. A global
-            # ``unique=True`` contradicted that — every ZEV ships with the same
-            # ``INV`` default, so the second one's billing run died on a database
-            # constraint instead of producing invoices.
+            # Numbering is per-ZEV: each community counts its invoices from 1,
+            # so the number only needs to be unique within the ZEV.
             models.UniqueConstraint(
                 fields=["zev", "invoice_number"],
                 name="unique_invoice_number_per_zev",
