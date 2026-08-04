@@ -134,10 +134,15 @@ def _compute_period_participant_stats(invoice) -> tuple[dict, list[dict]]:
         entry["from_grid_kwh"] += reading.split.grid_kwh
 
     # Per-participant production, attributed the same way. The PDF only reports
-    # each participant's total production, so the split is not needed here.
+    # each participant's total production, so the split is not needed here —
+    # with_split=False skips split_production (and its fail-fast non-negative
+    # contract) for every community reading, so a corrupt production meter
+    # (a meter correction with a negative energy_kwh) is attributed to its
+    # holder instead of making the PDF unrenderable for the whole ZEV.
     for reading in iter_allocated_readings(
         zev, start_dt, end_dt, kind=PRODUCTION, windows=windows,
         consumption_by_ts=cons_by_ts, production_by_ts=prod_by_ts,
+        with_split=False,
     ):
         if reading.holder_id is None:
             continue

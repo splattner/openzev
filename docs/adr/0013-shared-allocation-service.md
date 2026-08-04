@@ -125,7 +125,7 @@ Verification (at time of implementation):
 - `generate_invoices_for_zev` isolates failures per participant and reports generated/failed counts with per-participant errors (`invoices/test_batch_actions.py`)
 - The metering data-quality status reports holder-less readings (`unassigned_days` / `unassigned_readings`) and flags per-meter overlapping assignment windows (`assignment_overlap`), so one corrupt meter degrades to one bad row (`metering/tests.py`)
 - Query-count guards pin the single-fetch invariant and upper-bound per-consumer query counts across the billing path (`invoices/test_allocation_query_counts.py`)
-- The allocation read-model (`allocation/read_model.py`) centralizes the fetch/resolve/split orchestration; `allocation/test_read_model.py` pins physical totals, per-timestamp holder resolution, gap handling, and split math
+- The allocation read-model (`allocation/read_model.py`) centralizes the fetch/resolve/split orchestration; `allocation/test_read_model.py` pins physical totals, per-timestamp holder resolution, gap handling, and split math. `iter_allocated_readings(with_split=False)` lets a consumer that only needs holder-attributed totals (the PDF stats production loop) skip the split — and its fail-fast non-negative contract — so one corrupt production meter (a meter correction with a negative `energy_kwh`) is attributed to its holder instead of making the PDF unrenderable for the whole ZEV; the invoice engine still fail-fasts on each participant's own readings, where it calls `split_production` directly
 - Full backend suite passes (`python -m pytest -q`)
 
 Follow-ups from review (not this change):

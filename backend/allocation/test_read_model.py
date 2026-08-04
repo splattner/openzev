@@ -182,6 +182,41 @@ class ReadModelTests(TestCase):
         self.assertEqual(prod.split.local_sold_kwh, D(6))
         self.assertEqual(prod.split.exported_kwh, D(0))
 
+    def test_production_with_split_false_skips_fail_fast_on_negative(self):
+        """A negative production reading (a meter correction or bad import —
+        ``energy_kwh`` has no ``MinValueValidator``) must not break the PDF
+        stats production loop, which only wants holder-attributed totals. With
+        ``with_split=False`` the reading is attributed to its holder and
+        ``split`` is ``None``; the default (``with_split=True``) still fails
+        fast per ``allocation.split``'s non-negative contract.
+        """
+        from allocation.errors import InvalidAllocationInputError
+
+        neg_mp = self._mp(MeteringPointType.PRODUCTION, "CH-RM-PROD-NEG")
+        self._assign(neg_mp, self.alice, PERIOD_START)
+        self._production(neg_mp, date(2026, 1, 10), "-2")
+
+        windows = AssignmentWindows.for_zev(self.zev, PERIOD_START, PERIOD_END)
+
+        # Opting out of the split: no exception, split is None, the (negative)
+        # energy is attributed to the holder unchanged — matching the pre-PR
+        # pdf_stats production loop, which just summed produced_kwh.
+        readings = list(iter_allocated_readings(
+            self.zev, START_DT, END_DT, kind=PRODUCTION, windows=windows,
+            with_split=False,
+        ))
+        neg = next(r for r in readings if r.metering_point_id == neg_mp.id)
+        self.assertEqual(neg.holder_id, self.alice.id)
+        self.assertEqual(neg.energy_kwh, D(-2))
+        self.assertIsNone(neg.split)
+
+        # The default runs split_production, which rejects the negative input.
+        with self.assertRaises(InvalidAllocationInputError):
+            list(iter_allocated_readings(
+                self.zev, START_DT, END_DT, kind=PRODUCTION, windows=windows,
+            ))
+
+
     # ── contract ──────────────────────────────────────────────────────────
 
     def test_precomputed_totals_are_reused(self):
