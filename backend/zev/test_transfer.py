@@ -216,6 +216,27 @@ class ArchiveShapeTests(TestCase):
         self.assertNotIn("../../etc/passwd.csv", names)
         self.assertIn("readings/.._.._etc_passwd.csv", names)
 
+    def test_meter_ids_that_sanitize_to_the_same_name_keep_their_readings(self):
+        """``"A/B"`` and ``"A_B"`` must not share a ZIP member: a duplicate
+        member can only be read back as the first one, losing the second
+        meter's readings without an error."""
+        for meter_id, energy in (("SHAPE A/B", Decimal("9.0")), ("SHAPE A_B", Decimal("8.0"))):
+            point = MeteringPoint.objects.create(
+                zev=self.zev, meter_id=meter_id, meter_type=MeteringPointType.CONSUMPTION,
+            )
+            MeterReading.objects.create(
+                metering_point=point,
+                timestamp=datetime(2026, 2, 1, 0, 0, tzinfo=timezone.utc),
+                energy_kwh=energy,
+                direction="in",
+                resolution=ReadingResolution.HOURLY,
+            )
+        with zipfile.ZipFile(io.BytesIO(export_to_bytes(self.zev))) as archive:
+            reading_members = [name for name in archive.namelist() if name.startswith("readings/")]
+            payload = b"".join(archive.read(name) for name in set(reading_members))
+        self.assertIn(b"9.0", payload)
+        self.assertIn(b"8.0", payload)
+
 
 class RoundTripTests(TestCase):
     @classmethod

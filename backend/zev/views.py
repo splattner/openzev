@@ -153,6 +153,7 @@ class ZevViewSet(ZevScopedQuerySetMixin, viewsets.ModelViewSet):
                 target=zev,
                 target_id=str(zev.id),
                 target_display=zev.name,
+                zev=zev,
                 summary=f"ZEV export failed for {zev.name}: {exc}",
                 status=AuditEventStatus.FAILED,
             )

@@ -358,8 +358,7 @@ others use. If you meant a genuinely different tariff, give it a different name.
 The tariff-only JSON export has been replaced by a whole-ZEV transfer. To move a
 tariff structure to another instance, export the ZEV with **only the Tariffs
 section** selected and import it there — the result is a new ZEV carrying just
-the pricing, which is the same thing the old export produced plus somewhere to
-put it. See [ZEV Export and Import](17-zev-transfer.md).
+the pricing. See [ZEV Export and Import](17-zev-transfer.md).
 
 ## Editing and Deactivating Tariffs
 

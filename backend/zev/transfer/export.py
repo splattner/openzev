@@ -47,9 +47,7 @@ from .schema import (
     normalise_sections,
 )
 
-# Rows pulled from the database at a time while streaming readings out. Large
-# enough that the per-query overhead disappears, small enough that a chunk is
-# never a memory problem.
+# Rows pulled from the database at a time while streaming readings out.
 READING_CHUNK_SIZE = 5000
 
 
@@ -70,6 +68,27 @@ def _reading_csv_name(meter_id):
     """
     safe = "".join(char if char.isalnum() or char in "-_." else "_" for char in meter_id)
     return f"{READINGS_DIR}/{safe or 'meter'}.csv"
+
+
+def _disambiguate(name, used):
+    """Return ``name``, or ``name-2``/``name-3``/… on collision with ``used``.
+
+    Two meter ids that sanitize to the same member name (``"A/B"`` and
+    ``"A_B"``) would otherwise write duplicate ZIP members, and a duplicate
+    member can only be read back as the first one — the second meter's
+    readings would be lost without any error.
+    """
+    if name not in used:
+        used.add(name)
+        return name
+    stem, _, extension = name.rpartition(".")
+    suffix = 2
+    candidate = f"{stem}-{suffix}.{extension}"
+    while candidate in used:
+        suffix += 1
+        candidate = f"{stem}-{suffix}.{extension}"
+    used.add(candidate)
+    return candidate
 
 
 def _export_zev(zev):
@@ -153,9 +172,10 @@ def _write_readings(archive, zev):
     leaving the importer to guess between that and a dropped file.
     """
     counts = {}
+    used_names = set()
     for point in MeteringPoint.objects.filter(zev=zev).order_by("meter_id"):
         rows = 0
-        with archive.open(_reading_csv_name(point.meter_id), "w") as member:
+        with archive.open(_disambiguate(_reading_csv_name(point.meter_id), used_names), "w") as member:
             # ZipFile members are binary; readings are ASCII once serialised.
             text = io.TextIOWrapper(member, encoding="utf-8", newline="")
             writer = csv.writer(text)
@@ -212,7 +232,6 @@ def build_archive(zev, sections, fileobj, *, instance_name=""):
         if SECTION_METERING_POINTS in sections:
             points = _export_metering_points(zev)
             counts[SECTION_METERING_POINTS] = len(points)
-            counts["assignments"] = sum(len(point["assignments"]) for point in points)
             archive.writestr(SECTION_FILES[SECTION_METERING_POINTS], _dump(points))
 
         if SECTION_TARIFFS in sections:
@@ -229,8 +248,7 @@ def build_archive(zev, sections, fileobj, *, instance_name=""):
             counts[SECTION_INVOICES] = len(invoices)
             archive.writestr(SECTION_FILES[SECTION_INVOICES], _dump(invoices))
 
-        # Written last so its counts are the ones actually produced, but read
-        # first on import — ZIP central directories are order-independent.
+        # Written last so its counts are the ones actually produced.
         manifest = {
             "format_version": FORMAT_VERSION,
             "exported_at": datetime.now(timezone.utc).isoformat(),
@@ -238,8 +256,9 @@ def build_archive(zev, sections, fileobj, *, instance_name=""):
             "sections": list(sections),
             "counts": counts,
             # Kept so an in-place restore that preserves identity stays possible
-            # as a later feature rather than a re-export. Nothing reads these
-            # today: the importer always mints new ids.
+            # as a later feature rather than a re-export. The importer never
+            # reads the id — it always mints new ids — but falls back to the
+            # name when the settings section does not travel.
             "source_zev": {"id": str(zev.id), "name": zev.name},
         }
         archive.writestr(MANIFEST_NAME, _dump(manifest))

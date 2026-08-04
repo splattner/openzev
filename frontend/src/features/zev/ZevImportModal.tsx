@@ -122,8 +122,7 @@ export function ZevImportModal({ isOpen, onClose, onImported }: ZevImportModalPr
           {t('zevTransfer.importDescription')}
         </p>
 
-        {/* Running the import twice makes two ZEVs. Saying so up front is
-            cheaper than the support conversation about the duplicate. */}
+        {/* Running the import twice makes two ZEVs. */}
         <div className="warning-banner">{t('zevTransfer.notIdempotentWarning')}</div>
 
         <label>

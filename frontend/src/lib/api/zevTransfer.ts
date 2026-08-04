@@ -79,7 +79,7 @@ export function filenameFromDisposition(header: unknown): string | null {
 }
 
 /**
- * A failed import answers with a JSON body, but the export request asked for a
+ * A failed export answers with a JSON body, but the request asked for a
  * Blob — so axios hands back the error body as a Blob too, and the generic
  * error formatter sees nothing useful. This reads it back as text.
  */
