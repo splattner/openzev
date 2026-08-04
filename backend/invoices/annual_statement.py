@@ -12,12 +12,17 @@ from datetime import date, datetime, timezone as dt_timezone
 from decimal import Decimal, ROUND_HALF_UP
 
 from accounts.models import AppSettings
+from allocation.read_model import (
+    CONSUMPTION_METER_TYPES,
+    PRODUCTION_METER_TYPES,
+    community_totals_by_timestamp,
+)
 from allocation.split import split_consumption
 from allocation.windows import AssignmentWindows
 from .pdf_render import render_pdf
 
 from metering.models import MeterReading, ReadingDirection
-from zev.models import MeteringPoint, MeteringPointType, MeteringPointAssignment
+from zev.models import MeteringPointAssignment
 from .models import Invoice, InvoiceStatus
 from .pdf import _format_date_value, _render_template
 
@@ -202,51 +207,20 @@ def _compute_monthly_data(participant, zev, year: int, tr: dict) -> tuple[list[d
 
     cons_mp_ids = [
         a.metering_point_id for a in assignments
-        if a.metering_point.meter_type in [MeteringPointType.CONSUMPTION, MeteringPointType.BIDIRECTIONAL]
+        if a.metering_point.meter_type in CONSUMPTION_METER_TYPES
     ]
     prod_mp_ids = [
         a.metering_point_id for a in assignments
-        if a.metering_point.meter_type in [MeteringPointType.PRODUCTION, MeteringPointType.BIDIRECTIONAL]
+        if a.metering_point.meter_type in PRODUCTION_METER_TYPES
     ]
 
-    # All consumption/production metering points in the ZEV for the local-pool
-    # calculation. The pool is physical (ADR 0013): it covers every meter
-    # regardless of assignment or is_active, so an inactive meter's readings
-    # still feed the pool — matching the engine, PDF stats, and the dashboards.
-    all_cons_mp_ids = list(
-        MeteringPoint.objects.filter(
-            zev=zev,
-            meter_type__in=[MeteringPointType.CONSUMPTION, MeteringPointType.BIDIRECTIONAL],
-        ).values_list("id", flat=True)
+    # ── Physical community pool per timestamp (ADR 0013) ────────────────────
+    # Every metering point of the ZEV feeds the pool regardless of assignment
+    # or is_active, matching the engine, PDF stats, and the dashboards. Shared
+    # read-model helper: one definition of the pool across all consumers.
+    zev_consumption_by_ts, zev_production_by_ts = community_totals_by_timestamp(
+        zev, year_start_dt, year_end_dt
     )
-    all_prod_mp_ids = list(
-        MeteringPoint.objects.filter(
-            zev=zev,
-            meter_type__in=[MeteringPointType.PRODUCTION, MeteringPointType.BIDIRECTIONAL],
-        ).values_list("id", flat=True)
-    )
-
-    # ── Build ZEV-wide per-timestamp pivot ──────────────────────────────────
-    zev_readings = (
-        MeterReading.objects.filter(
-            metering_point_id__in=set(all_cons_mp_ids + all_prod_mp_ids),
-            timestamp__gte=year_start_dt,
-            timestamp__lt=year_end_dt,
-        )
-        .values("timestamp", "direction")
-        .annotate(total_kwh=Sum("energy_kwh"))
-        .order_by("timestamp")
-    )
-
-    zev_pivot: dict[datetime, dict[str, Decimal]] = {}
-    for row in zev_readings:
-        ts = row["timestamp"]
-        if ts not in zev_pivot:
-            zev_pivot[ts] = {"consumed": Decimal("0"), "produced": Decimal("0")}
-        if row["direction"] == ReadingDirection.IN:
-            zev_pivot[ts]["consumed"] = row["total_kwh"] or Decimal("0")
-        elif row["direction"] == ReadingDirection.OUT:
-            zev_pivot[ts]["produced"] = row["total_kwh"] or Decimal("0")
 
     # ── Participant consumption per timestamp ───────────────────────────────
     participant_consumption_rows = (
@@ -296,9 +270,8 @@ def _compute_monthly_data(participant, zev, year: int, tr: dict) -> tuple[list[d
         month_num = ts.month
         consumed = row["consumed_kwh"] or Decimal("0")
 
-        zev_at_ts = zev_pivot.get(ts, {"consumed": Decimal("0"), "produced": Decimal("0")})
-        zev_consumed = zev_at_ts["consumed"]
-        zev_produced = zev_at_ts["produced"]
+        zev_consumed = zev_consumption_by_ts.get(ts, Decimal("0"))
+        zev_produced = zev_production_by_ts.get(ts, Decimal("0"))
         from_zev, from_grid = split_consumption(consumed, zev_consumed, zev_produced)
 
         month_acc[month_num]["consumed"] += consumed
