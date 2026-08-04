@@ -139,6 +139,10 @@ DEFAULT_EMAIL_BODY_TEMPLATE = (
 
 **Invoice numbering:**
 - `next_invoice_number()` generates `"{prefix}-{counter:05d}"` (e.g. `INV-00001`).
+- Numbering is **per ZEV**: each community has its own prefix and counter and starts
+  at 1, enforced by the `unique_invoice_number_per_zev` constraint on `Invoice`.
+  Two ZEVs may therefore both hold an `INV-00001`; a number identifies an invoice
+  only together with its ZEV.
 - Atomically increments `invoice_counter` using `Zev.objects.filter(pk=self.pk).update(invoice_counter=F("invoice_counter") + 1)`.
 - Calls `self.refresh_from_db()` after increment.
 

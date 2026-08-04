@@ -16,7 +16,8 @@ class Invoice(models.Model):
     """A billing document for one participant for one period."""
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    invoice_number = models.CharField(max_length=50, unique=True)
+    # Unique per ZEV, not globally — see the Meta constraint below.
+    invoice_number = models.CharField(max_length=50)
     zev = models.ForeignKey(Zev, on_delete=models.PROTECT, related_name="invoices")
     participant = models.ForeignKey(Participant, on_delete=models.CASCADE, related_name="invoices")
     period_start = models.DateField()
@@ -40,6 +41,18 @@ class Invoice(models.Model):
 
     class Meta:
         ordering = ["-period_end", "participant"]
+        constraints = [
+            # Numbering is per-ZEV by design: ``Zev.next_invoice_number()`` reads
+            # ``invoice_prefix``/``invoice_counter`` off the ZEV row, so two
+            # communities each counting from 1 is the intended model. A global
+            # ``unique=True`` contradicted that — every ZEV ships with the same
+            # ``INV`` default, so the second one's billing run died on a database
+            # constraint instead of producing invoices.
+            models.UniqueConstraint(
+                fields=["zev", "invoice_number"],
+                name="unique_invoice_number_per_zev",
+            ),
+        ]
 
     def __str__(self):
         return f"Invoice {self.invoice_number} - {self.participant.full_name} ({self.period_start} – {self.period_end})"
