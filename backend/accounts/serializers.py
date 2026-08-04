@@ -261,3 +261,27 @@ class ApiKeyCreateSerializer(serializers.ModelSerializer):
         if value is not None and value <= timezone.now():
             raise serializers.ValidationError("Expiry must be in the future.")
         return value
+
+
+class AdminApiKeySerializer(serializers.ModelSerializer):
+    """A key as an admin sees it: the same fields plus who owns it.
+
+    Deliberately never exposes ``hashed_key``. There is no admin path to a
+    key's secret — none exists to expose, since only the hash is stored.
+    """
+
+    username = serializers.CharField(source="user.username", read_only=True)
+    user_email = serializers.EmailField(source="user.email", read_only=True)
+    user_role = serializers.CharField(source="user.role", read_only=True)
+    is_expired = serializers.BooleanField(read_only=True)
+    is_revoked = serializers.BooleanField(read_only=True)
+
+    class Meta:
+        model = ApiKey
+        fields = [
+            "id", "name", "prefix", "read_only",
+            "user", "username", "user_email", "user_role",
+            "created_at", "expires_at", "last_used_at", "revoked_at",
+            "is_expired", "is_revoked",
+        ]
+        read_only_fields = fields

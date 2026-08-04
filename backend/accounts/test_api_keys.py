@@ -656,3 +656,165 @@ class ApiKeyCrudTests(TestCase):
         event = AuditEvent.objects.get(action_type="api_key.create")
         self.assertNotIn(secret, str(event.metadata_json))
         self.assertNotIn(split_key(secret)[1], str(event.metadata_json))
+
+
+class AdminApiKeyManagementTests(TestCase):
+    """Admin console: see every key, revoke any of them.
+
+    This deliberately widens what an admin can reach — the original endpoints
+    were scoped to the owner. The reason is operational: offboarding somebody,
+    or responding to a leak, needs a way to find and kill a credential without
+    knowing whose it is. What stays closed is *creating* a key for somebody
+    else, which would be a durable credential in their name.
+    """
+
+    LIST_URL = "/api/v1/auth/api-keys/"
+
+    def setUp(self):
+        self.admin = make_user("console-admin", UserRole.ADMIN)
+        self.owner = make_user("key-owner", UserRole.ZEV_OWNER)
+        self.participant = make_user("key-participant", UserRole.PARTICIPANT)
+
+        self.owner_key, self.owner_raw = create_api_key(self.owner, name="owner nightly")
+        self.participant_key, _ = create_api_key(self.participant, name="participant export")
+        self.admin_key, _ = create_api_key(self.admin, name="admin own")
+
+        self.client = APIClient()
+        authenticate(self.client, self.admin)
+
+    # ── listing ──────────────────────────────────────────────────────────
+
+    def test_admin_sees_every_users_keys(self):
+        response = self.client.get(self.LIST_URL)
+
+        self.assertEqual(response.status_code, 200)
+        names = {row["name"] for row in response.data["results"]}
+        self.assertEqual(names, {"owner nightly", "participant export", "admin own"})
+
+    def test_the_list_names_the_owner(self):
+        response = self.client.get(self.LIST_URL)
+
+        row = next(r for r in response.data["results"] if r["name"] == "owner nightly")
+        self.assertEqual(row["username"], "key-owner")
+        self.assertEqual(row["user_email"], "key-owner@example.com")
+        self.assertEqual(row["user_role"], UserRole.ZEV_OWNER)
+
+    def test_the_list_never_exposes_the_hash(self):
+        """There is no admin path to a secret — none exists to expose."""
+        response = self.client.get(self.LIST_URL)
+
+        for row in response.data["results"]:
+            self.assertNotIn("hashed_key", row)
+            self.assertNotIn("key", row)
+
+    def test_revoked_keys_are_listed_too(self):
+        """An admin opening this page is usually mid-incident; 'was it revoked,
+        and when' is the question being asked."""
+        self.owner_key.revoked_at = timezone.now()
+        self.owner_key.save(update_fields=["revoked_at"])
+
+        response = self.client.get(self.LIST_URL)
+
+        row = next(r for r in response.data["results"] if r["name"] == "owner nightly")
+        self.assertTrue(row["is_revoked"])
+        self.assertIsNotNone(row["revoked_at"])
+
+    def test_can_filter_by_user(self):
+        response = self.client.get(self.LIST_URL, {"user": self.owner.pk})
+
+        self.assertEqual([r["name"] for r in response.data["results"]], ["owner nightly"])
+
+    def test_can_filter_by_status(self):
+        self.owner_key.revoked_at = timezone.now()
+        self.owner_key.save(update_fields=["revoked_at"])
+
+        active = self.client.get(self.LIST_URL, {"status": "active"})
+        revoked = self.client.get(self.LIST_URL, {"status": "revoked"})
+
+        self.assertNotIn("owner nightly", {r["name"] for r in active.data["results"]})
+        self.assertEqual([r["name"] for r in revoked.data["results"]], ["owner nightly"])
+
+    # ── revoking ─────────────────────────────────────────────────────────
+
+    def test_admin_can_revoke_another_users_key(self):
+        response = self.client.delete(f"{self.LIST_URL}{self.owner_key.pk}/")
+
+        self.assertEqual(response.status_code, 204)
+        self.owner_key.refresh_from_db()
+        self.assertIsNotNone(self.owner_key.revoked_at)
+
+    def test_the_revoked_key_stops_working_on_the_next_request(self):
+        key_client = APIClient()
+        key_client.credentials(HTTP_AUTHORIZATION=f"Api-Key {self.owner_raw}")
+        self.assertEqual(key_client.get("/api/v1/auth/me/").status_code, 200)
+
+        self.client.delete(f"{self.LIST_URL}{self.owner_key.pk}/")
+
+        self.assertEqual(key_client.get("/api/v1/auth/me/").status_code, 401)
+
+    def test_revoking_twice_is_refused_rather_than_silently_accepted(self):
+        self.client.delete(f"{self.LIST_URL}{self.owner_key.pk}/")
+
+        second = self.client.delete(f"{self.LIST_URL}{self.owner_key.pk}/")
+
+        self.assertEqual(second.status_code, 400)
+
+    def test_revoking_someone_elses_key_is_audited_as_such(self):
+        self.client.delete(f"{self.LIST_URL}{self.owner_key.pk}/")
+
+        event = AuditEvent.objects.filter(action_type="api_key.revoke").latest("created_at")
+        self.assertEqual(event.actor_user, self.admin)
+        self.assertTrue(event.metadata_json["revoked_by_admin"])
+        self.assertEqual(event.metadata_json["owner_username"], "key-owner")
+        self.assertIn("key-owner@example.com", event.summary)
+
+    def test_revoking_your_own_key_here_is_not_flagged_as_an_admin_action(self):
+        self.client.delete(f"{self.LIST_URL}{self.admin_key.pk}/")
+
+        event = AuditEvent.objects.filter(action_type="api_key.revoke").latest("created_at")
+        self.assertFalse(event.metadata_json["revoked_by_admin"])
+
+    # ── what stays closed ────────────────────────────────────────────────
+
+    def test_an_admin_cannot_mint_a_key_for_somebody_else(self):
+        """A durable credential in another person's name outlives the admin's
+        session and bills every action to its owner — strictly more than
+        impersonation, and nothing here needs it."""
+        response = self.client.post(
+            self.LIST_URL, {"name": "backdoor", "user": self.owner.pk}, format="json"
+        )
+
+        self.assertIn(response.status_code, (403, 405))
+        self.assertFalse(ApiKey.objects.filter(name="backdoor").exists())
+
+    def test_a_non_admin_cannot_reach_the_console_endpoints(self):
+        for user in (self.owner, self.participant):
+            with self.subTest(role=user.role):
+                client = APIClient()
+                authenticate(client, user)
+
+                self.assertEqual(client.get(self.LIST_URL).status_code, 403)
+                self.assertEqual(
+                    client.delete(f"{self.LIST_URL}{self.participant_key.pk}/").status_code, 403
+                )
+
+    def test_an_api_key_cannot_reach_the_console_endpoints(self):
+        """Not even an admin's own key: a leaked key must not be able to revoke
+        every other credential in the system."""
+        _, admin_raw = create_api_key(self.admin, name="admin second")
+        key_client = APIClient()
+        key_client.credentials(HTTP_AUTHORIZATION=f"Api-Key {admin_raw}")
+
+        self.assertEqual(key_client.get(self.LIST_URL).status_code, 403)
+        self.assertEqual(
+            key_client.delete(f"{self.LIST_URL}{self.owner_key.pk}/").status_code, 403
+        )
+
+    def test_the_owner_endpoint_is_still_scoped_to_its_owner(self):
+        """Widening the admin console must not widen /me/api-keys/."""
+        client = APIClient()
+        authenticate(client, self.owner)
+
+        response = client.get("/api/v1/auth/me/api-keys/")
+
+        self.assertEqual([r["name"] for r in response.data["results"]], ["owner nightly"])

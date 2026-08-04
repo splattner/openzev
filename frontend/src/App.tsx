@@ -7,6 +7,7 @@ import { ManagedZevProvider } from './lib/managedZev'
 const AccountProfilePage = lazy(async () => ({ default: (await import('./pages/AccountProfilePage')).AccountProfilePage }))
 const AdminDashboardPage = lazy(async () => ({ default: (await import('./pages/AdminDashboardPage')).AdminDashboardPage }))
 const AdminAccountsPage = lazy(async () => ({ default: (await import('./pages/AdminAccountsPage')).AdminAccountsPage }))
+const AdminApiKeysPage = lazy(async () => ({ default: (await import('./pages/AdminApiKeysPage')).AdminApiKeysPage }))
 const AdminPdfTemplatesPage = lazy(async () => ({ default: (await import('./pages/AdminPdfTemplatesPage')).AdminPdfTemplatesPage }))
 const AdminEmailTemplatesPage = lazy(async () => ({ default: (await import('./pages/AdminEmailTemplatesPage')).AdminEmailTemplatesPage }))
 const AdminInvoicesPage = lazy(async () => ({ default: (await import('./pages/AdminInvoicesPage')).AdminInvoicesPage }))
@@ -125,6 +126,14 @@ function App() {
               element={
                 <ProtectedRoute allowedRoles={['admin']}>
                   <AdminAccountsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="admin/api-keys"
+              element={
+                <ProtectedRoute allowedRoles={['admin']}>
+                  <AdminApiKeysPage />
                 </ProtectedRoute>
               }
             />

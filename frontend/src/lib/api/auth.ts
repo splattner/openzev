@@ -1,4 +1,5 @@
 import type {
+  AdminApiKey,
   ApiKey,
   ApiKeyInput,
   ApiKeyWithSecret,
@@ -192,4 +193,22 @@ export async function createApiKey(payload: ApiKeyInput): Promise<ApiKeyWithSecr
 
 export async function revokeApiKey(id: string): Promise<void> {
   await api.delete(`/auth/me/api-keys/${id}/`)
+}
+
+export interface AdminApiKeyFilters {
+  user?: number | ''
+  status?: 'active' | 'revoked' | ''
+}
+
+export async function fetchAllApiKeys(filters: AdminApiKeyFilters = {}): Promise<AdminApiKey[]> {
+  const params: Record<string, string> = {}
+  if (filters.user) params.user = String(filters.user)
+  if (filters.status) params.status = filters.status
+  const { data } = await api.get<AdminApiKey[] | PaginatedResponse<AdminApiKey>>('/auth/api-keys/', { params })
+  return Array.isArray(data) ? data : data.results
+}
+
+/** Revoke any user's key. Admin only; takes effect on the key's next request. */
+export async function revokeAnyApiKey(id: string): Promise<void> {
+  await api.delete(`/auth/api-keys/${id}/`)
 }

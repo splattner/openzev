@@ -298,6 +298,10 @@ export function Layout() {
                                                     <span className="nav-icon"><UsersIcon /></span>
                                                     <span className="nav-label">{t('nav.adminAccounts')}</span>
                                                 </NavLink>
+                                                <NavLink to="/admin/api-keys" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`} title={t('nav.adminApiKeys')}>
+                                                    <span className="nav-icon"><KeyIcon /></span>
+                                                    <span className="nav-label">{t('nav.adminApiKeys')}</span>
+                                                </NavLink>
                                                 <NavLink to="/admin/invoices" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`} title={t('nav.adminInvoices')}>
                                                     <span className="nav-icon"><InvoiceIcon /></span>
                                                     <span className="nav-label">{t('nav.adminInvoices')}</span>
@@ -490,6 +494,10 @@ function BuildingIcon() {
 
 function UsersIcon() {
     return <IconSvg path="M16 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2m18 0v-2a4 4 0 0 0-3-3.87M14 4.13a4 4 0 0 1 0 7.75M9.5 11A4 4 0 1 0 9.5 3a4 4 0 0 0 0 8Z" />
+}
+
+function KeyIcon() {
+    return <IconSvg path="M15 7a4 4 0 1 1-3.9 5H8.5l-1.5 1.5L5.5 12H3v-2.5L8.6 4h2.5A4 4 0 0 1 15 7Z" />
 }
 
 function PlugIcon() {

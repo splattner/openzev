@@ -1,5 +1,6 @@
 from django.urls import path
 from .views import (
+    AdminApiKeyDetailView, AdminApiKeyListView,
     ApiKeyDetailView, ApiKeyListCreateView,
     CustomTokenObtainPairView, CookieTokenRefreshView, logout_view,
     UserListCreateView,
@@ -38,6 +39,11 @@ urlpatterns = [
     # or revoke keys makes revoking a leaked one pointless.
     path("me/api-keys/", ApiKeyListCreateView.as_view(), name="api-key-list-create"),
     path("me/api-keys/<uuid:pk>/", ApiKeyDetailView.as_view(), name="api-key-detail"),
+    # Admin console: read + revoke any user's key. Also absent from
+    # ACCOUNTS_API_KEY_ALLOWLIST — an admin's own key must not be able to
+    # revoke everyone else's.
+    path("api-keys/", AdminApiKeyListView.as_view(), name="admin-api-key-list"),
+    path("api-keys/<uuid:pk>/", AdminApiKeyDetailView.as_view(), name="admin-api-key-detail"),
     path("me/social-accounts/", social_accounts_list, name="social-accounts-list"),
     path("me/social-accounts/<int:pk>/", social_account_delete, name="social-account-delete"),
     path("app-settings/", app_settings, name="app-settings"),

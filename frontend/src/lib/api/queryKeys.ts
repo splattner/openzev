@@ -9,6 +9,7 @@ export const queryKeys = {
     oauthProviders: () => ['auth', 'oauth-providers'] as const,
     socialAccounts: () => ['auth', 'social-accounts'] as const,
     apiKeys: () => ['auth', 'api-keys'] as const,
+    allApiKeys: (user?: number | '', status?: string) => ['auth', 'all-api-keys', user ?? '', status ?? ''] as const,
     oauthProviderConfigs: () => ['auth', 'oauth-provider-configs'] as const,
   },
   zev: {

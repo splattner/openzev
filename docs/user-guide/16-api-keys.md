@@ -149,6 +149,21 @@ Revocation cannot be undone. Any script still using the key starts failing with
 `401` immediately, so make sure you know what uses it first — the **last used**
 column is the quickest way to tell whether anything still does.
 
+### An administrator can revoke your key
+
+Administrators see every key in the system under **Admin Console → API Keys**,
+with its owner, prefix, scope, last use and expiry — and can revoke any of them.
+This exists for offboarding and for responding to a leak: a key has to be
+killable by someone other than the person who lost it.
+
+What an administrator **cannot** do is create a key in your name. Keys are only
+ever issued to the person signed in, under Account → Profile. A durable
+credential minted in somebody else's name would outlive the admin's session and
+bill every action it took to its supposed owner, so no such path exists.
+
+Every administrator revocation is recorded in the audit log naming both the key
+and the administrator who revoked it.
+
 ### Changing your password does not revoke your keys
 
 This is deliberate: a routine password rotation should not silently break every

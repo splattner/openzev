@@ -198,6 +198,16 @@ export interface ApiKeyWithSecret extends ApiKey {
     key: string
 }
 
+/** A key as the admin console sees it: same fields, plus its owner. */
+export interface AdminApiKey extends ApiKey {
+    user: number
+    username: string
+    user_email: string
+    user_role: string
+    revoked_at: string | null
+    is_revoked: boolean
+}
+
 export interface ApiKeyInput {
     name: string
     read_only: boolean

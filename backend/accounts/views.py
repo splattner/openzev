@@ -21,7 +21,7 @@ from .models import User, UserRole, EmailVerificationToken
 from .serializers import (
     UserSerializer, UserCreateSerializer,
     ChangePasswordSerializer, CustomTokenObtainPairSerializer,
-    ApiKeySerializer, ApiKeyCreateSerializer,
+    ApiKeySerializer, ApiKeyCreateSerializer, AdminApiKeySerializer,
     AppSettingsSerializer,
     FeatureFlagSerializer,
     VatRateSerializer,
@@ -686,4 +686,84 @@ class ApiKeyDetailView(generics.DestroyAPIView):
             target_display=instance.name,
             summary=f"Revoked API key '{instance.name}'.",
             metadata={"prefix": instance.prefix},
+        )
+
+
+class AdminApiKeyListView(generics.ListAPIView):
+    """Every API key in the system, for the admin console.
+
+    Deliberately read-and-revoke only: there is no admin path that *creates* a
+    key for somebody else. Minting a durable credential in another person's
+    name is a strictly larger power than impersonation — impersonation is
+    session-scoped and visible in the audit log as impersonation, whereas a key
+    keeps working after the admin walks away, and every action it takes is
+    attributed to its owner.
+
+    Unlike the per-user list, revoked keys are included: the reason an admin
+    opens this page is usually an incident, and "was this key revoked, and
+    when?" is the question being asked.
+    """
+
+    permission_classes = [IsAdmin]
+    serializer_class = AdminApiKeySerializer
+
+    def get_queryset(self):
+        queryset = ApiKey.objects.select_related("user").order_by("-created_at")
+
+        user_id = self.request.query_params.get("user")
+        if user_id:
+            queryset = queryset.filter(user_id=user_id)
+
+        status_filter = self.request.query_params.get("status")
+        if status_filter == "active":
+            queryset = queryset.filter(revoked_at__isnull=True)
+        elif status_filter == "revoked":
+            queryset = queryset.filter(revoked_at__isnull=False)
+
+        return queryset
+
+
+class AdminApiKeyDetailView(generics.DestroyAPIView):
+    """Revoke any user's key.
+
+    Revokes rather than deletes, matching the owner-facing endpoint: the row is
+    what lets the admin console answer "when was this revoked, and by whom"
+    afterwards. Takes effect on the next request — the authentication path
+    reads the row every time and nothing is cached.
+    """
+
+    permission_classes = [IsAdmin]
+    serializer_class = AdminApiKeySerializer
+    queryset = ApiKey.objects.select_related("user")
+
+    def perform_destroy(self, instance):
+        if instance.revoked_at is not None:
+            raise ValidationError({"detail": "This API key is already revoked."})
+
+        instance.revoked_at = timezone.now()
+        instance.save(update_fields=["revoked_at"])
+
+        owner = instance.user
+        acting_on_own_key = owner.pk == self.request.user.pk
+        record_audit_event(
+            request=self.request,
+            action_category=AuditActionCategory.AUTH,
+            action_type="api_key.revoke",
+            target_type="accounts.ApiKey",
+            target=instance,
+            target_id=str(instance.pk),
+            target_display=instance.name,
+            summary=(
+                f"Revoked API key '{instance.name}'."
+                if acting_on_own_key
+                else f"Admin revoked API key '{instance.name}' owned by {owner.email or owner.username}."
+            ),
+            metadata={
+                "prefix": instance.prefix,
+                "owner_user_id": str(owner.pk),
+                "owner_username": owner.username,
+                # The distinguishing fact for anyone auditing later: this was
+                # somebody else's credential, revoked by an administrator.
+                "revoked_by_admin": not acting_on_own_key,
+            },
         )
