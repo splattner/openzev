@@ -122,6 +122,7 @@ Verification (at time of implementation):
 - Reconciliation tests compare at the settlement quantum (0.0001 kWh) with `Decimal` rather than float tolerance; a multi-meter fixture covers two consumption meters per participant, two producers, a bidirectional meter, a producer-meter transfer, two transfers of one meter, and a never-assigned meter
 - `AssignmentWindows` windows are immutable (tuple) after construction
 - The generate endpoint reports allocation failures (`AllocationError`) as 400 with the underlying error instead of the 409 reserved for existing invoices (`invoices/tests.py`); the celery bulk task's audit event already carries the exact exception message
+- `generate_invoices_for_zev` isolates failures per participant and reports generated/failed counts with per-participant errors (`invoices/test_batch_actions.py`)
 - Full backend suite passes (`python -m pytest -q`)
 
 Follow-ups from review (not this change):
@@ -134,3 +135,4 @@ Follow-ups from review (not this change):
 - **DB exclusion constraint**: application `save()` enforcement is single-object only — two concurrent transactions can both pass `_validate_no_overlap()` and both `INSERT` overlapping windows, and `QuerySet.update()` / `bulk_create()` / raw SQL bypass `save()` entirely. A Postgres `ExclusionConstraint` on a `daterange` of `(metering_point, valid_from, valid_to)` would close that race at the DB layer if concurrent admin/script writers become a real risk; the runtime `AssignmentWindows` guard remains the backstop until then.
 - **System-wide local-civil-date semantics**: if business wants assignment validity, periods, and tariffs on Zurich civil dates, it must be decided for the whole system together (ADR 0001/0007 territory), not per-feature.
 - **Per-participant batch isolation**: `generate_invoices_for_zev` is a bare list comprehension — one bad metering point aborts the whole ZEV billing run. Isolate per participant (needs a product decision on what the operator sees for partial success).
+- **Holder-less meter visibility**: a metering point with no assignment overlapping the period counts in the physical pool but is billed to nobody, with no warning today. Surface such readings as a data-quality check next to the existing metering-quality checks, so an operator can assign the meter (e.g. to an *Allgemein* / community participant) or confirm the exclusion.

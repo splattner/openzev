@@ -23,8 +23,9 @@ Run bulk generation asynchronously via Celery, mirroring the email pattern.
   `{detail, queued: true, invoice_count}`.
 - The view records a `queued` audit event; the task records a final
   `success`/`failed` audit event with `source = celery`, including counts and
-  error details. Locked-invoice failures (`ValueError` from the engine) are
-  captured in the task's audit event instead of an HTTP 409.
+  error details. Per-participant failures (e.g. locked invoices) are
+  isolated: the batch continues, and the task's audit event reports
+  generated/failed counts plus per-participant errors instead of an HTTP 409.
 - The frontend shows a "generation started" toast and re-polls the period
   overview a few times so results appear without a manual reload.
 - Single-invoice `generate/` stays synchronous: its latency is acceptable and
@@ -41,6 +42,14 @@ Trade-offs:
 - Results are eventually consistent; the UI relies on period-overview refresh
   rather than a direct response payload.
 - Engine validation errors surface in the audit log, not as HTTP errors.
+- **Partial success is audit-log-only.** A participant whose invoice failed is
+  simply absent from that period's invoice overview — nothing in the UI points
+  at the Audit Log entry that names them. This is deliberate isolation: the
+  batch never blocks on a single bad participant. The operator discovers and
+  repairs partial success by re-running `generate-all` (it generates exactly the
+  missing invoices again) or by opening the Audit Log for the ZEV, whose final
+  `invoice.generate_all` event carries generated/failed counts and per-participant
+  errors.
 
 ## Alternatives considered
 

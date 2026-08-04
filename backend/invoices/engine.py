@@ -16,6 +16,8 @@ from typing import Iterable, NamedTuple
 from django.db import models, transaction
 from django.utils import timezone
 
+from billiard.exceptions import SoftTimeLimitExceeded
+
 from accounts.models import VatRate
 from allocation.split import split_consumption, split_production
 from allocation.windows import AssignmentWindows
@@ -895,11 +897,54 @@ def generate_invoice(participant: Participant, period_start: date, period_end: d
     return invoice
 
 
-def generate_invoices_for_zev(zev: Zev, period_start: date, period_end: date) -> list:
-    """Generate invoices for ALL active participants in a ZEV."""
+class BulkGenerationResult(NamedTuple):
+    """Outcome of a ZEV-wide invoice run: the invoices generated plus one
+    entry per participant whose invoice failed."""
+
+    invoices: list[Invoice]
+    failures: list[dict]
+
+
+def generate_invoices_for_zev(zev: Zev, period_start: date, period_end: date) -> BulkGenerationResult:
+    """Generate invoices for ALL active participants in a ZEV.
+
+    Failures are isolated per participant (see ADR 0011) and returned in
+    ``failures`` as ``{"participant_id": ..., "participant_name": ..., "error": ...}``.
+    """
     participants = zev.participants.filter(
         valid_from__lte=period_end,
     ).filter(
         models.Q(valid_to__isnull=True) | models.Q(valid_to__gte=period_start)
     )
-    return [generate_invoice(p, period_start, period_end) for p in participants]
+    invoices = []
+    failures = []
+    for participant in participants:
+        try:
+            invoices.append(generate_invoice(participant, period_start, period_end))
+        except SoftTimeLimitExceeded:
+            # A soft time limit must abort the whole run, not be recorded as one
+            # participant's failure; swallowing it would let the loop run into the
+            # hard limit and drop the audit event entirely.
+            raise
+        except Exception as exc:
+            logger.exception("Invoice generation failed for participant %s", participant.full_name)
+            # next_invoice_number() bumps zev.invoice_counter in memory; the
+            # savepoint rollback restores the row but not the instance, and every
+            # participant shares the same zev object (p.zev is zev). Re-sync so the
+            # next participant reuses the number the failed one gave back instead of
+            # skipping it and then colliding on a stale +1.
+            try:
+                zev.refresh_from_db(fields=["invoice_counter"])
+            except Exception:
+                # Don't mask the original failure; if we cannot re-sync, subsequent
+                # participants will fail early on the (likely unreachable) DB anyway.
+                logger.exception(
+                    "Could not re-sync invoice counter after failure for participant %s",
+                    participant.full_name,
+                )
+            failures.append({
+                "participant_id": str(participant.id),
+                "participant_name": participant.full_name,
+                "error": str(exc),
+            })
+    return BulkGenerationResult(invoices, failures)
