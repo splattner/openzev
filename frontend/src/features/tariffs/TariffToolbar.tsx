@@ -1,9 +1,5 @@
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import {
-  faDownload,
-  faPlus,
-  faUpload,
-} from '@fortawesome/free-solid-svg-icons'
+import { faPlus } from '@fortawesome/free-solid-svg-icons'
 import { useTranslation } from 'react-i18next'
 
 export type TariffValidityFilter = 'valid' | 'all'
@@ -16,8 +12,6 @@ type TariffToolbarProps = {
   validityFilter: TariffValidityFilter
   onValidityFilterChange: (value: TariffValidityFilter) => void
   onOpenCreateTariffModal: () => void
-  onOpenExportModal: () => void
-  onOpenImportModal: () => void
 }
 
 export function TariffToolbar({
@@ -28,8 +22,6 @@ export function TariffToolbar({
   validityFilter,
   onValidityFilterChange,
   onOpenCreateTariffModal,
-  onOpenExportModal,
-  onOpenImportModal,
 }: TariffToolbarProps) {
   const { t } = useTranslation()
 
@@ -59,14 +51,6 @@ export function TariffToolbar({
           <button className="button button-primary" onClick={onOpenCreateTariffModal}>
             <FontAwesomeIcon icon={faPlus} fixedWidth />
             {t('pages.tariffs.newTariff')}
-          </button>
-          <button className="button button-secondary" onClick={onOpenExportModal}>
-            <FontAwesomeIcon icon={faDownload} fixedWidth />
-            {t('pages.tariffs.exportJson')}
-          </button>
-          <button className="button button-secondary" onClick={onOpenImportModal}>
-            <FontAwesomeIcon icon={faUpload} fixedWidth />
-            {t('pages.tariffs.importJson')}
           </button>
         </div>
       </div>

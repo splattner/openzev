@@ -16,6 +16,7 @@ export const queryKeys = {
     list: () => ['zev', 'list'] as const,
     participants: (zevId?: string) => ['zev', 'participants', zevId ?? 'all'] as const,
     meteringPoints: (zevId?: string) => ['zev', 'metering-points', zevId ?? 'all'] as const,
+    transferSections: () => ['zev', 'transfer-sections'] as const,
   },
   tariffs: {
     list: (zevId?: string) => ['tariffs', 'list', zevId ?? 'all'] as const,

@@ -4,7 +4,6 @@ import type {
   TariffInput,
   TariffPeriod,
   TariffPeriodInput,
-  TariffPreset,
   TariffSeries,
   TariffVersionInput,
 } from '../../types/api'
@@ -76,19 +75,4 @@ export async function updateTariffPeriod(id: string, payload: Partial<TariffPeri
 
 export async function deleteTariffPeriod(id: string): Promise<void> {
   await api.delete(`/tariffs/periods/${id}/`)
-}
-
-export async function exportTariffs(zevId: string): Promise<TariffPreset[]> {
-  const { data } = await api.get<TariffPreset[]>('/tariffs/tariffs/export/', {
-    params: { zev_id: zevId },
-  })
-  return data
-}
-
-export async function importTariffs(zevId: string, tariffs: TariffPreset[]): Promise<{ created: number; tariffs: Tariff[] }> {
-  const { data } = await api.post<{ created: number; tariffs: Tariff[] }>('/tariffs/tariffs/import/', {
-    zev_id: zevId,
-    tariffs,
-  })
-  return data
 }

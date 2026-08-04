@@ -505,174 +505,21 @@ ELSE:
 - `admin` and `zev_owner` can trigger invoice generation and manage tariffs within their ZEVs.
 - `participant` consumes resulting invoice information only (read-only).
 
-### 6.1 Tariff preset export
+### 6.1 Tariff transfer (superseded)
 
-**Endpoint:** `GET /api/v1/tariffs/tariffs/export/?zev_id=<uuid>`
+The tariff-only JSON export and import — `GET /api/v1/tariffs/tariffs/export/`,
+`POST /api/v1/tariffs/tariffs/import/`, and their `TariffExportModal` /
+`TariffImportModal` UI — were **removed** and replaced by whole-ZEV transfer
+(issue #389). An export with only the `tariffs` section selected produces the
+same tariff structure, in an archive that also has somewhere to put it.
 
-**Permission:** `IsAuthenticated`, `IsZevOwnerOrAdmin`
+See `backend/zev/transfer/` for the archive contract and
+`docs/user-guide/17-zev-transfer.md` for the behaviour.
 
-**Behavior:**
-
-1. Requires `zev_id` query parameter (400 if missing).
-2. Resolves ZEV via `_get_accessible_zev` — admin can access any ZEV; owner
-   can access only owned ZEVs (404 if not found or not accessible).
-3. Queries all tariffs for the ZEV; returns 404 if none exist.
-4. Returns a JSON array of tariff presets using `_serialize_tariff_preset`.
-
-**Preset shape** (per tariff):
-
-| Field | Type | Notes |
-|---|---|---|
-| `name` | string | |
-| `category` | string | `energy`, `grid_fees`, `levies`, `metering` |
-| `billing_mode` | string | One of the 8 billing modes |
-| `energy_type` | string \| null | `local`, `grid`, `feed_in`, or `null` |
-| `fixed_price_chf` | string \| null | Decimal as string, `null` when N/A |
-| `percentage` | string \| null | Decimal as string, populated for `percentage_of_energy` |
-| `valid_from` | string | ISO 8601 date |
-| `valid_to` | string \| null | ISO 8601 date or `null` |
-| `notes` | string | |
-| `periods` | array | Nested period presets (below) |
-
-**Period preset shape:**
-
-| Field | Type | Notes |
-|---|---|---|
-| `period_type` | string | `flat`, `high`, `low` |
-| `price_chf_per_kwh` | string | Decimal as string |
-| `time_from` | string \| null | ISO 8601 time or `null` |
-| `time_to` | string \| null | ISO 8601 time or `null` |
-| `weekdays` | string | Comma-separated day codes or empty |
-
-Stripped fields: `id`, `zev`, `created_at`, `updated_at` are excluded so the
-preset is portable across ZEVs.
-
-### 6.1a Tariff series and version endpoints
-
-All four are `IsAuthenticated`, `IsZevOwnerOrAdmin`, and ZEV-scoped through
-`ZevScopedQuerySetMixin` — a caller cannot reach another owner's tariff (404).
-
-| Method | URL | Purpose |
-|---|---|---|
-| `GET` | `/tariffs/tariffs/series/` | Tariffs grouped into series. Optional `?zev_id=`. |
-| `POST` | `/tariffs/tariffs/{id}/new-version/` | Add a version to this series, closing the previous one. |
-| `POST` | `/tariffs/tariffs/{id}/duplicate/` | Copy under a new name as a separate series. |
-| `POST` | `/tariffs/tariffs/{id}/rename-series/` | Rename every version at once. |
-
-**`GET series/`** returns one object per series, sorted by `(category, name)`:
-
-| Field | Notes |
-|---|---|
-| `name`, `category`, `billing_mode`, `energy_type` | Invariant across the series (§3.1.1) |
-| `version_count` | |
-| `active_version_id` | `null` when today falls in a gap, or the series has been retired |
-| `gaps` | `[{start, end}]`, inclusive, interior only |
-| `versions` | Full `TariffSerializer` payloads, **newest first** |
-
-**`POST new-version/`** — body `{valid_from, fixed_price_chf?, percentage?, periods?}`.
-Copies the source version's configuration, applies the overrides, and copies the
-source's price bands unless `periods` is supplied.  Prices are overridable in the
-same request because a new version almost always exists *because* the price
-changed; requiring a second call would make the common case two steps.
-Truncation of the predecessor happens **before** the insert, since saving while
-the predecessor still covers the date would trip the overlap guard.
-`400` if a version already starts on that date.
-
-**`POST duplicate/`** — body `{name, valid_from?, fixed_price_chf?, percentage?, periods?}`.
-Does not touch the source's timeline.  `400` if `name` is blank or equal to the
-source's — the latter request means "another version", which has different
-timeline semantics and its own endpoint.
-
-**`POST rename-series/`** — body `{name}`.  Renames every version via
-`bulk_update`, deliberately bypassing `full_clean()`: renaming the whole series
-preserves every invariant, but validating each row against its not-yet-renamed
-siblings would report a false name clash.  `400` if another series in the ZEV
-already holds that name.
-
-Renaming is only offered series-wide.  Because the name *is* the series
-identity, renaming one version would fork the chain and leave a hole in the
-original timeline, so `name` is not editable per version.
-
-**Audit events:** `tariff.new_version`, `tariff.duplicate`,
-`tariff.rename_series` (all `AuditActionCategory.TARIFF`).  The rename records a
-`name` before/after diff.
-
-### 6.2 Tariff preset import
-
-**Endpoint:** `POST /api/v1/tariffs/tariffs/import/`
-
-**Permission:** `IsAuthenticated`, `IsZevOwnerOrAdmin`
-
-**Request body:**
-
-```json
-{
-  "zev_id": "<uuid>",
-  "tariffs": [ /* array of preset objects (§6.1 shape) */ ]
-}
-```
-
-**Behavior:**
-
-1. Validates `zev_id` (400 if missing) and `tariffs` array (400 if missing or
-   empty).
-2. Resolves ZEV via `_get_accessible_zev` (404 if not found or not accessible).
-3. Wraps all creation in `transaction.atomic()` — any validation failure rolls
-   back all tariffs.
-4. For each preset:
-   - Strips `id`, `zev`, `created_at`, `updated_at`; sets `zev` to target ZEV.
-   - Validates via `TariffSerializer`; raises on invalid data.
-   - Creates `Tariff`, then creates each nested `TariffPeriod` via
-     `TariffPeriodSerializer`.
-5. Returns 201 with `{ "created": <count>, "tariffs": [ ...serialized ] }`.
-6. On any validation error, returns 400 with `{ "error": "<message>" }`.
-
-### 6.3 Frontend: export/import UI
-
-**File:** `frontend/src/pages/TariffsPage.tsx`
-
-The tariffs page provides two toolbar buttons visible to `admin` and
-`zev_owner` roles:
-
-- **Export JSON** — opens a `FormModal` confirming the export. On confirm,
-  calls `exportTariffs(selectedZevId)`, converts the response to a JSON blob,
-  and triggers a browser download as `tariffs-<zevId>.json`.
-- **Import JSON** — opens a `FormModal` with a file input (`accept=".json"`).
-  On file selection, parses the JSON, validates it is an array, and calls
-  `importMutation.mutate({ zevId, tariffs })`. On success, invalidates
-  `['tariffs']` and `['tariff-periods']` query caches.
-
-### 6.4 TypeScript types
-
-```typescript
-// frontend/src/types/api.ts
-interface TariffPresetPeriod {
-    period_type: 'flat' | 'high' | 'low'
-    price_chf_per_kwh: string
-    time_from?: string | null
-    time_to?: string | null
-    weekdays?: string
-}
-
-interface TariffPreset {
-    name: string
-    category: 'energy' | 'grid_fees' | 'levies' | 'metering'
-    billing_mode: TariffBillingMode
-    energy_type?: 'local' | 'grid' | 'feed_in' | null
-    fixed_price_chf?: string | null
-    percentage?: string | null
-    valid_from: string
-    valid_to?: string | null
-    notes?: string
-    periods: TariffPresetPeriod[]
-}
-```
-
-```typescript
-// frontend/src/lib/api.ts
-exportTariffs(zevId: string): Promise<TariffPreset[]>
-importTariffs(zevId: string, tariffs: TariffPreset[]): Promise<{ created: number; tariffs: Tariff[] }>
-```
+The all-or-nothing-with-every-failure-reported semantics the tariff import
+established are preserved: `zev/transfer/importer.py` collects failures across
+every section and rolls the whole import back rather than stopping at the first
+one.
 
 ---
 

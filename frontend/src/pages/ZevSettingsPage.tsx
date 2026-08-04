@@ -1,8 +1,11 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useState, type FormEvent } from 'react'
 import { useTranslation } from 'react-i18next'
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
+import { faDownload } from '@fortawesome/free-solid-svg-icons'
 import { ZevEmailTemplateFields } from '../components/ZevEmailTemplateFields'
 import { ZevGeneralSettingsFields } from '../components/ZevGeneralSettingsFields'
+import { ZevExportModal } from '../features/zev/ZevExportModal'
 import { updateZev } from '../lib/api/zev'
 import { formatApiError } from '../lib/api/errors'
 import { queryKeys } from '../lib/api/queryKeys'
@@ -19,6 +22,7 @@ export function ZevSettingsPage() {
 
     const [form, setForm] = useState<ZevInput>(getDefaultZevForm())
     const [error, setError] = useState<string | null>(null)
+    const [showExportModal, setShowExportModal] = useState(false)
 
     useEffect(() => {
         if (!selectedZev) {
@@ -102,6 +106,32 @@ export function ZevSettingsPage() {
                     </div>
                 </form>
             </section>
+
+            <section className="card page-stack">
+                <div>
+                    <h3 style={{ marginTop: 0 }}>{t('zevTransfer.exportTitle')}</h3>
+                    <p className="muted" style={{ margin: 0 }}>
+                        {t('zevTransfer.exportSectionDescription')}
+                    </p>
+                </div>
+                <div className="actions-row">
+                    <button
+                        className="button button-secondary"
+                        type="button"
+                        onClick={() => setShowExportModal(true)}
+                    >
+                        <FontAwesomeIcon icon={faDownload} fixedWidth />
+                        {t('zevTransfer.exportAction')}
+                    </button>
+                </div>
+            </section>
+
+            <ZevExportModal
+                isOpen={showExportModal}
+                zevId={selectedZevId}
+                zevName={selectedZev.name}
+                onClose={() => setShowExportModal(false)}
+            />
         </div>
     )
 }

@@ -32,6 +32,7 @@ Welcome to the OpenZEV user documentation. This guide covers everything you need
 ## Administration
 
 - **[Admin Console](14-admin-console.md)** — ZEV management, regional settings, VAT, PDF templates, email templates, feature flags
+- **[ZEV Export and Import](17-zev-transfer.md)** — Move a whole community between instances as an archive
 
 ## Automation
 

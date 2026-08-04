@@ -4,12 +4,9 @@ import { ConfirmDialog, useConfirmDialog } from '../components/ConfirmDialog'
 import { TariffCategorySections } from '../features/tariffs/TariffCategorySections'
 import { useTariffCrud } from '../features/tariffs/useTariffCrud'
 import { TariffEmptyState } from '../features/tariffs/TariffEmptyState'
-import { TariffExportModal } from '../features/tariffs/TariffExportModal'
 import { TariffFormModal } from '../features/tariffs/TariffFormModal'
-import { TariffImportModal } from '../features/tariffs/TariffImportModal'
 import { TariffPeriodFormModal } from '../features/tariffs/TariffPeriodFormModal'
 import { TariffToolbar, type TariffValidityFilter } from '../features/tariffs/TariffToolbar'
-import { useTariffTransfer } from '../features/tariffs/useTariffTransfer'
 import { TariffVersionModal } from '../features/tariffs/TariffVersionModal'
 import { useTariffVersions } from '../features/tariffs/useTariffVersions'
 import { isTariffCurrentlyValid, todayIso } from '../features/tariffs/validity'
@@ -194,23 +191,6 @@ export function TariffsPage() {
         t,
     })
 
-    const {
-        showExportModal,
-        showImportModal,
-        exportPending,
-        openExportModal,
-        closeExportModal,
-        handleExport,
-        openImportModal,
-        closeImportModal,
-        handleImportFile,
-    } = useTariffTransfer({
-        selectedZevId,
-        queryClient,
-        pushToast,
-        t,
-    })
-
     const versions = useTariffVersions({ selectedZevId, queryClient, pushToast, t })
 
     if (seriesQuery.isLoading) {
@@ -236,21 +216,6 @@ export function TariffsPage() {
                 validityFilter={validityFilter}
                 onValidityFilterChange={setValidityFilter}
                 onOpenCreateTariffModal={openCreateTariffModal}
-                onOpenExportModal={openExportModal}
-                onOpenImportModal={openImportModal}
-            />
-
-            <TariffExportModal
-                isOpen={showExportModal}
-                onClose={closeExportModal}
-                onConfirmExport={handleExport}
-                isPending={exportPending}
-            />
-
-            <TariffImportModal
-                isOpen={showImportModal}
-                onClose={closeImportModal}
-                onImportFile={handleImportFile}
             />
 
             <TariffFormModal
@@ -286,10 +251,7 @@ export function TariffsPage() {
             />
 
             {tariffs.length === 0 ? (
-                <TariffEmptyState
-                    onOpenCreateTariffModal={openCreateTariffModal}
-                    onOpenImportModal={openImportModal}
-                />
+                <TariffEmptyState onOpenCreateTariffModal={openCreateTariffModal} />
             ) : visibleSeries.length === 0 ? (
                 <section className="card" style={{ display: 'grid', gap: '0.75rem' }}>
                     <h3 style={{ margin: 0 }}>{t('pages.tariffs.noResults.title')}</h3>

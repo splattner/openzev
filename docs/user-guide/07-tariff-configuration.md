@@ -353,17 +353,13 @@ Because a shared name makes two tariffs versions of each other, they must also
 type. OpenZEV rejects a version that disagrees and tells you which value the
 others use. If you meant a genuinely different tariff, give it a different name.
 
-## Importing Several Tariffs at Once
+## Copying Tariffs to Another Community
 
-**Import JSON** applies all or nothing. If any entry is rejected, nothing is
-saved and the error names **every** problem entry by its position in the file and
-its name, so you can fix them all in one pass:
-
-```
-2 of 7 tariffs could not be imported, so nothing was saved:
-  #3 "Kantonale Abgabe" — valid_from: Another tariff named "Kantonale Abgabe" …
-  #5 "Local Energy" — energy_type: Energy tariffs require an energy type.
-```
+The tariff-only JSON export has been replaced by a whole-ZEV transfer. To move a
+tariff structure to another instance, export the ZEV with **only the Tariffs
+section** selected and import it there — the result is a new ZEV carrying just
+the pricing, which is the same thing the old export produced plus somewhere to
+put it. See [ZEV Export and Import](17-zev-transfer.md).
 
 ## Editing and Deactivating Tariffs
 

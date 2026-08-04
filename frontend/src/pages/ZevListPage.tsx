@@ -9,12 +9,14 @@ import {
     faPen,
     faPlus,
     faTrash,
+    faUpload,
     faUser,
     faXmark,
 } from '@fortawesome/free-solid-svg-icons'
 import { ConfirmDialog, useConfirmDialog } from '../components/ConfirmDialog'
 import { ZevEmailTemplateFields } from '../components/ZevEmailTemplateFields'
 import { ZevGeneralSettingsFields } from '../components/ZevGeneralSettingsFields'
+import { ZevImportModal } from '../features/zev/ZevImportModal'
 import { formatShortDate, useAppSettings } from '../lib/appSettings'
 import { useAuth } from '../lib/auth'
 import { FormModal } from '../components/FormModal'
@@ -83,6 +85,7 @@ export function ZevListPage() {
     const [showEditModal, setShowEditModal] = useState(false)
     const [showOwnerModal, setShowOwnerModal] = useState(false)
     const [showCreateModal, setShowCreateModal] = useState(false)
+    const [showImportModal, setShowImportModal] = useState(false)
     const [editError, setEditError] = useState<string | null>(null)
     const [ownerError, setOwnerError] = useState<string | null>(null)
     const [createError, setCreateError] = useState<string | null>(null)
@@ -380,14 +383,31 @@ export function ZevListPage() {
 
             <div className="actions-row actions-row-gap-lg mb-1">
                 {isAdmin ? (
-                    <button className="button button-primary" onClick={openCreateModal}>
-                        <FontAwesomeIcon icon={faPlus} fixedWidth />
-                        {t('pages.zevs.newZev')}
-                    </button>
+                    <>
+                        <button className="button button-primary" onClick={openCreateModal}>
+                            <FontAwesomeIcon icon={faPlus} fixedWidth />
+                            {t('pages.zevs.newZev')}
+                        </button>
+                        {/* Import lives next to "new ZEV" because that is what it
+                            does: it always creates one, never updates an existing. */}
+                        <button className="button button-secondary" onClick={() => setShowImportModal(true)}>
+                            <FontAwesomeIcon icon={faUpload} fixedWidth />
+                            {t('zevTransfer.importAction')}
+                        </button>
+                    </>
                 ) : (
                     <p className="muted" style={{ margin: 0 }}>{t('pages.zevs.adminOnly')}</p>
                 )}
             </div>
+
+            <ZevImportModal
+                isOpen={showImportModal}
+                onClose={() => setShowImportModal(false)}
+                onImported={() => {
+                    setShowImportModal(false)
+                    void queryClient.invalidateQueries({ queryKey: queryKeys.zev.list() })
+                }}
+            />
 
             <FormModal isOpen={showCreateModal} title={wizardStep === 5 ? t('pages.zevs.wizard.titleDone') : t('pages.zevs.wizard.titleStep', { step: wizardStep })} onClose={closeCreateModal} maxWidth="960px">
                 <form onSubmit={submitCreate} className="form-grid">

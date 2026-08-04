@@ -1,13 +1,12 @@
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faPlus, faUpload } from '@fortawesome/free-solid-svg-icons'
+import { faPlus } from '@fortawesome/free-solid-svg-icons'
 import { useTranslation } from 'react-i18next'
 
 type TariffEmptyStateProps = {
   onOpenCreateTariffModal: () => void
-  onOpenImportModal: () => void
 }
 
-export function TariffEmptyState({ onOpenCreateTariffModal, onOpenImportModal }: TariffEmptyStateProps) {
+export function TariffEmptyState({ onOpenCreateTariffModal }: TariffEmptyStateProps) {
   const { t } = useTranslation()
 
   return (
@@ -18,10 +17,6 @@ export function TariffEmptyState({ onOpenCreateTariffModal, onOpenImportModal }:
         <button className="button button-primary" type="button" onClick={onOpenCreateTariffModal}>
           <FontAwesomeIcon icon={faPlus} fixedWidth />
           {t('pages.tariffs.newTariff')}
-        </button>
-        <button className="button button-secondary" type="button" onClick={onOpenImportModal}>
-          <FontAwesomeIcon icon={faUpload} fixedWidth />
-          {t('pages.tariffs.importJson')}
         </button>
       </div>
     </section>

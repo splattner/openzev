@@ -1,9 +1,13 @@
+import tempfile
 from datetime import date as date_type, datetime, timedelta, timezone as dt_timezone
 
-from django.http import HttpResponse
+from django.conf import settings as django_settings
+from django.http import FileResponse, HttpResponse
+from django.utils import timezone as dj_timezone
 from django.utils.crypto import get_random_string
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
+from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from accounts.permissions import IsAdmin
@@ -27,6 +31,16 @@ from .permissions import (
     ZevManagementPermission,
 )
 from .services import send_participant_invitation, create_zev_for_existing_owner
+from .transfer import (
+    SECTION_DEPENDENCIES,
+    SECTIONS,
+    ArchiveError,
+    ImportFailed,
+    archive_filename,
+    build_archive,
+    import_archive,
+    inspect_archive,
+)
 from audit.models import AuditActionCategory, AuditEventStatus
 from audit.mixins import AuditedUpdateMixin
 from audit.services import record_audit_event
@@ -83,6 +97,188 @@ class ZevViewSet(ZevScopedQuerySetMixin, viewsets.ModelViewSet):
         zev_data = {k: v for k, v in serializer.validated_data.items() if k != 'owner'}
         result = create_zev_for_existing_owner(owner_user=user, zev_data=zev_data)
         return Response(result, status=status.HTTP_201_CREATED)
+
+    # ── Transfer: whole-ZEV export and import ──────────────────────────────
+    #
+    # Who may do what follows the rules already in force rather than inventing
+    # new ones. Export is a detail action, so ``get_object()`` scopes it: an
+    # admin exports any ZEV, an owner only their own. Import is a POST, which
+    # ``ZevManagementPermission`` restricts to admins — the same rule as
+    # ``create()``, because importing an archive *is* creating a ZEV and a ZEV
+    # owner going through this endpoint would otherwise sidestep ``self_setup``
+    # and its "you already have a ZEV" guard.
+
+    @action(detail=False, methods=["get"], url_path="transfer-sections")
+    def transfer_sections(self, request):
+        """The section list and its dependency graph.
+
+        Served rather than hard-coded in the frontend so the rule that
+        assignments need participants lives in exactly one place.
+        """
+        return Response(
+            {
+                "sections": [
+                    {"name": name, "requires": list(SECTION_DEPENDENCIES[name])}
+                    for name in SECTIONS
+                ]
+            }
+        )
+
+    @action(detail=True, methods=["get"], url_path="export")
+    def export_archive(self, request, pk=None):
+        """Download the ZEV as a transfer archive."""
+        zev = self.get_object()
+        sections = self._parse_sections(request.query_params.get("sections"))
+
+        # Spooled: a structure-only export never touches the disk, while a
+        # community with years of readings rolls over instead of being held in
+        # memory. Building the archive off the request path is a matter of
+        # calling ``build_archive`` from a task and handing back an artefact
+        # URL — the builder streams either way.
+        buffer = tempfile.SpooledTemporaryFile(max_size=8 * 1024 * 1024)
+        try:
+            manifest = build_archive(
+                zev,
+                sections,
+                buffer,
+                instance_name=getattr(django_settings, "INSTANCE_NAME", ""),
+            )
+        except ValueError as exc:
+            buffer.close()
+            record_audit_event(
+                request=request,
+                action_category=AuditActionCategory.GOVERNANCE,
+                action_type="zev.export",
+                target_type="zev.Zev",
+                target=zev,
+                target_id=str(zev.id),
+                target_display=zev.name,
+                summary=f"ZEV export failed for {zev.name}: {exc}",
+                status=AuditEventStatus.FAILED,
+            )
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+        buffer.seek(0)
+        record_audit_event(
+            request=request,
+            action_category=AuditActionCategory.GOVERNANCE,
+            action_type="zev.export",
+            target_type="zev.Zev",
+            target=zev,
+            target_id=str(zev.id),
+            target_display=zev.name,
+            zev=zev,
+            # An export is a personal-data extract — names, addresses, emails
+            # and consumption profiles in one file — so the event records
+            # exactly which sections left the instance.
+            summary=f"Exported ZEV {zev.name} ({', '.join(manifest['sections'])}).",
+            metadata={"sections": manifest["sections"], "counts": manifest["counts"]},
+        )
+
+        response = FileResponse(
+            buffer,
+            content_type="application/zip",
+            as_attachment=True,
+            filename=archive_filename(zev, today=dj_timezone.localdate()),
+        )
+        return response
+
+    @action(
+        detail=False,
+        methods=["post"],
+        url_path="inspect-archive",
+        parser_classes=[MultiPartParser, FormParser],
+    )
+    def inspect_archive_action(self, request):
+        """Read an archive's manifest without importing anything."""
+        upload = request.FILES.get("file")
+        if upload is None:
+            return Response({"detail": "A ZIP archive is required."}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            manifest = inspect_archive(upload)
+        except (ArchiveError, ValueError) as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(manifest)
+
+    @action(
+        detail=False,
+        methods=["post"],
+        url_path="import-archive",
+        parser_classes=[MultiPartParser, FormParser],
+    )
+    def import_archive_action(self, request):
+        """Create a new ZEV from an uploaded transfer archive.
+
+        Never touches an existing ZEV: the import is not idempotent, so running
+        it twice yields two communities rather than merging into one.
+        """
+        upload = request.FILES.get("file")
+        if upload is None:
+            return Response({"detail": "A ZIP archive is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        sections = self._parse_sections(request.data.get("sections"))
+        name_override = (request.data.get("name") or "").strip()
+
+        def _failed(summary, payload, http_status=status.HTTP_400_BAD_REQUEST):
+            record_audit_event(
+                request=request,
+                action_category=AuditActionCategory.IMPORT,
+                action_type="zev.import",
+                target_type="zev.Zev",
+                target_display=name_override or upload.name,
+                summary=summary,
+                status=AuditEventStatus.FAILED,
+                metadata={"filename": upload.name},
+            )
+            return Response(payload, status=http_status)
+
+        try:
+            result = import_archive(
+                upload,
+                owner=request.user,
+                sections=sections,
+                name_override=name_override,
+            )
+        except ImportFailed as failure:
+            return _failed(
+                f"ZEV import failed: {failure.summary}",
+                {
+                    "detail": failure.summary,
+                    "errors": failure.errors,
+                    "total_errors": failure.total_errors,
+                },
+            )
+        except (ArchiveError, ValueError) as exc:
+            return _failed(f"ZEV import failed: {exc}", {"detail": str(exc)})
+
+        record_audit_event(
+            request=request,
+            action_category=AuditActionCategory.IMPORT,
+            action_type="zev.import",
+            target_type="zev.Zev",
+            target_id=result["zev_id"],
+            target_display=result["zev_name"],
+            zev=Zev.objects.filter(pk=result["zev_id"]).first(),
+            summary=f"Imported ZEV {result['zev_name']} ({', '.join(result['sections'])}).",
+            metadata={
+                "filename": upload.name,
+                "sections": result["sections"],
+                "counts": result["counts"],
+            },
+        )
+        return Response(result, status=status.HTTP_201_CREATED)
+
+    @staticmethod
+    def _parse_sections(raw):
+        """``"zev,participants"`` or a repeated form field -> a list, or None for all."""
+        if raw is None:
+            return None
+        if isinstance(raw, (list, tuple)):
+            names = [str(item).strip() for item in raw]
+        else:
+            names = [part.strip() for part in str(raw).split(",")]
+        names = [name for name in names if name]
+        return names or None
 
 
 class ParticipantViewSet(AuditedUpdateMixin, ZevScopedQuerySetMixin, viewsets.ModelViewSet):

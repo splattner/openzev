@@ -445,27 +445,6 @@ export interface TariffPeriodInput {
     weekdays?: string
 }
 
-export interface TariffPresetPeriod {
-    period_type: 'flat' | 'high' | 'low'
-    price_chf_per_kwh: string
-    time_from?: string | null
-    time_to?: string | null
-    weekdays?: string
-}
-
-export interface TariffPreset {
-    name: string
-    category: 'energy' | 'grid_fees' | 'levies' | 'metering'
-    billing_mode: TariffBillingMode
-    energy_type?: 'local' | 'grid' | 'feed_in' | null
-    fixed_price_chf?: string | null
-    percentage?: string | null
-    valid_from: string
-    valid_to?: string | null
-    notes?: string
-    periods: TariffPresetPeriod[]
-}
-
 export interface Invoice {
     id: string
     invoice_number: string
