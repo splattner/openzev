@@ -42,6 +42,14 @@ Trade-offs:
 - Results are eventually consistent; the UI relies on period-overview refresh
   rather than a direct response payload.
 - Engine validation errors surface in the audit log, not as HTTP errors.
+- **Partial success is audit-log-only.** A participant whose invoice failed is
+  simply absent from that period's invoice overview — nothing in the UI points
+  at the Audit Log entry that names them. This is deliberate isolation: the
+  batch never blocks on a single bad participant. The operator discovers and
+  repairs partial success by re-running `generate-all` (it generates exactly the
+  missing invoices again) or by opening the Audit Log for the ZEV, whose final
+  `invoice.generate_all` event carries generated/failed counts and per-participant
+  errors.
 
 ## Alternatives considered
 

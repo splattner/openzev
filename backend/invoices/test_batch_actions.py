@@ -363,6 +363,47 @@ class TestBulkGenerationIsolatesPerParticipantFailures:
         assert event.metadata_json["failures"][0]["participant_id"] == str(blocked.id)
         assert "1 participant(s) failed" in event.summary
 
+    def test_failed_participant_gives_its_invoice_number_back(self):
+        """A failure *after* ``next_invoice_number()`` must give its number back.
+
+        The locked-invoice guard raises before the counter is touched, so the
+        other tests here never exercise the counter path. If the shared ``zev``
+        instance is not re-synced after the savepoint rollback, the next
+        participant re-uses the stale ``+1`` and either skips a number or
+        collides with the previous one (a phantom ``UNIQUE constraint failed``).
+        """
+        from django.db import IntegrityError
+        from invoices.engine import generate_invoices_for_zev
+        from invoices.models import Invoice
+
+        owner = OwnerFactory()
+        zev = ZevFactory(owner=owner)
+        # Participant ordering is (last_name, first_name), so the failing
+        # participant sorts first and is processed before the two successes.
+        failing = ParticipantFactory(zev=zev, last_name="AAA")
+        ParticipantFactory(zev=zev, last_name="BBB")
+        ParticipantFactory(zev=zev, last_name="CCC")
+
+        real_create = Invoice.objects.create
+
+        def failing_create(**kwargs):
+            if kwargs["participant"].id == failing.id:
+                raise IntegrityError("simulated constraint violation")
+            return real_create(**kwargs)
+
+        with mock.patch.object(Invoice.objects, "create", side_effect=failing_create):
+            result = generate_invoices_for_zev(zev, date(2026, 1, 1), date(2026, 1, 31))
+
+        # The failed participant consumed (and gave back) number 1; the two
+        # successes then take 01 and 02 — gapless and collision-free, not the
+        # [02, 03] with a phantom second failure the stale counter would cause.
+        ok_ids = {p.id for p in zev.participants.exclude(id=failing.id)}
+        assert {i.participant_id for i in result.invoices} == ok_ids
+        assert {i.invoice_number for i in result.invoices} == {"INV-00001", "INV-00002"}
+        assert len(result.failures) == 1
+        assert result.failures[0]["participant_id"] == str(failing.id)
+        assert "simulated constraint violation" in result.failures[0]["error"]
+
 
 class TestInvoiceRetryEmailAction:
     def test_retry_email_rejects_already_sent_log(self):
