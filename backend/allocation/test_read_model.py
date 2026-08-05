@@ -122,6 +122,26 @@ class ReadModelTests(TestCase):
         self.assertEqual(cons_by_ts[_ts(date(2026, 1, 20))], D(8))
         self.assertEqual(prod_by_ts[_ts(date(2026, 1, 5))], D(6))
 
+    def test_totals_pair_meter_type_with_direction(self):
+        """A consumption meter's OUT reading leaves the production totals and
+        a production meter's IN reading leaves the consumption totals: the
+        pool is paired by (meter type, direction), not grouped by direction
+        alone."""
+        self._reading(self.consumption_mp, date(2026, 1, 20), "6", ReadingDirection.OUT)
+        self._reading(self.production_mp, date(2026, 1, 20), "6", ReadingDirection.IN)
+
+        cons_by_ts, prod_by_ts = community_totals_by_timestamp(self.zev, START_DT, END_DT)
+
+        # Jan 20 consumption is Bob's 8 kWh only; the production meter's IN
+        # reading must not feed the consumed side.
+        self.assertEqual(cons_by_ts[_ts(date(2026, 1, 20))], D(8))
+        # Jan 20 production is absent: the consumption meter's OUT reading must
+        # not feed the produced side.
+        self.assertNotIn(_ts(date(2026, 1, 20)), prod_by_ts)
+        # Sanity: the valid readings still land where they belong.
+        self.assertEqual(cons_by_ts[_ts(date(2026, 1, 5))], D(9))
+        self.assertEqual(prod_by_ts[_ts(date(2026, 1, 5))], D(6))
+
     # ── iter_allocated_readings: consumption ──────────────────────────────
 
     def _by_mp_ts(self, kind):

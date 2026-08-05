@@ -807,6 +807,7 @@ The description renders as: `"Surcharge 50% (50% von CHF 0.32/kWh)"` (German).
 | Analytics and PDF stats agree on participant splits | Charting consumers are mutually consistent |
 | Multi-meter fixture: two consumption meters, two producers, a bidirectional meter, producer-meter transfer, two transfers of one meter, never-assigned meter | §4.3/§4.5 allocation and pool coverage on a mixed fixture; all comparisons at the 0.0001 kWh settlement quantum |
 | Producer local credits and feed-in lines reconstruct exactly to the per-timestamp split shares | §4.5 producer credits are the billed image of the allocation (ADR 0013) |
+| Direction/type pairing: a consumption meter's OUT reading leaves the production pool and a production meter's IN reading leaves the consumption pool; the annual statement still agrees with the engine invoices | §4.3 pool is paired by (meter type, direction); pre-read-model union pivot grouped by direction only, inflating the statement's local share on corrupt readings |
 
 ### Backend (`allocation/tests.py`)
 

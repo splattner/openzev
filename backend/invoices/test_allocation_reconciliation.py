@@ -603,3 +603,64 @@ class AnnualStatementPhysicalPoolTests(_ReconciliationBase):
         # production never filtered on is_active — the fix touched only the pool
         # queries — so this pins cross-consumer agreement, not the regression.)
         self.assertSameEnergy(self._invoice_produced(invoice), totals["total_produced_kwh"])
+
+
+class AnnualStatementDirectionTypePairingTests(_ReconciliationBase):
+    """The annual-statement pool is paired by (meter type, direction), exactly
+    like the engine: a consumption meter's OUT reading leaves the production
+    pool and a production meter's IN reading leaves the consumption pool
+    (ADR 0013). The pre-read-model union pivot grouped by direction only, so
+    either leak inflated the statement's local share and made the statement
+    disagree with the invoices for the same period.
+    """
+
+    def setUp(self):
+        self.owner = User.objects.create_user(
+            username="pairing_owner", password="pass1234", role=UserRole.ZEV_OWNER
+        )
+        self.zev = Zev.objects.create(
+            name="Pairing ZEV", owner=self.owner, zev_type="vzev",
+            start_date=PERIOD_START, billing_interval="monthly", invoice_prefix="PZ",
+        )
+        self.zev.refresh_from_db()
+
+        self.alice = self._participant("Alice Muster", PERIOD_START)
+
+        self.consumption_mp = self._mp(MeteringPointType.CONSUMPTION, "CH-PZ-CONS")
+        self._assign(self.consumption_mp, self.alice, PERIOD_START)
+        self.production_mp = self._mp(MeteringPointType.PRODUCTION, "CH-PZ-PROD")
+        self._assign(self.production_mp, self.alice, PERIOD_START)
+
+        # Jan 5: Alice draws 10 kWh while the ZEV produces 4 kWh.
+        self._consumption(self.consumption_mp, date(2026, 1, 5), "10")
+        self._production(self.production_mp, date(2026, 1, 5), "4")
+
+    def _assert_statement_agrees_with_engine(self):
+        invoice = generate_invoice(self.alice, PERIOD_START, PERIOD_END)
+        tr = {"months": ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                        "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]}
+        _months, totals = _compute_monthly_data(self.alice, self.zev, 2026, tr)
+
+        # Engine, type/direction-paired on every branch: local 4, grid 6.
+        self.assertSameEnergy(invoice.total_local_kwh, "4")
+        self.assertSameEnergy(invoice.total_grid_kwh, "6")
+        # The statement must report the same split. Before the read-model the
+        # direction-only pivot inflated the local share (10.00/0.00 or
+        # 2.50/7.50 depending on the leak), disagreeing with the invoices.
+        self.assertSameEnergy(invoice.total_local_kwh, totals["from_zev_kwh"])
+        self.assertSameEnergy(invoice.total_grid_kwh, totals["from_grid_kwh"])
+        self.assertEqual(_months[0]["from_zev_kwh"], "4.00")
+        self.assertEqual(_months[0]["from_grid_kwh"], "6.00")
+
+    def test_out_reading_on_a_consumption_meter_leaves_the_production_pool(self):
+        """A consumption-typed meter that later gets PV and is never re-typed
+        to bidirectional carries OUT readings; they must not feed the
+        production pool (nothing validates direction against meter type)."""
+        self._reading(self.consumption_mp, date(2026, 1, 5), "6", ReadingDirection.OUT)
+        self._assert_statement_agrees_with_engine()
+
+    def test_in_reading_on_a_production_meter_leaves_the_consumption_pool(self):
+        """A production-typed meter carrying an IN reading must not feed the
+        consumption pool."""
+        self._reading(self.production_mp, date(2026, 1, 5), "6", ReadingDirection.IN)
+        self._assert_statement_agrees_with_engine()
