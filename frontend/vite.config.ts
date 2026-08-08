@@ -5,42 +5,37 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   build: {
-    rollupOptions: {
+    rolldownOptions: {
       output: {
-        manualChunks(id) {
-          if (!id.includes('node_modules')) {
-            return undefined
-          }
-
-          if (id.includes('@tanstack/react-query')) {
-            return 'vendor-react-query'
-          }
-
-          if (id.includes('@mui/x-data-grid')) {
-            return 'vendor-mui-data-grid'
-          }
-
-          if (id.includes('@mui/x-date-pickers') || id.includes('@mui/material') || id.includes('@emotion/')) {
-            return 'vendor-mui'
-          }
-
-          if (id.includes('@mantine/')) {
-            return 'vendor-mantine'
-          }
-
-          if (id.includes('recharts') || id.includes('d3-')) {
-            return 'vendor-charts'
-          }
-
-          if (id.includes('react-router')) {
-            return 'vendor-router'
-          }
-
-          if (id.includes('react') || id.includes('scheduler')) {
-            return 'vendor-react'
-          }
-
-          return 'vendor-misc'
+        // Vite 8 bundles with Rolldown, where the Rollup-style `manualChunks`
+        // function is deprecated and its per-module assignments are overridden
+        // by importer relationships. `codeSplitting.groups` with priorities is
+        // the supported equivalent: a module matching several groups (e.g.
+        // `@emotion/react` matching both the emotion and the react group) goes
+        // to the group with the highest priority, and a module whose own group
+        // has a lower priority than its importer's group is pulled into the
+        // importer's chunk. The MUI/emotion group therefore outranks the
+        // data-grid group (so `@mui/material` deps and Emotion stay out of the
+        // data-grid chunk) while excluding `x-data-grid` modules themselves
+        // (so they still split into their own chunk). Emotion must also outrank
+        // the catch-all vendor-misc group, otherwise it follows
+        // `@mui/styled-engine` into vendor-misc.
+        codeSplitting: {
+          groups: [
+            { name: 'vendor-react-query', test: /@tanstack\/react-query/, priority: 50 },
+            { name: 'vendor-mui', test: /@mui\/(?!x-data-grid|x-date-pickers)|@emotion\//, priority: 45 },
+            { name: 'vendor-mui-data-grid', test: /@mui\/x-data-grid/, priority: 40 },
+            { name: 'vendor-mui-date-pickers', test: /@mui\/x-date-pickers/, priority: 40 },
+            { name: 'vendor-mantine', test: /@mantine\//, priority: 35 },
+            { name: 'vendor-charts', test: /recharts|d3-/, priority: 30 },
+            { name: 'vendor-router', test: /react-router/, priority: 25 },
+            {
+              name: 'vendor-react',
+              test: /[\\/](?:react-dom|react|scheduler)[\\/]/,
+              priority: 20,
+            },
+            { name: 'vendor-misc', test: /node_modules/, priority: 5 },
+          ],
         },
       },
     },
