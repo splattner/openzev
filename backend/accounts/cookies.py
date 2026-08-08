@@ -21,7 +21,7 @@ ADMIN_ACCESS_COOKIE = "openzev_admin_access"
 ADMIN_REFRESH_COOKIE = "openzev_admin_refresh"
 
 
-def cookie_kwargs() -> dict:
+def _cookie_kwargs() -> dict:
     """Shared kwargs for all auth cookies: httpOnly, Secure in prod, SameSite=Lax."""
     return {
         "httponly": True,
@@ -42,7 +42,7 @@ def set_auth_cookies(
     jwt_settings = settings.SIMPLE_JWT
     access_max_age = int(jwt_settings.get("ACCESS_TOKEN_LIFETIME", timedelta(minutes=60)).total_seconds())
     refresh_max_age = int(jwt_settings.get("REFRESH_TOKEN_LIFETIME", timedelta(days=7)).total_seconds())
-    kw = cookie_kwargs()
+    kw = _cookie_kwargs()
     response.set_cookie(access_cookie, access, max_age=access_max_age, **kw)
     response.set_cookie(refresh_cookie, refresh, max_age=refresh_max_age, **kw)
 

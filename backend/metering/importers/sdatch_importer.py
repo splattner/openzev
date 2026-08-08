@@ -7,7 +7,6 @@ The format is based on the ebIX standard with Swiss extensions.
 Reference: SDAT-CH specification, swisseldex / Edirom
 """
 import uuid
-import logging
 from datetime import datetime, timezone, timedelta
 from decimal import Decimal
 
@@ -15,8 +14,6 @@ from lxml import etree
 
 from zev.models import MeteringPoint
 from metering.models import MeterReading, ImportLog, ImportSource
-
-logger = logging.getLogger(__name__)
 
 # Namespaces used in SDAT-CH MeteringData documents
 NSMAP = {

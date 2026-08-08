@@ -7,7 +7,6 @@ Produces a year-end summary document for a participant showing:
 - Savings compared to grid tariff
 - Energy self-sufficiency ratio
 """
-import logging
 from datetime import date, datetime, timezone as dt_timezone
 from decimal import Decimal, ROUND_HALF_UP
 
@@ -25,8 +24,6 @@ from metering.models import MeterReading, ReadingDirection
 from zev.models import MeteringPointAssignment
 from .models import Invoice, InvoiceStatus
 from .pdf import _format_date_value, _render_template
-
-logger = logging.getLogger(__name__)
 
 ANNUAL_STATEMENT_TEMPLATE = "invoices/annual_statement_pdf.html"
 

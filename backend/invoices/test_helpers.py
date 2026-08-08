@@ -7,16 +7,12 @@ newer tests gradually move to factories in ``testing.factories``.
 from datetime import date
 from decimal import Decimal
 
-from accounts.models import User
 from invoices.models import Invoice, InvoiceStatus
+from testing.helpers import make_user as make_user
 from zev.models import Participant, Zev
 
 
 _counter = 0
-
-
-def make_user(username, role, password="pass1234"):
-    return User.objects.create_user(username=username, password=password, role=role)
 
 
 def make_zev(owner, name="Test ZEV"):

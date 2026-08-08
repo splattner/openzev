@@ -34,7 +34,6 @@ from .models import (
 FRONTEND = "http://localhost:5173"
 PROVIDERS_PUBLIC = "/api/v1/auth/oauth/providers/"
 PROVIDERS_CONFIG = "/api/v1/auth/oauth/providers/config/"
-TOKEN_EXCHANGE = "/api/v1/auth/oauth/token-exchange/"
 SOCIAL_ACCOUNTS = "/api/v1/auth/me/social-accounts/"
 
 

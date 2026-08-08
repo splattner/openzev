@@ -283,7 +283,9 @@ def me(request):
                     impersonator = User.objects.get(pk=impersonator_id)
                     data["impersonated_by"] = UserSerializer(impersonator).data
                 except User.DoesNotExist:
-                    pass
+                    logger.warning(
+                        "impersonation claim references deleted user %s", impersonator_id
+                    )
         return Response(data)
     serializer = UserSerializer(request.user, data=request.data, partial=True, context={"request": request})
     serializer.is_valid(raise_exception=True)

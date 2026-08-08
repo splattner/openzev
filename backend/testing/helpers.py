@@ -11,6 +11,7 @@ from __future__ import annotations
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from accounts.models import User
+from zev.models import Participant
 
 
 def make_user(username: str, role: str, password: str = "pass1234") -> User:
@@ -27,6 +28,23 @@ def make_user(username: str, role: str, password: str = "pass1234") -> User:
     )
 
 
+def make_named_participant(zev, name, valid_from, valid_to=None) -> Participant:
+    """Create a participant, splitting ``name`` like ``"Alice Muster"``.
+
+    The email is derived from the full name, matching the fixture builder that
+    was previously duplicated across the allocation and invoice test modules.
+    """
+    first, last = name.split(" ", 1)
+    return Participant.objects.create(
+        zev=zev,
+        first_name=first,
+        last_name=last,
+        email=f"{name.replace(' ', '').lower()}@example.com",
+        valid_from=valid_from,
+        valid_to=valid_to,
+    )
+
+
 def authenticate(client, user) -> None:
     """Authenticate ``client`` as ``user`` via a Bearer token.
 
@@ -35,8 +53,3 @@ def authenticate(client, user) -> None:
     """
     refresh = RefreshToken.for_user(user)
     client.credentials(HTTP_AUTHORIZATION=f"Bearer {refresh.access_token}")
-
-
-def access_token_for(user) -> str:
-    """Return a raw access token string for ``user`` (useful for cookie tests)."""
-    return str(RefreshToken.for_user(user).access_token)

@@ -2,8 +2,6 @@ from rest_framework import serializers
 from django.core.exceptions import ValidationError as DjangoValidationError
 from .models import BillingMode, Tariff, TariffPeriod
 
-ENERGY_BILLING_MODES = {BillingMode.ENERGY, BillingMode.PERCENTAGE_OF_ENERGY}
-
 
 class TariffPeriodSerializer(serializers.ModelSerializer):
     def validate(self, attrs):

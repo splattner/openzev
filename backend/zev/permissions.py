@@ -47,10 +47,6 @@ class ZevManagementPermission(BaseZevScopedPermission):
         return True
 
 
-class ParticipantManagementPermission(BaseZevScopedPermission):
-    pass
-
-
 class MeteringPointPermission(BaseZevScopedPermission):
     allow_participant_safe_methods = True
 

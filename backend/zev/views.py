@@ -26,9 +26,9 @@ from .serializers import (
     MeteringPointAssignmentSerializer,
 )
 from .permissions import (
+    BaseZevScopedPermission,
     MeteringPointAssignmentPermission,
     MeteringPointPermission,
-    ParticipantManagementPermission,
     ZevManagementPermission,
 )
 from .services import send_participant_invitation, create_zev_for_existing_owner
@@ -303,7 +303,7 @@ class ZevViewSet(ZevScopedQuerySetMixin, viewsets.ModelViewSet):
 
 class ParticipantViewSet(AuditedUpdateMixin, ZevScopedQuerySetMixin, viewsets.ModelViewSet):
     serializer_class = ParticipantSerializer
-    permission_classes = [IsAuthenticated, ParticipantManagementPermission]
+    permission_classes = [IsAuthenticated, BaseZevScopedPermission]
     zev_owner_filter = "zev__owner"
     participant_filter = "user"
     scope_parent_path = ("zev",)

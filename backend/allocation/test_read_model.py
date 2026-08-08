@@ -24,7 +24,8 @@ from allocation.read_model import (
 from allocation.split import split_consumption, split_production
 from allocation.windows import AssignmentWindows
 from metering.models import MeterReading, ReadingDirection
-from zev.models import MeteringPoint, MeteringPointAssignment, MeteringPointType, Participant, Zev
+from testing.helpers import make_named_participant
+from zev.models import MeteringPoint, MeteringPointAssignment, MeteringPointType, Zev
 
 User = get_user_model()
 
@@ -57,8 +58,8 @@ class ReadModelTests(TestCase):
         )
         self.zev.refresh_from_db()
 
-        self.alice = self._participant("Alice Muster", PERIOD_START, date(2026, 1, 14))
-        self.bob = self._participant("Bob Beispiel", date(2026, 1, 16))
+        self.alice = make_named_participant(self.zev, "Alice Muster", PERIOD_START, date(2026, 1, 14))
+        self.bob = make_named_participant(self.zev, "Bob Beispiel", date(2026, 1, 16))
 
         # Consumption meter transferred Alice -> Bob with a gap (Jan 15).
         self.consumption_mp = self._mp(MeteringPointType.CONSUMPTION, "CH-RM-CONS-1")
@@ -80,15 +81,7 @@ class ReadModelTests(TestCase):
 
         self.windows = AssignmentWindows.for_zev(self.zev, PERIOD_START, PERIOD_END)
 
-    # ── fixture builders (mirror invoices/test_allocation_reconciliation.py) ──
-
-    def _participant(self, name, valid_from, valid_to=None):
-        first, last = name.split(" ", 1)
-        return Participant.objects.create(
-            zev=self.zev, first_name=first, last_name=last,
-            email=f"{name.replace(' ', '').lower()}@example.com",
-            valid_from=valid_from, valid_to=valid_to,
-        )
+    # ── fixture builders ──
 
     def _mp(self, meter_type, meter_id):
         return MeteringPoint.objects.create(zev=self.zev, meter_type=meter_type, meter_id=meter_id)

@@ -43,14 +43,14 @@ class ReportTestCase(TestCase):
         self.other_zev = make_zev(self.other_owner, "Other ZEV")
         self.other_participant = make_participant(self.other_zev, first="Otto", last="Fremd")
 
+    def _get(self, url, user, **params):
+        auth(self.client, user)
+        return self.client.get(url, params)
+
 
 class AnnualStatementTests(ReportTestCase):
-    def _get(self, user, **params):
-        auth(self.client, user)
-        return self.client.get(ANNUAL_STATEMENT, params)
-
     def test_admin_can_read_any_zev(self):
-        resp = self._get(self.admin, year=2026, zev_id=str(self.zev.pk),
+        resp = self._get(ANNUAL_STATEMENT, self.admin, year=2026, zev_id=str(self.zev.pk),
                          participant_id=str(self.participant.pk))
 
         self.assertEqual(resp.status_code, 200)
@@ -59,13 +59,13 @@ class AnnualStatementTests(ReportTestCase):
         self.assertTrue(resp["Content-Disposition"].startswith("inline"))
 
     def test_owner_can_read_own_zev(self):
-        resp = self._get(self.owner, year=2026, zev_id=str(self.zev.pk),
+        resp = self._get(ANNUAL_STATEMENT, self.owner, year=2026, zev_id=str(self.zev.pk),
                          participant_id=str(self.participant.pk))
 
         self.assertEqual(resp.status_code, 200)
 
     def test_owner_cannot_read_another_owners_zev(self):
-        resp = self._get(self.owner, year=2026, zev_id=str(self.other_zev.pk),
+        resp = self._get(ANNUAL_STATEMENT, self.owner, year=2026, zev_id=str(self.other_zev.pk),
                          participant_id=str(self.other_participant.pk))
 
         self.assertEqual(resp.status_code, 403)
@@ -73,7 +73,7 @@ class AnnualStatementTests(ReportTestCase):
     def test_participant_gets_their_own_without_naming_ids(self):
         """A participant never passes zev_id/participant_id; the ids they *do*
         pass are ignored, so they cannot request someone else's statement."""
-        resp = self._get(self.puser, year=2026,
+        resp = self._get(ANNUAL_STATEMENT, self.puser, year=2026,
                          zev_id=str(self.other_zev.pk),
                          participant_id=str(self.other_participant.pk))
 
@@ -81,28 +81,28 @@ class AnnualStatementTests(ReportTestCase):
         self.assertIn("annual-statement-2026-Muster.pdf", resp["Content-Disposition"])
 
     def test_participant_without_a_record_is_404(self):
-        resp = self._get(make_user("rpt_orphan", UserRole.PARTICIPANT), year=2026)
+        resp = self._get(ANNUAL_STATEMENT, make_user("rpt_orphan", UserRole.PARTICIPANT), year=2026)
 
         self.assertEqual(resp.status_code, 404)
 
     def test_year_is_required_and_must_be_numeric(self):
-        missing = self._get(self.admin, zev_id=str(self.zev.pk), participant_id=str(self.participant.pk))
+        missing = self._get(ANNUAL_STATEMENT, self.admin, zev_id=str(self.zev.pk), participant_id=str(self.participant.pk))
         self.assertEqual(missing.status_code, 400)
         self.assertEqual(missing.data["error"], "year is required.")
 
-        bad = self._get(self.admin, year="not-a-year", zev_id=str(self.zev.pk),
+        bad = self._get(ANNUAL_STATEMENT, self.admin, year="not-a-year", zev_id=str(self.zev.pk),
                         participant_id=str(self.participant.pk))
         self.assertEqual(bad.status_code, 400)
         self.assertEqual(bad.data["error"], "year must be a number.")
 
     def test_owner_must_name_both_ids(self):
-        resp = self._get(self.owner, year=2026, zev_id=str(self.zev.pk))
+        resp = self._get(ANNUAL_STATEMENT, self.owner, year=2026, zev_id=str(self.zev.pk))
 
         self.assertEqual(resp.status_code, 400)
         self.assertEqual(resp.data["error"], "participant_id and zev_id are required.")
 
     def test_unknown_zev_is_404(self):
-        resp = self._get(self.admin, year=2026, zev_id="00000000-0000-0000-0000-000000000000",
+        resp = self._get(ANNUAL_STATEMENT, self.admin, year=2026, zev_id="00000000-0000-0000-0000-000000000000",
                          participant_id=str(self.participant.pk))
 
         self.assertEqual(resp.status_code, 404)
@@ -110,7 +110,7 @@ class AnnualStatementTests(ReportTestCase):
     def test_participant_from_another_zev_is_404(self):
         """The participant lookup is scoped to the resolved ZEV, so naming a
         valid participant of a different ZEV must not leak their statement."""
-        resp = self._get(self.admin, year=2026, zev_id=str(self.zev.pk),
+        resp = self._get(ANNUAL_STATEMENT, self.admin, year=2026, zev_id=str(self.zev.pk),
                          participant_id=str(self.other_participant.pk))
 
         self.assertEqual(resp.status_code, 404)
@@ -122,14 +122,10 @@ class AnnualStatementTests(ReportTestCase):
 
 
 class AnnualStatementsZipTests(ReportTestCase):
-    def _get(self, user, **params):
-        auth(self.client, user)
-        return self.client.get(STATEMENTS_ZIP, params)
-
     def test_owner_downloads_a_zip_of_every_participant(self):
         make_participant(self.zev, first="Bea", last="Zweit")
 
-        resp = self._get(self.owner, year=2026, zev_id=str(self.zev.pk))
+        resp = self._get(STATEMENTS_ZIP, self.owner, year=2026, zev_id=str(self.zev.pk))
 
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(resp["Content-Type"], "application/zip")
@@ -141,49 +137,45 @@ class AnnualStatementsZipTests(ReportTestCase):
         )
 
     def test_participant_is_refused(self):
-        resp = self._get(self.puser, year=2026, zev_id=str(self.zev.pk))
+        resp = self._get(STATEMENTS_ZIP, self.puser, year=2026, zev_id=str(self.zev.pk))
 
         self.assertEqual(resp.status_code, 403)
 
     def test_owner_cannot_read_another_owners_zev(self):
-        resp = self._get(self.owner, year=2026, zev_id=str(self.other_zev.pk))
+        resp = self._get(STATEMENTS_ZIP, self.owner, year=2026, zev_id=str(self.other_zev.pk))
 
         self.assertEqual(resp.status_code, 403)
 
     def test_year_and_zev_id_are_both_required(self):
         for params in ({"year": 2026}, {"zev_id": "x"}):
             with self.subTest(params=params):
-                resp = self._get(self.owner, **params)
+                resp = self._get(STATEMENTS_ZIP, self.owner, **params)
                 self.assertEqual(resp.status_code, 400)
                 self.assertEqual(resp.data["error"], "year and zev_id are required.")
 
     def test_zev_without_participants_for_that_year_is_404(self):
         """Participants are filtered by validity window, so a year before the
         ZEV had anyone yields 404 rather than an empty archive."""
-        resp = self._get(self.owner, year=2020, zev_id=str(self.zev.pk))
+        resp = self._get(STATEMENTS_ZIP, self.owner, year=2020, zev_id=str(self.zev.pk))
 
         self.assertEqual(resp.status_code, 404)
 
     def test_participants_who_left_before_the_year_are_excluded(self):
         Participant.objects.filter(pk=self.participant.pk).update(valid_to=date(2024, 6, 30))
 
-        resp = self._get(self.owner, year=2026, zev_id=str(self.zev.pk))
+        resp = self._get(STATEMENTS_ZIP, self.owner, year=2026, zev_id=str(self.zev.pk))
 
         self.assertEqual(resp.status_code, 404)
 
 
 class FinancialSummaryTests(ReportTestCase):
-    def _get(self, user, **params):
-        auth(self.client, user)
-        return self.client.get(FINANCIAL_SUMMARY, params)
-
     def test_owner_cannot_read_another_owners_zev(self):
-        resp = self._get(self.owner, year=2026, zev_id=str(self.other_zev.pk))
+        resp = self._get(FINANCIAL_SUMMARY, self.owner, year=2026, zev_id=str(self.other_zev.pk))
 
         self.assertEqual(resp.status_code, 403)
 
     def test_zev_id_is_required_for_an_owner(self):
-        resp = self._get(self.owner, year=2026)
+        resp = self._get(FINANCIAL_SUMMARY, self.owner, year=2026)
 
         self.assertEqual(resp.status_code, 400)
         self.assertEqual(resp.data["error"], "zev_id is required.")
@@ -193,26 +185,26 @@ class FinancialSummaryTests(ReportTestCase):
         admin has none of their own in it."""
         owner_participant = make_participant(self.zev, user=self.owner, first="Olga", last="Wirt")
 
-        resp = self._get(self.admin, year=2026, zev_id=str(self.zev.pk))
+        resp = self._get(FINANCIAL_SUMMARY, self.admin, year=2026, zev_id=str(self.zev.pk))
 
         self.assertEqual(resp.status_code, 200)
         self.assertIn(f"financial-summary-2026-{owner_participant.last_name}.pdf",
                       resp["Content-Disposition"])
 
     def test_without_any_default_participant_it_is_400(self):
-        resp = self._get(self.admin, year=2026, zev_id=str(self.zev.pk))
+        resp = self._get(FINANCIAL_SUMMARY, self.admin, year=2026, zev_id=str(self.zev.pk))
 
         self.assertEqual(resp.status_code, 400)
         self.assertEqual(resp.data["error"], "participant_id is required (no default participant found).")
 
     def test_participant_from_another_zev_is_404(self):
-        resp = self._get(self.admin, year=2026, zev_id=str(self.zev.pk),
+        resp = self._get(FINANCIAL_SUMMARY, self.admin, year=2026, zev_id=str(self.zev.pk),
                          participant_id=str(self.other_participant.pk))
 
         self.assertEqual(resp.status_code, 404)
 
     def test_participant_ignores_supplied_ids_and_gets_their_own(self):
-        resp = self._get(self.puser, year=2026, zev_id=str(self.other_zev.pk),
+        resp = self._get(FINANCIAL_SUMMARY, self.puser, year=2026, zev_id=str(self.other_zev.pk),
                          participant_id=str(self.other_participant.pk))
 
         self.assertEqual(resp.status_code, 200)
@@ -228,10 +220,6 @@ class MalformedInputTests(ReportTestCase):
     handler, and an out-of-range year raised ValueError from date(year, 1, 1)
     deep inside PDF generation.
     """
-
-    def _get(self, url, user, **params):
-        auth(self.client, user)
-        return self.client.get(url, params)
 
     def test_malformed_zev_id_is_404(self):
         for url in (ANNUAL_STATEMENT, STATEMENTS_ZIP, FINANCIAL_SUMMARY):

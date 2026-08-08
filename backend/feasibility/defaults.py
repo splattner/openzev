@@ -6,7 +6,6 @@ can determine a figure from actual tariffs/metering data.
 """
 from decimal import Decimal
 
-SPECIFIC_YIELD_KWH_PER_KWP = Decimal("950")
 RETAIL_PRICE_CHF_PER_KWH = Decimal("0.32")
 FEED_IN_PRICE_CHF_PER_KWH = Decimal("0.09")
 INTERNAL_ENERGY_PRICE_CHF_PER_KWH = Decimal("0.20")

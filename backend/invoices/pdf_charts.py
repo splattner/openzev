@@ -1,11 +1,7 @@
 """Invoice PDF SVG chart builders — energy flow, comparison, and hourly profile."""
 
-import logging
-
 from .engine import _period_to_dt
 from .pdf_stats import _compute_period_participant_stats
-
-logger = logging.getLogger(__name__)
 
 # Shared palette for SVG charts — matches the invoice template brand.
 _CHART_LOCAL = "#1f5c3a"

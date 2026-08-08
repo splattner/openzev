@@ -3,7 +3,6 @@ Contract PDF generation for ZEV participation agreements.
 Renders an HTML template via Django's template engine and converts it to PDF
 using WeasyPrint.
 """
-import logging
 from datetime import date
 from decimal import Decimal
 
@@ -13,8 +12,6 @@ from .pdf_render import render_pdf
 
 from tariffs.models import BillingMode, EnergyType, PeriodType
 from zev.models import MeteringPointType
-
-logger = logging.getLogger(__name__)
 
 CONTRACT_TEMPLATE_NAME = "contracts/participant_contract_pdf.html"
 

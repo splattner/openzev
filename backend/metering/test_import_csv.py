@@ -3,12 +3,12 @@
 from datetime import date, datetime, timezone
 from decimal import Decimal
 
-from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
 from rest_framework.test import APIClient
 
 from accounts.models import UserRole
 from metering.models import ImportLog, MeterReading, ReadingDirection
+from metering.testing import preview_csv, upload_csv
 from testing.helpers import authenticate as auth, make_user
 from zev.models import MeteringPoint, MeteringPointAssignment, MeteringPointType, Participant, Zev
 
@@ -45,16 +45,8 @@ class CsvImportTests(TestCase):
             meter_type=MeteringPointType.CONSUMPTION,
         )
 
-    def _upload(self, name, content, **fields):
-        upload = SimpleUploadedFile(name, content, content_type="text/csv")
-        return self.client.post("/api/v1/metering/import/csv/", {"file": upload, **fields}, format="multipart")
-
-    def _preview(self, name, content, **fields):
-        upload = SimpleUploadedFile(name, content, content_type="text/csv")
-        return self.client.post("/api/v1/metering/import/preview-csv/", {"file": upload, **fields}, format="multipart")
-
     def test_malformed_csv_payload_is_reported_without_crash(self):
-        resp = self._upload("bad.csv", b"wrong_col1,wrong_col2\nfoo,bar\n")
+        resp = upload_csv(self.client, "bad.csv", b"wrong_col1,wrong_col2\nfoo,bar\n")
 
         self.assertEqual(resp.status_code, 201)
         self.assertEqual(resp.data["rows_imported"], 0)
@@ -68,7 +60,7 @@ class CsvImportTests(TestCase):
             b"CH-IMPORT-1,2026-01-01T02:00:00+02:00,1.5000,in\n"
         )
 
-        resp = self._upload("tz.csv", csv_bytes)
+        resp = upload_csv(self.client, "tz.csv", csv_bytes)
 
         self.assertEqual(resp.status_code, 201)
         self.assertEqual(resp.data["rows_imported"], 1)
@@ -82,7 +74,7 @@ class CsvImportTests(TestCase):
             b"CH-IMPORT-1,2026-01-02T00:00:00Z,2.0000,in\n"
         )
 
-        resp = self._upload("dupe.csv", csv_bytes)
+        resp = upload_csv(self.client, "dupe.csv", csv_bytes)
 
         self.assertEqual(resp.status_code, 201)
         self.assertEqual(resp.data["rows_imported"], 1)
@@ -96,11 +88,11 @@ class CsvImportTests(TestCase):
             b"CH-IMPORT-1,2026-01-03T00:00:00Z,3.0000,in\n"
         )
 
-        first_resp = self._upload("idempotent-first.csv", csv_bytes)
+        first_resp = upload_csv(self.client, "idempotent-first.csv", csv_bytes)
         self.assertEqual(first_resp.status_code, 201)
         self.assertEqual(first_resp.data["rows_imported"], 1)
 
-        second_resp = self._upload("idempotent-second.csv", csv_bytes)
+        second_resp = upload_csv(self.client, "idempotent-second.csv", csv_bytes)
 
         self.assertEqual(second_resp.status_code, 201)
         self.assertEqual(second_resp.data["rows_imported"], 0)
@@ -117,11 +109,11 @@ class CsvImportTests(TestCase):
             b"CH-IMPORT-1,2026-01-04T00:00:00Z,4.5000,in\n"
         )
 
-        first_resp = self._upload("overwrite-first.csv", initial_csv)
+        first_resp = upload_csv(self.client, "overwrite-first.csv", initial_csv)
         self.assertEqual(first_resp.status_code, 201)
         self.assertEqual(first_resp.data["rows_imported"], 1)
 
-        overwrite_resp = self._upload("overwrite-second.csv", updated_csv, overwrite_existing="true")
+        overwrite_resp = upload_csv(self.client, "overwrite-second.csv", updated_csv, overwrite_existing="true")
 
         self.assertEqual(overwrite_resp.status_code, 201)
         self.assertEqual(overwrite_resp.data["rows_imported"], 1)
@@ -142,7 +134,7 @@ class CsvImportTests(TestCase):
             b"CH-MISSING,2026-01-05T00:15:00Z,2.0000,in\n"
         )
 
-        resp = self._preview("preview.csv", csv_bytes)
+        resp = preview_csv(self.client, "preview.csv", csv_bytes)
 
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(resp.data["rows_total"], 2)
@@ -155,7 +147,7 @@ class CsvImportTests(TestCase):
     def test_headerless_csv_uses_index_column_mapping(self):
         csv_bytes = b"CH-IMPORT-1;2026-01-06T00:00:00Z;6,2500;in\n"
 
-        resp = self._upload(
+        resp = upload_csv(self.client,
             "headerless.csv",
             csv_bytes,
             has_header="false",
@@ -174,7 +166,7 @@ class CsvImportTests(TestCase):
     def test_daily_15min_profile_imports_configured_slots(self):
         csv_bytes = b"meter_id,date,v1,v2\nCH-IMPORT-1,2026-01-07,1.0000,2.0000\n"
 
-        resp = self._upload(
+        resp = upload_csv(self.client,
             "daily.csv",
             csv_bytes,
             format_profile="daily_15min",
@@ -198,7 +190,7 @@ class CsvImportTests(TestCase):
             b"CH-IMPORT-1,2026-01-08T00:00:00Z,1.0000,sideways\n"
         )
 
-        resp = self._upload("invalid-direction.csv", csv_bytes)
+        resp = upload_csv(self.client, "invalid-direction.csv", csv_bytes)
 
         self.assertEqual(resp.status_code, 201)
         self.assertEqual(resp.data["rows_imported"], 0)
@@ -213,7 +205,7 @@ class CsvImportTests(TestCase):
             b"CH-IMPORT-1,2026-01-09T00:00:00Z,,in\n"
         )
 
-        resp = self._upload("missing-values.csv", csv_bytes)
+        resp = upload_csv(self.client, "missing-values.csv", csv_bytes)
 
         self.assertEqual(resp.status_code, 201)
         self.assertEqual(resp.data["rows_imported"], 0)
@@ -228,7 +220,7 @@ class CsvImportTests(TestCase):
             b"CH-IMPORT-OTHER,2026-01-10T00:00:00Z,1.0000,in\n"
         )
 
-        resp = self._upload("other-zev.csv", csv_bytes)
+        resp = upload_csv(self.client, "other-zev.csv", csv_bytes)
 
         self.assertEqual(resp.status_code, 201)
         self.assertEqual(resp.data["rows_imported"], 0)
@@ -254,7 +246,7 @@ class CsvImportTests(TestCase):
             b"CH-BIDI,2026-01-11T00:30:00Z,4.0000\n"
         )
 
-        resp = self._upload("inferred-direction.csv", csv_bytes)
+        resp = upload_csv(self.client, "inferred-direction.csv", csv_bytes)
 
         self.assertEqual(resp.status_code, 201)
         self.assertEqual(resp.data["rows_imported"], 3)
@@ -272,7 +264,7 @@ class CsvImportTests(TestCase):
             b"CH-IMPORT-1,2026-01-12T00:00:00Z,1.0000,in\n"
         )
 
-        resp = self._upload("infer-zev.csv", csv_bytes)
+        resp = upload_csv(self.client, "infer-zev.csv", csv_bytes)
 
         self.assertEqual(resp.status_code, 201)
         log = ImportLog.objects.get(id=resp.data["id"])

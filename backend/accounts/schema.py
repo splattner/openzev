@@ -12,7 +12,7 @@ class ApiKeyAuthenticationScheme(OpenApiAuthenticationExtension):
     target_class = "accounts.authentication.ApiKeyAuthentication"
     name = "ApiKeyAuth"
 
-    def get_security_definition(self, auto_schema):
+    def get_security_definition(self, _auto_schema):
         return {
             "type": "apiKey",
             "in": "header",
@@ -33,7 +33,7 @@ class CookieJWTAuthenticationScheme(OpenApiAuthenticationExtension):
     target_class = "accounts.authentication.CookieJWTAuthentication"
     name = "CookieJwtAuth"
 
-    def get_security_definition(self, auto_schema):
+    def get_security_definition(self, _auto_schema):
         return {
             "type": "http",
             "scheme": "bearer",

@@ -26,7 +26,8 @@ from invoices.engine import generate_invoice
 from invoices.pdf_stats import _compute_period_participant_stats
 from metering.analytics import owner_dashboard_summary
 from metering.models import MeterReading, ReadingDirection
-from zev.models import MeteringPoint, MeteringPointAssignment, MeteringPointType, Participant, Zev
+from testing.helpers import make_named_participant
+from zev.models import MeteringPoint, MeteringPointAssignment, MeteringPointType, Zev
 
 User = get_user_model()
 
@@ -38,14 +39,6 @@ ENERGY_QUANTUM = Decimal("0.0001")
 
 class _ReconciliationBase(TestCase):
     """Shared fixture builders and consumers for reconciliation scenarios."""
-
-    def _participant(self, name, valid_from, valid_to=None):
-        first, last = name.split(" ", 1)
-        return Participant.objects.create(
-            zev=self.zev, first_name=first, last_name=last,
-            email=f"{name.replace(' ', '').lower()}@example.com",
-            valid_from=valid_from, valid_to=valid_to,
-        )
 
     def _mp(self, meter_type, meter_id):
         return MeteringPoint.objects.create(
@@ -159,8 +152,8 @@ class EnginePdfStatsAnalyticsReconciliationTests(_ReconciliationBase):
             invoice_prefix="RC",
         )
         self.zev.refresh_from_db()
-        self.alice = self._participant("Alice Muster", PERIOD_START, date(2026, 1, 14))
-        self.bob = self._participant("Bob Beispiel", date(2026, 1, 16))
+        self.alice = make_named_participant(self.zev, "Alice Muster", PERIOD_START, date(2026, 1, 14))
+        self.bob = make_named_participant(self.zev, "Bob Beispiel", date(2026, 1, 16))
 
         self.consumption_mp = self._mp(MeteringPointType.CONSUMPTION, "CH-RC-CONS-1")
         self._assign(self.consumption_mp, self.alice, PERIOD_START, date(2026, 1, 14))
@@ -280,8 +273,8 @@ class MultiMeterBidirectionalReconciliationTests(_ReconciliationBase):
             invoice_prefix="MM",
         )
         self.zev.refresh_from_db()
-        self.alice = self._participant("Alice Muster", PERIOD_START)
-        self.bob = self._participant("Bob Beispiel", date(2026, 1, 16))
+        self.alice = make_named_participant(self.zev, "Alice Muster", PERIOD_START)
+        self.bob = make_named_participant(self.zev, "Bob Beispiel", date(2026, 1, 16))
 
         self.cons1 = self._mp(MeteringPointType.CONSUMPTION, "CH-MM-CONS-1")
         self.cons2 = self._mp(MeteringPointType.CONSUMPTION, "CH-MM-CONS-2")
@@ -500,8 +493,8 @@ class UnassignedProductionReconciliationTests(_ReconciliationBase):
             invoice_prefix="UP",
         )
         self.zev.refresh_from_db()
-        self.alice = self._participant("Alice Muster", PERIOD_START)
-        self.bob = self._participant("Bob Beispiel", PERIOD_START)
+        self.alice = make_named_participant(self.zev, "Alice Muster", PERIOD_START)
+        self.bob = make_named_participant(self.zev, "Bob Beispiel", PERIOD_START)
 
         self.cons1 = self._mp(MeteringPointType.CONSUMPTION, "CH-UP-CONS-1")
         self.prod1 = self._mp(MeteringPointType.PRODUCTION, "CH-UP-PROD-1")
@@ -566,7 +559,7 @@ class AnnualStatementPhysicalPoolTests(_ReconciliationBase):
         )
         self.zev.refresh_from_db()
 
-        self.alice = self._participant("Alice Muster", PERIOD_START)
+        self.alice = make_named_participant(self.zev, "Alice Muster", PERIOD_START)
 
         self.consumption_mp = self._mp(MeteringPointType.CONSUMPTION, "CH-AP-CONS")
         self._assign(self.consumption_mp, self.alice, PERIOD_START)
@@ -624,7 +617,7 @@ class AnnualStatementDirectionTypePairingTests(_ReconciliationBase):
         )
         self.zev.refresh_from_db()
 
-        self.alice = self._participant("Alice Muster", PERIOD_START)
+        self.alice = make_named_participant(self.zev, "Alice Muster", PERIOD_START)
 
         self.consumption_mp = self._mp(MeteringPointType.CONSUMPTION, "CH-PZ-CONS")
         self._assign(self.consumption_mp, self.alice, PERIOD_START)

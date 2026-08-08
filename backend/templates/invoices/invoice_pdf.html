@@ -5,12 +5,7 @@
     <meta charset="UTF-8">
     <title>Invoice {{ invoice.invoice_number }}</title>
     <style>
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
-
+        /* ══ 1. Tokens & base ════════════════════════════════════ */
         :root {
             --ink: #0f172a;
             --ink-soft: #334155;
@@ -32,6 +27,12 @@
             --subtotal-color: #24352c;
         }
 
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
         body {
             font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
             font-size: 9.5pt;
@@ -43,7 +44,29 @@
             padding: 12mm 16mm;
         }
 
-        /* ── Header ─────────────────────────────────────────────── */
+        /* ══ 2. Utilities ════════════════════════════════════════ */
+        .eyebrow {
+            color: var(--muted);
+            font-size: 6.8pt;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+
+        /* Visually hidden but screen-reader accessible. */
+        .visually-hidden {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+            border: 0;
+        }
+
+        /* ══ 3. Document header ══════════════════════════════════ */
         .document-header {
             display: flex;
             justify-content: space-between;
@@ -133,7 +156,7 @@
             border: 0.5pt solid var(--brand-glow);
         }
 
-        /* ── Summary band ───────────────────────────────────────── */
+        /* ══ 4. Summary band ═════════════════════════════════════ */
         .invoice-summary {
             display: flex;
             gap: 10mm;
@@ -147,7 +170,6 @@
             min-width: 0;
         }
 
-        .eyebrow,
         .fact dt {
             color: var(--muted);
             font-size: 6.8pt;
@@ -325,7 +347,7 @@
             color: rgba(255,255,255,0.45);
         }
 
-        /* ── Line items ─────────────────────────────────────────── */
+        /* ══ 5. Line items ═══════════════════════════════════════ */
         .line-items {
             border-collapse: separate;
             border-spacing: 0;
@@ -419,12 +441,7 @@
         /* Each category is its own <tbody> rowgroup: this resets zebra parity
            per group and lets the side-label panel close cleanly at the group's
            bottom edge. */
-        .line-items .item-group:first-child {
-            border-top: 0;
-        }
-
         .line-items .item-group {
-            border-top: 1pt solid var(--line);
             break-inside: avoid;
         }
 
@@ -446,20 +463,7 @@
             border-bottom: none;
         }
 
-        /* Visually hidden but screen-reader accessible. */
-        .visually-hidden {
-            position: absolute;
-            width: 1px;
-            height: 1px;
-            padding: 0;
-            margin: -1px;
-            overflow: hidden;
-            clip: rect(0, 0, 0, 0);
-            white-space: nowrap;
-            border: 0;
-        }
-
-        /* ── Closing / totals ───────────────────────────────────── */
+        /* ══ 6. Closing & totals ═════════════════════════════════ */
         .invoice-closing {
             display: flex;
             gap: 8mm;
@@ -536,7 +540,7 @@
             color: var(--muted);
         }
 
-        /* ── Inline QR page ─────────────────────────────────────── */
+        /* ══ 7. Inline QR page variant ═══════════════════════════ */
         /* Reserve the full Swiss payment-part height at the bottom so the
            QR-Rechnung sits on the same page as short invoices.
            Uses @page margin-bottom + position: running() so content
@@ -546,12 +550,45 @@
             page: invoice-payment;
         }
 
-        .invoice-with-inline-qr .invoice-body {
+        /* ══ 8. Dedicated payment page ═══════════════════════════ */
+        .payment-page {
+            break-before: page;
+            page: payment;
             position: relative;
-            z-index: 1;
+            height: 285mm; /* 297 -12 */
         }
 
-        /* ── Insights page ──────────────────────────────────────── */
+        .payment-notice {
+            color: var(--muted);
+            font-size: 8.5pt;
+            left: 16mm;
+            position: absolute;
+            top: 14mm;
+            max-width: 170mm;
+            line-height: 1.4;
+        }
+
+        .payment-notice strong {
+            color: var(--brand-deep);
+        }
+
+        .qr-section {
+            width: 210mm;
+        }
+
+        .payment-page .qr-section {
+            position: absolute;
+            left: 0;
+            bottom: 0;
+        }
+
+        .qr-section svg {
+            display: block;
+            height: 106mm;
+            width: 210mm;
+        }
+
+        /* ══ 9. Insights page ════════════════════════════════════ */
         .insights-page {
             break-before: page;
             page: insights;
@@ -693,7 +730,7 @@
             width: 100%;
         }
 
-        /* ── Consistent 3-col meta ── */
+        /* ══ 10. Page furniture: running header/footer meta ══════ */
         .page-meta {
             width: 210mm;
             margin: 0;
@@ -738,44 +775,14 @@
         .page-meta .meta-right { text-align: right; flex: 1; }
         .page-meta .meta-center::after { content: counter(page) " / " counter(pages); }
 
-        /* ── Dedicated payment page ─────────────────────────────── */
-        .payment-page {
-            break-before: page;
-            page: payment;
-            position: relative;
-            height: 285mm; /* 297 -12 */
-        }
-
-        .payment-notice {
-            color: var(--muted);
-            font-size: 8.5pt;
-            left: 16mm;
-            position: absolute;
-            top: 14mm;
-            max-width: 170mm;
-            line-height: 1.4;
-        }
-
-        .payment-notice strong {
-            color: var(--brand-deep);
-        }
-
-        .qr-section {
-            width: 210mm;
-        }
-
-        .payment-page .qr-section {
-            position: absolute;
-            left: 0;
-            bottom: 0;
-        }
-
-        .qr-section svg {
-            display: block;
-            height: 106mm;
-            width: 210mm;
-        }
-
+        /* ══ 11. @page rules ═════════════════════════════════════ */
+        /* How this prints: the running header/footer and the QR slip are
+           normal <div>s in the body, repositioned into page margin boxes
+           via `position: running()` + `element()` in named pages
+           (default, payment, insights, invoice-payment). Each named page
+           also defines its own margins — the inline-QR variant reserves
+           the bottom 106mm for the slip, and `:first` suppresses the top
+           margin on page 1. */
         @page {
             size: A4;
             margin: 0 0 12mm 0;
@@ -900,7 +907,7 @@
                     </div>
                 </dl>
                 {% if savings_data %}
-                <aside class="amount-card amount-card--savings" aria-label="{{ tr.savings_title }}">
+                <aside class="amount-card" aria-label="{{ tr.savings_title }}">
                     <div class="amount-card-shine" aria-hidden="true"></div>
                     <div class="eyebrow">
                         {{ tr.savings_from }}

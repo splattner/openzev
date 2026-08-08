@@ -11,6 +11,7 @@ from django.test import TestCase
 from django.utils import timezone
 from tariffs.models import TariffCategory
 from metering.models import MeterReading, ReadingDirection
+from testing.helpers import make_named_participant
 from zev.models import MeteringPoint, MeteringPointAssignment, MeteringPointType, Participant, Zev
 
 from .models import Invoice, InvoiceItem, InvoiceStatus
@@ -347,7 +348,7 @@ class InvoicePdfQrTests(TestCase):
         self.assertIn('class="line-items"', html)
         self.assertIn('quantity-cell', html)
         self.assertNotIn('<th>{{ tr.unit }}</th>', html)  # unit merged into quantity
-        self.assertIn('amount-card--savings', html)
+        self.assertIn('savings-breakdown', html)  # savings card variant renders
 
     def test_template_context_enables_inline_qr_payment_for_small_invoices(self):
         invoice = self._invoice()
@@ -1206,14 +1207,6 @@ class PeriodParticipantStatsTests(TestCase):
         )
         self.zev.refresh_from_db()
 
-    def _participant(self, name, valid_from, valid_to=None):
-        first, last = name.split(" ", 1)
-        return Participant.objects.create(
-            zev=self.zev, first_name=first, last_name=last,
-            email=f"{name.replace(' ', '').lower()}@example.com",
-            valid_from=valid_from, valid_to=valid_to,
-        )
-
     def _reading(self, metering_point, day, kwh):
         return MeterReading.objects.create(
             metering_point=metering_point,
@@ -1237,8 +1230,8 @@ class PeriodParticipantStatsTests(TestCase):
     def test_mid_period_transfer_is_attributed_per_reading(self):
         """A metering point handed over mid-period attributes each reading to
         its holder without double-counting (join fan-out regression)."""
-        alice = self._participant("Alice Muster", self.PERIOD_START, date(2026, 1, 15))
-        bob = self._participant("Bob Beispiel", date(2026, 1, 16))
+        alice = make_named_participant(self.zev, "Alice Muster", self.PERIOD_START, date(2026, 1, 15))
+        bob = make_named_participant(self.zev, "Bob Beispiel", date(2026, 1, 16))
         self.participant = alice
         metering_point = MeteringPoint.objects.create(
             zev=self.zev, meter_type=MeteringPointType.CONSUMPTION)
@@ -1258,8 +1251,8 @@ class PeriodParticipantStatsTests(TestCase):
         assert by_name["Bob Beispiel"]["total_consumed_kwh"] == 6.0
 
     def test_readings_in_an_assignment_gap_appear_in_no_participants_stats(self):
-        alice = self._participant("Alice Muster", self.PERIOD_START, date(2026, 1, 10))
-        bob = self._participant("Bob Beispiel", date(2026, 1, 20))
+        alice = make_named_participant(self.zev, "Alice Muster", self.PERIOD_START, date(2026, 1, 10))
+        bob = make_named_participant(self.zev, "Bob Beispiel", date(2026, 1, 20))
         self.participant = alice
         metering_point = MeteringPoint.objects.create(
             zev=self.zev, meter_type=MeteringPointType.CONSUMPTION)
@@ -1284,8 +1277,8 @@ class PeriodParticipantStatsTests(TestCase):
         during the billed period but has since left the ZEV must still be
         named — the lookup is keyed off the assignment windows, not the
         current participant list."""
-        alice = self._participant("Alice Muster", self.PERIOD_START)
-        bob = self._participant("Bob Beispiel", self.PERIOD_START)
+        alice = make_named_participant(self.zev, "Alice Muster", self.PERIOD_START)
+        bob = make_named_participant(self.zev, "Bob Beispiel", self.PERIOD_START)
         self.participant = bob
         metering_point = MeteringPoint.objects.create(
             zev=self.zev, meter_type=MeteringPointType.CONSUMPTION)
@@ -1323,7 +1316,7 @@ class PeriodParticipantStatsTests(TestCase):
         """For unchanged data the PDF stats split matches the billed invoice
         totals exactly."""
         from .engine import generate_invoice
-        alice = self._participant("Alice Muster", self.PERIOD_START)
+        alice = make_named_participant(self.zev, "Alice Muster", self.PERIOD_START)
         self.participant = alice
         metering_point = MeteringPoint.objects.create(
             zev=self.zev, meter_type=MeteringPointType.CONSUMPTION)

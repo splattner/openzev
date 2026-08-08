@@ -23,6 +23,7 @@ from rest_framework.test import APIClient
 
 from accounts.models import User, UserRole
 from metering.models import MeterReading
+from metering.testing import preview_csv, upload_csv
 from testing.helpers import authenticate as auth
 from zev.models import MeteringPoint, MeteringPointType, Zev
 
@@ -48,18 +49,6 @@ class CsvImportCharacterizationTests(TestCase):
         )
 
     # ── helpers ──────────────────────────────────────────────────────────────
-
-    def _upload(self, name, content, **fields):
-        upload = SimpleUploadedFile(name, content, content_type="text/csv")
-        return self.client.post(
-            "/api/v1/metering/import/csv/", {"file": upload, **fields}, format="multipart"
-        )
-
-    def _preview(self, name, content, **fields):
-        upload = SimpleUploadedFile(name, content, content_type="text/csv")
-        return self.client.post(
-            "/api/v1/metering/import/preview-csv/", {"file": upload, **fields}, format="multipart"
-        )
 
     @staticmethod
     def _xlsx_bytes(rows, *, extra_sheet_rows=None, active_index=0):
@@ -214,7 +203,7 @@ class CsvImportCharacterizationTests(TestCase):
         """
         csv_bytes = b"CH-IMPORT-1;meta;meta;07.03.2026;1,0;2,0;3,0;4,0\n"
 
-        resp = self._upload(
+        resp = upload_csv(self.client,
             "production.csv",
             csv_bytes,
             has_header="false",
@@ -254,7 +243,7 @@ class CsvImportCharacterizationTests(TestCase):
             b"CH-IMPORT-1,08.03.2026 13:45,1.5000\n"
         )
 
-        resp = self._upload(
+        resp = upload_csv(self.client,
             "fmt.csv", csv_bytes, timestamp_format="%d.%m.%Y %H:%M"
         )
 
@@ -270,7 +259,7 @@ class CsvImportCharacterizationTests(TestCase):
             b"CH-IMPORT-1,2026-03-09T00:00:00Z,1.5000\n"
         )
 
-        resp = self._upload("mismatch.csv", csv_bytes, timestamp_format="%d.%m.%Y")
+        resp = upload_csv(self.client, "mismatch.csv", csv_bytes, timestamp_format="%d.%m.%Y")
 
         self.assertEqual(resp.status_code, 201)
         self.assertEqual(resp.data["rows_imported"], 0)
@@ -280,7 +269,7 @@ class CsvImportCharacterizationTests(TestCase):
     # ── C. Date parsing without an explicit format ───────────────────────────
 
     def _daily_date_upload(self, name, raw_date):
-        return self._upload(
+        return upload_csv(self.client,
             name,
             b"meter_id,date,v1\nCH-IMPORT-1," + raw_date + b",1.0000\n",
             format_profile="daily_15min",
@@ -306,7 +295,7 @@ class CsvImportCharacterizationTests(TestCase):
         )
 
     def test_preview_daily_profile_falls_back_to_raw_string_for_unparsable_date(self):
-        resp = self._preview(
+        resp = preview_csv(self.client,
             "unparsable.csv",
             b"meter_id,date,v1\nCH-IMPORT-1,not-a-date,1.0000\n",
             format_profile="daily_15min",
@@ -320,7 +309,7 @@ class CsvImportCharacterizationTests(TestCase):
     # ── D. Standard timestamps ───────────────────────────────────────────────
 
     def test_naive_timestamp_is_assumed_utc(self):
-        resp = self._upload(
+        resp = upload_csv(self.client,
             "naive.csv",
             b"meter_id,timestamp,energy_kwh\nCH-IMPORT-1,2026-05-01 05:00:00,1.0000\n",
         )
@@ -331,7 +320,7 @@ class CsvImportCharacterizationTests(TestCase):
         )
 
     def test_date_only_timestamp_becomes_midnight_utc(self):
-        resp = self._upload(
+        resp = upload_csv(self.client,
             "dateonly.csv",
             b"meter_id,timestamp,energy_kwh\nCH-IMPORT-1,2026-05-02,1.0000\n",
         )
@@ -342,7 +331,7 @@ class CsvImportCharacterizationTests(TestCase):
         )
 
     def test_unparsable_timestamp_is_skipped_and_reported(self):
-        resp = self._upload(
+        resp = upload_csv(self.client,
             "badts.csv",
             b"meter_id,timestamp,energy_kwh\nCH-IMPORT-1,definitely-not-a-date,1.0000\n",
         )
@@ -365,7 +354,7 @@ class CsvImportCharacterizationTests(TestCase):
             b"CH-UNKNOWN,2026-06-02T00:00:00Z,2.0000\n"
         )
 
-        resp = self._upload("blankline.csv", csv_bytes)
+        resp = upload_csv(self.client, "blankline.csv", csv_bytes)
 
         self.assertEqual(resp.status_code, 201)
         self.assertEqual(resp.data["rows_total"], 2)
@@ -380,7 +369,7 @@ class CsvImportCharacterizationTests(TestCase):
             b"CH-IMPORT-1,2026-06-03T00:00:00Z\n"
         )
 
-        resp = self._upload("short.csv", csv_bytes)
+        resp = upload_csv(self.client, "short.csv", csv_bytes)
 
         self.assertEqual(resp.status_code, 201)
         self.assertEqual(resp.data["rows_imported"], 0)
@@ -392,7 +381,7 @@ class CsvImportCharacterizationTests(TestCase):
             b"CH-IMPORT-1,2026-06-04T00:00:00Z,1.0000\n"
         )
 
-        resp = self._upload("bom.csv", csv_bytes)
+        resp = upload_csv(self.client, "bom.csv", csv_bytes)
 
         self.assertEqual(resp.status_code, 201)
         self.assertEqual(resp.data["rows_imported"], 1)
@@ -403,13 +392,13 @@ class CsvImportCharacterizationTests(TestCase):
             b'CH-IMPORT-1,2026-06-05T00:00:00Z,1.0000,"a,b"\n'
         )
 
-        resp = self._upload("quoted.csv", csv_bytes)
+        resp = upload_csv(self.client, "quoted.csv", csv_bytes)
 
         self.assertEqual(resp.status_code, 201)
         self.assertEqual(resp.data["rows_imported"], 1)
 
     def test_column_index_out_of_range_reports_the_range(self):
-        resp = self._upload(
+        resp = upload_csv(self.client,
             "oor.csv",
             b"meter_id,timestamp,energy_kwh\nCH-IMPORT-1,2026-06-06T00:00:00Z,1.0000\n",
             col_meter_id="99",
@@ -425,7 +414,7 @@ class CsvImportCharacterizationTests(TestCase):
         )
 
     def test_unknown_column_name_is_reported_by_name(self):
-        resp = self._upload(
+        resp = upload_csv(self.client,
             "unknown.csv",
             b"meter_id,timestamp,energy_kwh\nCH-IMPORT-1,2026-06-07T00:00:00Z,1.0000\n",
             col_meter_id="nope",
@@ -440,7 +429,7 @@ class CsvImportCharacterizationTests(TestCase):
     def test_daily_profile_reports_an_error_per_missing_interval_column(self):
         csv_bytes = b"meter_id,date,v1,v2\nCH-IMPORT-1,2026-06-08,1.0000,2.0000\n"
 
-        resp = self._upload(
+        resp = upload_csv(self.client,
             "shortslots.csv",
             csv_bytes,
             format_profile="daily_15min",
@@ -462,7 +451,7 @@ class CsvImportCharacterizationTests(TestCase):
         """An all-numeric column infers int64, whose str() is '1234'."""
         csv_bytes = b"meter_id,timestamp,energy_kwh\n1234,2026-07-01T00:00:00Z,1.0000\n"
 
-        resp = self._upload("numeric.csv", csv_bytes)
+        resp = upload_csv(self.client, "numeric.csv", csv_bytes)
 
         self.assertEqual(resp.status_code, 201)
         self.assertEqual(resp.data["rows_imported"], 1)
@@ -484,7 +473,7 @@ class CsvImportCharacterizationTests(TestCase):
             b",2026-07-02T00:15:00Z,2.0000\n"
         )
 
-        resp = self._upload("numeric-blank.csv", csv_bytes)
+        resp = upload_csv(self.client, "numeric-blank.csv", csv_bytes)
 
         self.assertEqual(resp.status_code, 201)
         self.assertEqual(resp.data["rows_imported"], 1)
@@ -499,7 +488,7 @@ class CsvImportCharacterizationTests(TestCase):
         NaN reaches the database."""
         csv_bytes = b"meter_id,timestamp,energy_kwh\nCH-IMPORT-1,2026-07-03T00:00:00Z,nan\n"
 
-        resp = self._upload("nan.csv", csv_bytes)
+        resp = upload_csv(self.client, "nan.csv", csv_bytes)
 
         self.assertEqual(resp.status_code, 201)
         self.assertEqual(resp.data["rows_imported"], 0)
@@ -508,7 +497,7 @@ class CsvImportCharacterizationTests(TestCase):
     def test_literal_infinite_energy_value_is_rejected(self):
         csv_bytes = b"meter_id,timestamp,energy_kwh\nCH-IMPORT-1,2026-07-04T00:00:00Z,inf\n"
 
-        resp = self._upload("inf.csv", csv_bytes)
+        resp = upload_csv(self.client, "inf.csv", csv_bytes)
 
         self.assertEqual(resp.status_code, 201)
         self.assertEqual(resp.data["rows_imported"], 0)
@@ -517,7 +506,7 @@ class CsvImportCharacterizationTests(TestCase):
     def test_four_decimal_energy_is_preserved_exactly(self):
         csv_bytes = b"meter_id,timestamp,energy_kwh\nCH-IMPORT-1,2026-07-05T00:00:00Z,1.2345\n"
 
-        resp = self._upload("decimals.csv", csv_bytes)
+        resp = upload_csv(self.client, "decimals.csv", csv_bytes)
 
         self.assertEqual(resp.data["rows_imported"], 1)
         reading = MeterReading.objects.get(metering_point=self.metering_point)
@@ -529,7 +518,7 @@ class CsvImportCharacterizationTests(TestCase):
             b"CH-IMPORT-1;2026-07-06T00:00:00Z;6,2500\n"
         )
 
-        resp = self._upload("commadec.csv", csv_bytes, delimiter=";")
+        resp = upload_csv(self.client, "commadec.csv", csv_bytes, delimiter=";")
 
         self.assertEqual(resp.data["rows_imported"], 1)
         reading = MeterReading.objects.get(metering_point=self.metering_point)
@@ -545,7 +534,7 @@ class CsvImportCharacterizationTests(TestCase):
             b'"   ",2026-07-07T00:00:00Z,1.0000\n'
         )
 
-        resp = self._upload("wsmeter.csv", csv_bytes)
+        resp = upload_csv(self.client, "wsmeter.csv", csv_bytes)
 
         self.assertEqual(resp.status_code, 201)
         self.assertTrue(
@@ -559,7 +548,7 @@ class CsvImportCharacterizationTests(TestCase):
             b",2026-07-08T00:00:00Z,1.0000\n"
         )
 
-        resp = self._upload("blankmeter.csv", csv_bytes)
+        resp = upload_csv(self.client, "blankmeter.csv", csv_bytes)
 
         self.assertEqual(resp.status_code, 201)
         self.assertTrue(
@@ -575,7 +564,7 @@ class CsvImportCharacterizationTests(TestCase):
             b"CH-IMPORT-1,2026-07-09T00:00:00Z,1.0000\n"
         )
 
-        resp = self._upload("nodirection.csv", csv_bytes, col_direction="does_not_exist")
+        resp = upload_csv(self.client, "nodirection.csv", csv_bytes, col_direction="does_not_exist")
 
         self.assertEqual(resp.status_code, 201)
         self.assertEqual(resp.data["rows_imported"], 1)
@@ -590,7 +579,7 @@ class CsvImportCharacterizationTests(TestCase):
         )
         csv_bytes = b"meter_id,timestamp,energy_kwh\n" + rows
 
-        resp = self._preview("many.csv", csv_bytes)
+        resp = preview_csv(self.client, "many.csv", csv_bytes)
 
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(resp.data["rows_total"], 35)
@@ -608,7 +597,7 @@ class CsvImportCharacterizationTests(TestCase):
             import_source="manual",
         )
 
-        resp = self._preview(
+        resp = preview_csv(self.client,
             "existing.csv",
             b"meter_id,date,v1\nCH-IMPORT-1,2026-08-03,1.0000\n",
             format_profile="daily_15min",
@@ -621,7 +610,7 @@ class CsvImportCharacterizationTests(TestCase):
         self.assertEqual(resp.data["preview_rows"][0]["timestamp"], "2026-08-03")
 
     def test_preview_column_error_returns_total_with_no_preview_rows(self):
-        resp = self._preview(
+        resp = preview_csv(self.client,
             "colerr.csv",
             b"meter_id,timestamp,energy_kwh\nCH-IMPORT-1,2026-08-04T00:00:00Z,1.0000\n",
             col_timestamp="missing_column",
@@ -652,7 +641,7 @@ class CsvImportCharacterizationTests(TestCase):
         self.assertEqual(MeterReading.objects.count(), 0)
 
     def test_multi_character_delimiter_is_rejected_with_a_helpful_message(self):
-        resp = self._upload(
+        resp = upload_csv(self.client,
             "multidelim.csv",
             b"meter_id;;timestamp;;energy_kwh\nCH-IMPORT-1;;2026-09-01T00:00:00Z;;1.0000\n",
             delimiter=";;",
@@ -662,7 +651,7 @@ class CsvImportCharacterizationTests(TestCase):
         self.assertIn("single character", resp.data["error"])
 
     def test_tab_delimiter_can_be_requested_as_a_backslash_escape(self):
-        resp = self._upload(
+        resp = upload_csv(self.client,
             "tabs.csv",
             b"meter_id\ttimestamp\tenergy_kwh\nCH-IMPORT-1\t2026-09-02T00:00:00Z\t1.0000\n",
             delimiter="\\t",
@@ -672,7 +661,7 @@ class CsvImportCharacterizationTests(TestCase):
         self.assertEqual(resp.data["rows_imported"], 1)
 
     def test_non_utf8_file_is_rejected_with_a_helpful_message(self):
-        resp = self._upload(
+        resp = upload_csv(self.client,
             "latin1.csv",
             "meter_id,timestamp,energy_kwh,note\nCH-IMPORT-1,2026-09-03T00:00:00Z,1.0,Zürich\n".encode(
                 "latin-1"
@@ -703,7 +692,7 @@ class CsvImportCharacterizationTests(TestCase):
             b"CH-IMPORT-1,2026-09-04T00:00:00Z,1.5000,EXTRA\n"
         )
 
-        resp = self._upload("extrafield.csv", csv_bytes)
+        resp = upload_csv(self.client, "extrafield.csv", csv_bytes)
 
         self.assertEqual(resp.status_code, 201)
         self.assertEqual(resp.data["rows_imported"], 1)
@@ -719,7 +708,7 @@ class CsvImportCharacterizationTests(TestCase):
             b"CH-IMPORT-1,2026-09-07T00:00:00Z\n"
         )
 
-        resp = self._upload("ragged.csv", csv_bytes)
+        resp = upload_csv(self.client, "ragged.csv", csv_bytes)
 
         self.assertEqual(resp.status_code, 201)
         self.assertEqual(resp.data["rows_imported"], 2)
