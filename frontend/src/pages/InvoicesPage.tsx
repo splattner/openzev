@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { InvoicePeriodRowsTable } from '../features/invoices/InvoicePeriodRowsTable'
 import { InvoiceBatchToolbar } from '../features/invoices/InvoiceBatchToolbar'
@@ -60,7 +60,7 @@ export function InvoicesPage() {
         refetchIntervalInBackground: true,
     })
 
-    const rows = useMemo(() => periodOverviewQuery.data?.rows ?? [], [periodOverviewQuery.data?.rows])
+    const rows = periodOverviewQuery.data?.rows ?? []
 
     async function handleOpenEmailLogs(invoiceId: string, invoiceNumber: string) {
         try {

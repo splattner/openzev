@@ -12,7 +12,7 @@ export interface ParticipantMapEntry {
     buildingFootprint?: ParticipantBuildingFootprint | null
 }
 
-export interface ParticipantMapGroup {
+interface ParticipantMapGroup {
     footprint: ParticipantBuildingFootprint
     participants: Array<{ id: string; displayName: string; address: string }>
 }

@@ -11,14 +11,13 @@ import {
     YAxis,
 } from 'recharts'
 import type { FeasibilitySensitivityPoint } from '../../types/api'
+import { AXIS_COLOR, ANNOTATION_COLOR } from '../../lib/chartTokens'
 
 // Blue/red diverging pair — validated colorblind-safe (worst adjacent CVD deltaE
 // 29.9, normal-vision 38.2; see dataviz skill's validate_palette.js). Green/red
 // was rejected here: it fails the deuteranopia check (deltaE 5.0).
 const LINE_COLOR = '#2563eb'
 const NEGATIVE_COLOR = '#dc2626'
-const AXIS_COLOR = '#9ca3af'
-const ANNOTATION_COLOR = '#6b7280'
 
 type Props = {
     sensitivity: FeasibilitySensitivityPoint[]

@@ -7,11 +7,11 @@ import {
   faTrash,
   faUserPlus,
 } from '@fortawesome/free-solid-svg-icons'
-import { useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { ActionMenu, type ActionMenuItem } from '../../components/ActionMenu'
 import { formatShortDate } from '../../lib/appSettings'
+import { todayLocalIso } from '../../lib/dates'
 import type { AppSettings, MeteringPoint, MeteringPointAssignment } from '../../types/api'
 import {
   assignmentStateBadgeClass,
@@ -65,7 +65,7 @@ export function MeteringPointsList({
   onDeleteAssignment,
 }: MeteringPointsListProps) {
   const { t } = useTranslation()
-  const todayIso = useMemo(() => new Date().toISOString().slice(0, 10), [])
+  const todayIso = todayLocalIso()
 
   return (
     <div className="metering-point-list">

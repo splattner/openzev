@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { todayLocalIso } from '../../lib/dates'
 import type { Participant, ParticipantInput } from '../../types/api'
 
 export type ParticipantFormValues = {
@@ -42,7 +43,7 @@ export const defaultParticipantFormValues: ParticipantFormValues = {
   postal_code: '',
   city: '',
   notes: '',
-  valid_from: new Date().toISOString().slice(0, 10),
+  valid_from: todayLocalIso(),
   valid_to: '',
 }
 

@@ -1,7 +1,7 @@
 import { type EmailLog } from '../types/api'
 import { formatDateTime, useAppSettings } from '../lib/appSettings'
 
-export interface EmailLogsModalProps {
+interface EmailLogsModalProps {
     invoiceNumber: string
     emailLogs: EmailLog[]
     isOpen: boolean

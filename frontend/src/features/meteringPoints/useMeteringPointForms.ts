@@ -1,3 +1,4 @@
+import { todayLocalIso } from '../../lib/dates'
 import type { MeteringPoint, MeteringPointAssignment, MeteringPointAssignmentInput, MeteringPointInput } from '../../types/api'
 
 export const defaultMeteringPointForm = (): MeteringPointInput => ({
@@ -11,13 +12,13 @@ export const defaultMeteringPointForm = (): MeteringPointInput => ({
 export const defaultAssignmentForm = (meteringPointId = ''): MeteringPointAssignmentInput => ({
   metering_point: meteringPointId,
   participant: '',
-  valid_from: new Date().toISOString().slice(0, 10),
+  valid_from: todayLocalIso(),
   valid_to: null,
 })
 
 export type MeteringPointStatusFilter = 'all' | 'active' | 'inactive'
 export type MeteringPointTypeFilter = 'all' | MeteringPoint['meter_type']
-export type AssignmentState = 'current' | 'upcoming' | 'ended'
+type AssignmentState = 'current' | 'upcoming' | 'ended'
 
 export function getAssignmentState(assignment: MeteringPointAssignment, todayIso: string): AssignmentState {
   if (assignment.valid_from > todayIso) return 'upcoming'

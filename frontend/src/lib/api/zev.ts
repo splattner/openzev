@@ -14,6 +14,7 @@ import type {
   ZevWizardResult,
 } from '../../types/api'
 import { api } from './client'
+import { downloadBlob } from '../downloadBlob'
 
 export async function createSelfSetupZev(
   payload: SelfSetupZevInput,
@@ -87,14 +88,7 @@ export async function createParticipantAccount(participantId: string, payload: {
 
 export async function downloadParticipantContractPdf(participantId: string, filename: string): Promise<void> {
   const response = await api.get(`/zev/participants/${participantId}/contract-pdf/`, { responseType: 'blob' })
-  const url = URL.createObjectURL(response.data as Blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = filename
-  document.body.appendChild(a)
-  a.click()
-  document.body.removeChild(a)
-  URL.revokeObjectURL(url)
+  downloadBlob(response.data as Blob, filename)
 }
 
 export async function fetchMeteringPoints(): Promise<PaginatedResponse<MeteringPoint>> {

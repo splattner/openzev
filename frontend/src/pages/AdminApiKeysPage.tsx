@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { fetchAllApiKeys, fetchUsers, revokeAnyApiKey } from '../lib/api/auth'
@@ -33,8 +33,8 @@ export function AdminApiKeysPage() {
         queryFn: fetchUsers,
     })
 
-    const keys = useMemo(() => keysQuery.data ?? [], [keysQuery.data])
-    const users = useMemo(() => usersQuery.data?.results ?? [], [usersQuery.data?.results])
+    const keys = keysQuery.data ?? []
+    const users = usersQuery.data?.results ?? []
 
     const revokeMutation = useMutation({
         mutationFn: (id: string) => revokeAnyApiKey(id),

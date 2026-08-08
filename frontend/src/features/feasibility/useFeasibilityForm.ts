@@ -2,10 +2,10 @@ import { z } from 'zod'
 import type { FeasibilityInput, FeasibilityPrefill } from '../../types/api'
 
 export type InternalEnergyPriceMode = 'absolute' | 'percentage_of_retail'
-export type AnnualProductionMode = 'absolute' | 'from_kwp'
-export type EnergyInputMode = 'aggregate' | 'participants'
+type AnnualProductionMode = 'absolute' | 'from_kwp'
+type EnergyInputMode = 'aggregate' | 'participants'
 
-export type ParticipantFormRow = {
+type ParticipantFormRow = {
   name: string
   annual_production_kwh: string
   annual_consumption_kwh: string

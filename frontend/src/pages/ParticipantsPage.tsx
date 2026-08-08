@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useMemo, useState } from 'react'
 import { ConfirmDialog, useConfirmDialog } from '../components/ConfirmDialog'
 import { ParticipantCardsSection } from '../features/participants/ParticipantCardsSection'
+import type { ParticipantValidityState } from '../features/participants/types'
 import {
     ParticipantCredentialsNotice,
     type ParticipantCredentialsNoticeData,
@@ -25,9 +26,8 @@ import { useManagedZev } from '../lib/managedZev'
 import { queryKeys } from '../lib/api/queryKeys'
 import { useTranslation } from 'react-i18next'
 import { useToast } from '../lib/toast'
+import { todayLocalIso } from '../lib/dates'
 import type { Participant, ParticipantInput } from '../types/api'
-
-type ParticipantValidityState = 'current' | 'upcoming' | 'ended'
 
 function getParticipantValidityState(participant: Participant, todayIso: string): ParticipantValidityState {
     if (participant.valid_from > todayIso) return 'upcoming'
@@ -185,7 +185,7 @@ export function ParticipantsPage() {
     const ownerIdByZevId = new Map((zevsQuery.data?.results ?? []).map((zev) => [zev.id, zev.owner]))
     const isOwnerParticipant = (participant: Participant) => ownerIdByZevId.get(participant.zev) === participant.user
     const editingParticipant = participants.find((participant) => participant.id === editingId)
-    const todayIso = new Date().toISOString().slice(0, 10)
+    const todayIso = todayLocalIso()
     const participantCards = [...participants]
         .map((participant) => {
             const warnings = participantWarnings(participant)

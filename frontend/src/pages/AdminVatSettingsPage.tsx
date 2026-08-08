@@ -12,7 +12,8 @@ import { useTranslation } from 'react-i18next'
 import { useToast } from '../lib/toast'
 import { ConfirmDialog, useConfirmDialog } from '../components/ConfirmDialog'
 import { StatCard } from '../components/StatCard'
-import type { VatRateInput } from '../types/api'
+import { todayLocalIso } from '../lib/dates'
+import type { VatRate, VatRateInput } from '../types/api'
 
 type VatRateFormState = {
     rate_percent: string
@@ -22,9 +23,12 @@ type VatRateFormState = {
 
 const defaultForm: VatRateFormState = {
     rate_percent: '8.1',
-    valid_from: new Date().toISOString().slice(0, 10),
+    valid_from: todayLocalIso(),
     valid_to: null,
 }
+
+// Stable empty array so the useMemo calls below keep consistent dependency references.
+const EMPTY_VAT_RATES: VatRate[] = []
 
 export function AdminVatSettingsPage() {
     const queryClient = useQueryClient()
@@ -40,8 +44,8 @@ export function AdminVatSettingsPage() {
         queryFn: fetchVatRates,
     })
 
-    const vatRates = useMemo(() => vatRatesQuery.data?.results ?? [], [vatRatesQuery.data?.results])
-    const today = new Date().toISOString().slice(0, 10)
+    const vatRates = vatRatesQuery.data?.results ?? EMPTY_VAT_RATES
+    const today = todayLocalIso()
 
     const activeVatRate = useMemo(
         () => vatRates.find((rate) => rate.valid_from <= today && (!rate.valid_to || rate.valid_to >= today)) ?? null,

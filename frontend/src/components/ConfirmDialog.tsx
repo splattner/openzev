@@ -1,6 +1,6 @@
 import { useState } from 'react'
 
-export interface ConfirmDialogOptions {
+interface ConfirmDialogOptions {
     title: string
     message: string
     confirmText?: string

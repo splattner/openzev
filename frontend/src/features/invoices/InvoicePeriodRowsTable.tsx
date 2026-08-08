@@ -3,6 +3,7 @@ import { faEllipsis, faEnvelope, faFileInvoice, faFilePdf } from '@fortawesome/f
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { ActionMenu, type ActionMenuItem } from '../../components/ActionMenu'
+import { getLatestEmailLog } from './emailLogs'
 import type { InvoicePeriodParticipantRow } from '../../types/api'
 
 function invoiceStatusBadgeClass(status: string): string {
@@ -16,13 +17,6 @@ function emailStatusBadgeClass(status: string): string {
   if (status === 'sent') return 'badge badge-success'
   if (status === 'failed') return 'badge badge-danger'
   return 'badge badge-neutral'
-}
-
-function getLatestEmailLog(invoice: {
-  email_logs?: Array<{ created_at: string; recipient: string; status: string; id: string }>
-} | null) {
-  if (!invoice?.email_logs?.length) return null
-  return [...invoice.email_logs].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0]
 }
 
 type InvoicePeriodRowsTableProps = {

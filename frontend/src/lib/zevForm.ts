@@ -1,9 +1,10 @@
+import { todayLocalIso } from './dates'
 import type { Zev, ZevInput } from '../types/api'
 
 export function getDefaultZevForm(): ZevInput {
     return {
         name: '',
-        start_date: new Date().toISOString().slice(0, 10),
+        start_date: todayLocalIso(),
         zev_type: 'vzev',
         grid_operator: '',
         grid_connection_point: '',

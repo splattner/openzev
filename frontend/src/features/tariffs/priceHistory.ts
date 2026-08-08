@@ -5,7 +5,7 @@ export type PriceUnit = 'chf_per_kwh' | 'chf' | 'percent'
 
 export type BandKey = 'flat' | 'high' | 'low' | 'amount' | 'effective'
 
-export type PriceHistoryPoint = {
+type PriceHistoryPoint = {
     /** Boundary as an epoch millisecond value, so the x-axis can be proportional. */
     t: number
     date: string
@@ -15,7 +15,7 @@ export type PriceHistoryPoint = {
     note?: string
 }
 
-export type PriceHistory = {
+type PriceHistory = {
     unit: PriceUnit
     bands: BandKey[]
     points: PriceHistoryPoint[]

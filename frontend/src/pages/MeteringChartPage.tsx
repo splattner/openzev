@@ -24,32 +24,9 @@ import {
     type BillingInterval,
     getCurrentBillingPeriod,
 } from '../lib/billingPeriod'
-import { formatDateTime, formatMonthYear, formatShortDate, useAppSettings } from '../lib/appSettings'
-import type { ChartDataPoint } from '../types/api'
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-function formatBucketLabel(
-    bucket: string,
-    resolution: 'day' | 'hour' | 'month',
-    formatters: {
-        shortDate: (value: string) => string
-        dateTime: (value: string) => string
-        monthYear: (value: string) => string
-    },
-): string {
-    try {
-        if (resolution === 'hour') {
-            return formatters.dateTime(bucket)
-        }
-        if (resolution === 'month') {
-            return formatters.monthYear(bucket)
-        }
-        return formatters.shortDate(bucket)
-    } catch {
-        return bucket
-    }
-}
+import { useAppSettings } from '../lib/appSettings'
+import { formatMeteringBucketLabel } from '../lib/meteringLabels'
+import type { AppSettings, ChartDataPoint } from '../types/api'
 
 // ── Summary stat card ─────────────────────────────────────────────────────────
 
@@ -77,17 +54,13 @@ function CustomTooltip({
     payload,
     label,
     resolution,
-    formatters,
+    settings,
 }: {
     active?: boolean
     payload?: Array<{ name: string; value: number; color: string }>
     label?: string
     resolution: 'day' | 'hour' | 'month'
-    formatters: {
-        shortDate: (value: string) => string
-        dateTime: (value: string) => string
-        monthYear: (value: string) => string
-    }
+    settings: AppSettings
 }) {
     if (!active || !payload?.length || !label) return null
     return (
@@ -101,7 +74,7 @@ function CustomTooltip({
                 boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
             }}
         >
-            <p style={{ margin: '0 0 4px', fontWeight: 600 }}>{formatBucketLabel(label, resolution, formatters)}</p>
+            <p style={{ margin: '0 0 4px', fontWeight: 600 }}>{formatMeteringBucketLabel(label, resolution, settings)}</p>
             {payload.map((entry) => (
                 <p key={entry.name} style={{ margin: '2px 0', color: entry.color }}>
                     {entry.name}: <strong>{entry.value.toFixed(3)} kWh</strong>
@@ -193,13 +166,7 @@ export function MeteringChartPage() {
         }
     }, [isManagedScope, selectedZevId, selectedMpId, meteringPoints, handleMpChange])
 
-    const bucketFormatters = {
-        shortDate: (value: string) => formatShortDate(value, settings),
-        dateTime: (value: string) => formatDateTime(value, settings),
-        monthYear: (value: string) => formatMonthYear(value),
-    }
-
-    const tickFormatter = (value: string) => formatBucketLabel(value, bucket, bucketFormatters)
+    const tickFormatter = (value: string) => formatMeteringBucketLabel(value, bucket, settings)
 
     return (
         <div className="page-stack">
@@ -405,7 +372,7 @@ export function MeteringChartPage() {
                                                 width={72}
                                             />
                                             <Tooltip
-                                                content={<CustomTooltip resolution={bucket} formatters={bucketFormatters} />}
+                                                content={<CustomTooltip resolution={bucket} settings={settings} />}
                                             />
                                             <Legend />
                                             <Bar

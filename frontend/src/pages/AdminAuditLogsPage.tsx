@@ -240,11 +240,3 @@ export function AuditLogsPage({ scope }: AuditLogsPageProps) {
         </div>
     )
 }
-
-export function AdminAuditLogsPage() {
-    return <AuditLogsPage scope="admin" />
-}
-
-export function OwnerAuditLogsPage() {
-    return <AuditLogsPage scope="owner" />
-}

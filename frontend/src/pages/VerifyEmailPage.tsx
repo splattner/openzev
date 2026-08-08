@@ -5,6 +5,7 @@ import { useAuth } from '../lib/auth'
 import { verifyEmail, setInitialPassword } from '../lib/api/auth'
 import { createSelfSetupZev } from '../lib/api/zev'
 import { formatApiError } from '../lib/api/errors'
+import { todayLocalIso } from '../lib/dates'
 import type { SelfSetupZevInput } from '../types/api'
 
 type Step = 'verifying' | 'error' | 'set-password' | 'create-zev' | 'done'
@@ -27,7 +28,7 @@ export function VerifyEmailPage() {
     // Create-ZEV step state
     const [zevForm, setZevForm] = useState<SelfSetupZevInput>({
         name: '',
-        start_date: new Date().toISOString().slice(0, 10),
+        start_date: todayLocalIso(),
         zev_type: 'zev',
         billing_interval: 'annual',
         grid_operator: '',

@@ -12,10 +12,9 @@ import { useTranslation } from 'react-i18next'
 import { ActionMenu, type ActionMenuItem } from '../../components/ActionMenu'
 import { formatShortDate } from '../../lib/appSettings'
 import type { AppSettings, Participant } from '../../types/api'
+import type { ParticipantValidityState } from './types'
 
-export type ParticipantValidityState = 'current' | 'upcoming' | 'ended'
-
-export type ParticipantCardEntry = {
+type ParticipantCardEntry = {
     participant: Participant
     warnings: string[]
     ownerRow: boolean

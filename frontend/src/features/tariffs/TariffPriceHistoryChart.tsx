@@ -12,9 +12,10 @@ import {
     YAxis,
 } from 'recharts'
 import { formatShortDate } from '../../lib/appSettings'
+import { AXIS_COLOR } from '../../lib/chartTokens'
+import { formatUtcIsoDate, todayLocalIso } from '../../lib/dates'
 import type { AppSettings, TariffSeries } from '../../types/api'
 import { buildPriceHistory, type BandKey, type PriceUnit } from './priceHistory'
-import { todayIso } from './validity'
 
 // Blue and orange are the colourblind-safe pair and carry the two bands that
 // actually co-occur (HT and NT). Flat never shares a version with HT/NT in
@@ -26,7 +27,6 @@ const BAND_COLOR: Record<BandKey, string> = {
     amount: '#2563eb',
     effective: '#2563eb',
 }
-const AXIS_COLOR = '#9ca3af'
 const GAP_FILL = '#ef4444'
 
 type Props = {
@@ -41,7 +41,7 @@ function decimalsFor(unit: PriceUnit): number {
 
 export function TariffPriceHistoryChart({ series, allSeries, settings }: Props) {
     const { t } = useTranslation()
-    const today = todayIso()
+    const today = todayLocalIso()
 
     const history = useMemo(
         () => buildPriceHistory(series, allSeries, today),
@@ -97,7 +97,9 @@ export function TariffPriceHistoryChart({ series, allSeries, settings }: Props) 
                         type="number"
                         scale="time"
                         domain={['dataMin', 'dataMax']}
-                        tickFormatter={(value: number) => formatShortDate(new Date(value).toISOString().slice(0, 10), settings)}
+                        tickFormatter={(value: number) =>
+                            formatShortDate(formatUtcIsoDate(new Date(value)), settings)
+                        }
                         stroke={AXIS_COLOR}
                         fontSize={11}
                         minTickGap={40}
@@ -109,7 +111,9 @@ export function TariffPriceHistoryChart({ series, allSeries, settings }: Props) 
                         width={56}
                     />
                     <Tooltip
-                        labelFormatter={(value) => formatShortDate(new Date(Number(value)).toISOString().slice(0, 10), settings)}
+                        labelFormatter={(value) =>
+                            formatShortDate(formatUtcIsoDate(new Date(Number(value))), settings)
+                        }
                         formatter={(value, name) => [
                             value === null || value === undefined
                                 ? t('pages.tariffs.priceHistory.noPrice')

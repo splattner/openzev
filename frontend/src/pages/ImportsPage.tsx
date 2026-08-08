@@ -178,7 +178,7 @@ export function ImportsPage() {
         ? !!file && !!preview && missingMeteringPoints === 0 && !!scopedZevId
         : !!file && !!scopedZevId
 
-    const previewRows = useMemo(() => preview?.preview_rows ?? [], [preview])
+    const previewRows = preview?.preview_rows ?? []
     const importLogRows = useMemo(
         () =>
             importLogs.map((log) => ({
