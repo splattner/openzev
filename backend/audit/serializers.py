@@ -32,6 +32,21 @@ class AuditEventSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
 
+class AuditFilterZevOptionSerializer(serializers.Serializer):
+    id = serializers.UUIDField()
+    name = serializers.CharField()
+
+
+class AuditFilterActorOptionSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    username = serializers.CharField()
+
+
+class AuditFilterOptionsSerializer(serializers.Serializer):
+    zevs = AuditFilterZevOptionSerializer(many=True)
+    actors = AuditFilterActorOptionSerializer(many=True)
+
+
 class AuditEventFilterSerializer(serializers.Serializer):
     actor_user = serializers.IntegerField(required=False)
     zev = serializers.UUIDField(required=False)

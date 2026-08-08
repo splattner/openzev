@@ -565,6 +565,21 @@ export interface AuditEventFilters {
     q?: string
 }
 
+export interface AuditFilterOption {
+    id: string
+    name: string
+}
+
+export interface AuditActorOption {
+    id: number
+    username: string
+}
+
+export interface AuditFilterOptions {
+    zevs: AuditFilterOption[]
+    actors: AuditActorOption[]
+}
+
 export interface PaginatedResponse<T> {
     count: number
     next: string | null

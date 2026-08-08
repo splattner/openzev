@@ -255,6 +255,7 @@ Add a new include in `backend/config/urls.py`:
 |---|---|---|---|
 | `/api/v1/audit/events/` | GET | Authenticated admin or `zev_owner` | Paginated list with role-scoped filtering |
 | `/api/v1/audit/events/{id}/` | GET | Authenticated admin or `zev_owner` | Single event detail if event is visible to actor |
+| `/api/v1/audit/events/filter-options/` | GET | Authenticated admin or `zev_owner` | Unpaginated `{zevs, actors}` distinct options derived from the visible event queryset |
 
 ### 5.3 List query parameters
 
@@ -418,15 +419,24 @@ avoid noise.
 - ProtectedRoute roles: `['admin']` for admin scope, `['admin', 'zev_owner']` for owner scope
 - Query: `useQuery({ queryKey: queryKeys.admin.auditEvents(filters), queryFn: () => fetchAuditEvents(filters) })`
 - Detail query: `useQuery({ queryKey: queryKeys.admin.auditEvent(eventId), queryFn: () => fetchAuditEvent(eventId), enabled: !!eventId })`
+- Options query: `useQuery({ queryKey: queryKeys.admin.auditFilterOptions(), queryFn: fetchAuditFilterOptions })`
 
 UI elements:
 
 1. Date range filters.
-2. ZEV select.
-3. Actor select/autocomplete.
+2. ZEV select (options from `fetchAuditFilterOptions`/`queryKeys.admin.auditFilterOptions`;
+   derived from the audit queryset itself, so the options match the visible
+   event scope: owner scope shows only ZEVs the owner has events for, admin
+   scope all ZEVs with events).
+3. Actor select (options from the same `fetchAuditFilterOptions` endpoint —
+   distinct users who actually acted on visible events, including owners and
+   admins; `id` + `username` only, no email or names; unrelated accounts never
+   appear).
 4. Category/type/status filters.
-5. Search input for summary/target lookup.
-6. Dense table with timestamp, actor, ZEV, category, action, target, status.
+5. Search input for summary/target lookup — admin-only: disabled for everyone
+   except users with `role = 'admin'`, with the `searchRestricted` hint shown.
+6. Dense table with timestamp, summary, ZEV (name resolved from the options
+   query, raw UUID as fallback), category, action, target, actor, status.
 7. Detail drawer or modal showing summary, reason, diff, and metadata.
 
 The page follows the same admin CRUD/table conventions used by existing admin
@@ -440,6 +450,7 @@ pages and should reuse shared components where available.
 |---|---|---|
 | `fetchAuditEvents(params)` | GET | `/audit/events/` |
 | `fetchAuditEvent(eventId)` | GET | `/audit/events/{id}/` |
+| `fetchAuditFilterOptions()` | GET | `/audit/events/filter-options/` |
 
 ### 7.3 Query keys
 
@@ -448,8 +459,9 @@ pages and should reuse shared components where available.
 Add:
 
 ```typescript
-auditEvents: (filters: AuditEventFilters) => ['admin', 'audit-events', filters] as const,
+auditEvents: (filters?: unknown) => ['admin', 'audit-events', filters ?? {}] as const,
 auditEvent: (eventId: string) => ['admin', 'audit-event', eventId] as const,
+auditFilterOptions: () => ['admin', 'audit-events', 'filter-options'] as const,
 ```
 
 These keys belong under `queryKeys.admin`.
@@ -512,6 +524,11 @@ export interface AuditEventFilters {
   date_from?: string
   date_to?: string
   q?: string
+}
+
+export interface AuditFilterOptions {
+  zevs: { id: string; name: string }[]
+  actors: { id: number; username: string }[]
 }
 ```
 
@@ -616,7 +633,7 @@ remove them under controlled maintenance procedures.
 | `test_audited_update_mixin_tracks_every_writable_serializer_field` | Audit mixin records every writable serializer field |
 | `test_infer_zev_resolves_nested_objects` | ZEV resolution works for invoice/participant/assignment targets |
 
-**`AuditEventApiTests`** (6 tests):
+**`AuditEventApiTests`** (10 tests):
 
 | Test | Asserts |
 |---|---|
@@ -625,6 +642,10 @@ remove them under controlled maintenance procedures.
 | `test_owner_cannot_access_global_event_with_null_zev` | Non-admin cannot view global events |
 | `test_participant_cannot_access_audit_api` | Participant receives 403 |
 | `test_list_filters_by_category_status_and_date_range` | Filtering behavior matches request params |
+| `test_list_filters_by_zev_and_actor_user` | List filters by `zev` and `actor_user` params, singly and combined |
+| `test_filter_options_admin_sees_all_zevs_and_actors` | Options expose all ZEVs and distinct actors, unpaginated |
+| `test_filter_options_owner_scoped_to_own_community` | Owner options only include own ZEVs and actors who acted there (participant, owner, admin) |
+| `test_filter_options_participant_forbidden` | Participant receives 403 on options endpoint |
 | `test_detail_returns_full_diff_and_metadata` | Detail response exposes structured payloads |
 
 ### Backend — workflow instrumentation

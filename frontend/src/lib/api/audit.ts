@@ -1,4 +1,4 @@
-import type { AuditEvent, AuditEventFilters, PaginatedResponse } from '../../types/api'
+import type { AuditEvent, AuditEventFilters, AuditFilterOptions, PaginatedResponse } from '../../types/api'
 import { api } from './client'
 
 function sanitizeFilters(filters?: AuditEventFilters): Record<string, string | number> {
@@ -28,5 +28,10 @@ export async function fetchAuditEvents(filters?: AuditEventFilters): Promise<Pag
 
 export async function fetchAuditEvent(eventId: string): Promise<AuditEvent> {
   const { data } = await api.get<AuditEvent>(`/audit/events/${eventId}/`)
+  return data
+}
+
+export async function fetchAuditFilterOptions(): Promise<AuditFilterOptions> {
+  const { data } = await api.get<AuditFilterOptions>('/audit/events/filter-options/')
   return data
 }

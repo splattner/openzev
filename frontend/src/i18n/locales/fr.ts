@@ -536,6 +536,8 @@ export const fr = {
             filters: {
                 all: 'Tous',
                 actionCategory: 'Catégorie d\'action',
+                zev: 'RCP',
+                actor: 'Acteur',
                 actionType: 'Type d\'action',
                 actionTypePlaceholder: 'ex. invoice.approve',
                 targetType: 'Type de cible',
@@ -554,6 +556,7 @@ export const fr = {
             columns: {
                 createdAt: 'Créé',
                 summary: 'Résumé',
+                zev: 'RCP',
                 category: 'Catégorie',
                 action: 'Action',
                 target: 'Cible',

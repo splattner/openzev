@@ -281,6 +281,95 @@ class AuditEventApiTests(TestCase):
         self.assertEqual(len(results), 1)
         self.assertEqual(results[0]["id"], str(self.owner2_event.id))
 
+    def test_list_filters_by_zev_and_actor_user(self):
+        AuditEvent.objects.filter(pk=self.owner1_event.pk).update(actor_user=self.participant_user)
+        AuditEvent.objects.filter(pk=self.owner2_event.pk).update(actor_user=self.participant_user)
+        AuditEvent.objects.filter(pk=self.global_event.pk).update(actor_user=self.admin)
+        auth(self.client, self.admin)
+
+        response = self.client.get("/api/v1/audit/events/", {"zev": str(self.zev1.id)})
+        self.assertEqual(response.status_code, 200)
+        ids = {item["id"] for item in response.data["results"]}
+        self.assertIn(str(self.owner1_event.id), ids)
+        self.assertNotIn(str(self.owner2_event.id), ids)
+        self.assertNotIn(str(self.global_event.id), ids)
+
+        response = self.client.get("/api/v1/audit/events/", {"actor_user": self.participant_user.id})
+        self.assertEqual(response.status_code, 200)
+        ids = {item["id"] for item in response.data["results"]}
+        self.assertIn(str(self.owner1_event.id), ids)
+        self.assertIn(str(self.owner2_event.id), ids)
+        self.assertNotIn(str(self.global_event.id), ids)
+
+        response = self.client.get(
+            "/api/v1/audit/events/",
+            {"zev": str(self.zev1.id), "actor_user": self.participant_user.id},
+        )
+        self.assertEqual(response.status_code, 200)
+        results = response.data["results"]
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0]["id"], str(self.owner1_event.id))
+
+    def test_filter_options_admin_sees_all_zevs_and_actors(self):
+        AuditEvent.objects.filter(pk=self.owner1_event.pk).update(actor_user=self.owner1)
+        AuditEvent.objects.filter(pk=self.owner2_event.pk).update(actor_user=self.owner2)
+        AuditEvent.objects.filter(pk=self.global_event.pk).update(actor_user=self.admin)
+        auth(self.client, self.admin)
+
+        response = self.client.get("/api/v1/audit/events/filter-options/")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            {zev["id"] for zev in response.data["zevs"]},
+            {str(self.zev1.id), str(self.zev2.id)},
+        )
+        self.assertEqual(
+            {actor["username"] for actor in response.data["actors"]},
+            {"audit_owner1_api", "audit_owner2_api", "audit_admin_api"},
+        )
+        self.assertEqual(
+            set(response.data.keys()),
+            {"zevs", "actors"},
+        )
+
+    def test_filter_options_owner_scoped_to_own_community(self):
+        AuditEvent.objects.filter(pk=self.owner1_event.pk).update(actor_user=self.participant_user)
+        AuditEvent.objects.filter(pk=self.owner2_event.pk).update(actor_user=self.owner2)
+        AuditEvent.objects.filter(pk=self.global_event.pk).update(actor_user=self.admin)
+        AuditEvent.objects.create(
+            zev=self.zev1,
+            actor_user=self.admin,
+            action_category=AuditActionCategory.GOVERNANCE,
+            action_type="zev.update",
+            target_type="zev.Zev",
+            target_id="zev-1",
+            summary="Admin updated owner1 zev",
+            status=AuditEventStatus.SUCCESS,
+        )
+        AuditEvent.objects.create(
+            zev=self.zev1,
+            actor_user=self.owner1,
+            action_category=AuditActionCategory.GOVERNANCE,
+            action_type="zev.update",
+            target_type="zev.Zev",
+            target_id="zev-1",
+            summary="Owner1 updated own zev",
+            status=AuditEventStatus.SUCCESS,
+        )
+        auth(self.client, self.owner1)
+
+        response = self.client.get("/api/v1/audit/events/filter-options/")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual({zev["id"] for zev in response.data["zevs"]}, {str(self.zev1.id)})
+        self.assertEqual(
+            {actor["username"] for actor in response.data["actors"]},
+            {"audit_participant_api", "audit_admin_api", "audit_owner1_api"},
+        )
+
+    def test_filter_options_participant_forbidden(self):
+        auth(self.client, self.participant_user)
+        response = self.client.get("/api/v1/audit/events/filter-options/")
+        self.assertEqual(response.status_code, 403)
+
     def test_detail_returns_full_diff_and_metadata(self):
         auth(self.client, self.admin)
         response = self.client.get(f"/api/v1/audit/events/{self.global_event.id}/")

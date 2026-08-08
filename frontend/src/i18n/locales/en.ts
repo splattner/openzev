@@ -529,6 +529,8 @@ export const en = {
             filters: {
                 all: 'All',
                 actionCategory: 'Action category',
+                zev: 'ZEV',
+                actor: 'Actor',
                 actionType: 'Action type',
                 actionTypePlaceholder: 'e.g. invoice.approve',
                 targetType: 'Target type',
@@ -547,6 +549,7 @@ export const en = {
             columns: {
                 createdAt: 'Created',
                 summary: 'Summary',
+                zev: 'ZEV',
                 category: 'Category',
                 action: 'Action',
                 target: 'Target',

@@ -536,6 +536,8 @@ export const it = {
             filters: {
                 all: 'Tutti',
                 actionCategory: 'Categoria azione',
+                zev: 'RCP',
+                actor: 'Attore',
                 actionType: 'Tipo di azione',
                 actionTypePlaceholder: 'es. invoice.approve',
                 targetType: 'Tipo di destinazione',
@@ -554,6 +556,7 @@ export const it = {
             columns: {
                 createdAt: 'Creato',
                 summary: 'Riepilogo',
+                zev: 'RCP',
                 category: 'Categoria',
                 action: 'Azione',
                 target: 'Destinazione',

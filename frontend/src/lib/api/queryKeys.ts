@@ -37,6 +37,7 @@ export const queryKeys = {
     annualStatementPdfTemplate: () => ['admin', 'pdf-template', 'annual-statement'] as const,
     auditEvents: (filters?: unknown) => ['admin', 'audit-events', filters ?? {}] as const,
     auditEvent: (eventId: string) => ['admin', 'audit-event', eventId] as const,
+    auditFilterOptions: () => ['admin', 'audit-events', 'filter-options'] as const,
   },
   metering: {
     points: (zevId?: string) => ['metering', 'points', zevId ?? 'all'] as const,

@@ -1,12 +1,18 @@
 from django.db.models import Q
+from drf_spectacular.utils import extend_schema
 from rest_framework.exceptions import PermissionDenied
-from rest_framework.generics import ListAPIView, RetrieveAPIView
+from rest_framework.generics import GenericAPIView, ListAPIView, RetrieveAPIView
 from rest_framework.permissions import BasePermission
+from rest_framework.response import Response
 
 from accounts.models import UserRole
 
 from .models import AuditEvent
-from .serializers import AuditEventFilterSerializer, AuditEventSerializer
+from .serializers import (
+    AuditEventFilterSerializer,
+    AuditEventSerializer,
+    AuditFilterOptionsSerializer,
+)
 
 
 class CanViewAuditEvents(BasePermission):
@@ -72,3 +78,40 @@ class AuditEventDetailView(BaseAuditEventView, RetrieveAPIView):
 
     def get_queryset(self):
         return self._base_queryset()
+
+
+class AuditEventFilterOptionsView(BaseAuditEventView, GenericAPIView):
+    """Distinct ZEVs and actors visible in the caller's audit scope.
+
+    Options are derived from the same visibility-scoped queryset as the
+    event list, so owners only ever see their own community and admins
+    everything, without exposing unrelated user accounts.
+    """
+
+    serializer_class = AuditFilterOptionsSerializer
+    pagination_class = None
+
+    @extend_schema(responses=AuditFilterOptionsSerializer)
+    def get(self, request, *args, **kwargs):
+        queryset = self._base_queryset()
+        zevs = (
+            queryset.filter(zev__isnull=False)
+            .values("zev_id", "zev__name")
+            .distinct()
+            .order_by("zev__name")
+        )
+        actors = (
+            queryset.filter(actor_user__isnull=False)
+            .values("actor_user_id", "actor_user__username")
+            .distinct()
+            .order_by("actor_user__username")
+        )
+        return Response(
+            {
+                "zevs": [{"id": str(zev["zev_id"]), "name": zev["zev__name"]} for zev in zevs],
+                "actors": [
+                    {"id": actor["actor_user_id"], "username": actor["actor_user__username"]}
+                    for actor in actors
+                ],
+            }
+        )

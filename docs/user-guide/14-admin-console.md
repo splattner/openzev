@@ -78,8 +78,9 @@ billing-relevant, and destructive actions.
 
 The page supports filters (date range, ZEV, actor, category, action type,
 status, and text search) and an event detail view that shows the summary,
-reason, structured field diff, and metadata. Events are read-only — there is no
-public write endpoint.
+reason, structured field diff, and metadata. Text search is available only to
+admin users; everyone else sees the ZEV/actor/category/status filters. Events
+are read-only — there is no public write endpoint.
 
 The API is `GET /api/v1/audit/events/` (list) and
 `GET /api/v1/audit/events/{id}/` (detail). See the access spec

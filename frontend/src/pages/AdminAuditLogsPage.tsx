@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
-import { fetchAuditEvents } from '../lib/api/audit'
+import { fetchAuditEvents, fetchAuditFilterOptions } from '../lib/api/audit'
 import { queryKeys } from '../lib/api/queryKeys'
 import { formatDateTime, useAppSettings } from '../lib/appSettings'
 import { useAuth } from '../lib/auth'
@@ -34,6 +34,8 @@ interface AuditFilterState {
     actionType: string
     targetType: string
     status: string
+    zev: string
+    actorUser: string
     dateFrom: string
     dateTo: string
     search: string
@@ -45,6 +47,8 @@ const DEFAULT_FILTERS: AuditFilterState = {
     actionType: '',
     targetType: '',
     status: '',
+    zev: '',
+    actorUser: '',
     dateFrom: '',
     dateTo: '',
     search: '',
@@ -74,17 +78,36 @@ export function AuditLogsPage({ scope }: AuditLogsPageProps) {
             action_type: filters.actionType || undefined,
             target_type: filters.targetType || undefined,
             status: (filters.status || undefined) as AuditEventStatus | undefined,
+            zev: filters.zev || undefined,
+            actor_user: filters.actorUser ? Number(filters.actorUser) : undefined,
             date_from: filters.dateFrom || undefined,
             date_to: filters.dateTo || undefined,
             q: canUseSearch ? filters.search || undefined : undefined,
         }),
-        [canUseSearch, filters.actionCategory, filters.actionType, filters.dateFrom, filters.dateTo, filters.page, filters.search, filters.status, filters.targetType],
+        [canUseSearch, filters.actionCategory, filters.actionType, filters.actorUser, filters.dateFrom, filters.dateTo, filters.page, filters.search, filters.status, filters.targetType, filters.zev],
     )
 
     const eventsQuery = useQuery({
         queryKey: queryKeys.admin.auditEvents(apiFilters),
         queryFn: () => fetchAuditEvents(apiFilters),
     })
+
+    // The ZEV/actor filter options come from the audit API itself, so they are
+    // derived from the same visibility-scoped queryset as the events: owners
+    // only see their own community (including owners/admins who actually acted
+    // there), admins see everything, and no unrelated user accounts leak.
+    const optionsQuery = useQuery({
+        queryKey: queryKeys.admin.auditFilterOptions(),
+        queryFn: fetchAuditFilterOptions,
+    })
+
+    const zevNameById = useMemo(() => {
+        const names = new Map<string, string>()
+        for (const zev of optionsQuery.data?.zevs ?? []) {
+            names.set(zev.id, zev.name)
+        }
+        return names
+    }, [optionsQuery.data])
 
     const events = eventsQuery.data?.results ?? []
 
@@ -121,6 +144,28 @@ export function AuditLogsPage({ scope }: AuditLogsPageProps) {
                             {AUDIT_ACTION_CATEGORIES.map((category) => (
                                 <option key={category} value={category}>
                                     {t(`pages.auditLogs.categories.${category}`)}
+                                </option>
+                            ))}
+                        </select>
+                    </label>
+                    <label>
+                        {t('pages.auditLogs.filters.zev')}
+                        <select value={filters.zev} onChange={(event) => updateFilter('zev', event.target.value)}>
+                            <option value="">{t('pages.auditLogs.filters.all')}</option>
+                            {(optionsQuery.data?.zevs ?? []).map((zev) => (
+                                <option key={zev.id} value={zev.id}>
+                                    {zev.name}
+                                </option>
+                            ))}
+                        </select>
+                    </label>
+                    <label>
+                        {t('pages.auditLogs.filters.actor')}
+                        <select value={filters.actorUser} onChange={(event) => updateFilter('actorUser', event.target.value)}>
+                            <option value="">{t('pages.auditLogs.filters.all')}</option>
+                            {(optionsQuery.data?.actors ?? []).map((actor) => (
+                                <option key={actor.id} value={String(actor.id)}>
+                                    {actor.username}
                                 </option>
                             ))}
                         </select>
@@ -187,6 +232,7 @@ export function AuditLogsPage({ scope }: AuditLogsPageProps) {
                                 <tr>
                                     <th>{t('pages.auditLogs.columns.createdAt')}</th>
                                     <th>{t('pages.auditLogs.columns.summary')}</th>
+                                    <th>{t('pages.auditLogs.columns.zev')}</th>
                                     <th>{t('pages.auditLogs.columns.category')}</th>
                                     <th>{t('pages.auditLogs.columns.action')}</th>
                                     <th>{t('pages.auditLogs.columns.target')}</th>
@@ -199,6 +245,7 @@ export function AuditLogsPage({ scope }: AuditLogsPageProps) {
                                     <tr key={event.id} style={{ cursor: 'pointer', background: selectedEventId === event.id ? 'var(--surface-subtle)' : undefined }} onClick={() => selectEvent(event)}>
                                         <td>{formatDateTime(event.created_at, settings)}</td>
                                         <td>{event.summary}</td>
+                                        <td>{event.zev ? zevNameById.get(event.zev) ?? event.zev : '—'}</td>
                                         <td>{t(`pages.auditLogs.categories.${event.action_category}`)}</td>
                                         <td><code>{event.action_type}</code></td>
                                         <td>{event.target_display || `${event.target_type}:${event.target_id || '-'}`}</td>
