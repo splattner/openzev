@@ -50,12 +50,12 @@ The chart shows:
   - 🟡 **Yellow:** Production (OUT)
 - **Tooltips:** Hover to see exact values
 
-### Export Charts
+### Raw Readings Table
 
-Charts can be exported as:
-- **PNG image** — For reports or presentations
-- **CSV data** — Underlying readings for analysis
-- **PDF** — Multi-page chart booklet
+Below or alongside the chart, a **Raw Metering Data** table shows the daily
+summary, expandable down to day-level readings with their timestamps (on the UTC
+timeline) and values. Use it to spot individual anomalous readings that the
+aggregated chart may hide.
 
 ## Data Quality View
 
@@ -121,41 +121,28 @@ Example:
 **Causes:**
 - Meter malfunction or power outage
 - File upload incomplete
-- Timestamp mismatch during import (timezone issue)
+- Timestamp mismatch during import (wrong format interpretation)
 
 **Fixes:**
 1. Ask participants to verify meter status
-2. Re-import data with correct timezone setting
-3. Review import protocol for parse errors
-4. Fill gaps manually if readings are recoverable
+2. Review the import protocol for parse errors
+3. Re-import the affected readings with the correct timestamp format
 
 ### Sudden spikes or drops
 
-**Possible issues:**
-- Meter miscalibration
-- Demand-side event (equipment switched on/off)
-- Data entry error
-- Timezone interpretation error
-
-**Diagnosis:**
-1. Check if spike is in consumption (IN) or production (OUT)
-2. Ask participant if they changed usage (e.g., heating, EV charging)
-3. Check if meter was replaced near spike date
-4. Review raw readings in chart tooltip (may help spot outliers)
+OpenZEV does not currently run automated anomaly detection on the raw readings.
+To investigate a suspected spike or drop, review the raw readings on the chart
+and confirm the value with the metering source.
 
 ## Billing Impact of Data Quality Issues
 
-OpenZEV generates invoices even if some data is incomplete. The system:
+OpenZEV generates invoices even if some metering data is incomplete. The period
+overview reports data quality with a severity indicator (green / yellow / red)
+and coverage percentage, so you can see which metering points were incomplete
+for the period.
 
-1. ✓ Bills all complete periods normally
-2. ⚠ Warns if any metering point is incomplete
-3. 📄 Includes note in invoice about missing data
-4. 📋 Stores quality report with invoice
-
-Participants should be informed of:
-- Which meters had incomplete data
-- How billing was handled (estimated vs. actual)
-- Next steps for correction
+Participants affected by incomplete data should be informed which meters were
+affected and how billing was handled for those readings.
 
 ## Next Steps
 

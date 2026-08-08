@@ -44,6 +44,7 @@ Describe the problem to solve and the expected business/product outcome.
 | `admin` | <access level> |
 | `zev_owner` | <access level> |
 | `participant` | <access level> |
+| `guest` | <access level> |
 
 Include backend permission classes and frontend `ProtectedRoute` roles.
 
@@ -125,7 +126,7 @@ interface <TypeName> {
 
 ### API client functions
 
-**File:** `frontend/src/lib/api.ts`
+**File:** `frontend/src/lib/api/<domain>.ts` (e.g. `invoices.ts`, `auth.ts`)
 
 | Function | Method | Endpoint |
 |---|---|---|

@@ -167,10 +167,8 @@ Defined in `accounts/permissions.py` and `zev/permissions.py`.
 |---|---|---|
 | `IsAdmin` | `accounts` | `user.is_authenticated AND user.is_admin` |
 | `IsZevOwnerOrAdmin` | `accounts` | `user.is_authenticated AND (user.is_zev_owner OR user.is_admin)` |
-| `IsParticipantOrAbove` | `accounts` | `user.is_authenticated` |
 | `BaseZevScopedPermission` | `zev` | Base class for ZEV-tenant-aware permissions; checks `has_permission` (role gate) and `has_object_permission` (ZEV ownership check) |
 | `ZevManagementPermission` | `zev` | Extends `BaseZevScopedPermission`; POST restricted to admin only |
-| `ParticipantManagementPermission` | `zev` | Extends `BaseZevScopedPermission`; no participant safe-method override |
 | `MeteringPointPermission` | `zev` | Extends `BaseZevScopedPermission`; `allow_participant_safe_methods = True` |
 | `MeteringPointAssignmentPermission` | `zev` | Extends `BaseZevScopedPermission`; no participant safe-method override |
 
@@ -426,7 +424,7 @@ setup. Creates a ZEV + owner Participant in one step.
 ### 8.1 Participant viewset
 
 **URL prefix:** `/api/v1/zev/participants/`
-**Permission:** `[IsAuthenticated, ParticipantManagementPermission]`
+**Permission:** `[IsAuthenticated, BaseZevScopedPermission]`
 
 **Queryset scoping:**
 - `admin` → all participants (with prefetched assignments).
@@ -571,8 +569,8 @@ The sidebar (`Layout.tsx`) shows sections conditionally:
 | GET / PATCH / PUT / DELETE | `/zevs/{id}/` | IsAuthenticated, ZevManagementPermission | ZEV detail (retrieve uses ZevDetailSerializer with nested participants) |
 | POST | `/zevs/create-with-owner/` | IsAuthenticated, ZevManagementPermission (admin only) | Wizard: create ZEV + owner + metering points |
 | POST | `/zevs/self-setup/` | IsAuthenticated | Self-setup: create ZEV for self-registered owner |
-| GET / POST | `/participants/` | IsAuthenticated, ParticipantManagementPermission | List/create participants |
-| GET / PATCH / PUT / DELETE | `/participants/{id}/` | IsAuthenticated, ParticipantManagementPermission | Participant detail |
+| GET / POST | `/participants/` | IsAuthenticated, BaseZevScopedPermission | List/create participants |
+| GET / PATCH / PUT / DELETE | `/participants/{id}/` | IsAuthenticated, BaseZevScopedPermission | Participant detail |
 | POST | `/participants/{id}/send-invitation/` | admin + zev_owner | Send invitation email |
 | GET | `/participants/{id}/contract-pdf/` | IsAuthenticated | Download participation contract PDF |
 | POST | `/participants/{id}/link-account/` | admin only | Link user account to participant |

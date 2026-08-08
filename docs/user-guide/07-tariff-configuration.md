@@ -145,25 +145,9 @@ attributable to a participant's consumption or meters.
   not change what January cost.
 - Each participant is charged only for the months they were actually a member.
 
-**Example — a community fee of CHF 60/month, billed January to March:**
-
-| | January | February | March | Invoice total |
-|---|---|---|---|---|
-| Alice (whole period) | 60 ÷ 3 = 20.00 | 20.00 | 20.00 | **60.00** |
-| Bob (whole period) | 20.00 | 20.00 | 20.00 | **60.00** |
-| Carol (joins Feb 1) | — | 20.00 | 20.00 | **40.00** |
-| Dave (leaves Jan 31) | 20.00 | — | — | **20.00** |
-| **Collected** | 60.00 | 60.00 | 60.00 | **180.00** |
-
-Every month's CHF 60 is collected exactly once, no matter how membership moved.
-Dave still receives an invoice for the period and pays for the one month he was
-a member; Carol pays for the two months she was.
-
-> **Rounding:** if the amount does not divide evenly, each invoice is rounded to
-> the centime on its own, so the community can end up a centime or two short —
-> CHF 100 across 3 participants bills 33.33 each and collects 99.99. Choose
-> amounts divisible by your participant count if this matters to your
-> bookkeeping.
+For a worked example of how a shared fee splits as members join and leave, and
+how rounding works, see
+[How Energy Allocation and Billing Works](08-billing-allocation-explained.md#shared-fees-and-changing-membership).
 
 **A note on the ZEV owner:** the owner is counted like anyone else, provided
 they have a participant record in the ZEV. If the owner is not a participant,

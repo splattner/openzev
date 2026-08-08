@@ -1,12 +1,17 @@
 # Audit Log Implementation Tracker
 
+> **⚠ Archived.** The audit-log initiative is fully implemented. All phases below
+> are complete. This file is kept as historical implementation notes only; the
+> canonical document is the completed baseline spec
+> [2026-05-audit-log-and-operational-traceability.md](2026-05-audit-log-and-operational-traceability.md).
+
 - Related spec: [2026-05-audit-log-and-operational-traceability.md](2026-05-audit-log-and-operational-traceability.md)
 - Related ADRs:
   - [0008-security-and-audit-logging.md](../adr/0008-security-and-audit-logging.md)
   - [0010-centralized-audit-event-stream.md](../adr/0010-centralized-audit-event-stream.md)
 - Owner: Core maintainers
 - Last updated: 2026-05-09
-- Status: Active
+- Status: Archived
 
 ## Purpose
 

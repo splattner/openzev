@@ -2,7 +2,9 @@
 
 Deploys OpenZEV frontend, backend, and Celery worker on Kubernetes.
 
-For full installation and production values examples, see the root guide: `README.md#helm-installation-kubernetes`.
+This chart README is the authoritative reference for installing and configuring
+the chart. See [Example values](#example-values) for a complete production-oriented
+configuration.
 
 ## Included resources
 
@@ -20,7 +22,7 @@ For full installation and production values examples, see the root guide: `READM
 ## Install
 
 ```bash
-helm upgrade --install openzev ./charts/openzev
+helm upgrade --install openzev ./charts/openzev -n openzev --create-namespace
 ```
 
 ## Use as a Helm repo
@@ -30,7 +32,7 @@ After enabling GitHub Pages on the `gh-pages` branch, add this repository as a H
 ```bash
 helm repo add openzev https://splattner.github.io/openzev
 helm repo update
-helm install openzev openzev/openzev
+helm install openzev openzev/openzev -n openzev --create-namespace
 ```
 
 ## Database credentials via existing secret
@@ -82,6 +84,16 @@ Default ingress routes:
 
 Configure hosts/paths in `values.yaml` under `ingress.hosts`.
 
+TLS can be enabled with `ingress.tls` (a standard list of Ingress TLS entries), e.g.:
+
+```yaml
+ingress:
+  tls:
+    - hosts:
+        - openzev.example.com
+      secretName: openzev-tls
+```
+
 When exposing OpenZEV via a domain, also set Django `ALLOWED_HOSTS`:
 
 ```yaml
@@ -113,4 +125,68 @@ email:
   existingSecret:
     name: openzev-mail-secret
     key: EMAIL_HOST_PASSWORD
+```
+
+## Redis
+
+Redis is external to this chart (see [Not included](#not-included)). Point the
+Celery broker at `redis.url`, and the cache database (e.g. geocoding results —
+kept on a separate logical Redis DB so cache keys never collide with Celery's
+broker) at `redis.cacheUrl`:
+
+```yaml
+redis:
+  url: redis://redis.example.svc.cluster.local:6379/0
+  cacheUrl: redis://redis.example.svc.cluster.local:6379/1
+```
+
+## Example values
+
+A complete production-oriented example covering external database and Redis,
+secrets, email, and ingress:
+
+```yaml
+frontendUrl: https://openzev.example.com
+
+database:
+  existingSecret:
+    name: openzev-db-secret
+    key: DATABASE_URL
+
+redis:
+  url: redis://redis.example.svc.cluster.local:6379/0
+  cacheUrl: redis://redis.example.svc.cluster.local:6379/1
+
+secretKey:
+  existingSecret:
+    name: openzev-django-secret
+    key: SECRET_KEY
+
+email:
+  backend: django.core.mail.backends.smtp.EmailBackend
+  host: smtp.example.com
+  port: 587
+  useTls: true
+  hostUser: openzev@example.com
+  defaultFromEmail: openzev@example.com
+  existingSecret:
+    name: openzev-mail-secret
+    key: EMAIL_HOST_PASSWORD
+
+ingress:
+  enabled: true
+  className: nginx
+  hosts:
+    - host: openzev.example.com
+      frontendPaths:
+        - /
+      backendPaths:
+        - /api
+        - /admin
+```
+
+Apply a values file with:
+
+```bash
+helm upgrade --install openzev openzev/openzev -n openzev --create-namespace -f values-prod.yaml
 ```

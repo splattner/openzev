@@ -29,7 +29,7 @@ From `backend/`:
 
 - Activate venv: `source ../.venv/bin/activate`
 - Run tests: `python -m pytest -q`
-- Run invoice tests only: `python -m pytest invoices/tests.py -q`
+- Run invoice tests only: `python -m pytest invoices -q`
 
 ### Frontend
 
@@ -70,6 +70,8 @@ For larger or risky changes, consult or create specs and ADRs:
   - `2026-03-tariffs-and-billing-engine.md` — tariffs, billing modes, invoice generation
   - `2026-03-invoice-lifecycle-and-communication.md` — invoice workflow, email, PDF rendering
   - `2026-03-admin-governance-and-settings.md` — AppSettings, VAT, admin dashboard, ZEV config
+  - `2026-05-audit-log-and-operational-traceability.md` — audit event stream, scoped visibility, redaction
+  - `2026-08-zev-transfer-archive.md` — whole-ZEV export/import archive
 
 - **Reference specs** document reusable cross-cutting patterns that should guide future work even when no baseline feature spec changes directly:
   - `2026-04-frontend-management-page-design.md` — reference spec for frontend CRUD / management-page cleanup, action hierarchy, page grouping, icons, i18n discipline, and responsive layouts

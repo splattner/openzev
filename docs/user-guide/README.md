@@ -5,7 +5,7 @@ Welcome to the OpenZEV user documentation. This guide covers everything you need
 ## Getting Started
 
 - **[Getting Started](01-getting-started.md)** — Installation, quick start with Docker, and demo accounts
-- **[Understanding Roles and Permissions](11-roles-and-permissions.md)** — Learn about admin, ZEV owner, and participant roles
+- **[Understanding Roles and Permissions](11-roles-and-permissions.md)** — Learn about admin, ZEV owner, participant, and guest roles
 
 ## Planning
 

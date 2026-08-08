@@ -4,13 +4,18 @@ This guide explains user roles and access boundaries in OpenZEV.
 
 ## User Roles
 
-OpenZEV supports three distinct roles:
+OpenZEV supports four distinct roles:
 
 | Role | Scope | Typical User | Purpose |
 | --- | --- | --- | --- |
 | **Admin** | Global system | Platform operator, IT | Full access to all ZEVs, settings, accounts |
 | **ZEV Owner** | Single ZEV (scoped) | Community operator | Manage one or more ZEV communities |
 | **Participant** | Own data only | Community member | View own consumption, download invoices |
+| **Guest** | None until linked | Unlinked account | Stand-by log-in; no community access until linked to a participant |
+
+> **Note:** The **guest** role is an internal transitional role. It normally has
+> no domain access and is used when an account is not (or no longer) linked to a
+> ZEV or participant.
 
 ## Admin Role
 
@@ -20,10 +25,7 @@ OpenZEV supports three distinct roles:
 
 - **Account Management:** Create, edit, remove user accounts
 - **User Roles:** Assign roles and ZEV scopes to other users
-- **System Settings:**
-  - Regional timezone and date format
-  - VAT rate configuration
-  - PDF invoice templates
+- **System Settings:** regional date formats, VAT rate configuration, PDF invoice templates, feature flags, and OAuth providers
 - **Multi-ZEV Oversight:** View and monitor all ZEVs in system
 - **Analytics:** Platform-wide KPIs and operational metrics
 - **Audit Logs:** View all user actions and system events
@@ -112,6 +114,18 @@ A ZEV Owner is **scoped** to one or more ZEVs:
 - Small businesses with energy meters
 - Anyone with meter(s) in a ZEV community
 
+## Guest Role
+
+A **Guest** is a log-in account that is not currently linked to a participant. It
+has no access to a ZEV's data until an admin links it to a participant.
+
+- **How a Guest is created:** when an admin **unlinks** an account from a
+  participant, that account's role becomes `guest`.
+- **Re-linking:** a guest account can be linked to a participant again by an
+  admin (same as a participant account).
+- **Restrictions:** guests cannot manage communities or settings, and cannot be
+  impersonated or impersonate others.
+
 ## Access Control Matrix
 
 | Feature | Admin | ZEV Owner | Participant |
@@ -124,6 +138,9 @@ A ZEV Owner is **scoped** to one or more ZEVs:
 | **Email Templates** | Manage defaults | Customize own ZEV | — |
 | **Settings** | Global settings | Own ZEV settings | Account profile |
 | **Admin Panel** | Full access | — | — |
+
+> **Note:** Guest accounts have no access in any column above until they are
+> linked to a participant, after which they follow the Participant rules.
 
 ## Assigning Roles
 
@@ -180,12 +197,13 @@ OpenZEV enforces data boundaries:
 
 ### Audit Trail
 
-All user actions are logged:
+Security-relevant and billing-relevant user actions are logged:
 - Who did what (action)
 - When (timestamp)
 - What changed (old → new values)
 
-Audit logs are visible only to admins.
+Audit logs are visible to **admins** (all events) and to **ZEV owners** for
+their own communities (scoped events).
 
 ## Best Practices
 

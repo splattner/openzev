@@ -137,16 +137,7 @@ If no VAT number is set on the ZEV, or no VAT rate is active for an invoice peri
 - **Subject line** — Email subject sent with invoices
 - **Email body** — Message body sent with invoice PDF attachment
 
-Both fields support variable placeholders:
-
-| Placeholder | Replaced With |
-| --- | --- |
-| `{invoice_number}` | Invoice number |
-| `{zev_name}` | Community name |
-| `{participant_name}` | Recipient full name |
-| `{period_start}` | Billing period start date |
-| `{period_end}` | Billing period end date |
-| `{total_chf}` | Invoice total in CHF |
+Both fields support variable placeholders such as `{invoice_number}`, `{zev_name}`, `{participant_name}`, `{period_start}`, `{period_end}`, and `{total_chf}`. See [Email Configuration → Email Templates](10-email-configuration.md#email-templates) for the full variable reference.
 
 Leave fields blank to use the system defaults. If a template contains an invalid placeholder, the system falls back to defaults automatically.
 

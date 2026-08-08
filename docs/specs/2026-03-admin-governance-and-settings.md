@@ -39,7 +39,7 @@ Global settings (date formats, VAT rates) and ZEV-level configuration (billing i
 
 - Multi-country tax engines with jurisdiction-specific filing
 - External policy synchronisation systems
-- Audit-log data model (see ADR 0008 — currently `updated_at` only)
+- Audit-log data model — now implemented; see [2026-05-audit-log-and-operational-traceability.md](2026-05-audit-log-and-operational-traceability.md) and ADR 0010
 
 ---
 
@@ -356,7 +356,7 @@ remain available as redirects into the corresponding tab of
     - Form with 3 dropdowns: short date format, long date format, date & time format.
     - Live preview section showing formatted output for a sample date (`2026-03-18`) and datetime (`2026-03-18T14:35:00Z`).
     - Saves via `updateAppSettings` mutation. On success, updates the query cache directly: `queryClient.setQueryData(['app-settings'], data)`.
-- **Functions tab:**
+- **Features tab:**
     - Uses `fetchFeatureFlags` with query key `['feature-flags']`.
     - Displays the registered feature flags in a table with toggle switches.
     - Toggling uses `updateFeatureFlag` and invalidates `['feature-flags']` after success.

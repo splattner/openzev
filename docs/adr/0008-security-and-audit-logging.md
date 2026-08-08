@@ -37,4 +37,14 @@ Trade-offs:
 2. No persistent audit records, only runtime logs.
    - Rejected due to weak operational traceability.
 3. Full centralized immutable audit ledger for every action.
-   - Deferred; valuable but higher implementation/operational complexity than current needs.
+   - Deferred at this ADR's date; valuable but higher implementation/operational complexity than the project needed at the time.
+
+## Update (2026-05-08)
+
+The centralized audit stream originally deferred here was subsequently adopted by
+[ADR 0010](./0010-centralized-audit-event-stream.md). ADR 0010 extends rather than
+replaces this ADR: 0008 documents the initial domain-specific audit scope and the
+layered security model; 0010 records the decision to introduce a centralized
+append-only `AuditEvent` stream for high-risk operational workflows. Treat ADR
+0010 and `docs/specs/2026-05-audit-log-and-operational-traceability.md` as the
+current authority for audit architecture.

@@ -161,7 +161,8 @@ Time-of-day subdivision of a tariff (e.g., HT 06:00–22:00, NT 22:00–06:00). 
 Specific point in time when a reading was recorded (e.g., 2026-01-15 14:00:00).
 
 **Timezone**
-Time zone used for interpreting timestamps during import. Critical for accurate billing alignment. See [Metering Import](05-metering-import.md#timezone-handling).
+Offset used to interpret a timestamp. Readings are stored on the UTC timeline;
+there is no timezone selector in the import UI. See [Metering Import](05-metering-import.md#timestamp-handling).
 
 ## V
 
@@ -196,32 +197,15 @@ See [How Energy Allocation Works](08-billing-allocation-explained.md) for full e
 
 ### Data Privacy
 
-- **Participants** see only their own data
-- **ZEV Owners** see only their assigned ZEV's data
-- **Admins** can see all data
-- Data is encrypted at rest and in transit
-
-See [Roles and Permissions](11-roles-and-permissions.md).
+Data access is scoped by role and ZEV: participants see only their own data,
+ZEV owners only their assigned community's data, and admins everything. See
+[Roles and Permissions](11-roles-and-permissions.md).
 
 ### Audit Trail
 
-All actions (login, invoice generation, email send) are logged with:
-- User (who did it)
-- Action (what was done)
-- Timestamp (when)
-- Changes (old → new values)
-
-Available to admins in audit logs.
+A record of who did what, when, and what changed. Visible to admins and — for
+their own communities — to ZEV owners. See [Roles and Permissions](11-roles-and-permissions.md).
 
 ## Feature Matrix by Role
 
-| Feature | Admin | ZEV Owner | Participant |
-| --- | --- | --- | --- |
-| View dashboard | ✓ Global | ✓ Own ZEV | ✓ Own only |
-| Manage tariffs | ✓ All | ✓ Own ZEV | — |
-| Import metering | ✓ All | ✓ Own ZEV | — |
-| Generate invoices | ✓ All | ✓ Own ZEV | — |
-| Manage users | ✓ | — | — |
-| Edit settings | ✓ Global | ✓ Own ZEV | ✓ Profile |
-
-See [Roles and Permissions](11-roles-and-permissions.md) for details.
+See [Roles and Permissions](11-roles-and-permissions.md#access-control-matrix) for the complete access matrix. Note that OpenZEV has four roles — admin, ZEV owner, participant, and guest — where a guest account gains access only once an admin links it to a participant.

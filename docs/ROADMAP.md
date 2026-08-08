@@ -18,6 +18,7 @@ This document tracks shipped features, active work, planned ideas, and deferred 
 | `planned` | Spec or ADR exists; not yet started |
 | `idea` | No spec yet; worth exploring |
 | `deferred` | Considered and explicitly postponed |
+| `removed` | Was implemented, then superseded/removed; see notes for the replacement |
 
 ## Priority (unshipped only)
 
@@ -30,6 +31,10 @@ This document tracks shipped features, active work, planned ideas, and deferred 
 ---
 
 ## Competitive Landscape
+
+> **⚠ Historical snapshot — dated May 2026.** This section records the competitive
+> landscape and product/regulatory claims as of that date and may have aged. Treat
+> it as research context only; current status lives below under each theme.
 
 Research conducted May 2026. Primary source: **PVshare** (pvshare.ch) — the leading Swiss vZEV/LEG SaaS billing platform.
 
@@ -105,7 +110,7 @@ PVshare Cockpit is a closed, subscription-based SaaS (CHF ~30/participant/year) 
 | Six billing modes (energy, % of grid, monthly fee, yearly fee, per-meter monthly/yearly) | `shipped` | — | [spec](specs/2026-03-tariffs-and-billing-engine.md) |
 | High-tariff / low-tariff pricing with time-of-day and weekday windows | `shipped` | — | [spec](specs/2026-03-tariffs-and-billing-engine.md) |
 | Four tariff categories (energy, grid fees, levies, metering) | `shipped` | — | [spec](specs/2026-03-tariffs-and-billing-engine.md) |
-| Tariff preset export (JSON) and import (atomic, ID-stripped) | `shipped` | — | — |
+| Tariff-only JSON export/import (tariff preset) | `removed` | — | Superseded by whole-ZEV transfer — [spec](specs/2026-08-zev-transfer-archive.md), [guide](user-guide/17-zev-transfer.md) |
 | VAT application with validity-windowed VAT rate table | `shipped` | — | [spec](specs/2026-03-tariffs-and-billing-engine.md) |
 | Annual financial report for tax purposes | `shipped` | — | — |
 | Period overview with strict daily completeness checking | `shipped` | — | [spec](specs/2026-03-invoice-lifecycle-and-communication.md) |
@@ -214,7 +219,7 @@ PVshare Cockpit is a closed, subscription-based SaaS (CHF ~30/participant/year) 
 | `ProtectedRoute` with `allowedRoles` on all frontend routes | `shipped` | — | — |
 | Two-factor authentication (TOTP) | `idea` | `medium` | Security improvement for admin and ZEV owner accounts |
 | Session management page (list and revoke active tokens) | `idea` | `low` | Useful for security-conscious owners |
-| Per-user API keys for automated integrations | `idea` | `low` | Needed for scheduled imports or monitoring scripts |
+| Per-user API keys for automated integrations | `shipped` | — | Owner-managed keys with revoke; backend key auth + throttling — [guide](user-guide/16-api-keys.md) |
 | External SSO / enterprise IdP (SAML, OIDC beyond current OAuth) | `deferred` | — | Out of scope; requires significant auth infrastructure work |
 
 ---
@@ -276,8 +281,8 @@ PVshare Cockpit is a closed, subscription-based SaaS (CHF ~30/participant/year) 
 | Production database backup / restore guidance | `idea` | `high` | No documented procedure; critical for production deployments |
 | Helm chart maturity (resource limits, liveness probes, secrets management) | `idea` | `medium` | Current chart is functional but minimal |
 | Observability — structured application logging and metrics endpoint | `idea` | `medium` | No Prometheus metrics or structured log format today |
-| End-to-end test suite (Playwright or similar) | `idea` | `medium` | Currently only backend unit tests; no frontend automated tests |
-| Frontend component-level unit tests | `idea` | `low` | Spec references `npm run test:unit` but no tests exist yet |
+| End-to-end test suite (Playwright or similar) | `idea` | `medium` | Playwright is used for automated user-guide screenshots; no interactive end-to-end coverage of user flows yet |
+| Frontend component-level unit tests | `shipped` | — | `npm run test:unit` (Vitest) covers API helpers, reducers and page-level logic |
 | Rate limiting on sensitive API endpoints | `idea` | `medium` | Auth and import endpoints have no rate limiting today |
 | Automated security dependency scanning (Dependabot / Snyk) | `idea` | `low` | Renovate is configured for updates; no security-focused CVE scanning |
 | Multi-region or multi-instance deployment guidance | `deferred` | — | Single-instance model assumed; stateful session and Celery design would need review |

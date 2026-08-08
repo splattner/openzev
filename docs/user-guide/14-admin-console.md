@@ -27,17 +27,78 @@ Admins can also create a bare ZEV (without the wizard) via the standard CRUD int
 
 ![Admin ZEV management](screenshots/15-admin-zevs.png)
 
-## Regional Settings
+## System Settings
 
-Configure regional defaults in **Admin Console → Regional Settings**:
+Regional display settings, feature flags, and OAuth providers are consolidated
+under **Admin Console → System Settings**.
+
+### Regional
+
+Configure regional display settings in **Admin Console → System Settings → Regional**:
 
 ![Regional settings](screenshots/12-admin-regional-settings.png)
 
-- **Default Timezone** — Used for timestamp interpretation in metering imports
-- **Date Format** — Display format for invoices and exports
-- **Currency** — Default billing currency (currently CHF)
+- **Short Date Format** — Compact date display (e.g. `DD.MM.YYYY`)
+- **Long Date Format** — Expanded date display (e.g. `D MMMM YYYY`)
+- **Date/Time Format** — Combined date and time display
 
-> **Note:** Timezone alignment is critical for accurate billing. See [Metering Data Import](05-metering-import.md) for details.
+> **Note:** The legacy route `/admin/settings/regional` redirects here.
+
+### Features
+
+Feature flags are managed in **Admin Console → System Settings → Features**.
+See [Feature Flags](#feature-flags) below.
+
+### OAuth
+
+Configure external OAuth login providers in **Admin Console → System Settings → OAuth**:
+
+- **Name** — Provider identifier (e.g. `github`)
+- **Display Name** — Human-readable label shown on the login page
+- **Client ID / Client Secret** — Credentials obtained from the provider
+- **Authorization / Token / Userinfo URLs** — Provider endpoint URLs
+- **Redirect URL** — The callback URL registered with the provider (e.g.
+  `https://app.example.com/api/v1/auth/oauth/callback/github/`)
+- **Scope** — Space-separated OIDC scopes (default `openid email profile`)
+- **Enabled** — Toggle to activate or deactivate the provider
+
+> **Note:** The legacy routes `/admin/features` and `/admin/oauth` redirect to
+> the matching tab on the System Settings page.
+
+## Audit Logs
+
+The audit log is the cross-cutting, append-only event stream of privileged,
+billing-relevant, and destructive actions.
+
+- **Admin Console → Audit Logs** (`/admin/audit-logs`) — admins can view **all**
+  events across the platform.
+- `/audit-logs` — admins **and ZEV owners** can view events scoped to their
+  communities. Owners only see events for ZEVs they manage; they cannot see
+  global or other-ZEV events.
+
+The page supports filters (date range, ZEV, actor, category, action type,
+status, and text search) and an event detail view that shows the summary,
+reason, structured field diff, and metadata. Events are read-only — there is no
+public write endpoint.
+
+The API is `GET /api/v1/audit/events/` (list) and
+`GET /api/v1/audit/events/{id}/` (detail). See the access spec
+[2026-05-audit-log-and-operational-traceability.md](../specs/2026-05-audit-log-and-operational-traceability.md)
+for the data model and redaction rules.
+
+## API Keys
+
+Automated integrations (imports, monitoring scripts) authenticate with per-user
+API keys.
+
+- **Account Profile → API Keys** — a user manages their own keys (create with a
+  name and expiry, and revoke). See [API Keys](16-api-keys.md).
+- **Admin Console → API Keys** (`/admin/api-keys`) — admins can view all keys
+  across users and **revoke** any of them. This page is revoke-only; keys are
+  created by their owner.
+
+> **Security:** API keys grant the same access as the owning account. Treat them
+> like passwords, and revoke unused or exposed keys promptly.
 
 ## VAT Settings
 
@@ -62,7 +123,9 @@ Admins can manage the HTML/CSS template used for invoice PDF generation in **Adm
 ![PDF templates](screenshots/14-admin-pdf-templates.png)
 
 - Edit the template used for invoice PDF rendering
-- Template changes apply to **newly generated invoices only** — existing PDFs are not re-rendered
+- Template changes affect future PDF renders. Existing stored PDFs remain
+  unchanged until **regenerated** — individual invoices can be regenerated, and
+  administrators can regenerate PDFs for an entire billing period.
 
 ## Email Templates
 
@@ -105,14 +168,7 @@ The **Available Fields** panel on the right side of the editor lists all support
 
 #### Invoice Email Variables
 
-| Variable | Description |
-| --- | --- |
-| `{invoice_number}` | Invoice number (e.g. INV-00001) |
-| `{zev_name}` | Name of the ZEV |
-| `{participant_name}` | Full name of the participant |
-| `{period_start}` | Start of the billing period (formatted date) |
-| `{period_end}` | End of the billing period (formatted date) |
-| `{total_chf}` | Total invoice amount in CHF |
+See [Email Configuration → Email Templates](10-email-configuration.md#email-templates) for the invoice email placeholders.
 
 #### Invitation Email Variables
 
@@ -210,7 +266,7 @@ FEATURE_ZEV_SELF_REGISTRATION_ENABLED=true
 
 ### Admin Console Usage
 
-Manage flags in **Admin Console → Features**.
+Manage flags in **Admin Console → System Settings → Features**.
 
 Each flag has:
 

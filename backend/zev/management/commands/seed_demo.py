@@ -8,7 +8,7 @@ Creates or refreshes an idempotent demo environment with:
 - 1 demo ZEV
 - 3 metering points (1 production, 2 consumption)
 - sample tariffs
-- 15-minute metering data for Q1 and Q2 2026
+- 15-minute metering data from the previous quarter up to today
 """
 
 from __future__ import annotations

@@ -137,27 +137,11 @@ Once an invoice is approved, you can email it to the participant.
 
 For invoices already in `Sent` status, the button label changes to **Resend Email**, allowing you to send additional copies.
 
-### Email Polling
+### Email Logs
 
-After sending, the page polls the server every 2 seconds (up to 30 seconds) to check for email delivery updates. A 90-second overall timeout prevents indefinite polling.
+Click the sent/total counter button (e.g. `1/2`) in the **Email** column to open the **Email Logs** modal. This shows each email attempt with recipient, status (`pending`, `sent`, `failed`), and timestamp, with a **Retry** button next to any failed entry to re-queue that specific email.
 
-### Email Logs Modal
-
-Click the sent/total counter button (e.g. `1/2`) in the **Email** column to open the **Email Logs** modal. This shows:
-
-- Each email attempt with recipient, status (`pending`, `sent`, `failed`), and timestamp.
-- A **Retry** button next to any failed email log entry, which re-queues that specific email.
-
-### Email Delivery Failures
-
-If an email fails:
-
-1. Open the Email Logs modal to see the error.
-2. Verify the participant's email address in [Participants](03-participant-management.md).
-3. Click **Retry** on the failed log entry to re-queue it.
-4. If email continues to fail, review the [Email Configuration](10-email-configuration.md) environment variables.
-
-Email sending is handled asynchronously by Celery with automatic retries (up to 3 attempts with 60-second delays). See [Email Configuration](10-email-configuration.md) for details.
+Email sending is asynchronous via Celery with automatic retries. For delivery mechanics, retry behavior, and troubleshooting failed emails, see [Email Configuration](10-email-configuration.md).
 
 ## Marking Invoices as Paid
 
@@ -191,7 +175,7 @@ Deletion is permanent; the invoice is removed from the database.
 
 **Fix:**
 1. Check the ZEV selector in the top navigation.
-2. Verify that [Participants](03-participant-management.md) exist and have [metering-point assignments](04-metering-point-management.md) covering the period.
+2. Verify that [Participants](03-participant-management.md) exist and have [metering-point assignments](04-metering-points.md) covering the period.
 
 ### Invoice totals look wrong
 

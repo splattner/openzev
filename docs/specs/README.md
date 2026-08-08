@@ -59,6 +59,8 @@ Baseline specs describe the current implementation. They must be kept in sync:
 | Tariffs, TariffPeriod, billing engine, invoice generation | `2026-03-tariffs-and-billing-engine.md` |
 | Invoice workflow, email sending, PDF rendering, EmailLog | `2026-03-invoice-lifecycle-and-communication.md` |
 | AppSettings, VatRate, admin dashboard, PDF template, ZEV config | `2026-03-admin-governance-and-settings.md` |
+| Audit events, scoped visibility, redaction | `2026-05-audit-log-and-operational-traceability.md` |
+| Whole-ZEV export/import archive | `2026-08-zev-transfer-archive.md` |
 
 ## Reference specs
 
@@ -87,6 +89,8 @@ These specs describe the current major product capabilities and should be update
 - `2026-03-tariffs-and-billing-engine.md`
 - `2026-03-invoice-lifecycle-and-communication.md`
 - `2026-03-admin-governance-and-settings.md`
+- `2026-05-audit-log-and-operational-traceability.md`
+- `2026-08-zev-transfer-archive.md`
 
 ## Frontend reference specs
 

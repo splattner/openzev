@@ -339,9 +339,9 @@ anything; inspect refuses a non-archive.
 
 ### Acceptance criteria
 
-- [ ] All transfer tests pass; full backend suite green; ruff clean on changed files
-- [ ] Frontend `npm run build` and `npm run test:unit` green
-- [ ] Collision-safe reading member names verified by test
-- [ ] Corrupt archives yield 400s with readable errors, never 500s
-- [ ] Manifest counts verified on import
-- [ ] Export default is structure-only in the UI
+- [x] All transfer tests pass; full backend suite green; ruff clean on changed files
+- [x] Frontend `npm run build` and `npm run test:unit` green
+- [x] Collision-safe reading member names verified by test
+- [x] Corrupt archives yield 400s with readable errors, never 500s
+- [x] Manifest counts verified on import
+- [x] Export default is structure-only in the UI

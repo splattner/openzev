@@ -3,7 +3,7 @@
 # Feature Spec: Audit log and operational traceability
 
 - Spec ID: SPEC-2026-audit-log-traceability
-- Status: Draft
+- Status: Approved
 - Scope: Major
 - Type: Change
 - Owners: Core maintainers
@@ -133,7 +133,7 @@ The audit service resolves `zev` in this priority order:
 | `status` | `CharField(20)` | `success` | `success`, `failed`, `denied`, `queued`, `started` |
 | `request_id` | `CharField(64)` nullable | `null` | Correlates all events in one request/job |
 | `correlation_id` | `CharField(64)` nullable | `null` | Optional cross-request correlation for async follow-up |
-| `source` | `CharField(20)` | `api` | `api`, `celery`, `system`, `management_command` |
+| `source` | `CharField(20)` | `api` | `api`, `api_key`, `celery`, `system`, `management_command` |
 | `ip_address` | `GenericIPAddressField` nullable | `null` | Request-derived; blank for system tasks |
 | `user_agent` | `TextField` | `""` | Request-derived; may be truncated to 500 chars before save |
 | `summary` | `CharField(500)` | required | Human-readable event summary for list UI |
@@ -492,7 +492,7 @@ export interface AuditEvent {
   status: AuditEventStatus
   request_id: string | null
   correlation_id: string | null
-  source: 'api' | 'celery' | 'system' | 'management_command'
+  source: 'api' | 'api_key' | 'celery' | 'system' | 'management_command'
   ip_address: string | null
   user_agent: string
   summary: string
@@ -602,7 +602,7 @@ remove them under controlled maintenance procedures.
 
 ### Backend — `backend/audit/tests.py`
 
-**`AuditEventModelTests`** (7 tests):
+**`AuditEventModelTests`** (9 tests):
 
 | Test | Asserts |
 |---|---|
@@ -612,6 +612,8 @@ remove them under controlled maintenance procedures.
 | `test_redaction_truncates_large_strings_and_caps_collections` | Oversized values are capped before persistence |
 | `test_record_audit_event_truncates_reason` | Long free-text reasons are truncated |
 | `test_build_diff_uses_allowed_fields_only` | Diff helper excludes unapproved fields |
+| `test_build_instance_snapshot_reads_fks_without_extra_queries` | Snapshots resolve FKs without extra queries |
+| `test_audited_update_mixin_tracks_every_writable_serializer_field` | Audit mixin records every writable serializer field |
 | `test_infer_zev_resolves_nested_objects` | ZEV resolution works for invoice/participant/assignment targets |
 
 **`AuditEventApiTests`** (6 tests):
@@ -625,48 +627,41 @@ remove them under controlled maintenance procedures.
 | `test_list_filters_by_category_status_and_date_range` | Filtering behavior matches request params |
 | `test_detail_returns_full_diff_and_metadata` | Detail response exposes structured payloads |
 
-### Backend — existing app tests updated
+### Backend — workflow instrumentation
 
-Planned coverage additions in existing test modules:
+Coverage is implemented in `backend/audit/tests.py`:
 
-| File | Test class | Planned tests |
-|---|---|---|
-| `backend/invoices/tests.py` | `InvoiceAuditLoggingTests` | 6 |
-| `backend/accounts/tests.py` | `AccountAuditLoggingTests` | 6 |
-| `backend/zev/tests.py` | `ZevAuditLoggingTests` | 6 |
-| `backend/tariffs/tests.py` | `TariffAuditLoggingTests` | 4 |
-| `backend/metering/tests.py` | `MeteringAuditLoggingTests` | 4 |
+**`AuditInstrumentationTests`** (3 tests): invoice approve, feature-flag
+update, and impersonation-denied each emit an audit event with expected payload.
 
-Each class should assert both event creation and event payload correctness for
-the covered workflow slice.
+**`AuditPhase3InstrumentationTests`** (10 tests): participant link,
+participant update, metering delete-readings, metering point + assignment
+updates, tariff create/update, tariff period update, user update, and the
+import-without-file failure each emit the correct audit event.
 
 ### Frontend
 
-Planned additions:
+**File:** `frontend/src/lib/api/audit.ts` (client), `frontend/src/pages/AdminAuditLogsPage.tsx` (page)
 
-1. `frontend/tests/api-audit.test.ts` for client request/response handling.
-2. `frontend/tests/admin-audit-page.test.ts` for filter rendering and detail
-   expansion behavior if component-level tests are introduced.
-3. Validation commands:
-   - `npm run lint`
-   - `npm run build`
-   - `npm run test:unit`
+- `frontend/tests/api-audit.test.ts` for client request/response handling.
+- Component/manual validation via `npm run lint`, `npm run build`, and
+  `npm run test:unit`.
 
 ### Acceptance criteria
 
-- [ ] A new append-only `AuditEvent` model is defined with actor, target, ZEV,
+- [x] A new append-only `AuditEvent` model is defined with actor, target, ZEV,
       summary, status, and structured diff fields.
-- [ ] Audit events are written through an explicit service layer with redaction
+- [x] Audit events are written through an explicit service layer with redaction
       and ZEV-resolution helpers.
-- [ ] The backend exposes read-only audit list/detail endpoints with admin and
+- [x] The backend exposes read-only audit list/detail endpoints with admin and
       owner-scoped visibility rules.
-- [ ] Invoice lifecycle, governance settings, account security, and import/email
+- [x] Invoice lifecycle, governance settings, account security, and import/email
       async workflows emit audit events in the first rollout slices.
-- [ ] The frontend provides an admin audit-log page with filters and event
+- [x] The frontend provides an admin audit-log page with filters and event
       detail inspection.
-- [ ] Sensitive secrets, template bodies, raw files, and credentials are not
+- [x] Sensitive secrets, template bodies, raw files, and credentials are not
       stored in audit payloads.
-- [ ] Oversized audit payloads are truncated or capped before persistence.
-- [ ] Audit retention guidance exists for long-term operational maintenance.
+- [x] Oversized audit payloads are truncated or capped before persistence.
+- [x] Audit retention guidance exists for long-term operational maintenance.
 
 <!-- markdownlint-enable MD060 -->

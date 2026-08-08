@@ -99,7 +99,7 @@ If a template contains an invalid placeholder (typo or unsupported variable), th
 
 ## Sending Invoices
 
-When you [send approved invoices](09-invoice-management.md#sending-invoices):
+When you [send approved invoices](09-invoice-management.md#sending-invoices-by-email):
 
 1. OpenZEV generates the PDF (if not already generated)
 2. Email is created using the ZEV's template (or the default)
@@ -210,6 +210,6 @@ Email delivery logs are kept for compliance and audit:
 
 ## Next Steps
 
-- **Send invoices:** [Invoice Management](09-invoice-management.md#sending-invoices)
+- **Send invoices:** [Invoice Management](09-invoice-management.md#sending-invoices-by-email)
 - **Manage participants:** [Participant Management](03-participant-management.md)
 - **ZEV setup:** [ZEV Setup](02-zev-setup.md)

@@ -55,16 +55,9 @@ In fullstack mode:
 
 ## Demo Accounts
 
-A demo dataset is pre-loaded with sample data for testing. Use these credentials:
+A demo dataset is pre-loaded with sample data for testing. The demo account credentials are listed in the root [`README.md`](../../README.md#seed-data--demo-accounts).
 
-| Role | Email | Password | Purpose |
-| --- | --- | --- | --- |
-| **Admin** | `admin@openzev.local` | `admin1234` | Full system management |
-| **ZEV Owner** | `owner@openzev.local` | `owner1234` | Manage a ZEV community |
-| **Participant** | `anna.consumer@openzev.local` | `participant1234` | View own data and invoices |
-| **Participant** | `ben.consumer@openzev.local` | `participant1234` | View own data and invoices |
-
-The demo dataset includes a sample ZEV community, participants, tariffs, and 15-minute interval metering data for Q1 and Q2 2026.
+The demo dataset includes a sample ZEV community, participants, tariffs, and 15-minute interval metering data for the previous quarter up to today.
 
 ### Resetting Demo Data
 

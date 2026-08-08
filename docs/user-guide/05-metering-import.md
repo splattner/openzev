@@ -4,17 +4,15 @@ This guide covers importing metering (consumption and production) readings into 
 
 ## Import Overview
 
-OpenZEV supports three import pathways:
+OpenZEV supports two import pathways:
 
 1. **CSV/Excel Files** — Column-mapped spreadsheets
-2. **SDAT-CH Format** — Swiss standard metering data exchange
-3. **Manual Entry** — For small datasets or testing
+2. **SDAT-CH Format** — Swiss standard metering data exchange (ebIX XML)
 
-All imports use a **preview-first validation** approach:
-1. Upload file
-2. Review mapping and preview (no data written yet)
-3. Confirm import
-4. System writes and shows protocol
+CSV imports use a **preview-first validation** workflow: you upload, review the
+column mapping and a preview (no data written yet), then confirm the import. The
+SDAT-CH path uses its own upload and processing workflow. After importing, the
+system writes and shows an import protocol.
 
 ![Imports page](screenshots/09-imports.png)
 
@@ -47,7 +45,6 @@ Prepare your data as CSV or Excel with columns:
      - `Timestamp` → which column?
      - `Value` → which column?
    - Set **Timestamp Format** (e.g., `YYYY-MM-DD HH:00:00`)
-   - Select **Timezone** (critical for accuracy!)
    - Set **Unit** (default: `kWh`)
 
 4. **Preview**
@@ -57,9 +54,10 @@ Prepare your data as CSV or Excel with columns:
    - Review **Warnings** (inactive participants, missing meters, etc.)
 
 5. **Review Import Options**
-   - **Merge with existing data:** Append to existing readings ✓ (default, safe)
-   - **Replace data in range:** Overwrite readings in a date range (careful!)
-   - **Continue on errors:** Skip invalid rows, keep valid ones
+   - **Overwrite existing data** for the same metering point + timestamp +
+     direction (unchecked by default). When checked, re-importing overwrites any
+     existing readings that match; when unchecked, existing readings are kept
+     and duplicates are skipped.
 
 6. **Confirm Import**
    - Click **Import**
@@ -107,23 +105,17 @@ OpenZEV supports the Swiss **SDAT-CH** metering data standard (used by utility p
 
 > **Note:** SDAT-CH metadata (meter type, interval) is extracted; timestamp resolution is auto-detected.
 
-## Timezone Handling
+## Timestamp Handling
 
-**Timezone is critical** for accurate billing.
+OpenZEV stores all readings internally on the UTC timeline, but there is **no
+timezone selector** in the import UI. The **Timestamp Format** field controls
+how timestamp values are parsed from the file.
 
-When importing:
-- Specify **Timezone** of the timestamp column (e.g., `Europe/Zurich`)
-- OpenZEV stores all readings in UTC internally
-- Invoice generation uses the ZEV's [configured timezone](02-zev-setup.md#regional-settings)
-
-### Example
-
-If your CSV timestamps are in Swiss time (`Europe/Zurich`):
-- Raw data: `2026-01-15 22:00:00` (CET = UTC+1)
-- Stored as: `2026-01-15 21:00:00` (UTC)
-- Invoice timezone: `Europe/Zurich` → displayed as `2026-01-15 22:00:00`
-
-Mixing timezones can cause off-by-one-hour billing errors!
+Be aware that mixing naive local-time timestamps and UTC can cause
+off-by-one-hour billing errors between Swiss local time (CET, UTC+1) and UTC.
+For example, `2026-01-15 22:00:00` in Swiss local time (CET) corresponds to
+`2026-01-15 21:00:00` UTC. Use one consistent timestamp interpretation across
+all your import files.
 
 ## Common Import Scenarios
 
@@ -142,9 +134,8 @@ CH12346-load,2026-01-15 01:00:00,0.630
 
 1. Upload file
 2. Map columns (metering_point_id, timestamp, value)
-3. Set timezone to `Europe/Zurich`
-4. Preview: Should show 2 meters, ~720 rows per meter
-5. Import
+3. Set the timestamp format and check the preview (should show 2 meters, ~720 rows per meter)
+4. Import
 
 ### Scenario 2: Utility SDAT-CH Export
 
@@ -179,7 +170,7 @@ Reading value is not numeric (e.g., "N/A" or blank).
 
 Solutions:
 1. Clean CSV: Replace non-numeric empty/error values with `0.000`
-2. Use **Continue on Errors** during import (skips bad rows)
+2. Correct the invalid rows and re-run the import (skipped/failed rows are listed in the import protocol)
 3. Re-run import
 
 ### "Participant is no longer active"
@@ -210,8 +201,8 @@ If you find errors in imported data:
 After import, review **Metering Data → Data Quality** to see:
 - Coverage per metering point
 - Missing readings
-- Anomalies (sudden spikes/drops)
 - Gaps vs. assignment/participant validity windows
+- Unassigned readings / assignment overlap warnings
 
 See [Metering Analysis](06-metering-analysis.md) for details.
 

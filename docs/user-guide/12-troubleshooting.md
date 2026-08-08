@@ -80,24 +80,14 @@ docker compose logs
 
 ### "Metering point not found" on import
 
-**Problem:** Import fails because a metering point ID doesn't exist.
-
-**Fix:**
-1. Check metering point ID spelling in CSV
-2. Create missing meters in **Metering Points** first
-3. Re-import file
+Import fails because a metering point ID in the file doesn't exist. See
+[Metering Data Import → Handling Import Errors](05-metering-import.md#handling-import-errors).
 
 ### "Timestamp outside validity period"
 
-**Problem:** Readings rejected because meter not yet active.
-
-**Cause:** Meter's **Valid From** date is after reading timestamp.
-
-**Fix:**
-1. Go to **Metering Points**
-2. Find meter
-3. Edit **Valid From** to before your readings
-4. Re-import data
+Readings are rejected because the timestamp falls outside the meter's assignment
+validity window. See [Metering Data Import](05-metering-import.md) and
+[Metering Points → Assignment Validity](04-metering-points.md#assignment-validity-periods).
 
 ### Import hangs or times out
 
@@ -116,18 +106,8 @@ docker compose logs
 
 ### Data quality shows mostly "Missing"
 
-**Problem:** "Missing" status on many meters.
-
-**Causes:**
-- Metering data not imported yet
-- Assignment validity period doesn't overlap date range
-- Meter not assigned to active participant
-
-**Fix:**
-1. Check [Metering Analysis](06-metering-analysis.md) for actual gaps
-2. Verify metering points exist: **Metering Points**
-3. Check participant is active: **Participants**
-4. Review import history: **Imports**
+Many meters show "Missing". Diagnose the gaps with
+[Metering Analysis](06-metering-analysis.md) before re-importing.
 
 ## Billing & Invoices
 
@@ -152,8 +132,8 @@ docker compose logs
    - Compare with invoice
 
 **If still wrong:**
-- Export invoice as CSV
-- Share with support or developer for review
+- Share the invoice **number and billing period** with support or the developer for review
+- Provide the raw readings and tariff configuration used for that period
 
 ### "Cannot send invoice" / Email failed
 
@@ -231,19 +211,9 @@ docker compose exec -T db psql -U openzev openzev < backup_YYYYMMDD.sql
 
 ### Email not being sent
 
-**Problem:** Invoices marked **Pending** or **Failed** email delivery.
-
-**Cause:** Celery worker not running.
-
-**Check:**
-```bash
-docker compose logs worker
-```
-
-**Fix:**
-```bash
-docker compose restart worker
-```
+Invoices stuck on **Pending** or **Failed** email delivery. See
+[Email Configuration → Handling Email Failures](10-email-configuration.md#handling-email-failures).
+A common cause is the Celery worker not running — check `docker compose logs worker`.
 
 ### Background jobs stuck
 
