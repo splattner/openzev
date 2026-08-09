@@ -91,32 +91,14 @@ def logout_view(request):
 
 
 class UserListCreateView(generics.ListCreateAPIView):
-    """Admin: create users. Admin/ZEV owner: list participant accounts for linking."""
-    permission_classes = [IsAuthenticated]
+    """Admin: list and create users."""
+    permission_classes = [IsAdmin]
 
     def get_queryset(self):
-        user = self.request.user
-        if user.is_admin:
-            return User.objects.all().order_by("username")
-        if user.is_zev_owner:
-            return User.objects.filter(role=UserRole.PARTICIPANT, is_active=True).order_by("username")
-        raise PermissionDenied("Permission denied.")
+        return User.objects.all().order_by("username")
 
     def get_serializer_class(self):
         return UserCreateSerializer if self.request.method == "POST" else UserSerializer
-
-    def create(self, request, *args, **kwargs):
-        if not request.user.is_admin:
-            record_audit_event(
-                request=request,
-                action_category=AuditActionCategory.AUTH,
-                action_type="user.create",
-                target_type="accounts.User",
-                summary="Denied user creation attempt by non-admin.",
-                status=AuditEventStatus.DENIED,
-            )
-            raise PermissionDenied("Only admins can create users.")
-        return super().create(request, *args, **kwargs)
 
     def perform_create(self, serializer):
         user = serializer.save()

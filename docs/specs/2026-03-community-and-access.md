@@ -374,16 +374,17 @@ not impersonating and the current path is not `/account`, redirect to
 
 ### 6.1 User list
 
-**Endpoint:** `GET /api/v1/auth/users/` (IsAuthenticated)
+**Endpoint:** `GET /api/v1/auth/users/` (IsAdmin)
 
-**Queryset scoping:**
-- `admin` → all users, ordered by username.
-- `zev_owner` → only `participant` role users that are active.
-- Other roles → 403 (PermissionDenied).
+Admin only — the user list is the instance-wide account registry; exposing it
+to owners would leak every participant's contact details across communities.
+Owners have no consumer for it: account linking is admin-only.
+
+**Queryset:** all users, ordered by username. Any non-admin role → 403.
 
 ### 6.2 User create
 
-**Endpoint:** `POST /api/v1/auth/users/` (IsAuthenticated; admin only in view logic)
+**Endpoint:** `POST /api/v1/auth/users/` (IsAdmin)
 
 **Payload:** `{ username, email, first_name, last_name, password, password2, role }`
 
@@ -619,7 +620,7 @@ The sidebar (`Layout.tsx`) shows sections conditionally:
 | GET / PATCH | `/me/` | IsAuthenticated | View/update own profile |
 | POST | `/me/change-password/` | IsAuthenticated | Change password (requires old password) |
 | POST | `/me/set-initial-password/` | IsAuthenticated | Set password for first time (verification flow) |
-| GET / POST | `/users/` | IsAuthenticated (create: admin only) | List users (scoped by role) / Create user |
+| GET / POST | `/users/` | IsAdmin | List users / Create user |
 | GET / PATCH / DELETE | `/users/{id}/` | IsAdmin | User detail (delete blocked if linked or last admin) |
 | POST | `/users/{user_id}/impersonate/` | IsAuthenticated (admin only) | Impersonate participant/owner |
 | GET / PATCH | `/app-settings/` | IsAuthenticated (update: admin only) | Application settings singleton |
@@ -662,7 +663,7 @@ backend's primary access control mechanism.
 | Participant | all | `zev.owner == user` | `user == request.user` | — |
 | MeteringPoint | all | `zev.owner == user` | assigned via MeteringPointAssignment | — |
 | MeteringPointAssignment | all | `metering_point.zev.owner == user` | `participant.user == user` | — |
-| User (list) | all | active participants only | PermissionDenied | PermissionDenied |
+| User (list) | all (`IsAdmin`) | PermissionDenied | PermissionDenied | PermissionDenied |
 | ImportLog | all | `zev.owner == user` OR `imported_by == user` | PermissionDenied | PermissionDenied |
 | MeterReading | all | ZEV-scoped meters | assigned meters | PermissionDenied |
 | Invoice | all | `zev.owner == user` | `participant.user == user` | — |
@@ -838,6 +839,7 @@ interface ParticipantAccountCreateResult { participant: Participant; account: Us
 | `VatRateSettingsTests` | 4 | Admin CRUD; non-admin blocked; overlap rejection; valid_to validation |
 | `OAuthProviderConfigTests` | 5 | Admin creates provider (internal host URLs, scheme-less URLs, default redirect URL); non-admin blocked; login initiate uses provider redirect URL |
 | `OAuthProviderSecretWriteOnlyTests` | 5 | `client_secret` is write-only: create/list/detail responses never contain it and report `has_client_secret`; create without a secret is refused; blank secret on update keeps the stored value; new secret on update rotates it |
+| `UserListCreateAdminOnlyTests` | 6 | Owner/participant/anonymous cannot list or create users; admin can list all users and create |
 | `RbacEndpointMatrixTests` | 6 | Full list/create/update/action-delete/unauthenticated matrix across all endpoints |
 | `OAuthTokenCleanupTaskTests` | 1 | Token cleanup task keeps active and removes expired entries |
 

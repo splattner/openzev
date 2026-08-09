@@ -765,6 +765,60 @@ class OAuthProviderSecretWriteOnlyTests(TestCase):
 		provider.refresh_from_db()
 		self.assertEqual(provider.client_secret, "rotated-secret")
 
+class UserListCreateAdminOnlyTests(TestCase):
+	"""The user list used to hand every ZEV owner every active participant
+	account in the instance; listing and creating are admin-only."""
+
+	def setUp(self):
+		self.admin = User.objects.create_user(username="ul_admin", password="pass1234", role=UserRole.ADMIN)
+		self.owner = User.objects.create_user(username="ul_owner", password="pass1234", role=UserRole.ZEV_OWNER)
+		self.participant_user = User.objects.create_user(username="ul_participant", password="pass1234", role=UserRole.PARTICIPANT)
+
+		self.admin_client = APIClient()
+		_cookie_auth(self.admin_client, "ul_admin")
+		self.owner_client = APIClient()
+		_cookie_auth(self.owner_client, "ul_owner")
+		self.participant_client = APIClient()
+		_cookie_auth(self.participant_client, "ul_participant")
+
+	def test_owner_cannot_list_users(self):
+		response = self.owner_client.get("/api/v1/auth/users/")
+		self.assertEqual(response.status_code, 403)
+
+	def test_participant_cannot_list_users(self):
+		response = self.participant_client.get("/api/v1/auth/users/")
+		self.assertEqual(response.status_code, 403)
+
+	def test_anonymous_cannot_list_users(self):
+		response = APIClient().get("/api/v1/auth/users/")
+		self.assertEqual(response.status_code, 401)
+
+	def test_owner_cannot_create_users(self):
+		response = self.owner_client.post(
+			"/api/v1/auth/users/",
+			{"username": "ul_backdoor", "email": "backdoor@example.com", "first_name": "Back",
+			 "last_name": "Door", "password": "pass1234", "password2": "pass1234", "role": "participant"},
+			format="json",
+		)
+		self.assertEqual(response.status_code, 403)
+		self.assertFalse(User.objects.filter(username="ul_backdoor").exists())
+
+	def test_admin_can_list_all_users(self):
+		response = self.admin_client.get("/api/v1/auth/users/")
+		self.assertEqual(response.status_code, 200)
+		usernames = {row["username"] for row in response.json()["results"]}
+		self.assertEqual(usernames, {"ul_admin", "ul_owner", "ul_participant"})
+
+	def test_admin_can_create_users(self):
+		response = self.admin_client.post(
+			"/api/v1/auth/users/",
+			{"username": "ul_created", "email": "created@example.com", "first_name": "New",
+			 "last_name": "User", "password": "Uniquely-Long-9164!", "password2": "Uniquely-Long-9164!", "role": "participant"},
+			format="json",
+		)
+		self.assertEqual(response.status_code, 201, response.content)
+		self.assertTrue(User.objects.filter(username="ul_created").exists())
+
 
 class RbacEndpointMatrixTests(TestCase):
 	def _auth(self, client, user, password="pass1234"):

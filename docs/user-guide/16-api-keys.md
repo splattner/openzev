@@ -107,8 +107,9 @@ The rule behind the list: a key may not touch credentials or sessions. That is
 what keeps a leaked key a revocable credential rather than a permanent account
 takeover.
 
-Reading is still open where it is useful — `GET auth/me/` and `GET auth/users/`
-work normally.
+Reading is still open where it is useful — `GET auth/me/` works for any key.
+`GET auth/users/` is the instance-wide user list and is restricted to admin
+keys; a non-admin key is refused there.
 
 ## Rate limits
 
