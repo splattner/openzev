@@ -128,11 +128,9 @@ class TariffViewSet(AuditedUpdateMixin, ZevScopedQuerySetMixin, viewsets.ModelVi
     def list_series(self, request):
         """Tariffs grouped into series, newest version first, with gaps flagged."""
         today = timezone.localdate()
+        # ``?zev_id=`` is applied by ``scope_queryset`` for every ZEV-scoped
+        # viewset, so this action no longer filters it a second time.
         tariffs = self.get_queryset().prefetch_related('periods')
-
-        zev_id = request.query_params.get('zev_id')
-        if zev_id:
-            tariffs = tariffs.filter(zev_id=zev_id)
 
         grouped: dict[tuple, list] = {}
         for tariff in tariffs:

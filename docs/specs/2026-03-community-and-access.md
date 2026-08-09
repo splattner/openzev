@@ -189,7 +189,31 @@ Defined in `accounts/permissions.py` and `zev/permissions.py`.
    `zev.participants.filter(user=user).exists()`.
 5. Else → deny.
 
-### 4.4 Write scoping (`ZevScopedQuerySetMixin`)
+### 4.4 Read scoping and the `zev_id` filter (`ZevScopedQuerySetMixin`)
+
+`scope_queryset` returns the role-scoped queryset, then narrows it by the
+optional `?zev_id=` query parameter. Both live here because every ZEV-scoped
+viewset already funnels its `get_queryset` through this method; leaving the
+parameter to each viewset is how it came to be accepted and silently ignored
+on six of them (#411), while the custom actions beside them honoured it.
+
+| Behaviour | Result |
+|---|---|
+| parameter omitted, or empty (`?zev_id=`) | role scope only, unchanged |
+| a ZEV in the caller's scope | narrowed to that ZEV |
+| a ZEV outside the caller's scope | empty list (never that ZEV's data) |
+| a non-UUID value | `400` with `zev_id` in the body |
+
+The ORM path is derived, not declared: `zev_owner_filter` is by definition the
+path to the ZEV's `owner`, so dropping the last segment gives the path to the
+ZEV itself (`metering_point__zev__owner` → `metering_point__zev`). A viewset
+that changes its relation path therefore cannot end up filtering on a stale
+one. The empty path denotes `ZevViewSet`, whose model *is* the ZEV.
+
+The filter can only narrow: it adds a conjunctive `filter()` to the
+already-role-scoped queryset, so it is not a route to another tenant's data.
+
+### 4.5 Write scoping (`ZevScopedQuerySetMixin`)
 
 `has_object_permission` runs on detail routes only — DRF has no object to
 check on create, so it is never consulted there. A permission class alone

@@ -19,6 +19,8 @@ write rule is the mirror of the read rule — you may only create or move an
 object into a ZEV you would be allowed to see.
 """
 
+import uuid
+
 from rest_framework import serializers
 
 
@@ -48,6 +50,20 @@ class ZevScopedQuerySetMixin:
     scope_parent_path: tuple[str, ...] | None = None
 
     def scope_queryset(self, qs):
+        """Everything a caller is allowed to see, narrowed by ``?zev_id=``.
+
+        Both are applied here because every ZEV-scoped viewset already funnels
+        its ``get_queryset`` through this method. Leaving the parameter to each
+        viewset is how it came to be accepted and silently ignored on six of
+        them (#411).
+
+        The filter cannot widen what a caller sees: it only ever adds a
+        conjunctive ``filter()`` to the role-scoped queryset, so naming
+        somebody else's ZEV yields an empty list rather than their data.
+        """
+        return self._narrow_by_zev_id(self._scope_by_role(qs))
+
+    def _scope_by_role(self, qs):
         user = self.request.user
         if user.is_admin:
             return qs
@@ -59,6 +75,35 @@ class ZevScopedQuerySetMixin:
         if self.participant_distinct:
             qs = qs.distinct()
         return qs
+
+    @property
+    def zev_lookup(self) -> str:
+        """ORM path from this model to its ``Zev``, derived from the role filter.
+
+        ``zev_owner_filter`` is by definition the path to that ZEV's ``owner``,
+        so dropping the final segment yields the path to the ZEV itself:
+        ``"metering_point__zev__owner"`` -> ``"metering_point__zev"``. Deriving
+        it keeps the two in step — a viewset that changes its relation path
+        cannot end up filtering on a stale one — and ``""`` correctly denotes
+        the ZEV viewset, whose model *is* the ZEV.
+        """
+        head, _, _ = self.zev_owner_filter.rpartition("__")
+        return head
+
+    def _narrow_by_zev_id(self, qs):
+        raw = self.request.query_params.get("zev_id")
+        if not raw:
+            return qs
+        try:
+            zev_id = uuid.UUID(str(raw))
+        except (ValueError, AttributeError, TypeError):
+            # Previously ignored along with the rest of the parameter, which
+            # returned every ZEV the caller could see and looked like success.
+            raise serializers.ValidationError(
+                {"zev_id": ["Must be a valid UUID."]}
+            ) from None
+        lookup = f"{self.zev_lookup}__id" if self.zev_lookup else "id"
+        return qs.filter(**{lookup: zev_id})
 
     # ── Write scoping ─────────────────────────────────────────────────────
 

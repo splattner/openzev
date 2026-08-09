@@ -10,8 +10,11 @@ pytestmark = pytest.mark.django_db
 
 
 class _FakeRequest:
-    def __init__(self, user):
+    """Stands in for a DRF ``Request``: the mixin reads both of these."""
+
+    def __init__(self, user, query_params=None):
         self.user = user
+        self.query_params = query_params or {}
 
 
 class _ZevScope(ZevScopedQuerySetMixin):
@@ -19,16 +22,16 @@ class _ZevScope(ZevScopedQuerySetMixin):
     participant_filter = "participants__user"
     participant_distinct = True
 
-    def __init__(self, user):
-        self.request = _FakeRequest(user)
+    def __init__(self, user, query_params=None):
+        self.request = _FakeRequest(user, query_params)
 
 
 class _OwnerOnlyScope(ZevScopedQuerySetMixin):
     zev_owner_filter = "owner"
     participant_filter = None
 
-    def __init__(self, user):
-        self.request = _FakeRequest(user)
+    def __init__(self, user, query_params=None):
+        self.request = _FakeRequest(user, query_params)
 
 
 class TestZevScopedQuerySetMixin:

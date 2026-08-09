@@ -286,15 +286,13 @@ class MeterReadingViewSet(ZevScopedQuerySetMixin, viewsets.ModelViewSet):
         """
         date_from_str = request.query_params.get("date_from")
         date_to_str = request.query_params.get("date_to")
-        zev_id = request.query_params.get("zev_id")
 
         today = date_type.today()
         date_from = date_type.fromisoformat(date_from_str) if date_from_str else today - timedelta(days=30)
         date_to = date_type.fromisoformat(date_to_str) if date_to_str else today
 
+        # ``zev_id`` is already applied by ``scope_queryset``.
         qs = self.get_queryset()
-        if zev_id:
-            qs = qs.filter(metering_point__zev_id=zev_id)
         mp_ids = qs.values_list("metering_point_id", flat=True).distinct()
         metering_points = MeteringPoint.objects.filter(id__in=mp_ids)
 
