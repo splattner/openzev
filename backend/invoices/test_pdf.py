@@ -37,10 +37,20 @@ from .pdf_translations import INVOICE_TRANSLATIONS
 from .template_context import build_sample_invoice_context
 
 
-def _render_template_html(invoice):
-    """Render the invoice template to an HTML string for structural assertions."""
+_STYLE_BLOCK_RE = re.compile(r"<style>.*?</style>", re.DOTALL)
+
+
+def _render_invoice_markup(invoice):
+    """Render the invoice template to markup, stylesheet removed.
+
+    The ``<style>`` block renders on every invoice, so a bare class name found
+    in the full HTML may be nothing but a CSS selector. Asserting against the
+    markup alone keeps a structural check from passing on the stylesheet while
+    the element it names is gone (#427).
+    """
     from .pdf import TEMPLATE_NAME
-    return _render_template(TEMPLATE_NAME, _build_template_context(invoice))
+    html = _render_template(TEMPLATE_NAME, _build_template_context(invoice))
+    return _STYLE_BLOCK_RE.sub("", html)
 
 
 class InvoicePdfQrTests(TestCase):
@@ -343,12 +353,26 @@ class InvoicePdfQrTests(TestCase):
         reader = PdfReader(io.BytesIO(pdf_bytes))
         self.assertGreaterEqual(len(reader.pages), 2)  # invoice + insights at minimum
 
-        html = _render_template_html(invoice)
-        # Structural checks on rendered HTML
-        self.assertIn('class="line-items"', html)
-        self.assertIn('quantity-cell', html)
-        self.assertNotIn('<th>{{ tr.unit }}</th>', html)  # unit merged into quantity
-        self.assertIn('savings-breakdown', html)  # savings card variant renders
+        markup = _render_invoice_markup(invoice)
+        # Structural checks on the rendered markup
+        self.assertIn('class="line-items"', markup)
+        self.assertIn('quantity-cell', markup)
+        self.assertNotIn('<th>{{ tr.unit }}</th>', markup)  # unit merged into quantity
+        self.assertIn('savings-breakdown', markup)  # savings card variant renders
+
+    def test_structural_markers_are_absent_when_their_element_does_not_render(self):
+        """Guards the assertions above.
+
+        Both markers also exist as CSS selectors, and the stylesheet renders on
+        every invoice — so asserting them against the full HTML passed even with
+        the elements deleted from the template (#427). An invoice with no items
+        has no line-item table and no savings card; if these markers still turn
+        up, the structural checks have stopped proving anything again.
+        """
+        markup = _render_invoice_markup(self._invoice())
+
+        self.assertNotIn('savings-breakdown', markup)
+        self.assertNotIn('quantity-cell', markup)
 
     def test_template_context_enables_inline_qr_payment_for_small_invoices(self):
         invoice = self._invoice()
