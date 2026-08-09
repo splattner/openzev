@@ -20,7 +20,9 @@ import {
 } from '../lib/api/metering'
 import { downloadAnnualStatement, downloadAllAnnualStatements, downloadFinancialSummary, fetchInvoices } from '../lib/api/invoices'
 import { queryKeys } from '../lib/api/queryKeys'
-import { formatShortDate, formatDateTime, formatMonthYear, useAppSettings } from '../lib/appSettings'
+import { downloadBlob } from '../lib/downloadBlob'
+import { formatMeteringBucketLabel } from '../lib/meteringLabels'
+import { formatShortDate, useAppSettings } from '../lib/appSettings'
 import { useAuth } from '../lib/auth'
 import { useManagedZev } from '../lib/managedZev'
 import { StatCard } from '../components/StatCard'
@@ -42,19 +44,11 @@ export function DashboardPage() {
     const [bucket, setBucket] = useState<'day' | 'hour' | 'month'>('day')
     const [selectedParticipantId, setSelectedParticipantId] = useState('')
     const [annualStatementYear, setAnnualStatementYear] = useState(new Date().getFullYear() - 1)
+    const availableYears = Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i)
 
     const isZevScopedRole = user?.role === 'admin' || user?.role === 'zev_owner'
 
-    const formatBucketLabel = (value: string) => {
-        switch (bucket) {
-            case 'hour':
-                return formatDateTime(value, settings)
-            case 'month':
-                return formatMonthYear(value)
-            default:
-                return formatShortDate(value, settings)
-        }
-    }
+    const formatBucketLabel = (value: string) => formatMeteringBucketLabel(value, bucket, settings)
     const formatBucketTooltipLabel = (label: unknown) => formatBucketLabel(String(label ?? ''))
 
     useEffect(() => {
@@ -142,42 +136,21 @@ export function DashboardPage() {
     const annualStatementMutation = useMutation({
         mutationFn: (year: number) => downloadAnnualStatement({ year }),
         onSuccess: (blob, year) => {
-            const url = URL.createObjectURL(blob)
-            const a = document.createElement('a')
-            a.href = url
-            a.download = `annual-statement-${year}.pdf`
-            document.body.appendChild(a)
-            a.click()
-            a.remove()
-            URL.revokeObjectURL(url)
+            downloadBlob(blob, `annual-statement-${year}.pdf`)
         },
     })
 
     const allAnnualStatementsMutation = useMutation({
         mutationFn: (year: number) => downloadAllAnnualStatements({ year, zev_id: selectedZevId! }),
         onSuccess: (blob, year) => {
-            const url = URL.createObjectURL(blob)
-            const a = document.createElement('a')
-            a.href = url
-            a.download = `annual-statements-${year}.zip`
-            document.body.appendChild(a)
-            a.click()
-            a.remove()
-            URL.revokeObjectURL(url)
+            downloadBlob(blob, `annual-statements-${year}.zip`)
         },
     })
 
     const financialSummaryMutation = useMutation({
         mutationFn: (year: number) => downloadFinancialSummary({ year, zev_id: selectedZevId || undefined }),
         onSuccess: (blob, year) => {
-            const url = URL.createObjectURL(blob)
-            const a = document.createElement('a')
-            a.href = url
-            a.download = `financial-summary-${year}.pdf`
-            document.body.appendChild(a)
-            a.click()
-            a.remove()
-            URL.revokeObjectURL(url)
+            downloadBlob(blob, `financial-summary-${year}.pdf`)
         },
     })
 
@@ -408,7 +381,7 @@ export function DashboardPage() {
                                     onChange={(e) => setAnnualStatementYear(Number(e.target.value))}
                                     style={{ width: 'auto' }}
                                 >
-                                    {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i).map((y) => (
+                                    {availableYears.map((y) => (
                                         <option key={y} value={y}>{y}</option>
                                     ))}
                                 </select>
@@ -441,7 +414,7 @@ export function DashboardPage() {
                                     onChange={(e) => setAnnualStatementYear(Number(e.target.value))}
                                     style={{ width: 'auto' }}
                                 >
-                                    {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i).map((y) => (
+                                    {availableYears.map((y) => (
                                         <option key={y} value={y}>{y}</option>
                                     ))}
                                 </select>
@@ -585,7 +558,7 @@ export function DashboardPage() {
                                     onChange={(e) => setAnnualStatementYear(Number(e.target.value))}
                                     style={{ width: 'auto' }}
                                 >
-                                    {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i).map((y) => (
+                                    {availableYears.map((y) => (
                                         <option key={y} value={y}>{y}</option>
                                     ))}
                                 </select>
@@ -618,7 +591,7 @@ export function DashboardPage() {
                                     onChange={(e) => setAnnualStatementYear(Number(e.target.value))}
                                     style={{ width: 'auto' }}
                                 >
-                                    {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i).map((y) => (
+                                    {availableYears.map((y) => (
                                         <option key={y} value={y}>{y}</option>
                                     ))}
                                 </select>

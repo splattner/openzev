@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { todayLocalIso } from '../../lib/dates'
 import type { Tariff, TariffInput, TariffPeriod, TariffPeriodInput } from '../../types/api'
 
 export type TariffFormValues = {
@@ -105,7 +106,7 @@ export const defaultTariffFormValues: TariffFormValues = {
   energy_type: 'local',
   fixed_price_chf: '',
   percentage: '',
-  valid_from: new Date().toISOString().slice(0, 10),
+  valid_from: todayLocalIso(),
   valid_to: '',
   notes: '',
 }

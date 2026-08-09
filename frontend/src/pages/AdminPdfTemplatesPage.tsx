@@ -670,7 +670,6 @@ export function AdminPdfTemplatesPage() {
                     style={{
                         background: 'transparent',
                         color: activeTab === 'invoice' ? 'var(--color-text, #000)' : 'var(--color-text-muted, #888)',
-                        borderBottom: activeTab === 'invoice' ? '2px solid var(--color-primary, #0066cc)' : 'none',
                         padding: '0.75rem 1rem',
                         fontSize: '1rem',
                         fontWeight: activeTab === 'invoice' ? 600 : 400,
@@ -686,7 +685,6 @@ export function AdminPdfTemplatesPage() {
                     style={{
                         background: 'transparent',
                         color: activeTab === 'contract' ? 'var(--color-text, #000)' : 'var(--color-text-muted, #888)',
-                        borderBottom: activeTab === 'contract' ? '2px solid var(--color-primary, #0066cc)' : 'none',
                         padding: '0.75rem 1rem',
                         fontSize: '1rem',
                         fontWeight: activeTab === 'contract' ? 600 : 400,
@@ -702,7 +700,6 @@ export function AdminPdfTemplatesPage() {
                     style={{
                         background: 'transparent',
                         color: activeTab === 'annual_statement' ? 'var(--color-text, #000)' : 'var(--color-text-muted, #888)',
-                        borderBottom: activeTab === 'annual_statement' ? '2px solid var(--color-primary, #0066cc)' : 'none',
                         padding: '0.75rem 1rem',
                         fontSize: '1rem',
                         fontWeight: activeTab === 'annual_statement' ? 600 : 400,

@@ -1,5 +1,4 @@
 import type {
-  PaginatedResponse,
   Tariff,
   TariffInput,
   TariffPeriod,
@@ -8,11 +7,6 @@ import type {
   TariffVersionInput,
 } from '../../types/api'
 import { api } from './client'
-
-export async function fetchTariffs(): Promise<PaginatedResponse<Tariff>> {
-  const { data } = await api.get<PaginatedResponse<Tariff>>('/tariffs/tariffs/')
-  return data
-}
 
 /**
  * Tariffs grouped into series (same name = versions of one tariff), each with
@@ -41,11 +35,6 @@ export async function duplicateTariff(id: string, payload: TariffVersionInput & 
 /** Rename every version at once — the name is what groups them. */
 export async function renameTariffSeries(id: string, name: string): Promise<Tariff> {
   const { data } = await api.post<Tariff>(`/tariffs/tariffs/${id}/rename-series/`, { name })
-  return data
-}
-
-export async function fetchTariffPeriods(): Promise<PaginatedResponse<TariffPeriod>> {
-  const { data } = await api.get<PaginatedResponse<TariffPeriod>>('/tariffs/periods/')
   return data
 }
 

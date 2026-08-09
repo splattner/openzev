@@ -148,11 +148,6 @@ export async function markInvoicePaid(invoiceId: string): Promise<Invoice> {
   return data
 }
 
-export async function cancelInvoice(invoiceId: string): Promise<Invoice> {
-  const { data } = await api.post<Invoice>(`/invoices/invoices/${invoiceId}/cancel/`)
-  return data
-}
-
 export async function deleteInvoice(invoiceId: string): Promise<void> {
   await api.delete(`/invoices/invoices/${invoiceId}/`)
 }
@@ -219,11 +214,6 @@ export async function resetAnnualStatementPdfTemplate(): Promise<PdfTemplateResp
 
 export async function previewPdfTemplate(content: string, templateType: 'invoice' | 'contract' | 'annual_statement'): Promise<{ html: string }> {
   const { data } = await api.post<{ html: string }>('/invoices/invoices/preview-pdf-template/', { content, template_type: templateType })
-  return data
-}
-
-export async function fetchEmailTemplates(): Promise<EmailTemplateResponse[]> {
-  const { data } = await api.get<EmailTemplateResponse[]>('/invoices/invoices/email-templates/')
   return data
 }
 

@@ -5,7 +5,7 @@ import { queryKeys } from './api/queryKeys'
 import { useAuth } from './auth'
 import type { AppSettings, DateTimeFormat, LongDateFormat, ShortDateFormat } from '../types/api'
 
-export const DEFAULT_APP_SETTINGS: AppSettings = {
+const DEFAULT_APP_SETTINGS: AppSettings = {
     date_format_short: 'dd.MM.yyyy',
     date_format_long: 'd MMMM yyyy',
     date_time_format: 'dd.MM.yyyy HH:mm',
@@ -101,10 +101,6 @@ export function formatDateByPattern(value: string | null | undefined, pattern: S
 
 export function formatShortDate(value: string | null | undefined, settings: AppSettings = DEFAULT_APP_SETTINGS): string {
     return formatDateByPattern(value, settings.date_format_short)
-}
-
-export function formatLongDate(value: string | null | undefined, settings: AppSettings = DEFAULT_APP_SETTINGS): string {
-    return formatDateByPattern(value, settings.date_format_long)
 }
 
 export function formatDateTime(value: string | null | undefined, settings: AppSettings = DEFAULT_APP_SETTINGS): string {

@@ -9,12 +9,11 @@ import {
     XAxis,
     YAxis,
 } from 'recharts'
+import { AXIS_COLOR, ANNOTATION_COLOR } from '../../lib/chartTokens'
 
 // Same validated blue/red diverging pair as the sensitivity chart.
 const POSITIVE_COLOR = '#2563eb'
 const NEGATIVE_COLOR = '#dc2626'
-const AXIS_COLOR = '#9ca3af'
-const ANNOTATION_COLOR = '#6b7280'
 
 type BarShapeProps = {
     x?: number

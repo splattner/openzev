@@ -7,6 +7,7 @@ import { FormModal } from '../../components/FormModal'
 import { formatApiError } from '../../lib/api/errors'
 import { queryKeys } from '../../lib/api/queryKeys'
 import { exportZevArchive, fetchTransferSections, readBlobError } from '../../lib/api/zevTransfer'
+import { downloadBlob } from '../../lib/downloadBlob'
 import { useToast } from '../../lib/toast'
 import { TransferSectionPicker } from './TransferSectionPicker'
 import { DEFAULT_SECTIONS, type TransferSectionName } from './transferSections'
@@ -48,14 +49,7 @@ export function ZevExportModal({ isOpen, zevId, zevName, onClose }: ZevExportMod
   const exportMutation = useMutation({
     mutationFn: () => exportZevArchive(zevId, selected),
     onSuccess: ({ blob, filename }) => {
-      const url = URL.createObjectURL(blob)
-      const link = document.createElement('a')
-      link.href = url
-      link.download = filename
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
-      URL.revokeObjectURL(url)
+      downloadBlob(blob, filename)
       pushToast(t('zevTransfer.exportSuccess'), 'success')
       onClose()
     },

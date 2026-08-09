@@ -10,7 +10,7 @@ export type ArchiveManifest = {
   source_zev: { id: string; name: string }
 }
 
-export type ImportResult = {
+type ImportResult = {
   zev_id: string
   zev_name: string
   sections: TransferSectionName[]
@@ -72,7 +72,7 @@ export async function importZevArchive(
   return data
 }
 
-export function filenameFromDisposition(header: unknown): string | null {
+function filenameFromDisposition(header: unknown): string | null {
   if (typeof header !== 'string') return null
   const match = /filename\*?=(?:UTF-8'')?"?([^";]+)"?/i.exec(header)
   return match ? decodeURIComponent(match[1]) : null

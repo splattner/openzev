@@ -1,11 +1,6 @@
-export type BillingInterval = 'monthly' | 'quarterly' | 'semi_annual' | 'annual'
+import { formatIsoDate } from './dates'
 
-export function toIsoDate(date: Date): string {
-    const year = date.getFullYear()
-    const month = String(date.getMonth() + 1).padStart(2, '0')
-    const day = String(date.getDate()).padStart(2, '0')
-    return `${year}-${month}-${day}`
-}
+export type BillingInterval = 'monthly' | 'quarterly' | 'semi_annual' | 'annual'
 
 export function startOfBillingPeriod(today: Date, interval: BillingInterval): Date {
     const year = today.getFullYear()
@@ -26,8 +21,8 @@ export function endOfBillingPeriod(start: Date, interval: BillingInterval): Date
 export function getCurrentBillingPeriod(interval: BillingInterval): { from: string; to: string } {
     const start = startOfBillingPeriod(new Date(), interval)
     return {
-        from: toIsoDate(start),
-        to: toIsoDate(endOfBillingPeriod(start, interval)),
+        from: formatIsoDate(start),
+        to: formatIsoDate(endOfBillingPeriod(start, interval)),
     }
 }
 
@@ -42,7 +37,7 @@ export function isBillingAlignedPeriod(from: string, to: string, interval: Billi
         return false
     }
     const start = startOfBillingPeriod(new Date(`${from}T00:00:00`), interval)
-    return toIsoDate(start) === from && toIsoDate(endOfBillingPeriod(start, interval)) === to
+    return formatIsoDate(start) === from && formatIsoDate(endOfBillingPeriod(start, interval)) === to
 }
 
 export function shiftBillingPeriod(
@@ -54,8 +49,8 @@ export function shiftBillingPeriod(
     const monthsToShift = (interval === 'monthly' ? 1 : interval === 'quarterly' ? 3 : interval === 'semi_annual' ? 6 : 12) * direction
     const shiftedStart = new Date(fromDate.getFullYear(), fromDate.getMonth() + monthsToShift, 1)
     return {
-        from: toIsoDate(shiftedStart),
-        to: toIsoDate(endOfBillingPeriod(shiftedStart, interval)),
+        from: formatIsoDate(shiftedStart),
+        to: formatIsoDate(endOfBillingPeriod(shiftedStart, interval)),
     }
 }
 
@@ -69,5 +64,5 @@ export function shiftBillingPeriod(
  */
 export function getPreviousBillingPeriod(interval: BillingInterval): { from: string; to: string } {
     const currentStart = startOfBillingPeriod(new Date(), interval)
-    return shiftBillingPeriod(toIsoDate(currentStart), interval, -1)
+    return shiftBillingPeriod(formatIsoDate(currentStart), interval, -1)
 }

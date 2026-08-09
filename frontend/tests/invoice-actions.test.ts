@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { getLatestEmailLog, hasDeletePermission } from '../src/features/invoices/useInvoiceActions'
+import { getLatestEmailLog } from '../src/features/invoices/emailLogs'
+import { hasDeletePermission } from '../src/features/invoices/useInvoiceActions'
 import type { Invoice } from '../src/types/api'
 
 describe('invoice action helpers', () => {

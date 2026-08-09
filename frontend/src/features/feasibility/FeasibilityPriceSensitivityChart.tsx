@@ -11,6 +11,7 @@ import {
     YAxis,
 } from 'recharts'
 import type { FeasibilityFairPriceRange, FeasibilityPriceSensitivityPoint } from '../../types/api'
+import { AXIS_COLOR, ANNOTATION_COLOR } from '../../lib/chartTokens'
 
 // Categorical pair (two distinct parties, not a polarity) — validated
 // colorblind-safe (worst adjacent CVD deltaE 30.3, normal-vision 33.3).
@@ -19,8 +20,6 @@ import type { FeasibilityFairPriceRange, FeasibilityPriceSensitivityPoint } from
 // in the other feasibility charts.
 const PRODUCER_COLOR = '#16a34a'
 const CONSUMER_COLOR = '#2563eb'
-const AXIS_COLOR = '#9ca3af'
-const ANNOTATION_COLOR = '#6b7280'
 const FAIR_RANGE_FILL = '#9ca3af'
 
 type Props = {

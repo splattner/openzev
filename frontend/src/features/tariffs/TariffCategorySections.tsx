@@ -13,6 +13,7 @@ import {
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { formatShortDate } from '../../lib/appSettings'
+import { todayLocalIso } from '../../lib/dates'
 import type {
     AppSettings,
     Tariff,
@@ -20,7 +21,7 @@ import type {
     TariffSeries,
     TariffVersion,
 } from '../../types/api'
-import { todayIso, validityState, type ValidityState } from './validity'
+import { validityState, type ValidityState } from './validity'
 import { TariffPriceHistoryChart } from './TariffPriceHistoryChart'
 
 type TariffSeriesSection = {
@@ -75,7 +76,7 @@ export function TariffCategorySections({
     // Which version a card is showing. Defaults to the active one, so a card
     // reads as "what this tariff costs now" until you deliberately look back.
     const [shownVersionBySeries, setShownVersionBySeries] = useState<Record<string, string>>({})
-    const today = todayIso()
+    const today = todayLocalIso()
 
     const toggleExpanded = (key: string) => {
         setExpandedSeries((current) => {

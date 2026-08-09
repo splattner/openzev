@@ -157,8 +157,8 @@ export async function deleteSocialAccount(id: number): Promise<void> {
 }
 
 export async function fetchOAuthProviderConfigs(): Promise<OAuthProviderConfig[]> {
-  const { data } = await api.get<OAuthProviderConfig[] | PaginatedResponse<OAuthProviderConfig>>('/auth/oauth/providers/config/')
-  return Array.isArray(data) ? data : data.results
+  const { data } = await api.get<PaginatedResponse<OAuthProviderConfig>>('/auth/oauth/providers/config/')
+  return data.results
 }
 
 export async function createOAuthProviderConfig(payload: OAuthProviderConfigInput): Promise<OAuthProviderConfig> {
@@ -176,8 +176,8 @@ export async function deleteOAuthProviderConfig(id: number): Promise<void> {
 }
 
 export async function fetchApiKeys(): Promise<ApiKey[]> {
-  const { data } = await api.get<ApiKey[] | PaginatedResponse<ApiKey>>('/auth/me/api-keys/')
-  return Array.isArray(data) ? data : data.results
+  const { data } = await api.get<PaginatedResponse<ApiKey>>('/auth/me/api-keys/')
+  return data.results
 }
 
 /**
@@ -195,7 +195,7 @@ export async function revokeApiKey(id: string): Promise<void> {
   await api.delete(`/auth/me/api-keys/${id}/`)
 }
 
-export interface AdminApiKeyFilters {
+interface AdminApiKeyFilters {
   user?: number | ''
   status?: 'active' | 'revoked' | ''
 }
@@ -204,8 +204,8 @@ export async function fetchAllApiKeys(filters: AdminApiKeyFilters = {}): Promise
   const params: Record<string, string> = {}
   if (filters.user) params.user = String(filters.user)
   if (filters.status) params.status = filters.status
-  const { data } = await api.get<AdminApiKey[] | PaginatedResponse<AdminApiKey>>('/auth/api-keys/', { params })
-  return Array.isArray(data) ? data : data.results
+  const { data } = await api.get<PaginatedResponse<AdminApiKey>>('/auth/api-keys/', { params })
+  return data.results
 }
 
 /** Revoke any user's key. Admin only; takes effect on the key's next request. */

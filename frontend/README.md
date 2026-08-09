@@ -1,73 +1,56 @@
-# React + TypeScript + Vite
+# OpenZEV frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+React + TypeScript + Vite single-page application for the OpenZEV energy
+community management platform. See the root `README.md` for full-stack setup;
+this file covers frontend-only development.
 
-Currently, two official plugins are available:
+## Stack
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- React 19, TypeScript, Vite
+- TanStack Query for server state
+- react-i18next for localization (EN/DE/FR/IT)
+- MUI (and a subset of Mantine) for components, Recharts for charts
+- Vitest for unit tests, Playwright for user-guide screenshots
 
-## React Compiler
+## Local development
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm install
+cp .env.example .env   # set VITE_API_BASE_URL (see root README)
+npm run dev            # http://localhost:5173
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+The dev server proxies API requests to the backend; the API URL comes from
+`VITE_API_BASE_URL` in `.env`.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+## Commands
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+| Command | Purpose |
+|---|---|
+| `npm run dev` | Dev server with HMR |
+| `npm run build` | Type-check (`tsc -b`) + production build to `dist/` |
+| `npm run lint` | ESLint |
+| `npm run test:unit` | Vitest unit tests (one-shot) |
+| `npm run test:unit:watch` | Vitest watch mode |
+| `npm run screenshots` | Playwright: regenerate user-guide screenshots into `../docs/user-guide/screenshots/` |
+| `npm run preview` | Serve the production build locally |
+
+## Project layout
+
+- `src/pages/` — route components
+- `src/features/` — domain-scoped hooks, forms and components (invoices,
+  tariffs, metering points, participants, feasibility, admin)
+- `src/lib/` — shared utilities, API client and date helpers
+- `src/i18n/locales/` — translation files (all user-facing text must go
+  through i18n; never hardcode UI strings)
+- `src/types/api.ts` — API contract types (keep in sync with the backend
+  serializers)
+- `tests/` — unit tests
+- `screenshots/` — Playwright configuration used by `npm run screenshots`
+
+## Conventions
+
+- Prefer small, targeted changes; preserve existing style and naming.
+- Update `src/types/api.ts` when backend response shapes change.
+- When changing API behavior, update backend tests and frontend consumers
+  together.

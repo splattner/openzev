@@ -11,6 +11,9 @@ import { queryKeys } from '../lib/api/queryKeys'
 import { useToast } from '../lib/toast'
 import type { Invoice } from '../types/api'
 
+// Stable empty array so the useMemo below keeps a consistent dependency reference.
+const EMPTY_INVOICES: Invoice[] = []
+
 function invoiceStatusBadgeClass(status: string): string {
     if (status === 'paid') return 'badge badge-success'
     if (status === 'cancelled') return 'badge badge-danger'
@@ -53,7 +56,7 @@ export function AdminInvoicesPage() {
         })
     }
 
-    const invoices = useMemo(() => invoicesQuery.data?.results ?? [], [invoicesQuery.data?.results])
+    const invoices = invoicesQuery.data?.results ?? EMPTY_INVOICES
 
     const rows = useMemo(
         () =>

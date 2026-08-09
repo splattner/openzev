@@ -9,9 +9,10 @@ import { TariffPeriodFormModal } from '../features/tariffs/TariffPeriodFormModal
 import { TariffToolbar, type TariffValidityFilter } from '../features/tariffs/TariffToolbar'
 import { TariffVersionModal } from '../features/tariffs/TariffVersionModal'
 import { useTariffVersions } from '../features/tariffs/useTariffVersions'
-import { isTariffCurrentlyValid, todayIso } from '../features/tariffs/validity'
+import { isTariffCurrentlyValid } from '../features/tariffs/validity'
 import { fetchTariffSeries } from '../lib/api/tariffs'
 import { queryKeys } from '../lib/api/queryKeys'
+import { todayLocalIso } from '../lib/dates'
 import { useAppSettings } from '../lib/appSettings'
 import { useAuth } from '../lib/auth'
 import { useManagedZev } from '../lib/managedZev'
@@ -33,7 +34,7 @@ export function TariffsPage() {
     const [validityFilter, setValidityFilter] = useState<TariffValidityFilter>('valid')
     // Shared with the validity badge on each card, so the filter and the badge
     // can never disagree about whether a tariff is in force.
-    const today = useMemo(() => todayIso(), [])
+    const today = useMemo(() => todayLocalIso(), [])
 
     // One query, not three: the series endpoint already groups versions, names
     // the active one, detects gaps, and nests each version's price bands. The

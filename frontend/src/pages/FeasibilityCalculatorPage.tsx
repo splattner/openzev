@@ -1,7 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation } from '@tanstack/react-query'
 import { useEffect } from 'react'
-import { useForm } from 'react-hook-form'
+import { useForm, useWatch } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 import { EnergyFlowChart } from '../components/EnergyFlowChart'
 import { StatCard } from '../components/StatCard'
@@ -41,19 +41,25 @@ export function FeasibilityCalculatorPage() {
     })
 
     const mutation = useMutation({ mutationFn: calculateFeasibility })
+    // Destructure the stable `mutate` callback: the `useMutation` result object
+    // is recreated on every render and mutation-state change, so depending on it
+    // would re-arm the debounce timer and re-submit forever.
+    const { mutate } = mutation
 
-    const watchedValues = form.watch()
+    // useWatch with no `name` is typed as a deep-partial value, but every field is
+    // always present at runtime because defaultValues populates them all, so casting
+    // to the full form type (matching the previous `form.watch()` return type) is safe.
+    const watchedValues = useWatch<FeasibilityFormValues>({ control: form.control }) as FeasibilityFormValues
 
     useEffect(() => {
         const timer = window.setTimeout(async () => {
             const isValid = await form.trigger()
             if (isValid) {
-                mutation.mutate(mapFormValuesToPayload(form.getValues()))
+                mutate(mapFormValuesToPayload(form.getValues()))
             }
         }, DEBOUNCE_MS)
         return () => window.clearTimeout(timer)
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [JSON.stringify(watchedValues)])
+    }, [watchedValues, form, mutate])
 
     const result = mutation.data
     const currentRatePct = Number(watchedValues.self_consumption_rate_pct) || 0

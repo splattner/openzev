@@ -25,12 +25,13 @@ import { fetchUsers } from '../lib/api/auth'
 import { formatApiError } from '../lib/api/errors'
 import { queryKeys } from '../lib/api/queryKeys'
 import { useTranslation } from 'react-i18next'
+import { todayLocalIso } from '../lib/dates'
 import { getDefaultZevForm, mapZevToForm } from '../lib/zevForm'
 import type { OwnerMeteringPointInput, Zev, ZevInput, ZevWizardInput, ZevWizardResult } from '../types/api'
 
 const defaultCreateForm = (): ZevWizardInput => ({
     name: '',
-    start_date: new Date().toISOString().slice(0, 10),
+    start_date: todayLocalIso(),
     zev_type: 'vzev',
     grid_operator: '',
     billing_interval: 'monthly',
