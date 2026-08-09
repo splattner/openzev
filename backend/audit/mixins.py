@@ -44,7 +44,12 @@ class AuditedUpdateMixin:
     def perform_update(self, serializer):
         tracked_fields = self.get_audit_tracked_fields(serializer)
         before = build_instance_snapshot(self.get_object(), tracked_fields)
-        instance = serializer.save()
+        # Through ``super()`` rather than ``serializer.save()``: this mixin sits
+        # in front of ``ZevScopedQuerySetMixin``, whose ``perform_update``
+        # enforces that the write stays inside the caller's own ZEV. Saving
+        # directly would step over that check.
+        super().perform_update(serializer)
+        instance = serializer.instance
         after = build_instance_snapshot(instance, tracked_fields)
 
         record_audit_event(

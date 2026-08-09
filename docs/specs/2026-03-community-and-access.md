@@ -189,6 +189,50 @@ Defined in `accounts/permissions.py` and `zev/permissions.py`.
    `zev.participants.filter(user=user).exists()`.
 5. Else → deny.
 
+### 4.4 Write scoping (`ZevScopedQuerySetMixin`)
+
+`has_object_permission` runs on detail routes only — DRF has no object to
+check on create, so it is never consulted there. A permission class alone
+therefore governs *which existing rows* a caller may touch, not *which ZEV a
+new row may be filed under*. Until #424 a `zev_owner` could post a payload
+naming another community's ZEV and have it accepted on every ZEV-scoped
+endpoint, and could move one of their own rows into a foreign ZEV with a
+`PATCH`.
+
+`ZevScopedQuerySetMixin` closes both directions, alongside the read scoping it
+already owned. Each viewset declares `scope_parent_path`: the attribute chain
+from a write payload to the ZEV the row would belong to.
+
+| Viewset | `scope_parent_path` |
+|---|---|
+| `ParticipantViewSet` | `("zev",)` |
+| `MeteringPointViewSet` | `("zev",)` |
+| `MeteringPointAssignmentViewSet` | `("metering_point", "zev")` |
+| `TariffViewSet` | `("zev",)` |
+| `TariffPeriodViewSet` | `("tariff", "zev")` |
+| `MeterReadingViewSet` | `("metering_point", "zev")` |
+
+**`assert_within_scope(validated_data)`**, run from `perform_create` and
+`perform_update` before the save:
+1. Resolve the target ZEV via `scope_parent_path`. Not present in the payload
+   (a `PATCH` that leaves the relation alone) → nothing to check, allow.
+2. `admin` → allow.
+3. `zev.owner == user` → allow.
+4. Else → `ValidationError` on the relation field (HTTP 400).
+
+Rejection is a field validation error rather than a permission denial so it
+reads like DRF's other related-field errors and names the offending field
+without describing the ZEV behind it.
+
+Two consequences for anything added later:
+
+- A new ZEV-scoped viewset must declare `scope_parent_path`, or its create
+  route is unscoped. `None` disables the check.
+- `perform_create` / `perform_update` overrides must go through
+  `super()` rather than calling `serializer.save()` directly, or they step
+  over the check. `AuditedUpdateMixin` sits in front of the scoping mixin and
+  cooperates for this reason.
+
 ---
 
 ## 5. Authentication and account lifecycle

@@ -75,6 +75,7 @@ class TariffViewSet(AuditedUpdateMixin, ZevScopedQuerySetMixin, viewsets.ModelVi
     permission_classes = [IsAuthenticated, IsZevOwnerOrAdmin]
     zev_owner_filter = "zev__owner"
     participant_filter = None
+    scope_parent_path = ("zev",)
 
     audit_action_category = AuditActionCategory.TARIFF
     audit_action_type = "tariff.update"
@@ -88,7 +89,7 @@ class TariffViewSet(AuditedUpdateMixin, ZevScopedQuerySetMixin, viewsets.ModelVi
         return self.scope_queryset(Tariff.objects.all())
 
     def perform_create(self, serializer):
-        tariff = serializer.save()
+        tariff = super().perform_create(serializer)
         _record_tariff_event(
             request=self.request,
             action_type="tariff.create",
@@ -347,6 +348,7 @@ class TariffPeriodViewSet(AuditedUpdateMixin, ZevScopedQuerySetMixin, viewsets.M
     permission_classes = [IsAuthenticated, IsZevOwnerOrAdmin]
     zev_owner_filter = "tariff__zev__owner"
     participant_filter = None
+    scope_parent_path = ("tariff", "zev")
 
     audit_action_category = AuditActionCategory.TARIFF
     audit_action_type = "tariff_period.update"
@@ -362,7 +364,7 @@ class TariffPeriodViewSet(AuditedUpdateMixin, ZevScopedQuerySetMixin, viewsets.M
         return self.scope_queryset(TariffPeriod.objects.all())
 
     def perform_create(self, serializer):
-        period = serializer.save()
+        period = super().perform_create(serializer)
         _record_tariff_event(
             request=self.request,
             action_type="tariff_period.create",

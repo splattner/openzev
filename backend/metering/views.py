@@ -32,6 +32,7 @@ class MeterReadingViewSet(ZevScopedQuerySetMixin, viewsets.ModelViewSet):
     zev_owner_filter = "metering_point__zev__owner"
     participant_filter = "metering_point__assignments__participant__user"
     participant_distinct = True
+    scope_parent_path = ("metering_point", "zev")
 
     def get_queryset(self):
         return self.scope_queryset(MeterReading.objects.select_related("metering_point__zev"))

@@ -306,6 +306,7 @@ class ParticipantViewSet(AuditedUpdateMixin, ZevScopedQuerySetMixin, viewsets.Mo
     permission_classes = [IsAuthenticated, ParticipantManagementPermission]
     zev_owner_filter = "zev__owner"
     participant_filter = "user"
+    scope_parent_path = ("zev",)
 
     audit_action_category = AuditActionCategory.PARTICIPANT
     audit_action_type = "participant.update"
@@ -319,7 +320,7 @@ class ParticipantViewSet(AuditedUpdateMixin, ZevScopedQuerySetMixin, viewsets.Mo
         return self.scope_queryset(Participant.objects.prefetch_related("metering_point_assignments"))
 
     def perform_create(self, serializer):
-        participant = serializer.save()
+        participant = super().perform_create(serializer)
         record_audit_event(
             request=self.request,
             action_category=AuditActionCategory.PARTICIPANT,
@@ -584,6 +585,7 @@ class MeteringPointViewSet(AuditedUpdateMixin, ZevScopedQuerySetMixin, viewsets.
     zev_owner_filter = "zev__owner"
     participant_filter = "assignments__participant__user"
     participant_distinct = True
+    scope_parent_path = ("zev",)
 
     audit_action_category = AuditActionCategory.METERING
     audit_action_type = "metering_point.update"
@@ -597,7 +599,7 @@ class MeteringPointViewSet(AuditedUpdateMixin, ZevScopedQuerySetMixin, viewsets.
         return self.scope_queryset(MeteringPoint.objects.select_related("zev"))
 
     def perform_create(self, serializer):
-        metering_point = serializer.save()
+        metering_point = super().perform_create(serializer)
         record_audit_event(
             request=self.request,
             action_category=AuditActionCategory.METERING,
@@ -688,6 +690,7 @@ class MeteringPointAssignmentViewSet(AuditedUpdateMixin, ZevScopedQuerySetMixin,
     permission_classes = [IsAuthenticated, MeteringPointAssignmentPermission]
     zev_owner_filter = "metering_point__zev__owner"
     participant_filter = "participant__user"
+    scope_parent_path = ("metering_point", "zev")
 
     audit_action_category = AuditActionCategory.METERING
     audit_action_type = "metering_assignment.update"
@@ -716,7 +719,7 @@ class MeteringPointAssignmentViewSet(AuditedUpdateMixin, ZevScopedQuerySetMixin,
         return qs
 
     def perform_create(self, serializer):
-        assignment = serializer.save()
+        assignment = super().perform_create(serializer)
         record_audit_event(
             request=self.request,
             action_category=AuditActionCategory.METERING,
