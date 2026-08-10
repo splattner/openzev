@@ -123,7 +123,8 @@ class FeatureFlagSerializer(serializers.ModelSerializer):
 
 
 class OAuthProviderSerializer(serializers.ModelSerializer):
-    """Full serializer for admin CRUD — includes client_secret."""
+    """Admin CRUD serializer; ``client_secret`` is write-only and a blank
+    value on update leaves the stored secret untouched."""
 
     # Use CharField to allow internal hostnames like "keycloak:8080" while
     # still enforcing a scheme/netloc via custom validators below.
@@ -131,6 +132,16 @@ class OAuthProviderSerializer(serializers.ModelSerializer):
     token_url = serializers.CharField(max_length=500)
     userinfo_url = serializers.CharField(max_length=500)
     redirect_url = serializers.CharField(max_length=500, required=False, allow_blank=True)
+    client_secret = serializers.CharField(
+        write_only=True,
+        required=False,
+        allow_blank=True,
+        trim_whitespace=False,
+    )
+    has_client_secret = serializers.SerializerMethodField()
+
+    def get_has_client_secret(self, obj) -> bool:
+        return bool(obj.client_secret)
 
     def validate_name(self, value):
         normalized = slugify((value or "").strip())
@@ -166,6 +177,14 @@ class OAuthProviderSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         attrs = super().validate(attrs)
+        secret = (attrs.get("client_secret") or "").strip()
+        if self.instance is None and not secret:
+            raise serializers.ValidationError(
+                {"client_secret": "A client secret is required when creating a provider."}
+            )
+        if self.instance is not None and not secret:
+            attrs.pop("client_secret", None)
+
         provider_name = attrs.get("name") or getattr(self.instance, "name", "")
         redirect_url = attrs.get("redirect_url")
 
@@ -184,6 +203,7 @@ class OAuthProviderSerializer(serializers.ModelSerializer):
         model = OAuthProvider
         fields = [
             "id", "name", "display_name", "client_id", "client_secret",
+            "has_client_secret",
             "authorization_url", "token_url", "userinfo_url", "redirect_url", "scope",
             "enabled", "created_at", "updated_at",
         ]

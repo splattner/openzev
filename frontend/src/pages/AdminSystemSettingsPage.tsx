@@ -170,7 +170,7 @@ export function AdminSystemSettingsPage() {
             name: provider.name,
             display_name: provider.display_name,
             client_id: provider.client_id,
-            client_secret: provider.client_secret,
+            client_secret: '',
             authorization_url: provider.authorization_url,
             token_url: provider.token_url,
             userinfo_url: provider.userinfo_url,
@@ -205,11 +205,15 @@ export function AdminSystemSettingsPage() {
     function submitOAuthForm(event: FormEvent<HTMLFormElement>) {
         event.preventDefault()
         setOauthFormError(null)
+        const payload = { ...oauthForm }
+        if (oauthEditTarget && !payload.client_secret) {
+            delete payload.client_secret
+        }
         if (oauthEditTarget) {
-            updateOAuthMutation.mutate({ id: oauthEditTarget.id, payload: oauthForm })
+            updateOAuthMutation.mutate({ id: oauthEditTarget.id, payload })
             return
         }
-        createOAuthMutation.mutate(oauthForm)
+        createOAuthMutation.mutate(payload)
     }
 
     function confirmDeleteOAuthProvider(provider: OAuthProviderConfig) {
@@ -510,7 +514,10 @@ export function AdminSystemSettingsPage() {
 
                     <label>
                         <span>{t('adminOAuth.fieldClientSecret')}</span>
-                        <input type="password" name="client_secret" value={oauthForm.client_secret} onChange={handleOAuthChange} required autoComplete="new-password" />
+                        <input type="password" name="client_secret" value={oauthForm.client_secret} onChange={handleOAuthChange} required={!oauthEditTarget} autoComplete="new-password" />
+                        {oauthEditTarget && oauthEditTarget.has_client_secret && (
+                            <small className="muted">{t('adminOAuth.fieldClientSecretHint')}</small>
+                        )}
                     </label>
 
                     <label>

@@ -823,17 +823,23 @@ interface ParticipantAccountCreateResult { participant: Participant; account: Us
 
 ### 16.1 Backend test classes
 
-**`accounts/tests.py`** (528 lines, 7 test classes):
+**`accounts/tests.py`** (13 test classes):
 
 | Class | Tests | Description |
 |---|---|---|
 | `UserModelTests` | 3 | Role helper properties; superuser creation sets `role=ADMIN`; superuser creation rejects non-admin role |
 | `PasswordChangeFlagTests` | 1 | `must_change_password` cleared on password change |
+| `TokenLoginCredentialTests` | 1 | Email login issues httpOnly cookie JWTs instead of a response body token |
+| `RegistrationTests` | 4 | Self-registration accepts email only and generates a username; creates an inactive `zev_owner`; verification activates the account; disabled registration is refused |
+| `FeatureFlagsApiTests` | 5 | Anonymous 401 and non-admin 403 on list; admin can list and toggle; defaults sync on read |
 | `ImpersonationTests` | 4 | Admin can impersonate participant/owner; non-admin blocked; admin cannot impersonate admin |
 | `LinkedAccountSafetyTests` | 8 | Admin can edit linked account; cannot delete linked; can delete unlinked; cannot delete last admin (with audit-denied assertion); can delete self when other admin exists (with audit actor SET_NULL assertion); can delete other admin when multiple exist; cannot change own role (via both detail and me endpoints) |
 | `AppSettingsTests` | 3 | Authenticated user reads settings; admin updates; non-admin cannot update |
 | `VatRateSettingsTests` | 4 | Admin CRUD; non-admin blocked; overlap rejection; valid_to validation |
+| `OAuthProviderConfigTests` | 5 | Admin creates provider (internal host URLs, scheme-less URLs, default redirect URL); non-admin blocked; login initiate uses provider redirect URL |
+| `OAuthProviderSecretWriteOnlyTests` | 5 | `client_secret` is write-only: create/list/detail responses never contain it and report `has_client_secret`; create without a secret is refused; blank secret on update keeps the stored value; new secret on update rotates it |
 | `RbacEndpointMatrixTests` | 6 | Full list/create/update/action-delete/unauthenticated matrix across all endpoints |
+| `OAuthTokenCleanupTaskTests` | 1 | Token cleanup task keeps active and removes expired entries |
 
 **`zev/tests.py`** (554 lines, 6 test classes):
 

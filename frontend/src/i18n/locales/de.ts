@@ -1867,6 +1867,7 @@ export const de = {
         fieldDisplayName: 'Anzeigename',
         fieldClientId: 'Client-ID',
         fieldClientSecret: 'Client-Secret',
+        fieldClientSecretHint: 'Für diesen Anbieter ist ein Secret hinterlegt; leer lassen, um es beizubehalten.',
         fieldAuthorizationUrl: 'Autorisierungs-URL',
         fieldTokenUrl: 'Token-URL',
         fieldUserinfoUrl: 'Userinfo-URL',

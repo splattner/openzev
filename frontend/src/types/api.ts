@@ -151,7 +151,7 @@ export interface OAuthProvider {
 
 export interface OAuthProviderConfig extends OAuthProvider {
     client_id: string
-    client_secret: string
+    has_client_secret: boolean
     authorization_url: string
     token_url: string
     userinfo_url: string
@@ -165,7 +165,7 @@ export interface OAuthProviderConfigInput {
     name: string
     display_name: string
     client_id: string
-    client_secret: string
+    client_secret?: string
     authorization_url: string
     token_url: string
     userinfo_url: string

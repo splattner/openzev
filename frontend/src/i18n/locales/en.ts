@@ -1841,6 +1841,7 @@ export const en = {
         fieldDisplayName: 'Display name',
         fieldClientId: 'Client ID',
         fieldClientSecret: 'Client Secret',
+        fieldClientSecretHint: 'A secret is configured for this provider; leave blank to keep it.',
         fieldAuthorizationUrl: 'Authorization URL',
         fieldTokenUrl: 'Token URL',
         fieldUserinfoUrl: 'Userinfo URL',

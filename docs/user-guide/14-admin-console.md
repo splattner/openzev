@@ -55,7 +55,9 @@ Configure external OAuth login providers in **Admin Console → System Settings 
 
 - **Name** — Provider identifier (e.g. `github`)
 - **Display Name** — Human-readable label shown on the login page
-- **Client ID / Client Secret** — Credentials obtained from the provider
+- **Client ID / Client Secret** — Credentials obtained from the provider. The
+  secret is never shown again after saving: enter it when creating the
+  provider, and leave the field blank when editing to keep the existing secret.
 - **Authorization / Token / Userinfo URLs** — Provider endpoint URLs
 - **Redirect URL** — The callback URL registered with the provider (e.g.
   `https://app.example.com/api/v1/auth/oauth/callback/github/`)

@@ -1875,6 +1875,7 @@ export const it = {
         fieldDisplayName: 'Nome visualizzato',
         fieldClientId: 'Client ID',
         fieldClientSecret: 'Client Secret',
+        fieldClientSecretHint: 'È configurato un segreto per questo provider; lascia vuoto per mantenerlo.',
         fieldAuthorizationUrl: 'URL di autorizzazione',
         fieldTokenUrl: 'URL del token',
         fieldUserinfoUrl: 'URL userinfo',

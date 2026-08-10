@@ -652,6 +652,120 @@ class OAuthProviderConfigTests(TestCase):
 		)
 
 
+class OAuthProviderSecretWriteOnlyTests(TestCase):
+	"""client_secret is never returned; blank on update keeps the stored secret."""
+
+	def _auth(self, client, user, password="pass1234"):
+		_cookie_auth(client, user.username, password)
+
+	def _payload(self, **overrides):
+		payload = {
+			"name": "github",
+			"display_name": "GitHub",
+			"client_id": "openzev",
+			"client_secret": "super-secret",
+			"authorization_url": "https://github.com/login/oauth/authorize",
+			"token_url": "https://github.com/login/oauth/access_token",
+			"userinfo_url": "https://api.github.com/user",
+			"scope": "read:user user:email",
+			"enabled": True,
+		}
+		payload.update(overrides)
+		return payload
+
+	def setUp(self):
+		self.client = APIClient()
+		self.admin = User.objects.create_user(username="oauth_writeonly", password="pass1234", role=UserRole.ADMIN)
+		self._auth(self.client, self.admin)
+
+	def test_create_response_never_contains_the_secret(self):
+		resp = self.client.post("/api/v1/auth/oauth/providers/config/", self._payload(), format="json")
+
+		self.assertEqual(resp.status_code, 201)
+		self.assertNotIn("client_secret", resp.data)
+		self.assertTrue(resp.data["has_client_secret"])
+
+	def test_list_and_detail_never_contain_the_secret(self):
+		provider = OAuthProvider.objects.create(
+			name="github",
+			display_name="GitHub",
+			client_id="openzev",
+			client_secret="super-secret",
+			authorization_url="https://github.com/login/oauth/authorize",
+			token_url="https://github.com/login/oauth/access_token",
+			userinfo_url="https://api.github.com/user",
+			scope="read:user user:email",
+			enabled=True,
+		)
+
+		list_resp = self.client.get("/api/v1/auth/oauth/providers/config/")
+		detail_resp = self.client.get(f"/api/v1/auth/oauth/providers/config/{provider.pk}/")
+
+		self.assertNotIn("client_secret", list_resp.data["results"][0])
+		self.assertTrue(list_resp.data["results"][0]["has_client_secret"])
+		self.assertNotIn("client_secret", detail_resp.data)
+		self.assertTrue(detail_resp.data["has_client_secret"])
+
+	def test_create_without_a_secret_is_refused(self):
+		resp = self.client.post(
+			"/api/v1/auth/oauth/providers/config/",
+			self._payload(client_secret=""),
+			format="json",
+		)
+
+		self.assertEqual(resp.status_code, 400)
+		self.assertIn("client_secret", resp.data)
+		self.assertFalse(OAuthProvider.objects.filter(name="github").exists())
+
+	def test_blank_secret_on_update_keeps_the_stored_secret(self):
+		provider = OAuthProvider.objects.create(
+			name="github",
+			display_name="GitHub",
+			client_id="openzev",
+			client_secret="super-secret",
+			authorization_url="https://github.com/login/oauth/authorize",
+			token_url="https://github.com/login/oauth/access_token",
+			userinfo_url="https://api.github.com/user",
+			scope="read:user user:email",
+			enabled=True,
+		)
+
+		resp = self.client.patch(
+			f"/api/v1/auth/oauth/providers/config/{provider.pk}/",
+			{"client_secret": "", "display_name": "GitHub Login"},
+			format="json",
+		)
+
+		self.assertEqual(resp.status_code, 200)
+		self.assertTrue(resp.data["has_client_secret"])
+		provider.refresh_from_db()
+		self.assertEqual(provider.client_secret, "super-secret")
+
+	def test_new_secret_on_update_rotates_the_stored_secret(self):
+		provider = OAuthProvider.objects.create(
+			name="github",
+			display_name="GitHub",
+			client_id="openzev",
+			client_secret="old-secret",
+			authorization_url="https://github.com/login/oauth/authorize",
+			token_url="https://github.com/login/oauth/access_token",
+			userinfo_url="https://api.github.com/user",
+			scope="read:user user:email",
+			enabled=True,
+		)
+
+		resp = self.client.patch(
+			f"/api/v1/auth/oauth/providers/config/{provider.pk}/",
+			{"client_secret": "rotated-secret"},
+			format="json",
+		)
+
+		self.assertEqual(resp.status_code, 200)
+		self.assertTrue(resp.data["has_client_secret"])
+		provider.refresh_from_db()
+		self.assertEqual(provider.client_secret, "rotated-secret")
+
+
 class RbacEndpointMatrixTests(TestCase):
 	def _auth(self, client, user, password="pass1234"):
 		_cookie_auth(client, user.username, password)

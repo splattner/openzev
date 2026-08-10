@@ -364,6 +364,10 @@ remain available as redirects into the corresponding tab of
     - Uses `fetchOAuthProviderConfigs` with query key `['oauth-provider-configs']`.
     - Displays configured providers in a table with enabled badges and compact Edit/Delete actions.
     - Provider create/edit uses a shared modal form; delete uses `ConfirmDialog`.
+    - `client_secret` is write-only: API responses never contain it (only
+      `has_client_secret`), create without a secret is refused (400), and the
+      edit form shows the secret field blank with a hint — a blank submit omits
+      the key from the PATCH payload so the stored secret stays unchanged.
 
 Legacy routes `/admin/settings/regional`, `/admin/features`, and `/admin/oauth`
 redirect to the matching tab on this page.
