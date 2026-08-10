@@ -1,5 +1,33 @@
 # Changelog
 
+## [1.7.0](https://github.com/splattner/openzev/compare/v1.6.0...v1.7.0) (2026-08-10)
+
+
+### Features
+
+* **accounts:** admin console for API key management ([#409](https://github.com/splattner/openzev/issues/409)) ([d665a68](https://github.com/splattner/openzev/commit/d665a680494e9d5142cd89461633a7e62b3a02e6))
+* **accounts:** API keys for direct API access ([#395](https://github.com/splattner/openzev/issues/395)) ([5ce8145](https://github.com/splattner/openzev/commit/5ce814543fed7c105e9d7e0dab42f9ff366a5958))
+* **allocation:** shared local-pool allocation service (ADR 0013) ([#383](https://github.com/splattner/openzev/issues/383)) ([9538663](https://github.com/splattner/openzev/commit/95386638245bd50bc2eada4988860f32f2c05975))
+* **audit:** add scoped ZEV and actor filters ([#421](https://github.com/splattner/openzev/issues/421)) ([dde9f6f](https://github.com/splattner/openzev/commit/dde9f6fc0b82e6799af3254e264063a2b6d84113))
+* **invoices:** redesign invoice PDF and split generation modules ([#379](https://github.com/splattner/openzev/issues/379)) ([1c3353e](https://github.com/splattner/openzev/commit/1c3353e5a91ad024f92f527fc1feea3059a9cd4f))
+* **invoices:** remove three steps from the billing run ([#382](https://github.com/splattner/openzev/issues/382)) ([f687104](https://github.com/splattner/openzev/commit/f687104c19d92f80edd6c053a959720de9dc8ed1))
+* **metering:** flag holder-less readings in data-quality status ([#396](https://github.com/splattner/openzev/issues/396)) ([7afe033](https://github.com/splattner/openzev/commit/7afe0336ae0aaf4fa84d3079b95152136cbdb15f))
+* **zev:** whole-ZEV export and import, replacing the tariff-only transfer ([#410](https://github.com/splattner/openzev/issues/410)) ([b58c657](https://github.com/splattner/openzev/commit/b58c657a55bd59b7f4e069f8a643559ebf779129))
+
+
+### Bug Fixes
+
+* **allocation:** give allocation failures their own exception taxonomy ([#392](https://github.com/splattner/openzev/issues/392)) ([6a1c984](https://github.com/splattner/openzev/commit/6a1c98475c81f767d5f6cb2eff5fec89391ca392))
+* **docker:** wait for migrations before seeding demo data ([#376](https://github.com/splattner/openzev/issues/376)) ([028d1e7](https://github.com/splattner/openzev/commit/028d1e7ee9e8a13b7ea27f4ba86c9329c6db159b))
+* **i18n:** use RCP term in French and Italian UI ([#422](https://github.com/splattner/openzev/issues/422)) ([0726c99](https://github.com/splattner/openzev/commit/0726c99fe5aa480bddca4ef1a0e02b34e43c7a0e))
+* **invoices:** isolate bulk generation failures per participant ([#394](https://github.com/splattner/openzev/issues/394)) ([549ce97](https://github.com/splattner/openzev/commit/549ce97cfda6a8017c140cf9f274f00f00aa71e0))
+* **invoices:** make the annual-statement local pool physical ([#406](https://github.com/splattner/openzev/issues/406)) ([5bee49c](https://github.com/splattner/openzev/commit/5bee49cf78a1b03495824923e7b61bde6b939f20))
+* **invoices:** scope invoice-number uniqueness to the ZEV ([#405](https://github.com/splattner/openzev/issues/405)) ([6ce3f79](https://github.com/splattner/openzev/commit/6ce3f79ee19eca4b8f3e4183f895bd255a7d6960)), closes [#401](https://github.com/splattner/openzev/issues/401)
+* **zev:** enforce assignment non-overlap rule on save() ([#390](https://github.com/splattner/openzev/issues/390)) ([a16c5bc](https://github.com/splattner/openzev/commit/a16c5bc903e5bf9619e8a2c7ca026d8f765c47b7))
+* **zev:** harden whole-ZEV transfer archives against malformed and inconsistent input ([#415](https://github.com/splattner/openzev/issues/415)) ([f29515f](https://github.com/splattner/openzev/commit/f29515f242aa9f9a75ff595cc8ba6dcc46bd0e6d))
+* **zev:** honour ?zev_id= on the ZEV-scoped list endpoints ([#426](https://github.com/splattner/openzev/issues/426)) ([7101cf5](https://github.com/splattner/openzev/commit/7101cf554a093483a4887d4811cfa1bd5363cf62))
+* **zev:** scope writes to the caller's own ZEV, not just reads ([#425](https://github.com/splattner/openzev/issues/425)) ([1521955](https://github.com/splattner/openzev/commit/1521955704a4d0843fe88bd41a3365ba86650264))
+
 ## [1.6.0](https://github.com/splattner/openzev/compare/v1.5.1...v1.6.0) (2026-07-30)
 
 
