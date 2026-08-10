@@ -1,5 +1,5 @@
 from rest_framework import generics, status
-from rest_framework.decorators import api_view, authentication_classes, permission_classes
+from rest_framework.decorators import api_view, authentication_classes, permission_classes, throttle_classes
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
 from rest_framework.exceptions import PermissionDenied, ValidationError
@@ -35,6 +35,7 @@ from .cookies import (
     set_auth_cookies,
 )
 from .permissions import IsAdmin
+from .throttling import AuthLoginThrottle, AuthRefreshThrottle, AuthRegisterThrottle, AuthVerifyThrottle
 from audit.models import AuditActionCategory, AuditEventStatus
 from audit.mixins import AuditedUpdateMixin
 from audit.services import build_diff, record_audit_event
@@ -44,6 +45,7 @@ logger = logging.getLogger(__name__)
 class CustomTokenObtainPairView(TokenObtainPairView):
     """JWT login — sets httpOnly cookies and returns a minimal JSON body."""
     serializer_class = CustomTokenObtainPairSerializer
+    throttle_classes = [AuthLoginThrottle]
 
     def post(self, request, *args, **kwargs):
         response = super().post(request, *args, **kwargs)
@@ -57,6 +59,7 @@ class CookieTokenRefreshView(APIView):
     """Token refresh that reads the refresh token from the httpOnly cookie
     and writes the new access (and rotated refresh) token back as cookies."""
     permission_classes = [AllowAny]
+    throttle_classes = [AuthRefreshThrottle]
 
     def post(self, request, *args, **kwargs):
         refresh_token = request.COOKIES.get(REFRESH_COOKIE)
@@ -432,6 +435,7 @@ def feature_flag_update(request, pk: int):
 
 @api_view(["POST"])
 @permission_classes([AllowAny])
+@throttle_classes([AuthRegisterThrottle])
 def register(request):
     """Self-registration: create a pending zev_owner account and send a verification email."""
     if not FeatureFlag.is_enabled(FeatureFlag.ZEV_SELF_REGISTRATION_ENABLED):
@@ -505,6 +509,7 @@ def register(request):
 
 @api_view(["POST"])
 @permission_classes([AllowAny])
+@throttle_classes([AuthVerifyThrottle])
 def verify_email(request):
     """Consume a one-time verification token and return JWT tokens to auto-login the user."""
     token_value = request.data.get("token", "").strip()

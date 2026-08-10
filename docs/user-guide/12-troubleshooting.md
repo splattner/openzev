@@ -50,6 +50,7 @@ docker compose logs
 | "Invalid credentials" | Wrong username/password | Check [demo accounts](01-getting-started.md#demo-accounts) |
 | "Account not activated" | User never received invitation | Reset password via login page |
 | "Permission denied" | User role is too restrictive | Ask admin to update your role |
+| "429 Too many requests" | Login/registration attempts exceeded the per-IP rate limit | Wait a while (check the `Retry-After` header) before trying again |
 
 ### Forgot Password
 

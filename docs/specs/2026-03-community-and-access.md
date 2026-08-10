@@ -368,6 +368,31 @@ re-fetch `/auth/me/`.
 not impersonating and the current path is not `/account`, redirect to
 `/account` with `state.forcePasswordChange = true`.
 
+### 5.9 Auth endpoint throttling
+
+Every public auth *write* endpoint carries a per-IP rate limit
+(`AuthRateThrottle` subclasses in `accounts/throttling.py`), so a stranger who
+can hit them without any credential is bounded even when the interactive UI's
+cookie sessions stay unthrottled:
+
+| Endpoint | Throttle class | Scope | Default rate (env override) |
+|---|---|---|---|
+| `POST /api/v1/auth/token/` | `AuthLoginThrottle` | `auth_login` | `40/hour` (`AUTH_LOGIN_THROTTLE_RATE`) |
+| `POST /api/v1/auth/token/refresh/` | `AuthRefreshThrottle` | `auth_refresh` | `60/hour` (`AUTH_REFRESH_THROTTLE_RATE`) |
+| `POST /api/v1/auth/register/` | `AuthRegisterThrottle` | `auth_register` | `10/hour` (`AUTH_REGISTER_THROTTLE_RATE`) |
+| `POST /api/v1/auth/verify-email/` | `AuthVerifyThrottle` | `auth_verify` | `30/hour` (`AUTH_VERIFY_THROTTLE_RATE`) |
+| `POST /api/v1/auth/oauth/login/<provider_slug>/` | `AuthOAuthInitiateThrottle` | `auth_oauth_initiate` | `60/hour` (`AUTH_OAUTH_INITIATE_THROTTLE_RATE`) |
+| `POST /api/v1/auth/oauth/token-exchange/` | `AuthOAuthExchangeThrottle` | `auth_oauth_exchange` | `40/hour` (`AUTH_OAUTH_EXCHANGE_THROTTLE_RATE`) |
+
+Rates live in `REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"]`. A request over the
+budget is refused with `429 Too Many Requests` before the view body runs. The
+test settings (`config/settings_test.py`) disable all scopes so the rest of the
+suite is not throttled.
+
+Limits are keyed by `REMOTE_ADDR`. Behind a reverse proxy, `NUM_PROXIES` must
+be set and the ingress must overwrite `X-Forwarded-For`, otherwise every client
+shares one IP bucket (a whole-office lockout at 10 registrations/hour).
+
 ---
 
 ## 6. User management (admin)
@@ -823,6 +848,9 @@ interface ParticipantAccountCreateResult { participant: Participant; account: Us
 
 ### 16.1 Backend test classes
 
+Line counts are not tracked here — they drift with every change. The inventory
+lists the test classes per module (test counts are the `test_*` methods).
+
 **`accounts/tests.py`** (13 test classes):
 
 | Class | Tests | Description |
@@ -841,16 +869,44 @@ interface ParticipantAccountCreateResult { participant: Participant; account: Us
 | `RbacEndpointMatrixTests` | 6 | Full list/create/update/action-delete/unauthenticated matrix across all endpoints |
 | `OAuthTokenCleanupTaskTests` | 1 | Token cleanup task keeps active and removes expired entries |
 
-**`zev/tests.py`** (554 lines, 6 test classes):
+**Other `accounts/` test modules:**
+
+| Module | Classes | Tests | Coverage |
+|---|---|---|---|
+| `test_api_keys.py` | 10 | 81 | Generation, hashing, auth, read-only keys, scope deny-list, audit, throttling, CRUD, admin management |
+| `test_oauth.py` | 9 | 50 | Provider listing, initiate, callback guards/redirects, link flow, social accounts, audit |
+| `test_cookie_oauth.py` | — (6 module-level test functions) | 6 | Refresh/logout cookie handling; token exchange sets cookies and consumes codes |
+| `test_impersonation.py` | 5 | 21 | Permissions, audit, cookie round-trip, stop-impersonation |
+| `test_throttling.py` | 1 | 7 | Per-IP 429 boundaries for all six public auth write endpoints; budgets are independent |
+
+**`zev/tests.py`** (14 test classes):
 
 | Class | Tests | Description |
 |---|---|---|
+| `ZevPaymentTermTests` | 4 | Payment term default (30 days), range validation, API accept/reject |
 | `ParticipantEndpointRestrictionTests` | 7 | Participant cannot access ZEV/participant lists; can list own metering points; cannot create/update/delete metering points; cannot access assignments |
 | `ZevCreationWizardTests` | 2 | Non-admin cannot create ZEV; admin wizard creates ZEV + owner + participant + assignments |
 | `ParticipantAccountLifecycleTests` | 3 | Create participant auto-creates account with initial password; update saves contact details; invitation resets password and sends email |
+| `AdminCanEditOwnerParticipantTests` | 2 | Admin can edit the owner participant; owner cannot edit own record |
 | `ParticipantAccountLinkingTests` | 5 | Admin can link/unlink accounts; rejects double-linking; admin can create-and-link; non-admin cannot link/create |
 | `ZevOwnerRoleSyncTests` | 1 | Owner transfer promotes new owner, demotes previous |
 | `MeteringPointAssignmentValidationTests` | 9 | Unique assignment, no overlaps, historical OK, open-end blocks future, dates within participant window, self-update OK |
+| `AssignmentSaveOverlapGuardTests` | 5 | Overlap guard on save path |
+| `SeedDemoAssignmentReseedTests` | 1 | Demo seed re-creates assignments |
+| `MeteringPointReadingsDeletionTests` | 4 | Delete-readings action variants |
+| `NextInvoiceNumberTests` | 3 | Invoice number allocation |
+| `SeedDemoPeriodHelpersTests` | 6 | Demo seed period helpers |
+| `SeedDemoTariffVersionTests` | 10 | Demo seed tariff versioning |
+
+**Other `zev/` test modules:**
+
+| Module | Classes | Tests | Coverage |
+|---|---|---|---|
+| `test_scoping.py` | 1 | 4 | `ZevScopedQuerySetMixin` read scoping by role |
+| `test_write_scoping.py` | 4 | 17 | Write scoping: foreign create refused, move-via-PATCH refused, legit writes and admin bypass still work, audit retained |
+| `test_zev_id_filter.py` | 5 | 15 | `?zev_id=` narrowing on list endpoints |
+| `test_transfer.py` | 6 | 66 | Whole-ZEV archive shape, round-trip, rejected archives, schema parity, transfer endpoints |
+| `test_geocoding.py` | 4 | 19 | Building footprint cache, warm tasks, trigger-on-save |
 
 ### 16.2 Frontend
 

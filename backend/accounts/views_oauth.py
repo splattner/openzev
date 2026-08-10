@@ -21,7 +21,7 @@ from django.http import HttpResponseRedirect
 from django.shortcuts import get_object_or_404
 from django.utils.text import slugify
 from rest_framework import generics, status
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, permission_classes, throttle_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
@@ -30,6 +30,7 @@ from audit.models import AuditActionCategory, AuditEventStatus
 from audit.services import build_diff, record_audit_event
 
 from .cookies import set_auth_cookies
+from .throttling import AuthOAuthExchangeThrottle, AuthOAuthInitiateThrottle
 from .models import (
     OAuthExchangeCode,
     OAuthProvider,
@@ -255,6 +256,7 @@ def oauth_providers_public(request):
 
 @api_view(["POST"])
 @permission_classes([AllowAny])
+@throttle_classes([AuthOAuthInitiateThrottle])
 def oauth_login_initiate(request, provider_slug: str):
     """Return the provider authorization URL for a login flow."""
     provider = get_object_or_404(OAuthProvider, name=provider_slug, enabled=True)
@@ -484,6 +486,7 @@ def oauth_callback(request, provider_slug: str):
 
 @api_view(["POST"])
 @permission_classes([AllowAny])
+@throttle_classes([AuthOAuthExchangeThrottle])
 def oauth_token_exchange(request):
     """
     Exchange a short-lived OAuth exchange code for JWT tokens.

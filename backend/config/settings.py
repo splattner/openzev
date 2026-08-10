@@ -139,6 +139,13 @@ REST_FRAMEWORK = {
         # Only applies to key-authenticated requests; cookie sessions return a
         # null cache key and are not throttled.
         "api_key": env("API_KEY_THROTTLE_RATE", default="600/hour"),
+        # Per-IP budgets for the public auth endpoints (accounts.throttling).
+        "auth_login": env("AUTH_LOGIN_THROTTLE_RATE", default="40/hour"),
+        "auth_refresh": env("AUTH_REFRESH_THROTTLE_RATE", default="60/hour"),
+        "auth_register": env("AUTH_REGISTER_THROTTLE_RATE", default="10/hour"),
+        "auth_verify": env("AUTH_VERIFY_THROTTLE_RATE", default="30/hour"),
+        "auth_oauth_initiate": env("AUTH_OAUTH_INITIATE_THROTTLE_RATE", default="60/hour"),
+        "auth_oauth_exchange": env("AUTH_OAUTH_EXCHANGE_THROTTLE_RATE", default="40/hour"),
     },
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",

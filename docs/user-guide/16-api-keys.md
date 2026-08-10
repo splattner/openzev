@@ -117,7 +117,9 @@ Key-authenticated requests are limited to **600 requests per hour per key**
 returns `429 Request was throttled.`
 
 The limit is per key, not per account, so one busy script cannot starve another.
-Browser sessions are not throttled.
+Browser sessions are not throttled by this limit; the login, registration,
+refresh, verification and OAuth login/exchange endpoints carry their own
+per-IP limits (see `AUTH_*_THROTTLE_RATE` settings).
 
 Rejected responses normally carry a `Retry-After` header with the seconds to
 wait — but **not always**: once you are well past the limit the header is

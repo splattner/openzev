@@ -283,6 +283,6 @@ PVshare Cockpit is a closed, subscription-based SaaS (CHF ~30/participant/year) 
 | Observability — structured application logging and metrics endpoint | `idea` | `medium` | No Prometheus metrics or structured log format today |
 | End-to-end test suite (Playwright or similar) | `idea` | `medium` | Playwright is used for automated user-guide screenshots; no interactive end-to-end coverage of user flows yet |
 | Frontend component-level unit tests | `shipped` | — | `npm run test:unit` (Vitest) covers API helpers, reducers and page-level logic |
-| Rate limiting on sensitive API endpoints | `idea` | `medium` | Auth and import endpoints have no rate limiting today |
+| Rate limiting on sensitive API endpoints | `partial` | `medium` | Auth endpoints (login, refresh, register, verify-email, OAuth login/exchange) are throttled per IP; import endpoints are not |
 | Automated security dependency scanning (Dependabot / Snyk) | `idea` | `low` | Renovate is configured for updates; no security-focused CVE scanning |
 | Multi-region or multi-instance deployment guidance | `deferred` | — | Single-instance model assumed; stateful session and Celery design would need review |
