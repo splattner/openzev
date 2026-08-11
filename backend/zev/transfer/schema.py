@@ -86,6 +86,7 @@ ZEV_FIELDS = (
     "billing_interval",
     "invoice_prefix",
     "invoice_counter",
+    "contract_counter",
     "invoice_language",
     "payment_term_days",
     "bank_iban",

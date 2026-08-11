@@ -113,9 +113,12 @@ Ordering: `["-created_at"]`.
 | `id` | `BigAutoField` (PK) | Auto-generated |
 | `template_name` | `CharField(200)`, unique | Relative path used as lookup key (e.g. `invoices/invoice_pdf.html`) |
 | `content` | `TextField` | Full HTML content of the customized template |
+| `default_digest` | `CharField(64)`, blank | sha256 of the on-disk default at save time (override staleness detection) |
 | `updated_at` | `DateTimeField` (auto) | Last modification timestamp |
 
 A row exists only when the template has been customized via the admin API. When no row is present, the on-disk default file is used. Deleting the row reverts to the default.
+
+Since the redesign (see `2026-08-contract-pdf-redesign.md` §12) `PATCH` validates the submitted content by rendering it against the matching sample context before storing (400 on error, nothing persisted) — in strict mode, unknown template variables (e.g. a `{{ participant.emali }}` typo, which the default engine renders as an empty string) are rejected with 400 naming the variable. Responses carry `is_stale` — true when `default_digest` no longer matches the current on-disk default, i.e. a release shipped a new default since the override was last saved. Migration `0009` backfills pre-existing overrides with the digest of the default shipping in that release (a baseline — legacy provenance is unknowable); a blank digest (no provenance) is never flagged stale. Overrides keep working with `{% include "pdf/shared_pdf_base.html" %}` (resolved through the engine loaders), so keeping that line gives future design-token updates for free; pre-redesign overrides without the include still render standalone.
 
 ### 3.5 EmailTemplate
 

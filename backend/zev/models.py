@@ -1,6 +1,6 @@
 import uuid
 from datetime import date
-from django.db import models
+from django.db import models, transaction
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator
@@ -55,6 +55,9 @@ class Zev(models.Model):
     )
     invoice_prefix = models.CharField(max_length=10, default="INV", help_text="Prefix for invoice numbers")
     invoice_counter = models.PositiveIntegerField(default=1, help_text="Auto-incremented invoice number")
+    contract_counter = models.PositiveIntegerField(
+        default=1, help_text="Auto-incremented participation-contract document number"
+    )
     invoice_language = models.CharField(
         max_length=2,
         choices=InvoiceLanguage.choices,
@@ -115,6 +118,27 @@ class Zev(models.Model):
         num = f"{self.invoice_prefix}-{self.invoice_counter:05d}"
         Zev.objects.filter(pk=self.pk).update(invoice_counter=models.F("invoice_counter") + 1)
         self.refresh_from_db()
+        return num
+
+    def next_contract_number(self, year: int | None = None) -> str:
+        """Next participation-contract document number (per-ZEV sequence).
+
+        Format ``CTR-YYYY-NNNN``. The counter is read and incremented under a
+        ``select_for_update`` row lock, so two concurrent issuances cannot
+        derive the same number from a stale counter value. Pass ``year`` to
+        pin the year (used by the contract service so its patched clock and
+        the rendered document agree). Safe to call inside an outer
+        ``transaction.atomic()`` (the contract service does): the inner
+        atomic block becomes a savepoint, so the bump rolls back with the
+        caller's transaction. Standalone callers get their own transaction.
+        """
+        year = year or timezone.localdate().year
+        with transaction.atomic():
+            locked = Zev.objects.select_for_update().get(pk=self.pk)
+            num = f"CTR-{year}-{locked.contract_counter:04d}"
+            Zev.objects.filter(pk=locked.pk).update(
+                contract_counter=models.F("contract_counter") + 1
+            )
         return num
 
 

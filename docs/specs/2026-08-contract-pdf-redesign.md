@@ -2,7 +2,7 @@
 
 - Spec ID: SPEC-2026-08-contract-pdf-redesign
 - Status: Approved
-- Scope: Minor
+- Scope: Medium
 - Type: Change
 - Owners: spalinger
 - Created: 2026-08-10
@@ -43,32 +43,35 @@ FADP) before release.
 |---|---|
 | Templates | New shared partial `pdf/shared_pdf_base.html`; `invoices/invoice_pdf.html` refactored to include it (CSS extraction only — markup untouched); `contracts/participant_contract_pdf.html` fully redesigned to the same anatomy |
 | Context | `invoices/dates.py` (shared date formatting), `_build_contract_context` additions (formatted contract date, participation start, document id, VAT rate display), `build_sample_contract_context` extended |
-| Tests | `invoices/test_contract_context.py` extended with context-field, translation-parity, tariff-rule and end-to-end render tests; `invoices/test_template_admin.py` extended with override-integrity tests (save-time validation, staleness) |
+| Tests | `invoices/test_contract_context.py`: context fields, translation + placeholder parity, tariff rule, blank-box placeholders, four-language end-to-end renders and contract issuance; `invoices/test_template_admin.py`: override-integrity tests (save-time validation, staleness), include-through-override compatibility |
 | Template admin | `PdfTemplate` overrides are validated before they are stored (PATCH rejects syntax errors and unknown output variables with `400`), and customizations are stale-tracked via `PdfTemplate.default_digest` + `is_stale` (migration `invoices/0009`, admin UI stale banner) — see §5.2 |
 | Docs | This baseline spec |
 | Legal wording | Clause texts were updated alongside the layout (see §7): clauses 2 (purpose/scope with EnG/EnV citations), 4 (mandate + annual information duty), 5 (binding tariff rule, cap with tenancy-law reservation, notification/termination, billing), 6 (per-interval allocation, feed-in remuneration), 7 (universal-service guarantee), 8 (grid-operator-area join condition), 10 (communication) and 12 (regulatory-change dissolution). `Anhang B` adds a **binding** privacy notice (controller, purposes, recipients, retention table, data-subject rights) |
 
 ### Out of scope
 
-- No new API endpoints or permission changes; the download endpoint keeps its
-  path, method and permission model.
-- Contract download button unchanged. The admin template editor
-  (`AdminPdfTemplatesPage.tsx`) gains an override-staleness banner,
+- No new endpoints, permissions or serializers; the download endpoint keeps
+  its path and permission model, but its behavior now issues or reuses a
+  persisted versioned snapshot — see §13.
+- No frontend changes beyond the template-validation work: the admin template
+  editor (`AdminPdfTemplatesPage.tsx`) gains an override-staleness banner,
   accessible tab roles (roving tabindex + arrow-key navigation) and the
-  redesigned contract template's fields in the editor reference, as part of
-  the template-validation work.
-- Only one data-model addition: `PdfTemplate.default_digest` (migration
-  `invoices/0009`) for stale-override detection; `PATCH` now validates
+  redesigned contract template's fields in the editor reference.
+- Three data-model additions: `PdfTemplate.default_digest` (migration
+  `invoices/0009`) for stale-override detection, plus the `ContractIssue`
+  snapshot table and per-ZEV `contract_counter` (migrations `invoices/0010`,
+  `zev/0017`) behind the versioned download — see §13. `PATCH` now validates
   overrides before storing (see §5.2).
-- The contract download flow adds no audit events (the document id is printed
-  on the PDF, not audit-logged). Template-admin mutations keep their audit
-  trail; non-admin attempts are DENIED-logged by the shared
-  `_AdminTemplateView` base (`views_templates.py`).
+- The contract download flow records `contract.issue`, `contract.download`
+  and (on raced minting) `contract.number_gap` audit events. Template-admin
+  mutations keep their audit trail; non-admin attempts are DENIED-logged by
+  the shared `_AdminTemplateView` base (`views_templates.py`).
 - Customized `PdfTemplate` DB overrides for the contract keep rendering their
   stored standalone HTML and are **not** migrated — the redesign only reaches
   them after a reset to default (DELETE on the template endpoint).
 - The plain-language summary page is reworded into the non-binding
-  `Anhang A`; the legally binding wording changes are in scope above.
+  `Anhang A`; the legally binding clause-wording changes listed in §1/§7
+  were updated alongside the layout and are in scope above.
 
 ## 3. Actors, permissions, and ZEV scope
 
@@ -87,7 +90,8 @@ Download endpoint: `GET /api/v1/zev/participants/{pk}/contract-pdf/` — DRF act
 manual check: `is_admin` or `is_zev_owner` may fetch any participant;
 otherwise `participant.user == request.user` is required (403 otherwise).
 Response is a streamed `application/pdf` attachment named
-`contract_{last_name}_{first_name}.pdf`.
+`contract_{last_name}_{first_name}_v{version}.pdf` (versioned snapshot, see
+§13).
 
 Template admin endpoints: `GET|PATCH|DELETE
 /api/v1/invoices/invoices/contract-pdf-template/` — `PdfTemplateView`
@@ -97,9 +101,11 @@ audit-logged under `template.contract_pdf.*`).
 ## 4. Data model
 
 The contract render context is the contract surface, so it is documented here
-at field level. The only data-model change in this branch is
-`PdfTemplate.default_digest` (migration `invoices/0009`), documented in §5.2
-and in `2026-03-admin-governance-and-settings.md` §5.4.
+at field level. The redesign itself needs no schema changes; the branch adds
+`PdfTemplate.default_digest` (migration `invoices/0009`, see §5.2 and
+`2026-03-admin-governance-and-settings.md` §5.4), and the versioned download
+adds a `ContractIssue` snapshot table and a per-ZEV `contract_counter`
+column (migrations `invoices/0010`, `zev/0017`) — documented in §13.
 
 ### 4.1 Contract render context
 
@@ -119,8 +125,8 @@ Built by `_build_contract_context(participant)` in `invoices/contract_pdf.py`.
 | `billing_interval_display` | `str` | `tr["billing_intervals"].get(zev.billing_interval, zev.billing_interval)` |
 | `contract_date` | `str` | `format_date_value(timezone.localdate(), date_pattern)` — the contract is generated on demand, so "today" doubles as the issue date |
 | `participation_start` | `str` | `format_date_value(earliest assignment.valid_from or participant.valid_from, date_pattern)` |
-| `document_id` | `str` | `"CTR-" + str(participant.pk).replace("-", "")[:8].upper()` — the `Participant.id` UUID is dash-stripped and truncated to 8 chars (12 total), a traceability aid rather than a digest or legal reference |
-| `vat_rate_display` | `str` | `""` unless `zev.vat_number`; then `f"{float(rate) * 100:.2f} %"` of `VatRate.active_for_day(timezone.localdate())`, or `""` if no active rate |
+| `document_id` | `str` | Stable per-ZEV document number `CTR-YYYY-NNNN` for issued contracts (see §13); the pure render path falls back to `"CTR-" + str(participant.pk).replace("-", "")[:8].upper()` — a truncated uppercase UUID string (`Participant.id` is a UUID), not a digest or cryptographic identifier |
+| `vat_rate_display` | `str` | `""` unless `zev.vat_number`; then `f"{float(rate) * 100:.2f} %"` of `VatRate.active_for_day(as_of)` (`timezone.localdate()`), or `""` if no active rate |
 | `tr` | `dict` | Copy of `CONTRACT_TRANSLATIONS[zev.invoice_language or "de"]` with `payment_terms_unit` resolved to the singular/plural form based on `zev.payment_term_days == 1`. Copied (not the shared constant) so per-ZEV resolution never leaks into other contracts |
 | `lang` | `str` | `zev.invoice_language or "de"` |
 | `local_tariff_notes` | `str` | `zev.local_tariff_notes or ""` |
@@ -188,16 +194,14 @@ Consumption contract:
 
 ### 5.1 Template comment gotcha (Django 6)
 
-Django 6's template lexer token regex is
-`({%.*?%}|{{.*?}}|{#.*?#})` **without `re.DOTALL`**, so a `{# ... #}`
-comment **cannot span multiple lines** — a multi-line `{#` is emitted as
-literal text into the rendered HTML. If that text contains a literal `<style>`
-token it corrupts WeasyPrint's HTML parsing (the real stylesheet gets
-swallowed; page layout breaks; see the invoice 2-page regression this spec
-fixed). Rule for all templates:
+Django 6's template lexer cannot match multi-line `{# ... #}` comments:
+the token regex `({%.*?%}|{{.*?}}|{#.*?#})` has no `re.DOTALL`, so a
+multi-line `{#` is emitted as literal HTML; a literal `<style>` token inside
+it corrupts WeasyPrint's parsing (stylesheet swallowed, pagination breaks —
+this was the invoice 2-page regression). Rules for all templates:
 
+- Single-line `{# ... #}` comments only.
 - Use `{% comment %} ... {% endcomment %}` for multi-line comments.
-- A `{# ... #}` comment must be a single line.
 
 ### 5.2 Template override validation and provenance
 
@@ -229,134 +233,45 @@ The admin UI (`AdminPdfTemplatesPage.tsx`) shows a stale banner when
 
 ## 6. Contract template anatomy
 
-**File:** `backend/templates/contracts/participant_contract_pdf.html`
-`CONTRACT_TEMPLATE_NAME = "contracts/participant_contract_pdf.html"`
+**Files:** `backend/templates/contracts/participant_contract_pdf.html`;
+`CONTRACT_TEMPLATE_NAME = "contracts/participant_contract_pdf.html"`.
 
 Clause headings use `.section-heading`: a `position: relative` block whose
-`::after` draws a 1pt `--brand-pale` rule at 50% height across the full
-content width; the heading text is wrapped in a `<span>` with
-`background: #fff`, `padding-right: 4mm` and `z-index: 1` so it masks the
-rule behind the text. This masking pattern (instead of a flex text+rule row)
-is deliberate: WeasyPrint's flexbox support shrinks the text item and
-mis-aligns the rule when a translation wraps to two lines.
+`::after` draws a 1pt `--brand-pale` rule at 50% height; the title sits in a
+`<span>` (`background: #fff`, `padding-right: 4mm`, `z-index: 1`) that masks
+the rule behind the text. The masking (not a flex text+rule row) is
+deliberate: WeasyPrint's flexbox shrinks the text item and mis-aligns the
+rule on two-line translations. Binding clause numbers 1–11 are hardcoded
+`.clause-num` inside the mask so all locales share the same numbering.
 
-The binding part is a numbered framework agreement (clauses 1–12, numbers
-hardcoded in the template as `.clause-num` inside the masked heading span so
-all locales share the same numbering), followed by the signature block and a
-non-binding appendix. Content flows naturally across pages (`break-inside:
-avoid` on cards/blocks); only the appendix forces a break
-(`.appendix-part { break-before: page; }`).
+Content flows naturally (`break-inside: avoid` on cards/blocks); only
+`.sig-section`/`.appendix-part { break-before: page; }` force page breaks.
 
-1. **Page 1** — full document header in flow: brand row + ZEV name + owner
-   address (from `owner_participant`; VAT number line when set) on the left;
-   document label (`tr.contract_title`), `document-number` (`document_id`)
-   and `document-status` (`tr.contract_date_label` + `contract_date`) on
-   the right. Below it an invoice-style `.contract-summary` band: a
-   `.facts-grid` surface card with the four key terms as a 2×2 grid
-   (participation start, billing interval, payment terms incl. unit, VAT
-   with `vat_rate_display` when liable) and a dark `.tariff-card` (gradient
-   like the invoice amount card) showing the first local tariff rate with
-   `tr.tariff_rp_unit`. The hint line is tariff-type aware: percentage
-   tariffs print the rule line `tariff_pct_line` (e.g. "= 80.00 % des
-   Standardtarifs des Netzbetreibers"), flat tariffs the tariff name.
-   Without local tariffs the card shows `—`
-   (`tariff_none`). The band deliberately carries no participant identity — that
-   lives only in the clause-1 party cards, so nothing is printed twice.
-   Then:
-   - `1. Vertragsparteien` (`tr.parties_title`): two `.party-card`s in
-     `.parties-grid` (participant / owner). Cards carry the defined-term
-     role text (`participant_label`/`owner_label`), `.party-name` and
-     `.party-fact` label/value rows; metering points render as monospace
-     `.meter-chip`s (dashed `.meter-chip--empty` `CH` chips when none) with
-     `field-hint` location descriptions and `tr.meter_hint`. All
-     system-known values are pre-filled.
-   - `2. Zweck und Geltungsbereich` (`tr.subject_title`): purpose/scope
-     prose citing Art. 16–18 EnG, Art. 14–18 EnV, Art. 17a–17c EnG, the
-     internal/external split, and the bilateral topology: the agreement is
-     concluded between the Manager and each participant, and the identical
-     agreements of all participants together form the vZEV's internal
-     framework.
-   - `3. Begriffe` (`tr.definitions_title`): `.clause-list` of seven
-     definitions (`tr.definitions_items`).
-2. **Clauses 4–7** — `4.` organisation/mandate of the vZEV Manager
-   (`manager_title`, `manager_text` + `manager_duties` list); the mandate
-   text separates operational discretion from material decisions, which
-   require the consent of all participants (admissions, amendments), and
-   adds the annual information duty (tariffs, production, allocation);
-   `5.` tariffs and billing (`agreements_title`): tariff table
-   (`tariff-table`, brand-deep header row with the numeric column
-   right-aligned via `th.num`, zebra rows, right-aligned `td.rate`,
-   `tariff-empty` fallback) with a fourth validity column (`row.validity`),
-   tariff-note `freetext-box`, then a conditional tariff rule paragraph
-   (`tariff_rule`, autoescaped like all output — translation values carry
-   no markup, so nothing is rendered `|safe`): percentage-of-grid prints
-   `clause_tariff_rule_pct` with the configured percentage formatted in,
-   flat tariffs print `clause_tariff_rule_flat` — both describe automatic
-   adjustment when the grid operator's prices change and the communication
-   duty (with each invoice or at least annually); an optional reference
-   product line (`reference_product_label` + `tariff_reference_product` from
-   `Tariff.notes`); then the tariff cap (never above the external standard
-   tariff; 80% benchmark for tenancies; for tenants the lease and mandatory
-   tenancy law prevail), the notification/termination clause (one month
-   notice, withdrawal right) and the billing clause (external bill
-   redistribution, 5% default interest, suspension on repeated non-payment);
-   `6.` metering and allocation
-   (`metering_title`/`_text`), mirroring `allocation/split.py`: allocation
-   per metering interval (local energy = production consumed in the
-   interval, distributed pro rata to simultaneous consumption), exported
-   surplus allocated pro rata to the production plants whose owners receive
-   the feed-in remuneration; `7.` liability and recourse (solidary liability
-   Art. 17 EnG, internal recourse, no minimum-energy entitlement, force
-   majeure, and the explicit universal-service guarantee)
-   (`liability_title`/`_text`).
-3. **Clauses 8–12 + signatures** — `8.` entry/exit/mutations
-   (`membership_title`/`_text`; join condition is the vZEV-correct one:
-   same grid-operator service area plus the technical vZEV prerequisites,
-   each party retaining its own grid connection — not the ZEV
-   same-connection topology); `9.` data protection (controller, purposes,
-   10-year retention, FADP rights) (`privacy_title`/`_text`); `10.`
-   communication and dispute resolution (email deemed received after 3
-   days, amicable settlement first) (`communication_title`/`_text`); `11.`
-   duration and termination (`tr.duration_title`/`_text`); `12.` final
-   provisions (Swiss law, jurisdiction, written form, severability)
-   (`tr.jurisdiction_title`/`_text`, incl. a dissolution right with
-   appropriate notice when legal or grid-operator requirements no longer
-   allow the vZEV to continue); additional agreements freetext box
-   (`tr.additional_label`). Then `Unterschriften` (`tr.signatures_title`,
-   unnumbered): `.sig-grid` with `break-inside: avoid` (signature block
-   never splits across pages); each `.sig-block` pre-fills `.sig-name` with
-   the party's full name; only `Ort, Datum` and `Unterschrift` lines stay
-   blank for wet signing. Each blank is a `.sig-line` (8mm tall signing
-   space, 0.5pt `--ink-soft` bottom border) with its `.sig-line-label`
-   caption *below* the line.
-4. **Appendix A** (`.appendix-part`, new page) — `h1.appendix-heading`
-   `Anhang A` (`tr.appendix_title`) + intro; seven `.info-block`s
-   (`break-inside: avoid`): ZEV explainer, vZEV explainer, legal basis list,
-   rights/obligations list, joint liability, privacy, tariff provisions.
-   The non-binding character is stated exactly once: the heading
-   parenthetical and `precedence_note` (which also says the appendix is no
-   legal advice and that Appendix B is binding).
-5. **Appendix B** (`.appendix-part`, new page after Appendix A) — a
-   **binding** part of the contract (`tr.appendix_b_title` +
-   `appendix_b_subtitle`, "Bestandteil des Vertrags"): controller identity
-   (`privacy_controller_title`/`_text`), purposes, recipient categories
-   (`privacy_recipients_*`), a retention table zipped from
-   `privacy_retention_categories`/`privacy_retention_periods` (headers
-   `privacy_retention_col_data`/`privacy_retention_col_period`) and the
-   data-subject rights (FADP, EDÖB complaint route). Clause 9 points to it;
-   unlike Appendix A (explicitly non-binding guidance), Appendix B has
-   binding contractual effect. The controller address paragraph is written
-   on **one source line**: `.clause-text` uses `white-space: pre-line`, so
-   any source newline between its `{% if %}`/`{% endif %}` tag pairs would
-   render as a line break (this once put the city's leading comma on its own
-   line).
+| Block | Keys | Layout |
+|---|---|---|
+| Page-1 document header | `contract_title`, `contract_date_label`; `document-number`/`document-status` markup | Brand row + ZEV name + owner address left (VAT number line when set); document label, `document_id`, issue date right |
+| Summary band | `participation_start_label`, `billing_interval_label`, `payment_terms_label` (unit resolved at render, §4.1), `vat_label`/`vat_required`/`vat_not_required`, `local_tariff_label`, `tariff_rp_unit`, `tariff_pct_line`, `tariff_none` | `.contract-summary`: `.facts-grid` 2×2 (participation start, billing interval, payment terms, VAT when liable) + dark `.tariff-card` with the first local tariff rate and exactly one tariff-type-aware hint line (percentage: `tariff_pct_line`; flat: tariff name); `—` when no local tariffs. No participant identity (lives only in clause 1), no `Details: Ziff. 5` pointer — clause 5's table carries the full tariff |
+| Clause 1 — parties | `parties_title`, `participant_label`, `owner_label`, `field_address`/`field_phone`/`field_email`, `field_meter`/`field_meter_pv`, `meter_hint`, `meter_none` | Two `.party-card`s in `.parties-grid`; `.party-name` + `.party-fact` rows; metering points as monospace `.meter-chip`s (neutral `meter_none` when none); all system-known values pre-filled |
+| Clause 2 — purpose/scope | `subject_title`, `subject_text` | Art. 16–18 EnG, Art. 14–18 EnV, Art. 17a–17c EnG; internal/external split; bilateral Manager↔participant agreements together form the vZEV framework |
+| Clause 3 — definitions | `definitions_title`, `definitions_items` (7) | `.clause-list` |
+| Clause 4 — manager mandate | `manager_title`, `manager_text`, `manager_duties` (5) | Operational discretion vs. material decisions (consent of all participants); annual information duty |
+| Clause 5 — tariffs/billing | `agreements_title`, `local_tariff_label`/`local_tariff_unit`/`local_tariff_note`, `tariff_col_name`/`tariff_col_calc`/`tariff_col_price`, `tariff_valid_label`, `clause_tariff_rule_lead`, `clause_tariff_cap_lead`/`clause_tariff_cap`, `clause_tariff_adjustment_lead`/`clause_tariff_adjustment`, `clause_billing_lead`/`clause_billing`, `reference_product_label` | `.tariff-table` (brand-deep header, right-aligned `th.num`, zebra `td.rate`, `tariff-empty` fallback, validity column); `.freetext-box` notes (`white-space: pre-line`, `overflow-wrap: anywhere`); conditional `tariff_rule` paragraph (percentage or flat, see §7), optional reference-product line, cap, notification/termination and billing paragraphs |
+| Clause 6 — metering/allocation | `metering_title`, `metering_text` | Per-interval pro-rata allocation (mirrors `allocation/split.py`); exported surplus pro rata to the production plants |
+| Clause 7 — liability | `liability_title`, `liability_text` | Solidary liability (Art. 17 EnG), internal recourse, no minimum-energy entitlement, force majeure, universal-service guarantee |
+| Clause 8 — entry/exit | `membership_title`, `membership_text` | Statutory common-self-consumption conditions at the place of production; grid operator's assessment/registration process decisive; own grid connection retained |
+| Clause 9 — data protection | `privacy_title`, `privacy_text` | Controller, purposes, statutory retention, FADP rights; points to the binding Appendix B below |
+| Clause 10 — duration | `duration_title`, `duration_text` | Owners' two-month route subject to the grid-operator mutation process; tenants under mandatory tenancy law; exit effective only once the metering/supply arrangement is implemented |
+| Clause 11 — final provisions | `jurisdiction_title`, `jurisdiction_text`, `communication_text` | Email deemed received after 3 days, amicable settlement first, Swiss law, jurisdiction, written form, severability, dissolution right on regulatory change |
+| Additional agreements | `additional_label` | Freetext box |
+| Signatures | `signatures_title`, `sig_intro`, `sig_owner`, `sig_participant`, `sig_place_date`, `sig_signature` | One `.sig-section` (`break-inside: avoid`): heading + intro + `.sig-grid`; each `.sig-block` pre-fills `.sig-name`; only `Ort, Datum` and `Unterschrift` stay blank — `.sig-line` blanks (7 mm tall, 0.5 pt `--ink-soft` underline, label below) |
+| Appendix A | `appendix_title`, `precedence_note`, `info_subtitle`, `info_zev_title`/`info_zev_text`, `info_vzev_title`/`info_vzev_text`, `info_legal_title`/`info_legal_items`, `info_rights_title`/`info_rights_items`, `info_liability_title`/`info_liability_text`, `info_privacy_title`/`info_privacy_text`, `info_tariff_title`/`info_tariff_text` | New page; `h1.appendix-heading`; seven `.info-block`s (`break-inside: avoid`) — ZEV explainer, vZEV explainer, legal basis, rights/obligations, joint liability, privacy, tariff provisions. The non-binding character is stated exactly once: the heading parenthetical and `precedence_note` (which also says the appendix is no legal advice and that Appendix B is binding) |
+| Appendix B | `appendix_b_title`, `appendix_b_subtitle`, `privacy_short`, `privacy_controller_title`/`privacy_controller_text`, `privacy_purposes_title`/`privacy_purposes_items`, `privacy_recipients_title`/`privacy_recipients_text`, `privacy_retention_title`/`privacy_retention_col_data`/`privacy_retention_col_period`, `privacy_rights_title`/`privacy_rights_items` | New page; **binding** privacy notice (`Datenschutzerklärung – Bestandteil des Vertrags`): controller identity, purposes, recipient categories, a retention table zipped from `privacy_retention_categories` × `privacy_retention_periods` (4 rows, §7) and the data-subject rights incl. the EDÖB complaint route. Unlike Appendix A (explicitly non-binding), it has binding contractual effect. The controller address paragraph is written on **one source line**: `.clause-text` uses `white-space: pre-line`, so any source newline between the `{% if %}`/`{% endif %}` tag pairs would render as a line break (this once put the city's leading comma on its own line) |
 
 ### 6.1 Page machinery (footer only)
 
-The contract prints **no running header** — a header plus footer on every
-page read as visual noise; the single page-1 document header carries the
-identity, and the footer carries the per-page furniture. There is therefore
-no named `@page` rule either; one default rule serves every page:
+No running header — header + footer on every page reads as noise, and the
+page-1 document header already carries the identity. One default `@page`
+rule serves every page (no named rule needed):
 
 ```css
 @page {
@@ -371,76 +286,88 @@ no named `@page` rule either; one default rule serves every page:
 ```
 
 One running element (direct child of `<body>`, same pattern as the invoice):
-
-- `position: running(footer-meta)` — `page-meta page-meta--footer` with
-  `{{ zev.name }} · {{ document_id }}` left, `Seite N von M` counter
-  center, issue date right.
+`position: running(footer-meta)` on `page-meta page-meta--footer` —
+`{{ zev.name }} · {{ document_id }}` left, the page counter center, the
+issue date right.
 
 ### 6.2 Removed in the redesign
 
-- The always-empty `Gebäude / Wohnung` field row and its
-  `tr.field_building` translation keys (all four locales) — dead space.
-- The legacy per-page manually repeated header divs and hardcoded colors;
-  all styling now uses tokens from the shared partial.
-- The running header on pages 2+ (and the named `contract` `@page` rule it
-  required): footer-only page furniture instead.
-- The closing `.info-note` disclaimer callout of Appendix A
-  (`tr.info_note_title`/`tr.info_note_text`, all four locales) plus its CSS:
-  the heading parenthetical and `precedence_note` already state that the
-  appendix is non-binding and the agreement prevails, so the callout was a
-  third copy of the same sentence. `precedence_note` absorbed its only
-  unique statement ("does not constitute legal advice").
+- The always-empty `Gebäude / Wohnung` field row and its `field_building`
+  translation keys (all four locales).
+- Legacy per-page manually repeated header divs and hardcoded colors — all
+  styling now uses tokens from the shared partial.
+- The running header on pages 2+ and the named `contract` `@page` rule it
+  required: footer-only page furniture instead.
+- The plain-language summary sheet (`summary_title`/`summary_note`/
+  `summary_points`) — the signed document no longer carries a second summary
+  layer (Appendix A opens with the `precedence_note` hierarchy statement);
+  its "Tarifstabilität: Anpassungen höchstens jährlich" bullet also
+  contradicted the clause-5 automatic-adjustment rule.
+- The fake empty `CH` metering-point chips (leftover after
+  `field_meter_second` was dropped) — replaced by one neutral `meter_none`
+  statement per meter group.
+- Absolute privacy guarantees that were not operationally enforced
+  (10-year retention, deletion of aggregated high-resolution data, no
+  cross-border transfer) — Appendix B now states statutory retention and a
+  conditional cross-border transfer ("nur, soweit gesetzlich zulässig und
+  erforderlich").
+- The closing `.info-note` disclaimer box of Appendix A
+  (`info_note_title`/`info_note_text`, all four locales) plus its CSS: the
+  heading parenthetical and `precedence_note` already stated that the
+  appendix is non-binding and the agreement prevails, so the box was a third
+  copy of the same sentence. `precedence_note` absorbed its only unique
+  statement ("does not constitute legal advice").
 - The `tariff_details_5` hint line ("Details: Ziff. 5") on the dark
   `.tariff-card`: the card already shows the first local tariff rate and
   clause 5's table follows on the same spread.
 
 ## 7. Translation content
 
-`CONTRACT_TRANSLATIONS` in `invoices/contract_translations.py`: a pure data
-module mirroring `invoices/pdf_translations.py`; four locale dicts (`de`,
-`fr`, `it`, `en`), **111 keys each**, identical key sets, structure and
-placeholder sets (guarded by the translation-parity tests). Translation
-values contain **no HTML markup** (asserted by the no-HTML test) so the
-template renders them without `|safe`. Keys added by the redesign:
-`contract_date_label`, `participation_start_label`, `appendix_title`, and
-the `page_label`/`page_of` pairs (previously unused, now consumed by the
-page counter). Keys added by the framework-agreement upgrade: clause keys
-`definitions_title`/`definitions_items` (7 items), `manager_title`/
-`manager_text`/`manager_duties` (5 items), `clause_tariff_cap`,
-`clause_tariff_adjustment`, `clause_billing`, `metering_title`/
-`metering_text`, `liability_title`/`liability_text`, `membership_title`/
-`membership_text`, `privacy_title`/`privacy_text`, `communication_text`
-(no `communication_title` — the clause heading is generated in the
-template). The tariff labels were rewritten per locale
-(`local_tariff_label`, e.g. "Ihr Tarif für lokalen Solarstrom" in de,
-"Votre tarif d'énergie solaire locale" in fr). Later in-place text
-upgrades (no key changes):
-bilateral-framework sentence in `subject_text`, consent governance and
-annual information in `manager_text`, tenancy-law reservation in
-`clause_tariff_cap`, per-interval allocation plus feed-in remuneration in
-`metering_text`, universal-service guarantee in `liability_text`,
-grid-operator-area join condition in `membership_text`, and the
-regulatory-change dissolution rule in `jurisdiction_text`. Rewritten in
-place: `subject_title`/`subject_text`
-(now purpose & scope with the EnG/EnV/Mantelerlass references) and
-`jurisdiction_title`/`jurisdiction_text` (now final provisions incl.
-written form and severability). The percentage-tariff model added
-`clause_tariff_rule_pct` (`{pct}` placeholder) and `clause_tariff_rule_flat`
-(conditional rule paragraphs for clause 5), `tariff_pct_of` (green-box rule
-line), `tariff_valid_label`/`tariff_valid_open` (validity column incl.
-open-ended spans) and `reference_product_label`.
-`local_tariff_label` now reads "Ihr Tarif für lokalen Solarstrom" etc.
-instead of the neutral "(v)ZEV" phrasing; `clause_tariff_adjustment` was
-rewritten from an annual review into a notification/termination clause
-(automatic adjustment makes the annual review redundant); `info_tariff_text`
-now points to the clause-5 rule; `tariff_rp_unit`/`tariff_col_price` use
-"Rp./kWh" in de/en. Appendix B keys (all four locales):
-`appendix_b_title`, `appendix_b_subtitle` and the structured
-privacy-notice set — `privacy_controller_title`/`_text`,
-`privacy_purposes_*`, `privacy_recipients_title`/`_text`,
-`privacy_retention_title`/`_categories`/`_periods`/
-`_col_data`/`_col_period`, plus the data-subject rights / EDÖB complaint
-text.
+`CONTRACT_TRANSLATIONS` in `invoices/contract_translations.py` (pure data
+module, mirroring `invoices/pdf_translations.py`): four locales
+(`de`, `fr`, `it`, `en`), **111 keys each**, identical key sets and
+structure (guarded by `test_all_locales_have_identical_keys_and_structure`).
+
+New keys by change phase:
+
+| Phase | Keys |
+|---|---|
+| Redesign | `contract_date_label`, `participation_start_label`, `appendix_title`, `page_label`/`page_of` (page counter) |
+| Clause 3 | `definitions_title`, `definitions_items` (7) |
+| Clause 4 | `manager_title`, `manager_text`, `manager_duties` (5) |
+| Clause 5 | `clause_tariff_cap`, `clause_tariff_adjustment`, `clause_billing`, `clause_tariff_rule_pct` (`{pct}` placeholder), `clause_tariff_rule_flat`, `tariff_pct_of`, `tariff_rp_unit`, `tariff_col_price`, `tariff_valid_label`, `tariff_valid_open`, `reference_product_label` |
+| Clauses 6–11 | `metering_title`/`metering_text`, `liability_title`/`liability_text`, `membership_title`/`membership_text`, `privacy_title`/`privacy_text`, `communication_text` |
+| Appendix B | `privacy_controller_title`/`privacy_controller_text`, `privacy_purposes_title`/`privacy_purposes_items` (3), `privacy_recipients_title`/`privacy_recipients_text`, `privacy_retention_title`/`privacy_retention_col_data`/`privacy_retention_col_period`, `privacy_retention_categories` (4)/`privacy_retention_periods` (4), `privacy_rights_title`/`privacy_rights_items` (5) |
+| Review pass | `meter_none`, `precedence_note`, and the `*_lead` template keys (`clause_tariff_rule_lead`, `clause_tariff_cap_lead`, `clause_tariff_adjustment_lead`, `clause_billing_lead`) |
+
+Rules and in-place updates:
+
+- **No HTML in values.** No string or list item contains a tag — the
+  template renders `<strong>{{ tr.…_lead }}</strong>` itself, so nothing is
+  rendered `|safe` (`test_translation_values_carry_no_html_markup`).
+- **Removed dead keys** from all locales: `field_name`, `sig_name`,
+  `field_meter_second`, `info_title`, `contract_date`, `summary_title`/
+  `summary_note`/`summary_points`, and (with the Appendix-A disclaimer box)
+  `info_note_title`/`info_note_text` and the `tariff_details_5` card hint.
+- **Placeholder prose** (`local_tariff_note_placeholder`,
+  `additional_placeholder`) renders only in admin previews (`is_preview`);
+  issued contracts print a blank box.
+- **In-place text upgrades** (no key changes): `subject_*` (EnG/EnV/
+  Mantelerlass references, bilateral framework), `jurisdiction_*` (final
+  provisions incl. written form/severability), per-interval allocation and
+  feed-in remuneration in `metering_text`, tenancy-law reservation in
+  `clause_tariff_cap`, universal-service guarantee in `liability_text`,
+  grid-operator-area join condition in `membership_text`; percentage-tariff
+  model reworked `clause_tariff_adjustment` into a notification/termination
+  clause; `local_tariff_label` now reads "Ihr Tarif für lokalen Solarstrom"
+  etc.; the document-header VAT label uses `vat_label`; the German
+  `owner_label` reads "vZEV-Verantwortlicher" (typed variants in the other
+  three locales).
+- **Derived keys (not in the dict).** At render time the `tr` copy used by the
+  template additionally receives `payment_terms_unit` (singular/plural from
+  `zev.payment_term_days`, §4.1) and `privacy_retention_rows` (zipped
+  `privacy_retention_categories` × `privacy_retention_periods`); the sample
+  preview context does the same (see §9).
 
 ## 8. Shared date formatting
 
@@ -472,7 +399,9 @@ from a 22.50 Rp./kWh grid base, validity 01.01.–31.12.2026, notes "EKZ
 Standardprodukt der Grundversorgung") plus the derived `tariff_pct_line`,
 `tariff_rule` and `tariff_reference_product` keys so the preview shows the
 formula green-box line and the clause-5 rule; the flat-rate branch is covered
-by unit tests. The existing sample keys already include
+by unit tests. The sample sets `is_preview: True` so the template editor
+preview can show placeholder guidance in empty freetext boxes — issued
+contracts never do. The existing sample keys already include
 `contract_date`, `tr`, `lang`, `owner_participant`, `consumption_mps`,
 `production_mps`, `local_tariff_rows`, `local_tariff_notes`,
 `additional_contract_notes`.
@@ -482,10 +411,10 @@ by unit tests. The existing sample keys already include
 | Risk | Impact | Mitigation |
 |---|---|---|
 | Deployments with a customized contract template keep the legacy design until reset | Low | Documented here and in the admin UI: the redesign ships with the on-disk default; `DELETE` on the template endpoint adopts it |
-| Template refactors silently change rendered PDFs (regression found: multi-line `{#` comment corrupted the invoice head, adding a page) | Medium | Render smoke tests assert real PDF page counts for invoice (2/3-page layout) and contract (≥ 3 pages) in all four languages |
-| WeasyPrint tolerance of layout edge cases (signature block split, running elements, limited flexbox) | Medium | `.sig-grid` and `.info-block` use `break-inside: avoid`; heading rules use absolute positioning + span masking instead of flex; manual eyeball of de/fr/it/en sample renders before release |
+| Template refactors silently change rendered PDFs (regression found: multi-line `{#` comment corrupted the invoice head, adding a page) | Medium | Render smoke tests assert real PDF page counts for invoice (2/3-page layout) and contract (3–7 pages, no nearly-empty page, signature block never split) in all four languages |
+| WeasyPrint tolerance of layout edge cases (signature block split, running elements, limited flexbox) | Medium | `.sig-section` (intro + grid) and `.info-block` use `break-inside: avoid`; heading rules use absolute positioning + span masking instead of flex; manual eyeball of de/fr/it/en sample renders before release |
 | Clause wording was drafted alongside the redesign, not yet legally reviewed | Medium | Treat `contract_translations.py` as a reviewable draft: a human EnG/EnV/FADP pass is a merge gate before production issuance; the pure-data module keeps the prose reviewable without touching render code |
-| `document_id` readability if pks grow | Low | Truncated to 8 chars; collision risk negligible within one ZEV; id is traceability aid, not a legal reference |
+| `document_id` traceability and collisions | Low | Issued contracts carry `CTR-YYYY-NNNN`, a per-ZEV sequence minted under the counter row lock (§13) — collisions impossible, number gaps audited; only the pure render path (previews/samples) falls back to an 8-char truncated participant-pk string, a traceability aid, not a legal reference |
 
 ## 11. Test plan
 
@@ -521,7 +450,7 @@ by unit tests. The existing sample keys already include
 | `test_vat_rate_display_empty_when_liable_without_active_rate` | `vat_number` without an active rate → `""` |
 | `test_document_id_is_short_and_stable` | `CTR-` prefix, 12 chars total |
 
-**`ContractPdfTariffRuleTests`** (6 tests):
+**`ContractPdfTariffRuleTests`** (7 tests):
 
 | Test | Asserts |
 |---|---|
@@ -531,15 +460,15 @@ by unit tests. The existing sample keys already include
 | `test_percentage_tariff_without_grid_base_shows_bare_percentage_without_unit` | No active grid tariff → `rate_rp` `"80.00%"` with empty `unit`; markup renders the bare percentage in the green box |
 | `test_open_ended_percentage_tariff_renders_open_validity` | Open-ended tariff (`valid_to` null) → `validity` `"ab 01.01.2026"` via `tariff_valid_open` |
 | `test_no_local_tariff_prints_no_rule_and_placeholder_amount` | No local tariffs → no `tariff_rule`, green box renders the `—` placeholder and `tariff-empty` |
-| `test_empty_notes_render_blank_box_not_placeholder_prose` | Empty `local_tariff_notes`/`additional_contract_notes` render a blank box, never the German placeholder example text |
+| `test_empty_notes_render_blank_box_not_placeholder_prose` | Empty notes print a blank freetext box on real contracts — never the German example prose (`freetext-placeholder` absent) |
 
 **`ContractPdfTranslationParityTests`** (3 tests):
 
 | Test | Asserts |
 |---|---|
 | `test_all_locales_have_identical_keys_and_structure` | All four locales have identical key sets, dict/list/str structure, and list lengths |
-| `test_translation_values_carry_no_html_markup` | No translation value contains HTML markup (prose stays plain text; markup lives in the template, never `\|safe`) |
-| `test_all_locales_use_identical_placeholder_sets` | The `{placeholder}` set of every key matches across all four locales (a typo like `{pct}` vs `{pctt}` in one language fails here) |
+| `test_translation_values_carry_no_html_markup` | No translation string or list item in any locale contains an HTML tag — markup (bold lead-ins) lives in the template, so nothing needs `|safe` |
+| `test_all_locales_use_identical_placeholder_sets` | Every `{placeholder}` in a key's value matches across all four locales (catches a typo that would only blow up at render time in one language) |
 
 **`ContractPdfRenderingTests`** (12 tests) — end-to-end smoke tests rendering
 real PDFs (WeasyPrint) and asserting markup with the `<style>` blocks stripped
@@ -547,35 +476,61 @@ real PDFs (WeasyPrint) and asserting markup with the `<style>` blocks stripped
 
 | Test | Asserts |
 |---|---|
-| `test_renders_pdf_in_all_four_languages_with_running_page_machinery` | `generate_contract_pdf` yields a PDF (`%PDF-1.7`) of ≥ 3 pages (pypdf) in de/fr/it/en; markup contains the translated title, `running(footer-meta)`, `page-meta--footer`, `counter(page)`, `counter(pages)`, and asserts `running(header-meta)` is absent (footer-only furniture) |
+| `test_renders_pdf_in_all_four_languages_with_running_page_machinery` | `generate_contract_pdf` yields a PDF (`%PDF-1.7`) of 3–7 pages (pypdf) in de/fr/it/en; markup contains the translated title, `running(footer-meta)`, `page-meta--footer`, `counter(page)`, `counter(pages)`, and asserts `running(header-meta)` is absent (footer-only furniture) |
 | `test_page_1_uses_the_invoice_document_header_anatomy` | `document-header`, `document-label`, `document-number`, `document-status`, `Ausstellungsdatum`, `parties-grid` present |
 | `test_known_values_are_prefilled_and_vat_rate_is_rendered` | Participant/owner names, assigned meter ids, `8.10 %`, VAT number, and participation start all render |
 | `test_sample_contract_context_renders` | `build_sample_contract_context()` renders without error and contains the sample `document_id` |
-| `test_appendix_b_renders_the_structured_privacy_notice` | Appendix B shows controller identity (owner name), purposes, retention table and data-subject rights; the controller address renders on one line (`Solarweg 1, 8000 Zürich`) — pre-line would turn any source newline into a line break |
-| `test_summary_sheet_is_not_part_of_the_signed_document` | The plain-language summary is not part of the signed contract; Appendix A opens with the non-binding/precedence-note heading; no `info-note` box (the removed disclaimer) |
-| `test_corrected_contract_clauses_render_without_unsafe_shortcuts` | The signed document renders the legal/operational guardrails without promising unrestricted clauses |
-| `test_no_page_is_left_nearly_empty` | Every PDF page carries ≥ 100 extracted characters (guards against a near-empty page) |
-| `test_signature_block_is_never_split_across_pages` | The page with `Unterschriften` also contains `Ort, Datum` and `Unterschrift` (`.sig-section` travels as one block) |
-| `test_free_text_notes_keep_line_breaks_and_escape_markup` | Multiline notes keep line breaks; markup in notes is HTML-escaped; `.freetext-box` uses `white-space: pre-line` |
-| `test_very_long_notes_do_not_balloon_the_document` | A ~3,800-char note keeps the PDF within bounds and Appendix B still renders last |
-| `test_unassigned_meter_placeholder_is_neutral` | Without assignments the markup shows the translated "no metering point" statement and never a bare chip |
+| `test_appendix_b_renders_the_structured_privacy_notice` | Appendix B shows controller identity (owner name), purposes, retention table (incl. `10 Jahre (gesetzliche Aufbewahrungspflicht)`) and rights (incl. `EDÖB`); the controller address renders on one line (`Solarweg 1, 8000 Zürich`) — pre-line would turn any source newline into a line break |
+| `test_summary_sheet_is_not_part_of_the_signed_document` | No `summary-sheet` markup, no "Auf einen Blick"/"Günstiger Lokalstrom"/"Tarifstabilität"; Appendix A renders its general/non-binding heading and `precedence_note` hierarchy statement; no `info-note` box (the removed disclaimer) |
+| `test_corrected_contract_clauses_render_without_unsafe_shortcuts` | The signed document renders the legal/operational guardrails (tenancy-law reservation, grid-operator-area join condition, universal-service guarantee, regulatory-change dissolution) without promising unrestricted clauses |
+| `test_no_page_is_left_nearly_empty` | Every page carries ≥ 100 extracted characters (guards against the previous signatures-only page of ~180 chars) |
+| `test_signature_block_is_never_split_across_pages` | The page with `Unterschriften` also contains `Ort, Datum` and `Unterschrift` (heading + intro + grids travel as one `.sig-section`) |
+| `test_free_text_notes_keep_line_breaks_and_escape_markup` | Multiline notes keep `
 
-Total: 37 test methods across 6 classes in `test_contract_context.py`.
+` in the rendered markup, `<script>` content is HTML-escaped, and the `.freetext-box` rule sets `white-space: pre-line` + `overflow-wrap: anywhere` |
+| `test_very_long_notes_do_not_balloon_the_document` | A ~3,800-char note keeps the PDF ≤ 12 pages and Appendix B still renders last |
+| `test_unassigned_meter_placeholder_is_neutral` | Without assignments the markup shows the `meter_none` statement once per meter group and never a bare `CH` chip |
+
+**`ContractIssuanceTests`** (11 tests):
+
+| Test | Asserts |
+|---|---|
+| `test_first_download_issues_version_one_with_sequence_number` | First issue → version 1, `CTR-2026-0001`, PDF stored, sha256 `context_hash`, `zev.contract_counter` incremented |
+| `test_unchanged_redownload_reuses_the_frozen_snapshot` | Identical rendered HTML → the stored issue is returned, no new row, byte-identical PDF |
+| `test_redownload_on_a_later_calendar_day_reuses_the_frozen_snapshot` | The "today" date in the rendered document does not force a new version on a later day |
+| `test_concurrent_identical_issuances_mint_a_single_version` | Two threads rendering identical content under the Zev row lock produce one issue; the unused minted number is audited as a `contract.number_gap` event |
+| `test_contract_issues_survive_participant_and_zev_deletion` | `ContractIssue` rows are not cascade-deleted with participant or ZEV (snapshot persists) |
+| `test_data_change_bumps_version_and_number` | A tariff change mints version 2 with `CTR-2026-0002` and different bytes |
+| `test_document_number_sequence_is_per_zev` | Two ZEVs each start at `CTR-2026-0001` |
+| `test_new_issue_renders_the_stable_document_number_in_the_pdf` | The rendered document embeds the stable `document_id` |
+| `test_contract_pdf_endpoint_streams_the_issued_snapshot` | `GET /api/v1/zev/participants/{pk}/contract-pdf/` streams `application/pdf`, filename carries `_v1`, unchanged re-download adds no issue but writes a `contract.download` audit event |
+| `test_concurrent_first_issuances_get_distinct_versions` | A request that read `latest` before a competing first issuance committed derives the version from the row visible under the Zev row lock — no `(participant, version)` collision |
+| `test_issue_zev_is_derived_from_the_participant` | `ContractIssue.save()` derives the denormalized `zev` from `participant.zev` |
+
+Total: 48 test methods across 7 classes in `test_contract_context.py`.
 
 ### Backend — `invoices/test_template_admin.py`
 
 **`TemplateAdminPermissionTests`** (6), **`EmailTemplateAdminTests`** (4),
 **`PdfTemplatePreviewTests`** (4), **`PdfTemplateAdminTests`** (3) and
 **`PdfTemplateOverrideIntegrityTests`** (8) — 25 test methods across 5
-classes. The override-integrity class guards save-time validation
-(`test_broken_override_is_rejected_and_nothing_is_stored`,
-`test_patch_rejects_unknown_template_variables`), staleness
-(`test_valid_override_is_stored_with_default_digest_and_not_stale`,
-`test_get_flags_override_saved_against_an_older_default_as_stale`,
-`test_override_without_digest_provenance_is_never_stale`,
-`test_default_template_is_never_stale`) and the legacy-override compatibility
-claims (`test_override_with_shared_base_include_renders_through_the_real_path`,
-`test_legacy_override_without_include_still_renders`).
+classes.
+
+**`PdfTemplateOverrideIntegrityTests`** (8 tests):
+
+| Test | Asserts |
+|---|---|
+| `test_broken_override_is_rejected_and_nothing_is_stored` | PATCH with broken template syntax → 400, no `PdfTemplate` row |
+| `test_valid_override_is_stored_with_default_digest_and_not_stale` | PATCH validates via render; row stores `default_digest`, response `is_stale: false` |
+| `test_get_flags_override_saved_against_an_older_default_as_stale` | A stored digest that no longer matches the on-disk default → `is_stale: true` on GET |
+| `test_override_without_digest_provenance_is_never_stale` | A row with blank `default_digest` (no provenance) → `is_customized: true`, `is_stale: false` |
+| `test_patch_rejects_unknown_template_variables` | `{{ participant.emali }}` renders as a sentinel under the strict-validation engine → 400 naming the variable, nothing stored |
+| `test_default_template_is_never_stale` | No row → `is_customized: false`, `is_stale: false` |
+| `test_override_with_shared_base_include_renders_through_the_real_path` | Current default stored as override still resolves `{% include "pdf/shared_pdf_base.html" %}` through the real `generate_contract_pdf` path (shared-base CSS present) |
+| `test_legacy_override_without_include_still_renders` | A pre-redesign override with its own full markup still renders a PDF without error |
+
+(8 methods — the class also guards the compat claim that old overrides keep
+working.)
 
 ### Regression coverage in `invoices/test_pdf.py`
 
@@ -587,23 +542,142 @@ described in §5.1.
 
 ### Validation commands
 
-- `python -m pytest -q` — full backend suite green (see §11 for the counts
-  verified against this branch).
+- `python -m pytest -q` — full backend suite green, 1103 tests (incl.
+  contract context, issuance and template-override tests).
 - `ruff check invoices/` — lint clean.
 - `python manage.py makemigrations --check --dry-run` — no missing migrations.
+- `npm run test:unit` + `npm run build` — frontend (template editor field
+  reference and stale banner) green.
 - Manual: render de/fr/it/en sample PDFs via the admin template preview
   (`/api/v1/invoices/invoices/contract-pdf-template/` POST) and eyeball
   pagination — signature block must not split, footer on every page.
 
 ### Acceptance criteria
 
-- [ ] Invoice and contract PDFs include the same shared design base; invoice
+- [x] Invoice and contract PDFs include the same shared design base; invoice
       markup unchanged (only CSS extracted).
-- [ ] Contract renders: page 1 document header, running footer on every page (no running header),
+- [x] Contract renders: page 1 document header, running footer on every page (no running header),
       `Seite N von M` counters on every page.
-- [ ] All system-known values pre-filled (owner address, participation start,
+- [x] All system-known values pre-filled (owner address, participation start,
       active VAT rate, document id); only signature/date lines blank.
-- [ ] No `Gebäude / Wohnung` field anywhere in the contract template or
+- [x] No `Gebäude / Wohnung` field anywhere in the contract template or
       translation dicts.
-- [ ] Full backend suite green; ruff clean.
-- [ ] This spec's field names, paths, and test counts verified against code.
+- [x] Empty freetext notes print a blank box on issued contracts — never
+      placeholder prose; placeholders exist only in admin previews.
+- [x] PDF-template PATCH validates by rendering before storing; broken
+      overrides are rejected with 400 and nothing is persisted.
+- [x] Overrides carry `default_digest`; GET/PATCH surface `is_stale` when the
+      on-disk default changed since the override was saved (migration `0009`
+      backfills legacy rows; blank digest is never stale).
+- [x] Contract downloads freeze a versioned snapshot (`ContractIssue`,
+      `CTR-YYYY-NNNN` per-ZEV sequence); unchanged re-downloads reuse it and
+      data changes mint a new version.
+- [x] Concurrent issuances cannot collide on number or version; re-downloads
+      are audited (`contract.download`), issuance writes `contract.issue`,
+      unused minted numbers write `contract.number_gap`.
+- [x] The passing of a calendar day does not re-issue a contract (renders
+      reproduce `rendered_on`); concurrent identical issuances mint one
+      version.
+- [x] Issued snapshots survive participant/ZEV deletion (SET_NULL archive);
+      PDF-template PATCH rejects unknown template variables with 400.
+- [x] Full backend suite green; ruff clean.
+- [x] This spec's field names, paths, and test counts verified against code.
+
+## 12. Template-override hardening
+
+The whole-document override model (a `PdfTemplate` row replacing the on-disk
+HTML) is kept, but is now validated at the door and provenance-aware:
+
+- **PATCH validates before storing.** `PdfTemplateView.patch` renders the
+  submitted content against its sample context (same helper as the preview
+  endpoint, `_render_with_sample_context`) and returns 400 on any render
+  error — a broken override or one with a template syntax error can no
+  longer be saved to fail later at document-render (email) time. Validation
+  additionally runs in **strict mode** through the dedicated
+  `strict-validation` template engine (`config/settings.py`, `string_if_invalid`
+  sentinel): Django normally renders unknown variables as an empty string, so
+  a typo like `{{ participant.emali }}` would silently produce a broken PDF —
+  the sentinel turns any unknown variable into a 400 that names the variable.
+  (The sample contexts mirror the real render contexts, so a variable the
+  default template legitimately uses is never flagged; the invoice sample
+  gained `unit_label` and `zev.invoice_language`, the contract sample
+  `payment_terms_unit` to stay in parity.)
+- **Provenance.** `PdfTemplate.default_digest` snapshots the sha256 of the
+  on-disk default at save time. Migration `0009` backfills pre-existing
+  overrides with the digest of the default shipping in that release — this is
+  a **baseline, not a detection**: legacy rows carry no history, so an
+  override saved against an older release is treated as fresh (its true
+  provenance is unknowable from the stored data) and can only be flagged
+  stale once a *future* release changes the default again. `is_stale` is
+  computed on read — stored digest vs. the current on-disk default — and
+  returned by GET/PATCH; the frontend template editor shows a banner on stale
+  overrides and a hint to keep the
+  `{% include "pdf/shared_pdf_base.html" %}` line. A blank digest (no
+  provenance) is never flagged stale.
+- **Compat preserved.** Overrides saved before the redesign (full markup,
+  no include) keep rendering — pinned by a regression test; overrides that
+  keep the include line get shared-base updates for free.
+- **No cleanup command, deliberately.** The reviewed alternative of an
+  `audit_pdf_templates` management command (classify existing overrides as
+  reset-safe vs. manually-modified) is skipped: no deployment carries
+  pre-redesign overrides, so there is nothing to migrate, and the `is_stale`
+  banner covers the ongoing case. Add the command only if a deployment ever
+  accumulates legacy overrides.
+
+## 13. Contract issuance and versioning
+
+The contract is no longer a throwaway render of mutable state:
+
+- **`ContractIssue`** (`invoices.models`, migration `0010`) stores a
+  frozen snapshot per issuance: `participant`, `zev`, `version`,
+  `document_number`, `language`, `rendered_on` (the calendar date the document
+  was rendered with — its issue date), `context_hash` (sha256 of the rendered
+  HTML), the PDF bytes, `issued_at` and `issued_by`; unique on
+  `(participant, version)`. `zev` is a denormalized copy of `participant.zev`
+  derived in `save()` so the two can never disagree.
+- **Issue-date freeze.** Change detection reproduces the stored document
+  rather than re-rendering at "today": `_build_contract_context`/
+  `_render_contract_html` accept an `as_of` date, and the comparison renders
+  with `latest.rendered_on` + `latest.document_number`. The passing of a
+  calendar day alone therefore never mints a new version (the printed issue
+  date is part of the signed document); only a data/template/VAT change that
+  alters the frozen document's content does.
+- **Retention.** Both foreign keys are `SET_NULL`: deleting a participant or
+  ZEV retains the issued snapshots as an immutable archive
+  (`document_number` + the audit log keep the traceability; the retained
+  `zev` column survives participant deletion). There is deliberately **no
+  historical-download endpoint yet** — the API streams the latest issue only;
+  earlier versions exist in the archive for future retrieval (known
+  limitation).
+- **`issue_contract_pdf(participant)`** renders, hashes, and either reuses
+  the latest stored snapshot (unchanged content — same bytes, no new
+  version) or mints a new version. `generate_contract_pdf` stays as the pure
+  render for tests/previews.
+- **Concurrency.** Number minting and issue creation share one transaction;
+  the per-ZEV counter lock (`select_for_update`) serializes concurrent
+  issuances. `latest` is re-read and re-compared under that lock — before
+  minting and again after the counter bump — so a competing issuance that
+  committed while this request waited is either reused (identical content
+  mints **no redundant version**; the unused counter bump is an accepted
+  number gap, written to the audit stream as a `contract.number_gap`
+  SYSTEM event carrying the skipped and reused document numbers) or taken
+  into account for the next version. A lost race can
+  never collide on `(participant, version)`.
+- **Document numbers** are a per-ZEV sequence `CTR-YYYY-NNNN` from
+  `Zev.contract_counter` (migration `zev/0017`, atomic `F()` increment,
+  `next_contract_number(year=...)`), exported in the ZEV transfer schema.
+- **Download flow.** `GET /api/v1/zev/participants/{pk}/contract-pdf/`
+  issues on first download and streams the snapshot afterwards; the
+  filename carries the version (`contract_{last}_{first}_v{n}.pdf`). A new
+  issuance writes a `contract.issue` PARTICIPANT audit event; an unchanged
+  re-download writes a `contract.download` event (with
+  `reused_snapshot: true`), so every receipt of the signed document is
+  traceable.
+- **Storage.** PDF bytes live in a `BinaryField` per snapshot (~50–400 KB
+  each). Growth is proportional to participants × versions; whole-ZEV export
+  (transfer archive) covers archival copies. Object storage is not in scope
+  for this change.
+
+Future work (not in this change): signature capture (place/date + upload,
+later e-sign), PDF/A + PDF metadata for the 10-year retention clause, and
+migrating the remaining translation dicts to gettext.

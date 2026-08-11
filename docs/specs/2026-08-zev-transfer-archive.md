@@ -59,7 +59,13 @@ UI under ProtectedRoute roles `admin` / `zev_owner` on `ZevSettingsPage.tsx`.
 
 ## 4. Data model
 
-No new models or migrations. The archive reads and writes existing models:
+No new models or migrations for the archive itself (it reads and writes
+existing models); the contract-snapshot work this release adds one column
+(`Zev.contract_counter`, migration `zev/0017`) that is exported in the
+transfer schema, and the `ContractIssue` snapshot table
+(`invoices/`, migration `0010`) is intentionally **not** part of the
+archive — issued PDFs travel with their ZEV via the schema, not as rows.
+The archive reads and writes:
 `zev.models.Zev`, `zev.models.Participant`, `zev.models.MeteringPoint`,
 `zev.models.MeteringPointAssignment`, `tariffs.models.Tariff`,
 `tariffs.models.TariffPeriod`, `invoices.models.Invoice`,

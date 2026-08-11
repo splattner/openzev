@@ -2,23 +2,28 @@ import io
 import re
 from datetime import date
 from decimal import Decimal
+from hashlib import sha256
 from unittest.mock import patch
 
 from django.template.loader import render_to_string
 from django.test import TestCase
 
 from accounts.models import AppSettings, UserRole, VatRate
+from audit.models import AuditEvent
 from invoices.contract_pdf import (
     CONTRACT_TEMPLATE_NAME,
     _build_contract_context,
+    _render_contract_html,
     generate_contract_pdf,
+    issue_contract_pdf,
 )
 from invoices.contract_translations import CONTRACT_TRANSLATIONS
+from invoices.models import ContractIssue
 from invoices.test_helpers import make_participant, make_user, make_zev
 from invoices.template_context import build_sample_contract_context
 from tariffs.models import BillingMode, EnergyType
 from testing.factories import TariffFactory, assignment_for, flat_tariff
-from zev.models import MeteringPoint, MeteringPointAssignment, MeteringPointType
+from zev.models import MeteringPoint, MeteringPointAssignment, MeteringPointType, Zev
 
 
 _STYLE_BLOCK_RE = re.compile(r"<style>.*?</style>", re.DOTALL)
@@ -354,6 +359,216 @@ class ContractPdfTariffRuleTests(TestCase):
         self.assertIn("freetext-box", markup)
         self.assertNotIn("freetext-placeholder", markup)
         self.assertNotIn("Beispiel: Der Tarif", markup)
+
+
+class ContractIssuanceTests(TestCase):
+    """Issued contracts are frozen, versioned snapshots: unchanged re-downloads
+    reuse the stored PDF, data changes mint a new numbered version, and the
+    document number is a per-ZEV sequence."""
+
+    def setUp(self):
+        self.owner = make_user("issue_owner", UserRole.ZEV_OWNER)
+        self.zev = make_zev(self.owner, "Issuance ZEV")
+        self.participant = make_participant(self.zev, first="Issue", last="Participant")
+        flat_tariff(self.zev, price="0.18000")
+
+    def _issue(self, today=date(2026, 4, 15)):
+        with patch("invoices.contract_pdf.timezone.localdate") as mocked_localdate:
+            mocked_localdate.return_value = today
+            return issue_contract_pdf(self.participant)
+
+    def test_first_download_issues_version_one_with_sequence_number(self):
+        issue, created = self._issue()
+
+        self.assertTrue(created)
+        self.assertEqual(issue.version, 1)
+        self.assertEqual(issue.document_number, "CTR-2026-0001")
+        self.assertTrue(issue.pdf.startswith(b"%PDF"))
+        self.assertEqual(len(issue.context_hash), 64)
+        self.zev.refresh_from_db()
+        self.assertEqual(self.zev.contract_counter, 2)
+
+    def test_unchanged_redownload_reuses_the_frozen_snapshot(self):
+        first, _ = self._issue()
+        second, created = self._issue()
+
+        self.assertFalse(created)
+        self.assertEqual(second.pk, first.pk)
+        self.assertEqual(second.pdf, first.pdf)
+        self.assertEqual(ContractIssue.objects.count(), 1)
+
+    def test_redownload_on_a_later_calendar_day_reuses_the_frozen_snapshot(self):
+        """The issue date is frozen into the snapshot (``rendered_on``): a
+        re-download reproduces the issued document at that date, so the passing
+        of a calendar day alone must never mint a new version."""
+        first, created = self._issue(today=date(2026, 4, 15))
+        self.assertTrue(created)
+
+        second, created = self._issue(today=date(2026, 8, 11))
+
+        self.assertFalse(created)
+        self.assertEqual(second.pk, first.pk)
+        self.assertEqual(second.pdf, first.pdf)
+        self.assertEqual(ContractIssue.objects.count(), 1)
+
+    def test_concurrent_identical_issuances_mint_a_single_version(self):
+        """A competing issuance of identical content that commits while this
+        request waits is reused, not re-minted — the row becomes visible under
+        the Zev lock and the post-lock comparison reproduces it."""
+        def _competing_issuer(year=None):
+            # Simulate the other request's identical first issuance having
+            # landed while this one was inside the locked section.
+            if not ContractIssue.objects.filter(participant=self.participant).exists():
+                html = _render_contract_html(
+                    self.participant,
+                    document_id="CTR-2026-0001",
+                    as_of=date(2026, 4, 15),
+                )
+                ContractIssue.objects.create(
+                    zev=self.zev,
+                    participant=self.participant,
+                    version=1,
+                    document_number="CTR-2026-0001",
+                    language="de",
+                    rendered_on=date(2026, 4, 15),
+                    context_hash=sha256(html.encode("utf-8")).hexdigest(),
+                    pdf=b"%PDF-competing",
+                )
+            return f"CTR-{year}-0002"
+
+        with patch("invoices.contract_pdf.timezone.localdate") as mocked_localdate:
+            mocked_localdate.return_value = date(2026, 4, 15)
+            with patch.object(Zev, "next_contract_number", side_effect=_competing_issuer):
+                issue, created = issue_contract_pdf(self.participant)
+
+        self.assertFalse(created)
+        self.assertEqual(issue.version, 1)
+        self.assertEqual(issue.document_number, "CTR-2026-0001")
+        self.assertEqual(ContractIssue.objects.count(), 1)
+
+        # The number minted before the competitor's identical snapshot became
+        # visible is never reused — but the gap is written to the audit
+        # stream so the sequence stays explainable.
+        gap = AuditEvent.objects.get(action_type="contract.number_gap")
+        self.assertEqual(gap.metadata_json["skipped_document_number"], "CTR-2026-0002")
+        self.assertEqual(gap.metadata_json["reused_document_number"], "CTR-2026-0001")
+        self.assertEqual(gap.source, "system")
+
+    def test_contract_issues_survive_participant_and_zev_deletion(self):
+        """Issued contracts are an immutable archive: deleting the participant
+        or the ZEV retains the snapshot (SET_NULL), so a signed document is
+        never destroyed by account cleanup."""
+        issue, _ = self._issue()
+        issue_id = issue.pk
+
+        self.participant.delete()
+        self.zev.delete()
+
+        archived = ContractIssue.objects.get(pk=issue_id)
+        self.assertIsNone(archived.participant_id)
+        self.assertIsNone(archived.zev_id)
+        self.assertEqual(archived.version, 1)
+        self.assertEqual(archived.document_number, "CTR-2026-0001")
+        self.assertTrue(archived.pdf.startswith(b"%PDF"))
+
+    def test_data_change_bumps_version_and_number(self):
+        first, _ = self._issue()
+        flat_tariff(self.zev, price="0.19000")  # a second local tariff changes the render
+        second, created = self._issue()
+
+        self.assertTrue(created)
+        self.assertEqual(second.version, 2)
+        self.assertEqual(second.document_number, "CTR-2026-0002")
+        self.assertNotEqual(second.pdf, first.pdf)
+
+    def test_document_number_sequence_is_per_zev(self):
+        other_owner = make_user("issue_owner_other", UserRole.ZEV_OWNER)
+        other_zev = make_zev(other_owner, "Other Issuance ZEV")
+        other_participant = make_participant(other_zev, first="Other", last="Participant")
+        flat_tariff(other_zev, price="0.20000")
+        with patch("invoices.contract_pdf.timezone.localdate") as mocked_localdate:
+            mocked_localdate.return_value = date(2026, 4, 15)
+            other_issue, _ = issue_contract_pdf(other_participant)
+
+        self.assertEqual(other_issue.document_number, "CTR-2026-0001")
+        self.assertEqual(self._issue()[0].document_number, "CTR-2026-0001")
+
+    def test_new_issue_renders_the_stable_document_number_in_the_pdf(self):
+        issue, _ = self._issue()
+
+        context = _build_contract_context(self.participant, document_id=issue.document_number)
+        html = render_to_string(CONTRACT_TEMPLATE_NAME, context)
+        self.assertIn("CTR-2026-0001", html)
+
+    def test_concurrent_first_issuances_get_distinct_versions(self):
+        """A request that read ``latest`` before a competing first issuance
+        committed must derive the version from the row visible under the Zev
+        row lock — not crash on the (participant, version) constraint."""
+        def _competing_issuer(year=None):
+            # Simulate the other request's commit having landed while this one
+            # waited on the row lock: the re-read inside the lock must see it.
+            if not ContractIssue.objects.filter(participant=self.participant).exists():
+                ContractIssue.objects.create(
+                    zev=self.zev,
+                    participant=self.participant,
+                    version=1,
+                    document_number="CTR-2026-0001",
+                    language="de",
+                    context_hash="0" * 64,
+                    pdf=b"%PDF-competing",
+                )
+            return f"CTR-{year}-0002"
+
+        with patch("invoices.contract_pdf.timezone.localdate") as mocked_localdate:
+            mocked_localdate.return_value = date(2026, 4, 15)
+            with patch.object(Zev, "next_contract_number", side_effect=_competing_issuer):
+                issue, created = issue_contract_pdf(self.participant)
+
+        self.assertTrue(created)
+        self.assertEqual(issue.version, 2)
+        self.assertEqual(issue.document_number, "CTR-2026-0002")
+
+    def test_issue_zev_is_derived_from_the_participant(self):
+        """``ContractIssue.zev`` is a denormalized copy of ``participant.zev``;
+        save() derives it so the two can never disagree."""
+        other_owner = make_user("issue_owner_zev_derive", UserRole.ZEV_OWNER)
+        other_zev = make_zev(other_owner, "Derivation ZEV")
+
+        issue = ContractIssue.objects.create(
+            zev=other_zev,  # deliberately wrong — save() must override it
+            participant=self.participant,
+            version=99,
+            document_number="CTR-X-0099",
+            language="de",
+            context_hash="0" * 64,
+            pdf=b"%PDF",
+        )
+
+        self.assertEqual(issue.zev, self.zev)
+
+    def test_contract_pdf_endpoint_streams_the_issued_snapshot(self):
+        from rest_framework.test import APIClient
+
+        client = APIClient()
+        client.force_authenticate(self.owner)
+        url = f"/api/v1/zev/participants/{self.participant.pk}/contract-pdf/"
+
+        resp = client.get(url)
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp["Content-Type"], "application/pdf")
+        self.assertIn("_v1.pdf", resp["Content-Disposition"])
+        issue = ContractIssue.objects.get()
+        self.assertEqual(issue.issued_by, self.owner)
+        self.assertTrue(AuditEvent.objects.filter(action_type="contract.issue").exists())
+
+        # Unchanged re-download reuses the snapshot — no new version, no new
+        # issuance, but the download itself is audited.
+        resp = client.get(url)
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(ContractIssue.objects.count(), 1)
+        download = AuditEvent.objects.get(action_type="contract.download")
+        self.assertEqual(download.metadata_json["version"], 1)
+        self.assertTrue(download.metadata_json["reused_snapshot"])
 
 
 class ContractPdfTranslationParityTests(TestCase):

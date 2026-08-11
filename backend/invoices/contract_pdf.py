@@ -3,6 +3,7 @@ Contract PDF generation for ZEV participation agreements.
 Renders an HTML template via Django's template engine and converts it to PDF
 using WeasyPrint.
 """
+from datetime import date
 from decimal import Decimal
 
 from django.template.loader import render_to_string
@@ -20,7 +21,7 @@ from zev.models import MeteringPointType
 CONTRACT_TEMPLATE_NAME = "contracts/participant_contract_pdf.html"
 
 
-def _build_local_tariff_display(zev, tr: dict, date_pattern: str) -> list[dict]:
+def _build_local_tariff_display(zev, tr: dict, date_pattern: str, as_of: date) -> list[dict]:
     """Return a list of display rows for all active local energy tariffs of the ZEV.
 
     Each row: {"name", "rate_rp", "rate_description", "pct", "unit",
@@ -30,9 +31,9 @@ def _build_local_tariff_display(zev, tr: dict, date_pattern: str) -> list[dict]:
     price exists (the rate then displays as a bare percentage). validity is the
     formatted validity span (open-ended tariffs render via tr["tariff_valid_open"]);
     notes forwards Tariff.notes so a configured reference product can be
-    printed in clause 5.
+    printed in clause 5. Tariffs are filtered against ``as_of`` so a re-download
+    reproduces the issued document rather than today's state.
     """
-    today = timezone.localdate()
     rows = []
 
     # Fetch all tariffs once and partition in Python. The grid base price for
@@ -41,7 +42,7 @@ def _build_local_tariff_display(zev, tr: dict, date_pattern: str) -> list[dict]:
     tariffs = list(zev.tariffs.prefetch_related("periods").all())
 
     def _active(t, *, local):
-        if t.valid_from > today or (t.valid_to is not None and t.valid_to < today):
+        if t.valid_from > as_of or (t.valid_to is not None and t.valid_to < as_of):
             return False
         return t.energy_type == (EnergyType.LOCAL if local else EnergyType.GRID)
 
@@ -150,7 +151,8 @@ def _build_local_tariff_display(zev, tr: dict, date_pattern: str) -> list[dict]:
     return rows
 
 
-def _build_contract_context(participant) -> dict:
+def _build_contract_context(participant, document_id: str | None = None,
+                            as_of: date | None = None) -> dict:
     from zev.models import MeteringPoint, MeteringPointAssignment
 
     zev = participant.zev
@@ -174,11 +176,14 @@ def _build_contract_context(participant) -> dict:
     # ZEV owner as participant (for address details)
     owner_participant = zev.participants.filter(user=zev.owner).first()
 
-    # The contract PDF is generated on demand, so "today" doubles as the issue
-    # date. localdate() applies Django's configured timezone (Europe/Zurich)
-    # rather than the server's, so the document date matches the business
-    # calendar.
-    today = timezone.localdate()
+    # The effective issue date: "today" for a fresh render, the snapshot's
+    # rendered_on for a change-detection re-render. Every date-sensitive lookup
+    # below (assignment filtering, contract date, active VAT rate, active
+    # tariffs) goes through as_of so the re-render reproduces the issued
+    # document byte-for-byte — the passing of time alone never mints a version.
+    # localdate() applies Django's configured timezone (Europe/Zurich) rather
+    # than the server's, so the document date matches the business calendar.
+    as_of = as_of or timezone.localdate()
 
     # Include all non-ended assignments so the contract can be prefilled for
     # participants who start on a future meter assignment.
@@ -191,7 +196,7 @@ def _build_contract_context(participant) -> dict:
     ) | set(
         MeteringPointAssignment.objects.filter(
             participant=participant,
-            valid_to__gte=today,
+            valid_to__gte=as_of,
         ).values_list("metering_point_id", flat=True)
     )
 
@@ -211,11 +216,11 @@ def _build_contract_context(participant) -> dict:
     app_settings = AppSettings.load()
     date_pattern = app_settings.date_format_short
 
-    local_tariff_rows = _build_local_tariff_display(zev, tr, date_pattern)
+    local_tariff_rows = _build_local_tariff_display(zev, tr, date_pattern, as_of)
     billing_interval_display = tr["billing_intervals"].get(
         zev.billing_interval, zev.billing_interval
     )
-    contract_date = format_date_value(today, date_pattern)
+    contract_date = format_date_value(as_of, date_pattern)
 
     # Clause-5 tariff rule, derived from the first active local tariff so the
     # green box, tariff table and clause always agree on the governing rule: a
@@ -242,14 +247,16 @@ def _build_contract_context(participant) -> dict:
     ).order_by("valid_from").values_list("valid_from", flat=True).first()
     participation_start = format_date_value(first_assignment_start or participant.valid_from, date_pattern)
 
-    # Short document id for traceability on paper (a compact digest of the
-    # participant's primary key, not the internal id itself).
-    document_id = f"CTR-{str(participant.pk).replace('-', '')[:8].upper()}"
+    # Short document id for traceability on paper. Issued contracts carry the
+    # stable per-ZEV document number; the pure render path falls back to a
+    # compact digest of the participant's primary key.
+    if document_id is None:
+        document_id = f"CTR-{str(participant.pk).replace('-', '')[:8].upper()}"
 
     # Show the currently active VAT rate when the ZEV is VAT-liable.
     vat_rate_display = ""
     if zev.vat_number:
-        active_rate = VatRate.active_for_day(today)
+        active_rate = VatRate.active_for_day(as_of)
         if active_rate is not None:
             vat_rate_display = f"{float(active_rate.rate) * 100:.2f} %"
 
@@ -275,9 +282,10 @@ def _build_contract_context(participant) -> dict:
     }
 
 
-def _render_contract_html(participant) -> str:
+def _render_contract_html(participant, document_id: str | None = None,
+                          as_of: date | None = None) -> str:
     """Render the contract HTML for a participant (DB override wins)."""
-    context = _build_contract_context(participant)
+    context = _build_contract_context(participant, document_id=document_id, as_of=as_of)
     # Import here to avoid circular imports at module load time
     from .models import PdfTemplate
     record = PdfTemplate.objects.filter(template_name=CONTRACT_TEMPLATE_NAME).first()
@@ -286,6 +294,123 @@ def _render_contract_html(participant) -> str:
     return render_to_string(CONTRACT_TEMPLATE_NAME, context)
 
 
-def generate_contract_pdf(participant) -> bytes:
-    """Generate a participation contract PDF for the given participant."""
-    return render_pdf(_render_contract_html(participant))
+def generate_contract_pdf(participant, document_id: str | None = None) -> bytes:
+    """Generate a participation contract PDF for the given participant.
+
+    Pure render: always re-derives the current state. Issued documents should
+    go through :func:`issue_contract_pdf`, which freezes a versioned snapshot.
+    """
+    return render_pdf(_render_contract_html(participant, document_id=document_id))
+
+
+def _record_number_gap(participant, skipped_number, reused_issue, issued_by):
+    """Audit a document number that was minted but never used.
+
+    Happens when two concurrent issuances race for identical content: both
+    mint a number under the Zev lock, but the second reuses the snapshot the
+    first committed, leaving a gap in the per-ZEV sequence (e.g. ``0001``
+    then ``0003``). The gap is accepted — never papered over by reusing
+    numbers — but recorded so the sequence stays explainable.
+    """
+    from audit.models import AuditActionCategory, AuditEventSource
+    from audit.services import record_audit_event
+
+    record_audit_event(
+        action_category=AuditActionCategory.PARTICIPANT,
+        action_type="contract.number_gap",
+        target_type="zev.Participant",
+        target_id=str(participant.pk),
+        target_display=participant.full_name,
+        summary=(
+            f"Contract number {skipped_number} minted but unused "
+            f"(identical snapshot v{reused_issue.version} reused); accepted sequence gap."
+        ),
+        user=issued_by,
+        zev=participant.zev,
+        source=AuditEventSource.SYSTEM,
+        metadata={
+            "zev_id": str(participant.zev_id),
+            "skipped_document_number": skipped_number,
+            "reused_version": reused_issue.version,
+            "reused_document_number": reused_issue.document_number,
+        },
+    )
+
+
+def issue_contract_pdf(participant, issued_by=None) -> tuple:
+    """Return the frozen participation-contract snapshot for ``participant``.
+
+    Unchanged re-downloads reuse the latest stored snapshot (same rendered
+    HTML hash); any data or template change mints a new version with the next
+    per-ZEV document number. ``issued_by`` is recorded on the snapshot for
+    traceability. Returns ``(ContractIssue, created: bool)``.
+    """
+    from hashlib import sha256
+
+    from django.db import transaction
+
+    from .models import ContractIssue
+
+    zev = participant.zev
+
+    # One issue date per issuance, resolved through Django's configured
+    # timezone: the rendered document date, the document-number year and the
+    # frozen rendered_on must all agree — three separate date.today() calls
+    # could straddle midnight around the turn of a business day.
+    issue_date = timezone.localdate()
+
+    def _matches_issue(issue) -> bool:
+        """True when a re-render of ``issue`` (its document number and its
+        issue date) still produces exactly the stored HTML. Rendering at the
+        issue date rather than today keeps the passing of time out of the
+        change detection: a calendar day alone never mints a version."""
+        html = _render_contract_html(
+            participant, document_id=issue.document_number, as_of=issue.rendered_on
+        )
+        return sha256(html.encode("utf-8")).hexdigest() == issue.context_hash
+
+    latest = ContractIssue.objects.filter(participant=participant).order_by("-version").first()
+    if latest and _matches_issue(latest):
+        return latest, False
+
+    # Number minting and issue creation share one transaction. The number is
+    # minted under a row lock (see Zev.next_contract_number), which serializes
+    # concurrent issuances for the same ZEV. ``latest`` is re-read and
+    # re-compared under that lock — before minting and again after it — so a
+    # competing issuance that committed while we waited is either reused
+    # (identical content mints no redundant version) or taken into account for
+    # the next version. A lost race can never collide on ``(participant,
+    # version)``. If rendering or creation fails, the counter bump rolls back
+    # with it.
+    with transaction.atomic():
+        latest = ContractIssue.objects.filter(participant=participant).order_by("-version").first()
+        if latest and _matches_issue(latest):
+            return latest, False
+        year = issue_date.year
+        document_number = zev.next_contract_number(year=year)
+        # Re-read after minting: the Zev row lock serializes issuances, so any
+        # competing issue that committed while we waited is visible now. A
+        # competitor that landed the identical document is reused (no redundant
+        # version; the unused counter bump is an accepted number gap, written
+        # to the audit stream so the sequence is explainable); a competitor
+        # with different content is taken into account for the version
+        # derivation below.
+        latest = ContractIssue.objects.filter(participant=participant).order_by("-version").first()
+        if latest and _matches_issue(latest):
+            _record_number_gap(participant, document_number, latest, issued_by)
+            return latest, False
+        html = _render_contract_html(participant, document_id=document_number, as_of=issue_date)
+        digest = sha256(html.encode("utf-8")).hexdigest()
+
+        issue = ContractIssue.objects.create(
+            zev=zev,
+            participant=participant,
+            version=(latest.version + 1) if latest else 1,
+            document_number=document_number,
+            language=zev.invoice_language or "de",
+            rendered_on=issue_date,
+            context_hash=digest,
+            pdf=render_pdf(html),
+            issued_by=issued_by,
+        )
+    return issue, True

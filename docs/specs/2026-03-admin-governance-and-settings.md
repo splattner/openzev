@@ -209,7 +209,7 @@ All three PDF template endpoints are served by `PdfTemplateView` (`views_templat
 | `/api/v1/invoices/invoices/pdf-template/` | GET | `IsAdmin` | Returns `{ template_name, content, is_customized, is_stale }` — DB override if present, else the on-disk default; `is_stale` compares the stored `default_digest` against the current on-disk default |
 | `/api/v1/invoices/invoices/pdf-template/` | PATCH | `IsAdmin` | Validates `content` before storing: rendered against the sample context through the `strict-validation` engine — syntax errors and unknown output variables (e.g. `{{ invoice.emali }}`) are rejected with `400` and nothing is stored. Then `update_or_create` of the `PdfTemplate` row storing `default_digest` (sha256 of the on-disk default); audit-logged (`template.invoice_pdf.update`). Returns `{ template_name, content, is_customized: true, is_stale: false, detail }`. Blank/non-string content → `400` |
 | `/api/v1/invoices/invoices/pdf-template/` | DELETE | `IsAdmin` | Deletes the DB override (reverts to on-disk default); audit-logged (`template.invoice_pdf.reset`). Returns `{ template_name, content, is_customized: false, detail }` with the default content |
-| `/api/v1/invoices/invoices/contract-pdf-template/` | GET/PATCH/DELETE | same | Same behaviour for `invoices/contract_pdf.html` (audit prefix `template.contract_pdf`) |
+| `/api/v1/invoices/invoices/contract-pdf-template/` | GET/PATCH/DELETE | same | Same behaviour for `contracts/participant_contract_pdf.html` (audit prefix `template.contract_pdf`) |
 | `/api/v1/invoices/invoices/annual-statement-pdf-template/` | GET/PATCH/DELETE | same | Same behaviour for `invoices/annual_statement_pdf.html` (audit prefix `template.annual_statement_pdf`) |
 | `/api/v1/invoices/invoices/preview-pdf-template/` | POST | `IsAdmin` | Renders submitted `content` with sample data (`template_type`: `invoice` (default) / `contract` / `annual_statement`) and returns `{ html }`. Render errors or missing content → `400` |
 
@@ -278,6 +278,16 @@ Template variable resolution:
 **Module:** `invoices.contract_pdf`
 
 Uses `CONTRACT_TEMPLATE_NAME = "contracts/participant_contract_pdf.html"` rendered with WeasyPrint.
+
+**Snapshot issuance (redesign, SPEC-2026-08-contract-pdf-redesign):** the
+download endpoint `GET /api/v1/zev/participants/{pk}/contract-pdf/` no longer
+generates a throwaway render — it issues or reuses a persisted versioned
+snapshot (`ContractIssue`, migration `invoices/0010`): first download
+mints version 1 with a per-ZEV document number `CTR-YYYY-NNNN`
+(`Zev.contract_counter`, migration `zev/0017`), unchanged re-downloads reuse
+the frozen PDF, data changes mint a new version, and every receipt is
+audited (`contract.issue` / `contract.download`). The response filename
+carries the version: `contract_{last}_{first}_v{n}.pdf`.
 
 **Multi-language support:** `CONTRACT_TRANSLATIONS` dict with keys `de`, `fr`, `it`, `en`. Language is determined by `zev.invoice_language or "de"`.
 

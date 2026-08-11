@@ -352,15 +352,50 @@ class ParticipantViewSet(AuditedUpdateMixin, ZevScopedQuerySetMixin, viewsets.Mo
     @action(detail=True, methods=["get"], url_path="contract-pdf",
             permission_classes=[IsAuthenticated])
     def contract_pdf(self, request, pk=None):
-        """Generate and stream a participation contract PDF for this participant."""
-        from invoices.contract_pdf import generate_contract_pdf
+        """Stream the issued participation-contract PDF for this participant.
+
+        The first download issues version 1; unchanged re-downloads reuse the
+        frozen snapshot, and data changes produce a new numbered version.
+        """
+        from invoices.contract_pdf import issue_contract_pdf
         participant = self.get_object()
         if not request.user.is_admin and not request.user.is_zev_owner:
             if participant.user != request.user:
                 return Response({"detail": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
-        pdf_bytes = generate_contract_pdf(participant)
-        filename = f"contract_{participant.last_name}_{participant.first_name}.pdf"
-        response = HttpResponse(pdf_bytes, content_type="application/pdf")
+        issue, created = issue_contract_pdf(participant, issued_by=request.user)
+        if created:
+            record_audit_event(
+                request=request,
+                action_category=AuditActionCategory.PARTICIPANT,
+                action_type="contract.issue",
+                target_type="zev.Participant",
+                target_id=str(participant.pk),
+                target_display=participant.full_name,
+                summary=f"Issued participation contract v{issue.version} ({issue.document_number}).",
+                metadata={
+                    "zev_id": str(participant.zev_id),
+                    "version": issue.version,
+                    "document_number": issue.document_number,
+                },
+            )
+        else:
+            record_audit_event(
+                request=request,
+                action_category=AuditActionCategory.PARTICIPANT,
+                action_type="contract.download",
+                target_type="zev.Participant",
+                target_id=str(participant.pk),
+                target_display=participant.full_name,
+                summary=f"Downloaded participation contract v{issue.version} ({issue.document_number}).",
+                metadata={
+                    "zev_id": str(participant.zev_id),
+                    "version": issue.version,
+                    "document_number": issue.document_number,
+                    "reused_snapshot": True,
+                },
+            )
+        filename = f"contract_{participant.last_name}_{participant.first_name}_v{issue.version}.pdf"
+        response = HttpResponse(issue.pdf, content_type="application/pdf")
         response["Content-Disposition"] = f'attachment; filename="{filename}"'
         return response
 

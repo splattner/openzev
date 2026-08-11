@@ -1,5 +1,8 @@
 import uuid
+
+from django.conf import settings
 from django.db import models
+from django.utils import timezone
 from zev.models import Zev, Participant
 from tariffs.models import TariffCategory
 
@@ -102,6 +105,75 @@ class PdfTemplate(models.Model):
 
     def __str__(self) -> str:
         return self.template_name
+
+
+def contract_issue_rendered_on_default():
+    """Default ``ContractIssue.rendered_on``: today in Django's configured
+    timezone.
+
+    A named module-level function (not a lambda) so ``makemigrations`` can
+    serialize it, and never server-local ``date.today``: the issuance machinery
+    resolves every date through Django's timezone, and the model default must
+    agree with it.
+    """
+    return timezone.localdate()
+
+
+class ContractIssue(models.Model):
+    """A frozen participation-contract version as actually issued.
+
+    The contract is not a live render of mutable state: every data change
+    (tariff, owner address, notes, VAT rate, template) produces a new numbered
+    version, while unchanged re-downloads reuse the stored snapshot — so the
+    document a participant signed can always be retrieved exactly as issued.
+    ``context_hash`` is the sha256 of the rendered HTML and doubles as the
+    change detector; re-downloads reproduce the render at ``rendered_on`` (the
+    calendar date the document carries) rather than today, so the passing of
+    time alone never mints a new version. Snapshots are an immutable archive:
+    both foreign keys are ``SET_NULL``, so deleting a participant or ZEV
+    retains the issued documents (``document_number`` + audit log keep the
+    traceability).
+    """
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    zev = models.ForeignKey(
+        Zev, on_delete=models.SET_NULL, null=True, related_name="contract_issues"
+    )
+    participant = models.ForeignKey(
+        Participant, on_delete=models.SET_NULL, null=True, related_name="contract_issues"
+    )
+    version = models.PositiveIntegerField()
+    document_number = models.CharField(max_length=32)
+    language = models.CharField(max_length=2)
+    rendered_on = models.DateField(
+        default=contract_issue_rendered_on_default,
+        help_text="Calendar date the document was rendered with (its issue date)",
+    )
+    context_hash = models.CharField(max_length=64, help_text="sha256 of the rendered HTML")
+    pdf = models.BinaryField(editable=False)
+    issued_at = models.DateTimeField(auto_now_add=True)
+    issued_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL
+    )
+
+    class Meta:
+        ordering = ["-version"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["participant", "version"], name="uniq_contract_issue_participant_version"
+            ),
+        ]
+
+    def save(self, *args, **kwargs):
+        # ``zev`` is a denormalized copy of ``participant.zev`` (cascade and
+        # per-ZEV queries without a join); derive it so the two never disagree.
+        # Archived rows (participant deleted, SET_NULL) keep their stored zev.
+        if self.participant_id is not None:
+            self.zev = self.participant.zev
+        super().save(*args, **kwargs)
+
+    def __str__(self) -> str:
+        return f"{self.document_number} v{self.version} ({self.participant_id})"
 
 
 # ── Email template defaults ─────────────────────────────────────────────
