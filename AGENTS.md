@@ -72,6 +72,7 @@ For larger or risky changes, consult or create specs and ADRs:
   - `2026-03-admin-governance-and-settings.md` — AppSettings, VAT, admin dashboard, ZEV config
   - `2026-05-audit-log-and-operational-traceability.md` — audit event stream, scoped visibility, redaction
   - `2026-08-zev-transfer-archive.md` — whole-ZEV export/import archive
+  - `2026-08-contract-pdf-redesign.md` — contract PDF design, context, shared PDF design base
 
 - **Reference specs** document reusable cross-cutting patterns that should guide future work even when no baseline feature spec changes directly:
   - `2026-04-frontend-management-page-design.md` — reference spec for frontend CRUD / management-page cleanup, action hierarchy, page grouping, icons, i18n discipline, and responsive layouts

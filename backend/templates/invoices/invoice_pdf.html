@@ -1,162 +1,22 @@
 <!DOCTYPE html>
-<html lang="{{ invoice.zev.invoice_language|default:'en' }}">
+<html lang="{{ invoice.zev.invoice_language|default:'de' }}">
 
 <head>
     <meta charset="UTF-8">
     <title>Invoice {{ invoice.invoice_number }}</title>
+    {% comment %}The shared tokens, base, utilities, document-header anatomy
+    and page-meta furniture live in pdf/shared_pdf_base.html so the invoice and
+    contract PDFs stay visually consistent. Customised PdfTemplate overrides
+    store full standalone HTML and are unaffected by the include.{% endcomment %}
+    {% include "pdf/shared_pdf_base.html" %}
+
     <style>
-        /* ══ 1. Tokens & base ════════════════════════════════════ */
-        :root {
-            --ink: #0f172a;
-            --ink-soft: #334155;
-            --muted: #64748b;
-            --line: #e2e8f0;
-            --line-subtle: #f1f5f9;
-            --surface: #f8faf7;
-            --brand: #143828;
-            --brand-deep: #0d2b1d;
-            --brand-mid: #1f5c3a;
-            --brand-pale: #e8f0ec;
-            --brand-glow: #d4e0d7;
-            --gold: #bfa05a;
-            --brand-accent: #9ec3ac;
-            --brand-light: #d6ead9;
-            --brand-muted: #c8dccf;
-            --zebra: #f3f6f2;
-            --chart-surface: #fbfcfb;
-            --subtotal-color: #24352c;
-        }
-
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
-
-        body {
-            font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
-            font-size: 9.5pt;
-            color: var(--ink);
-            line-height: 1.4;
-        }
-
+        /* ══ 2. Page layout ═════════════════════════════════════ */
         .invoice-page {
             padding: 12mm 16mm;
         }
 
-        /* ══ 2. Utilities ════════════════════════════════════════ */
-        .eyebrow {
-            color: var(--muted);
-            font-size: 6.8pt;
-            font-weight: 700;
-            letter-spacing: 0.08em;
-            text-transform: uppercase;
-        }
-
-        /* Visually hidden but screen-reader accessible. */
-        .visually-hidden {
-            position: absolute;
-            width: 1px;
-            height: 1px;
-            padding: 0;
-            margin: -1px;
-            overflow: hidden;
-            clip: rect(0, 0, 0, 0);
-            white-space: nowrap;
-            border: 0;
-        }
-
-        /* ══ 3. Document header ══════════════════════════════════ */
-        .document-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            padding-bottom: 4mm;
-            border-bottom: 0.5pt solid var(--line);
-            position: relative;
-        }
-
-        .document-header::after {
-            content: "";
-            position: absolute;
-            bottom: -0.5pt;
-            left: 0;
-            width: 40mm;
-            height: 1.5pt;
-            background: var(--brand-mid);
-            border-radius: 1pt;
-        }
-
-        .brand-row {
-            display: flex;
-            align-items: center;
-            gap: 2.5mm;
-            margin-bottom: 2mm;
-        }
-
-        .brand-mark {
-            width: 6mm;
-            height: 6mm;
-            background: var(--brand-deep);
-            border-radius: 50%;
-            flex-shrink: 0;
-        }
-
-        .company-name {
-            color: var(--brand-deep);
-            font-size: 15pt;
-            font-weight: 700;
-            letter-spacing: -0.02em;
-            line-height: 1.1;
-            white-space: nowrap;
-        }
-
-        .company-address {
-            margin-top: 1.5mm;
-            color: var(--ink-soft);
-            font-size: 8pt;
-            line-height: 1.4;
-        }
-
-        .document-label {
-            color: var(--muted);
-            font-size: 7pt;
-            font-weight: 700;
-            letter-spacing: 0.1em;
-            text-align: right;
-            text-transform: uppercase;
-            margin-bottom: 1mm;
-        }
-
-        .document-number {
-            color: var(--ink);
-            font-size: 22pt;
-            font-weight: 300;
-            letter-spacing: -0.03em;
-            text-align: right;
-            line-height: 1;
-        }
-
-        .document-number strong {
-            font-weight: 700;
-        }
-
-        .document-status {
-            display: inline-block;
-            color: var(--brand-mid);
-            font-size: 7pt;
-            font-weight: 700;
-            letter-spacing: 0.04em;
-            text-transform: uppercase;
-            text-align: right;
-            margin-top: 2mm;
-            padding: 0.8mm 2.2mm;
-            background: var(--brand-pale);
-            border-radius: 3mm;
-            border: 0.5pt solid var(--brand-glow);
-        }
-
-        /* ══ 4. Summary band ═════════════════════════════════════ */
+        /* ══ 3. Summary band ═════════════════════════════════════ */
         .invoice-summary {
             display: flex;
             gap: 10mm;
@@ -347,7 +207,7 @@
             color: rgba(255,255,255,0.45);
         }
 
-        /* ══ 5. Line items ═══════════════════════════════════════ */
+        /* ══ 4. Line items ═══════════════════════════════════════ */
         .line-items {
             border-collapse: separate;
             border-spacing: 0;
@@ -463,7 +323,7 @@
             border-bottom: none;
         }
 
-        /* ══ 6. Closing & totals ═════════════════════════════════ */
+        /* ══ 5. Closing & totals ═════════════════════════════════ */
         .invoice-closing {
             display: flex;
             gap: 8mm;
@@ -540,7 +400,7 @@
             color: var(--muted);
         }
 
-        /* ══ 7. Inline QR page variant ═══════════════════════════ */
+        /* ══ 6. Inline QR page variant ═══════════════════════════ */
         /* Reserve the full Swiss payment-part height at the bottom so the
            QR-Rechnung sits on the same page as short invoices.
            Uses @page margin-bottom + position: running() so content
@@ -550,7 +410,7 @@
             page: invoice-payment;
         }
 
-        /* ══ 8. Dedicated payment page ═══════════════════════════ */
+        /* ══ 7. Dedicated payment page ═══════════════════════════ */
         .payment-page {
             break-before: page;
             page: payment;
@@ -588,7 +448,7 @@
             width: 210mm;
         }
 
-        /* ══ 9. Insights page ════════════════════════════════════ */
+        /* ══ 8. Insights page ════════════════════════════════════ */
         .insights-page {
             break-before: page;
             page: insights;
@@ -730,52 +590,14 @@
             width: 100%;
         }
 
-        /* ══ 10. Page furniture: running header/footer meta ══════ */
-        .page-meta {
-            width: 210mm;
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            color: var(--muted);
-            font-size: 7pt;
-            font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
-        }
-
-        .page-meta-inner {
-            margin: 0 16mm;
-            padding: 2.5mm 0 2mm 0;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            gap: 4mm;
-        }
-
-        .page-meta--footer .page-meta-inner {
-            border-top: 0.5pt solid var(--line);
-        }
-
-        .page-meta--header .page-meta-inner {
-            border-bottom: 0.5pt solid var(--line);
-        }
-
-        .page-meta .meta-left::before {
-            content: "";
-            display: inline-block;
-            width: 2.5mm;
-            height: 2.5mm;
-            background: var(--brand-mid);
-            border-radius: 50%;
-            margin-right: 2mm;
-            vertical-align: middle;
-            position: relative;
-            top: -0.2mm;
-        }
-        .page-meta .meta-center { text-align: center; flex: 0 0 auto; }
-        .page-meta .meta-left { text-align: left; flex: 1; }
-        .page-meta .meta-right { text-align: right; flex: 1; }
+        /* ══ 9. Page furniture ═══════════════════════════════════ */
+        /* The shared design base (pdf/shared_pdf_base.html) supplies the
+           .page-meta running header/footer classes. The centre counter text is
+           invoice-specific: this footer reads "N / M", whereas the contract
+           renders "Seite N von M". */
         .page-meta .meta-center::after { content: counter(page) " / " counter(pages); }
 
-        /* ══ 11. @page rules ═════════════════════════════════════ */
+        /* ══ 10. @page rules ═════════════════════════════════════ */
         /* How this prints: the running header/footer and the QR slip are
            normal <div>s in the body, repositioned into page margin boxes
            via `position: running()` + `element()` in named pages

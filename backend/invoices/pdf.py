@@ -5,16 +5,16 @@ converted to PDF. Optionally embeds a Swiss QR-Rechnung.
 """
 import io
 import logging
-from datetime import date, datetime
+from datetime import date
 
 from accounts.models import AppSettings
 from django.conf import settings
 from django.core.files.base import ContentFile
 from django.template import Context, Template
 from django.template.loader import render_to_string
-from django.utils import timezone
 from tariffs.models import TariffCategory
 
+from .dates import format_date_value
 from .description_utils import strip_period_suffix
 from .pdf_charts import (
     _build_energy_chart_svg,
@@ -30,26 +30,10 @@ logger = logging.getLogger(__name__)
 TEMPLATE_NAME = "invoices/invoice_pdf.html"
 
 
-def _format_date_value(value: date | datetime | None, pattern: str) -> str:
-    if value is None:
-        return ""
-
-    if isinstance(value, datetime):
-        value = timezone.localtime(value).date() if timezone.is_aware(value) else value.date()
-
-    day = f"{value.day:02d}"
-    month = f"{value.month:02d}"
-    year = str(value.year)
-
-    if pattern == AppSettings.SHORT_DATE_DD_MM_YYYY:
-        return f"{day}.{month}.{year}"
-    if pattern == AppSettings.SHORT_DATE_DD_SLASH_MM_SLASH_YYYY:
-        return f"{day}/{month}/{year}"
-    if pattern == AppSettings.SHORT_DATE_MM_SLASH_DD_SLASH_YYYY:
-        return f"{month}/{day}/{year}"
-    if pattern == AppSettings.SHORT_DATE_YYYY_MM_DD:
-        return f"{year}-{month}-{day}"
-    return value.isoformat()
+# Kept as an alias so existing callers (annual_statement, tasks,
+# financial_summary) keep importing ``_format_date_value`` from here. The
+# implementation is shared with the contract PDF via invoices/dates.py.
+_format_date_value = format_date_value
 
 
 def _normalize_text(value: str | None) -> str:

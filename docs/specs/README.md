@@ -61,6 +61,7 @@ Baseline specs describe the current implementation. They must be kept in sync:
 | AppSettings, VatRate, admin dashboard, PDF template, ZEV config | `2026-03-admin-governance-and-settings.md` |
 | Audit events, scoped visibility, redaction | `2026-05-audit-log-and-operational-traceability.md` |
 | Whole-ZEV export/import archive | `2026-08-zev-transfer-archive.md` |
+| Contract PDF design, shared PDF design base | `2026-08-contract-pdf-redesign.md` |
 
 ## Reference specs
 
@@ -91,6 +92,7 @@ These specs describe the current major product capabilities and should be update
 - `2026-03-admin-governance-and-settings.md`
 - `2026-05-audit-log-and-operational-traceability.md`
 - `2026-08-zev-transfer-archive.md`
+- `2026-08-contract-pdf-redesign.md`
 
 ## Frontend reference specs
 

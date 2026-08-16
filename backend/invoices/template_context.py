@@ -8,7 +8,7 @@ request dependency, so they live here rather than in views.py.
 """
 
 from .annual_statement import ANNUAL_TRANSLATIONS, _build_monthly_chart_svg
-from .contract_pdf import CONTRACT_TRANSLATIONS
+from .contract_translations import CONTRACT_TRANSLATIONS
 from .pdf_translations import INVOICE_TRANSLATIONS
 
 
@@ -42,14 +42,15 @@ def build_sample_invoice_context() -> dict:
             vat_chf="36.45",
             total_chf="486.45",
             notes="Sample invoice for template preview.",
+            zev=_Obj(invoice_language="en"),
         ),
         "grouped_items": [
             {
                 "key": "energy",
                 "label": tr["cat_energy"],
                 "items": [
-                    _Obj(description="Local ZEV energy Jan 2026", quantity_kwh="320.50", unit="kWh", unit_price_chf="0.18", total_chf="57.69"),
-                    _Obj(description="Grid energy Jan 2026", quantity_kwh="180.00", unit="kWh", unit_price_chf="0.22", total_chf="39.60"),
+                    _Obj(description="Local ZEV energy Jan 2026", quantity_kwh="320.50", unit="kWh", unit_label="kWh", unit_price_chf="0.18", total_chf="57.69"),
+                    _Obj(description="Grid energy Jan 2026", quantity_kwh="180.00", unit="kWh", unit_label="kWh", unit_price_chf="0.22", total_chf="39.60"),
                 ],
                 "subtotal": "97.29",
             },
@@ -57,7 +58,7 @@ def build_sample_invoice_context() -> dict:
                 "key": "grid_fees",
                 "label": tr["cat_grid_fees"],
                 "items": [
-                    _Obj(description="Grid usage fee Jan 2026", quantity_kwh="500.50", unit="kWh", unit_price_chf="0.08", total_chf="40.04"),
+                    _Obj(description="Grid usage fee Jan 2026", quantity_kwh="500.50", unit="kWh", unit_label="kWh", unit_price_chf="0.08", total_chf="40.04"),
                 ],
                 "subtotal": "40.04",
             },
@@ -117,7 +118,13 @@ def build_sample_invoice_context() -> dict:
 
 
 def build_sample_contract_context() -> dict:
-    tr = CONTRACT_TRANSLATIONS.get("en", CONTRACT_TRANSLATIONS["de"])
+    tr = dict(CONTRACT_TRANSLATIONS.get("en", CONTRACT_TRANSLATIONS["de"]))
+    tr["privacy_retention_rows"] = list(
+        zip(tr["privacy_retention_categories"], tr["privacy_retention_periods"])
+    )
+    # Mirrors _build_contract_context: the payment-term unit is derived from
+    # the ZEV's payment term days.
+    tr["payment_terms_unit"] = tr["payment_terms_unit_pl"]
     return {
         "participant": _Obj(
             full_name="Hans Beispiel",
@@ -143,6 +150,7 @@ def build_sample_contract_context() -> dict:
             grid_operator="Stadtwerk Zürich",
             vat_number="CHE-123.456.789",
             bank_iban="CH93 0076 2011 6238 5295 7",
+            payment_term_days=30,
             owner=_Obj(
                 _full_name="Maria Muster",
                 username="maria",
@@ -156,14 +164,31 @@ def build_sample_contract_context() -> dict:
             _Obj(meter_id="CH1008845123456000000000000054321", location_description="Rooftop PV system"),
         ],
         "local_tariff_rows": [
-            {"name": "Local solar tariff", "rate_rp": "18.00", "rate_description": "Flat rate"},
+            {
+                "name": "Local solar tariff",
+                "rate_rp": "18.00",
+                "unit": tr["tariff_rp_unit"],
+                "pct": "80.00",
+                "rate_description": "80.00% × 22.50 Rp./kWh (% of grid tariff)",
+                "valid_from": "01.01.2026",
+                "valid_to": "31.12.2026",
+                "validity": "01.01.2026 – 31.12.2026",
+                "notes": "EKZ Standardprodukt der Grundversorgung",
+            },
         ],
+        "tariff_pct_line": tr["tariff_pct_of"].format(pct="80.00"),
+        "tariff_rule": tr["clause_tariff_rule_pct"].format(pct="80.00"),
+        "tariff_reference_product": "EKZ Standardprodukt der Grundversorgung",
         "billing_interval_display": "Quarterly",
         "contract_date": "01.01.2026",
+        "participation_start": "01.01.2026",
+        "document_id": "CTR-3B7A9C21",
+        "vat_rate_display": "8.10 %",
         "tr": tr,
         "lang": "en",
-        "local_tariff_notes": "The tariff may be adjusted annually based on production costs.",
+        "local_tariff_notes": "The tariff follows the tariff rule in section 5 and adjusts automatically when the grid operator changes its prices.",
         "additional_contract_notes": "Participant agrees to the general terms and conditions of the ZEV.",
+        "is_preview": True,
     }
 
 
