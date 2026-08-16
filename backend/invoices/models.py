@@ -93,6 +93,11 @@ class PdfTemplate(models.Model):
 
     template_name = models.CharField(max_length=200, unique=True)
     content = models.TextField()
+    # Digest of the on-disk default at save time. When the shipped default
+    # changes afterwards, the override becomes "stale" (computed on read,
+    # never stored as state) so admins can see a customization is based on
+    # an older default. Blank on legacy rows kept as unknown provenance.
+    default_digest = models.CharField(max_length=64, blank=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self) -> str:

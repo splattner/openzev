@@ -79,6 +79,19 @@ TEMPLATES = [
             ],
         },
     },
+    {
+        # Validation-only engine for the admin PDF-template editor: unknown
+        # template variables render as a sentinel (instead of Django's default
+        # silent empty string) so PATCH can reject typo'd variables. Loaders
+        # mirror the default engine so {% include %} resolves identically.
+        "NAME": "strict-validation",
+        "BACKEND": "django.template.backends.django.DjangoTemplates",
+        "DIRS": [BASE_DIR / "templates"],
+        "APP_DIRS": True,
+        "OPTIONS": {
+            "string_if_invalid": "__INVALID_TPL_VAR__:%s",
+        },
+    },
 ]
 
 WSGI_APPLICATION = "config.wsgi.application"

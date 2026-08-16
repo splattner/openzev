@@ -15,8 +15,12 @@ forget either one.
 The URLs are unchanged; see ``invoices/urls.py``.
 """
 
+import hashlib
+import re
+
 from django.conf import settings
 from django.template import Context, Template
+from django.template import engines
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -32,11 +36,73 @@ from .template_context import (
     build_sample_invoice_context,
 )
 
+# Template type → sample-context builder. The preview endpoint and PATCH
+# validation share this mapping; ``template_type`` is supplied per URL.
+SAMPLE_CONTEXTS = {
+    "contract": build_sample_contract_context,
+    "annual_statement": build_sample_annual_statement_context,
+}
+
 
 def _read_default_template(template_name: str) -> str:
     """Read the on-disk (default) content for a template."""
     path = settings.BASE_DIR / "templates" / template_name
     return path.read_text(encoding="utf-8")
+
+
+INVALID_VAR_PATTERN = re.compile(r"__INVALID_TPL_VAR__:([A-Za-z0-9_.]+)")
+
+
+def _render_with_sample_context(template_type: str, content: str, *, strict: bool = False) -> str:
+    """Render a template body against its sample context.
+
+    Used by the preview endpoint and, on save, by ``PdfTemplateView.patch`` so
+    a broken template or a context-key drift is rejected at edit time instead
+    of failing at document-render time. Unknown template types fall back to the
+    invoice sample context (mirrors the historical preview behaviour).
+
+    In ``strict`` mode (save-time validation) the template renders through the
+    ``strict-validation`` engine, whose ``string_if_invalid`` turns unknown
+    *output* variables — including attribute typos like ``{{ participant.emali }}``,
+    which the default engine would silently render as an empty string — into a
+    sentinel; any sentinel in the output raises ``ValueError`` listing the
+    offending variables. Preview stays non-strict so admins can type in
+    progress.
+
+    Two known limitations of save-time validation: variables consulted only
+    inside control-flow tags (``{% if %}``/``{% for %}``) never resolve to a
+    rendering position, so an unknown variable there passes strict validation;
+    and only Django HTML rendering is exercised — WeasyPrint/CSS/PDF-render
+    failures are not caught at save time. Both surfaces are handled by the
+    preview endpoint and at document-render time instead.
+    """
+    build_context = SAMPLE_CONTEXTS.get(template_type, build_sample_invoice_context)
+    if not strict:
+        return Template(content).render(Context(build_context()))
+    strict_engine = engines["strict-validation"]
+    rendered = strict_engine.from_string(content).render(build_context())
+    invalid_vars = sorted(set(m for m in INVALID_VAR_PATTERN.findall(rendered)))
+    if invalid_vars:
+        raise ValueError(f"Unknown template variables: {', '.join(invalid_vars)}")
+    return rendered
+
+
+def _default_digest(template_name: str) -> str:
+    """sha256 of the on-disk default template content."""
+    return hashlib.sha256(_read_default_template(template_name).encode("utf-8")).hexdigest()
+
+
+def _is_stale(record, template_name: str) -> bool:
+    """A stored override is stale when its saved digest no longer matches the
+    current on-disk default (i.e. a release shipped a new default since the
+    override was last saved). No row (default template) is never stale, and a
+    blank digest (legacy row without provenance, migration `0009` backfills
+    those) is never flagged — an unknown provenance must not alarm."""
+    if record is None:
+        return False
+    if not record.default_digest:
+        return False
+    return record.default_digest != _default_digest(template_name)
 
 
 class _AdminTemplateView(APIView):
@@ -78,6 +144,7 @@ class PdfTemplateView(_AdminTemplateView):
 
     template_name = ""
     audit_action_prefix = ""
+    template_type = "invoice"
 
     def denial_audit(self, request) -> dict:
         return {
@@ -102,15 +169,43 @@ class PdfTemplateView(_AdminTemplateView):
     def get(self, request, *args, **kwargs):
         record = PdfTemplate.objects.filter(template_name=self.template_name).first()
         content = record.content if record else _read_default_template(self.template_name)
-        return Response({"template_name": self.template_name, "content": content, "is_customized": record is not None})
+        return Response({
+            "template_name": self.template_name,
+            "content": content,
+            "is_customized": record is not None,
+            "is_stale": _is_stale(record, self.template_name),
+        })
 
     def patch(self, request, *args, **kwargs):
         content = request.data.get("content")
         if not isinstance(content, str) or not content.strip():
             return Response({"error": "Template content is required."}, status=status.HTTP_400_BAD_REQUEST)
-        PdfTemplate.objects.update_or_create(template_name=self.template_name, defaults={"content": content})
+        # Validate before storing: a broken override or one that references
+        # unknown context keys must never be persisted, or every document
+        # render would fail later (in production, at email time). Strict mode
+        # rejects unknown output variables (e.g. {{ participant.emali }}) that
+        # the default engine would silently render as an empty string. Unknown
+        # variables consulted only inside {% if %}/{% for %} control flow are
+        # not output and therefore not caught here.
+        try:
+            _render_with_sample_context(self.template_type, content, strict=True)
+        except Exception as exc:
+            return Response(
+                {"error": f"Template rendering error: {exc}"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        PdfTemplate.objects.update_or_create(
+            template_name=self.template_name,
+            defaults={"content": content, "default_digest": _default_digest(self.template_name)},
+        )
         self._record(request, action_suffix="update", summary=f"Updated PDF template {self.template_name}.")
-        return Response({"template_name": self.template_name, "content": content, "is_customized": True, "detail": "PDF template updated successfully."})
+        return Response({
+            "template_name": self.template_name,
+            "content": content,
+            "is_customized": True,
+            "is_stale": False,
+            "detail": "PDF template updated successfully.",
+        })
 
     def delete(self, request, *args, **kwargs):
         """Revert to the on-disk default."""
@@ -126,11 +221,6 @@ class PdfTemplatePreviewView(_AdminTemplateView):
     Returns: { "html": "<rendered html>" }
     """
 
-    SAMPLE_CONTEXTS = {
-        "contract": build_sample_contract_context,
-        "annual_statement": build_sample_annual_statement_context,
-    }
-
     def post(self, request, *args, **kwargs):
         content = request.data.get("content")
         template_type = request.data.get("template_type", "invoice")
@@ -138,10 +228,8 @@ class PdfTemplatePreviewView(_AdminTemplateView):
         if not isinstance(content, str) or not content.strip():
             return Response({"error": "Template content is required."}, status=status.HTTP_400_BAD_REQUEST)
 
-        build_context = self.SAMPLE_CONTEXTS.get(template_type, build_sample_invoice_context)
-
         try:
-            rendered = Template(content).render(Context(build_context()))
+            rendered = _render_with_sample_context(template_type, content)
         except Exception as exc:
             return Response(
                 {"error": f"Template rendering error: {exc}"},

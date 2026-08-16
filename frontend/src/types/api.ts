@@ -686,6 +686,7 @@ export interface PdfTemplateResponse {
     template_name: string
     content: string
     is_customized: boolean
+    is_stale?: boolean
     detail?: string
 }
 

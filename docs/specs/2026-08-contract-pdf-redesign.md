@@ -9,7 +9,7 @@
 - Target Release: post-1.7.0
 - Related Issues: none
 - Related ADRs: none
-- Impacted Areas: backend | docs
+- Impacted Areas: backend | frontend | docs
 
 ---
 
@@ -24,10 +24,16 @@ single page-1 document header, running page furniture).
 
 This change ports the invoice's design system and page machinery into the
 contract, extracts the shared parts into one partial so both documents stay
-visually consistent long-term, and pre-fills every value the system knows. The
-contract now prints page numbers (`Seite N von M`), a document id and issue
-date in the running footer, and an appendix (`Anhang A`) with the legal
-information blocks.
+visually consistent long-term, and pre-fills every value the system knows.
+The contract now prints page numbers (`Seite N von M`), a document id and
+issue date in the running footer, a non-binding summary appendix
+(`Anhang A`) with the legal information blocks, and a **binding privacy
+notice (`Anhang B`)** (see §7).
+
+Because the contract is a legally signed instrument, the clause-wording
+updates described in §2 and §7 are called out explicitly rather than shipped
+as visual polish; they should receive a human legal review (Swiss EnG/EnV,
+FADP) before release.
 
 ## 2. Scope
 
@@ -37,19 +43,32 @@ information blocks.
 |---|---|
 | Templates | New shared partial `pdf/shared_pdf_base.html`; `invoices/invoice_pdf.html` refactored to include it (CSS extraction only — markup untouched); `contracts/participant_contract_pdf.html` fully redesigned to the same anatomy |
 | Context | `invoices/dates.py` (shared date formatting), `_build_contract_context` additions (formatted contract date, participation start, document id, VAT rate display), `build_sample_contract_context` extended |
-| Tests | `invoices/test_contract_context.py` extended with context-field, translation-parity, tariff-rule and end-to-end render tests |
+| Tests | `invoices/test_contract_context.py` extended with context-field, translation-parity, tariff-rule and end-to-end render tests; `invoices/test_template_admin.py` extended with override-integrity tests (save-time validation, staleness) |
+| Template admin | `PdfTemplate` overrides are validated before they are stored (PATCH rejects syntax errors and unknown output variables with `400`), and customizations are stale-tracked via `PdfTemplate.default_digest` + `is_stale` (migration `invoices/0009`, admin UI stale banner) — see §5.2 |
 | Docs | This baseline spec |
+| Legal wording | Clause texts were updated alongside the layout (see §7): clauses 2 (purpose/scope with EnG/EnV citations), 4 (mandate + annual information duty), 5 (binding tariff rule, cap with tenancy-law reservation, notification/termination, billing), 6 (per-interval allocation, feed-in remuneration), 7 (universal-service guarantee), 8 (grid-operator-area join condition), 10 (communication) and 12 (regulatory-change dissolution). `Anhang B` adds a **binding** privacy notice (controller, purposes, recipients, retention table, data-subject rights) |
 
 ### Out of scope
 
-- No API, endpoint, permission, serializer, or data-model changes; no migration.
-- No frontend changes (download endpoint and admin template editor are unchanged).
-- No new audit events (the document id is printed on the PDF, not audit-logged).
+- No new API endpoints or permission changes; the download endpoint keeps its
+  path, method and permission model.
+- Contract download button unchanged. The admin template editor
+  (`AdminPdfTemplatesPage.tsx`) gains an override-staleness banner,
+  accessible tab roles (roving tabindex + arrow-key navigation) and the
+  redesigned contract template's fields in the editor reference, as part of
+  the template-validation work.
+- Only one data-model addition: `PdfTemplate.default_digest` (migration
+  `invoices/0009`) for stale-override detection; `PATCH` now validates
+  overrides before storing (see §5.2).
+- The contract download flow adds no audit events (the document id is printed
+  on the PDF, not audit-logged). Template-admin mutations keep their audit
+  trail; non-admin attempts are DENIED-logged by the shared
+  `_AdminTemplateView` base (`views_templates.py`).
 - Customized `PdfTemplate` DB overrides for the contract keep rendering their
   stored standalone HTML and are **not** migrated — the redesign only reaches
   them after a reset to default (DELETE on the template endpoint).
-- No change to the legal wording or structure of clauses beyond converting
-  page 3 to a numbered appendix heading.
+- The plain-language summary page is reworded into the non-binding
+  `Anhang A`; the legally binding wording changes are in scope above.
 
 ## 3. Actors, permissions, and ZEV scope
 
@@ -77,8 +96,10 @@ audit-logged under `template.contract_pdf.*`).
 
 ## 4. Data model
 
-No model, serializer, or migration changes. The contract render context is the
-contract surface, so it is documented here at field level.
+The contract render context is the contract surface, so it is documented here
+at field level. The only data-model change in this branch is
+`PdfTemplate.default_digest` (migration `invoices/0009`), documented in §5.2
+and in `2026-03-admin-governance-and-settings.md` §5.4.
 
 ### 4.1 Contract render context
 
@@ -90,16 +111,16 @@ Built by `_build_contract_context(participant)` in `invoices/contract_pdf.py`.
 | `owner_participant` | `Participant \| None` | `zev.participants.filter(user=zev.owner).first()` |
 | `zev` | `Zev` | `participant.zev` |
 | `consumption_mps` | `list[MeteringPoint]` | Metering points of non-ended assignments (valid_to null or `>= today`) with meter type `CONSUMPTION` or `BIDIRECTIONAL` (`MeteringPoint.objects.filter(id__in=assigned_mp_ids)`, DB order) |
-| `production_mps` | `list[MeteringPoint]` | Same assignment filter, meter type `PRODUCTION` |
+| `production_mps` | `list[MeteringPoint]` | Same assignment filter, meter type `PRODUCTION` or `BIDIRECTIONAL` |
 | `local_tariff_rows` | `list[dict]` | Active local-energy tariff display rows, see §4.2 |
 | `tariff_rule` | `str \| None` | Clause-5 rule paragraph, pre-rendered from `clause_tariff_rule_pct` (with the configured percentage formatted in) or `clause_tariff_rule_flat`, following the first active local tariff's mode; `None` when no local tariff exists |
 | `tariff_pct_line` | `str \| None` | Green-box rule line, `tr["tariff_pct_of"]` formatted with the first row's percentage; `None` for flat tariffs |
 | `tariff_reference_product` | `str \| None` | `Tariff.notes` of the first row when set — printed under the clause-5 rule as the reference product |
 | `billing_interval_display` | `str` | `tr["billing_intervals"].get(zev.billing_interval, zev.billing_interval)` |
-| `contract_date` | `str` | `format_date_value(date.today(), date_pattern)` — the contract is generated on demand, so "today" doubles as the issue date |
+| `contract_date` | `str` | `format_date_value(timezone.localdate(), date_pattern)` — the contract is generated on demand, so "today" doubles as the issue date |
 | `participation_start` | `str` | `format_date_value(earliest assignment.valid_from or participant.valid_from, date_pattern)` |
-| `document_id` | `str` | `"CTR-" + str(participant.pk).replace("-", "")[:8].upper()` — 12 chars total for integer pks |
-| `vat_rate_display` | `str` | `""` unless `zev.vat_number`; then `f"{float(rate) * 100:.2f} %"` of `VatRate.active_for_day(date.today())`, or `""` if no active rate |
+| `document_id` | `str` | `"CTR-" + str(participant.pk).replace("-", "")[:8].upper()` — the `Participant.id` UUID is dash-stripped and truncated to 8 chars (12 total), a traceability aid rather than a digest or legal reference |
+| `vat_rate_display` | `str` | `""` unless `zev.vat_number`; then `f"{float(rate) * 100:.2f} %"` of `VatRate.active_for_day(timezone.localdate())`, or `""` if no active rate |
 | `tr` | `dict` | Copy of `CONTRACT_TRANSLATIONS[zev.invoice_language or "de"]` with `payment_terms_unit` resolved to the singular/plural form based on `zev.payment_term_days == 1`. Copied (not the shared constant) so per-ZEV resolution never leaks into other contracts |
 | `lang` | `str` | `zev.invoice_language or "de"` |
 | `local_tariff_notes` | `str` | `zev.local_tariff_notes or ""` |
@@ -110,7 +131,7 @@ invoice PDF uses, so both documents print identical date formats.
 
 ### 4.2 Local tariff display rows
 
-`_build_local_tariff_display(zev, lang, tr, date_pattern)` returns one dict per
+`_build_local_tariff_display(zev, tr, date_pattern)` returns one dict per
 active local tariff (`billing_mode` `ENERGY` or `PERCENTAGE_OF_ENERGY`,
 `energy_type` `LOCAL`, `valid_from <= today <= valid_to`):
 
@@ -178,6 +199,34 @@ fixed). Rule for all templates:
 - Use `{% comment %} ... {% endcomment %}` for multi-line comments.
 - A `{# ... #}` comment must be a single line.
 
+### 5.2 Template override validation and provenance
+
+PDF-template overrides (`PdfTemplate` rows: invoice, contract, annual
+statement) are edited by admins through `PdfTemplateView` in `views_templates.py`.
+Two protections ship with this branch:
+
+- **Save-time validation.** `PATCH` renders the submitted content against the
+  template's sample context through the `strict-validation` template engine
+  (whose `string_if_invalid` emits a sentinel for unknown variables) before
+  storing. Syntax errors and **unknown output variables** — including attribute
+  typos like `{{ participant.emali }}`, which the default engine silently
+  renders as an empty string — are rejected with `400` and nothing is stored.
+  Known limitations (documented in the code): variables consulted only inside
+  control-flow tags (`{% if %}`/`{% for %}`) never reach a rendering position,
+  so a typo there is not detected, and validation exercises Django HTML
+  rendering only — WeasyPrint/CSS/PDF-render failures are caught at preview or
+  document-render time, not at save time.
+- **Staleness tracking.** Each stored override keeps `default_digest`, the
+  sha256 of the on-disk default at save time (migration `invoices/0009`).
+  `GET` computes `is_stale` by comparing it against the current on-disk
+  default, never against a stored flag. Legacy rows backfilled by the
+  migration carry the digest of the default shipping in this release and are
+  treated as current; a blank digest (template file unresolvable at migrate
+  time) means *unknown provenance* and is never stale.
+
+The admin UI (`AdminPdfTemplatesPage.tsx`) shows a stale banner when
+`is_customized && is_stale`, and `DELETE` reverts to the on-disk default.
+
 ## 6. Contract template anatomy
 
 **File:** `backend/templates/contracts/participant_contract_pdf.html`
@@ -209,9 +258,8 @@ avoid` on cards/blocks); only the appendix forces a break
    like the invoice amount card) showing the first local tariff rate with
    `tr.tariff_rp_unit`. The hint line is tariff-type aware: percentage
    tariffs print the rule line `tariff_pct_line` (e.g. "= 80.00 % des
-   Standardtarifs des Netzbetreibers"), flat tariffs the tariff name, and a
-   second hint always points to the governing rule (`tariff_details_5`,
-   "Details: Ziff. 5"). Without local tariffs the card shows `—`
+   Standardtarifs des Netzbetreibers"), flat tariffs the tariff name.
+   Without local tariffs the card shows `—`
    (`tariff_none`). The band deliberately carries no participant identity — that
    lives only in the clause-1 party cards, so nothing is printed twice.
    Then:
@@ -240,7 +288,8 @@ avoid` on cards/blocks); only the appendix forces a break
    right-aligned via `th.num`, zebra rows, right-aligned `td.rate`,
    `tariff-empty` fallback) with a fourth validity column (`row.validity`),
    tariff-note `freetext-box`, then a conditional tariff rule paragraph
-   (`tariff_rule`, rendered `| safe`): percentage-of-grid-tariff prints
+   (`tariff_rule`, autoescaped like all output — translation values carry
+   no markup, so nothing is rendered `|safe`): percentage-of-grid prints
    `clause_tariff_rule_pct` with the configured percentage formatted in,
    flat tariffs print `clause_tariff_rule_flat` — both describe automatic
    adjustment when the grid operator's prices change and the communication
@@ -283,9 +332,24 @@ avoid` on cards/blocks); only the appendix forces a break
 4. **Appendix A** (`.appendix-part`, new page) — `h1.appendix-heading`
    `Anhang A` (`tr.appendix_title`) + intro; seven `.info-block`s
    (`break-inside: avoid`): ZEV explainer, vZEV explainer, legal basis list,
-   rights/obligations list, joint liability, privacy, tariff provisions;
-   closing `.info-note` disclaimer callout marking the appendix as
-   non-binding guidance.
+   rights/obligations list, joint liability, privacy, tariff provisions.
+   The non-binding character is stated exactly once: the heading
+   parenthetical and `precedence_note` (which also says the appendix is no
+   legal advice and that Appendix B is binding).
+5. **Appendix B** (`.appendix-part`, new page after Appendix A) — a
+   **binding** part of the contract (`tr.appendix_b_title` +
+   `appendix_b_subtitle`, "Bestandteil des Vertrags"): controller identity
+   (`privacy_controller_title`/`_text`), purposes, recipient categories
+   (`privacy_recipients_*`), a retention table zipped from
+   `privacy_retention_categories`/`privacy_retention_periods` (headers
+   `privacy_retention_col_data`/`privacy_retention_col_period`) and the
+   data-subject rights (FADP, EDÖB complaint route). Clause 9 points to it;
+   unlike Appendix A (explicitly non-binding guidance), Appendix B has
+   binding contractual effect. The controller address paragraph is written
+   on **one source line**: `.clause-text` uses `white-space: pre-line`, so
+   any source newline between its `{% if %}`/`{% endif %}` tag pairs would
+   render as a line break (this once put the city's leading comma on its own
+   line).
 
 ### 6.1 Page machinery (footer only)
 
@@ -320,12 +384,24 @@ One running element (direct child of `<body>`, same pattern as the invoice):
   all styling now uses tokens from the shared partial.
 - The running header on pages 2+ (and the named `contract` `@page` rule it
   required): footer-only page furniture instead.
+- The closing `.info-note` disclaimer callout of Appendix A
+  (`tr.info_note_title`/`tr.info_note_text`, all four locales) plus its CSS:
+  the heading parenthetical and `precedence_note` already state that the
+  appendix is non-binding and the agreement prevails, so the callout was a
+  third copy of the same sentence. `precedence_note` absorbed its only
+  unique statement ("does not constitute legal advice").
+- The `tariff_details_5` hint line ("Details: Ziff. 5") on the dark
+  `.tariff-card`: the card already shows the first local tariff rate and
+  clause 5's table follows on the same spread.
 
 ## 7. Translation content
 
-`CONTRACT_TRANSLATIONS` in `invoices/contract_pdf.py`: four locale dicts
-(`de`, `fr`, `it`, `en`), 90 keys each, identical key sets and structure
-(guarded by the translation-parity test). Keys added by the redesign:
+`CONTRACT_TRANSLATIONS` in `invoices/contract_translations.py`: a pure data
+module mirroring `invoices/pdf_translations.py`; four locale dicts (`de`,
+`fr`, `it`, `en`), **111 keys each**, identical key sets, structure and
+placeholder sets (guarded by the translation-parity tests). Translation
+values contain **no HTML markup** (asserted by the no-HTML test) so the
+template renders them without `|safe`. Keys added by the redesign:
 `contract_date_label`, `participation_start_label`, `appendix_title`, and
 the `page_label`/`page_of` pairs (previously unused, now consumed by the
 page counter). Keys added by the framework-agreement upgrade: clause keys
@@ -333,9 +409,12 @@ page counter). Keys added by the framework-agreement upgrade: clause keys
 `manager_text`/`manager_duties` (5 items), `clause_tariff_cap`,
 `clause_tariff_adjustment`, `clause_billing`, `metering_title`/
 `metering_text`, `liability_title`/`liability_text`, `membership_title`/
-`membership_text`, `privacy_title`/`privacy_text`, `communication_title`/
-`communication_text`. The tariff labels (`local_tariff_label`) now say
-“(v)ZEV” in all locales. Later in-place text upgrades (no key changes):
+`membership_text`, `privacy_title`/`privacy_text`, `communication_text`
+(no `communication_title` — the clause heading is generated in the
+template). The tariff labels were rewritten per locale
+(`local_tariff_label`, e.g. "Ihr Tarif für lokalen Solarstrom" in de,
+"Votre tarif d'énergie solaire locale" in fr). Later in-place text
+upgrades (no key changes):
 bilateral-framework sentence in `subject_text`, consent governance and
 annual information in `manager_text`, tenancy-law reservation in
 `clause_tariff_cap`, per-interval allocation plus feed-in remuneration in
@@ -349,13 +428,19 @@ written form and severability). The percentage-tariff model added
 `clause_tariff_rule_pct` (`{pct}` placeholder) and `clause_tariff_rule_flat`
 (conditional rule paragraphs for clause 5), `tariff_pct_of` (green-box rule
 line), `tariff_valid_label`/`tariff_valid_open` (validity column incl.
-open-ended spans), `tariff_details_5` and `reference_product_label`.
+open-ended spans) and `reference_product_label`.
 `local_tariff_label` now reads "Ihr Tarif für lokalen Solarstrom" etc.
 instead of the neutral "(v)ZEV" phrasing; `clause_tariff_adjustment` was
 rewritten from an annual review into a notification/termination clause
 (automatic adjustment makes the annual review redundant); `info_tariff_text`
 now points to the clause-5 rule; `tariff_rp_unit`/`tariff_col_price` use
-"Rp./kWh" in de/en.
+"Rp./kWh" in de/en. Appendix B keys (all four locales):
+`appendix_b_title`, `appendix_b_subtitle` and the structured
+privacy-notice set — `privacy_controller_title`/`_text`,
+`privacy_purposes_*`, `privacy_recipients_title`/`_text`,
+`privacy_retention_title`/`_categories`/`_periods`/
+`_col_data`/`_col_period`, plus the data-subject rights / EDÖB complaint
+text.
 
 ## 8. Shared date formatting
 
@@ -406,11 +491,12 @@ by unit tests. The existing sample keys already include
 
 ### Backend — `invoices/test_contract_context.py`
 
-**`ContractPdfContextTests`** (1 test):
+**`ContractPdfContextTests`** (2 tests):
 
 | Test | Asserts |
 |---|---|
 | `test_future_metering_point_assignments_are_included_in_contract_context` | Assignments starting in the future still surface their metering points in the context |
+| `test_bidirectional_meter_appears_in_consumption_and_production_lists` | A `BIDIRECTIONAL` meter appears in both the consumption and the production inventory |
 
 **`ContractPdfPaymentTermsTests`** (5 tests):
 
@@ -440,19 +526,22 @@ by unit tests. The existing sample keys already include
 | Test | Asserts |
 |---|---|
 | `test_percentage_tariff_row_carries_pct_price_validity_and_notes` | Percentage row carries `pct` `"80.00"`, effective `rate_rp` `"18.00"` (80% of the 22.50 Rp/kWh grid base), `validity` `"01.01.2026 – 31.12.2026"` and the tariff `notes` |
-| `test_percentage_tariff_prints_formula_rule_reference_and_green_box_line` | `tariff_rule` contains the rendered percentage and the reference product; markup shows the rule paragraph, `tariff_pct_line`, `Details: Ziff. 5`, the reference-product line and the validity column |
+| `test_percentage_tariff_prints_formula_rule_reference_and_green_box_line` | `tariff_rule` contains the rendered percentage and the reference product; markup shows the rule paragraph, `tariff_pct_line`, the reference-product line and the validity column |
 | `test_flat_tariff_falls_back_to_fixed_rate_clause_without_pct_line` | Flat tariff → `tariff_rule` is `clause_tariff_rule_flat`, no `pct`, no `tariff_pct_line`, no reference-product line in markup |
 | `test_percentage_tariff_without_grid_base_shows_bare_percentage_without_unit` | No active grid tariff → `rate_rp` `"80.00%"` with empty `unit`; markup renders the bare percentage in the green box |
 | `test_open_ended_percentage_tariff_renders_open_validity` | Open-ended tariff (`valid_to` null) → `validity` `"ab 01.01.2026"` via `tariff_valid_open` |
 | `test_no_local_tariff_prints_no_rule_and_placeholder_amount` | No local tariffs → no `tariff_rule`, green box renders the `—` placeholder and `tariff-empty` |
+| `test_empty_notes_render_blank_box_not_placeholder_prose` | Empty `local_tariff_notes`/`additional_contract_notes` render a blank box, never the German placeholder example text |
 
-**`ContractPdfTranslationParityTests`** (1 test):
+**`ContractPdfTranslationParityTests`** (3 tests):
 
 | Test | Asserts |
 |---|---|
 | `test_all_locales_have_identical_keys_and_structure` | All four locales have identical key sets, dict/list/str structure, and list lengths |
+| `test_translation_values_carry_no_html_markup` | No translation value contains HTML markup (prose stays plain text; markup lives in the template, never `\|safe`) |
+| `test_all_locales_use_identical_placeholder_sets` | The `{placeholder}` set of every key matches across all four locales (a typo like `{pct}` vs `{pctt}` in one language fails here) |
 
-**`ContractPdfRenderingTests`** (4 tests) — end-to-end smoke tests rendering
+**`ContractPdfRenderingTests`** (12 tests) — end-to-end smoke tests rendering
 real PDFs (WeasyPrint) and asserting markup with the `<style>` blocks stripped
 (mirrors `invoices/test_pdf.py::_render_invoice_markup`):
 
@@ -462,8 +551,31 @@ real PDFs (WeasyPrint) and asserting markup with the `<style>` blocks stripped
 | `test_page_1_uses_the_invoice_document_header_anatomy` | `document-header`, `document-label`, `document-number`, `document-status`, `Ausstellungsdatum`, `parties-grid` present |
 | `test_known_values_are_prefilled_and_vat_rate_is_rendered` | Participant/owner names, assigned meter ids, `8.10 %`, VAT number, and participation start all render |
 | `test_sample_contract_context_renders` | `build_sample_contract_context()` renders without error and contains the sample `document_id` |
+| `test_appendix_b_renders_the_structured_privacy_notice` | Appendix B shows controller identity (owner name), purposes, retention table and data-subject rights; the controller address renders on one line (`Solarweg 1, 8000 Zürich`) — pre-line would turn any source newline into a line break |
+| `test_summary_sheet_is_not_part_of_the_signed_document` | The plain-language summary is not part of the signed contract; Appendix A opens with the non-binding/precedence-note heading; no `info-note` box (the removed disclaimer) |
+| `test_corrected_contract_clauses_render_without_unsafe_shortcuts` | The signed document renders the legal/operational guardrails without promising unrestricted clauses |
+| `test_no_page_is_left_nearly_empty` | Every PDF page carries ≥ 100 extracted characters (guards against a near-empty page) |
+| `test_signature_block_is_never_split_across_pages` | The page with `Unterschriften` also contains `Ort, Datum` and `Unterschrift` (`.sig-section` travels as one block) |
+| `test_free_text_notes_keep_line_breaks_and_escape_markup` | Multiline notes keep line breaks; markup in notes is HTML-escaped; `.freetext-box` uses `white-space: pre-line` |
+| `test_very_long_notes_do_not_balloon_the_document` | A ~3,800-char note keeps the PDF within bounds and Appendix B still renders last |
+| `test_unassigned_meter_placeholder_is_neutral` | Without assignments the markup shows the translated "no metering point" statement and never a bare chip |
 
-Total: 19 test methods across 5 classes.
+Total: 37 test methods across 6 classes in `test_contract_context.py`.
+
+### Backend — `invoices/test_template_admin.py`
+
+**`TemplateAdminPermissionTests`** (6), **`EmailTemplateAdminTests`** (4),
+**`PdfTemplatePreviewTests`** (4), **`PdfTemplateAdminTests`** (3) and
+**`PdfTemplateOverrideIntegrityTests`** (8) — 25 test methods across 5
+classes. The override-integrity class guards save-time validation
+(`test_broken_override_is_rejected_and_nothing_is_stored`,
+`test_patch_rejects_unknown_template_variables`), staleness
+(`test_valid_override_is_stored_with_default_digest_and_not_stale`,
+`test_get_flags_override_saved_against_an_older_default_as_stale`,
+`test_override_without_digest_provenance_is_never_stale`,
+`test_default_template_is_never_stale`) and the legacy-override compatibility
+claims (`test_override_with_shared_base_include_renders_through_the_real_path`,
+`test_legacy_override_without_include_still_renders`).
 
 ### Regression coverage in `invoices/test_pdf.py`
 
@@ -475,8 +587,10 @@ described in §5.1.
 
 ### Validation commands
 
-- `python -m pytest -q` — full backend suite (1048 tests + 206 subtests green).
+- `python -m pytest -q` — full backend suite green (see §11 for the counts
+  verified against this branch).
 - `ruff check invoices/` — lint clean.
+- `python manage.py makemigrations --check --dry-run` — no missing migrations.
 - Manual: render de/fr/it/en sample PDFs via the admin template preview
   (`/api/v1/invoices/invoices/contract-pdf-template/` POST) and eyeball
   pagination — signature block must not split, footer on every page.

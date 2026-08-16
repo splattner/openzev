@@ -206,8 +206,8 @@ All three PDF template endpoints are served by `PdfTemplateView` (`views_templat
 
 | Endpoint | Method | Permission | Behaviour |
 |---|---|---|---|
-| `/api/v1/invoices/invoices/pdf-template/` | GET | `IsAdmin` | Returns `{ template_name, content, is_customized }` — DB override if present, else the on-disk default |
-| `/api/v1/invoices/invoices/pdf-template/` | PATCH | `IsAdmin` | `update_or_create` of the `PdfTemplate` row; audit-logged (`template.invoice_pdf.update`). Returns `{ template_name, content, is_customized: true, detail }`. Blank/non-string content → `400` |
+| `/api/v1/invoices/invoices/pdf-template/` | GET | `IsAdmin` | Returns `{ template_name, content, is_customized, is_stale }` — DB override if present, else the on-disk default; `is_stale` compares the stored `default_digest` against the current on-disk default |
+| `/api/v1/invoices/invoices/pdf-template/` | PATCH | `IsAdmin` | Validates `content` before storing: rendered against the sample context through the `strict-validation` engine — syntax errors and unknown output variables (e.g. `{{ invoice.emali }}`) are rejected with `400` and nothing is stored. Then `update_or_create` of the `PdfTemplate` row storing `default_digest` (sha256 of the on-disk default); audit-logged (`template.invoice_pdf.update`). Returns `{ template_name, content, is_customized: true, is_stale: false, detail }`. Blank/non-string content → `400` |
 | `/api/v1/invoices/invoices/pdf-template/` | DELETE | `IsAdmin` | Deletes the DB override (reverts to on-disk default); audit-logged (`template.invoice_pdf.reset`). Returns `{ template_name, content, is_customized: false, detail }` with the default content |
 | `/api/v1/invoices/invoices/contract-pdf-template/` | GET/PATCH/DELETE | same | Same behaviour for `invoices/contract_pdf.html` (audit prefix `template.contract_pdf`) |
 | `/api/v1/invoices/invoices/annual-statement-pdf-template/` | GET/PATCH/DELETE | same | Same behaviour for `invoices/annual_statement_pdf.html` (audit prefix `template.annual_statement_pdf`) |
@@ -221,9 +221,23 @@ interface PdfTemplateResponse {
     template_name: string   // e.g. "invoices/invoice_pdf.html"
     content: string         // raw HTML
     is_customized: boolean  // true when a DB override exists
+    is_stale: boolean       // true when the override's default_digest no longer matches the shipped default
     detail?: string         // success message on PATCH/DELETE
 }
 ```
+
+**Validation and staleness semantics** (migration `invoices/0009` added
+`PdfTemplate.default_digest`): save-time validation catches syntax errors and
+unknown *output* variables only — a variable consulted solely inside
+`{% if %}`/`{% for %}` control flow is not detected, and validation runs Django
+HTML rendering only (WeasyPrint/PDF-render failures surface at preview or
+render time). `default_digest` is compared on read, so a release that changes
+an on-disk default flags stale overrides on the next GET. Legacy rows are
+backfilled by the migration with the digest of the default shipping in that
+release (treated as current); a blank digest means unknown provenance and is
+never stale. The admin UI (`AdminPdfTemplatesPage.tsx`) shows a stale banner
+when `is_customized && is_stale`. `DELETE` always reverts to the
+on-disk default. See `2026-08-contract-pdf-redesign.md` §5.2.
 
 ### 5.5 ZEV Settings (per-community)
 

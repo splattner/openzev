@@ -17,6 +17,10 @@ import { queryKeys } from '../lib/api/queryKeys'
 import type { PdfTemplateResponse } from '../types/api'
 import { useToast } from '../lib/toast'
 
+const PDF_TEMPLATE_TABS = ['invoice', 'contract', 'annual_statement'] as const
+
+type PdfTemplateTab = (typeof PDF_TEMPLATE_TABS)[number]
+
 interface FieldGroup {
     title: string
     fields: { variable: string; description: string }[]
@@ -61,6 +65,7 @@ function TemplateTextarea({
 }) {
     const textareaRef = useRef<HTMLTextAreaElement>(null)
     const overlayRef = useRef<HTMLDivElement>(null)
+    const containerRef = useRef<HTMLDivElement>(null)
     const [tooltip, setTooltip] = useState<{ text: string; x: number; y: number } | null>(null)
 
     const fieldMap = useMemo(() => {
@@ -100,7 +105,7 @@ function TemplateTextarea({
     }, [value])
 
     return (
-        <div style={{ position: 'relative' }}>
+        <div ref={containerRef} style={{ position: 'relative' }}>
             <textarea
                 ref={textareaRef}
                 value={value}
@@ -148,8 +153,7 @@ function TemplateTextarea({
                             }}
                             onMouseEnter={(e) => {
                                 const rect = (e.target as HTMLElement).getBoundingClientRect()
-                                const container = (e.target as HTMLElement).closest('[style*="position: relative"]')
-                                const containerRect = container?.getBoundingClientRect() ?? rect
+                                const containerRect = containerRef.current?.getBoundingClientRect() ?? rect
                                 setTooltip({
                                     text: desc,
                                     x: rect.left - containerRect.left,
@@ -266,6 +270,11 @@ function TemplateEditor({
                 {isError && <p className="error-banner">{t('common.error')}</p>}
                 {data && (
                     <>
+                        {data.is_stale && (
+                            <div className="warning-banner" role="alert">
+                                {t('admin.staleTemplate')}
+                            </div>
+                        )}
                         <p className="muted">{data.template_name}</p>
                         {!showPreview && (
                             <label>
@@ -276,6 +285,14 @@ function TemplateEditor({
                                     fieldGroups={fieldGroups}
                                 />
                             </label>
+                        )}
+                        {/* The shared-base include lives in the invoice and
+                            contract defaults; the annual-statement template
+                            is standalone, so the hint only applies there. */}
+                        {templateType !== 'annual_statement' && !showPreview && (
+                            <p className="muted" style={{ marginTop: '0.5rem' }}>
+                                {t('admin.templateIncludeHint')}
+                            </p>
                         )}
                         {showPreview && (
                             <div>
@@ -340,7 +357,29 @@ export function AdminPdfTemplatesPage() {
     const { t } = useTranslation()
     const { pushToast } = useToast()
     const queryClient = useQueryClient()
-    const [activeTab, setActiveTab] = useState<'invoice' | 'contract' | 'annual_statement'>('invoice')
+    const [activeTab, setActiveTab] = useState<PdfTemplateTab>('invoice')
+
+    const tabLabels: Record<PdfTemplateTab, string> = {
+        invoice: t('admin.invoiceTemplate'),
+        contract: t('admin.contractTemplate'),
+        annual_statement: t('admin.annualStatementTemplate'),
+    }
+
+    const handleTabKeyDown = useCallback(
+        (event: React.KeyboardEvent<HTMLDivElement>) => {
+            const index = PDF_TEMPLATE_TABS.indexOf(activeTab)
+            let next: number | null = null
+            if (event.key === 'ArrowRight') next = (index + 1) % PDF_TEMPLATE_TABS.length
+            else if (event.key === 'ArrowLeft') next = (index - 1 + PDF_TEMPLATE_TABS.length) % PDF_TEMPLATE_TABS.length
+            else if (event.key === 'Home') next = 0
+            else if (event.key === 'End') next = PDF_TEMPLATE_TABS.length - 1
+            if (next === null) return
+            event.preventDefault()
+            setActiveTab(PDF_TEMPLATE_TABS[next])
+            document.getElementById(`pdf-template-tab-${PDF_TEMPLATE_TABS[next]}`)?.focus()
+        },
+        [activeTab],
+    )
 
     const invoiceFieldGroups: FieldGroup[] = [
         {
@@ -450,7 +489,11 @@ export function AdminPdfTemplatesPage() {
             title: t('admin.fields.ownerParticipant'),
             fields: [
                 { variable: '{{ owner_participant.full_name }}', description: t('admin.fields.fullName') },
-                { variable: '{{ zev.owner.email }}', description: t('admin.fields.email') },
+                { variable: '{{ owner_participant.address_line1 }}', description: t('admin.fields.addressLine1') },
+                { variable: '{{ owner_participant.address_line2 }}', description: t('admin.fields.addressLine2') },
+                { variable: '{{ owner_participant.postal_code }}', description: t('admin.fields.postalCode') },
+                { variable: '{{ owner_participant.city }}', description: t('admin.fields.city') },
+                { variable: '{{ owner_participant.email }}', description: t('admin.fields.email') },
             ],
         },
         {
@@ -469,13 +512,30 @@ export function AdminPdfTemplatesPage() {
                 { variable: '{{ row.name }}', description: t('admin.fields.tariffName') },
                 { variable: '{{ row.rate_rp }}', description: t('admin.fields.tariffRate') },
                 { variable: '{{ row.rate_description }}', description: t('admin.fields.tariffRateDesc') },
+                { variable: '{{ row.pct }}', description: t('admin.fields.tariffPct') },
+                { variable: '{{ row.unit }}', description: t('admin.fields.tariffUnit') },
+                { variable: '{{ row.valid_from }}', description: t('admin.fields.tariffValidFrom') },
+                { variable: '{{ row.valid_to }}', description: t('admin.fields.tariffValidTo') },
+                { variable: '{{ row.validity }}', description: t('admin.fields.tariffValidity') },
+                { variable: '{{ row.notes }}', description: t('admin.fields.tariffNotes') },
                 { variable: '{{ local_tariff_notes }}', description: t('admin.fields.localTariffNotes') },
+            ],
+        },
+        {
+            title: t('admin.fields.tariffClause'),
+            fields: [
+                { variable: '{{ tariff_rule }}', description: t('admin.fields.tariffRule') },
+                { variable: '{{ tariff_pct_line }}', description: t('admin.fields.tariffPctLine') },
+                { variable: '{{ tariff_reference_product }}', description: t('admin.fields.tariffReferenceProduct') },
             ],
         },
         {
             title: t('admin.fields.contractDetails'),
             fields: [
                 { variable: '{{ contract_date }}', description: t('admin.fields.contractDate') },
+                { variable: '{{ participation_start }}', description: t('admin.fields.participationStart') },
+                { variable: '{{ document_id }}', description: t('admin.fields.documentId') },
+                { variable: '{{ vat_rate_display }}', description: t('admin.fields.vatRateDisplay') },
                 { variable: '{{ billing_interval_display }}', description: t('admin.fields.billingInterval') },
                 { variable: '{{ additional_contract_notes }}', description: t('admin.fields.additionalNotes') },
                 { variable: '{{ lang }}', description: t('admin.fields.languageCode') },
@@ -588,6 +648,7 @@ export function AdminPdfTemplatesPage() {
     const invoiceTemplateQuery = useQuery({
         queryKey: queryKeys.admin.invoicePdfTemplate(),
         queryFn: fetchInvoicePdfTemplate,
+        enabled: activeTab === 'invoice',
     })
 
     const saveInvoiceMutation = useMutation({
@@ -611,6 +672,7 @@ export function AdminPdfTemplatesPage() {
     const contractTemplateQuery = useQuery({
         queryKey: queryKeys.admin.contractPdfTemplate(),
         queryFn: fetchContractPdfTemplate,
+        enabled: activeTab === 'contract',
     })
 
     const saveContractMutation = useMutation({
@@ -634,6 +696,7 @@ export function AdminPdfTemplatesPage() {
     const annualStatementTemplateQuery = useQuery({
         queryKey: queryKeys.admin.annualStatementPdfTemplate(),
         queryFn: fetchAnnualStatementPdfTemplate,
+        enabled: activeTab === 'annual_statement',
     })
 
     const saveAnnualStatementMutation = useMutation({
@@ -664,97 +727,99 @@ export function AdminPdfTemplatesPage() {
                 </p>
             </header>
 
-            <div style={{ display: 'flex', gap: '1rem', borderBottom: '1px solid var(--color-border, #e5e7eb)', marginBottom: '1.5rem' }}>
-                <button
-                    onClick={() => setActiveTab('invoice')}
-                    style={{
-                        background: 'transparent',
-                        color: activeTab === 'invoice' ? 'var(--color-text, #000)' : 'var(--color-text-muted, #888)',
-                        padding: '0.75rem 1rem',
-                        fontSize: '1rem',
-                        fontWeight: activeTab === 'invoice' ? 600 : 400,
-                        cursor: 'pointer',
-                        border: 'none',
-                        borderBlockEnd: activeTab === 'invoice' ? '2px solid var(--color-primary, #0066cc)' : 'none',
-                    }}
-                >
-                    {t('admin.invoiceTemplate')}
-                </button>
-                <button
-                    onClick={() => setActiveTab('contract')}
-                    style={{
-                        background: 'transparent',
-                        color: activeTab === 'contract' ? 'var(--color-text, #000)' : 'var(--color-text-muted, #888)',
-                        padding: '0.75rem 1rem',
-                        fontSize: '1rem',
-                        fontWeight: activeTab === 'contract' ? 600 : 400,
-                        cursor: 'pointer',
-                        border: 'none',
-                        borderBlockEnd: activeTab === 'contract' ? '2px solid var(--color-primary, #0066cc)' : 'none',
-                    }}
-                >
-                    {t('admin.contractTemplate')}
-                </button>
-                <button
-                    onClick={() => setActiveTab('annual_statement')}
-                    style={{
-                        background: 'transparent',
-                        color: activeTab === 'annual_statement' ? 'var(--color-text, #000)' : 'var(--color-text-muted, #888)',
-                        padding: '0.75rem 1rem',
-                        fontSize: '1rem',
-                        fontWeight: activeTab === 'annual_statement' ? 600 : 400,
-                        cursor: 'pointer',
-                        border: 'none',
-                        borderBlockEnd: activeTab === 'annual_statement' ? '2px solid var(--color-primary, #0066cc)' : 'none',
-                    }}
-                >
-                    {t('admin.annualStatementTemplate')}
-                </button>
+            <div
+                role="tablist"
+                aria-label={t('admin.pdfTemplates')}
+                onKeyDown={handleTabKeyDown}
+                style={{ display: 'flex', gap: '1rem', borderBottom: '1px solid var(--color-border, #e5e7eb)', marginBottom: '1.5rem' }}
+            >
+                {PDF_TEMPLATE_TABS.map((tab) => (
+                    <button
+                        key={tab}
+                        type="button"
+                        role="tab"
+                        id={`pdf-template-tab-${tab}`}
+                        aria-selected={activeTab === tab}
+                        aria-controls={`pdf-template-panel-${tab}`}
+                        tabIndex={activeTab === tab ? 0 : -1}
+                        onClick={() => setActiveTab(tab)}
+                        style={{
+                            background: 'transparent',
+                            color: activeTab === tab ? 'var(--color-text, #000)' : 'var(--color-text-muted, #888)',
+                            padding: '0.75rem 1rem',
+                            fontSize: '1rem',
+                            fontWeight: activeTab === tab ? 600 : 400,
+                            cursor: 'pointer',
+                            border: 'none',
+                            borderBlockEnd: activeTab === tab ? '2px solid var(--color-primary, #0066cc)' : 'none',
+                        }}
+                    >
+                        {tabLabels[tab]}
+                    </button>
+                ))}
             </div>
 
             {activeTab === 'invoice' && (
-                <TemplateEditor
-                    data={invoiceTemplateQuery.data}
-                    isLoading={invoiceTemplateQuery.isLoading}
-                    isError={invoiceTemplateQuery.isError}
-                    onSave={(content) => saveInvoiceMutation.mutate(content)}
-                    onReset={() => resetInvoiceMutation.mutate()}
-                    isSaving={saveInvoiceMutation.isPending}
-                    isResetting={resetInvoiceMutation.isPending}
-                    title={t('admin.invoiceTemplate')}
-                    fieldGroups={invoiceFieldGroups}
-                    templateType="invoice"
-                />
+                <div
+                    id="pdf-template-panel-invoice"
+                    role="tabpanel"
+                    aria-labelledby="pdf-template-tab-invoice"
+                >
+                    <TemplateEditor
+                        data={invoiceTemplateQuery.data}
+                        isLoading={invoiceTemplateQuery.isLoading}
+                        isError={invoiceTemplateQuery.isError}
+                        onSave={(content) => saveInvoiceMutation.mutate(content)}
+                        onReset={() => resetInvoiceMutation.mutate()}
+                        isSaving={saveInvoiceMutation.isPending}
+                        isResetting={resetInvoiceMutation.isPending}
+                        title={t('admin.invoiceTemplate')}
+                        fieldGroups={invoiceFieldGroups}
+                        templateType="invoice"
+                    />
+                </div>
             )}
 
             {activeTab === 'contract' && (
-                <TemplateEditor
-                    data={contractTemplateQuery.data}
-                    isLoading={contractTemplateQuery.isLoading}
-                    isError={contractTemplateQuery.isError}
-                    onSave={(content) => saveContractMutation.mutate(content)}
-                    onReset={() => resetContractMutation.mutate()}
-                    isSaving={saveContractMutation.isPending}
-                    isResetting={resetContractMutation.isPending}
-                    title={t('admin.contractTemplate')}
-                    fieldGroups={contractFieldGroups}
-                    templateType="contract"
-                />
+                <div
+                    id="pdf-template-panel-contract"
+                    role="tabpanel"
+                    aria-labelledby="pdf-template-tab-contract"
+                >
+                    <TemplateEditor
+                        data={contractTemplateQuery.data}
+                        isLoading={contractTemplateQuery.isLoading}
+                        isError={contractTemplateQuery.isError}
+                        onSave={(content) => saveContractMutation.mutate(content)}
+                        onReset={() => resetContractMutation.mutate()}
+                        isSaving={saveContractMutation.isPending}
+                        isResetting={resetContractMutation.isPending}
+                        title={t('admin.contractTemplate')}
+                        fieldGroups={contractFieldGroups}
+                        templateType="contract"
+                    />
+                </div>
             )}
 
             {activeTab === 'annual_statement' && (
-                <TemplateEditor
-                    data={annualStatementTemplateQuery.data}
-                    isLoading={annualStatementTemplateQuery.isLoading}
-                    isError={annualStatementTemplateQuery.isError}
-                    onSave={(content) => saveAnnualStatementMutation.mutate(content)}
-                    onReset={() => resetAnnualStatementMutation.mutate()}
-                    isSaving={saveAnnualStatementMutation.isPending}
-                    isResetting={resetAnnualStatementMutation.isPending}
-                    title={t('admin.annualStatementTemplate')}
-                    fieldGroups={annualStatementFieldGroups}
-                    templateType="annual_statement"
-                />
+                <div
+                    id="pdf-template-panel-annual_statement"
+                    role="tabpanel"
+                    aria-labelledby="pdf-template-tab-annual_statement"
+                >
+                    <TemplateEditor
+                        data={annualStatementTemplateQuery.data}
+                        isLoading={annualStatementTemplateQuery.isLoading}
+                        isError={annualStatementTemplateQuery.isError}
+                        onSave={(content) => saveAnnualStatementMutation.mutate(content)}
+                        onReset={() => resetAnnualStatementMutation.mutate()}
+                        isSaving={saveAnnualStatementMutation.isPending}
+                        isResetting={resetAnnualStatementMutation.isPending}
+                        title={t('admin.annualStatementTemplate')}
+                        fieldGroups={annualStatementFieldGroups}
+                        templateType="annual_statement"
+                    />
+                </div>
             )}
         </div>
     )

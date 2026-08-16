@@ -17,6 +17,8 @@ from rest_framework.test import APIClient
 
 from accounts.models import UserRole
 from audit.models import AuditActionCategory, AuditEvent, AuditEventStatus
+from invoices.contract_pdf import generate_contract_pdf
+from invoices.test_helpers import make_participant, make_zev
 from testing.helpers import authenticate as auth, make_user
 
 from .models import EMAIL_TEMPLATE_DEFAULTS, EmailTemplate, PdfTemplate
@@ -250,3 +252,123 @@ class PdfTemplateAdminTests(TestCase):
         self.client.delete(url)
         reset_event = AuditEvent.objects.get(action_type="template.invoice_pdf.reset")
         self.assertEqual(reset_event.summary, "Reset PDF template invoices/invoice_pdf.html to default.")
+
+
+class PdfTemplateOverrideIntegrityTests(TestCase):
+    """The whole-document override path is validated at the door and
+    provenance-aware: broken templates are rejected on save (never stored to
+    fail at document-render time), staleness against a changed on-disk default
+    is surfaced on read, and the shared-base include keeps working through the
+    DB override render path."""
+
+    def setUp(self):
+        self.client = APIClient()
+        auth(self.client, make_user("override_admin", UserRole.ADMIN))
+        self.owner = make_user("override_owner", UserRole.ZEV_OWNER)
+
+    def test_broken_override_is_rejected_and_nothing_is_stored(self):
+        url = "/api/v1/invoices/invoices/contract-pdf-template/"
+
+        resp = self.client.patch(url, {"content": "{% not_a_tag %}"}, format="json")
+
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn("Template rendering error", resp.data["error"])
+        self.assertFalse(PdfTemplate.objects.exists())
+
+    def test_valid_override_is_stored_with_default_digest_and_not_stale(self):
+        url = "/api/v1/invoices/invoices/contract-pdf-template/"
+
+        resp = self.client.patch(url, {"content": "<p>custom</p>"}, format="json")
+
+        self.assertEqual(resp.status_code, 200)
+        self.assertFalse(resp.data["is_stale"])
+        record = PdfTemplate.objects.get(template_name="contracts/participant_contract_pdf.html")
+        self.assertEqual(record.content, "<p>custom</p>")
+        self.assertTrue(record.default_digest)
+
+    def test_get_flags_override_saved_against_an_older_default_as_stale(self):
+        url = "/api/v1/invoices/invoices/pdf-template/"
+        PdfTemplate.objects.create(
+            template_name="invoices/invoice_pdf.html",
+            content="<p>old override</p>",
+            default_digest="0" * 64,  # a digest that can never match a real file
+        )
+
+        resp = self.client.get(url)
+
+        self.assertTrue(resp.data["is_customized"])
+        self.assertTrue(resp.data["is_stale"])
+
+    def test_override_without_digest_provenance_is_never_stale(self):
+        """A legacy override with a blank digest (migration 0009 backfills
+        those, but a row may still lack provenance) must not alarm."""
+        url = "/api/v1/invoices/invoices/pdf-template/"
+        PdfTemplate.objects.create(
+            template_name="invoices/invoice_pdf.html",
+            content="<p>legacy override</p>",
+        )
+
+        resp = self.client.get(url)
+
+        self.assertTrue(resp.data["is_customized"])
+        self.assertFalse(resp.data["is_stale"])
+
+    def test_patch_rejects_unknown_template_variables(self):
+        """Django renders unknown variables as an empty string by default, so a
+        typo like ``{{ participant.emali }}`` would silently produce a broken
+        PDF. Save-time validation must reject it."""
+        url = "/api/v1/invoices/invoices/contract-pdf-template/"
+        resp = self.client.patch(
+            url,
+            {"content": "<p>Contact: {{ participant.emali }}</p>"},
+            format="json",
+        )
+
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn("participant.emali", resp.data["error"])
+        self.assertFalse(PdfTemplate.objects.exists())
+
+    def test_default_template_is_never_stale(self):
+        resp = self.client.get("/api/v1/invoices/invoices/pdf-template/")
+
+        self.assertFalse(resp.data["is_customized"])
+        self.assertFalse(resp.data["is_stale"])
+
+    def _contract_participant(self):
+        zev = make_zev(self.owner, "Override ZEV")
+        return make_participant(zev, first="Override", last="Participant")
+
+    def test_override_with_shared_base_include_renders_through_the_real_path(self):
+        """The current default already includes the shared design base; stored
+        as an override it must keep resolving it via the engine loaders, so the
+        two sources of design truth stay aligned."""
+        url = "/api/v1/invoices/invoices/contract-pdf-template/"
+        default_content = self.client.get(url).data["content"]
+
+        resp = self.client.patch(url, {"content": default_content}, format="json")
+        self.assertEqual(resp.status_code, 200)
+
+        participant = self._contract_participant()
+        pdf = generate_contract_pdf(participant)
+        self.assertTrue(pdf.startswith(b"%PDF"))
+
+        from django.template.loader import render_to_string
+        from invoices.contract_pdf import CONTRACT_TEMPLATE_NAME, _build_contract_context
+        html = render_to_string(CONTRACT_TEMPLATE_NAME, _build_contract_context(participant))
+        self.assertIn("running(footer-meta)", html)  # shared-base CSS survived
+        self.assertIn("document-header", html)
+
+    def test_legacy_override_without_include_still_renders(self):
+        """Overrides saved before the redesign carry their own full markup and
+        no shared-base include; they must still render without error."""
+        url = "/api/v1/invoices/invoices/contract-pdf-template/"
+        legacy = (
+            "<!DOCTYPE html><html><body><h1>Legacy contract</h1>"
+            "<p>{{ participant.full_name }}</p></body></html>"
+        )
+
+        resp = self.client.patch(url, {"content": legacy}, format="json")
+        self.assertEqual(resp.status_code, 200)
+
+        pdf = generate_contract_pdf(self._contract_participant())
+        self.assertTrue(pdf.startswith(b"%PDF"))

@@ -33,18 +33,26 @@ extracted_urlpatterns = [
     path("invoices/financial-summary/", FinancialSummaryView.as_view(), name="invoice-financial-summary"),
     path(
         "invoices/pdf-template/",
-        PdfTemplateView.as_view(template_name=TEMPLATE_NAME, audit_action_prefix="template.invoice_pdf"),
+        PdfTemplateView.as_view(
+            template_name=TEMPLATE_NAME, audit_action_prefix="template.invoice_pdf", template_type="invoice"
+        ),
         name="invoice-pdf-template",
     ),
     path(
         "invoices/contract-pdf-template/",
-        PdfTemplateView.as_view(template_name=CONTRACT_TEMPLATE_NAME, audit_action_prefix="template.contract_pdf"),
+        PdfTemplateView.as_view(
+            template_name=CONTRACT_TEMPLATE_NAME,
+            audit_action_prefix="template.contract_pdf",
+            template_type="contract",
+        ),
         name="invoice-contract-pdf-template",
     ),
     path(
         "invoices/annual-statement-pdf-template/",
         PdfTemplateView.as_view(
-            template_name=ANNUAL_STATEMENT_TEMPLATE, audit_action_prefix="template.annual_statement_pdf"
+            template_name=ANNUAL_STATEMENT_TEMPLATE,
+            audit_action_prefix="template.annual_statement_pdf",
+            template_type="annual_statement",
         ),
         name="invoice-annual-statement-pdf-template",
     ),
