@@ -34,5 +34,13 @@ REST_FRAMEWORK = {
         "auth_verify": None,
         "auth_oauth_initiate": None,
         "auth_oauth_exchange": None,
+        "import": None,
+        "transfer_import": None,
     },
 }
+
+# Pin the env-tunable upload caps to their defaults so a developer's local
+# .env cannot change what the suite observes; limit tests patch the module
+# constants directly.
+IMPORT_MAX_ROWS = 200_000
+TRANSFER_MAX_DECOMPRESSED_MB = 500

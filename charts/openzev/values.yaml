@@ -111,7 +111,11 @@ email:
 ingress:
   enabled: true
   className: ""
-  annotations: {}
+  # 50m covers the upload endpoints (ingress-nginx defaults to 1m, which
+  # would kill even small imports). Per-location limits for the docker
+  # fullstack setup live in docker/fullstack-nginx.conf.
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
   tls: []
   hosts:
     - host: openzev.local

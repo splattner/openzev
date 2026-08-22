@@ -1,4 +1,4 @@
-from rest_framework.throttling import SimpleRateThrottle
+from rest_framework.throttling import SimpleRateThrottle, UserRateThrottle
 
 
 class ApiKeyRateThrottle(SimpleRateThrottle):
@@ -59,3 +59,15 @@ class AuthOAuthInitiateThrottle(AuthRateThrottle):
 
 class AuthOAuthExchangeThrottle(AuthRateThrottle):
     scope = "auth_oauth_exchange"
+
+
+class ImportThrottle(UserRateThrottle):
+    """Per-user budget for metering imports."""
+
+    scope = "import"
+
+
+class TransferArchiveThrottle(UserRateThrottle):
+    """Per-user budget for whole-ZEV transfer archive import/inspect."""
+
+    scope = "transfer_import"

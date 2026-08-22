@@ -10,6 +10,7 @@ from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from accounts.permissions import IsZevOwnerOrAdmin
+from accounts.throttling import ApiKeyRateThrottle, ImportThrottle
 from zev.models import Zev, Participant, MeteringPoint
 from .models import MeterReading, ImportLog
 from zev.scoping import ZevScopedQuerySetMixin
@@ -388,6 +389,10 @@ class ImportView(viewsets.ViewSet):
     """Handles CSV and SDAT-CH file uploads for metering data."""
     permission_classes = [IsAuthenticated, IsZevOwnerOrAdmin]
     parser_classes = [MultiPartParser, FormParser]
+    # ImportThrottle bounds bulk uploads per user; ApiKeyRateThrottle stays so
+    # view-level lists (which replace DEFAULT_THROTTLE_CLASSES) keep counting
+    # key-authenticated requests against the key budget.
+    throttle_classes = [ApiKeyRateThrottle, ImportThrottle]
 
     @action(detail=False, methods=["post"], url_path="csv")
     def upload_csv(self, request):
@@ -418,8 +423,8 @@ class ImportView(viewsets.ViewSet):
         delimiter = request.data.get("delimiter", ",")
         format_profile = request.data.get("format_profile", "standard")
         timestamp_format = request.data.get("timestamp_format") or None
-        interval_minutes = int(request.data.get("interval_minutes", 15))
-        values_count = int(request.data.get("values_count", 96))
+        interval_minutes = request.data.get("interval_minutes", 15)
+        values_count = request.data.get("values_count", 96)
 
         try:
             payload = preview_csv(
@@ -465,8 +470,9 @@ class ImportView(viewsets.ViewSet):
             metadata={
                 "filename": file.name,
                 "format_profile": format_profile,
-                "interval_minutes": interval_minutes,
-                "values_count": values_count,
+                # The preview succeeded, so both values are int-coercible.
+                "interval_minutes": int(interval_minutes),
+                "values_count": int(values_count),
             },
         )
         return Response(payload)
@@ -493,8 +499,8 @@ class ImportView(viewsets.ViewSet):
             delimiter = request.data.get("delimiter", ",")
             format_profile = request.data.get("format_profile", "standard")
             timestamp_format = request.data.get("timestamp_format") or None
-            interval_minutes = int(request.data.get("interval_minutes", 15))
-            values_count = int(request.data.get("values_count", 96))
+            interval_minutes = request.data.get("interval_minutes", 15)
+            values_count = request.data.get("values_count", 96)
             overwrite_existing_raw = request.data.get("overwrite_existing", "false")
             overwrite_existing = str(overwrite_existing_raw).strip().lower() in {"1", "true", "yes", "on"}
 

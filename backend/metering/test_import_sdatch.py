@@ -2,12 +2,14 @@
 
 from datetime import date, datetime, timezone
 from decimal import Decimal
+from unittest import mock
 
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
 from rest_framework.test import APIClient
 
 from accounts.models import UserRole
+from metering.importers import csv_importer, sdatch_importer
 from metering.models import ImportLog, ImportSource, MeterReading, ReadingDirection
 from testing.helpers import authenticate as auth, make_user
 from zev.models import MeteringPoint, MeteringPointAssignment, MeteringPointType, Participant, Zev
@@ -206,3 +208,48 @@ class SdatchImportTests(TestCase):
         self.assertEqual(resp.status_code, 201)
         self.assertEqual(resp.data["rows_imported"], 1)
         self.assertTrue(MeterReading.objects.filter(metering_point=admin_meter).exists())
+
+
+class SdatchLimitTests(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.owner = make_user("sdatch_limit_owner", UserRole.ZEV_OWNER)
+        auth(self.client, self.owner)
+        self.zev = Zev.objects.create(name="SDAT Limit ZEV", owner=self.owner, zev_type="vzev", invoice_prefix="Y")
+
+    def test_file_over_size_cap_is_reported_without_parsing(self):
+        xml = (
+            b'<?xml version="1.0" encoding="UTF-8"?><MeteringData>'
+            b'<MeteringPoint><ID>CH-SDAT-1</ID></MeteringPoint></MeteringData>'
+        )
+
+        with mock.patch.object(sdatch_importer, "MAX_SDAT_BYTES", 10):
+            upload = SimpleUploadedFile("big.xml", xml, content_type="application/xml")
+            resp = self.client.post(
+                "/api/v1/metering/import/sdatch/",
+                {"file": upload, "zev_id": str(self.zev.id)},
+                format="multipart",
+            )
+
+        self.assertEqual(resp.status_code, 201)
+        self.assertIn("too large", resp.data["errors"][0]["error"].lower())
+        self.assertEqual(resp.data["rows_imported"], 0)
+        self.assertEqual(MeterReading.objects.count(), 0)
+
+    def test_row_error_list_is_capped_with_a_truncation_note(self):
+        meters = "".join(
+            f"<MeteringPoint><ID>NOPE-{i}</ID></MeteringPoint>" for i in range(60)
+        )
+        xml = f'<?xml version="1.0" encoding="UTF-8"?><MeteringData>{meters}</MeteringData>'.encode()
+
+        upload = SimpleUploadedFile("errs.xml", xml, content_type="application/xml")
+        resp = self.client.post(
+            "/api/v1/metering/import/sdatch/",
+            {"file": upload, "zev_id": str(self.zev.id)},
+            format="multipart",
+        )
+
+        self.assertEqual(resp.status_code, 201)
+        errors = resp.data["errors"]
+        self.assertEqual(len(errors), csv_importer.MAX_REPORTED_ERRORS + 1)
+        self.assertIn("Too many errors", errors[-1]["error"])

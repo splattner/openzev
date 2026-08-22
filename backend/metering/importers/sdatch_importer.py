@@ -14,6 +14,9 @@ from lxml import etree
 
 from zev.models import MeteringPoint
 from metering.models import MeterReading, ImportLog, ImportSource
+from metering.importers.limits import MAX_UPLOAD_BYTES, add_error, mb
+
+MAX_SDAT_BYTES = MAX_UPLOAD_BYTES
 
 # Namespaces used in SDAT-CH MeteringData documents
 NSMAP = {
@@ -45,8 +48,24 @@ def import_sdatch(file, zev, user):
         filename=filename,
     )
 
+    # App-level size cap (nginx enforces 413 earlier).
+    size_hint = getattr(file, "size", None)
+    if size_hint is not None and size_hint > MAX_SDAT_BYTES:
+        log.rows_total = 0
+        log.rows_imported = 0
+        log.rows_skipped = 0
+        log.errors = [{"error": f"File too large ({mb(size_hint)}). Maximum is {mb(MAX_SDAT_BYTES)}."}]
+        log.save()
+        return log
+
     try:
-        tree = etree.parse(file)
+        parser = etree.XMLParser(
+            resolve_entities=False,
+            load_dtd=False,
+            no_network=True,
+            huge_tree=False,
+        )
+        tree = etree.parse(file, parser)
         root = tree.getroot()
     except Exception as exc:
         log.rows_total = 0
@@ -76,7 +95,7 @@ def import_sdatch(file, zev, user):
         meter_id = (meter_id_elem.text or "").strip()
         mp = meter_lookup.get(meter_id)
         if mp is None:
-            errors.append({"meter_id": meter_id, "error": "Metering point not found in ZEV."})
+            add_error(errors, {"meter_id": meter_id, "error": "Metering point not found in ZEV."})
             continue
 
         for interval in mp_elem.iter("{*}Interval"):
@@ -93,7 +112,7 @@ def import_sdatch(file, zev, user):
             try:
                 start_ts = _parse_ts(start_elem.text.strip())
             except Exception as exc:
-                errors.append({"error": f"Invalid timestamp {start_elem.text}: {exc}"})
+                add_error(errors, {"error": f"Invalid timestamp {start_elem.text}: {exc}"})
                 continue
 
             # Resolution in minutes (default 15)
@@ -138,8 +157,7 @@ def import_sdatch(file, zev, user):
                         skipped += 1
                 except Exception as exc:
                     skipped += 1
-                    errors.append({"error": str(exc)})
-
+                    add_error(errors, {"error": str(exc)})
     log.rows_total = rows_total
     log.rows_imported = imported
     log.rows_skipped = skipped

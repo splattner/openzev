@@ -279,6 +279,45 @@ Preview accepts the same configuration parameters as CSV import (column map,
 header, delimiter, profile, timestamp format, interval, values count) but does
 **not** write any data.
 
+### 4.4 Hardening and limits (C+ — 2026-08)
+
+All import paths enforce app-level and nginx-level limits; the parser is pinned to prevent version drift.
+
+**Nginx body limits:**
+- Global `client_max_body_size 10m` (`docker/fullstack-nginx.conf`, `frontend/nginx.conf`).
+- Per-location `50m` on `/api/v1/metering/import/` (CSV/SDAT) and `/api/v1/zev/zevs/(import|inspect)-archive` (transfer) — the paths include the `/api/v1/` prefix the Django router mounts. The Helm chart sets `nginx.ingress.kubernetes.io/proxy-body-size: "50m"` on the ingress (ingress-nginx defaults to 1m, which would block even small uploads).
+- `error_page 413` returns JSON `{"detail":"File too large."}` rather than HTML.
+
+**SDAT-CH XML parser (pinned):**
+```python
+parser = etree.XMLParser(resolve_entities=False, load_dtd=False, no_network=True, huge_tree=False)
+tree = etree.parse(file, parser)
+```
+On lxml 6.1.1 the default is `resolve_entities='internal'` with a libxml2 amplification ceiling (~100x, `huge_tree=False`), so Billion Laughs does not reach GB-scale — explicit flags pin behaviour against future `huge_tree=True` drift. See `backend/metering/importers/sdatch_importer.py`. An oversized SDAT file is reported as an ImportLog error (HTTP 201) — the SDAT importer always reports through its log — unlike CSV, whose oversize files return HTTP 400.
+
+**CSV / Excel streaming and caps (`backend/metering/importers/csv_importer.py`):**
+- `MAX_CSV_BYTES 50 MB` enforced via the upload's `size` attribute (nginx rejects oversized bodies earlier with 413); `MAX_XLSX_DECOMPRESSED_BYTES 50 MB`, `MAX_CSV_ROWS 200k` (env `IMPORT_MAX_ROWS`, `backend/config/settings.py`), `MAX_CSV_COLUMNS 1500`. The row cap counts data rows — a header row does not consume it. Headroom by profile: `standard` (one reading per row) is the tight case at ~5.7 meter-years of 15-minute data (35,040 rows/meter-year); `daily_15min` (one row per meter-day) has ~548 meter-years of headroom. Raise `IMPORT_MAX_ROWS` for larger standard-profile exports.
+- `MAX_XLSX_MEMBERS 200`, `MAX_XLSX_RATIO 500:1` (XLSX is a ZIP; `openpyxl` with `read_only=True` still materializes shared strings, so the ZIP is validated before inflation). The ratio is a heuristic, deliberately loose: legitimate sparse sheets compress far beyond 100:1, and the decompressed-size sum is the hard bound. Sheet row caps are enforced *during* iteration and the column cap on *every* row, so an oversized sheet is rejected before it is materialized and a wide row cannot hide behind a narrow first row.
+- `MAX_VALUES_COUNT 1440` (values per `daily_15min` row) — prevents CPU bomb via `values_count=100000`; both `preview_csv` and `import_csv` validate `1..1440` through `_coerce_values_count`, and `interval_minutes >= 1` through `_coerce_interval_minutes`. Validation is single-layer: the coercers raise `ImportFileError` on non-integer input (no silent defaults), which the views map to a 400.
+- Streaming via `TextIOWrapper` over the uploaded file (`detach()` in a `finally` keeps the underlying upload readable on error paths); `file.read().decode` whole-file buffering removed.
+- `MAX_REPORTED_ERRORS 50` (shared across importers from `backend/metering/importers/limits.py`) — further per-row errors are truncated with a sentinel error. SDAT-CH reuses the same `add_error` helper, capping during the parse loop. The "Overwrote N existing readings" note is prepended after the loop and trimmed so the list never exceeds cap + 1 nor loses the sentinel.
+
+**Shared limits module (`backend/metering/importers/limits.py`):**
+- `MAX_UPLOAD_BYTES 50 MB` (aliased as `MAX_CSV_BYTES`, `MAX_SDAT_BYTES`, `MAX_TRANSFER_COMPRESSED_BYTES`), `MAX_REPORTED_ERRORS 50`, the `mb()` formatter, `add_error()`, and `validate_zip()` — one ZIP validator (member count, declared decompressed sum, ratio with a 1 MB decompressed floor) used by both `_read_xlsx_table` and `open_archive`, parameterized by limits and error class. `reject_unsafe_member_path()` rejects absolute paths, `..` traversal on `/`- or `\`-separated paths, and Windows drive letters.
+
+**Transfer archive ZIP caps (`backend/zev/transfer/importer.py:open_archive`):**
+- `MAX_TRANSFER_COMPRESSED_BYTES 50 MB`, `MAX_TRANSFER_DECOMPRESSED_BYTES 500 MB` (env `TRANSFER_MAX_DECOMPRESSED_MB`, `backend/config/settings.py`), `MAX_TRANSFER_MEMBERS 500`, `MAX_TRANSFER_RATIO 500:1`.
+- The decompressed cap is derived from the archive scale the feature documents: 2M readings ≈ 150 MB of CSV (`docs/specs/2026-08-zev-transfer-archive.md`). Decompressed members are streamed, never materialised, so the cap is a trust bound rather than a memory bound; a guard test (`zev/test_transfer_limits.py:TransferArchiveLimitTests`) fails if it is lowered below that scale. The compressed cap pairs with nginx's 50m location and is not tunable.
+- Checked inside `open_archive`, which validates the opened `ZipFile` through the shared `validate_zip` before returning it (no second open); unsafe member paths (traversal, absolute, drive letters) are rejected.
+
+**Throttling (worker exhaustion, not just OOM):**
+- `backend/accounts/throttling.py:ImportThrottle` (`UserRateThrottle` subclass, `60/hour` per-user) on `POST /import/csv`, `/import/sdatch`, `/import/preview-csv` (`backend/metering/views.py`); `backend/accounts/throttling.py:TransferArchiveThrottle` (`UserRateThrottle` subclass, `20/hour` per-user) on `POST /zev/zevs/import-archive` and `inspect-archive` (`backend/zev/views.py`).
+- Both views list `ApiKeyRateThrottle` alongside their specific throttle: view-level `throttle_classes` *replace* `DEFAULT_THROTTLE_CLASSES`, so without it key-authenticated requests would stop counting against the API-key budget. These endpoints are authenticated (DRF checks permissions before throttles), so per-user keying always applies.
+- Rates in `backend/config/settings.py` (`REST_FRAMEWORK.DEFAULT_THROTTLE_RATES`) with env overrides `IMPORT_THROTTLE_RATE`, `TRANSFER_IMPORT_THROTTLE_RATE`; disabled in tests (`backend/config/settings_test.py` → `None`). The env-tunable volume caps (`IMPORT_MAX_ROWS`, `TRANSFER_MAX_DECOMPRESSED_MB`) are pinned to their defaults there.
+- Rationale: sync gunicorn workers tie up on parse duration even for legal-sized files; size caps alone do not bound concurrency.
+
+**Frontend error shapes:** the import UI reads `error` (app 400s) with `detail` as a fallback — the proxy's 413 body (`{"detail":"File too large."}`) — and treats a 201 whose log has `rows_imported == 0` with errors as a failure (the SDAT-CH oversize path reports through its log).
+
 ---
 
 ## 5. API endpoints
@@ -771,6 +810,26 @@ type MeteringDashboardSummary =
 | `ImportParserRobustnessTests` | §4.1: malformed CSV reported without crash; malformed SDAT-CH reported without crash; timezone offset normalized to UTC; duplicate rows skipped; idempotent re-import; overwrite mode updates value without creating new row |
 | `MeteringRawDataEndpointTests` | §5.3: owner gets daily-grouped raw rows with correct direction sums; participant can read own metering point's raw data |
 | `DataQualityStatusTests` | §5.5: owner sees gaps and severity; participant sees own meters; default 30-day range; fully assigned readings report no unassigned; holder-less meter flags every reading; assignment-gap readings flagged unassigned; overlapping windows flag only the corrupt meter (others still report) |
+
+### Backend (`metering/test_import_limits.py`, `metering/test_import_sdatch.py`)
+
+| Test class | Validates |
+|---|---|
+| `CsvLimitTests` | §4.4: CSV over the size cap, row cap, or column cap is rejected with a 400 before parsing; the header row does not consume the row cap, and headerless files get the full budget; `values_count` outside `1..1440`, `interval_minutes < 1`, and non-integer `interval_minutes`/`values_count` rejected on import and preview, `values_count` at maximum accepted; per-row error list capped at 50 with a truncation sentinel, and the overwrite note cannot push it past the cap |
+| `XlsxZipLimitTests` | §4.4: XLSX ZIP with too many members or a high-ratio member is rejected before openpyxl inflates it; a non-ZIP `.xlsx` is rejected; a sheet whose width appears only after the first row is rejected (column cap holds per row) |
+| `SdatchLimitTests` | §4.4: SDAT-CH file over the size cap produces an ImportLog error without parsing; the per-row error list is capped at 50 with a truncation sentinel during the parse loop |
+
+### Backend (`accounts/test_throttling.py`)
+
+| Test class | Validates |
+|---|---|
+| `UploadEndpointThrottleTests` | §4.4: import endpoints and transfer-archive endpoints each return 429 past their per-user budget; the two budgets are independent; key-authenticated import requests still count against the API-key budget |
+
+### Backend (`zev/test_transfer_limits.py`)
+
+| Test class | Validates |
+|---|---|
+| `TransferArchiveLimitTests` | §4.4: transfer archives with traversal member paths (`/`- and `\`-separated, plus Windows drive letters), absolute paths, too many members, over the compressed or decompressed caps, or a high-ratio member are rejected; non-ZIP archives are rejected; the decompressed cap cannot drop below the documented 2M-row archive scale |
 
 ### Frontend
 

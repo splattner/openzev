@@ -159,11 +159,19 @@ REST_FRAMEWORK = {
         "auth_verify": env("AUTH_VERIFY_THROTTLE_RATE", default="30/hour"),
         "auth_oauth_initiate": env("AUTH_OAUTH_INITIATE_THROTTLE_RATE", default="60/hour"),
         "auth_oauth_exchange": env("AUTH_OAUTH_EXCHANGE_THROTTLE_RATE", default="40/hour"),
+        # Per-user budgets bounding bulk uploads (worker-exhaustion guard).
+        "import": env("IMPORT_THROTTLE_RATE", default="60/hour"),
+        "transfer_import": env("TRANSFER_IMPORT_THROTTLE_RATE", default="20/hour"),
     },
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 50,
 }
+
+# ── Upload hardening volume caps ──────────────────────────────────────────────
+# Rationale: docs/specs/2026-03-metering-import-and-quality.md §4.4.
+IMPORT_MAX_ROWS = env.int("IMPORT_MAX_ROWS", default=200_000)
+TRANSFER_MAX_DECOMPRESSED_MB = env.int("TRANSFER_MAX_DECOMPRESSED_MB", default=500)
 
 from datetime import timedelta
 

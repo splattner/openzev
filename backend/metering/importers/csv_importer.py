@@ -11,15 +11,33 @@ Both formats support header-based mapping and index-based mapping for headerless
 import csv
 import io
 import uuid
+import zipfile
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal, InvalidOperation
 
 import openpyxl
 from dateutil import parser as dateutil_parser
+from django.conf import settings
 
+from metering.importers.limits import (
+    MAX_REPORTED_ERRORS,
+    MAX_UPLOAD_BYTES,
+    add_error,
+    mb,
+    validate_zip,
+)
 from metering.models import ImportLog, ImportSource, MeterReading
 from zev.models import MeteringPoint, Zev
+
+# Upload hardening limits — rationale: docs/specs/2026-03-metering-import-and-quality.md §4.4.
+MAX_CSV_BYTES = MAX_UPLOAD_BYTES
+MAX_CSV_ROWS = getattr(settings, "IMPORT_MAX_ROWS", 200_000)
+MAX_CSV_COLUMNS = 1_500
+MAX_VALUES_COUNT = 1440  # one value per minute per day
+MAX_XLSX_DECOMPRESSED_BYTES = 50 * 1024 * 1024  # decompressed budget, deliberately not aliased to MAX_UPLOAD_BYTES
+MAX_XLSX_MEMBERS = 200
+MAX_XLSX_RATIO = 500
 
 DEFAULT_COLUMN_MAP = {
     "meter_id": "meter_id",
@@ -88,19 +106,72 @@ def _build_table(raw_rows, *, has_header):
 
 
 def _read_csv_table(file, *, has_header, delimiter):
+    # The file is decoded incrementally (no up-front read().decode() pass);
+    # blank rows are skipped the way pandas does.
+    size_hint = getattr(file, "size", None)
+    if size_hint is not None and size_hint > MAX_CSV_BYTES:
+        raise ImportFileError(f"File too large ({mb(size_hint)}). Maximum is {mb(MAX_CSV_BYTES)}.")
+
+    file.seek(0)
+    # Unwrap Django UploadedFile to the underlying stream for TextIOWrapper.
+    binary = getattr(file, "file", file)
+
+    rows = []
+    # The header is not a data row, so a headered file may carry one extra row.
+    row_cap = MAX_CSV_ROWS + (1 if has_header else 0)
+    text_wrapper = None
     try:
-        text = file.read().decode("utf-8-sig")
+        text_wrapper = io.TextIOWrapper(binary, encoding="utf-8-sig", newline="")
+        reader = csv.reader(text_wrapper, delimiter=delimiter)
+        for row in reader:
+            if not row:
+                continue
+            if len(row) > MAX_CSV_COLUMNS:
+                raise ImportFileError(
+                    f"Row {len(rows) + 1} has too many columns ({len(row)} > {MAX_CSV_COLUMNS})."
+                )
+            if len(rows) >= row_cap:
+                raise ImportFileError(f"File has too many rows (exceeds {MAX_CSV_ROWS}).")
+            rows.append(row)
     except UnicodeDecodeError as exc:
         raise ImportFileError(
             "File is not valid UTF-8. Re-export it as UTF-8 (in Excel: 'CSV UTF-8') and try again."
         ) from exc
-    reader = csv.reader(io.StringIO(text, newline=""), delimiter=delimiter)
-    # pandas skips blank lines *and* renumbers, so a blank line does not consume
-    # a row number. Rows of empty strings are data and are kept.
-    return _build_table([row for row in reader if row], has_header=has_header)
+    except ImportFileError:
+        raise
+    except csv.Error as exc:
+        raise ImportFileError(f"CSV parse error: {exc}") from exc
+    finally:
+        # Detach (not close): the finalizer of a TextIOWrapper closes the
+        # underlying stream, and the caller may still want to read the file.
+        if text_wrapper is not None:
+            text_wrapper.detach()
+
+    return _build_table(rows, has_header=has_header)
 
 
 def _read_xlsx_table(file, *, has_header):
+    # XLSX is a ZIP: validate members / decompressed size / ratio before
+    # openpyxl inflates anything (sharedStrings.xml alone can be a bomb).
+    file.seek(0)
+    try:
+        with zipfile.ZipFile(file) as zf:
+            validate_zip(
+                zf,
+                label="Excel file",
+                max_members=MAX_XLSX_MEMBERS,
+                max_total_bytes=MAX_XLSX_DECOMPRESSED_BYTES,
+                max_ratio=MAX_XLSX_RATIO,
+                error_cls=ImportFileError,
+            )
+    except ImportFileError:
+        raise
+    except zipfile.BadZipFile as exc:
+        raise ImportFileError(f"Could not read the Excel file: {exc}") from exc
+    except Exception as exc:
+        raise ImportFileError(f"Could not validate Excel archive: {exc}") from exc
+
+    file.seek(0)
     try:
         workbook = openpyxl.load_workbook(file, read_only=True, data_only=True, keep_links=False)
     except Exception as exc:  # openpyxl raises a variety of types for bad files
@@ -108,7 +179,20 @@ def _read_xlsx_table(file, *, has_header):
     try:
         # pandas reads sheet index 0, which is not necessarily the sheet that was
         # selected when the workbook was saved (openpyxl's ``active``).
-        raw_rows = [list(row) for row in workbook.worksheets[0].iter_rows(values_only=True)]
+        sheet = workbook.worksheets[0]
+        # The header is not a data row, so a headered sheet may carry one extra row.
+        row_cap = MAX_CSV_ROWS + (1 if has_header else 0)
+        raw_rows = []
+        for row in sheet.iter_rows(values_only=True):
+            if len(raw_rows) >= row_cap:
+                raise ImportFileError(
+                    f"Excel sheet has too many rows (exceeds {MAX_CSV_ROWS})."
+                )
+            if len(row) > MAX_CSV_COLUMNS:
+                raise ImportFileError(
+                    f"Excel sheet has too many columns ({len(row)} > {MAX_CSV_COLUMNS})."
+                )
+            raw_rows.append(list(row))
     finally:
         workbook.close()
 
@@ -269,6 +353,30 @@ def _infer_log_zev(explicit_zev, touched_metering_points):
     return None
 
 
+def _coerce_values_count(values_count):
+    """Bounds the per-row slot loop."""
+    try:
+        values_count = int(values_count)
+    except (TypeError, ValueError):
+        raise ImportFileError(f"values_count must be an integer (got {values_count!r}).")
+    if values_count < 1 or values_count > MAX_VALUES_COUNT:
+        raise ImportFileError(
+            f"values_count must be between 1 and {MAX_VALUES_COUNT} (got {values_count})."
+        )
+    return values_count
+
+
+def _coerce_interval_minutes(interval_minutes):
+    """Timestamps are spaced by this many minutes."""
+    try:
+        interval_minutes = int(interval_minutes)
+    except (TypeError, ValueError):
+        raise ImportFileError(f"interval_minutes must be an integer (got {interval_minutes!r}).")
+    if interval_minutes < 1:
+        raise ImportFileError("interval_minutes must be at least 1.")
+    return interval_minutes
+
+
 def preview_csv(
     file,
     user,
@@ -285,6 +393,8 @@ def preview_csv(
 ):
     col = {**DEFAULT_COLUMN_MAP, **(column_map or {})}
     has_header = _to_bool(has_header, default=True)
+    interval_minutes = _coerce_interval_minutes(interval_minutes)
+    values_count = _coerce_values_count(values_count)
     table = _read_table(file, has_header=has_header, delimiter=delimiter)
 
     required_keys = ["meter_id", "timestamp", "energy_kwh"] if format_profile == "standard" else ["meter_id", "timestamp", "energy_start"]
@@ -389,6 +499,8 @@ def import_csv(
 
     has_header = _to_bool(has_header, default=True)
     overwrite_existing = _to_bool(overwrite_existing, default=False)
+    interval_minutes = _coerce_interval_minutes(interval_minutes)
+    values_count = _coerce_values_count(values_count)
     table = _read_table(file, has_header=has_header, delimiter=delimiter)
 
     log = ImportLog.objects.create(
@@ -422,23 +534,24 @@ def import_csv(
         try:
             if _is_missing(row[resolved_cols["meter_id"]]):
                 skipped += 1
-                errors.append({"row": row_number, "error": "Missing meter_id value."})
+                add_error(errors, {"row": row_number, "error": "Missing meter_id value."})
                 continue
 
             meter_id = str(row[resolved_cols["meter_id"]]).strip()
             if not meter_id:
                 skipped += 1
-                errors.append({"row": row_number, "error": "Empty meter_id value."})
+                add_error(errors, {"row": row_number, "error": "Empty meter_id value."})
                 continue
 
             mp = meter_lookup.get(meter_id)
             if mp is None:
                 skipped += 1
-                errors.append(
+                add_error(
+                    errors,
                     {
                         "row": row_number,
                         "error": f"Metering point '{meter_id}' not found or not accessible.",
-                    }
+                    },
                 )
                 continue
 
@@ -448,7 +561,7 @@ def import_csv(
                 raw_day = row[resolved_cols["timestamp"]]
                 if _is_missing(raw_day):
                     skipped += 1
-                    errors.append({"row": row_number, "error": "Missing date value for daily profile."})
+                    add_error(errors, {"row": row_number, "error": "Missing date value for daily profile."})
                     continue
 
                 day_start = _build_day_start(raw_day, timestamp_format)
@@ -458,14 +571,15 @@ def import_csv(
                     col_pos = start_pos + slot
                     if col_pos >= table.width:
                         skipped += 1
-                        errors.append(
+                        add_error(
+                            errors,
                             {
                                 "row": row_number,
                                 "error": (
                                     f"Missing interval column at position {col_pos} "
                                     f"(slot {slot + 1}/{values_count})."
                                 ),
-                            }
+                            },
                         )
                         continue
 
@@ -507,21 +621,22 @@ def import_csv(
                             imported += 1
                         else:
                             skipped += 1
-                            errors.append(
+                            add_error(
+                                errors,
                                 {
                                     "row": row_number,
                                     "error": (
                                         "Duplicate reading for metering_point + timestamp + direction "
                                         f"(slot {slot + 1}/{values_count})."
                                     ),
-                                }
+                                },
                             )
                 continue
 
             raw_ts = row[resolved_cols["timestamp"]]
             if _is_missing(raw_ts):
                 skipped += 1
-                errors.append({"row": row_number, "error": "Missing timestamp value."})
+                add_error(errors, {"row": row_number, "error": "Missing timestamp value."})
                 continue
 
             if timestamp_format:
@@ -541,11 +656,12 @@ def import_csv(
                     explicit_direction = str(raw_direction).strip().lower()
                     if explicit_direction and explicit_direction not in {"in", "out"}:
                         skipped += 1
-                        errors.append(
+                        add_error(
+                            errors,
                             {
                                 "row": row_number,
                                 "error": f"Invalid direction '{explicit_direction}'. Expected 'in' or 'out'.",
-                            }
+                            },
                         )
                         continue
 
@@ -581,21 +697,27 @@ def import_csv(
                     imported += 1
                 else:
                     skipped += 1
-                    errors.append(
+                    add_error(
+                        errors,
                         {
                             "row": row_number,
                             "error": "Duplicate reading for metering_point + timestamp + direction.",
-                        }
+                        },
                     )
         except (KeyError, InvalidOperation, TypeError, ValueError) as exc:
-            errors.append({"row": row_number, "error": str(exc)})
+            add_error(errors, {"row": row_number, "error": str(exc)})
             skipped += 1
 
     log.zev = _infer_log_zev(zev, touched_metering_points)
     log.rows_imported = imported + overwritten
     log.rows_skipped = skipped
     if overwritten > 0:
+        # Prepended after the loop, when the cap may already be reached: trim
+        # the oldest payload so the note cannot push the list past the cap or
+        # displace the truncation note (which stays last).
         errors.insert(0, {"row": None, "error": f"Overwrote {overwritten} existing readings."})
+        if len(errors) > MAX_REPORTED_ERRORS + 1:
+            del errors[1]
     log.errors = errors
     log.save()
     return log

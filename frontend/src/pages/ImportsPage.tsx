@@ -121,7 +121,14 @@ export function ImportsPage() {
     const uploadMutation = useMutation({
         mutationFn: uploadMeteringFile,
         onSuccess: (result) => {
-            pushToast(t('pages.imports.messages.importSuccess', { imported: result.rows_imported, skipped: result.rows_skipped }), 'success')
+            // SDAT-CH reports parse failures inside the ImportLog of a 201
+            // response; an import that produced nothing and logged errors is
+            // a failure, not a success toast.
+            if (result.rows_imported === 0 && (result.errors?.length ?? 0) > 0) {
+                pushToast(result.errors?.[0]?.error || t('pages.imports.messages.importFailed'), 'error')
+            } else {
+                pushToast(t('pages.imports.messages.importSuccess', { imported: result.rows_imported, skipped: result.rows_skipped }), 'success')
+            }
             setWizardOpen(false)
             setWizardStep(1)
             setFile(null)
@@ -129,8 +136,9 @@ export function ImportsPage() {
             void queryClient.invalidateQueries({ queryKey: queryKeys.metering.importLogs() })
         },
         onError: (error) => {
-            const errorMessage = (error as { response?: { data?: { error?: string } } })?.response?.data?.error
-            pushToast(errorMessage || t('pages.imports.messages.importFailed'), 'error')
+            // `detail` is the proxy's error shape (e.g. the nginx 413 body).
+            const data = (error as { response?: { data?: { error?: string; detail?: string } } })?.response?.data
+            pushToast(data?.error || data?.detail || t('pages.imports.messages.importFailed'), 'error')
         },
     })
 

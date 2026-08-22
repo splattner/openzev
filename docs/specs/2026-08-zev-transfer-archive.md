@@ -208,7 +208,8 @@ has no readings).
   `check_format_version`, then per-section `_load_json`.
 - The whole import runs in one transaction — nothing is created unless
   everything validates. Failures are collected in a `_Collector` (the first
-  `MAX_REPORTED_ERRORS = 50` stored, the true total counted alongside) and
+  `MAX_REPORTED_ERRORS = 50` — shared with the metering importer via
+  `metering/importers/limits.py` — stored, the true total counted alongside) and
   raised as `ImportFailed(errors, total_errors=...)`; the response lists every
   problem by section, entry and reason.
 - `_preflight_meter_ids` rejects meter ids already on the instance, by name,

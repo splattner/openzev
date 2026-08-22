@@ -12,6 +12,7 @@ from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from accounts.permissions import IsAdmin
+from accounts.throttling import ApiKeyRateThrottle, TransferArchiveThrottle
 from accounts.models import User, UserRole
 from accounts.serializers import UserSerializer
 from metering.models import MeterReading
@@ -205,6 +206,7 @@ class ZevViewSet(ZevScopedQuerySetMixin, viewsets.ModelViewSet):
         methods=["post"],
         url_path="inspect-archive",
         parser_classes=[MultiPartParser, FormParser],
+        throttle_classes=[ApiKeyRateThrottle, TransferArchiveThrottle],
     )
     def inspect_archive_action(self, request):
         """Read an archive's manifest without importing anything."""
@@ -222,6 +224,7 @@ class ZevViewSet(ZevScopedQuerySetMixin, viewsets.ModelViewSet):
         methods=["post"],
         url_path="import-archive",
         parser_classes=[MultiPartParser, FormParser],
+        throttle_classes=[ApiKeyRateThrottle, TransferArchiveThrottle],
     )
     def import_archive_action(self, request):
         """Create a new ZEV from an uploaded transfer archive.

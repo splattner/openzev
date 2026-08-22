@@ -26,10 +26,18 @@ import zipfile
 from decimal import Decimal, InvalidOperation
 
 from django.core.exceptions import ValidationError as DjangoValidationError
+from django.conf import settings
 from django.db import DataError, IntegrityError, transaction
 
 from invoices.models import Invoice, InvoiceItem
 from metering.importers.csv_importer import _parse_datetime_utc, _parse_decimal
+from metering.importers.limits import (
+    MAX_REPORTED_ERRORS,
+    MAX_UPLOAD_BYTES,
+    mb,
+    reject_unsafe_member_path,
+    validate_zip,
+)
 from metering.models import ImportLog, ImportSource, MeterReading, ReadingDirection, ReadingResolution
 from tariffs.models import Tariff, TariffPeriod
 from zev.models import MeteringPoint, MeteringPointAssignment, Participant, Zev
@@ -72,7 +80,46 @@ MAX_ENERGY_KWH = Decimal("99999999.9999")
 
 # A malformed readings file can produce one error per row. The response has to
 # stay a response, so the list is capped and the true total reported alongside.
-MAX_REPORTED_ERRORS = 50
+
+# Upload hardening limits — rationale: docs/specs/2026-03-metering-import-and-quality.md §4.4.
+MAX_TRANSFER_DECOMPRESSED_BYTES = getattr(settings, "TRANSFER_MAX_DECOMPRESSED_MB", 500) * 1024 * 1024
+MAX_TRANSFER_MEMBERS = 500
+MAX_TRANSFER_COMPRESSED_BYTES = MAX_UPLOAD_BYTES
+MAX_TRANSFER_RATIO = 500
+
+
+def open_archive(fileobj):
+    """Open a transfer archive, validating limits first.
+
+    Raises ``ArchiveError`` when the file is too large, has too many members,
+    exceeds decompressed-size or compression-ratio limits, or contains unsafe
+    member paths.
+    """
+    fileobj.seek(0)
+    size_hint = getattr(fileobj, "size", None)
+    if size_hint is not None and size_hint > MAX_TRANSFER_COMPRESSED_BYTES:
+        raise ArchiveError(
+            f"Archive too large ({mb(size_hint)}). Maximum compressed size is {mb(MAX_TRANSFER_COMPRESSED_BYTES)}."
+        )
+    try:
+        zf = zipfile.ZipFile(fileobj)
+    except zipfile.BadZipFile as exc:
+        raise ArchiveError("The uploaded file is not a valid ZIP archive.") from exc
+    try:
+        infos = validate_zip(
+            zf,
+            label="Archive",
+            max_members=MAX_TRANSFER_MEMBERS,
+            max_total_bytes=MAX_TRANSFER_DECOMPRESSED_BYTES,
+            max_ratio=MAX_TRANSFER_RATIO,
+            error_cls=ArchiveError,
+        )
+        for info in infos:
+            reject_unsafe_member_path(info.filename, error_cls=ArchiveError)
+    except BaseException:
+        zf.close()
+        raise
+    return zf
 
 
 class ImportFailed(Exception):
@@ -201,13 +248,6 @@ def read_manifest(archive):
         raise ArchiveError(f"{MANIFEST_NAME} 'source_zev' must be a JSON object.")
 
     return manifest
-
-
-def open_archive(fileobj):
-    try:
-        return zipfile.ZipFile(fileobj)
-    except zipfile.BadZipFile as exc:
-        raise ArchiveError("The uploaded file is not a valid ZIP archive.") from exc
 
 
 def inspect_archive(fileobj):
