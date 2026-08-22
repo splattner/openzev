@@ -5,12 +5,14 @@ export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '/api/v1'
 export const api = axios.create({
   baseURL: API_BASE_URL,
   withCredentials: true,
+  xsrfCookieName: 'csrftoken',
+  xsrfHeaderName: 'X-CSRFToken',
 })
 
 let refreshPromise: Promise<void> | null = null
 
 async function refreshAccessToken(): Promise<void> {
-  await axios.post(`${API_BASE_URL}/auth/token/refresh/`, null, { withCredentials: true })
+  await api.post('/auth/token/refresh/', null)
 }
 
 api.interceptors.response.use(

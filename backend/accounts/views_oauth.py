@@ -24,12 +24,11 @@ from rest_framework import generics, status
 from rest_framework.decorators import api_view, permission_classes, throttle_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
-from rest_framework_simplejwt.tokens import RefreshToken
-
 from audit.models import AuditActionCategory, AuditEventStatus
 from audit.services import build_diff, record_audit_event
 
 from .cookies import set_auth_cookies
+from .jwt_utils import make_jwt_for_user as _make_jwt_for_user
 from .throttling import AuthOAuthExchangeThrottle, AuthOAuthInitiateThrottle
 from .models import (
     OAuthExchangeCode,
@@ -129,16 +128,6 @@ def _record_provider_event(request, *, action_type, provider, summary, changes=N
         changes=changes,
         metadata=metadata,
     )
-
-
-def _make_jwt_for_user(user: User) -> dict:
-    """Mint a JWT pair (access + refresh) for *user*, matching the custom claims."""
-    refresh = RefreshToken.for_user(user)
-    refresh["role"] = user.role
-    refresh["email"] = user.email
-    refresh["full_name"] = user.get_full_name()
-    refresh["must_change_password"] = user.must_change_password
-    return {"access": str(refresh.access_token), "refresh": str(refresh)}
 
 
 def _generate_username_from_email(email: str) -> str:
@@ -516,7 +505,7 @@ def oauth_token_exchange(request):
 
     tokens = _make_jwt_for_user(user)
     response = Response({"detail": "Login successful."})
-    set_auth_cookies(response, access=tokens["access"], refresh=tokens["refresh"])
+    set_auth_cookies(request, response, access=tokens["access"], refresh=tokens["refresh"])
     return response
 
 

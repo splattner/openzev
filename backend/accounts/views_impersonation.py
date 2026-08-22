@@ -136,13 +136,14 @@ class ImpersonateParticipantView(APIView):
         current_refresh = request.COOKIES.get(REFRESH_COOKIE, "")
         if current_access and current_refresh:
             set_auth_cookies(
+                request,
                 response,
                 access=current_access,
                 refresh=current_refresh,
                 access_cookie=ADMIN_ACCESS_COOKIE,
                 refresh_cookie=ADMIN_REFRESH_COOKIE,
             )
-        set_auth_cookies(response, access=str(refresh.access_token), refresh=str(refresh))
+        set_auth_cookies(request, response, access=str(refresh.access_token), refresh=str(refresh))
         return response
 
 
@@ -189,6 +190,6 @@ class StopImpersonationView(APIView):
         )
 
         response = Response({"detail": "Impersonation ended."})
-        set_auth_cookies(response, access=admin_access, refresh=admin_refresh)
+        set_auth_cookies(request, response, access=admin_access, refresh=admin_refresh)
         clear_auth_cookies(response, access_cookie=ADMIN_ACCESS_COOKIE, refresh_cookie=ADMIN_REFRESH_COOKIE)
         return response

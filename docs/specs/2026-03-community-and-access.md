@@ -267,7 +267,7 @@ Two consequences for anything added later:
 
 **Payload:** `{ email, password }` (preferred) or `{ username, password }` (backward-compatible)
 
-Custom `TokenObtainPairSerializer` embeds in the token:
+Helper `accounts.views._make_jwt_for_user(user) -> dict` adds custom claims (also used by `CustomTokenObtainPairSerializer` and `verify_email`/`set_initial_password`; `views_oauth._make_jwt_for_user` and impersonation use the same claims):
 
 | Claim | Value |
 |---|---|
@@ -276,10 +276,11 @@ Custom `TokenObtainPairSerializer` embeds in the token:
 | `full_name` | `user.get_full_name()` |
 | `must_change_password` | `user.must_change_password` |
 
-**Token refresh:** `POST /api/v1/auth/token/refresh/` (standard SimpleJWT).
+**Token refresh:** `POST /api/v1/auth/token/refresh/` reads `openzev_refresh` cookie; CSRF via `CookieJWTAuthentication` (`SessionAuthentication.enforce_csrf` on unsafe methods) + `CsrfViewMiddleware` kept for admin/Django views.
 
-**Frontend storage:** `localStorage` keys `openzev.access` and `openzev.refresh`.
-Axios interceptor attaches `Authorization: Bearer {access}` to all API requests.
+**Cookie transport:** httpOnly cookies `openzev_access` / `openzev_refresh` + `csrftoken` via `django.middleware.csrf.get_token` (`CsrfViewMiddleware` sets cookie). `CSRF_TRUSTED_ORIGINS` defaults to `CORS_ALLOWED_ORIGINS`.
+
+**Frontend:** `frontend/src/lib/api/client.ts` `api = axios.create({withCredentials:true, xsrfCookieName:'csrftoken', xsrfHeaderName:'X-CSRFToken'})` scoped to instance (no `axios.defaults`).
 
 ### 5.2 Self-registration (zev_owner)
 
@@ -307,7 +308,7 @@ Axios interceptor attaches `Authorization: Bearer {access}` to all API requests.
 2. Validate not consumed and within 24h expiry.
 3. Mark token as consumed (`consumed_at = now`).
 4. Activate user (`is_active = True`).
-5. Issue JWT tokens (access + refresh) for auto-login.
+5. Issue JWT via `accounts.views._make_jwt_for_user(user)` set as httpOnly cookies `openzev_access` / `openzev_refresh` (+ `csrftoken` via `get_token`) for auto-login.
 
 ### 5.4 Initial password set
 
@@ -321,7 +322,7 @@ password. Otherwise returns 400 ("Use the change-password endpoint instead.").
 **Flow:**
 1. Validate password via Django password validators.
 2. Set password, clear `must_change_password` flag.
-3. Return fresh JWT tokens.
+3. Issue fresh JWT via `accounts.views._make_jwt_for_user(user)` set as httpOnly cookies `openzev_access` / `openzev_refresh` (+ `csrftoken` via `get_token`) so updated claims take effect.
 
 ### 5.5 Password change
 
@@ -349,18 +350,14 @@ Validates old password, sets new password, clears `must_change_password`.
 impersonate an admin returns 400.
 
 **Flow:**
-1. Generate a new JWT refresh token for the target user.
-2. Embed `impersonated_by = request.user.id` in the token claims.
-3. Return `{ access, refresh, impersonated_user, impersonator }`.
+1. Generate via `_make_jwt_for_user(target)` + `impersonated_by = request.user.id` claim, set as httpOnly cookies `openzev_access` / `openzev_refresh` (+ `csrftoken` via `get_token`); park caller tokens in `ADMIN_ACCESS_COOKIE` / `ADMIN_REFRESH_COOKIE`.
+2. Return `{ impersonated_user, impersonator }` (tokens are cookies, not body).
 
 **Frontend flow (`AuthContext.startImpersonation`):**
-1. Save current tokens to `openzev.impersonation.original_*` localStorage keys.
-2. Store impersonator user in `openzev.impersonation.impersonator`.
-3. Replace active tokens with the impersonated user's tokens.
-4. Re-fetch `/auth/me/` to update the UI context.
+1. Call impersonate endpoint (cookies handled via `api` with `withCredentials`); backup cookies stored httpOnly.
+2. Re-fetch `/auth/me/` to update the UI context.
 
-**Stop impersonation:** restore original tokens, clear impersonation keys,
-re-fetch `/auth/me/`.
+**Stop impersonation:** restore `ADMIN_*` cookies to main pair, clear backup cookies, re-fetch `/auth/me/`.
 
 ### 5.8 Forced password change redirect
 
@@ -638,8 +635,8 @@ The sidebar (`Layout.tsx`) shows sections conditionally:
 
 | Method | URL | Permission | Description |
 |---|---|---|---|
-| POST | `/token/` | AllowAny | JWT login (returns access + refresh tokens) |
-| POST | `/token/refresh/` | AllowAny | JWT token refresh |
+| POST | `/token/` | AllowAny | JWT login (sets httpOnly cookies `openzev_access` / `openzev_refresh` + `csrftoken` via `get_token`; header `Authorization: Api-Key` is case-insensitive) |
+| POST | `/token/refresh/` | AllowAny | JWT refresh (reads `openzev_refresh` cookie; CSRF via `CookieJWTAuthentication` + `CsrfViewMiddleware`) |
 | POST | `/register/` | AllowAny | Self-register a zev_owner account |
 | POST | `/verify-email/` | AllowAny | Consume verification token, activate user |
 | GET / PATCH | `/me/` | IsAuthenticated | View/update own profile |
@@ -786,8 +783,7 @@ Composite serializer for the creation wizard. Nested:
 
 ### 13.6 CustomTokenObtainPairSerializer
 
-Extends SimpleJWT's `TokenObtainPairSerializer`. Adds custom claims:
-`role`, `email`, `full_name`, `must_change_password`.
+`CustomTokenObtainPairSerializer` has its own `get_token` with the same claims as helper `_make_jwt_for_user(user) -> dict` (used by `verify_email`/`set_initial_password` and `views_oauth`/`impersonation`): `role`, `email`, `full_name`, `must_change_password`.
 
 ---
 
@@ -925,7 +921,7 @@ lists the test classes per module (test counts are the `test_*` methods).
 | Scope leakage across ZEV boundaries | High | Backend queryset scoping per role; `BaseZevScopedPermission` object-level checks; regression test matrix |
 | UI-only enforcement drift | High | Backend always enforces permissions; frontend guards are UX convenience only (ADR 0003) |
 | Assignment validity edge cases | Medium | Date-boundary tests; serializer + model double validation; ADR 0001 rules |
-| Impersonation abuse | High | Admin-only guard; cannot impersonate other admins; impersonation state tracked in JWT claims and localStorage |
+| Impersonation abuse | High | Admin-only guard; cannot impersonate other admins; impersonation state tracked in JWT claims and `ADMIN_*` backup cookies |
 | Self-registration spam | Medium | Email verification required; unusable password until verified |
 | Linked account deletion | Medium | Delete blocked if `participations.exists()`; `SET_NULL` FK prevents cascade |
 

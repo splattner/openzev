@@ -101,10 +101,9 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
     @classmethod
     def get_token(cls, user):
         token = super().get_token(user)
-        token["role"] = user.role
-        token["email"] = user.email
-        token["full_name"] = user.get_full_name()
-        token["must_change_password"] = user.must_change_password
+        from .jwt_utils import add_custom_claims
+
+        add_custom_claims(token, user)
         return token
 
 

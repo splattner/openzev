@@ -14,10 +14,17 @@ from django.core.mail import EmailMessage
 from django.utils import timezone
 from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.serializers import TokenRefreshSerializer
-from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView
 from .api_keys import default_api_key_expiry, generate_key
-from .models import User, UserRole, EmailVerificationToken
+from .models import (
+    ApiKey,
+    AppSettings,
+    EmailVerificationToken,
+    FeatureFlag,
+    User,
+    UserRole,
+    VatRate,
+)
 from .serializers import (
     UserSerializer, UserCreateSerializer,
     ChangePasswordSerializer, CustomTokenObtainPairSerializer,
@@ -26,7 +33,7 @@ from .serializers import (
     FeatureFlagSerializer,
     VatRateSerializer,
 )
-from .models import ApiKey, AppSettings, FeatureFlag, VatRate
+from .authentication import enforce_csrf
 from .cookies import (
     ADMIN_ACCESS_COOKIE,
     ADMIN_REFRESH_COOKIE,
@@ -42,6 +49,9 @@ from audit.services import build_diff, record_audit_event
 
 logger = logging.getLogger(__name__)
 
+from .jwt_utils import make_jwt_for_user as _make_jwt_for_user
+
+
 class CustomTokenObtainPairView(TokenObtainPairView):
     """JWT login — sets httpOnly cookies and returns a minimal JSON body."""
     serializer_class = CustomTokenObtainPairSerializer
@@ -50,7 +60,7 @@ class CustomTokenObtainPairView(TokenObtainPairView):
     def post(self, request, *args, **kwargs):
         response = super().post(request, *args, **kwargs)
         if response.status_code == 200:
-            set_auth_cookies(response, access=response.data["access"], refresh=response.data["refresh"])
+            set_auth_cookies(request, response, access=response.data["access"], refresh=response.data["refresh"])
             response.data = {"detail": "Login successful."}
         return response
 
@@ -66,6 +76,8 @@ class CookieTokenRefreshView(APIView):
         if not refresh_token:
             return Response({"detail": "Refresh token not found."}, status=status.HTTP_401_UNAUTHORIZED)
 
+        enforce_csrf(request)
+
         serializer = TokenRefreshSerializer(data={"refresh": refresh_token})
         try:
             serializer.is_valid(raise_exception=True)
@@ -77,7 +89,7 @@ class CookieTokenRefreshView(APIView):
         new_access = serializer.validated_data["access"]
         new_refresh = serializer.validated_data.get("refresh", refresh_token)
         response = Response({"detail": "Token refreshed."})
-        set_auth_cookies(response, access=new_access, refresh=new_refresh)
+        set_auth_cookies(request, response, access=new_access, refresh=new_refresh)
         return response
 
 
@@ -528,9 +540,9 @@ def verify_email(request):
         changes=build_diff({"is_active": False}, {"is_active": user.is_active}, ["is_active"]),
     )
 
-    refresh = RefreshToken.for_user(user)
+    tokens = _make_jwt_for_user(user)
     response = Response({"detail": "Email verified."})
-    set_auth_cookies(response, access=str(refresh.access_token), refresh=str(refresh))
+    set_auth_cookies(request, response, access=tokens["access"], refresh=tokens["refresh"])
     return response
 
 
@@ -582,9 +594,9 @@ def set_initial_password(request):
     )
 
     # Issue fresh tokens so the updated claims (must_change_password=False) take effect
-    refresh = RefreshToken.for_user(user)
+    tokens = _make_jwt_for_user(user)
     response = Response({"detail": "Password set successfully."})
-    set_auth_cookies(response, access=str(refresh.access_token), refresh=str(refresh))
+    set_auth_cookies(request, response, access=tokens["access"], refresh=tokens["refresh"])
     return response
 
 

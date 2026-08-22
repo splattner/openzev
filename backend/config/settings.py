@@ -57,11 +57,16 @@ MIDDLEWARE = [
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
+    # API CSRF is in CookieJWTAuthentication; this middleware stays for admin and Django views.
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "audit.middleware.AuditRequestContextMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
+
+CSRF_COOKIE_HTTPONLY = False
+CSRF_COOKIE_SECURE = not DEBUG
+CSRF_COOKIE_SAMESITE = "Lax"
 
 ROOT_URLCONF = "config.urls"
 
@@ -189,6 +194,7 @@ CORS_ALLOWED_ORIGINS = env.list(
     default=["http://localhost:5173", "http://localhost:3000"],
 )
 CORS_ALLOW_CREDENTIALS = True
+CSRF_TRUSTED_ORIGINS = env.list("CSRF_TRUSTED_ORIGINS", default=CORS_ALLOWED_ORIGINS)
 
 # ── DRF Spectacular (OpenAPI) ─────────────────────────────────────────────────
 SPECTACULAR_SETTINGS = {

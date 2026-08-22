@@ -1,7 +1,7 @@
 from django.conf import settings
 from django.utils import timezone
 from rest_framework import exceptions
-from rest_framework.authentication import BaseAuthentication, get_authorization_header
+from rest_framework.authentication import BaseAuthentication, SessionAuthentication, get_authorization_header
 from rest_framework.permissions import SAFE_METHODS
 from rest_framework_simplejwt.authentication import JWTAuthentication
 
@@ -10,12 +10,12 @@ from .api_keys import split_key, verify_secret
 ACCESS_COOKIE = "openzev_access"
 
 
-class CookieJWTAuthentication(JWTAuthentication):
-    """JWT authentication that reads the access token from an httpOnly cookie.
+def enforce_csrf(request) -> None:
+    SessionAuthentication().enforce_csrf(request)
 
-    Falls back to the standard Authorization header so API clients and existing
-    tooling (e.g. drf-spectacular, curl) continue to work without changes.
-    """
+
+class CookieJWTAuthentication(JWTAuthentication):
+    """JWT authentication that prefers the Authorization header and falls back to the httpOnly cookie."""
 
     def authenticate(self, request):
         # Prefer the Authorization header (API clients / backward-compat)
@@ -23,7 +23,8 @@ class CookieJWTAuthentication(JWTAuthentication):
         if header:
             # Leave ``Api-Key`` credentials to ApiKeyAuthentication rather than
             # failing the request with "token not valid".
-            if header.split()[0:1] == [b"Api-Key"]:
+            parts = header.split()
+            if parts and parts[0].lower() == b"api-key":
                 return None
             return super().authenticate(request)
 
@@ -33,7 +34,12 @@ class CookieJWTAuthentication(JWTAuthentication):
             return None
 
         validated_token = self.get_validated_token(raw_token)
-        return self.get_user(validated_token), validated_token
+        user = self.get_user(validated_token)
+
+        if request.method not in SAFE_METHODS:
+            enforce_csrf(request)
+
+        return user, validated_token
 
 
 # ── API key scope rules ───────────────────────────────────────────────────────
