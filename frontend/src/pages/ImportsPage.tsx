@@ -466,24 +466,24 @@ export function ImportsPage() {
                 </div>
             </section>
 
-            <FormModal isOpen={wizardOpen} title="Import Wizard" onClose={resetWizard} maxWidth="1080px">
+            <FormModal isOpen={wizardOpen} title={t('pages.imports.wizard.title')} onClose={resetWizard} maxWidth="1080px">
                 <div className="page-stack" style={{ gap: '0.75rem' }}>
                     <div className="muted" style={{ fontSize: '0.9rem' }}>
-                        Step {wizardStep} / 2
+                        {t('pages.imports.wizard.step', { step: wizardStep })}
                     </div>
 
                     {wizardStep === 1 && (
                         <form onSubmit={handleNextStep} className="page-stack" style={{ gap: '0.75rem' }}>
                             <label>
-                                <span>Source format</span>
+                                <span>{t('pages.imports.wizard.sourceFormat')}</span>
                                 <select value={source} onChange={(event) => setSource(event.target.value as 'csv' | 'sdatch')}>
-                                    <option value="csv">CSV / Excel</option>
-                                    <option value="sdatch">SDAT-CH (ebIX XML)</option>
+                                    <option value="csv">{t('pages.imports.format.csv')}</option>
+                                    <option value="sdatch">{t('pages.imports.format.sdatch')}</option>
                                 </select>
                             </label>
 
                             <label>
-                                <span>Source file</span>
+                                <span>{t('pages.imports.wizard.sourceFile')}</span>
                                 <input
                                     type="file"
                                     onChange={(event) => setFile(event.target.files?.[0] ?? null)}
@@ -494,11 +494,11 @@ export function ImportsPage() {
                             <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.6rem' }}>
                                 <button type="button" className="button button-secondary" onClick={resetWizard}>
                                     <FontAwesomeIcon icon={faXmark} fixedWidth />
-                                    Cancel
+                                    {t('pages.imports.wizard.cancel')}
                                 </button>
                                 <button type="submit" className="button button-primary" disabled={!canGoStep2}>
                                     <FontAwesomeIcon icon={faArrowRight} fixedWidth />
-                                    Next: Configuration
+                                    {t('pages.imports.wizard.nextConfig')}
                                 </button>
                             </div>
                         </form>
@@ -515,24 +515,24 @@ export function ImportsPage() {
                                                 checked={hasHeader}
                                                 onChange={(event) => handleHasHeaderChange(event.target.checked)}
                                             />
-                                            <span>File has header row</span>
+                                            <span>{t('pages.imports.wizard.hasHeader')}</span>
                                         </label>
                                         <label>
-                                            <span>Delimiter</span>
+                                            <span>{t('pages.imports.wizard.delimiter')}</span>
                                             <input value={delimiter} onChange={(event) => setDelimiter(event.target.value || ',')} placeholder="," />
                                         </label>
                                         <label>
-                                            <span>Row format</span>
+                                            <span>{t('pages.imports.wizard.rowFormat')}</span>
                                             <select
                                                 value={formatProfile}
                                                 onChange={(event) => setFormatProfile(event.target.value as 'standard' | 'daily_15min')}
                                             >
-                                                <option value="standard">Standard (1 reading per row)</option>
-                                                <option value="daily_15min">Daily profile (96x 15-min values)</option>
+                                                <option value="standard">{t('pages.imports.rowFormat.standard')}</option>
+                                                <option value="daily_15min">{t('pages.imports.rowFormat.daily15min')}</option>
                                             </select>
                                         </label>
                                         <label>
-                                            <span>Date/time format</span>
+                                            <span>{t('pages.imports.wizard.datetimeFormat')}</span>
                                             <input
                                                 value={timestampFormat}
                                                 onChange={(event) => setTimestampFormat(event.target.value)}
@@ -543,7 +543,7 @@ export function ImportsPage() {
 
                                     <div className="inline-form grid grid-4">
                                         <label>
-                                            <span>Meter ID column</span>
+                                            <span>{t('pages.imports.wizard.meterIdCol')}</span>
                                             <input
                                                 value={columnMap.meter_id}
                                                 onChange={(event) => setColumnMap((prev) => ({ ...prev, meter_id: event.target.value }))}
@@ -551,7 +551,7 @@ export function ImportsPage() {
                                             />
                                         </label>
                                         <label>
-                                            <span>{formatProfile === 'daily_15min' ? 'Date column' : 'Timestamp column'}</span>
+                                            <span>{formatProfile === 'daily_15min' ? t('pages.imports.wizard.dateCol') : t('pages.imports.wizard.timestampCol')}</span>
                                             <input
                                                 value={columnMap.timestamp}
                                                 onChange={(event) => setColumnMap((prev) => ({ ...prev, timestamp: event.target.value }))}
@@ -562,7 +562,7 @@ export function ImportsPage() {
                                         {formatProfile === 'standard' ? (
                                             <>
                                                 <label>
-                                                    <span>Energy column</span>
+                                                    <span>{t('pages.imports.wizard.energyCol')}</span>
                                                     <input
                                                         value={columnMap.energy_kwh}
                                                         onChange={(event) => setColumnMap((prev) => ({ ...prev, energy_kwh: event.target.value }))}
@@ -570,7 +570,7 @@ export function ImportsPage() {
                                                     />
                                                 </label>
                                                 <label>
-                                                    <span>Direction column (optional)</span>
+                                                    <span>{t('pages.imports.wizard.directionCol')}</span>
                                                     <input
                                                         value={columnMap.direction}
                                                         onChange={(event) => setColumnMap((prev) => ({ ...prev, direction: event.target.value }))}
@@ -581,7 +581,7 @@ export function ImportsPage() {
                                         ) : (
                                             <>
                                                 <label>
-                                                    <span>First interval column</span>
+                                                    <span>{t('pages.imports.wizard.firstIntervalCol')}</span>
                                                     <input
                                                         value={columnMap.energy_start}
                                                         onChange={(event) => setColumnMap((prev) => ({ ...prev, energy_start: event.target.value }))}
@@ -589,11 +589,11 @@ export function ImportsPage() {
                                                     />
                                                 </label>
                                                 <label>
-                                                    <span>Intervals per row</span>
+                                                    <span>{t('pages.imports.wizard.intervalsPerRow')}</span>
                                                     <input type="number" min={1} max={200} value={valuesCount} onChange={(event) => setValuesCount(Number(event.target.value || 96))} />
                                                 </label>
                                                 <label>
-                                                    <span>Minutes per interval</span>
+                                                    <span>{t('pages.imports.wizard.minutesPerInterval')}</span>
                                                     <input type="number" min={1} max={240} value={intervalMinutes} onChange={(event) => setIntervalMinutes(Number(event.target.value || 15))} />
                                                 </label>
                                             </>
@@ -606,25 +606,25 @@ export function ImportsPage() {
                                             checked={overwriteExisting}
                                             onChange={(event) => setOverwriteExisting(event.target.checked)}
                                         />
-                                        <span>Overwrite existing data for same metering point + timestamp + direction</span>
+                                        <span>{t('pages.imports.wizard.overwriteExisting')}</span>
                                     </label>
 
                                     <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                                         <button type="button" className="button button-primary" onClick={loadPreview} disabled={previewMutation.isPending || !file}>
                                             <FontAwesomeIcon icon={faMagnifyingGlass} fixedWidth />
-                                            {previewMutation.isPending ? 'Loading preview...' : 'Load Preview'}
+                                            {previewMutation.isPending ? t('pages.imports.loadingPreview') : t('pages.imports.loadPreview')}
                                         </button>
                                         {preview && (
                                             <>
-                                                <Badge label={`${preview.summary.existing_metering_points} meter found`} ok={preview.summary.existing_metering_points > 0} />
-                                                <Badge label={`${preview.summary.missing_metering_points} missing`} ok={preview.summary.missing_metering_points === 0} />
+                                                <Badge label={t('pages.imports.previewFound', { count: preview.summary.existing_metering_points })} ok={preview.summary.existing_metering_points > 0} />
+                                                <Badge label={t('pages.imports.previewMissing', { count: preview.summary.missing_metering_points })} ok={preview.summary.missing_metering_points === 0} />
                                             </>
                                         )}
                                     </div>
 
                                     {preview && missingMeteringPoints > 0 && (
                                         <div className="error-banner" style={{ marginTop: '0.4rem' }}>
-                                            {missingMeteringPoints} metering point(s) from this file are missing. Please create them first; import start is blocked.
+                                            {t('pages.imports.previewMissingBanner', { count: missingMeteringPoints })}
                                         </div>
                                     )}
 
@@ -633,7 +633,7 @@ export function ImportsPage() {
                                             <ul style={{ margin: 0, paddingLeft: '1.1rem' }}>
                                                 {preview.errors.slice(0, 8).map((entry, index) => (
                                                     <li key={`${entry.row ?? 'general'}-${index}`}>
-                                                        {entry.row ? `Row ${entry.row}: ` : ''}{entry.error}
+                                                        {entry.row ? <>{t('pages.imports.preview.rowPrefix', { row: entry.row })} </> : ''}{entry.error}
                                                     </li>
                                                 ))}
                                             </ul>
@@ -645,11 +645,11 @@ export function ImportsPage() {
                                             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                                                 <thead>
                                                     <tr>
-                                                        <th style={{ textAlign: 'left', padding: '0.4rem 0.6rem' }}>Row</th>
-                                                        <th style={{ textAlign: 'left', padding: '0.4rem 0.6rem' }}>Meter ID</th>
-                                                        <th style={{ textAlign: 'left', padding: '0.4rem 0.6rem' }}>Status</th>
-                                                        <th style={{ textAlign: 'left', padding: '0.4rem 0.6rem' }}>Date/Timestamp</th>
-                                                        <th style={{ textAlign: 'left', padding: '0.4rem 0.6rem' }}>Existing data</th>
+                                                        <th style={{ textAlign: 'left', padding: '0.4rem 0.6rem' }}>{t('pages.imports.preview.row')}</th>
+                                                        <th style={{ textAlign: 'left', padding: '0.4rem 0.6rem' }}>{t('pages.imports.preview.meterId')}</th>
+                                                        <th style={{ textAlign: 'left', padding: '0.4rem 0.6rem' }}>{t('pages.imports.preview.status')}</th>
+                                                        <th style={{ textAlign: 'left', padding: '0.4rem 0.6rem' }}>{t('pages.imports.preview.timestamp')}</th>
+                                                        <th style={{ textAlign: 'left', padding: '0.4rem 0.6rem' }}>{t('pages.imports.preview.existingData')}</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody>
@@ -658,11 +658,11 @@ export function ImportsPage() {
                                                             <td style={{ padding: '0.4rem 0.6rem' }}>{row.row}</td>
                                                             <td style={{ padding: '0.4rem 0.6rem' }}>{row.meter_id ?? '-'}</td>
                                                             <td style={{ padding: '0.4rem 0.6rem' }}>
-                                                                <Badge label={row.metering_point_exists ? 'Exists' : 'Missing'} ok={row.metering_point_exists} />
+                                                                <Badge label={row.metering_point_exists ? t('pages.imports.preview.exists') : t('pages.imports.preview.missing')} ok={row.metering_point_exists} />
                                                             </td>
                                                             <td style={{ padding: '0.4rem 0.6rem' }}>{row.timestamp ?? '-'}</td>
                                                             <td style={{ padding: '0.4rem 0.6rem' }}>
-                                                                {row.existing_data == null ? '-' : row.existing_data ? 'Yes' : 'No'}
+                                                                {row.existing_data == null ? '-' : row.existing_data ? t('pages.imports.preview.yes') : t('pages.imports.preview.no')}
                                                             </td>
                                                         </tr>
                                                     ))}
@@ -674,15 +674,15 @@ export function ImportsPage() {
                             ) : (
                                 <>
                                     <p className="muted" style={{ margin: 0 }}>
-                                        SDAT-CH import currently requires selecting the target ZEV owner scope.
+                                        {t('pages.imports.sdatchScope')}
                                     </p>
                                     <label>
-                                        <span>ZEV</span>
+                                        <span>{t('pages.imports.wizard.selectZev')}</span>
                                         {isManagedScope ? (
-                                            <input value={selectedZev?.name ?? 'No ZEV selected'} disabled />
+                                            <input value={selectedZev?.name ?? t('pages.imports.wizard.noZevSelected')} disabled />
                                         ) : (
                                             <select value={zevId} onChange={(event) => setZevId(event.target.value)}>
-                                                <option value="">Select ZEV</option>
+                                                <option value="">{t('pages.imports.wizard.selectZev')}</option>
                                                 {availableZevs.map((zev) => (
                                                     <option key={zev.id} value={zev.id}>{zev.name}</option>
                                                 ))}
@@ -695,11 +695,11 @@ export function ImportsPage() {
                             <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.6rem', marginTop: '0.4rem' }}>
                                 <button type="button" className="button button-secondary" onClick={() => setWizardStep(1)}>
                                     <FontAwesomeIcon icon={faArrowLeft} fixedWidth />
-                                    Back
+                                    {t('pages.imports.wizard.back')}
                                 </button>
                                 <button type="button" className="button button-primary" onClick={startImport} disabled={uploadMutation.isPending || !canStartImport}>
                                     <FontAwesomeIcon icon={faUpload} fixedWidth />
-                                    {uploadMutation.isPending ? 'Importing...' : 'Start Import'}
+                                    {uploadMutation.isPending ? t('pages.imports.wizard.importing') : t('pages.imports.wizard.startImport')}
                                 </button>
                             </div>
                         </div>

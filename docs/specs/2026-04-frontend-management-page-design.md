@@ -255,6 +255,10 @@ These pages define the current management-page reference set.
 - All visible user-facing copy in management pages must come from `react-i18next` locale files in `frontend/src/i18n/locales`.
 - Strings must not include presentational prefixes or suffixes that belong to icons or layout.
 - New sections, badges, empty states, and filter labels must be translated in all active locales: `en`, `de`, `fr`, `it`.
+- Count-bearing strings use i18next `_one`/`_other` suffix keys (e.g. `previewFound_one`, `previewFound_other`) rather than pseudo-plurals like `(s)`.
+- Frozen terms (`ZEV`, `vZEV`, `SDAT-CH`, `CSV / Excel`, format specifiers, unit symbols) are never translated. Each locale file documents them in a header comment block.
+- `frontend/src/@types/i18next.d.ts` sets `CustomTypeOptions.defaultNS` for future compile-time key checking. Strict `resources` typing is deferred until computed-key patterns are migrated.
+- `frontend/tests/locale-parity.test.ts` enforces exact leaf-key structure across all four locales, rejects empty/whitespace-only values, verifies interpolation placeholder names match, and asserts every leaf is a string.
 
 ### 7.7 Responsive rules
 
@@ -279,6 +283,7 @@ These pages define the current management-page reference set.
 
 - Build and type checks: `npm run build`
 - Lint: `npm run lint`
+- Locale parity: `npx vitest run tests/locale-parity.test.ts` — en/de/fr/it key-structure equality, no empty values, all leaves are strings, interpolation placeholders match
 - Manual verification on the reference pages:
   - page header and description are present
   - top-level create/import/export actions use icon + label buttons

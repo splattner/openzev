@@ -1,3 +1,16 @@
+// Frozen terms (do not translate in this locale):
+//   ZEV, vZEV, SDAT-CH, CSV / Excel
+//   Format specifiers: %d.%m.%Y, %Y-%m-%d, etc.
+//   Unit symbols: kWh, kW, kVA, CHF
+//
+// Translatable Swiss terms specific to this locale:
+//   metering point → Zählpunkt / Messpunkt (DE), point de mesure (FR), punto di misura (IT)
+//   participant → Teilnehmende (DE), participant·e (FR), partecipante (IT)
+//   tariff → Tarif (DE), tarif (FR), tariffa (IT)
+//   billing → Abrechnung (DE), décompte (FR), fatturazione (IT)
+//   import → Import (DE), importation (FR), importazione (IT)
+//   quarter-hour → Viertelstunde (DE), quart d'heure (FR), quarto d'ora (IT)
+//   load profile → Lastgang (DE), courbe de charge (FR), profilo di carico (IT)
 export const en = {
     app: {
         title: 'OpenZEV',
@@ -27,7 +40,13 @@ export const en = {
         meteringPoints: 'Metering Points',
         meteringData: 'Metering Data',
         meteringDataQuality: 'Data Quality',
-        manageZev: 'Manage (v)Zev',
+        manageZev: 'Manage (v)ZEV',
+        sourceCode: 'Source code on GitHub',
+        impersonatingAs: 'Impersonating account as {{name}}',
+        stopImpersonation: 'Stop',
+        noZevSelected: 'No (v)ZEV selected',
+        loadingZevs: 'Loading…',
+        noZevAvailable: 'No (v)ZEV available',
         zevSettings: 'Settings',
         tariffs: 'Tariffs',
         invoices: 'Invoices',
@@ -124,7 +143,9 @@ export const en = {
         createdAt: 'Created',
         noData: 'No data available',
         saving: 'Saving...',
+        back: 'Back to dashboard',
         close: 'Close',
+        openPdf: 'Open PDF',
         showDetails: 'Show details',
         hideDetails: 'Hide details',
         periodSelector: {
@@ -136,6 +157,10 @@ export const en = {
             lastQuarter: 'Last quarter',
             thisYear: 'This year',
             lastYear: 'Last year',
+        },
+        copyFeedback: {
+            copied: '{{label}} copied.',
+            error: 'Could not copy {{label}}.',
         },
     },
     entity: {
@@ -291,7 +316,7 @@ export const en = {
             invoiceEmail: 'Invoice Email',
             invitationEmail: 'Invitation Email',
             verificationEmail: 'Verification Email',
-            subject: 'Subject',
+            subject: 'Subject:',
             body: 'Body',
             variable: 'Variable',
             fieldDescription: 'Description',
@@ -532,6 +557,62 @@ export const en = {
                 reason: 'Reason',
                 general: 'General',
             },
+            wizard: {
+                title: 'Import Wizard',
+                step: 'Step {{step}} / 2',
+                sourceFormat: 'Source format',
+                sourceFile: 'Source file',
+                hasHeader: 'File has header row',
+                delimiter: 'Delimiter',
+                rowFormat: 'Row format',
+                datetimeFormat: 'Date/time format',
+                meterIdCol: 'Meter ID column',
+                timestampCol: 'Timestamp column',
+                dateCol: 'Date column',
+                energyCol: 'Energy column',
+                firstIntervalCol: 'First interval column',
+                directionCol: 'Direction column (optional)',
+                intervalsPerRow: 'Intervals per row',
+                minutesPerInterval: 'Minutes per interval',
+                overwriteExisting: 'Overwrite existing data for same metering point + timestamp + direction',
+                selectZev: 'Select ZEV',
+                cancel: 'Cancel',
+                noZevSelected: 'No ZEV selected',
+                nextConfig: 'Next: Configuration',
+                back: 'Back',
+                startImport: 'Start Import',
+                importing: 'Importing...',
+            },
+            preview: {
+                row: 'Row',
+                meterId: 'Meter ID',
+                status: 'Status',
+                timestamp: 'Date/Timestamp',
+                existingData: 'Existing data',
+                exists: 'Exists',
+                missing: 'Missing',
+                yes: 'Yes',
+                no: 'No',
+                rowPrefix: 'Row {{row}}:',
+            },
+            format: {
+                // Frozen — product / format proper nouns; do not translate
+                sdatch: 'SDAT-CH (ebIX XML)',
+                csv: 'CSV / Excel',
+            },
+            rowFormat: {
+                standard: 'Standard (1 reading per row)',
+                daily15min: 'Daily profile (96x 15-min values)',
+            },
+            sdatchScope: 'SDAT-CH import currently requires selecting the target ZEV owner scope.',
+            previewFound_one: '{{count}} metering point found',
+            previewFound_other: '{{count}} metering points found',
+            previewMissing_one: '{{count}} metering point missing',
+            previewMissing_other: '{{count}} metering points missing',
+            previewMissingBanner_one: '{{count}} metering point from this file is missing. Please create it before starting the import.',
+            previewMissingBanner_other: '{{count}} metering points from this file are missing. Please create them first; import start is blocked.',
+            loadingPreview: 'Loading preview...',
+            loadPreview: 'Load Preview',
         },
         auditLogs: {
             eyebrowAdmin: 'Admin',
@@ -723,6 +804,8 @@ export const en = {
             title: 'Invoices',
             description: 'Manage billing periods and invoices for the selected ZEV.',
             selectZev: 'Select a ZEV to manage billing periods.',
+            newMeteringPoint: 'New Metering Point',
+            assign: 'Assign participant',
             selectZevPlaceholder: 'Select a ZEV…',
             prevPeriod: 'Previous period',
             nextPeriod: 'Next period',
@@ -738,11 +821,41 @@ export const en = {
                 total: 'Total',
                 pdf: 'PDF',
                 actions: 'Actions',
+                summaryLabel: 'Metering point summary',
+                summary: {
+                    total: 'Total',
+                    active: 'Active',
+                    inactive: 'Inactive',
+                    assigned: 'Assigned',
+                    unassigned: 'Unassigned',
+                },
+                filters: {
+                    search: 'Search',
+                    searchPlaceholder: 'Meter ID or location',
+                    status: 'Status',
+                    allStatuses: 'All statuses',
+                    type: 'Type',
+                    allTypes: 'All types',
+                    clear: 'Clear filters',
+                },
+                noResults: {
+                    title: 'No metering points match these filters',
+                    description: 'Try a different status, type, or search term.',
+                },
+                noLocation: 'No location description',
             },
             metering: {
                 complete: 'Complete',
                 missing: 'Missing',
                 pointsWithData: '{{n}}/{{total}} points with data',
+                assignmentCount: 'Assignments: {{count}}',
+                moreActions: 'More',
+                openEnded: 'Open-ended',
+                assignmentState: {
+                    current: 'Current',
+                    upcoming: 'Upcoming',
+                    ended: 'Ended',
+                },
             },
             notCreated: 'Not created',
             openPdf: 'Open PDF',
@@ -832,10 +945,29 @@ export const en = {
                 emailSentSuccess: 'Email sent successfully!',
                 emailPollingTimeout: 'Email was queued, but status update is taking longer than expected.',
             },
+            emailLogs: {
+                title: 'Email History – Invoice {{number}}',
+                empty: 'No email attempts yet',
+            subject: 'Subject: {{subject}}',
+                retry: 'Retry',
+                retrying: 'Retrying...',
+                queued: 'Queued:',
+                sent: 'Sent:',
+            status: {
+                pending: 'Pending',
+                sent: 'Sent',
+                failed: 'Failed',
+                unknown: 'Unknown',
+            },
+            },
             deleteModal: {
                 title: 'Delete Invoice',
                 message: 'Are you sure you want to delete this invoice? This action cannot be undone.',
             },
+        },
+        notFound: {
+            title: 'Page not found',
+            description: 'The page you requested does not exist.',
         },
         participants: {
             title: 'Participants',
@@ -1356,6 +1488,21 @@ export const en = {
             description: 'Communities you can manage in OpenZEV.',
             newZev: 'New ZEV',
             adminOnly: 'Only admins can create new ZEVs.',
+            validation: {
+                zevNameRequired: 'ZEV name is required.',
+                startDateRequired: 'Start date is required.',
+                ownerFirstNameRequired: 'Owner first name is required.',
+                ownerLastNameRequired: 'Owner last name is required.',
+                ownerEmailRequired: 'Owner email is required.',
+                meteringPointRequired: 'At least one metering point is required.',
+                meterIdRequired: 'Each metering point needs a meter ID.',
+                selectNewOwner: 'Please select a new owner.',
+            },
+            messages: {
+                createFailed: 'Failed to create ZEV.',
+                updateFailed: 'Failed to update ZEV.',
+                assignFailed: 'Failed to assign owner.',
+            },
             editModalTitle: 'Edit ZEV',
             saveZev: 'Save ZEV',
             noZevs: 'No ZEVs yet.',
@@ -1588,6 +1735,7 @@ export const en = {
             },
         },
         dashboard: {
+            openInvoicePdf: 'Open PDF for invoice {{number}}',
             participant: 'Participant',
             allParticipants: 'All participants',
             resolution: 'Resolution',

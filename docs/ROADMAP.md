@@ -143,6 +143,7 @@ PVshare Cockpit is a closed, subscription-based SaaS (CHF ~30/participant/year) 
 | Data quality status (green/yellow/red gap detection with gap spans) | `shipped` | — | [spec](specs/2026-03-metering-import-and-quality.md) |
 | Energy flow Sankey chart (ZEV-level production/consumption overview) | `shipped` | — | — |
 | Data completeness alerts — notify ZEV owner when metering gap detected | `idea` | `high` | Proactive; prevents invoice blocking surprises |
+| Flag holder-less readings in data-quality status | `shipped` | — | PR #396; unassigned readings surfaced per metering point |
 | Automated SDAT-CH polling / scheduled import from VNB | `idea` | `medium` | Removes manual upload step for SDAT customers |
 | Bulk meter reading export (CSV/Excel) for a period and ZEV | `idea` | `medium` | Needed for external analysis and audit |
 | Anomaly / outlier detection on imported readings | `idea` | `low` | Flag unusually high/low values before billing |
@@ -163,7 +164,7 @@ PVshare Cockpit is a closed, subscription-based SaaS (CHF ~30/participant/year) 
 | Participant invitation (reset password + email with temporary credentials) | `shipped` | — | — |
 | Participant account linking / unlinking | `shipped` | — | [spec](specs/2026-03-metering-point-management.md) |
 | Auto-create user account on participant creation | `shipped` | — | — |
-| Participant contract PDF (metering points, tariffs, billing interval, notes) | `shipped` | — | — |
+| Participant contract PDF (metering points, tariffs, billing interval, notes) | `shipped` | — | Versioned contract snapshots on download (PR #443) |
 | Participant status indicator | `shipped` | — | — |
 | Participant location map (OpenStreetMap building outlines, geocoded from address) | `shipped` | — | [ADR 0012](adr/0012-participant-geocoding-via-nominatim.md) |
 | `MeteringPoint` CRUD (consumption, production, bidirectional types) | `shipped` | — | [spec](specs/2026-03-metering-point-management.md) |
@@ -214,12 +215,15 @@ PVshare Cockpit is a closed, subscription-based SaaS (CHF ~30/participant/year) 
 | Password change (authenticated, old-password verification) | `shipped` | — | — |
 | Initial password set for admin-created accounts | `shipped` | — | — |
 | Admin impersonation (with impersonator identity preserved in token) | `shipped` | — | [spec](specs/2026-03-community-and-access.md) |
-| OAuth authentication with configurable redirect URL | `shipped` | — | — |
+| OAuth authentication with configurable redirect URL | `shipped` | — | Client secret write-only (PR #432); CSRF enforcement for cookie JWT sessions (PR #446) |
 | Feature flag to disable self-registration globally | `shipped` | — | — |
+| Admin-only restriction on `/auth/users/` endpoint | `shipped` | — | PR #430 |
+| Upload parsing hardening (zip bombs, parse loops, size caps) | `shipped` | — | PR #449; [spec](specs/2026-03-metering-import-and-quality.md) §4.4 |
 | `ProtectedRoute` with `allowedRoles` on all frontend routes | `shipped` | — | — |
 | Two-factor authentication (TOTP) | `idea` | `medium` | Security improvement for admin and ZEV owner accounts |
 | Session management page (list and revoke active tokens) | `idea` | `low` | Useful for security-conscious owners |
 | Per-user API keys for automated integrations | `shipped` | — | Owner-managed keys with revoke; backend key auth + throttling — [guide](user-guide/16-api-keys.md) |
+| Admin console for API key management | `shipped` | — | PR #409 |
 | External SSO / enterprise IdP (SAML, OIDC beyond current OAuth) | `deferred` | — | Out of scope; requires significant auth infrastructure work |
 
 ---
@@ -283,6 +287,6 @@ PVshare Cockpit is a closed, subscription-based SaaS (CHF ~30/participant/year) 
 | Observability — structured application logging and metrics endpoint | `idea` | `medium` | No Prometheus metrics or structured log format today |
 | End-to-end test suite (Playwright or similar) | `idea` | `medium` | Playwright is used for automated user-guide screenshots; no interactive end-to-end coverage of user flows yet |
 | Frontend component-level unit tests | `shipped` | — | `npm run test:unit` (Vitest) covers API helpers, reducers and page-level logic |
-| Rate limiting on sensitive API endpoints | `partial` | `medium` | Auth endpoints (login, refresh, register, verify-email, OAuth login/exchange) are throttled per IP; import endpoints are not |
+| Rate limiting on sensitive API endpoints | `shipped` | — | Auth endpoints throttled per IP; import endpoints throttled 60/h/user; transfer archive endpoints throttled 20/h/user; API key auth counts against budget |
 | Automated security dependency scanning (Dependabot / Snyk) | `idea` | `low` | Renovate is configured for updates; no security-focused CVE scanning |
 | Multi-region or multi-instance deployment guidance | `deferred` | — | Single-instance model assumed; stateful session and Celery design would need review |

@@ -533,8 +533,8 @@ export function DashboardPage() {
                                                         rel="noreferrer"
                                                         className="button button-primary"
                                                         style={{ textDecoration: 'none', padding: '0.3rem 0.5rem', lineHeight: 1 }}
-                                                        aria-label={`Open PDF for ${invoice.invoice_number}`}
-                                                        title="Open PDF"
+                                                        aria-label={t('pages.dashboard.openInvoicePdf', { number: invoice.invoice_number })}
+                                                        title={t('common.openPdf')}
                                                     >
                                                         📄
                                                     </a>

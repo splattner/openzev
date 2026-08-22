@@ -108,7 +108,7 @@ export function ZevListPage() {
             setWizardStep(5)
             void queryClient.invalidateQueries({ queryKey: queryKeys.zev.list() })
         },
-        onError: (error) => setCreateError(formatApiError(error, 'Failed to create ZEV.')),
+        onError: (error) => setCreateError(formatApiError(error, t('pages.zevs.messages.createFailed'))),
     })
 
     const updateMutation = useMutation({
@@ -120,7 +120,7 @@ export function ZevListPage() {
             setEditError(null)
             void queryClient.invalidateQueries({ queryKey: queryKeys.zev.list() })
         },
-        onError: (error) => setEditError(formatApiError(error, 'Failed to update ZEV.')),
+        onError: (error) => setEditError(formatApiError(error, t('pages.zevs.messages.updateFailed'))),
     })
 
     const deleteMutation = useMutation({
@@ -139,7 +139,7 @@ export function ZevListPage() {
             setOwnerError(null)
             void queryClient.invalidateQueries({ queryKey: queryKeys.zev.list() })
         },
-        onError: (error) => setOwnerError(formatApiError(error, 'Failed to assign owner.')),
+        onError: (error) => setOwnerError(formatApiError(error, t('pages.zevs.messages.assignFailed'))),
     })
 
     function startEdit(zev: Zev) {
@@ -198,10 +198,10 @@ export function ZevListPage() {
     async function copyToClipboard(value: string, label: string) {
         try {
             await navigator.clipboard.writeText(value)
-            setCopyFeedback(`${label} copied.`)
+            setCopyFeedback(t('common.copyFeedback.copied', { label }))
             window.setTimeout(() => setCopyFeedback(null), 2000)
         } catch {
-            setCopyFeedback(`Could not copy ${label.toLowerCase()}.`)
+            setCopyFeedback(t('common.copyFeedback.error', { label }))
             window.setTimeout(() => setCopyFeedback(null), 2000)
         }
     }
@@ -214,20 +214,20 @@ export function ZevListPage() {
 
     function validateWizardStep(step: WizardStep): string | null {
         if (step === 1) {
-            if (!createForm.name.trim()) return 'ZEV name is required.'
-            if (!createForm.start_date) return 'Start date is required.'
+            if (!createForm.name.trim()) return t('pages.zevs.validation.zevNameRequired')
+            if (!createForm.start_date) return t('pages.zevs.validation.startDateRequired')
         }
 
         if (step === 2) {
-            if (!createForm.owner.first_name.trim()) return 'Owner first name is required.'
-            if (!createForm.owner.last_name.trim()) return 'Owner last name is required.'
-            if (!createForm.owner.email.trim()) return 'Owner email is required.'
+            if (!createForm.owner.first_name.trim()) return t('pages.zevs.validation.ownerFirstNameRequired')
+            if (!createForm.owner.last_name.trim()) return t('pages.zevs.validation.ownerLastNameRequired')
+            if (!createForm.owner.email.trim()) return t('pages.zevs.validation.ownerEmailRequired')
         }
 
         if (step === 3) {
-            if (!createForm.metering_points.length) return 'At least one metering point is required.'
+            if (!createForm.metering_points.length) return t('pages.zevs.validation.meteringPointRequired')
             if (createForm.metering_points.some((point) => !point.meter_id.trim())) {
-                return 'Each metering point needs a meter ID.'
+                return t('pages.zevs.validation.meterIdRequired')
             }
         }
 
@@ -268,7 +268,7 @@ export function ZevListPage() {
     function submitOwnerAssignment(event: FormEvent<HTMLFormElement>) {
         event.preventDefault()
         if (!ownerTargetZev || !newOwnerId) {
-            setOwnerError('Please select a new owner.')
+            setOwnerError(t('pages.zevs.validation.selectNewOwner'))
             return
         }
 
@@ -280,7 +280,7 @@ export function ZevListPage() {
             title: t('pages.zevs.ownerModal.transferTitle'),
             message: t('pages.zevs.ownerModal.transferMessage', { zev: ownerTargetZev.name, from: currentOwnerName, to: nextOwnerName }),
             confirmText: t('pages.zevs.ownerModal.transferConfirm'),
-            cancelText: 'Cancel',
+            cancelText: t('common.cancel'),
             isDangerous: true,
             onConfirm: async () => {
                 await assignOwnerMutation.mutateAsync({ id: ownerTargetZev.id, owner: nextOwnerNumericId })
@@ -345,8 +345,8 @@ export function ZevListPage() {
         }
     }
 
-    if (isLoading) return <div className="card">Loading ZEVs...</div>
-    if (isError) return <div className="card error-banner">Failed to load ZEVs.</div>
+    if (isLoading) return <div className="card">{t('common.loading')}</div>
+    if (isError) return <div className="card error-banner">{t('common.error')}</div>
 
     const ownerNameById = new Map((usersQuery.data?.results ?? []).map((candidate) => [candidate.id, `${candidate.first_name} ${candidate.last_name}`]))
     const linkedParticipantsForTarget = (participantsQuery.data?.results ?? []).filter((participant) => (
@@ -635,7 +635,7 @@ export function ZevListPage() {
                                     <button
                                         className="button button-secondary"
                                         type="button"
-                                        onClick={() => copyToClipboard(createdCredentials.username, 'Username')}
+                                        onClick={() => copyToClipboard(createdCredentials.username, t('pages.zevs.wizard.usernameLabel'))}
                                     >
                                         <FontAwesomeIcon icon={faCopy} fixedWidth />
                                         {t('pages.zevs.wizard.copyUsername')}
@@ -648,7 +648,7 @@ export function ZevListPage() {
                                     <button
                                         className="button button-secondary"
                                         type="button"
-                                        onClick={() => copyToClipboard(createdCredentials.temporary_password, 'Password')}
+                                        onClick={() => copyToClipboard(createdCredentials.temporary_password, t('pages.zevs.wizard.passwordLabel'))}
                                     >
                                         <FontAwesomeIcon icon={faCopy} fixedWidth />
                                         {t('pages.zevs.wizard.copyPassword')}

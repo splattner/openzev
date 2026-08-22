@@ -23,10 +23,10 @@ export function InvoiceDetailPage() {
     })
 
     if (invoiceQuery.isLoading) {
-        return <div className="card">Loading invoice details...</div>
+        return <div className="card">{t('common.loading')}</div>
     }
     if (invoiceQuery.isError || !invoiceQuery.data) {
-        return <div className="card error-banner">Failed to load invoice details.</div>
+        return <div className="card error-banner">{t('common.error')}</div>
     }
 
     const inv = invoiceQuery.data

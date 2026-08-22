@@ -1,5 +1,6 @@
 import type { ReactElement } from 'react'
 import { Navigate, useLocation } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { useAuth } from '../lib/auth'
 import type { UserRole } from '../types/api'
 
@@ -10,11 +11,12 @@ export function ProtectedRoute({
     children: ReactElement
     allowedRoles?: UserRole[]
 }) {
+    const { t } = useTranslation()
     const { isAuthenticated, isLoading, user, isImpersonating } = useAuth()
     const location = useLocation()
 
     if (isLoading) {
-        return <div className="center-screen">Loading...</div>
+        return <div className="center-screen">{t('common.loading')}</div>
     }
 
     if (!isAuthenticated) {

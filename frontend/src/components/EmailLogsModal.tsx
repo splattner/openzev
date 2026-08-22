@@ -1,5 +1,6 @@
 import { type EmailLog } from '../types/api'
 import { formatDateTime, useAppSettings } from '../lib/appSettings'
+import { useTranslation } from 'react-i18next'
 
 interface EmailLogsModalProps {
     invoiceNumber: string
@@ -16,12 +17,6 @@ const statusColors: Record<string, string> = {
     failed: '#ef4444',   // red
 }
 
-const statusLabels: Record<string, string> = {
-    pending: 'Pending',
-    sent: 'Sent',
-    failed: 'Failed',
-}
-
 export function EmailLogsModal({
     invoiceNumber,
     emailLogs,
@@ -30,7 +25,15 @@ export function EmailLogsModal({
     onRetry,
     isRetrying = false,
 }: EmailLogsModalProps) {
+    const { t } = useTranslation()
     const { settings } = useAppSettings()
+
+    const statusLabels: Record<string, string> = {
+        pending: t('pages.invoices.emailLogs.status.pending'),
+        sent: t('pages.invoices.emailLogs.status.sent'),
+        failed: t('pages.invoices.emailLogs.status.failed'),
+        unknown: t('pages.invoices.emailLogs.status.unknown'),
+    }
 
     if (!isOpen) return null
 
@@ -57,10 +60,10 @@ export function EmailLogsModal({
                 }}
                 onClick={(e) => e.stopPropagation()}
             >
-                <h3 style={{ marginBottom: '1.5rem' }}>Email History – Invoice {invoiceNumber}</h3>
+                <h3 style={{ marginBottom: '1.5rem' }}>{t('pages.invoices.emailLogs.title', { number: invoiceNumber })}</h3>
 
                 {emailLogs.length === 0 ? (
-                    <p style={{ color: '#888', textAlign: 'center', padding: '2rem 0' }}>No email attempts yet</p>
+                    <p style={{ color: '#888', textAlign: 'center', padding: '2rem 0' }}>{t('pages.invoices.emailLogs.empty')}</p>
                 ) : (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                         {emailLogs.map((log) => (
@@ -77,7 +80,7 @@ export function EmailLogsModal({
                                     <div>
                                         <strong>{log.recipient}</strong>
                                         <div style={{ fontSize: '0.85rem', color: '#888', marginTop: '0.25rem' }}>
-                                            Subject: {log.subject}
+                                            {t('pages.invoices.emailLogs.subject', { subject: log.subject })}
                                         </div>
                                     </div>
                                     <div
@@ -85,7 +88,7 @@ export function EmailLogsModal({
                                             display: 'inline-block',
                                             padding: '0.35rem 0.8rem',
                                             borderRadius: '0.3rem',
-                                            backgroundColor: statusColors[log.status],
+                                            backgroundColor: statusColors[log.status] ?? '#9ca3af',
                                             color: '#fff',
                                             fontSize: '0.8rem',
                                             fontWeight: '600',
@@ -93,13 +96,13 @@ export function EmailLogsModal({
                                             minWidth: '80px',
                                         }}
                                     >
-                                        {statusLabels[log.status]}
+                                        {statusLabels[log.status] ?? t('pages.invoices.emailLogs.status.unknown')}
                                     </div>
                                 </div>
 
                                 <div style={{ fontSize: '0.85rem', color: '#666', marginBottom: '0.5rem' }}>
-                                    <div>Queued: {formatDateTime(log.created_at, settings)}</div>
-                                    {log.sent_at && <div>Sent: {formatDateTime(log.sent_at, settings)}</div>}
+                                    <div>{t('pages.invoices.emailLogs.queued')} {formatDateTime(log.created_at, settings)}</div>
+                                    {log.sent_at && <div>{t('pages.invoices.emailLogs.sent')} {formatDateTime(log.sent_at, settings)}</div>}
                                 </div>
 
                                 {log.error_message && (
@@ -127,7 +130,7 @@ export function EmailLogsModal({
                                         disabled={isRetrying}
                                         type="button"
                                     >
-                                        {isRetrying ? 'Retrying...' : 'Retry'}
+                                        {isRetrying ? t('pages.invoices.emailLogs.retrying') : t('pages.invoices.emailLogs.retry')}
                                     </button>
                                 )}
                             </div>
@@ -137,7 +140,7 @@ export function EmailLogsModal({
 
                 <div style={{ marginTop: '2rem', display: 'flex', justifyContent: 'flex-end' }}>
                     <button className="button button-secondary" onClick={onClose} type="button">
-                        Close
+                        {t('common.close')}
                     </button>
                 </div>
             </div>
