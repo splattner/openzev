@@ -30,7 +30,9 @@ LABEL org.opencontainers.image.title="$OCI_TITLE" \
     org.opencontainers.image.revision="$OCI_REVISION" \
     org.opencontainers.image.created="$OCI_CREATED"
 
-COPY frontend/nginx.conf /etc/nginx/conf.d/default.conf
+# compose overrides this with nginx.compose.conf to proxy /api same-origin.
+ARG NGINX_CONF=nginx.conf
+COPY frontend/$NGINX_CONF /etc/nginx/conf.d/default.conf
 COPY --from=build /app/dist /usr/share/nginx/html
 EXPOSE 80
 CMD ["nginx", "-g", "daemon off;"]
