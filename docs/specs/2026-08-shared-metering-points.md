@@ -40,17 +40,27 @@ date (energy) or month (fees). `allocation_weight` is not a percentage,
 per-mille value, or Swiss STWE Wertquote — the legal distinction is spelled out
 at §5.2. This supersedes issue #387's recorded "Split key: equal per
 participant" decision, per the issue's own invitation ("none is closed off").
-Rewriting the `SHARED_*` fee modes (§7.2) to the same weight is what resolves
-the "two meanings of *share*" trap the issue warned about.
 
-**Coupling this creates, stated once.** After this change a single
-`allocation_weight` drives both community-meter allocation *and* the existing
-`SHARED_MONTHLY_FEE` / `SHARED_YEARLY_FEE` tariff modes. Editing a
-participant's weight for common-area purposes therefore also re-splits their
-shared tariff fees on the next regeneration. Default weights (`1`) reproduce
-today's amounts exactly, so nothing changes until somebody sets a weight — but
-the coupling is permanent and deliberate, and is the price of not having two
-meanings of *share*.
+**Two cost drivers, two split keys.** A shared *fee* (metering administration,
+a service contract) and Allgemeinstrom (common-area consumption) are different
+cost drivers, and Swiss practice splits them differently: administration per
+account, common-area electricity by value share. Forcing both onto one key
+would make setting a weight for the common meter silently re-split the shared
+fees, which is not what anybody asked for.
+
+So the key is chosen where the cost is defined:
+
+| Cost | Split key | Chosen on |
+|---|---|---|
+| Community metering point (Allgemeinstrom) | Always by `allocation_weight` | — (that is the feature) |
+| `SHARED_MONTHLY_FEE` / `SHARED_YEARLY_FEE` | `equal` (headcount) or `weight` | `Tariff.split_key`, default `equal` |
+
+`Tariff.split_key` defaults to `equal`, which is exactly today's
+`unit_price / count` behaviour — so every existing shared-fee tariff is
+unaffected, and the 22 existing shared-fee tests pass unmodified. A ZEV that
+wants weighted lift electricity *and* per-account metering administration can
+express both. "Split key" is the issue's own vocabulary (#387's decision
+table), reused here deliberately.
 
 ### 1.1 Terminology and invariants
 
@@ -59,7 +69,11 @@ meanings of *share*.
 | `allocation_mode` | Assignment field, `personal` \| `community` — whether a meter's costs go to the holder alone or are split across eligible participants |
 | `allocation_weight` | Positive unitless participant input; the basis for splitting community costs |
 | `allocation_share` | Derived weight share, computed on demand, never stored |
+| `split_key` | Tariff field, `equal` \| `weight` — which denominator a `SHARED_*` fee uses. Does not apply to community metering points, which always use weight |
 | `ownership_value_share` | Legal STWE ownership share (future, out of scope): a fraction with a common denominator under Art. 712e ZGB |
+
+`allocation_mode` (who pays) and `split_key` (how a shared fee is divided) are
+independent: the first is a property of an assignment, the second of a tariff.
 
 Invariants:
 
@@ -72,9 +86,9 @@ Invariants:
 - `SHARED_MONTHLY_FEE` / `SHARED_YEARLY_FEE` are existing tariff billing
   modes — a different concept from `allocation_mode`; their names are
   unchanged for data/API compatibility.
-- A single `allocation_weight` applies to all community-meter allocations and
-  existing shared tariff fees within a ZEV. Deployments that need different
-  keys per cost type are not supported (§3).
+- Community-meter allocation always uses `allocation_weight`. A `SHARED_*`
+  fee uses whichever key its own tariff names, defaulting to `equal`, so
+  setting a weight never changes a shared fee that did not opt in.
 - All allocated monetary amounts conserve to the source amount within the
   documented rounding convention (§9).
 - **Personal-vs-community is decided per timestamp, never per queryset** (§7.3).
@@ -88,7 +102,8 @@ Invariants:
 - [ ] Shared energy follows membership at the reading's date; shared fees follow membership at the month
 - [ ] A meter that is personal for part of a period and community for the rest is billed correctly in both windows, with no double billing and no lost readings (§7.3)
 - [ ] Dashboards (analytics, pdf_stats), annual statement and hourly profiles reconcile with invoices for community meters
-- [ ] `SHARED_MONTHLY_FEE`/`SHARED_YEARLY_FEE` split by weight; unchanged amounts for default equal weights
+- [ ] A `SHARED_*` tariff with `split_key = equal` bills exactly as it does today, whatever weights are set; with `split_key = weight` it splits by weight
+- [ ] Setting a participant's `allocation_weight` changes community-meter shares and no `equal`-keyed shared fee
 - [ ] The 22 existing shared-fee tests pass **unmodified**; the 10 reconciliation tests keep their existing assertions with the fixture extended by a community meter
 - [ ] New i18n keys exist in all four locales — `frontend/tests/locale-parity.test.ts` (added in #452) fails otherwise
 - [ ] `python -m pytest -q`, `npm run test:unit`, `npm run build` green
@@ -101,23 +116,28 @@ Invariants:
 |---|---|
 | `zev` models | `MeteringPointAssignment.allocation_mode` enum; `Participant.allocation_weight` field; migration |
 | `zev` serializers | `allocation_mode` exposed via `fields = "__all__"`; `allocation_weight` added to `ParticipantSerializer` explicit field list |
+| `tariffs` model | `Tariff.split_key` enum (`equal` \| `weight`, default `equal`); migration. `TariffSerializer` uses `fields = "__all__"`, so no serializer change |
 | `allocation/windows.py` | Window tuples carry the allocation mode; new `assignment_at()` resolution object; `participant_at` / `participant_on` / `is_held_by` unchanged |
 | `allocation/read_model.py` | `AllocatedReading` carries holder + allocation mode so consumers can distribute community readings instead of attributing them |
 | `invoices/engine.py` | Per-timestamp allocation-mode gate in the personal loops, community querysets, date- and month-granular share helpers, price-once-allocate-second, per-metering-point fee changes, bucket plumbed into line items/descriptions, shared kWh in invoice totals |
 | ADR 0013 consumers | `invoices/pdf_stats.py`, `invoices/pdf_charts.py`, `invoices/annual_statement.py`, `metering/analytics.py` distribute shares instead of attributing to the holder |
-| `zev/transfer` | Export/import field whitelists (`schema.py`) carry `allocation_mode` and `allocation_weight` so sharing round-trips whole-ZEV export/import (#410) — §6 |
-| Frontend | Mode selector + badge (metering points), weight field + computed-share indicator (participants), tariff shared-fee hint rewording, 4 locales |
+| `zev/transfer` | Export/import field whitelists (`schema.py`) carry `allocation_mode`, `allocation_weight` and `split_key` so sharing round-trips whole-ZEV export/import (#410) — §6 |
+| Frontend | Mode selector + badge (metering points), weight field + computed-share indicator (participants), split-key selector + hint rewording (tariffs), 4 locales |
 | Docs | Baseline spec updates: `2026-03-community-and-access.md`, `2026-03-metering-point-management.md`, `2026-03-tariffs-and-billing-engine.md` |
 
 ### Out of scope
 
 - Weight history/versioning: editing a participant's weight applies to every
   period they appear in on regeneration (documented, not prevented).
-- Per-metering-point or per-cost-type allocation keys — a single
-  `allocation_weight` applies to all community-meter allocations and existing
-  shared tariff fees within a ZEV. Deployments needing different keys (e.g.
-  value shares for lift electricity, equal shares for metering
-  administration) are not supported by this feature.
+- A per-*assignment* split key for community metering points: every community
+  meter allocates by `allocation_weight`. Splitting one common meter equally
+  while another follows the weight is a follow-up, and would go on the
+  assignment next to `allocation_mode`. (Shared *fees* are configurable per
+  tariff — see §5.3.)
+- More than one weight per participant: a single `allocation_weight` is the
+  only weight basis. A deployment wanting, say, floor area for heating and
+  value share for the lift needs the general allocation-method framework
+  below, not a second weight column.
 - The legal property Wertquote (Art. 712e ZGB) and a general
   allocation-method framework (`CostAllocationRule` / per-cost-type keys such
   as area or measured consumption): documented follow-ups — §5.2.
@@ -198,7 +218,33 @@ weight set is valid. Rendered as a plain decimal weight ("1", "1.25", "200").
 **Serializer:** `ParticipantSerializer` uses an explicit `fields` list — add
 `"allocation_weight"` to `fields` (not to `read_only_fields`).
 
-### 5.3 `allocation/windows.py` — `AssignmentWindows`
+### 5.3 `Tariff`
+
+**Model:** `tariffs.models.Tariff`
+
+| Field | Type | Default | Constraints / Notes |
+|---|---|---|---|
+| `split_key` | `CharField(max_length=10, choices=SplitKey.choices)` | `SplitKey.EQUAL` | New. `SplitKey(models.TextChoices)`: `EQUAL = "equal"`; `WEIGHT = "weight"`. Read **only** for `SHARED_MONTHLY_FEE` / `SHARED_YEARLY_FEE`; ignored by every other billing mode |
+
+Defaulting to `EQUAL` is what keeps this change invisible to existing data: a
+shared-fee tariff that has never heard of weights keeps dividing by headcount,
+which is why the 22 existing shared-fee tests pass unmodified (§10).
+
+The field is stored on every tariff regardless of billing mode rather than
+being conditionally present, matching how `fixed_price_chf` and `percentage`
+already sit on all tariffs and are read only by the modes that need them. The
+serializer does not validate it against `billing_mode`: an ignored value is
+harmless, and a validation rule would have to be relaxed the moment a second
+billing mode wants a split key.
+
+**Serializer:** `TariffSerializer` — `fields = "__all__"`, so `split_key` is
+exposed and writable with no serializer change. Its `validate()` is
+billing-mode-aware and needs no new branch.
+
+**Migration:** one `AddField` with default `EQUAL`; existing rows get the
+default, no data migration, reversible.
+
+### 5.4 `allocation/windows.py` — `AssignmentWindows`
 
 Window rows grow from 4- to 5-tuples:
 `(metering_point_id, valid_from, valid_to, participant_id, allocation_mode)`.
@@ -221,11 +267,15 @@ keeps the three existing lookups and their pinned tests (`allocation/tests.py`)
 intact; consumers that must distribute community costs switch to
 `assignment_at` and are enforced by the reconciliation fixture (§7.7).
 
-### 5.4 Admin and OpenAPI
+### 5.5 Admin and OpenAPI
 
 - `backend/zev/admin.py`: `ParticipantInline` and
   `MeteringPointAssignmentInline` use explicit `fields` tuples — add
   `allocation_weight` / `allocation_mode`.
+- `backend/tariffs/admin.py`: `TariffAdmin` declares `list_display` and
+  `list_filter` but no `fields` tuple, so `split_key` reaches the change form
+  with no change; add it to `list_filter` so shared-fee tariffs can be found
+  by key.
 - OpenAPI: drf-spectacular regenerates from the serializers — no manual step,
   but schema snapshots in tests (if any) must be refreshed.
 
@@ -240,6 +290,8 @@ No new endpoints; two response/request shapes gain fields. Base prefix
 | `/api/v1/zev/metering-point-assignments/{id}/` | GET/PATCH/PUT/DELETE | same | same |
 | `/api/v1/zev/participants/` | GET/POST | `IsAuthenticated, BaseZevScopedPermission` | Body/response gain `allocation_weight: string` (decimal, default `"1.0000"`) |
 | `/api/v1/zev/participants/{id}/` | GET/PATCH/PUT/DELETE | same | same |
+| `/api/v1/tariffs/tariffs/` | GET/POST | `IsAuthenticated, IsZevOwnerOrAdmin` | Body/response gain `split_key: "equal" \| "weight"` (default `equal`) |
+| `/api/v1/tariffs/tariffs/{id}/` | GET/PATCH/PUT/DELETE | same | same |
 
 Error behaviour: unchanged — serializer `validate()` surfaces model
 `ValidationError`s as 400 with per-field keys (`allocation_mode`,
@@ -247,25 +299,27 @@ Error behaviour: unchanged — serializer `validate()` surfaces model
 the field validator.
 
 Whole-ZEV export/import (`zev/transfer/`, added in #410) whitelists its fields
-in `zev/transfer/schema.py`: `PARTICIPANT_FIELDS` and `ASSIGNMENT_FIELDS` gain
-`allocation_weight` / `allocation_mode` so sharing round-trips an
-export/import (see the §9 risk row). The archive `FORMAT_VERSION` does not
-change: both fields are additive with defaults, so an older archive imports as
-all-personal, weight 1 — which is exactly today's behaviour.
+in `zev/transfer/schema.py`: `PARTICIPANT_FIELDS` gains `allocation_weight`,
+`ASSIGNMENT_FIELDS` gains `allocation_mode` and `TARIFF_FIELDS` gains
+`split_key`, so sharing round-trips an export/import (see the §9 risk row).
+The archive `FORMAT_VERSION` does not change: all three fields are additive
+with defaults, so an older archive imports as all-personal, weight 1, equal
+key — which is exactly today's behaviour.
 
 ## 7. Billing engine
 
 ### 7.1 Allocation-weight membership helpers
 
-Generalize `_count_active_participants_by_month` into two tariff-independent
-helpers driven by the invoice period (the month list comes from
-`_billable_months` today):
+Add two tariff-independent helpers driven by the invoice period, alongside the
+existing `_count_active_participants_by_month` (which stays — §7.2 still uses
+it for `equal`-keyed fees). The month list comes from `_billable_months` today:
 
 ```python
 def _allocation_weight_sum_by_month(zev, period_start, period_end) -> dict[date, Decimal]:
     # weight sum per billed month — counted per month so a joiner does not
     # dilute earlier months; read from ZEV membership, never from sibling
-    # invoices. Feeds SHARED_* fees and per-metering-point fees (§7.2, §7.5).
+    # invoices. Feeds weight-keyed SHARED_* fees and the per-metering-point
+    # fees of community meters (§7.2, §7.5).
 
 def _allocation_weight_sum_by_date(zev, period_start, period_end) -> dict[date, Decimal]:
     # weight sum per calendar date, from participant validity ranges
@@ -283,15 +337,34 @@ all weights 1, the month sums equal headcounts and the current equal-split
 behaviour is the special case. This keeps "single-participant regeneration
 equals a full run" intact.
 
-### 7.2 `SHARED_*` fee modes become weight-weighted
+### 7.2 `SHARED_*` fee modes read their tariff's split key
 
-The `_price_fixed_fees` shared branch (currently `total += unit_price / count`)
-becomes `unit_price * allocation_weight_i / weight_sum(month)`. Month-granular
-by design: a participant active for any part of the month shares the month's
-fee under the same eligibility rule as today's count-based split. Equal split
-is the case where all weights are equal (§7.1). With all weights 1 this
-reproduces today's amounts exactly, which is why the 22 existing shared-fee
-tests pass unmodified.
+The `_price_fixed_fees` shared branch keeps its structure — per billed month,
+skip months the participant was not a member of, accumulate — and only the
+denominator becomes conditional:
+
+```python
+if tariff.split_key == SplitKey.WEIGHT:
+    shares = _allocation_weight_sum_by_month(participant.zev, period_start, period_end)
+    numerator = participant.allocation_weight
+else:                                   # SplitKey.EQUAL — today's behaviour
+    shares = _count_active_participants_by_month(participant.zev, tariff, period_start, period_end)
+    numerator = Decimal("1")
+...
+    total += unit_price * numerator / shares[month]
+```
+
+Both keys stay month-granular and share one eligibility rule: a participant
+active for any part of the month shares that month's fee. `EQUAL` is
+arithmetically identical to today's `unit_price / count` — the numerator is 1
+and the denominator is the same headcount — so existing shared-fee tariffs
+produce byte-identical invoices and the 22 existing tests pass unmodified.
+
+`_count_active_participants_by_month` therefore **stays**; it is not replaced
+by the weight helpers, which are added alongside it. It keeps its `tariff`
+argument (it derives its months from the tariff's validity), while the weight
+helpers are tariff-independent because they also serve community energy, which
+has no tariff of its own until pricing time.
 
 ### 7.3 Personal vs. community is a per-timestamp decision
 
@@ -384,10 +457,16 @@ allocate the participant's share:
   per-window care as §7.3, not a blanket join exclusion. It keeps its
   `metering_point__is_active=True` filter.
 - New: for each per-metering-point tariff, each month, each **active**
-  community metering point contributes `unit_price * share(month)` to the
-  participant's `bucket="shared"` line of that tariff (inactive community
-  meters bill nobody). Meter fees are month-granular: the fee is a monthly
-  charge, so a participant active any part of the month shares it.
+  community metering point contributes
+  `unit_price * allocation_weight_i / weight_sum(month)` to the participant's
+  `bucket="shared"` line of that tariff (inactive community meters bill
+  nobody). Meter fees are month-granular: the fee is a monthly charge, so a
+  participant active any part of the month shares it.
+- `split_key` plays no part here. It is read only by the two `SHARED_*` billing
+  modes (§5.3); `PER_METERING_POINT_*` tariffs have no split key, and the cost
+  being divided belongs to a community *meter*, which always allocates by
+  weight (§1.1). A per-assignment key would be the place to make that
+  configurable, and is out of scope (§3).
 
 ### 7.6 Line items and descriptions
 
@@ -414,7 +493,7 @@ instead of attributing them to the holder.
 |---|---|
 | `allocation/read_model.py` | `AllocatedReading` gains the allocation mode; holder resolution switches from `participant_at` to `assignment_at` |
 | `invoices/pdf_stats.py` | Both `iter_allocated_readings` loops currently skip `holder_id is None`; community-marked readings get distributed into each participant's totals by weight |
-| `metering/analytics.py` | The six `participant_at` sites switch to `assignment_at` and distribute community readings by date-granular weight share (one extra query: participant validity + weights). The `participant_on` data-quality site keeps literal-holder semantics — a community meter is not unassigned (§5.3) |
+| `metering/analytics.py` | The six `participant_at` sites switch to `assignment_at` and distribute community readings by date-granular weight share (one extra query: participant validity + weights). The `participant_on` data-quality site keeps literal-holder semantics — a community meter is not unassigned (§5.4) |
 | `invoices/annual_statement.py` | Monthly tables include the participant's share (two `is_held_by` sites + a community loop) |
 | `invoices/pdf_charts.py` | Hourly profile includes weighted community energy (one `is_held_by` site) |
 
@@ -454,11 +533,23 @@ invariant goes red there.
 - i18n under `pages.participants`: `form.allocationWeight`,
   `form.allocationWeightHint`, `weightShare`, `weightShareHint`.
 
-### 8.3 Tariffs hint rewording
+### 8.3 Tariffs: split-key selector
 
-The shared-fee hint (`pages.tariffs.form.sharedFeeHint`) currently says the
-amount is split *gleichmässig* (equally) — reword to weight-based in all four
-locales.
+**File:** `frontend/src/features/tariffs/TariffFormModal.tsx` (form state in
+`useTariffForms.ts`).
+
+- New select `split_key` (`equal` / `weight`), **shown only when
+  `billing_mode` is `shared_monthly_fee` or `shared_yearly_fee`** — the field
+  is meaningless for the other six modes and the form already switches inputs
+  on billing mode. Default `equal`.
+- The existing shared-fee hint (`pages.tariffs.form.sharedFeeHint`) says the
+  amount is split *gleichmässig* (equally). That stays correct for `equal` and
+  becomes wrong for `weight`, so the hint becomes key-dependent: keep the
+  current string for `equal` and add a second one for `weight`, rather than
+  rewording the existing key to cover both vaguely.
+- i18n under `pages.tariffs.form`: `splitKey`, `splitKeyEqual`,
+  `splitKeyWeight`, `sharedFeeHintWeight` (the existing `sharedFeeHint` keeps
+  its current text and meaning).
 
 ### 8.4 Locale parity
 
@@ -469,21 +560,25 @@ files in the same commit, or `npm run test:unit` fails.
 
 ### 8.5 TypeScript types
 
-**File:** `frontend/src/types/api.ts` — shorthand deltas on the four shapes:
+**File:** `frontend/src/types/api.ts` — shorthand deltas on six shapes:
 
 ```typescript
 // MeteringPointAssignment / MeteringPointAssignmentInput gain:
     allocation_mode?: 'personal' | 'community'   // defaults 'personal'
 // Participant / ParticipantInput gain:
     allocation_weight?: string                   // decimal string, default "1.0000"
+// Tariff / TariffInput gain:
+    split_key?: 'equal' | 'weight'               // defaults 'equal'
 ```
 
 ### 8.6 API client functions
 
-`frontend/src/lib/api/zev.ts`: no new functions —
-`createMeteringPointAssignment` / `updateMeteringPointAssignment` /
-`createParticipant` / `updateParticipant` carry the new fields via the
-extended input types.
+No new functions in either client — the existing calls carry the new fields via
+the extended input types:
+
+- `frontend/src/lib/api/zev.ts`: `createMeteringPointAssignment` /
+  `updateMeteringPointAssignment` / `createParticipant` / `updateParticipant`
+- `frontend/src/lib/api/tariffs.ts`: the tariff create/update calls
 
 ## 9. Risks and mitigations
 
@@ -491,15 +586,16 @@ extended input types.
 |---|---|---|
 | A meter whose mode changes mid-period is double-billed or silently unbilled | High | §7.3: the decision is per timestamp via `assignment_at`, never a queryset filter; asserted from both sides by `test_mixed_window_meter_bills_personally_then_shares` |
 | Rounding does not conserve exactly (N-way rappen division) | Medium | Existing documented convention: each participant's share is quantized per line item at line build, rounded half-up, and the sub-rappen remainder is dropped ("shared fees already collect 99.99 of 100.00"). The conservation test asserts Σ shares vs. source < 1 rappen per line; cumulative drift is bounded by lines × 1 rappen per invoice. Exact conservation via a batch allocator stays an ADR 0013 follow-up |
-| Editing a weight retroactively changes regenerated periods, including existing `SHARED_*` fees (§1) | Medium | Documented (§1, §3) + UI hint on the regeneration confirmation; drafts regenerate freely, finalized invoices are protected by existing engine guards |
+| Editing a weight retroactively changes regenerated periods | Medium | Documented (§3) + UI hint on the regeneration confirmation; drafts regenerate freely, finalized invoices are protected by existing engine guards. Blast radius is bounded by `split_key`: community meters and `weight`-keyed fees only — an `equal`-keyed shared fee never moves |
+| A `SHARED_*` tariff is switched to `weight` without anyone noticing the fees move | Low | The selector appears only for the two shared modes and defaults to `equal` (§8.3); the change is an ordinary audited tariff mutation (`AuditedUpdateMixin` on `TariffViewSet`), so the before/after shows in the audit log with the rest of the tariff diff |
 | N-fold refetch of community readings per participant in `generate_invoices_for_zev` | Low | Consistent with existing ZEV-total behaviour; memoize per (zev, period) if trivial; query-count pins live in §7.7 |
-| Export/import silently drops the new fields | Low | `zev/transfer/schema.py` whitelists gain `allocation_weight` / `allocation_mode` in phase 1 (§6); older archives import as all-personal, weight 1 |
+| Export/import silently drops the new fields | Low | `zev/transfer/schema.py` whitelists gain `allocation_weight` / `allocation_mode` / `split_key` in phase 1 (§6); older archives import as all-personal, weight 1, equal key |
 
 ## 10. Test plan
 
 Existing suites: the 22 shared-fee tests and 6 query-count tests stay green
 **unmodified**; the 10 reconciliation tests keep their existing assertions with
-a community meter added to their shared fixture (§7.7). New backend tests (39):
+a community meter added to their shared fixture (§7.7). New backend tests (46):
 
 ### Backend — `allocation/tests.py`
 
@@ -526,6 +622,16 @@ a community meter added to their shared fixture (§7.7). New backend tests (39):
 | `test_allocation_mode_exposed_in_assignment_serializer` | GET shape |
 | `test_allocation_weight_exposed_and_writable_in_participant_serializer` | GET/PATCH shape |
 
+### Backend — `tariffs/tests.py`
+
+**`SplitKeyModelAndApiTests`** (3 tests):
+
+| Test | Asserts |
+|---|---|
+| `test_split_key_defaults_to_equal` | Model default on every billing mode |
+| `test_split_key_exposed_and_writable_via_api` | GET/PATCH round-trip through `fields = "__all__"` |
+| `test_split_key_is_accepted_but_inert_on_non_shared_modes` | Storing `weight` on an energy tariff changes no amount (§5.3: read only by the two shared modes) |
+
 ### Backend — `metering/tests.py`
 
 **1 test** — extends the existing data-quality suite:
@@ -536,12 +642,15 @@ a community meter added to their shared fixture (§7.7). New backend tests (39):
 
 ### Backend — `invoices/test_shared_fee.py`
 
-**`WeightWeightedSharedFeeTests`** (5 tests):
+**`SplitKeyedSharedFeeTests`** (8 tests):
 
 | Test | Asserts |
 |---|---|
-| `test_unequal_weights_weight_the_shares` | Golden franc values |
-| `test_default_weights_reproduce_equal_split` | Regression guard |
+| `test_equal_key_ignores_weights_entirely` | **The isolation guarantee:** unequal weights set, `split_key = equal`, amounts identical to today's headcount split |
+| `test_weight_key_splits_by_weight` | Golden franc values with `split_key = weight` |
+| `test_split_key_defaults_to_equal` | A tariff created without naming a key bills as it does today |
+| `test_two_shared_tariffs_can_use_different_keys` | One `equal` and one `weight` tariff in the same ZEV, same invoice, both correct — the case this field exists for |
+| `test_default_weights_reproduce_equal_split_under_weight_key` | With all weights 1, `weight` and `equal` agree |
 | `test_joiner_shifts_weight_sum_only_from_their_own_month` | Per-month denominator |
 | `test_tiny_weight_bills_almost_nothing` | Negligible-weight member (0.0001 of 1.0001) |
 | `test_an_indivisible_weighted_share_leaves_the_rappen_shortfall` | Rounding convention |
@@ -603,17 +712,22 @@ invoice language.
 
 ## 11. Implementation phasing
 
-1. **Terminology, migration, API, assignment resolution** (§5, §6): migrations,
+1. **Terminology, migration, API, assignment resolution** (§5, §6): the three
+   migrations (`allocation_mode`, `allocation_weight`, `split_key`),
    serializers, `assignment_at`, `zev/transfer/schema.py` whitelists, admin
-   registration. No billing change.
+   registration. No billing change — every default reproduces current
+   behaviour, which is what makes this phase independently shippable.
 2. **Allocation primitive and tests** (§7.1): date/month weight-sum helpers,
    share math, conservation and granularity tests; reconciliation fixture
-   extended with a community meter here.
+   extended with a community meter here. `_count_active_participants_by_month`
+   is left alone.
 3. **Read model and all consumers** (§7.7): `AllocatedReading` mode, migrate
    analytics, pdf_stats, statements and charts until reconciliation is green.
 4. **Invoice engine** (§7.2–§7.6): the per-timestamp gate first (§7.3), then
    allocate community energy, credits, fixed fees and meter-point charges via
-   the primitive.
+   the primitive. The `split_key` branch in `_price_fixed_fees` (§7.2) can land
+   independently of the community-meter work — it touches a different code
+   path — and is the cheapest half to review.
 5. **Frontend, documentation, export/import validation** (§8, §6): ship only
    once invoice and reconciliation tests are green.
 
