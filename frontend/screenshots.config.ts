@@ -8,6 +8,8 @@
  *   SCREENSHOT_BASE_URL  – default http://localhost:8080
  *   SCREENSHOT_USER      – default admin
  *   SCREENSHOT_PASSWORD   – default admin1234
+ *   SCREENSHOT_CHANNEL    – optional Playwright channel override. Defaults to
+ *                           "chromium" (the headless shell renders PDFs blank).
  */
 import { defineConfig } from '@playwright/test'
 
@@ -25,5 +27,7 @@ export default defineConfig({
     locale: 'de-CH',
     colorScheme: 'light',
     screenshot: 'off', // we take them manually
+    // Full chromium build: the headless shell renders inline PDFs blank.
+    channel: process.env.SCREENSHOT_CHANNEL ?? 'chromium',
   },
 })

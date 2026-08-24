@@ -5,6 +5,7 @@ from django.utils.text import slugify
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from urllib.parse import urlparse
+from .jwt_utils import add_custom_claims
 from .models import ApiKey, AppSettings, FeatureFlag, OAuthProvider, SocialAccount, User, UserRole, VatRate
 
 
@@ -101,8 +102,6 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
     @classmethod
     def get_token(cls, user):
         token = super().get_token(user)
-        from .jwt_utils import add_custom_claims
-
         add_custom_claims(token, user)
         return token
 

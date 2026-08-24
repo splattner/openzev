@@ -636,7 +636,10 @@ Existing suites stay green (contract: 48 tests in `test_contract_context.py`; te
   (muted-on-brand-pale) was fixed by using `--ink-soft` on pale surfaces.
 - **Screenshot regeneration** — `docs/user-guide/screenshots/*` re-captured
   against the redesigned UI (22/22 Playwright captures, de-CH, base viewport
-  1440×900, `SCREENSHOT_CHANNEL=chromium` so embedded PDFs render). Every
+  1440×900; `screenshots.config.ts` defaults to the full `chromium` channel
+  so embedded PDFs render, and the 08b/14 captures assert the PDF viewer
+  painted so a blank embed fails the run instead of being committed
+  silently). Every
   capture goes through `screenshotFull` (`capture.spec.ts`): the viewport is
   grown to the content height instead of using `fullPage`, which captures
   beyond the viewport without re-resolving `100dvh` — the sticky sidebar

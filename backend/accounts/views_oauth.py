@@ -28,7 +28,7 @@ from audit.models import AuditActionCategory, AuditEventStatus
 from audit.services import build_diff, record_audit_event
 
 from .cookies import set_auth_cookies
-from .jwt_utils import make_jwt_for_user as _make_jwt_for_user
+from .jwt_utils import make_jwt_for_user
 from .throttling import AuthOAuthExchangeThrottle, AuthOAuthInitiateThrottle
 from .models import (
     OAuthExchangeCode,
@@ -503,7 +503,7 @@ def oauth_token_exchange(request):
     user = exchange.user
     exchange.delete()
 
-    tokens = _make_jwt_for_user(user)
+    tokens = make_jwt_for_user(user)
     response = Response({"detail": "Login successful."})
     set_auth_cookies(request, response, access=tokens["access"], refresh=tokens["refresh"])
     return response

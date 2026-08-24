@@ -94,16 +94,7 @@ The detail page shows:
 | Grid kWh | Energy drawn from the external grid. |
 | Feed-in kWh | Energy fed back into the grid. |
 
-**Line items table** — grouped by **tariff category** (e.g. Energy, Fee). Each line shows:
-
-- Type (e.g. Local Energy, Grid Energy, Feed-in Credit, Fee)
-- Description
-- Quantity (kWh)
-- Unit
-- Unit price (CHF)
-- Total (CHF)
-
-A subtotal is shown at the end of each tariff category group.
+**The invoice document** — the stored PDF itself is embedded below the summary cards in a full document viewer (the same file the participant receives by email). It contains the line items, grouped by **tariff category** (e.g. Energy, Fee), with each line's type, description, quantity (kWh), unit price (CHF), and total, plus a subtotal per group. If no PDF has been generated yet, the page shows a **Generate PDF** button instead; the viewer appears once the document exists.
 
 > **Note:** Invoices cannot be edited directly. If a correction is needed, fix the underlying data (metering readings or tariff prices) and use **Generate Again** to recreate the invoice.
 
@@ -194,7 +185,7 @@ Deletion is permanent; the invoice is removed from the database.
 ## Best Practices
 
 - **Check metering completeness** before generating invoices — the Metering Data column shows exactly which meters are missing data and how many days are affected.
-- **Approve after review** — open the invoice detail page to verify line items and totals before approving.
+- **Approve after review** — open the invoice detail page and check the embedded invoice document (line items and totals) before approving.
 - **Generate PDFs before sending** — while not strictly required, generating the PDF first lets you review the document before emailing.
 - **Use Generate Again sparingly** — regenerating replaces the existing invoice. If the old invoice was already sent, consider whether the participant needs to be notified of the change.
 

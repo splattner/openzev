@@ -137,8 +137,6 @@ def _read_csv_table(file, *, has_header, delimiter):
         raise ImportFileError(
             "File is not valid UTF-8. Re-export it as UTF-8 (in Excel: 'CSV UTF-8') and try again."
         ) from exc
-    except ImportFileError:
-        raise
     except csv.Error as exc:
         raise ImportFileError(f"CSV parse error: {exc}") from exc
     finally:
@@ -180,7 +178,7 @@ def _read_xlsx_table(file, *, has_header):
         # pandas reads sheet index 0, which is not necessarily the sheet that was
         # selected when the workbook was saved (openpyxl's ``active``).
         sheet = workbook.worksheets[0]
-        # The header is not a data row, so a headered sheet may carry one extra row.
+        # A headered sheet carries one extra row beyond the data-row cap.
         row_cap = MAX_CSV_ROWS + (1 if has_header else 0)
         raw_rows = []
         for row in sheet.iter_rows(values_only=True):

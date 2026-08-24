@@ -34,6 +34,7 @@ from .serializers import (
     VatRateSerializer,
 )
 from .authentication import enforce_csrf
+from .jwt_utils import make_jwt_for_user
 from .cookies import (
     ADMIN_ACCESS_COOKIE,
     ADMIN_REFRESH_COOKIE,
@@ -49,7 +50,6 @@ from audit.services import build_diff, record_audit_event
 
 logger = logging.getLogger(__name__)
 
-from .jwt_utils import make_jwt_for_user as _make_jwt_for_user
 
 
 class CustomTokenObtainPairView(TokenObtainPairView):
@@ -540,7 +540,7 @@ def verify_email(request):
         changes=build_diff({"is_active": False}, {"is_active": user.is_active}, ["is_active"]),
     )
 
-    tokens = _make_jwt_for_user(user)
+    tokens = make_jwt_for_user(user)
     response = Response({"detail": "Email verified."})
     set_auth_cookies(request, response, access=tokens["access"], refresh=tokens["refresh"])
     return response
@@ -594,7 +594,7 @@ def set_initial_password(request):
     )
 
     # Issue fresh tokens so the updated claims (must_change_password=False) take effect
-    tokens = _make_jwt_for_user(user)
+    tokens = make_jwt_for_user(user)
     response = Response({"detail": "Password set successfully."})
     set_auth_cookies(request, response, access=tokens["access"], refresh=tokens["refresh"])
     return response

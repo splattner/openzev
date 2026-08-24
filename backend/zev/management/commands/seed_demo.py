@@ -6,7 +6,7 @@ Creates or refreshes an idempotent demo environment with:
 - 1 ZEV owner account
 - 2 participant accounts
 - 1 demo ZEV
-- 3 metering points (1 production, 2 consumption)
+- 5 metering points (1 production, 4 consumption)
 - sample tariffs
 - 15-minute metering data from the previous quarter up to today
 """
@@ -229,6 +229,16 @@ class Command(BaseCommand):
             meter_id="CH-DEMO-CONS-0002",
             meter_type=MeteringPointType.CONSUMPTION,
             location_description="Apartment 2 consumption meter",
+        )
+        # Intentionally unassigned: exercises the "no assignment yet" UI state
+        # (Ohne Zuweisung filter, Teilnehmer zuweisen action) in demos and lets
+        # the screenshot suite capture the assign flow without creating its own
+        # fixtures.
+        self._upsert_metering_point(
+            zev=zev,
+            meter_id="CH-DEMO-CONS-0003",
+            meter_type=MeteringPointType.CONSUMPTION,
+            location_description="Spare consumption meter (unassigned)",
         )
         # Allgemeinstrom: the shared draw nobody uses alone. Held by the owner
         # (who acts as the Verwaltung here) but allocated across the community

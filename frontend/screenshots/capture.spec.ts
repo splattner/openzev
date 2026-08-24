@@ -21,6 +21,13 @@ const API_BASE = process.env.SCREENSHOT_API_URL ?? 'http://localhost:8000/api/v1
 const USER = process.env.SCREENSHOT_USER ?? 'admin'
 const PASS = process.env.SCREENSHOT_PASSWORD ?? 'admin1234'
 
+/**
+ * The only ZEV the seed fills with readings and tariffs. The app's fallback
+ * picks an arbitrary managed ZEV when nothing is pinned, and this database
+ * carries dozens of empty tenants — so data-dependent captures must pin it.
+ */
+const DEMO_ZEV_NAME = 'OpenZEV Demo Community'
+
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 const SCREENSHOT_DIR = path.resolve(__dirname, '../../docs/user-guide/screenshots')
@@ -55,16 +62,11 @@ async function navigateTo(page: Page, urlPath: string) {
 /**
  * Step back one billing period.
  *
- * The dashboard and metering-data pages open on the *current* period
- * (`getCurrentBillingPeriod`), which is still in progress and carries no
- * readings worth showing, so those captures step back once to reach the
- * quarter `seed_demo` fills.
- *
- * The invoices page is deliberately **not** among them: it already opens on
- * the last complete period (`getPreviousBillingPeriod`), so stepping back
- * there would overshoot into an empty one.
- *
- * Matches the arrow icon rather than the button label, which is translated.
+ * Dashboard and chart pages open on the *current* period; `seed_demo` fills the
+ * last complete quarter, so those captures step back once. Matches the arrow
+ * icon rather than the button label, which is translated. The invoices overview
+ * must NOT use this: it already opens on the last complete period by design
+ * (InvoicesPage), so stepping back would land on an empty one.
  */
 async function goToPreviousPeriod(page: Page) {
   await page.locator('button:has(svg[data-icon="arrow-left"])').first().click()
@@ -97,56 +99,54 @@ async function getAdminToken(page: Page): Promise<string> {
   return ac!.value
 }
 
-/**
- * Create a fresh unassigned metering point in the first available ZEV and pin
- * the frontend ZEV selection to that same tenant so the screenshot test can
- * reliably open the assign modal regardless of seed data state.
- */
-async function prepareUnassignedMeteringPoint(page: Page): Promise<{ meterId: string } | null> {
+/** Resolve the id of the data-bearing demo ZEV via the admin API. */
+async function resolveDemoZevId(page: Page): Promise<string | null> {
   const adminToken = await getAdminToken(page)
-  const headers = { Authorization: `Bearer ${adminToken}` }
-
-  const zevsResp = await page.request.get(`${API_BASE}/zev/zevs/`, { headers })
-  expect(zevsResp.ok(), `Fetching ZEVs failed (${zevsResp.status()})`).toBeTruthy()
-  const zevsBody = await zevsResp.json() as { results?: Array<{ id: string }> }
-  const zevId = zevsBody.results?.[0]?.id
-  if (!zevId) return null
-
-  const meterId = `screenshot-mp-${Date.now()}`
-  const createResp = await page.request.post(`${API_BASE}/zev/metering-points/`, {
-    headers,
-    data: {
-      zev: zevId,
-      meter_id: meterId,
-      meter_type: 'consumption',
-      is_active: true,
-      location_description: 'Screenshot fixture',
-    },
+  const zevsResp = await page.request.get(`${API_BASE}/zev/zevs/`, {
+    headers: { Authorization: `Bearer ${adminToken}` },
   })
-  expect(createResp.ok(), `Creating metering point failed (${createResp.status()})`).toBeTruthy()
-
-  await page.addInitScript((selectedZevId: string) => {
-    localStorage.setItem('openzev.selectedZevId', selectedZevId)
-  }, zevId)
-
-  return { meterId }
+  expect(zevsResp.ok(), `Fetching ZEVs failed (${zevsResp.status()})`).toBeTruthy()
+  const zevsBody = await zevsResp.json() as { results?: Array<{ id: string; name: string }> }
+  return zevsBody.results?.find(z => z.name === DEMO_ZEV_NAME)?.id ?? null
 }
 
 /**
- * Impersonate a participant by calling the impersonate endpoint.
- * The server backs up the admin cookies to openzev_admin_access/openzev_admin_refresh
- * and sets new openzev_access/openzev_refresh cookies for the participant — all
- * handled transparently by the browser context's cookie jar.
+ * Pin the global ZEV selection to the demo ZEV before any navigation so the
+ * dashboard, metering charts, tariff and assign-modal captures render seeded
+ * data instead of an arbitrary empty tenant.
  */
-async function impersonateFirstParticipant(page: Page): Promise<boolean> {
+async function pinDemoZev(page: Page): Promise<boolean> {
+  const zevId = await resolveDemoZevId(page)
+  if (!zevId) return false
+  await page.addInitScript((selectedZevId: string) => {
+    localStorage.setItem('openzev.selectedZevId', selectedZevId)
+  }, zevId)
+  return true
+}
+
+/**
+ * Impersonate a participant of the demo ZEV. Impersonating the first
+ * participant overall would land on whichever empty tenant sorts first and the
+ * participant dashboard would render without any readings.
+ */
+async function impersonateDemoParticipant(page: Page): Promise<boolean> {
   const adminToken = await getAdminToken(page)
   const headers = { Authorization: `Bearer ${adminToken}` }
 
-  // Fetch the list of users and find one with role "participant"
+  const zevId = await resolveDemoZevId(page)
+  if (!zevId) return false
+
+  // User ids linked to participants of the demo ZEV.
+  const partsResp = await page.request.get(`${API_BASE}/zev/participants/?zev_id=${zevId}`, { headers })
+  expect(partsResp.ok(), `Fetching participants failed (${partsResp.status()})`).toBeTruthy()
+  const partsBody = await partsResp.json() as { results?: Array<{ user: number | null }> }
+  const demoUserIds = new Set((partsBody.results ?? []).map(p => p.user).filter((u): u is number => u != null))
+  if (demoUserIds.size === 0) return false
+
   const usersResp = await page.request.get(`${API_BASE}/auth/users/`, { headers })
   expect(usersResp.ok(), `Fetching users failed (${usersResp.status()})`).toBeTruthy()
   const usersBody = await usersResp.json() as { results: Array<{ id: number; role: string }> }
-  const participant = usersBody.results.find(u => u.role === 'participant')
+  const participant = usersBody.results.find(u => u.role === 'participant' && demoUserIds.has(u.id))
   if (!participant) return false
 
   // Call the impersonate endpoint — the server rotates the cookies automatically.
@@ -162,165 +162,120 @@ async function impersonateFirstParticipant(page: Page): Promise<boolean> {
   return true
 }
 
-// ---------------------------------------------------------------------------
-// PII blurring — page-specific CSS + JS to redact sensitive information
-// ---------------------------------------------------------------------------
-
-/** Global PII selectors — applied on every authenticated page (header/nav) */
-const GLOBAL_PII_CSS = `
-  .user-menu .user-meta strong,
-  .user-menu .user-meta small,
-  .zev-menu .user-meta small,
-  .impersonation-banner strong {
-    filter: blur(6px) !important;
-    -webkit-filter: blur(6px) !important;
-    user-select: none !important;
-  }
-`
+/** Move the mouse off any element so no hover state leaks into the shot. */
+async function resetHover(page: Page) {
+  await page.mouse.move(0, 0)
+  // Let CSS hover transitions fade out before the capture.
+  await page.waitForTimeout(250)
+}
 
 /**
- * Per-page blur configuration.
- * - `selectors`: CSS selectors whose matched elements get `filter: blur(6px)`.
- * - `blurInputs`: CSS selector for `<input>` elements to blur by inline style.
+ * Capture the whole page by growing the viewport to the content height.
  *
- * Never match on visible text: this suite runs in de-CH, so any English string
- * stops matching the moment a page is translated, and PII silently un-blurs.
- * Target `name` attributes or structural selectors instead.
+ * `fullPage: true` is not usable here: it captures beyond the viewport without
+ * re-resolving `100dvh`, so the sticky sidebar stops at the original viewport
+ * height while the main column continues, and Chromium's PDF plugin (which
+ * only paints surfaces inside the viewport) leaves embedded PDF viewers blank.
+ * Resizing first fixes both, because every surface ends up inside the viewport.
+ *
+ * Content height can itself depend on viewport height (the PDF embeds are
+ * 70–72vh), so after growing, re-measure; if the target moved, solve the
+ * linear model c(h) = base + factor·h from both samples and jump straight to
+ * its fixed point c(h) = h instead of creeping toward it.
  */
-interface BlurConfig {
-  selectors?: string
-  blurInputs?: string
-}
-
-const PAGE_BLUR: Record<string, BlurConfig> = {
-  dashboard: {
-    selectors: [
-      'section.card > h3',                          // energy balance heading (ZEV + participant name)
-      '.inline-form select',                         // participant filter dropdown
-      'section.card table tbody td:first-child',     // participant name column in stats table
-      '.sankey-participant-label',                   // participant names in Sankey energy flow chart
-    ].join(', '),
-  },
-  'participant-dashboard': {
-    selectors: [
-      '.impersonation-banner strong',                // impersonation banner name
-      '.sankey-participant-label',                   // participant names in Sankey energy flow chart
-    ].join(', '),
-  },
-  participants: {
-    selectors: [
-      '.participant-card-title strong',              // participant name
-      '.participant-card-section:nth-child(1) > div:not(.participant-card-label)', // email + phone
-      '.participant-card-section:nth-child(2) > div:not(.participant-card-label)', // address
-      'section.card p strong',                       // credentials notice: name
-      'code',                                        // credentials notice: username/password
-    ].join(', '),
-  },
-  'metering-points': {
-    selectors: [
-      '.metering-point-title strong',                // metering point id
-      '.metering-assignment-line strong',            // assigned participant name
-    ].join(', '),
-  },
-  'metering-points-modal': {
-    selectors: [
-      '.metering-point-title strong',                // metering point id
-      '.metering-assignment-line strong',            // assigned participant name in background card
-      'div[style*="z-index: 1000"] select',          // participant dropdown inside modal
-    ].join(', '),
-  },
-  invoices: {
-    selectors: [
-      'div[style*="font-weight"]',                   // ZEV name in period navigation card
-      '.table-card table tbody td:first-child',      // participant name + email column
-    ].join(', '),
-  },
-  'invoice-detail': {
-    selectors: [
-      '.page-stack > header p.muted',                // participant name + period in subtitle
-    ].join(', '),
-  },
-  'zev-settings': {
-    // Match by name attribute, not label text: labels are translated and the
-    // suite runs in de-CH, so English label text silently stops matching.
-    blurInputs: 'input[name="name"], input[name="bank_name"], input[name="bank_iban"]',
-  },
-  'admin-accounts': {
-    selectors: [
-      '.table-card table tbody td:nth-child(2)',     // participant name + email
-      '.table-card table tbody td:nth-child(3)',     // ZEV name
-      '.table-card table tbody td:nth-child(4)',     // account username + email
-      'section.card p strong',                       // credentials notice: name
-      'code',                                        // credentials notice: username/password
-    ].join(', '),
-  },
-  'admin-zevs': {
-    selectors: [
-      '.table-card table tbody td:nth-child(1)',     // ZEV name
-      '.table-card table tbody td:nth-child(2)',     // owner name
-    ].join(', '),
-  },
-  'admin-invoices': {
-    selectors: [
-      '.MuiDataGrid-cell[data-field="participant_name"]', // participant name
-      '.MuiDataGrid-cell[data-field="zev_name"]',         // ZEV name
-    ].join(', '),
-  },
-  'account-profile': {
-    selectors: [
-      '.form-grid > .card:last-child strong',       // OAuth provider display name
-      '.form-grid > .card:last-child button',       // link buttons can include provider name
-    ].join(', '),
-    blurInputs: 'input[name="first_name"], input[name="last_name"], input[name="email"], input[disabled]',
-  },
-}
-
-/**
- * Apply PII blur — global header selectors + page-specific rules.
- * Call AFTER the page has loaded but BEFORE taking the screenshot.
- */
-async function blurPII(page: Page, pageKey?: string) {
-  // 1. Global header blur (always)
-  await page.addStyleTag({ content: GLOBAL_PII_CSS })
-
-  // 2. Page-specific element blur via CSS
-  const config = pageKey ? PAGE_BLUR[pageKey] : undefined
-
-  if (config?.selectors) {
-    await page.addStyleTag({
-      content: `${config.selectors} { filter: blur(6px) !important; -webkit-filter: blur(6px) !important; user-select: none !important; }`,
-    })
+async function screenshotFull(page: Page, name: string) {
+  await resetHover(page)
+  const measure = () => page.evaluate(() => document.documentElement.scrollHeight)
+  const resize = async (height: number) => {
+    await page.setViewportSize({ width: 1440, height })
+    await page.waitForTimeout(400)
   }
 
-  // 3. Blur specific input elements by CSS selector
-  if (config?.blurInputs) {
-    await page.evaluate((selector: string) => {
-      for (const el of document.querySelectorAll<HTMLInputElement>(selector)) {
-        if (el.value?.trim()) el.style.filter = 'blur(6px)'
-      }
-    }, config.blurInputs)
+  let viewport = 900
+  let content = await measure()
+  let prevViewport: number | null = null
+  let prevContent: number | null = null
+
+  for (let i = 0; i < 4 && content > viewport; i++) {
+    let target = Math.max(900, content)
+    if (prevViewport != null && prevContent != null && viewport > prevViewport) {
+      const factor = Math.min(0.9, (content - prevContent) / (viewport - prevViewport))
+      target = Math.max(900, Math.round((content - factor * viewport) / (1 - factor)))
+    }
+    prevViewport = viewport
+    prevContent = content
+    viewport = target
+    await resize(viewport)
+    content = await measure()
   }
-
-  // Brief settle after DOM changes
-  await page.waitForTimeout(200)
-}
-
-/** Take a full-page screenshot with PII blurred. */
-async function screenshot(page: Page, name: string, pageKey?: string) {
-  await blurPII(page, pageKey)
-  await page.screenshot({
-    path: path.join(SCREENSHOT_DIR, `${name}.png`),
-    fullPage: true,
-  })
-}
-
-/** Take a viewport-only screenshot (no scroll) with PII blurred. */
-async function screenshotViewport(page: Page, name: string, pageKey?: string) {
-  await blurPII(page, pageKey)
+  if (content > viewport) {
+    await resize(content) // non-linear fallback: fit whatever grew last
+  }
   await page.screenshot({
     path: path.join(SCREENSHOT_DIR, `${name}.png`),
     fullPage: false,
   })
+}
+
+/** Take a viewport-only screenshot (no scroll) — for viewport-scoped UI like modals. */
+async function screenshotViewport(page: Page, name: string) {
+  await resetHover(page)
+  await page.screenshot({
+    path: path.join(SCREENSHOT_DIR, `${name}.png`),
+    fullPage: false,
+  })
+}
+
+/**
+ * Fail loudly if the embedded PDF viewer didn't paint — the iframe element
+ * exists even when blank, so assert Chromium's PDF-viewer frame appears.
+ */
+async function assertPdfPainted(page: Page) {
+  await expect
+    .poll(
+      () => page.frames().some(f => f.url().startsWith('chrome-extension://mhjfbmdgcfjbbpaeojofohoefgiehjai')),
+      {
+        message: 'PDF viewer did not paint — re-run with SCREENSHOT_CHANNEL=chromium (default in screenshots.config.ts)',
+        timeout: 15_000,
+      }
+    )
+    .toBe(true)
+}
+
+/**
+ * Close the viewer's thumbnail sidebar: Chromium opens it by default and
+ * `#navpanes=0` doesn't reach the viewer on blob URLs, so click the toolbar
+ * toggle (`#sidenavToggle`, via `aria-expanded`) instead.
+ */
+async function closePdfSidebar(page: Page) {
+  const viewer = page.frames().find(f => f.url().startsWith('chrome-extension://mhjfbmdgcfjbbpaeojofohoefgiehjai'))
+  if (!viewer) return
+  const toggle = viewer.locator('#sidenavToggle')
+  if (!(await toggle.count())) return
+  const wasExpanded = await viewer.evaluate(() => {
+    const btn = document.querySelector('pdf-viewer')?.shadowRoot
+      ?.querySelector('viewer-toolbar')?.shadowRoot?.querySelector('#sidenavToggle') as HTMLElement | null
+    if (!btn) return null
+    const expanded = btn.getAttribute('aria-expanded')
+    if (expanded === 'true') btn.click()
+    return expanded
+  })
+  if (wasExpanded !== 'true') return // already closed, or no toggle
+  // Wait until it actually closed; fail loudly if a Chromium update renames
+  // the toggle, instead of committing a screenshot with the strip back.
+  await expect
+    .poll(
+      () => viewer.evaluate(() =>
+        document.querySelector('pdf-viewer')?.shadowRoot
+          ?.querySelector('viewer-toolbar')?.shadowRoot
+          ?.querySelector('#sidenavToggle')?.getAttribute('aria-expanded') ?? 'missing'
+      ),
+      {
+        message: 'PDF viewer sidebar did not close — Chromium viewer DOM changed?',
+        timeout: 5_000,
+      }
+    )
+    .toBe('false')
 }
 
 // ---------------------------------------------------------------------------
@@ -334,30 +289,29 @@ test.describe('User Guide Screenshots', () => {
 
   // 01 — Login page (unauthenticated)
   test('01-login', async ({ page }) => {
-    // Clear tokens so we see the login page
-    await page.addInitScript(() => {
-      localStorage.removeItem('openzev.access')
-      localStorage.removeItem('openzev.refresh')
-    })
     await navigateTo(page, '/login')
     await page.waitForSelector('form')
-    await screenshot(page, '01-login')
+    await screenshotFull(page, '01-login')
   })
 
   // 02 — Dashboard
   test('02-dashboard', async ({ page }) => {
+    if (!(await pinDemoZev(page))) {
+      test.skip()
+      return
+    }
     await navigateTo(page, '/')
     // Wait for dashboard content (stat cards or similar)
     await page.waitForSelector('.card', { timeout: 10_000 })
     await goToPreviousPeriod(page)
     // The energy-flow Sankey only renders once the period has readings.
     await page.waitForSelector('.sankey-participant-label', { timeout: 15_000 })
-    await screenshotViewport(page, '02-dashboard', 'dashboard')
+    await screenshotFull(page, '02-dashboard')
   })
 
   // 02b — Participant Dashboard (via impersonation)
   test('02b-participant-dashboard', async ({ page }) => {
-    const ok = await impersonateFirstParticipant(page)
+    const ok = await impersonateDemoParticipant(page)
     if (!ok) {
       test.skip()
       return
@@ -366,44 +320,27 @@ test.describe('User Guide Screenshots', () => {
     await page.waitForSelector('.card, .stat-card', { timeout: 10_000 })
     await goToPreviousPeriod(page)
     await page.waitForSelector('.sankey-participant-label', { timeout: 15_000 })
-    await screenshotViewport(page, '02b-participant-dashboard', 'participant-dashboard')
+    await screenshotFull(page, '02b-participant-dashboard')
   })
 
   // 03 — Participants
   test('03-participants', async ({ page }) => {
     await navigateTo(page, '/participants')
     await page.waitForSelector('table, .card', { timeout: 10_000 })
-    await screenshot(page, '03-participants', 'participants')
-  })
-
-  // 03b — The participant form, showing the allocation weight field and its hint
-  test('03b-participant-allocation-weight', async ({ page }) => {
-    await navigateTo(page, '/participants')
-    await page.getByRole('button', { name: /neuer teilnehmer|new participant|nouveau participant|nuovo partecipante/i })
-      .first().click()
-    await page.waitForSelector('div[style*="z-index: 1000"]', { timeout: 5_000 })
-    const weight = page.locator('input[name="allocation_weight"]')
-    await weight.fill('2')
-    // The participant form is taller than the 900px viewport, so the weight
-    // field and its hint sit below the fold. Centre them, or the capture shows
-    // a clipped field with the explanatory hint cut off entirely.
-    await weight.evaluate((el) => el.scrollIntoView({ block: 'center' }))
-    await page.waitForTimeout(400)
-
-    await screenshotViewport(page, '03b-participant-allocation-weight')
+    await screenshotFull(page, '03-participants')
   })
 
   // 04 — Metering Points
   test('04-metering-points', async ({ page }) => {
     await navigateTo(page, '/metering-points')
     await page.waitForSelector('table, .card', { timeout: 10_000 })
-    await screenshot(page, '04-metering-points', 'metering-points')
+    await screenshotFull(page, '04-metering-points')
   })
 
-  // 04b — Metering Points with Assign Participant modal
+  // 04b — Metering Points with Assign Participant modal, captured against the
+  // seeded unassigned metering point (CH-DEMO-CONS-0003) — no fixture needed.
   test('04b-metering-points-assign', async ({ page }) => {
-    const fixture = await prepareUnassignedMeteringPoint(page)
-    if (!fixture) {
+    if (!(await pinDemoZev(page))) {
       test.skip()
       return
     }
@@ -411,7 +348,7 @@ test.describe('User Guide Screenshots', () => {
     await navigateTo(page, '/metering-points')
     await page.waitForSelector('.metering-point-card, table, .card', { timeout: 10_000 })
 
-    const pointCard = page.locator('.metering-point-card').filter({ hasText: fixture.meterId }).first()
+    const pointCard = page.locator('.metering-point-card').filter({ hasText: 'CH-DEMO-CONS-0003' }).first()
     await expect(pointCard).toBeVisible({ timeout: 10_000 })
 
     const assignBtn = pointCard.getByRole('button', {
@@ -422,21 +359,25 @@ test.describe('User Guide Screenshots', () => {
     // Wait for modal overlay to appear
     await page.waitForSelector('div[style*="z-index: 1000"]', { timeout: 5_000 })
     await page.waitForTimeout(500)
-    await screenshotViewport(page, '04b-metering-points-assign', 'metering-points-modal')
+    await screenshotViewport(page, '04b-metering-points-assign')
   })
 
   // 05 — Metering Data / Charts (with a metering point selected)
   test('05-metering-data', async ({ page }) => {
+    if (!(await pinDemoZev(page))) {
+      test.skip()
+      return
+    }
     await navigateTo(page, '/metering-data')
     await page.waitForSelector('.card', { timeout: 10_000 })
-    // Select the first available metering point to show chart data
+    // Select the first metering point that can carry readings.
     const mpSelect = page.locator('select').first()
     const options = mpSelect.locator('option')
     const count = await options.count()
-    if (count > 1) {
-      // Pick the second option (first is the placeholder)
-      const value = await options.nth(1).getAttribute('value')
-      if (value) {
+    for (let i = 1; i < count; i++) {
+      const label = await options.nth(i).textContent()
+      const value = await options.nth(i).getAttribute('value')
+      if (value && label) {
         await mpSelect.selectOption(value)
         await page.waitForTimeout(1000)
 
@@ -452,30 +393,35 @@ test.describe('User Guide Screenshots', () => {
           await prevPeriod.click()
           await page.waitForTimeout(1500)
         }
-
-        await page.waitForSelector('.recharts-wrapper', { timeout: 15_000 })
-        await page.waitForTimeout(1000)
+        break
       }
     }
-    await screenshotViewport(page, '05-metering-data')
+
+    await page.waitForSelector('.recharts-wrapper', { timeout: 15_000 })
+    await page.waitForTimeout(1000)
+    await screenshotFull(page, '05-metering-data')
   })
 
   // 06 — ZEV Settings
   test('06-zev-settings', async ({ page }) => {
     await navigateTo(page, '/zev-settings')
     await page.waitForSelector('form, .card', { timeout: 10_000 })
-    await screenshot(page, '06-zev-settings', 'zev-settings')
+    await screenshotFull(page, '06-zev-settings')
   })
 
   // 07 — Tariffs
   test('07-tariffs', async ({ page }) => {
     await navigateTo(page, '/tariffs')
     await page.waitForSelector('table, .card', { timeout: 10_000 })
-    await screenshot(page, '07-tariffs')
+    await screenshotFull(page, '07-tariffs')
   })
 
   // 07b — A tariff's version history and price chart, both behind the expander
   test('07b-tariff-versions', async ({ page }) => {
+    if (!(await pinDemoZev(page))) {
+      test.skip()
+      return
+    }
     await navigateTo(page, '/tariffs')
     const card = page.locator('article.tariff-card').filter({ hasText: 'Grid Energy HT/NT' }).first()
     await card.waitFor({ timeout: 10_000 })
@@ -485,130 +431,120 @@ test.describe('User Guide Screenshots', () => {
     // with more than one version, so it also asserts the seed still has them.
     await card.locator('.tariff-price-history').waitFor({ timeout: 10_000 })
     await page.waitForTimeout(1000)  // let Recharts finish laying out
-    await screenshot(page, '07b-tariff-versions')
-  })
-
-  // 07c — The shared-fee split key, which only exists for the two shared modes
-  test('07c-tariff-split-key', async ({ page }) => {
-    await navigateTo(page, '/tariffs')
-    await page.getByRole('button', { name: /new tariff|neuer tarif|nouveau tarif|nuova tariffa/i })
-      .first().click()
-    await page.waitForSelector('div[style*="z-index: 1000"]', { timeout: 5_000 })
-
-    // The split-key selector is rendered only for shared_monthly_fee /
-    // shared_yearly_fee, so pick one before capturing.
-    await page.locator('select[name="billing_mode"]').selectOption('shared_monthly_fee')
-    await page.locator('input[name="fixed_price_chf"]').fill('90.00')
-    const splitKey = page.locator('select[name="split_key"]')
-    await expect(splitKey).toBeVisible({ timeout: 5_000 })
-    await splitKey.selectOption('weight')
-    await page.waitForTimeout(400)
-
-    await screenshotViewport(page, '07c-tariff-split-key')
+    await screenshotFull(page, '07b-tariff-versions')
   })
 
   // 08 — Invoices (period overview)
   test('08-invoices', async ({ page }) => {
     await navigateTo(page, '/invoices')
-    await page.waitForSelector('table, .card', { timeout: 10_000 })
-    // No step back here: InvoicesPage already opens on the last *complete*
-    // period (getPreviousBillingPeriod), which is the one seed_demo bills.
-    // Stepping back again would land a period earlier and capture an empty
-    // table.
-    await screenshot(page, '08-invoices', 'invoices')
+    await page.waitForSelector('.period-selector', { timeout: 10_000 })
+    // The page opens on the last complete period — exactly where seed_demo
+    // bills — so no period navigation here (see goToPreviousPeriod docstring).
+    await screenshotFull(page, '08-invoices')
   })
 
   // 08b — Invoice Detail page
   test('08b-invoice-detail', async ({ page }) => {
-    // Fetch the first existing invoice ID via the API. The login endpoint is
-    // cookie-based and returns no token in its body, so read the access cookie
-    // via getAdminToken rather than reaching for a `.access` field that has
-    // never existed — a bogus header here overrides the valid cookie and 401s.
-    const resp = await page.request.get(`${API_BASE}/invoices/invoices/`, {
-      headers: { Authorization: `Bearer ${await getAdminToken(page)}` },
-    })
+    const headers = { Authorization: `Bearer ${await getAdminToken(page)}` }
+    const resp = await page.request.get(`${API_BASE}/invoices/invoices/`, { headers })
     expect(resp.ok(), `Invoice list request failed (${resp.status()})`).toBeTruthy()
 
-    const body = await resp.json() as { results?: Array<{ id: string }> }
-    const invoiceId = body.results?.[0]?.id
+    const body = await resp.json() as { results?: Array<{ id: string; pdf_url: string | null }> }
+    const invoice = body.results?.[0]
 
     // Fail loudly rather than silently capturing the invoices overview under the
     // invoice-detail name, which is how this file came to hold a duplicate.
-    expect(invoiceId, 'No invoice found — run `manage.py seed_demo` first').toBeTruthy()
+    expect(invoice, 'No invoice found — run `manage.py seed_demo` first').toBeTruthy()
 
-    await navigateTo(page, `/invoices/${invoiceId}`)
+    // Reseeding the database wipes stored PDF artifacts, so the embed would
+    // show the "generate" card instead of a document. Generate one up front.
+    if (!invoice!.pdf_url) {
+      const gen = await page.request.post(`${API_BASE}/invoices/invoices/${invoice!.id}/generate-pdf/`, { headers })
+      expect(gen.ok(), `PDF generation failed (${gen.status()})`).toBeTruthy()
+    }
+
+    // screenshotFull grows the viewport to the content height, so the embedded
+    // PDF viewer — which Chromium only paints inside the viewport — renders.
+    await navigateTo(page, `/invoices/${invoice!.id}`)
     await page.waitForSelector('.grid-4', { timeout: 10_000 })
-    await page.waitForTimeout(500)
-    await screenshot(page, '08b-invoice-detail', 'invoice-detail')
+    await page.waitForSelector('iframe[title]', { timeout: 15_000 })
+    await page.waitForTimeout(3500)
+    await assertPdfPainted(page)
+    await closePdfSidebar(page)
+    await screenshotFull(page, '08b-invoice-detail')
   })
 
   // 09 — Imports
   test('09-imports', async ({ page }) => {
     await navigateTo(page, '/imports')
     await page.waitForSelector('.card', { timeout: 10_000 })
-    await screenshot(page, '09-imports')
+    await screenshotFull(page, '09-imports')
   })
 
   // 10 — Admin Dashboard
   test('10-admin-dashboard', async ({ page }) => {
     await navigateTo(page, '/admin')
     await page.waitForSelector('.card', { timeout: 10_000 })
-    await screenshotViewport(page, '10-admin-dashboard')
+    await screenshotFull(page, '10-admin-dashboard')
   })
 
   // 11 — Admin Accounts
   test('11-admin-accounts', async ({ page }) => {
     await navigateTo(page, '/admin/accounts')
     await page.waitForSelector('table, .card', { timeout: 10_000 })
-    await screenshot(page, '11-admin-accounts', 'admin-accounts')
+    await screenshotFull(page, '11-admin-accounts')
   })
 
   // 12 — Admin Regional Settings
   test('12-admin-regional-settings', async ({ page }) => {
     await navigateTo(page, '/admin/settings/regional')
     await page.waitForSelector('form, .card', { timeout: 10_000 })
-    await screenshot(page, '12-admin-regional-settings')
+    await screenshotFull(page, '12-admin-regional-settings')
   })
 
   // 13 — Admin VAT Settings
   test('13-admin-vat-settings', async ({ page }) => {
     await navigateTo(page, '/admin/settings/vat')
     await page.waitForSelector('form, table, .card', { timeout: 10_000 })
-    await screenshot(page, '13-admin-vat-settings')
+    await screenshotFull(page, '13-admin-vat-settings')
   })
 
   // 14 — Admin PDF Templates
   test('14-admin-pdf-templates', async ({ page }) => {
     await navigateTo(page, '/admin/pdf-templates')
     await page.waitForSelector('.card, textarea', { timeout: 10_000 })
-    await screenshot(page, '14-admin-pdf-templates')
+    await page.waitForSelector('iframe[title]', { timeout: 15_000 })
+    await page.waitForTimeout(1000)
+    await assertPdfPainted(page)
+    await closePdfSidebar(page)
+    await screenshotFull(page, '14-admin-pdf-templates')
   })
 
   // 14b — Admin Email Templates
   test('14b-admin-email-templates', async ({ page }) => {
     await navigateTo(page, '/admin/email-templates')
     await page.waitForSelector('.card, textarea', { timeout: 10_000 })
-    await screenshot(page, '14b-admin-email-templates')
+    await screenshotFull(page, '14b-admin-email-templates')
   })
 
   // 15 — Admin ZEV List
   test('15-admin-zevs', async ({ page }) => {
     await navigateTo(page, '/admin/zevs')
     await page.waitForSelector('table, .card', { timeout: 10_000 })
-    await screenshot(page, '15-admin-zevs', 'admin-zevs')
+    await screenshotFull(page, '15-admin-zevs')
   })
 
   // 16 — Account Profile
   test('16-account-profile', async ({ page }) => {
     await navigateTo(page, '/account')
     await page.waitForSelector('form, .card', { timeout: 10_000 })
-    await screenshot(page, '16-account-profile', 'account-profile')
+    await screenshotFull(page, '16-account-profile')
   })
 
   // 17 — Admin Invoices
   test('17-admin-invoices', async ({ page }) => {
     await navigateTo(page, '/admin/invoices')
-    await page.waitForSelector('.MuiDataGrid-root, .card', { timeout: 10_000 })
-    await screenshot(page, '17-admin-invoices', 'admin-invoices')
+    await page.waitForSelector('.data-table, .card', { timeout: 10_000 })
+    await screenshotFull(page, '17-admin-invoices')
   })
 })
