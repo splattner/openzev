@@ -110,6 +110,7 @@ class ParticipantSerializer(serializers.ModelSerializer):
             "valid_from",
             "valid_to",
             "notes",
+            "allocation_weight",
             "metering_points",
             "has_metering_point_assignment",
             "building_footprint",

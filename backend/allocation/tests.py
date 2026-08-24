@@ -27,7 +27,7 @@ from allocation.split import (
     split_consumption,
     split_production,
 )
-from allocation.windows import AssignmentWindows
+from allocation.windows import AssignmentResolution, AssignmentWindows
 
 
 def D(value) -> Decimal:
@@ -300,8 +300,8 @@ def test_participant_at_resolves_the_holder_on_the_boundary_day():
     """Assignment validity is date-granular: a reading at 00:30 on the day an
     assignment starts already belongs to the new holder."""
     windows = AssignmentWindows([
-        ("mp1", datetime.date(2026, 6, 1), datetime.date(2026, 6, 15), 11),
-        ("mp1", datetime.date(2026, 6, 16), None, 22),
+        ("mp1", datetime.date(2026, 6, 1), datetime.date(2026, 6, 15), 11, "personal", 1),
+        ("mp1", datetime.date(2026, 6, 16), None, 22, "personal", 2),
     ])
 
     assert windows.participant_at("mp1", TS.replace(month=6, day=15, hour=23)) == 11
@@ -310,8 +310,8 @@ def test_participant_at_resolves_the_holder_on_the_boundary_day():
 
 def test_gap_readings_resolve_to_no_participant():
     windows = AssignmentWindows([
-        ("mp1", datetime.date(2026, 6, 1), datetime.date(2026, 6, 15), 11),
-        ("mp1", datetime.date(2026, 7, 1), None, 22),
+        ("mp1", datetime.date(2026, 6, 1), datetime.date(2026, 6, 15), 11, "personal", 1),
+        ("mp1", datetime.date(2026, 7, 1), None, 22, "personal", 2),
     ])
 
     assert windows.participant_at("mp1", TS.replace(month=6, day=20)) is None
@@ -320,8 +320,8 @@ def test_gap_readings_resolve_to_no_participant():
 def test_participant_on_matches_the_same_date_as_participant_at():
     """Day-level resolution is equivalent to timestamp-level resolution."""
     windows = AssignmentWindows([
-        ("mp1", datetime.date(2026, 6, 1), datetime.date(2026, 6, 15), 11),
-        ("mp1", datetime.date(2026, 6, 16), None, 22),
+        ("mp1", datetime.date(2026, 6, 1), datetime.date(2026, 6, 15), 11, "personal", 1),
+        ("mp1", datetime.date(2026, 6, 16), None, 22, "personal", 2),
     ])
 
     assert windows.participant_on("mp1", datetime.date(2026, 6, 15)) == 11
@@ -330,13 +330,13 @@ def test_participant_on_matches_the_same_date_as_participant_at():
 
 
 def test_open_ended_assignment_covers_everything_after_valid_from():
-    windows = AssignmentWindows([("mp1", datetime.date(2026, 6, 1), None, 11)])
+    windows = AssignmentWindows([("mp1", datetime.date(2026, 6, 1), None, 11, "personal", 1)])
 
     assert windows.participant_at("mp1", TS) == 11
 
 
 def test_unknown_metering_point_has_no_holder():
-    windows = AssignmentWindows([("mp1", datetime.date(2026, 6, 1), None, 11)])
+    windows = AssignmentWindows([("mp1", datetime.date(2026, 6, 1), None, 11, "personal", 1)])
 
     assert windows.participant_at("mp9", TS) is None
 
@@ -346,8 +346,8 @@ def test_is_held_by_matches_only_the_current_holder():
     participant holding the metering point at the reading's timestamp, false
     for any other participant, for gap readings, and for unknown points."""
     windows = AssignmentWindows([
-        ("mp1", datetime.date(2026, 6, 1), datetime.date(2026, 6, 15), 11),
-        ("mp1", datetime.date(2026, 7, 1), None, 22),
+        ("mp1", datetime.date(2026, 6, 1), datetime.date(2026, 6, 15), 11, "personal", 1),
+        ("mp1", datetime.date(2026, 7, 1), None, 22, "personal", 2),
     ])
 
     assert windows.is_held_by(11, "mp1", TS.replace(month=6, day=10)) is True
@@ -367,8 +367,8 @@ def test_matching_uses_the_utc_civil_date_of_the_timestamp():
     converts to UTC via ``astimezone``, so even a non-UTC datetime resolves
     to the correct UTC date instead of silently shifting the civil date."""
     windows = AssignmentWindows([
-        ("mp1", datetime.date(2026, 6, 15), datetime.date(2026, 6, 15), 11),
-        ("mp1", datetime.date(2026, 6, 16), None, 22),
+        ("mp1", datetime.date(2026, 6, 15), datetime.date(2026, 6, 15), 11, "personal", 1),
+        ("mp1", datetime.date(2026, 6, 16), None, 22, "personal", 2),
     ])
     tz_utc = datetime.timezone.utc
     tz_zurich = datetime.timezone(datetime.timedelta(hours=2))  # CEST in June
@@ -401,8 +401,8 @@ def test_allocation_failures_share_a_common_base():
 
     with pytest.raises(AllocationError):
         AssignmentWindows([
-            ("mp1", datetime.date(2026, 6, 1), datetime.date(2026, 6, 20), 11),
-            ("mp1", datetime.date(2026, 6, 15), None, 22),
+            ("mp1", datetime.date(2026, 6, 1), datetime.date(2026, 6, 20), 11, "personal", 1),
+            ("mp1", datetime.date(2026, 6, 15), None, 22, "personal", 2),
         ])
 
 
@@ -411,16 +411,16 @@ def test_overlapping_windows_fail_fast():
     them silently, so direct-DB edits or migration errors surface loudly."""
     with pytest.raises(OverlappingAssignmentWindowsError):
         AssignmentWindows([
-            ("mp1", datetime.date(2026, 6, 1), datetime.date(2026, 6, 20), 11),
-            ("mp1", datetime.date(2026, 6, 15), None, 22),
+            ("mp1", datetime.date(2026, 6, 1), datetime.date(2026, 6, 20), 11, "personal", 1),
+            ("mp1", datetime.date(2026, 6, 15), None, 22, "personal", 2),
         ])
 
 
 def test_open_ended_window_overlaps_any_later_window():
     with pytest.raises(OverlappingAssignmentWindowsError):
         AssignmentWindows([
-            ("mp1", datetime.date(2026, 6, 1), None, 11),
-            ("mp1", datetime.date(2026, 7, 1), None, 22),
+            ("mp1", datetime.date(2026, 6, 1), None, 11, "personal", 1),
+            ("mp1", datetime.date(2026, 7, 1), None, 22, "personal", 2),
         ])
 
 
@@ -428,9 +428,81 @@ def test_adjacent_windows_are_not_an_overlap():
     """valid_to is inclusive, so handing over on 16 June means the previous
     window legitimately ends on 15 June."""
     windows = AssignmentWindows([
-        ("mp1", datetime.date(2026, 6, 1), datetime.date(2026, 6, 15), 11),
-        ("mp1", datetime.date(2026, 6, 16), None, 22),
+        ("mp1", datetime.date(2026, 6, 1), datetime.date(2026, 6, 15), 11, "personal", 1),
+        ("mp1", datetime.date(2026, 6, 16), None, 22, "personal", 2),
     ])
 
     assert windows.participant_at("mp1", TS.replace(month=6, day=15, hour=23)) == 11
     assert windows.participant_at("mp1", TS.replace(month=6, day=16, hour=0)) == 22
+
+
+# ---------------------------------------------------------------------------
+# assignment_at / AssignmentResolution (shared metering points)
+# ---------------------------------------------------------------------------
+
+
+def test_assignment_at_resolves_mode_and_holder():
+    """assignment_at reports holder_id, allocation_mode and assignment_id —
+    everything a mode-aware billing gate needs, unlike the literal
+    participant_at/is_held_by."""
+    windows = AssignmentWindows([
+        ("mp1", datetime.date(2026, 6, 1), datetime.date(2026, 6, 15), 11, "personal", 101),
+        ("mp1", datetime.date(2026, 6, 16), None, 22, "community", 102),
+    ])
+
+    personal = windows.assignment_at("mp1", TS.replace(month=6, day=10))
+    assert personal == AssignmentResolution(holder_id=11, allocation_mode="personal", assignment_id=101)
+
+    community = windows.assignment_at("mp1", TS.replace(month=6, day=20))
+    assert community == AssignmentResolution(holder_id=22, allocation_mode="community", assignment_id=102)
+
+
+def test_participant_at_stays_literal_for_community_windows():
+    """participant_at is unaffected by allocation_mode: a community meter
+    still resolves to its holder of record, not None."""
+    windows = AssignmentWindows([
+        ("mp1", datetime.date(2026, 6, 1), None, 11, "community", 101),
+    ])
+
+    assert windows.participant_at("mp1", TS) == 11
+
+
+def test_is_held_by_stays_literal_for_community_windows():
+    """is_held_by is unaffected by allocation_mode: True for the holder of a
+    community meter too. Billing code that must not bill the holder
+    personally for community energy needs assignment_at instead."""
+    windows = AssignmentWindows([
+        ("mp1", datetime.date(2026, 6, 1), None, 11, "community", 101),
+    ])
+
+    assert windows.is_held_by(11, "mp1", TS) is True
+
+
+def test_assignment_at_returns_none_only_for_true_gaps():
+    """None means no assignment covers the timestamp — a gap, not a
+    community window (which resolves to a real AssignmentResolution)."""
+    windows = AssignmentWindows([
+        ("mp1", datetime.date(2026, 6, 1), datetime.date(2026, 6, 15), 11, "personal", 101),
+        ("mp1", datetime.date(2026, 7, 1), None, 22, "community", 102),
+    ])
+
+    assert windows.assignment_at("mp1", TS.replace(month=6, day=20)) is None
+    assert windows.assignment_at("mp9", TS) is None
+    assert windows.assignment_at("mp1", TS.replace(month=6, day=10)) is not None
+    assert windows.assignment_at("mp1", TS.replace(month=7, day=5)) is not None
+
+
+def test_personal_windows_unaffected():
+    """A windows set with only personal assignments resolves identically
+    through assignment_at as it always did through participant_at/is_held_by
+    — this is a regression guard, not new behaviour."""
+    windows = AssignmentWindows([
+        ("mp1", datetime.date(2026, 6, 1), datetime.date(2026, 6, 15), 11, "personal", 101),
+        ("mp1", datetime.date(2026, 6, 16), None, 22, "personal", 102),
+    ])
+
+    resolution = windows.assignment_at("mp1", TS.replace(month=6, day=15, hour=23))
+    assert resolution.holder_id == 11
+    assert resolution.allocation_mode == "personal"
+    assert windows.participant_at("mp1", TS.replace(month=6, day=15, hour=23)) == resolution.holder_id
+    assert windows.is_held_by(11, "mp1", TS.replace(month=6, day=15, hour=23)) is True

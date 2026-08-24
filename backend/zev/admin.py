@@ -6,13 +6,13 @@ class ParticipantInline(admin.TabularInline):
     model = Participant
     extra = 0
     show_change_link = True
-    fields = ("first_name", "last_name", "email", "valid_from", "valid_to")
+    fields = ("first_name", "last_name", "email", "valid_from", "valid_to", "allocation_weight")
 
 
 class MeteringPointAssignmentInline(admin.TabularInline):
     model = MeteringPointAssignment
     extra = 0
-    fields = ("metering_point", "valid_from", "valid_to")
+    fields = ("metering_point", "valid_from", "valid_to", "allocation_mode")
     autocomplete_fields = ("metering_point",)
 
 

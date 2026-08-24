@@ -10,7 +10,7 @@ class TariffPeriodInline(admin.TabularInline):
 @admin.register(Tariff)
 class TariffAdmin(admin.ModelAdmin):
     list_display = ("name", "zev", "category", "billing_mode", "energy_type", "fixed_price_chf", "valid_from", "valid_to")
-    list_filter = ("category", "billing_mode", "energy_type", "zev")
+    list_filter = ("category", "billing_mode", "energy_type", "zev", "split_key")
     inlines = [TariffPeriodInline]
 
 

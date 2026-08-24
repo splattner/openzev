@@ -250,7 +250,7 @@ def _compute_monthly_data(participant, zev, year: int, tr: dict) -> tuple[list[d
     # active at the reading's timestamp — a mid-year transfer must not hand
     # the new holder the old holder's readings.
     windows = AssignmentWindows(
-        (a.metering_point_id, a.valid_from, a.valid_to, participant.id)
+        (a.metering_point_id, a.valid_from, a.valid_to, participant.id, a.allocation_mode, a.id)
         for a in assignments
     )
 

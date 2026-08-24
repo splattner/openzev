@@ -112,6 +112,7 @@ PARTICIPANT_FIELDS = (
     "valid_from",
     "valid_to",
     "notes",
+    "allocation_weight",
 )
 
 METERING_POINT_FIELDS = (
@@ -124,6 +125,7 @@ METERING_POINT_FIELDS = (
 ASSIGNMENT_FIELDS = (
     "valid_from",
     "valid_to",
+    "allocation_mode",
 )
 
 TARIFF_FIELDS = (
@@ -133,6 +135,7 @@ TARIFF_FIELDS = (
     "energy_type",
     "fixed_price_chf",
     "percentage",
+    "split_key",
     "valid_from",
     "valid_to",
     "notes",

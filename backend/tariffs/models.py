@@ -40,6 +40,18 @@ class PeriodType(models.TextChoices):
     LOW = "low", "Low tariff (NT)"
 
 
+class SplitKey(models.TextChoices):
+    """Which denominator a SHARED_* fee uses.
+
+    Read only for SHARED_MONTHLY_FEE / SHARED_YEARLY_FEE; ignored by every
+    other billing mode. Does not apply to community metering points, which
+    always allocate by Participant.allocation_weight.
+    """
+
+    EQUAL = "equal", "Equal (headcount)"
+    WEIGHT = "weight", "Weight"
+
+
 class Tariff(models.Model):
     """Tariff definition for a ZEV with a validity period."""
 
@@ -55,6 +67,7 @@ class Tariff(models.Model):
         help_text="Percentage of all energy tariffs (same energy type) used as the effective price. "
                   "Only applicable for billing_mode=percentage_of_energy.",
     )
+    split_key = models.CharField(max_length=10, choices=SplitKey.choices, default=SplitKey.EQUAL)
     valid_from = models.DateField()
     valid_to = models.DateField(null=True, blank=True)
     notes = models.TextField(blank=True)

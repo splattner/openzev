@@ -23,7 +23,9 @@ cross-cutting decision.
 """
 
 import itertools
+from dataclasses import dataclass
 from datetime import date, datetime, timezone
+from typing import Any
 
 from django.db.models import Q
 
@@ -31,23 +33,39 @@ from allocation.errors import OverlappingAssignmentWindowsError
 from zev.models import MeteringPointAssignment
 
 
+@dataclass(frozen=True)
+class AssignmentResolution:
+    """The assignment covering a metering point at a timestamp.
+
+    ``holder_id`` is the literal holder (``MeteringPointAssignment.participant``)
+    regardless of ``allocation_mode`` — a community meter keeps its holder of
+    record for provenance, UI and data-quality purposes. Billing code decides
+    what to do with ``allocation_mode``; this object only reports it.
+    """
+
+    holder_id: Any
+    allocation_mode: str
+    assignment_id: Any
+
+
 class AssignmentWindows:
     """Resolve which participant held a metering point at a given timestamp."""
 
     def __init__(self, rows):
         """``rows``: iterable of ``(metering_point_id, valid_from, valid_to,
-        participant_id)``. Windows are sorted by ``valid_from``; two windows
-        for the same metering point that overlap (an open-ended ``valid_to``
-        overlaps everything later) raise ``OverlappingAssignmentWindowsError``
-        rather than resolving in favour of one of them."""
+        participant_id, allocation_mode, assignment_id)``. Windows are sorted
+        by ``valid_from``; two windows for the same metering point that
+        overlap (an open-ended ``valid_to`` overlaps everything later) raise
+        ``OverlappingAssignmentWindowsError`` rather than resolving in favour
+        of one of them."""
         windows: dict = {}
-        for mp_id, valid_from, valid_to, participant_id in rows:
+        for mp_id, valid_from, valid_to, participant_id, allocation_mode, assignment_id in rows:
             windows.setdefault(mp_id, []).append(
-                (valid_from, valid_to, participant_id)
+                (valid_from, valid_to, participant_id, allocation_mode, assignment_id)
             )
         for mp_id, mp_windows in windows.items():
             mp_windows.sort(key=lambda w: w[0])
-            for (prev_from, prev_to, _), (cur_from, cur_to, _) in itertools.pairwise(
+            for (prev_from, prev_to, *_), (cur_from, cur_to, *_) in itertools.pairwise(
                 mp_windows
             ):
                 if prev_to is None or cur_from <= prev_to:
@@ -64,7 +82,10 @@ class AssignmentWindows:
             valid_from__lte=end,
         ).filter(
             Q(valid_to__isnull=True) | Q(valid_to__gte=start),
-        ).values_list("metering_point_id", "valid_from", "valid_to", "participant_id")
+        ).values_list(
+            "metering_point_id", "valid_from", "valid_to", "participant_id",
+            "allocation_mode", "id",
+        )
         return cls(rows)
 
     @classmethod
@@ -75,12 +96,16 @@ class AssignmentWindows:
             valid_from__lte=end,
         ).filter(
             Q(valid_to__isnull=True) | Q(valid_to__gte=start),
-        ).values_list("metering_point_id", "valid_from", "valid_to", "participant_id")
+        ).values_list(
+            "metering_point_id", "valid_from", "valid_to", "participant_id",
+            "allocation_mode", "id",
+        )
         return cls(rows)
 
     def active_windows(self, metering_point_id) -> tuple:
-        """``(valid_from, valid_to, participant_id)`` windows for one metering
-        point. Immutable: billing eligibility must not change mid-run."""
+        """``(valid_from, valid_to, participant_id, allocation_mode,
+        assignment_id)`` windows for one metering point. Immutable: billing
+        eligibility must not change mid-run."""
         return tuple(self._windows.get(metering_point_id, ()))
 
     @property
@@ -89,8 +114,16 @@ class AssignmentWindows:
         return {
             participant_id
             for mp_windows in self._windows.values()
-            for _valid_from, _valid_to, participant_id in mp_windows
+            for _valid_from, _valid_to, participant_id, _mode, _aid in mp_windows
         }
+
+    def _window_on(self, metering_point_id, day: date):
+        """The raw window tuple covering ``metering_point_id`` on ``day``, or ``None``."""
+        for window in self.active_windows(metering_point_id):
+            valid_from, valid_to = window[0], window[1]
+            if valid_from <= day and (valid_to is None or valid_to >= day):
+                return window
+        return None
 
     def participant_on(self, metering_point_id, day: date):
         """Participant id holding ``metering_point_id`` on ``day``, or ``None``.
@@ -98,12 +131,12 @@ class AssignmentWindows:
         Assignment validity is date-granular, so matching a day directly is
         equivalent to matching any timestamp that falls on it. Callers that
         only need the day (e.g. data-quality checks) should resolve once per
-        distinct day instead of once per reading.
+        distinct day instead of once per reading. Literal holder semantics —
+        unaffected by ``allocation_mode``: a community meter is not
+        unassigned.
         """
-        for valid_from, valid_to, participant_id in self.active_windows(metering_point_id):
-            if valid_from <= day and (valid_to is None or valid_to >= day):
-                return participant_id
-        return None
+        window = self._window_on(metering_point_id, day)
+        return window[2] if window is not None else None
 
     def participant_at(self, metering_point_id, ts: datetime):
         """Participant id holding ``metering_point_id`` at ``ts``, or ``None``.
@@ -113,10 +146,32 @@ class AssignmentWindows:
         day an assignment starts already belongs to the new holder. ``ts`` is
         always UTC in this codebase (ADR 0007); the explicit
         ``astimezone(timezone.utc)`` is a defensive guard so a non-UTC
-        datetime cannot silently shift the civil date.
+        datetime cannot silently shift the civil date. Literal holder
+        semantics — unaffected by ``allocation_mode``; see ``assignment_at``
+        for a mode-aware resolution.
         """
         day = ts.astimezone(timezone.utc).date()
         return self.participant_on(metering_point_id, day)
+
+    def assignment_at(self, metering_point_id, ts: datetime) -> AssignmentResolution | None:
+        """The assignment covering ``metering_point_id`` at ``ts``, or ``None``.
+
+        ``None`` only when no assignment covers the timestamp — a true gap.
+        Unlike ``participant_at``, this reports the allocation mode, so
+        billing code can distinguish "no assignment" (gap) from
+        "community-allocated" (a valid assignment whose costs are
+        distributed) instead of conflating the two under a bare ``None``.
+        """
+        day = ts.astimezone(timezone.utc).date()
+        window = self._window_on(metering_point_id, day)
+        if window is None:
+            return None
+        _valid_from, _valid_to, participant_id, allocation_mode, assignment_id = window
+        return AssignmentResolution(
+            holder_id=participant_id,
+            allocation_mode=allocation_mode,
+            assignment_id=assignment_id,
+        )
 
     def is_held_by(self, participant_id, metering_point_id, ts: datetime) -> bool:
         """Whether ``participant_id`` holds ``metering_point_id`` at ``ts``.
@@ -124,6 +179,8 @@ class AssignmentWindows:
         Convenience wrapper over ``participant_at`` for the common billing
         check "does this reading belong to this participant?". Readings in an
         assignment gap (or predating every window) belong to nobody, so this
-        returns ``False`` for them.
+        returns ``False`` for them. Literal holder semantics — ``True`` for a
+        community meter's holder too; callers that must not bill the holder
+        personally for community energy should use ``assignment_at`` instead.
         """
         return self.participant_at(metering_point_id, ts) == participant_id

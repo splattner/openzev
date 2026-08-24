@@ -13,7 +13,7 @@ from zev.management.commands.seed_demo import Command as SeedDemoCommand, previo
 from metering.models import MeterReading
 from tariffs.models import BillingMode, PeriodType, Tariff
 from tariffs.series import active_version, find_gaps
-from zev.models import MeteringPoint, MeteringPointAssignment, MeteringPointType, Participant, Zev
+from zev.models import AllocationMode, MeteringPoint, MeteringPointAssignment, MeteringPointType, Participant, Zev
 
 
 from testing.helpers import authenticate as auth, make_user
@@ -1036,3 +1036,79 @@ class SeedDemoTariffVersionTests(TestCase):
 		)
 		self._seed()
 		self.assertTrue(Tariff.objects.filter(zev=self.zev, name="Hand Added Levy").exists())
+
+
+class AllocationModelAndApiTests(TestCase):
+	"""Model defaults and API round-trip for allocation_mode / allocation_weight
+	(shared metering points, docs/specs/2026-08-shared-metering-points.md)."""
+
+	def setUp(self):
+		self.client = APIClient()
+		self.admin = make_user("alloc_admin", UserRole.ADMIN)
+		self.zev = Zev.objects.create(
+			name="Alloc ZEV", owner=self.admin, zev_type="vzev", invoice_prefix="A",
+		)
+		self.participant = Participant.objects.create(
+			zev=self.zev, first_name="Alloc", last_name="Participant",
+			email="alloc@example.com", valid_from=date(2026, 1, 1),
+		)
+		self.mp = MeteringPoint.objects.create(
+			zev=self.zev, meter_id="ALLOC-MP-1", meter_type=MeteringPointType.CONSUMPTION,
+		)
+		auth(self.client, self.admin)
+
+	def test_assignment_allocation_mode_defaults_to_personal(self):
+		assignment = MeteringPointAssignment.objects.create(
+			metering_point=self.mp, participant=self.participant, valid_from=date(2026, 1, 1),
+		)
+		self.assertEqual(assignment.allocation_mode, AllocationMode.PERSONAL)
+
+	def test_assignment_accepts_community_allocation_mode_via_api(self):
+		resp = self.client.post(
+			"/api/v1/zev/metering-point-assignments/",
+			{
+				"metering_point": str(self.mp.id),
+				"participant": str(self.participant.id),
+				"valid_from": "2026-01-01",
+				"allocation_mode": "community",
+			},
+			format="json",
+		)
+		self.assertEqual(resp.status_code, 201, resp.content)
+		self.assertEqual(resp.data["allocation_mode"], "community")
+
+	def test_participant_allocation_weight_defaults_to_one(self):
+		self.assertEqual(self.participant.allocation_weight, Decimal("1"))
+
+	def test_zero_and_negative_allocation_weight_rejected(self):
+		for bad_weight in ("0", "-1"):
+			with self.subTest(bad_weight=bad_weight):
+				resp = self.client.patch(
+					f"/api/v1/zev/participants/{self.participant.id}/",
+					{"allocation_weight": bad_weight},
+					format="json",
+				)
+				self.assertEqual(resp.status_code, 400)
+				self.assertIn("allocation_weight", resp.data)
+
+	def test_allocation_mode_exposed_in_assignment_serializer(self):
+		assignment = MeteringPointAssignment.objects.create(
+			metering_point=self.mp, participant=self.participant, valid_from=date(2026, 1, 1),
+			allocation_mode=AllocationMode.COMMUNITY,
+		)
+		resp = self.client.get(f"/api/v1/zev/metering-point-assignments/{assignment.id}/")
+		self.assertEqual(resp.status_code, 200)
+		self.assertEqual(resp.data["allocation_mode"], "community")
+
+	def test_allocation_weight_exposed_and_writable_in_participant_serializer(self):
+		get_resp = self.client.get(f"/api/v1/zev/participants/{self.participant.id}/")
+		self.assertEqual(get_resp.data["allocation_weight"], "1.0000")
+
+		patch_resp = self.client.patch(
+			f"/api/v1/zev/participants/{self.participant.id}/",
+			{"allocation_weight": "2.5000"},
+			format="json",
+		)
+		self.assertEqual(patch_resp.status_code, 200, patch_resp.content)
+		self.participant.refresh_from_db()
+		self.assertEqual(self.participant.allocation_weight, Decimal("2.5000"))

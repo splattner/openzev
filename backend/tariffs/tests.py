@@ -1,8 +1,10 @@
+from datetime import date
+
 from django.test import TestCase
 from rest_framework.test import APIClient
 
 from accounts.models import User, UserRole
-from tariffs.models import BillingMode, Tariff, TariffCategory
+from tariffs.models import BillingMode, SplitKey, Tariff, TariffCategory
 from zev.models import Zev
 
 
@@ -249,3 +251,70 @@ class TariffPermissionTests(TestCase):
 		)
 
 		self.assertEqual(second_resp.status_code, 201)
+
+
+class SplitKeyModelAndApiTests(TestCase):
+	"""split_key model default and API round-trip (shared metering points,
+	docs/specs/2026-08-shared-metering-points.md). Billing behaviour is pinned
+	in invoices/test_shared_fee.py; this class only covers the field itself."""
+
+	def setUp(self):
+		self.client = APIClient()
+		self.owner = User.objects.create_user(
+			username="split_key_owner", password="pass1234", role=UserRole.ZEV_OWNER,
+		)
+		self.zev = Zev.objects.create(name="Split Key ZEV", owner=self.owner, zev_type="vzev")
+		auth(self.client, self.owner)
+
+	def _post_tariff(self, name, *, billing_mode, energy_type=None, fixed_price_chf="100.00", **extra):
+		payload = {
+			"zev": str(self.zev.id),
+			"name": name,
+			"category": TariffCategory.METERING,
+			"billing_mode": billing_mode,
+			"energy_type": energy_type,
+			"fixed_price_chf": fixed_price_chf,
+			"valid_from": "2026-01-01",
+			**extra,
+		}
+		return self.client.post("/api/v1/tariffs/tariffs/", payload, format="json")
+
+	def test_split_key_defaults_to_equal(self):
+		for billing_mode in (BillingMode.ENERGY, BillingMode.SHARED_MONTHLY_FEE):
+			with self.subTest(billing_mode=billing_mode):
+				tariff = Tariff.objects.create(
+					zev=self.zev, name=f"Default {billing_mode}",
+					category=TariffCategory.METERING, billing_mode=billing_mode,
+					energy_type="local" if billing_mode == BillingMode.ENERGY else None,
+					valid_from=date(2026, 1, 1),
+				)
+				self.assertEqual(tariff.split_key, SplitKey.EQUAL)
+
+	def test_split_key_exposed_and_writable_via_api(self):
+		create_resp = self._post_tariff(
+			"Metering Fee", billing_mode=BillingMode.SHARED_MONTHLY_FEE, split_key="weight",
+		)
+		self.assertEqual(create_resp.status_code, 201, create_resp.content)
+		self.assertEqual(create_resp.data["split_key"], "weight")
+
+		tariff_id = create_resp.data["id"]
+		get_resp = self.client.get(f"/api/v1/tariffs/tariffs/{tariff_id}/")
+		self.assertEqual(get_resp.data["split_key"], "weight")
+
+		patch_resp = self.client.patch(
+			f"/api/v1/tariffs/tariffs/{tariff_id}/", {"split_key": "equal"}, format="json",
+		)
+		self.assertEqual(patch_resp.status_code, 200, patch_resp.content)
+		self.assertEqual(patch_resp.data["split_key"], "equal")
+
+	def test_split_key_is_accepted_but_inert_on_non_shared_modes(self):
+		"""split_key is read only by the two shared billing modes (model
+		docstring); storing it on any other mode is harmless."""
+		resp = self._post_tariff(
+			"Local Energy", billing_mode=BillingMode.ENERGY, energy_type="local",
+			fixed_price_chf=None, split_key="weight",
+		)
+		self.assertEqual(resp.status_code, 201, resp.content)
+		self.assertEqual(resp.data["split_key"], "weight")
+		tariff = Tariff.objects.get(pk=resp.data["id"])
+		self.assertEqual(tariff.billing_mode, BillingMode.ENERGY)

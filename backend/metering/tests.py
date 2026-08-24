@@ -6,7 +6,7 @@ from rest_framework.test import APIClient
 
 from accounts.models import UserRole
 from metering.models import MeterReading, ReadingDirection, ReadingResolution
-from zev.models import Zev, Participant, MeteringPoint, MeteringPointAssignment, MeteringPointType
+from zev.models import AllocationMode, Zev, Participant, MeteringPoint, MeteringPointAssignment, MeteringPointType
 
 
 from testing.helpers import authenticate as auth, make_user
@@ -545,6 +545,35 @@ class DataQualityStatusTests(TestCase):
 	def test_fully_assigned_readings_report_no_unassigned(self):
 		"""Readings covered by an active assignment are not flagged."""
 		auth(self.client, self.owner)
+
+		MeterReading.objects.create(
+			metering_point=self.metering_point,
+			timestamp=datetime(2026, 1, 2, 12, 0, tzinfo=timezone.utc),
+			energy_kwh=Decimal("10.0"),
+			direction=ReadingDirection.IN,
+			resolution=ReadingResolution.DAILY,
+		)
+
+		resp = self.client.get(
+			"/api/v1/metering/readings/data-quality-status/",
+			{"date_from": "2026-01-01", "date_to": "2026-01-07"},
+		)
+
+		self.assertEqual(resp.status_code, 200)
+		mp_status = resp.data["metering_points"][0]
+		self.assertEqual(mp_status["unassigned_readings"], 0)
+		self.assertEqual(mp_status["unassigned_days"], 0)
+
+	def test_community_meter_does_not_look_unassigned_in_data_quality(self):
+		"""A community-allocated assignment is still a real assignment: the
+		holder-less flag (participant_on, kept literal for shared metering
+		points — docs/specs/2026-08-shared-metering-points.md §5.4) must not
+		mistake it for a gap."""
+		auth(self.client, self.owner)
+
+		MeteringPointAssignment.objects.filter(
+			metering_point=self.metering_point, participant=self.participant,
+		).update(allocation_mode=AllocationMode.COMMUNITY)
 
 		MeterReading.objects.create(
 			metering_point=self.metering_point,

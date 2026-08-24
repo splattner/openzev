@@ -1,5 +1,6 @@
 import uuid
 from datetime import date
+from decimal import Decimal
 from django.db import models, transaction
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -174,6 +175,16 @@ class Participant(models.Model):
     valid_from = models.DateField()
     valid_to = models.DateField(null=True, blank=True)
     notes = models.TextField(blank=True)
+    allocation_weight = models.DecimalField(
+        max_digits=12,
+        decimal_places=4,
+        default=Decimal("1"),
+        validators=[MinValueValidator(Decimal("0.0001"))],
+        help_text=(
+            "Unitless relative weight for splitting community-meter costs. "
+            "Not a percentage, per-mille, or Wertquote."
+        ),
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -216,6 +227,21 @@ class MeteringPoint(models.Model):
         return self.meter_id
 
 
+class AllocationMode(models.TextChoices):
+    """Whether an assignment's costs go to its holder alone or are split.
+
+    ``COMMUNITY`` does not change who holds the metering point — the
+    assignment's ``participant`` stays the holder of record for provenance,
+    UI, and data-quality purposes (see ``AssignmentWindows.participant_on``).
+    It changes only who pays: billing distributes the meter's costs across
+    every eligible participant by ``Participant.allocation_weight`` instead
+    of attributing them to the holder.
+    """
+
+    PERSONAL = "personal", "Personal"
+    COMMUNITY = "community", "Community"
+
+
 class MeteringPointAssignment(models.Model):
     """Temporal assignment of a metering point to a participant."""
 
@@ -232,6 +258,11 @@ class MeteringPointAssignment(models.Model):
     )
     valid_from = models.DateField()
     valid_to = models.DateField(null=True, blank=True)
+    allocation_mode = models.CharField(
+        max_length=10,
+        choices=AllocationMode.choices,
+        default=AllocationMode.PERSONAL,
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

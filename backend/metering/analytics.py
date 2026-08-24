@@ -48,7 +48,10 @@ def _assignment_windows_for_readings(qs, start: date_type, end: date_type) -> As
         valid_from__lte=end,
     ).filter(
         Q(valid_to__isnull=True) | Q(valid_to__gte=start)
-    ).values_list("metering_point_id", "valid_from", "valid_to", "participant_id")
+    ).values_list(
+        "metering_point_id", "valid_from", "valid_to", "participant_id",
+        "allocation_mode", "id",
+    )
     return AssignmentWindows(rows)
 
 
@@ -646,7 +649,10 @@ def compute_data_quality_status(metering_points, date_from, date_to, today):
         valid_from__lte=date_to,
     ).filter(
         Q(valid_to__isnull=True) | Q(valid_to__gte=date_from)
-    ).values_list("metering_point_id", "valid_from", "valid_to", "participant_id")
+    ).values_list(
+        "metering_point_id", "valid_from", "valid_to", "participant_id",
+        "allocation_mode", "id",
+    )
 
     windows_by_mp: dict = {}
     for row in assignment_rows:
