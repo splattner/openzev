@@ -55,9 +55,12 @@ class PeriodReadings(NamedTuple):
     is what lets the pricing loops tell a true gap apart from energy that
     simply belongs to somebody, or something, else (§7.3).
 
-    ``weight_sum_by_date``/``weight_sum_by_month`` are the community's
-    allocation-weight denominators for the invoice period, used to turn a
-    community reading's price into this participant's share.
+    ``weight_sum_by_date`` is the community's date-granular allocation-weight
+    denominator for the invoice period, used to turn a community reading's
+    price into this participant's share. There is deliberately no month-
+    granular twin here: the fixed-fee denominators are clamped to each
+    tariff's own validity, so they are built inside ``_price_fixed_fees``
+    from one shared membership fetch rather than precomputed per invoice.
     """
 
     participant_consumption: models.QuerySet
@@ -67,7 +70,6 @@ class PeriodReadings(NamedTuple):
     zev_consumption_by_ts: dict
     zev_production_by_ts: dict
     weight_sum_by_date: dict
-    weight_sum_by_month: dict
     assignment_windows: AssignmentWindows
 
 
@@ -146,7 +148,6 @@ def _gather_period_readings(participant, period_start, period_end) -> PeriodRead
         zev_consumption_by_ts=zev_consumption_by_ts,
         zev_production_by_ts=zev_production_by_ts,
         weight_sum_by_date=_allocation_weight_sum_by_date(zev, period_start, period_end),
-        weight_sum_by_month=_allocation_weight_sum_by_month(zev, period_start, period_end),
         # ZEV-wide, not participant-scoped: the personal loops must be able to
         # resolve *any* window at a reading's timestamp — another
         # participant's, or a community one — to tell a true gap apart from
@@ -451,15 +452,13 @@ def _overlaps(valid_from: date, valid_to: date | None, start: date, end: date) -
     return valid_from <= end and (valid_to is None or valid_to >= start)
 
 
-def _billable_months(tariff: Tariff, period_start: date, period_end: date):
-    """Yield ``(month, billed_from, billed_to)`` for each month the fee covers.
+def _months_between(overlap_start: date, overlap_end: date):
+    """Yield ``(month, billed_from, billed_to)`` across ``overlap_start``..``overlap_end``.
 
     ``month`` is the first of the month and identifies it; the other two are
-    clamped to the part of it that is actually billed, which is what membership
-    is tested against. A period opening mid-month bills only from that day.
+    clamped to the part of it actually covered, which is what membership is
+    tested against.
     """
-    overlap_start = max(period_start, tariff.valid_from)
-    overlap_end = min(period_end, tariff.valid_to or period_end)
     if overlap_start > overlap_end:
         return
 
@@ -473,6 +472,19 @@ def _billable_months(tariff: Tariff, period_start: date, period_end: date):
             min(next_month - timedelta(days=1), overlap_end),
         )
         cursor = next_month
+
+
+def _billable_months(tariff: Tariff, period_start: date, period_end: date):
+    """Yield ``(month, billed_from, billed_to)`` for each month the fee covers.
+
+    Clamped to the overlap of the invoice period and the tariff's own validity,
+    so a period opening mid-month — or a tariff version starting mid-month —
+    bills only from that day.
+    """
+    yield from _months_between(
+        max(period_start, tariff.valid_from),
+        min(period_end, tariff.valid_to or period_end),
+    )
 
 
 def _count_active_participants_by_month(zev: Zev, tariff: Tariff, period_start: date, period_end: date) -> dict[date, int]:
@@ -514,41 +526,67 @@ def _count_active_participants_by_month(zev: Zev, tariff: Tariff, period_start: 
     return counts
 
 
-def _allocation_weight_sum_by_month(zev: Zev, period_start: date, period_end: date) -> dict[date, Decimal]:
-    """Sum of ``Participant.allocation_weight`` active in each billed month.
+def _participant_weight_windows(zev: Zev) -> list[tuple[date, date | None, Decimal]]:
+    """``(valid_from, valid_to, allocation_weight)`` for every participant of ``zev``.
 
-    Counted per month, not once over the period — same rationale as
-    ``_count_active_participants_by_month``: a joiner in February must not
-    dilute January's share. Read from ZEV membership, never from sibling
-    invoices, so generating one participant's invoice alone yields the same
-    share as a full run.
-
-    Unlike ``_count_active_participants_by_month`` this takes no ``tariff``:
-    it feeds both weight-keyed SHARED_* fees (which look up their own
-    tariff-clipped months here) and per-metering-point community fees, and
-    is computed once over the whole invoice period rather than once per
-    tariff. A month with no eligible participant is absent, not zero, so a
-    caller cannot divide by it.
+    Fetched once and resolved in Python by the weight-sum helpers below —
+    the same "single fetch, then Python" shape the rest of this module uses.
+    Callers pricing several tariffs in one invoice should fetch once and pass
+    the result down rather than re-querying per tariff.
     """
-    windows = list(
+    return list(
         Participant.objects.filter(zev=zev).values_list("valid_from", "valid_to", "allocation_weight")
     )
 
+
+def _allocation_weight_sum_by_month(
+    zev: Zev,
+    period_start: date,
+    period_end: date,
+    tariff: Tariff | None = None,
+    *,
+    windows: list | None = None,
+) -> dict[date, Decimal]:
+    """Sum of ``Participant.allocation_weight`` active in each billed month.
+
+    The weight-keyed counterpart of ``_count_active_participants_by_month``,
+    and it must clamp its months exactly the same way, because
+    ``_price_fixed_fees`` pairs this denominator with a numerator loop driven
+    by ``_billable_months(tariff, ...)``. Passing ``tariff`` clamps to the
+    overlap of the invoice period and that tariff's validity; omitting it
+    covers the whole period.
+
+    **Pass the tariff whenever one is in play.** Without it, a tariff clipped
+    inside the period — a version starting mid-month, say — would count a
+    participant who is a member of the calendar month but not of the part of
+    it the tariff actually bills. They would sit in the denominator while
+    their own numerator loop skips them, so the community would recover less
+    than the full fee (issue #465).
+
+    Counted per month, not once over the period: a joiner in February must not
+    dilute January's share. Read from ZEV membership, never from sibling
+    invoices, so generating one participant's invoice alone yields the same
+    share as a full run. A month with no eligible participant is absent, not
+    zero, so a caller cannot divide by it.
+    """
+    if windows is None:
+        windows = _participant_weight_windows(zev)
+
+    months = (
+        _billable_months(tariff, period_start, period_end)
+        if tariff is not None
+        else _months_between(period_start, period_end)
+    )
+
     sums: dict[date, Decimal] = {}
-    cursor = _month_start(period_start)
-    last_month = _month_start(period_end)
-    while cursor <= last_month:
-        next_month = _next_month(cursor)
-        billed_from = max(cursor, period_start)
-        billed_to = min(next_month - timedelta(days=1), period_end)
+    for month, billed_from, billed_to in months:
         total = sum(
             (weight for valid_from, valid_to, weight in windows
              if _overlaps(valid_from, valid_to, billed_from, billed_to)),
             Decimal("0"),
         )
         if total > 0:
-            sums[cursor] = total
-        cursor = next_month
+            sums[month] = total
 
     return sums
 
@@ -760,7 +798,22 @@ def _price_fixed_fees(participant, tariffs, period_start, period_end, accumulato
     community meter contributes its own weight-split ``bucket="shared"``
     line — ``split_key`` plays no part here, since a community meter's cost
     always allocates by weight.
+
+    Both weight-split paths share one fetch of the ZEV's participant windows,
+    resolved per tariff in Python: the denominator's *months* are
+    tariff-specific but the underlying membership rows are not, so querying
+    per tariff would be an N+1 over the ZEV's tariff list.
     """
+    weight_windows: list | None = None
+
+    def weight_sums_for(tariff: Tariff) -> dict[date, Decimal]:
+        nonlocal weight_windows
+        if weight_windows is None:
+            weight_windows = _participant_weight_windows(participant.zev)
+        return _allocation_weight_sum_by_month(
+            participant.zev, period_start, period_end, tariff, windows=weight_windows,
+        )
+
     for tariff in tariffs:
         if tariff.billing_mode in _ENERGY_BILLING_MODES:
             continue
@@ -798,8 +851,7 @@ def _price_fixed_fees(participant, tariffs, period_start, period_end, accumulato
             community_counts = _count_community_metering_points_by_month(
                 participant.zev, tariff, period_start, period_end)
             if community_counts:
-                weight_sums = _allocation_weight_sum_by_month(
-                    participant.zev, period_start, period_end)
+                weight_sums = weight_sums_for(tariff)
                 shared_total = Decimal("0")
                 shared_months = 0
                 for month, billed_from, billed_to in _billable_months(tariff, period_start, period_end):
@@ -827,9 +879,10 @@ def _price_fixed_fees(participant, tariffs, period_start, period_end, accumulato
             # key). EQUAL is today's headcount split — the numerator is 1
             # and the denominator is the same participant count, so it is
             # arithmetically identical to the pre-split_key behaviour.
+            # Both branches clamp their months to this tariff's validity, so
+            # the two keys agree exactly when every weight is 1.
             if tariff.split_key == SplitKey.WEIGHT:
-                shares = _allocation_weight_sum_by_month(
-                    participant.zev, period_start, period_end)
+                shares = weight_sums_for(tariff)
                 numerator = participant.allocation_weight
             else:
                 shares = _count_active_participants_by_month(

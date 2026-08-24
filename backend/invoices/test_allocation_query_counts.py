@@ -13,6 +13,7 @@ Counts are measured on the shared multi-meter reconciliation fixture and
 verified to be identical on SQLite and PostgreSQL.
 """
 from datetime import date
+from decimal import Decimal
 
 from django.contrib.auth import get_user_model
 from django.db import connection
@@ -30,6 +31,8 @@ from invoices.test_allocation_reconciliation import (
     PERIOD_START,
     _ReconciliationBase,
 )
+from tariffs.models import BillingMode, SplitKey, TariffCategory
+from testing import factories
 from testing.helpers import make_named_participant
 from zev.models import MeteringPointType, Zev
 
@@ -106,14 +109,54 @@ class AllocationQueryCountTests(_ReconciliationBase):
 
     def test_engine_generate_invoice_query_count(self):
         # Windows fetch + readings fetch + tariff lookup + invoice writes.
-        # 13 -> 17: shared metering points (#387) add four queries — a
-        # community consumption and a community production reading fetch,
-        # plus one Participant fetch each for the date- and month-granular
-        # allocation-weight sums (_allocation_weight_sum_by_date/_by_month) —
-        # still a single query each regardless of how many community
-        # readings or how many months the period spans.
+        # 13 -> 17 -> 16: shared metering points (#387) added a community
+        # consumption and a community production reading fetch, plus a
+        # Participant fetch each for the date- and month-granular
+        # allocation-weight sums. #465 dropped the month-granular one from
+        # PeriodReadings: it was never read, because the fixed-fee
+        # denominators are tariff-clamped and are built inside
+        # _price_fixed_fees instead.
         self._call_at_most(
-            17, generate_invoice, self.alice, PERIOD_START, PERIOD_END
+            16, generate_invoice, self.alice, PERIOD_START, PERIOD_END
+        )
+
+    def test_weight_keyed_shared_fees_do_not_scale_queries_with_tariff_count(self):
+        """The single-fetch invariant across the *tariff* list, not just the
+        reading list.
+
+        ``_price_fixed_fees`` resolves a weight denominator per tariff (their
+        billed months differ), but the underlying ZEV membership rows do not
+        change between tariffs — so they must be fetched once per invoice, not
+        once per tariff. This was an N+1 until #465; the fixture above has no
+        weight-keyed or per-metering-point tariff, so the whole-engine bound
+        never exercised this path.
+        """
+        for index in range(6):
+            tariff = factories.TariffFactory(
+                zev=self.zev,
+                name=f"Weighted shared fee {index}",
+                category=TariffCategory.METERING,
+                billing_mode=BillingMode.SHARED_MONTHLY_FEE,
+                energy_type=None,
+                fixed_price_chf=Decimal("10.00"),
+                valid_from=PERIOD_START,
+                split_key=SplitKey.WEIGHT,
+            )
+            self.assertEqual(tariff.split_key, SplitKey.WEIGHT)
+
+        with CaptureQueriesContext(connection) as ctx:
+            generate_invoice(self.alice, PERIOD_START, PERIOD_END)
+
+        membership_fetches = [
+            query for query in ctx.captured_queries
+            if 'FROM "zev_participant"' in query["sql"] and "allocation_weight" in query["sql"]
+        ]
+        # One for the date-granular community-energy denominator, one shared
+        # by all six weight-keyed tariffs. Six tariffs must not mean six.
+        self.assertLessEqual(
+            len(membership_fetches), 2,
+            f"expected at most 2 membership fetches, got {len(membership_fetches)} "
+            f"for 6 weight-keyed tariffs — N+1 over the tariff list",
         )
 
     def test_pdf_stats_query_count(self):

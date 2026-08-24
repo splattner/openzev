@@ -451,14 +451,23 @@ own weight — the same key a `COMMUNITY`-mode metering point always uses
 (§4.6.4). With every weight at the default `1`, `weight` and `equal` agree
 exactly.
 
+**Both denominators are clamped to the same months as the numerator** — the
+overlap of the invoice period *and this tariff's own validity*, not the period
+alone. A tariff clipped inside the period (a version starting mid-month, which
+tariff versioning makes ordinary — §3.1.1) otherwise counts a participant who
+is a member of the calendar month but not of the part the tariff actually
+bills: they land in the denominator while the numerator loop below skips them,
+and the community recovers less than the whole fee. The weight-sum helper
+therefore takes the tariff, exactly as the headcount helper always has.
+
 ```
 monthly_amount = fixed_price_chf / 12  if shared_yearly_fee else fixed_price_chf
 IF split_key == WEIGHT:
     numerator   = participant.allocation_weight
-    denominator_for(month) = allocation_weight_sum_by_month[month]   # sum of every eligible participant's weight
+    denominator_for(month) = allocation_weight_sum_by_month(tariff)[month]  # weights active in the BILLED window
 ELSE:
     numerator   = 1
-    denominator_for(month) = N   # headcount, as below
+    denominator_for(month) = N   # headcount over the same billed window, as below
 
 total = 0
 charged_months = 0
@@ -533,7 +542,7 @@ shared_months = 0
 for each billable month M in community_counts:
     if this participant's validity does not overlap M (clamped to the overlap):
         continue
-    weight_sum = allocation_weight_sum_by_month[M]
+    weight_sum = allocation_weight_sum_by_month(tariff)[M]   # clamped to this tariff's billed window
     total += unit_price × community_counts[M] × participant.allocation_weight / weight_sum
     shared_months += 1
 
@@ -545,6 +554,11 @@ if shared_months > 0:
 billing modes. The cost being divided belongs to a community *metering
 point*, which always allocates by weight (§1.1 of the feature spec). A
 per-assignment split key is a documented follow-up, out of scope.
+
+Both weight-split paths (this one and §4.6.3) resolve their denominator per
+tariff but share **one** fetch of the ZEV's participant membership rows per
+invoice: the billed months differ between tariffs, the membership does not, so
+querying per tariff would be an N+1 over the ZEV's tariff list.
 
 ### 4.7 Item accumulation
 
@@ -935,6 +949,7 @@ The description renders as: `"Surcharge 50% (50% von CHF 0.32/kWh)"` (German).
 | CHF 100 across 3 participants recovers 99.99 | §4.6.3 documented rounding shortfall |
 | Description text and average-share unit price | §7.2 |
 | `equal` key ignores weights entirely (isolation guarantee); `weight` key splits by weight; default is `equal`; two shared tariffs can use different keys in the same invoice; default weights reproduce the equal split under `weight`; a joiner shifts the weight-sum denominator only from their own month; a negligible-weight member bills almost nothing; an indivisible weighted share leaves the documented rappen shortfall | §4.6.3 `split_key` (`SPEC-2026-08-shared-metering-points` §7.2) |
+| A tariff starting mid-month: both keys agree, a full ZEV run recovers the whole fee, and a member active *inside* the billed window still dilutes it | §4.6.3 tariff-clamped denominators (regression, #465) |
 
 ### Backend (`invoices/test_shared_metering.py`)
 

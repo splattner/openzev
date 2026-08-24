@@ -486,3 +486,69 @@ def test_an_indivisible_weighted_share_leaves_the_rappen_shortfall():
     )
 
     assert total == Decimal("99.99")
+
+
+# ---------------------------------------------------------------------------
+# Tariff-clamped denominators (regression: #465)
+#
+# ``_price_fixed_fees`` drives its numerator loop from
+# ``_billable_months(tariff, ...)``. A denominator clamped to the invoice
+# *period* instead of the tariff's own validity counts members of the calendar
+# month who are not members of the part the tariff actually bills — they land
+# in the denominator while their own numerator loop skips them, so the
+# community recovers less than the whole fee. Tariff versioning makes a
+# mid-period ``valid_from`` ordinary, so this is not an exotic shape.
+# ---------------------------------------------------------------------------
+
+def test_weight_and_equal_keys_agree_when_the_tariff_starts_mid_month():
+    """The isolation guarantee under a clipped tariff: with every weight at
+    the default 1, ``weight`` must bill exactly what ``equal`` bills."""
+    zev = factories.ZevFactory()
+    stayer = factories.ParticipantFactory(zev=zev, valid_from=JAN)
+    # Leaves on the 10th — before the tariff starts on the 15th, so they are
+    # never billed for it and must not sit in either denominator.
+    factories.ParticipantFactory(zev=zev, valid_from=JAN, valid_to=date(2026, 1, 10))
+
+    equal = shared_tariff(zev, price="100.00", name="Equal fee",
+                          valid_from=date(2026, 1, 15), split_key=SplitKey.EQUAL)
+    weight = shared_tariff(zev, price="100.00", name="Weight fee",
+                           valid_from=date(2026, 1, 15), split_key=SplitKey.WEIGHT)
+
+    invoice = generate_invoice(stayer, JAN, JAN_END)
+    by_name = {item.description.split(" (")[0]: item for item in invoice.items.all()}
+
+    assert by_name[equal.name].total_chf == Decimal("100.00")
+    assert by_name[weight.name].total_chf == by_name[equal.name].total_chf
+
+
+def test_weighted_shared_fee_is_fully_recovered_when_the_tariff_starts_mid_month():
+    """Reconciliation property under a clipped tariff: a full ZEV run recovers
+    the month's amount once, not a fraction of it."""
+    zev = factories.ZevFactory()
+    factories.ParticipantFactory(zev=zev, valid_from=JAN)
+    factories.ParticipantFactory(zev=zev, valid_from=JAN, valid_to=date(2026, 1, 10))
+    shared_tariff(zev, price="100.00", valid_from=date(2026, 1, 15),
+                  split_key=SplitKey.WEIGHT)
+
+    result = generate_invoices_for_zev(zev, JAN, JAN_END)
+    recovered = sum(
+        (item.total_chf for invoice in result.invoices
+         for item in invoice.items.filter(tariff_category=TariffCategory.METERING)),
+        Decimal("0"),
+    )
+
+    assert result.failures == []
+    assert recovered == Decimal("100.00")
+
+
+def test_weighted_shared_fee_denominator_still_tracks_the_billed_window():
+    """The clamp must not overshoot: a member who *is* active inside the
+    tariff's billed window still dilutes it."""
+    zev = factories.ZevFactory()
+    stayer = factories.ParticipantFactory(zev=zev, valid_from=JAN)
+    # Leaves on the 20th — inside the Jan 15..Jan 31 billed window.
+    factories.ParticipantFactory(zev=zev, valid_from=JAN, valid_to=date(2026, 1, 20))
+    shared_tariff(zev, price="100.00", valid_from=date(2026, 1, 15),
+                  split_key=SplitKey.WEIGHT)
+
+    assert fee_line(generate_invoice(stayer, JAN, JAN_END)).total_chf == Decimal("50.00")

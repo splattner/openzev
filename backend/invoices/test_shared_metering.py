@@ -27,7 +27,7 @@ from tariffs.models import BillingMode, EnergyType, TariffCategory
 from testing import factories
 from zev.models import AllocationMode, MeteringPoint, MeteringPointAssignment, MeteringPointType, Zev
 
-from .engine import generate_invoice
+from .engine import generate_invoice, generate_invoices_for_zev
 
 pytestmark = pytest.mark.django_db
 
@@ -452,3 +452,53 @@ class InvoiceTotalsAndDescriptionTests(_SharedMeteringBase, TestCase):
                 invoice = generate_invoice(alice, JAN, JAN_END)
                 grid_item = self._grid_items(invoice)[0]
                 self.assertIn(marker, grid_item.description)
+
+
+class CommunityFeeTariffClampTests(_SharedMeteringBase, TestCase):
+    """A per-metering-point tariff clipped inside the invoice period must not
+    dilute its community contribution with members it never bills (#465).
+
+    ``_price_fixed_fees`` drives the numerator from
+    ``_billable_months(tariff, ...)``; a denominator clamped to the period
+    instead would leave part of the meter's fee recovered from nobody.
+    """
+
+    def test_community_meter_fee_is_fully_recovered_when_the_tariff_starts_mid_month(self):
+        alice = self._participant("Alice Muster", weight="1")
+        # Leaves before the tariff starts, so she is never billed for it.
+        self._participant("Bob Beispiel", valid_to=date(2026, 1, 10), weight="1")
+        community_mp = self._mp(MeteringPointType.CONSUMPTION, "CH-SM-CLAMP-1")
+        self._assign(community_mp, alice, JAN, mode=AllocationMode.COMMUNITY)
+        factories.TariffFactory(
+            zev=self.zev, billing_mode=BillingMode.PER_METERING_POINT_MONTHLY_FEE,
+            category=TariffCategory.METERING, energy_type=None,
+            fixed_price_chf=Decimal("10.00"), valid_from=date(2026, 1, 15),
+        )
+
+        result = generate_invoices_for_zev(self.zev, JAN, JAN_END)
+        recovered = sum(
+            (item.total_chf for invoice in result.invoices
+             for item in invoice.items.filter(tariff_category=TariffCategory.METERING)),
+            Decimal("0"),
+        )
+
+        self.assertEqual(result.failures, [])
+        self.assertEqual(recovered, Decimal("10.00"))
+
+    def test_a_member_inside_the_billed_window_still_shares_the_community_fee(self):
+        """The clamp must not overshoot — someone active during the billed
+        part of the month keeps their share."""
+        alice = self._participant("Alice Muster", weight="1")
+        self._participant("Bob Beispiel", valid_to=date(2026, 1, 20), weight="1")
+        community_mp = self._mp(MeteringPointType.CONSUMPTION, "CH-SM-CLAMP-2")
+        self._assign(community_mp, alice, JAN, mode=AllocationMode.COMMUNITY)
+        factories.TariffFactory(
+            zev=self.zev, billing_mode=BillingMode.PER_METERING_POINT_MONTHLY_FEE,
+            category=TariffCategory.METERING, energy_type=None,
+            fixed_price_chf=Decimal("10.00"), valid_from=date(2026, 1, 15),
+        )
+
+        alice_invoice = generate_invoice(alice, JAN, JAN_END)
+        shared = next(i for i in self._fee_items(alice_invoice) if i.total_chf > 0)
+
+        self.assertEqual(shared.total_chf, Decimal("5.00"))
