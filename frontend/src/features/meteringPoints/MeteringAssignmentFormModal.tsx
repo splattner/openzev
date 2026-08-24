@@ -1,17 +1,14 @@
-import dayjs from 'dayjs'
-import { DatePicker } from '@mui/x-date-pickers/DatePicker'
 import { type Dispatch, type FormEvent, type SetStateAction } from 'react'
 import { useTranslation } from 'react-i18next'
 import { FormModal } from '../../components/FormModal'
-import { toDayJsDateFormat } from '../../lib/appSettings'
-import type { AppSettings, MeteringPointAssignmentInput, Participant } from '../../types/api'
+import { CivilDateInput } from '../../components/CivilDateInput'
+import type { MeteringPointAssignmentInput, Participant } from '../../types/api'
 
 type MeteringAssignmentFormModalProps = {
   isOpen: boolean
   title: string
   form: MeteringPointAssignmentInput
   participants: Participant[]
-  settings: AppSettings
   isPending: boolean
   onClose: () => void
   onSubmit: (event: FormEvent<HTMLFormElement>) => void
@@ -24,7 +21,6 @@ export function MeteringAssignmentFormModal({
   title,
   form,
   participants,
-  settings,
   isPending,
   onClose,
   onSubmit,
@@ -54,20 +50,16 @@ export function MeteringAssignmentFormModal({
 
         <label>
           <span>{t('pages.meteringPoints.assignForm.validFrom')}</span>
-          <DatePicker
-            format={toDayJsDateFormat(settings.date_format_short)}
-            value={form.valid_from ? dayjs(form.valid_from) : null}
-            onChange={(value) => setForm((previous) => ({ ...previous, valid_from: value ? value.format('YYYY-MM-DD') : '' }))}
-            slotProps={{ textField: { required: true, size: 'small' } }}
+          <CivilDateInput
+            value={form.valid_from || null}
+            onChange={(iso) => setForm((previous) => ({ ...previous, valid_from: iso ?? '' }))}
           />
         </label>
         <label>
           <span>{t('pages.meteringPoints.assignForm.validTo')}</span>
-          <DatePicker
-            format={toDayJsDateFormat(settings.date_format_short)}
-            value={form.valid_to ? dayjs(form.valid_to) : null}
-            onChange={(value) => setForm((previous) => ({ ...previous, valid_to: value ? value.format('YYYY-MM-DD') : null }))}
-            slotProps={{ textField: { size: 'small' } }}
+          <CivilDateInput
+            value={form.valid_to || null}
+            onChange={(iso) => setForm((previous) => ({ ...previous, valid_to: iso }))}
           />
         </label>
 

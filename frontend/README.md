@@ -9,7 +9,7 @@ this file covers frontend-only development.
 - React 19, TypeScript, Vite
 - TanStack Query for server state
 - react-i18next for localization (EN/DE/FR/IT)
-- MUI (and a subset of Mantine) for components, Recharts for charts
+- Mantine for components (shared `DataTable` built on `@tanstack/react-table`), Recharts for charts
 - Vitest for unit tests, Playwright for user-guide screenshots
 
 ## Local development

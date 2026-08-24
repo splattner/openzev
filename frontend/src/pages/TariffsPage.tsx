@@ -226,13 +226,12 @@ export function TariffsPage() {
                 onSubmit={submitTariff}
                 initialTariff={editingTariff}
                 selectedZevId={selectedZevId || ''}
-                settings={settings}
                 isPending={tariffPending}
             />
 
             <TariffVersionModal
-                dialog={versions.dialog}
                 settings={settings}
+                dialog={versions.dialog}
                 isPending={versions.isPending}
                 onClose={versions.closeDialog}
                 onSubmitNewVersion={versions.submitNewVersion}
@@ -265,10 +264,10 @@ export function TariffsPage() {
                 </section>
             ) : (
                 <TariffCategorySections
+                    settings={settings}
                     tariffSections={tariffSections}
                     allSeries={allSeries}
                     percentageBasePricing={percentageBasePricing}
-                    settings={settings}
                     deleteTariffDisabled={deleteTariffPending || dialogLoading}
                     deletePeriodDisabled={deletePeriodPending || dialogLoading}
                     onEditTariff={startTariffEdit}

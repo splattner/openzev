@@ -26,7 +26,7 @@ export function FormModal({ isOpen, title, children, onClose, maxWidth = '600px'
         >
             <div
                 style={{
-                    backgroundColor: 'white',
+                    backgroundColor: 'var(--surface-card)',
                     borderRadius: '0.5rem',
                     boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)',
                     maxWidth,
@@ -46,7 +46,7 @@ export function FormModal({ isOpen, title, children, onClose, maxWidth = '600px'
                             border: 'none',
                             fontSize: '1.5rem',
                             cursor: 'pointer',
-                            color: '#6b7280',
+                            color: 'var(--text-muted)',
                             padding: '0',
                             width: '2rem',
                             height: '2rem',

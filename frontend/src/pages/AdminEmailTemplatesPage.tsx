@@ -19,19 +19,24 @@ interface FieldInfo {
 function FieldReference({ fields }: { fields: FieldInfo[] }) {
     const { t } = useTranslation()
     return (
-        <aside className="card page-stack" style={{ maxHeight: '80vh', overflowY: 'auto' }}>
+        <aside
+            className="card page-stack"
+            style={{ maxHeight: '80vh', overflowY: 'auto', width: '100%' }}
+            tabIndex={0}
+            aria-label={t('admin.fieldReference')}
+        >
             <h4 style={{ margin: 0 }}>{t('admin.availableFields')}</h4>
-            <p className="muted" style={{ fontSize: '0.85rem', margin: 0 }}>
+            <p className="muted" style={{ fontSize: '0.78rem', margin: 0, lineHeight: 1.35 }}>
                 {t('admin.emailTemplates.variableHint')}
             </p>
-            <table style={{ width: '100%', fontSize: '0.85rem', borderCollapse: 'collapse' }}>
+            <table style={{ width: '100%', fontSize: '0.78rem', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
                 <tbody>
                     {fields.map((f) => (
-                        <tr key={f.variable} style={{ borderBottom: '1px solid var(--color-border, #e5e7eb)' }}>
-                            <td style={{ padding: '0.35rem 0.5rem 0.35rem 0', fontFamily: 'monospace', whiteSpace: 'nowrap' }}>
+                        <tr key={f.variable} style={{ borderBottom: '1px solid var(--border-default)' }}>
+                            <td style={{ padding: '0.3rem 0.35rem 0.3rem 0', fontFamily: 'monospace', overflowWrap: 'anywhere', width: '50%', fontSize: '0.72rem' }} title={f.variable}>
                                 {f.variable}
                             </td>
-                            <td className="muted" style={{ padding: '0.35rem 0' }}>
+                            <td className="muted" style={{ padding: '0.3rem 0', overflowWrap: 'anywhere', lineHeight: 1.3, fontSize: '0.74rem' }}>
                                 {f.description}
                             </td>
                         </tr>
@@ -112,7 +117,7 @@ function EmailTemplateEditor({
                         <label>
                             <span>{t('admin.emailTemplates.body')}</span>
                             <textarea
-                                rows={14}
+                                rows={24}
                                 value={body}
                                 onChange={(e) => setBody(e.target.value)}
                                 style={{ fontFamily: "'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace", fontSize: '0.9rem' }}
@@ -188,20 +193,20 @@ export function AdminEmailTemplatesPage() {
                 </p>
             </header>
 
-            <div style={{ display: 'flex', gap: '1rem', borderBottom: '1px solid var(--color-border, #e5e7eb)', marginBottom: '1.5rem' }}>
+            <div style={{ display: 'flex', gap: '1rem', borderBottom: '1px solid var(--border-default)', marginBottom: '1.5rem' }}>
                 {tabs.map((tab) => (
                     <button
                         key={tab.key}
                         onClick={() => setActiveTab(tab.key)}
                         style={{
                             background: 'transparent',
-                            color: activeTab === tab.key ? 'var(--color-text, #000)' : 'var(--color-text-muted, #888)',
+                            color: activeTab === tab.key ? 'var(--text-primary)' : 'var(--text-muted)',
                             padding: '0.75rem 1rem',
                             fontSize: '1rem',
                             fontWeight: activeTab === tab.key ? 600 : 400,
                             cursor: 'pointer',
                             border: 'none',
-                            borderBlockEnd: activeTab === tab.key ? '2px solid var(--color-primary, #0066cc)' : 'none',
+                            borderBlockEnd: activeTab === tab.key ? '2px solid var(--interactive)' : 'none',
                         }}
                     >
                         {tab.label}

@@ -41,7 +41,7 @@ in the frontend.
 | Page shell | Page header, summary toolbar, filters, card/table containers |
 | Action hierarchy | Primary, secondary, overflow, destructive, modal footer actions |
 | Icon treatment | Font Awesome icon + label buttons, fixed-width icon alignment |
-| Page grouping patterns | When to use sections, nested cards, tables, DataGrid, or tabs |
+| Page grouping patterns | When to use sections, nested cards, tables (`DataTable`), or tabs |
 | Shared primitives | `ActionMenu`, `ConfirmDialog`, `FormModal`, `BillingPeriodSelector`, `StatCard` |
 | I18n constraints | User-facing text in locale files only; translated labels must not encode visual symbols |
 | Responsive behaviour | Management pages must remain usable on mobile and reduced-width layouts |
@@ -106,10 +106,16 @@ language and should be reused instead of ad hoc page-local CSS when possible:
 |---|---|
 | `.page-stack` | Vertical page layout spacing |
 | `.card`, `.table-card`, `.stat-card` | Primary container surfaces |
-| `.button`, `.button-secondary`, `.button-danger`, `.button-compact` | Shared button system |
-| `.badge`, `.badge-neutral`, `.badge-info`, `.badge-success`, `.badge-danger`, `.badge-warning` | Small semantic status/category labels |
+| `.button`, `.button-secondary`, `.button-danger`, `.button-compact` | Shared button system (flat `var(--interactive)` fill since SPEC-2026-08-ui-redesign-pdf-style Phase 2; hover `var(--interactive-hover)`) |
+| `.badge`, `.badge-neutral`, `.badge-info`, `.badge-success`, `.badge-danger`, `.badge-warning` (+ invoice workflow variants `.badge-draft/.badge-approved/.badge-sent/.badge-paid/.badge-cancelled`) | Small semantic status/category labels — filled desaturated fills from the generated `--status-*` semantics, never gold-on-white |
 | `.actions-row`, `.actions-row-wrap`, `.actions-row-end` | Inline action layouts |
 | `.participant-*`, `.metering-*`, `.tariff-*`, `.invoice-*` | Page-family-specific structural patterns that are already in active use |
+
+Tables additionally follow the operational contract introduced by the UI
+redesign: sticky `thead`, 36px row rhythm, row-hover on `var(--surface)`, and
+right-aligned tabular numerals for quantities/money. All values resolve through
+the design tokens (`design/tokens.json` → `frontend/src/styles/tokens.css`);
+raw hex colors are lint-barred (stylelint `color-no-hex` + hex sweep).
 
 ### 4.3 Icon contract
 
@@ -135,6 +141,13 @@ Frontend interaction rules relevant to async work:
 - A mutation must invalidate the page’s canonical query key(s) after success.
 - Destructive or long-running flows should display a confirmation or modal before execution.
 - Buttons must reflect pending state through disabled state and, when already implemented by the page, pending labels.
+- Disabled is reserved for transient unavailability (a mutation in flight).
+  Actions that are permanently unavailable in the current context (zero
+  eligible records, single-page result sets, future billing periods) are
+  hidden instead of rendered as dead disabled buttons — a greyed button reads
+  to users as a stuck loading state. Disabled buttons use the
+  `cursor: not-allowed` affordance (`index.css` `.button:disabled`), never
+  `cursor: wait`.
 
 ## 7. Frontend
 
@@ -145,15 +158,18 @@ Management pages should follow this high-level order:
 1. Page header with title and one-sentence description.
 2. Summary/action toolbar for counts, current context, and top-level create/import/export actions.
 3. Filters when the page supports narrowing or searching records.
-4. Main content using either a structured table/DataGrid or a card list, depending on record complexity.
+4. Main content using either a structured table (shared `frontend/src/components/DataTable.tsx`) or a card list, depending on record complexity.
 5. Modals and confirm dialogs rendered at the end of the component tree.
 
 ### 7.2 Information architecture rules
 
-#### A. When to use tables or DataGrid
+#### A. When to use tables (DataTable)
 
-Use a table/DataGrid when records are flat and users scan across repeated dense
-columns.
+Use a `DataTable` when records are flat and users scan across repeated dense
+columns. The `DataTable` footer (range label, page-size select, prev/next
+buttons) renders only when the rows span more than one page
+(`table.getPageCount() > 1`); single-page tables hide it entirely instead of
+showing permanently disabled pagination buttons.
 
 Current examples:
 
@@ -248,7 +264,7 @@ These pages define the current management-page reference set.
 - File: `frontend/src/pages/ImportsPage.tsx`
 - Route: `/imports`
 - Query keys: `['imports']`, `['zevs']`
-- Pattern: top-level action card, DataGrid for import logs, per-row protocol/delete actions, destructive bulk-delete modal, import wizard modal.
+- Pattern: top-level action card, `DataTable` for import logs, per-row protocol/delete actions, destructive bulk-delete modal, import wizard modal.
 
 ### 7.6 I18n rules
 

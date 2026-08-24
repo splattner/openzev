@@ -261,6 +261,10 @@ export function useMeteringPointActions({
             pushToast(t('pages.meteringPoints.messages.selectParticipant'), 'error')
             return
         }
+        if (!assignForm.valid_from) {
+            pushToast(t('pages.meteringPoints.messages.missingValidFrom'), 'error')
+            return
+        }
         const payload: MeteringPointAssignmentInput = {
             ...assignForm,
             valid_to: assignForm.valid_to || null,

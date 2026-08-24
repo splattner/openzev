@@ -227,54 +227,60 @@ export function AuditLogsPage({ scope }: AuditLogsPageProps) {
 
                 {events.length > 0 && (
                     <>
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>{t('pages.auditLogs.columns.createdAt')}</th>
-                                    <th>{t('pages.auditLogs.columns.summary')}</th>
-                                    <th>{t('pages.auditLogs.columns.zev')}</th>
-                                    <th>{t('pages.auditLogs.columns.category')}</th>
-                                    <th>{t('pages.auditLogs.columns.action')}</th>
-                                    <th>{t('pages.auditLogs.columns.target')}</th>
-                                    <th>{t('pages.auditLogs.columns.actor')}</th>
-                                    <th>{t('pages.auditLogs.columns.status')}</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {events.map((event) => (
-                                    <tr key={event.id} style={{ cursor: 'pointer', background: selectedEventId === event.id ? 'var(--surface-subtle)' : undefined }} onClick={() => selectEvent(event)}>
-                                        <td>{formatDateTime(event.created_at, settings)}</td>
-                                        <td>{event.summary}</td>
-                                        <td>{event.zev ? zevNameById.get(event.zev) ?? event.zev : '—'}</td>
-                                        <td>{t(`pages.auditLogs.categories.${event.action_category}`)}</td>
-                                        <td><code>{event.action_type}</code></td>
-                                        <td>{event.target_display || `${event.target_type}:${event.target_id || '-'}`}</td>
-                                        <td>{event.actor_display || '—'}</td>
-                                        <td><span className={statusBadgeClass(event.status)}>{t(`pages.auditLogs.statuses.${event.status}`)}</span></td>
+                        <div className="table-scroll">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>{t('pages.auditLogs.columns.createdAt')}</th>
+                                        <th>{t('pages.auditLogs.columns.summary')}</th>
+                                        <th>{t('pages.auditLogs.columns.zev')}</th>
+                                        <th>{t('pages.auditLogs.columns.category')}</th>
+                                        <th>{t('pages.auditLogs.columns.action')}</th>
+                                        <th>{t('pages.auditLogs.columns.target')}</th>
+                                        <th>{t('pages.auditLogs.columns.actor')}</th>
+                                        <th>{t('pages.auditLogs.columns.status')}</th>
                                     </tr>
-                                ))}
-                            </tbody>
-                        </table>
-
-                        <div className="actions-row actions-row-wrap actions-row-end" style={{ marginTop: '1rem' }}>
-                            <span className="muted">{t('pages.auditLogs.pagination.pageLabel', { page: filters.page, total: eventsQuery.data?.count ?? 0 })}</span>
-                            <button
-                                type="button"
-                                className="button button-secondary"
-                                onClick={() => updateFilter('page', Math.max(1, filters.page - 1))}
-                                disabled={!eventsQuery.data?.previous}
-                            >
-                                {t('pages.auditLogs.pagination.previous')}
-                            </button>
-                            <button
-                                type="button"
-                                className="button button-secondary"
-                                onClick={() => updateFilter('page', filters.page + 1)}
-                                disabled={!eventsQuery.data?.next}
-                            >
-                                {t('pages.auditLogs.pagination.next')}
-                            </button>
+                                </thead>
+                                <tbody>
+                                    {events.map((event) => (
+                                        <tr key={event.id} style={{ cursor: 'pointer', background: selectedEventId === event.id ? 'var(--surface-subtle)' : undefined }} onClick={() => selectEvent(event)}>
+                                            <td>{formatDateTime(event.created_at, settings)}</td>
+                                            <td>{event.summary}</td>
+                                            <td>{event.zev ? zevNameById.get(event.zev) ?? event.zev : '—'}</td>
+                                            <td>{t(`pages.auditLogs.categories.${event.action_category}`)}</td>
+                                            <td><code>{event.action_type}</code></td>
+                                            <td>{event.target_display || `${event.target_type}:${event.target_id || '-'}`}</td>
+                                            <td>{event.actor_display || '—'}</td>
+                                            <td><span className={statusBadgeClass(event.status)}>{t(`pages.auditLogs.statuses.${event.status}`)}</span></td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
                         </div>
+
+                        {/* Only rendered when the result spans more than one page:
+                            DRF returns next = previous = null exactly when count <= page size. */}
+                        {(eventsQuery.data?.next || eventsQuery.data?.previous) && (
+                            <div className="actions-row actions-row-wrap actions-row-end" style={{ marginTop: '1rem' }}>
+                                <span className="muted">{t('pages.auditLogs.pagination.pageLabel', { page: filters.page, total: eventsQuery.data?.count ?? 0 })}</span>
+                                <button
+                                    type="button"
+                                    className="button button-secondary"
+                                    onClick={() => updateFilter('page', Math.max(1, filters.page - 1))}
+                                    disabled={!eventsQuery.data?.previous}
+                                >
+                                    {t('pages.auditLogs.pagination.previous')}
+                                </button>
+                                <button
+                                    type="button"
+                                    className="button button-secondary"
+                                    onClick={() => updateFilter('page', filters.page + 1)}
+                                    disabled={!eventsQuery.data?.next}
+                                >
+                                    {t('pages.auditLogs.pagination.next')}
+                                </button>
+                            </div>
+                        )}
                     </>
                 )}
             </section>

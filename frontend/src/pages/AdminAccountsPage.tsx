@@ -400,10 +400,12 @@ export function AdminAccountsPage() {
                                                 </>
                                             ) : (
                                                 <>
-                                                    <button className="button button-secondary button-compact" type="button" onClick={() => openLinkModal(participant)} disabled={linkableAccounts.length === 0}>
-                                                        <FontAwesomeIcon icon={faLink} fixedWidth />
-                                                        {t('pages.accounts.linkExisting')}
-                                                    </button>
+                                                    {linkableAccounts.length > 0 && (
+                                                        <button className="button button-secondary button-compact" type="button" onClick={() => openLinkModal(participant)}>
+                                                            <FontAwesomeIcon icon={faLink} fixedWidth />
+                                                            {t('pages.accounts.linkExisting')}
+                                                        </button>
+                                                    )}
                                                     <button className="button button-primary button-compact" type="button" onClick={() => openCreateAccountModal(participant)}>
                                                         <FontAwesomeIcon icon={faPlus} fixedWidth />
                                                         {t('pages.accounts.createAccount')}

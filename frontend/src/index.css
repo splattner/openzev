@@ -1174,6 +1174,17 @@ h3 {
   color: var(--ink-soft);
 }
 
+/* Shared ActionMenu (Mantine dropdown) danger entries. Mantine's color prop
+   cannot resolve CSS variables for its hover tint, so the class carries both
+   label and hover colors from the tokens directly. */
+.action-menu-item-danger {
+  color: var(--danger-700);
+}
+
+.action-menu-item-danger:hover {
+  background: var(--danger-100);
+}
+
 .badge-approved,
 .badge-sent {
   background: var(--status-info);

@@ -1,7 +1,5 @@
-import dayjs from 'dayjs'
-import { DatePicker } from '@mui/x-date-pickers/DatePicker'
+import { CivilDateInput } from './CivilDateInput'
 import { useTranslation } from 'react-i18next'
-import { toDayJsDateFormat, useAppSettings } from '../lib/appSettings'
 import type { ZevInput } from '../types/api'
 
 type ZevGeneralSettingsFieldsProps = {
@@ -10,7 +8,6 @@ type ZevGeneralSettingsFieldsProps = {
 }
 
 export function ZevGeneralSettingsFields({ form, onChange }: ZevGeneralSettingsFieldsProps) {
-    const { settings } = useAppSettings()
     const { t } = useTranslation()
 
     return (
@@ -30,13 +27,9 @@ export function ZevGeneralSettingsFields({ form, onChange }: ZevGeneralSettingsF
                     </label>
                     <label>
                         <span>{t('pages.zevSettings.fields.startDate')}</span>
-                        <DatePicker
-                            format={toDayJsDateFormat(settings.date_format_short)}
-                            value={form.start_date ? dayjs(form.start_date) : null}
-                            onChange={(newValue) =>
-                                onChange({ start_date: newValue ? newValue.format('YYYY-MM-DD') : '' })
-                            }
-                            slotProps={{ textField: { required: true, size: 'small' } }}
+                        <CivilDateInput
+                            value={form.start_date || null}
+                            onChange={(iso) => onChange({ start_date: iso ?? '' })}
                         />
                     </label>
                     <label>

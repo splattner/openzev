@@ -58,14 +58,17 @@ export function PrefillFromZevCard({ onPrefillLoaded }: Props) {
                         <option key={zev.id} value={zev.id}>{zev.name}</option>
                     ))}
                 </select>
-                <button
-                    type="button"
-                    className="button button-secondary"
-                    disabled={!selectedZevId || prefillMutation.isPending}
-                    onClick={() => selectedZevId && prefillMutation.mutate(selectedZevId)}
-                >
-                    {prefillMutation.isPending ? t('common.loading') : t('pages.feasibility.prefill.load')}
-                </button>
+                {/* Hidden until a ZEV is chosen; disabled only while loading. */}
+                {selectedZevId !== '' && (
+                    <button
+                        type="button"
+                        className="button button-secondary"
+                        disabled={prefillMutation.isPending}
+                        onClick={() => prefillMutation.mutate(selectedZevId)}
+                    >
+                        {prefillMutation.isPending ? t('common.loading') : t('pages.feasibility.prefill.load')}
+                    </button>
+                )}
             </div>
         </section>
     )

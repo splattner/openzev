@@ -1,5 +1,5 @@
-import { Fragment, type MouseEvent, type ReactNode, useMemo, useState } from 'react'
-import { Divider, ListSubheader, Menu, MenuItem } from '@mui/material'
+import { Fragment, useMemo, type ReactNode } from 'react'
+import { Menu } from '@mantine/core'
 
 export interface ActionMenuItem {
     key: string
@@ -19,8 +19,6 @@ interface ActionMenuProps {
 }
 
 export function ActionMenu({ label, items, buttonClassName = 'button button-secondary button-compact', icon }: ActionMenuProps) {
-    const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null)
-    const open = Boolean(anchorEl)
     const availableItems = useMemo(() => items.filter((item) => !item.disabled), [items])
     const renderedItems = useMemo(() => {
         return items.map((item, index) => {
@@ -35,59 +33,40 @@ export function ActionMenu({ label, items, buttonClassName = 'button button-seco
         })
     }, [items])
 
-    function handleOpen(event: MouseEvent<HTMLButtonElement>) {
-        setAnchorEl(event.currentTarget)
-    }
-
-    function handleClose() {
-        setAnchorEl(null)
-    }
-
     return (
-        <>
-            <button
-                type="button"
-                className={buttonClassName}
-                onClick={handleOpen}
-                disabled={availableItems.length === 0}
-                aria-haspopup="menu"
-                aria-expanded={open ? 'true' : undefined}
-            >
-                {icon ? <span className="button-icon" aria-hidden="true">{icon}</span> : null}
-                {label}
-            </button>
-            <Menu
-                anchorEl={anchorEl}
-                open={open}
-                onClose={handleClose}
-                anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-                transformOrigin={{ vertical: 'top', horizontal: 'right' }}
-            >
+        <Menu
+            position="bottom-end"
+            withinPortal
+            shadow="md"
+            transitionProps={{ transition: 'pop-top-right' }}
+        >
+            <Menu.Target>
+                <button
+                    type="button"
+                    className={buttonClassName}
+                    disabled={availableItems.length === 0}
+                    aria-haspopup="menu"
+                >
+                    {icon ? <span className="menu-item-icon" aria-hidden="true">{icon}</span> : null}
+                    {label}
+                </button>
+            </Menu.Target>
+            <Menu.Dropdown>
                 {renderedItems.map(({ item, showSection, showDivider }) => (
                     <Fragment key={item.key}>
-                        {showDivider && <Divider />}
-                        {showSection && (
-                            <ListSubheader
-                                disableSticky
-                                sx={{ lineHeight: 1.8, fontSize: '0.72rem', fontWeight: 700, color: '#64748b' }}
-                            >
-                                {item.section}
-                            </ListSubheader>
-                        )}
-                        <MenuItem
+                        {showDivider && <Menu.Divider />}
+                        {showSection && <Menu.Label>{item.section}</Menu.Label>}
+                        <Menu.Item
                             disabled={item.disabled}
-                            onClick={() => {
-                                handleClose()
-                                item.onClick()
-                            }}
-                            sx={item.danger ? { color: '#b91c1c' } : undefined}
+                            leftSection={item.icon ? <span className="menu-item-icon" aria-hidden="true">{item.icon}</span> : undefined}
+                            className={item.danger ? 'action-menu-item-danger' : undefined}
+                            onClick={item.onClick}
                         >
-                            {item.icon ? <span className="menu-item-icon" aria-hidden="true">{item.icon}</span> : null}
                             {item.label}
-                        </MenuItem>
+                        </Menu.Item>
                     </Fragment>
                 ))}
-            </Menu>
-        </>
+            </Menu.Dropdown>
+        </Menu>
     )
 }

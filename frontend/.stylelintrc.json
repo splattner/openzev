@@ -1,0 +1,6 @@
+{
+    "ignoreFiles": ["src/styles/tokens.css"],
+    "rules": {
+        "color-no-hex": true
+    }
+}

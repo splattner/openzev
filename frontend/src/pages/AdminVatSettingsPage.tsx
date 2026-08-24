@@ -2,13 +2,12 @@ import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faCheck, faPen, faPlus, faTrash, faXmark } from '@fortawesome/free-solid-svg-icons'
-import dayjs from 'dayjs'
-import { DatePicker } from '@mui/x-date-pickers/DatePicker'
 import { createVatRate, deleteVatRate, fetchVatRates, updateVatRate } from '../lib/api/auth'
 import { formatApiError } from '../lib/api/errors'
 import { queryKeys } from '../lib/api/queryKeys'
-import { formatShortDate, toDayJsDateFormat, useAppSettings } from '../lib/appSettings'
+import { formatShortDate, useAppSettings } from '../lib/appSettings'
 import { useTranslation } from 'react-i18next'
+import { CivilDateInput } from '../components/CivilDateInput'
 import { useToast } from '../lib/toast'
 import { ConfirmDialog, useConfirmDialog } from '../components/ConfirmDialog'
 import { StatCard } from '../components/StatCard'
@@ -155,25 +154,17 @@ export function AdminVatSettingsPage() {
                         </label>
                         <label>
                             <span>{t('adminVatSettings.form.validFrom')}</span>
-                            <DatePicker
-                                format={toDayJsDateFormat(settings.date_format_short)}
-                                value={form.valid_from ? dayjs(form.valid_from) : null}
-                                onChange={(newValue) =>
-                                    setForm((prev) => ({ ...prev, valid_from: newValue ? newValue.format('YYYY-MM-DD') : '' }))
-                                }
-                                slotProps={{ textField: { required: true, size: 'small' } }}
+                            <CivilDateInput
+                                value={form.valid_from || null}
+                                onChange={(iso) => setForm((prev) => ({ ...prev, valid_from: iso ?? '' }))}
                             />
                             <small className="muted">{t('adminVatSettings.form.validFromHint')}</small>
                         </label>
                         <label>
                             <span>{t('adminVatSettings.form.validTo')}</span>
-                            <DatePicker
-                                format={toDayJsDateFormat(settings.date_format_short)}
-                                value={form.valid_to ? dayjs(form.valid_to) : null}
-                                onChange={(newValue) =>
-                                    setForm((prev) => ({ ...prev, valid_to: newValue ? newValue.format('YYYY-MM-DD') : null }))
-                                }
-                                slotProps={{ textField: { size: 'small' } }}
+                            <CivilDateInput
+                                value={form.valid_to || null}
+                                onChange={(iso) => setForm((prev) => ({ ...prev, valid_to: iso }))}
                             />
                             <small className="muted">{t('adminVatSettings.form.validToHint')}</small>
                         </label>

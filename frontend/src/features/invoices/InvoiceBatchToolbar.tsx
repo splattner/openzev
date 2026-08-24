@@ -28,6 +28,9 @@ export function InvoiceBatchToolbar({
 }: InvoiceBatchToolbarProps) {
   const { t } = useTranslation()
 
+  // The menu never repeats the promoted recommended action.
+  const menuActions = menuItems.filter((item) => item.key !== recommendedAction?.key)
+
   return (
     <section className="card invoice-batch-toolbar">
       <div className="invoice-batch-header">
@@ -53,20 +56,27 @@ export function InvoiceBatchToolbar({
             {recommendedAction.label}
           </button>
         )}
-        <button
-          className="button button-secondary button-compact"
-          type="button"
-          disabled={anyBatchPending || pdfCount === 0}
-          onClick={onDownloadAll}
-        >
-          <FontAwesomeIcon icon={faDownload} fixedWidth />
-          {t('pages.invoices.batch.downloadAll')} {pdfCount > 0 && `(${pdfCount})`}
-        </button>
-        <ActionMenu
-          label={t('pages.invoices.moreBatchActions')}
-          icon={<FontAwesomeIcon icon={faEllipsis} fixedWidth />}
-          items={menuItems.filter((item) => item.key !== recommendedAction?.key)}
-        />
+        {/* Hidden rather than disabled when there is nothing to act on
+            (e.g. future periods): permanently dead buttons read as a stuck
+            loading state. Disabled is reserved for transient batch pending. */}
+        {pdfCount > 0 && (
+          <button
+            className="button button-secondary button-compact"
+            type="button"
+            disabled={anyBatchPending}
+            onClick={onDownloadAll}
+          >
+            <FontAwesomeIcon icon={faDownload} fixedWidth />
+            {t('pages.invoices.batch.downloadAll')} ({pdfCount})
+          </button>
+        )}
+        {(anyBatchPending || menuActions.some((item) => !item.disabled)) && (
+          <ActionMenu
+            label={t('pages.invoices.moreBatchActions')}
+            icon={<FontAwesomeIcon icon={faEllipsis} fixedWidth />}
+            items={menuActions}
+          />
+        )}
       </div>
     </section>
   )

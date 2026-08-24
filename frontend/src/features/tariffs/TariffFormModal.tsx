@@ -1,14 +1,12 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faCheck, faXmark } from '@fortawesome/free-solid-svg-icons'
-import dayjs from 'dayjs'
-import { DatePicker } from '@mui/x-date-pickers/DatePicker'
 import { Controller, useForm, useWatch } from 'react-hook-form'
 import { useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { FormModal } from '../../components/FormModal'
-import { toDayJsDateFormat } from '../../lib/appSettings'
-import type { AppSettings, Tariff, TariffBillingMode, TariffInput } from '../../types/api'
+import { CivilDateInput } from '../../components/CivilDateInput'
+import type { Tariff, TariffBillingMode, TariffInput } from '../../types/api'
 import {
   defaultTariffFormValues,
   mapTariffFormValuesToInput,
@@ -36,7 +34,6 @@ type TariffFormModalProps = {
   onSubmit: (payload: TariffInput) => void
   initialTariff?: Tariff
   selectedZevId: string
-  settings: AppSettings
   isPending?: boolean
 }
 
@@ -47,7 +44,6 @@ export function TariffFormModal({
   onSubmit,
   initialTariff,
   selectedZevId,
-  settings,
   isPending = false,
 }: TariffFormModalProps) {
   const { t } = useTranslation()
@@ -186,11 +182,9 @@ export function TariffFormModal({
             control={form.control}
             name="valid_from"
             render={({ field }) => (
-              <DatePicker
-                format={toDayJsDateFormat(settings.date_format_short)}
-                value={field.value ? dayjs(field.value) : null}
-                onChange={(val) => field.onChange(val ? val.format('YYYY-MM-DD') : '')}
-                slotProps={{ textField: { size: 'small', fullWidth: true } }}
+              <CivilDateInput
+                value={field.value || null}
+                onChange={(iso) => field.onChange(iso ?? '')}
               />
             )}
           />
@@ -201,11 +195,9 @@ export function TariffFormModal({
             control={form.control}
             name="valid_to"
             render={({ field }) => (
-              <DatePicker
-                format={toDayJsDateFormat(settings.date_format_short)}
-                value={field.value ? dayjs(field.value) : null}
-                onChange={(val) => field.onChange(val ? val.format('YYYY-MM-DD') : '')}
-                slotProps={{ textField: { size: 'small', fullWidth: true } }}
+              <CivilDateInput
+                value={field.value || null}
+                onChange={(iso) => field.onChange(iso ?? '')}
               />
             )}
           />

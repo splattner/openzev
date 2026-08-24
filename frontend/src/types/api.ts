@@ -460,6 +460,7 @@ export interface Invoice {
     participant_name: string
     period_start: string
     period_end: string
+    due_date?: string | null
     subtotal_chf?: string
     vat_rate?: string
     vat_chf?: string

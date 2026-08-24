@@ -83,15 +83,15 @@ export function ApiKeysSection({ onRevoke }: Props) {
                 <div
                     className="api-key-secret"
                     style={{
-                        border: '1px solid #f59e0b',
-                        background: '#fffbeb',
+                        border: '1px solid var(--gold)',
+                        background: 'var(--warning-100)',
                         borderRadius: '6px',
                         padding: '1rem',
                         marginBottom: '1.5rem',
                     }}
                 >
-                    <strong style={{ color: '#92400e' }}>{t('account.apiKeys.secretShownOnceTitle')}</strong>
-                    <p style={{ color: '#78350f', marginTop: '0.5rem' }}>
+                    <strong style={{ color: 'var(--warning-800)' }}>{t('account.apiKeys.secretShownOnceTitle')}</strong>
+                    <p style={{ color: 'var(--warning-800)', marginTop: '0.5rem' }}>
                         {t('account.apiKeys.secretShownOnceBody')}
                     </p>
                     <code
@@ -99,10 +99,10 @@ export function ApiKeysSection({ onRevoke }: Props) {
                         style={{
                             display: 'block',
                             wordBreak: 'break-all',
-                            background: '#fff',
+                            background: 'var(--surface-card)',
                             padding: '0.75rem',
                             borderRadius: '4px',
-                            border: '1px solid #fcd34d',
+                            border: '1px solid var(--warning-200)',
                         }}
                     >
                         {freshSecret.key}
@@ -178,7 +178,7 @@ export function ApiKeysSection({ onRevoke }: Props) {
                             />
                             {t('account.apiKeys.readOnlyLabel')}
                         </label>
-                        <small style={{ color: '#6b7280', marginTop: '0.25rem', display: 'block' }}>
+                        <small style={{ color: 'var(--text-muted)', marginTop: '0.25rem', display: 'block' }}>
                             {t('account.apiKeys.readOnlyHint')}
                         </small>
                     </div>
@@ -237,7 +237,7 @@ export function ApiKeysSection({ onRevoke }: Props) {
                             {status !== 'active' && (
                                 <span
                                     className="badge"
-                                    style={{ marginLeft: '0.5rem', background: '#fef3c7', color: '#92400e' }}
+                                    style={{ marginLeft: '0.5rem', background: 'var(--warning-100)', color: 'var(--warning-800)' }}
                                 >
                                     {t(
                                         status === 'expired'
@@ -246,7 +246,7 @@ export function ApiKeysSection({ onRevoke }: Props) {
                                     )}
                                 </span>
                             )}
-                            <small style={{ display: 'block', color: '#6b7280' }}>
+                            <small style={{ display: 'block', color: 'var(--text-muted)' }}>
                                 <code>{key.prefix}</code>
                                 {' · '}
                                 {t('account.apiKeys.createdOn', { date: formatDateTime(key.created_at, settings) })}

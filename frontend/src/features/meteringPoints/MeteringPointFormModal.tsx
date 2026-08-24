@@ -1,4 +1,4 @@
-import { FormControlLabel, Switch } from '@mui/material'
+import { Switch } from '@mantine/core'
 import { type Dispatch, type FormEvent, type SetStateAction } from 'react'
 import { useTranslation } from 'react-i18next'
 import { FormModal } from '../../components/FormModal'
@@ -54,13 +54,9 @@ export function MeteringPointFormModal({
         </label>
 
         <div style={{ gridColumn: '1 / -1' }}>
-          <FormControlLabel
-            control={
-              <Switch
-                checked={form.is_active}
-                onChange={(_event, checked) => setForm((previous) => ({ ...previous, is_active: checked }))}
-              />
-            }
+          <Switch
+            checked={form.is_active}
+            onChange={(event) => setForm((previous) => ({ ...previous, is_active: event.currentTarget.checked }))}
             label={t('pages.meteringPoints.form.active')}
           />
         </div>

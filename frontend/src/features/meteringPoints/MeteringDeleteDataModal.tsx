@@ -47,10 +47,10 @@ export function MeteringDeleteDataModal({
               display: 'flex',
               alignItems: 'center',
               gap: '0.6rem',
-              border: mode === 'all' ? '2px solid #0f766e' : '1px solid var(--color-border, #d1d5db)',
+              border: mode === 'all' ? '2px solid var(--brand-mid)' : '1px solid var(--border-default)',
               borderRadius: '0.6rem',
               padding: '0.75rem 0.85rem',
-              background: mode === 'all' ? '#ecfeff' : 'white',
+              background: mode === 'all' ? 'var(--brand-pale)' : 'var(--surface-card)',
               cursor: 'pointer',
             }}
           >
@@ -68,10 +68,10 @@ export function MeteringDeleteDataModal({
               display: 'flex',
               alignItems: 'center',
               gap: '0.6rem',
-              border: mode === 'range' ? '2px solid #0f766e' : '1px solid var(--color-border, #d1d5db)',
+              border: mode === 'range' ? '2px solid var(--brand-mid)' : '1px solid var(--border-default)',
               borderRadius: '0.6rem',
               padding: '0.75rem 0.85rem',
-              background: mode === 'range' ? '#ecfeff' : 'white',
+              background: mode === 'range' ? 'var(--brand-pale)' : 'var(--surface-card)',
               cursor: 'pointer',
             }}
           >

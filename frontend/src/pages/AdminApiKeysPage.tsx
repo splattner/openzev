@@ -136,7 +136,7 @@ export function AdminApiKeysPage() {
             ) : keys.length === 0 ? (
                 <div className="card muted">{t('pages.adminApiKeys.empty')}</div>
             ) : (
-                <section className="card" style={{ overflowX: 'auto' }}>
+                <section className="card table-scroll">
                     <table className="data-table">
                         <thead>
                             <tr>

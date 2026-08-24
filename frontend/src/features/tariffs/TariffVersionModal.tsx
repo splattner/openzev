@@ -1,13 +1,11 @@
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faCheck, faTriangleExclamation, faXmark } from '@fortawesome/free-solid-svg-icons'
 import dayjs from 'dayjs'
-import { DatePicker } from '@mui/x-date-pickers/DatePicker'
-import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs'
-import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { FormModal } from '../../components/FormModal'
-import { formatShortDate, toDayJsDateFormat } from '../../lib/appSettings'
+import { CivilDateInput } from '../../components/CivilDateInput'
+import { formatShortDate } from '../../lib/appSettings'
 import type { AppSettings, TariffVersion, TariffVersionInput } from '../../types/api'
 import type { VersionDialog } from './useTariffVersions'
 
@@ -145,14 +143,10 @@ export function TariffVersionModal({
                 ? t('pages.tariffs.versions.effectiveFrom')
                 : t('pages.tariffs.form.validFrom')}
             </span>
-            <LocalizationProvider dateAdapter={AdapterDayjs}>
-              <DatePicker
-                format={toDayJsDateFormat(settings.date_format_short)}
-                value={validFrom ? dayjs(validFrom) : null}
-                onChange={(value) => setValidFrom(value ? value.format('YYYY-MM-DD') : '')}
-                slotProps={{ textField: { size: 'small', fullWidth: true } }}
-              />
-            </LocalizationProvider>
+            <CivilDateInput
+              value={validFrom || null}
+              onChange={(iso) => setValidFrom(iso ?? '')}
+            />
           </label>
         )}
 

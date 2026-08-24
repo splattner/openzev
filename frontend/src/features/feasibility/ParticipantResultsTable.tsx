@@ -14,10 +14,10 @@ export function ParticipantResultsTable({ participants }: Props) {
     if (participants.length === 0) return null
 
     return (
-        <div style={{ overflowX: 'auto' }}>
+        <div className="table-scroll">
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
                 <thead>
-                    <tr style={{ borderBottom: '1px solid #e5e7eb' }}>
+                    <tr style={{ borderBottom: '1px solid var(--border-default)' }}>
                         <th style={{ textAlign: 'left', padding: '0.4rem 0.6rem' }}>{t('pages.feasibility.results.participantName')}</th>
                         <th style={{ textAlign: 'right', padding: '0.4rem 0.6rem' }}>{t('pages.feasibility.results.participantProduction')}</th>
                         <th style={{ textAlign: 'right', padding: '0.4rem 0.6rem' }}>{t('pages.feasibility.results.participantConsumption')}</th>
@@ -28,7 +28,7 @@ export function ParticipantResultsTable({ participants }: Props) {
                 </thead>
                 <tbody>
                     {participants.map((p) => (
-                        <tr key={p.name} style={{ borderBottom: '1px solid #f3f4f6' }}>
+                        <tr key={p.name} style={{ borderBottom: '1px solid var(--border-subtle)' }}>
                             <td style={{ padding: '0.4rem 0.6rem' }}>{p.name}</td>
                             <td style={{ textAlign: 'right', padding: '0.4rem 0.6rem' }}>{Number(p.annual_production_kwh).toFixed(0)} kWh</td>
                             <td style={{ textAlign: 'right', padding: '0.4rem 0.6rem' }}>{Number(p.annual_consumption_kwh).toFixed(0)} kWh</td>

@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { Drawer } from '@mui/material'
+import { Drawer } from '@mantine/core'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faXmark } from '@fortawesome/free-solid-svg-icons'
 import { useQuery } from '@tanstack/react-query'
@@ -52,20 +52,16 @@ export function AuditEventDrawer({ eventId, onClose, statusBadgeClass }: AuditEv
 
     return (
         <Drawer
-            anchor="right"
-            open={Boolean(eventId)}
+            opened={Boolean(eventId)}
             onClose={onClose}
-            hideBackdrop
-            ModalProps={{ disableEnforceFocus: true, disableScrollLock: true }}
-            // Without a backdrop the Modal root still covers the viewport, so
-            // clicks would land on it instead of the table underneath.
-            sx={{
-                pointerEvents: 'none',
-                '& .MuiDrawer-paper': {
-                    pointerEvents: 'auto',
-                    width: { xs: '100%', sm: 460, lg: 560 },
-                    boxShadow: '-8px 0 24px -12px rgba(0, 0, 0, 0.35)',
-                },
+            position="right"
+            withCloseButton={false}
+            trapFocus={false}
+            lockScroll={false}
+            styles={{
+                content: { width: 'min(100vw, 560px)', pointerEvents: 'auto', boxShadow: '-8px 0 24px -12px rgba(0, 0, 0, 0.35)' },
+                inner: { padding: 0 },
+                root: { pointerEvents: 'none' },
             }}
         >
             <div className="audit-drawer">

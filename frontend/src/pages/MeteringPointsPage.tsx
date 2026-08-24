@@ -131,7 +131,6 @@ export function MeteringPointsPage() {
                 title={editingAssignId ? t('pages.meteringPoints.editAssignTitle') : t('pages.meteringPoints.assignTitle')}
                 form={assignForm}
                 participants={assignParticipants}
-                settings={settings}
                 isPending={saveAssignMutation.isPending}
                 onClose={closeAssignModal}
                 onSubmit={submitAssignForm}
@@ -161,10 +160,10 @@ export function MeteringPointsPage() {
                     />
                 ) : (
                     <MeteringPointsList
+                        settings={settings}
                         meteringPoints={meteringPoints}
                         assignmentsByMeteringPoint={filteredAssignmentsByMeteringPoint}
                         participantNameById={participantNameById}
-                        settings={settings}
                         canManageMeteringPoints={canManageMeteringPoints}
                         canDeleteData={user?.role === 'admin'}
                         deleteMeteringPointPending={deleteMpMutation.isPending}
@@ -182,12 +181,12 @@ export function MeteringPointsPage() {
             </div>
 
             <MeteringDeleteDataModal
+                settings={settings}
                 isOpen={showDeleteDataModal}
                 meterId={deleteDataTarget?.meter_id}
                 mode={deleteDataMode}
                 dateFrom={deleteDataFrom}
                 dateTo={deleteDataTo}
-                settings={settings}
                 isPending={deleteMeteringDataMutation.isPending}
                 onClose={closeDeleteDataModal}
                 onConfirm={submitDeleteData}

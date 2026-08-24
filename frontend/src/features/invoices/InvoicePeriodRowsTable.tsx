@@ -4,14 +4,8 @@ import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { ActionMenu, type ActionMenuItem } from '../../components/ActionMenu'
 import { getLatestEmailLog } from './emailLogs'
+import { invoiceStatusBadgeClass } from './invoiceStatus'
 import type { InvoicePeriodParticipantRow } from '../../types/api'
-
-function invoiceStatusBadgeClass(status: string): string {
-  if (status === 'paid') return 'badge badge-success'
-  if (status === 'cancelled') return 'badge badge-danger'
-  if (status === 'approved' || status === 'sent') return 'badge badge-info'
-  return 'badge badge-neutral'
-}
 
 function emailStatusBadgeClass(status: string): string {
   if (status === 'sent') return 'badge badge-success'
@@ -114,7 +108,7 @@ export function InvoicePeriodRowsTable({
                           {t('pages.invoices.viewLogs')} ({invoice.email_logs?.length ?? 0})
                         </button>
                         {(invoice.email_logs?.filter((log) => log.status === 'failed').length ?? 0) > 0 && (
-                          <span style={{ color: '#ef4444', marginLeft: '0.3rem', fontSize: '0.85rem', fontWeight: 'bold' }}>
+                          <span style={{ color: 'var(--danger-600)', marginLeft: '0.3rem', fontSize: '0.85rem', fontWeight: 'bold' }}>
                             {t('pages.invoices.failedEmails', {
                               n: invoice.email_logs?.filter((log) => log.status === 'failed').length,
                             })}

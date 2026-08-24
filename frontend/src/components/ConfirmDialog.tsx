@@ -72,7 +72,7 @@ export function ConfirmDialog({
                 onClick={(e) => e.stopPropagation()}
             >
                 <h3 style={{ marginBottom: '1rem' }}>{title}</h3>
-                <p style={{ marginBottom: '1.5rem', color: '#666', lineHeight: '1.5' }}>{message}</p>
+                <p style={{ marginBottom: '1.5rem', color: 'var(--text-body)', lineHeight: '1.5' }}>{message}</p>
                 <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
                     <button
                         className="button button-secondary"

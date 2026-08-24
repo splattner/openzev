@@ -11,7 +11,6 @@ import {
     faUpload,
     faXmark,
 } from '@fortawesome/free-solid-svg-icons'
-import { DataGrid, type GridColDef, type GridRenderCellParams } from '@mui/x-data-grid'
 import { ConfirmDialog, useConfirmDialog } from '../components/ConfirmDialog'
 import { FormModal } from '../components/FormModal'
 import {
@@ -27,11 +26,12 @@ import {
 import { queryKeys } from '../lib/api/queryKeys'
 import { formatDateTime, useAppSettings } from '../lib/appSettings'
 import { useAuth } from '../lib/auth'
-import { getDataGridLocaleText } from '../lib/dataGridLocale'
 import { useManagedZev } from '../lib/managedZev'
 import { useTranslation } from 'react-i18next'
 import { useToast } from '../lib/toast'
 import type { ImportLog, ImportPreviewResult } from '../types/api'
+import { DataTable } from '../components/DataTable'
+import type { ColumnDef } from '@tanstack/react-table'
 
 type CsvColumnMap = {
     meter_id: string
@@ -64,7 +64,7 @@ export function ImportsPage() {
     const { user } = useAuth()
     const { settings } = useAppSettings()
     const { selectedZevId, selectedZev } = useManagedZev()
-    const { t, i18n } = useTranslation()
+    const { t } = useTranslation()
     const isManagedScope = user?.role === 'admin' || user?.role === 'zev_owner'
 
     const { data, isLoading, isError } = useQuery({ queryKey: queryKeys.metering.importLogs(), queryFn: fetchImportLogs })
@@ -198,86 +198,51 @@ export function ImportsPage() {
         [importLogs, settings],
     )
 
-    const importLogColumns = useMemo<GridColDef[]>(
+    const importLogColumns = useMemo<ColumnDef<(typeof importLogRows)[number], unknown>[]>(
         () => [
             {
-                field: 'created_display',
-                headerName: t('pages.imports.columns.created'),
-                flex: 1.2,
-                minWidth: 190,
-                sortable: false,
-                filterable: false,
+                accessorKey: 'created_display',
+                header: t('pages.imports.columns.created'),
             },
             {
-                field: 'source',
-                headerName: t('pages.imports.columns.source'),
-                flex: 0.8,
-                minWidth: 110,
-                sortable: false,
-                filterable: false,
+                accessorKey: 'source',
+                header: t('pages.imports.columns.source'),
             },
             {
-                field: 'filename_display',
-                headerName: t('pages.imports.columns.filename'),
-                flex: 1.3,
-                minWidth: 190,
-                sortable: false,
-                filterable: false,
+                accessorKey: 'filename_display',
+                header: t('pages.imports.columns.filename'),
             },
             {
-                field: 'rows_total_display',
-                headerName: t('pages.imports.columns.total'),
-                flex: 0.6,
-                minWidth: 90,
-                align: 'right',
-                headerAlign: 'right',
-                sortable: false,
-                filterable: false,
+                accessorKey: 'rows_total_display',
+                header: t('pages.imports.columns.total'),
+                meta: { numeric: true },
             },
             {
-                field: 'rows_imported',
-                headerName: t('pages.imports.columns.imported'),
-                type: 'number',
-                flex: 0.7,
-                minWidth: 105,
-                align: 'right',
-                headerAlign: 'right',
-                sortable: false,
-                filterable: false,
+                accessorKey: 'rows_imported',
+                header: t('pages.imports.columns.imported'),
+                meta: { numeric: true },
             },
             {
-                field: 'rows_skipped',
-                headerName: t('pages.imports.columns.skipped'),
-                type: 'number',
-                flex: 0.7,
-                minWidth: 105,
-                align: 'right',
-                headerAlign: 'right',
-                sortable: false,
-                filterable: false,
+                accessorKey: 'rows_skipped',
+                header: t('pages.imports.columns.skipped'),
+                meta: { numeric: true },
             },
             {
-                field: 'protocol',
-                headerName: t('pages.imports.columns.protocol'),
-                flex: 0.9,
-                minWidth: 150,
-                sortable: false,
-                filterable: false,
-                renderCell: (params: GridRenderCellParams<ImportLog>) => (
-                    <button type="button" className="button button-primary" onClick={() => setSelectedLog(params.row)}>
+                id: 'protocol',
+                header: t('pages.imports.columns.protocol'),
+                enableSorting: false,
+                cell: (ctx) => (
+                    <button type="button" className="button button-primary" onClick={() => setSelectedLog(ctx.row.original)}>
                         <FontAwesomeIcon icon={faEye} fixedWidth />
                         {t('pages.imports.actions.openProtocol')}
                     </button>
                 ),
             },
             {
-                field: 'actions',
-                headerName: t('pages.imports.columns.actions'),
-                flex: 0.9,
-                minWidth: 150,
-                sortable: false,
-                filterable: false,
-                renderCell: (params: GridRenderCellParams<ImportLog>) => (
+                id: 'actions',
+                header: t('pages.imports.columns.actions'),
+                enableSorting: false,
+                cell: (ctx) => (
                     <button
                         type="button"
                         className="button button-danger"
@@ -285,12 +250,12 @@ export function ImportsPage() {
                         onClick={() => confirm({
                             title: t('pages.imports.delete.singleTitle'),
                             message: t('pages.imports.delete.singleMessage', {
-                                filename: params.row.filename || '-',
-                                createdAt: formatDateTime(params.row.created_at, settings),
+                                filename: ctx.row.original.filename || '-',
+                                createdAt: formatDateTime(ctx.row.original.created_at, settings),
                             }),
                             confirmText: t('pages.imports.delete.confirmAction'),
                             isDangerous: true,
-                            onConfirm: () => deleteImportMutation.mutate(params.row.id),
+                            onConfirm: () => deleteImportMutation.mutate(ctx.row.original.id),
                         })}
                     >
                         <FontAwesomeIcon icon={faTrash} fixedWidth />
@@ -299,7 +264,7 @@ export function ImportsPage() {
                 ),
             },
         ],
-        [confirm, deleteImportMutation, dialogLoading, settings, t],
+        [t, settings, confirm, deleteImportMutation, dialogLoading],
     )
 
     function resetWizard() {
@@ -641,7 +606,7 @@ export function ImportsPage() {
                                     ) : null}
 
                                     {previewRows.length > 0 && (
-                                        <div style={{ maxHeight: 250, overflow: 'auto', border: '1px solid var(--color-border, #ddd)', borderRadius: 6 }}>
+                                        <div style={{ maxHeight: 250, overflow: 'auto', border: '1px solid var(--border-default)', borderRadius: 6 }}>
                                             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                                                 <thead>
                                                     <tr>
@@ -654,7 +619,7 @@ export function ImportsPage() {
                                                 </thead>
                                                 <tbody>
                                                     {previewRows.map((row) => (
-                                                        <tr key={`${row.row}-${row.meter_id ?? 'empty'}`} style={{ borderTop: '1px solid var(--color-border, #eee)' }}>
+                                                        <tr key={`${row.row}-${row.meter_id ?? 'empty'}`} style={{ borderTop: '1px solid var(--border-default)' }}>
                                                             <td style={{ padding: '0.4rem 0.6rem' }}>{row.row}</td>
                                                             <td style={{ padding: '0.4rem 0.6rem' }}>{row.meter_id ?? '-'}</td>
                                                             <td style={{ padding: '0.4rem 0.6rem' }}>
@@ -708,31 +673,13 @@ export function ImportsPage() {
             </FormModal>
 
             <div className="table-card" style={{ width: '100%' }}>
-                <DataGrid
-                    rows={importLogRows}
+                <DataTable
+                    data={importLogRows}
                     columns={importLogColumns}
                     getRowId={(row) => row.id}
-                    disableRowSelectionOnClick
-                    disableColumnFilter
-                    disableColumnSorting
-                    disableColumnMenu
-                    hideFooterSelectedRowCount
-                    pageSizeOptions={[10, 25, 50, 100]}
-                    initialState={{
-                        pagination: {
-                            paginationModel: { pageSize: 25, page: 0 },
-                        },
-                    }}
-                    localeText={{
-                        ...getDataGridLocaleText(i18n.language),
-                        noRowsLabel: t('pages.imports.noRows'),
-                    }}
-                    sx={{
-                        border: 0,
-                        '& .MuiDataGrid-columnHeaders': {
-                            backgroundColor: '#f8fafc',
-                        },
-                    }}
+                    enableSorting={false}
+                    initialPageSize={25}
+                    emptyMessage={t('pages.imports.noRows')}
                 />
             </div>
 
@@ -788,7 +735,7 @@ export function ImportsPage() {
                         {(selectedLog.errors?.length ?? 0) === 0 ? (
                             <p className="muted" style={{ margin: 0 }}>{t('pages.imports.protocol.noSkippedDetails')}</p>
                         ) : (
-                            <div style={{ maxHeight: 300, overflow: 'auto', border: '1px solid var(--color-border, #ddd)', borderRadius: 6 }}>
+                            <div style={{ maxHeight: 300, overflow: 'auto', border: '1px solid var(--border-default)', borderRadius: 6 }}>
                                 <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                                     <thead>
                                         <tr>
@@ -798,7 +745,7 @@ export function ImportsPage() {
                                     </thead>
                                     <tbody>
                                         {selectedLog.errors?.map((entry, index) => (
-                                            <tr key={`${entry.row ?? 'global'}-${index}`} style={{ borderTop: '1px solid var(--color-border, #eee)' }}>
+                                            <tr key={`${entry.row ?? 'global'}-${index}`} style={{ borderTop: '1px solid var(--border-default)' }}>
                                                 <td style={{ padding: '0.5rem 0.75rem', verticalAlign: 'top' }}>
                                                     {entry.row ?? t('pages.imports.protocol.general')}
                                                 </td>

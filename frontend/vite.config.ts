@@ -10,22 +10,14 @@ export default defineConfig({
         // Vite 8 bundles with Rolldown, where the Rollup-style `manualChunks`
         // function is deprecated and its per-module assignments are overridden
         // by importer relationships. `codeSplitting.groups` with priorities is
-        // the supported equivalent: a module matching several groups (e.g.
-        // `@emotion/react` matching both the emotion and the react group) goes
-        // to the group with the highest priority, and a module whose own group
+        // the supported equivalent: a module matching several groups goes to
+        // the group with the highest priority, and a module whose own group
         // has a lower priority than its importer's group is pulled into the
-        // importer's chunk. The MUI/emotion group therefore outranks the
-        // data-grid group (so `@mui/material` deps and Emotion stay out of the
-        // data-grid chunk) while excluding `x-data-grid` modules themselves
-        // (so they still split into their own chunk). Emotion must also outrank
-        // the catch-all vendor-misc group, otherwise it follows
-        // `@mui/styled-engine` into vendor-misc.
+        // importer's chunk — hence the catch-all vendor-misc group sits at
+        // the lowest priority.
         codeSplitting: {
           groups: [
             { name: 'vendor-react-query', test: /@tanstack\/react-query/, priority: 50 },
-            { name: 'vendor-mui', test: /@mui\/(?!x-data-grid|x-date-pickers)|@emotion\//, priority: 45 },
-            { name: 'vendor-mui-data-grid', test: /@mui\/x-data-grid/, priority: 40 },
-            { name: 'vendor-mui-date-pickers', test: /@mui\/x-date-pickers/, priority: 40 },
             { name: 'vendor-mantine', test: /@mantine\//, priority: 35 },
             { name: 'vendor-charts', test: /recharts|d3-/, priority: 30 },
             { name: 'vendor-router', test: /react-router/, priority: 25 },
@@ -42,10 +34,17 @@ export default defineConfig({
   },
   server: {
     proxy: {
-      '/api': {
-        target: 'http://backend:8000',
-        changeOrigin: true,
-      },
+      // Default matches the compose topology (http://backend:8000). Override
+      // with VITE_DEV_PROXY_TARGET=http://localhost:8000 for bare-metal dev.
+      ...(Object.fromEntries(['/api', '/media'].map((path) => [
+        path,
+        {
+          // Dev parity with the production nginx (fullstack-nginx.conf):
+          // document embeds fetch /media same-origin instead of cross-origin.
+          target: process.env.VITE_DEV_PROXY_TARGET ?? 'http://backend:8000',
+          changeOrigin: true,
+        },
+      ]))),
     },
   },
 })

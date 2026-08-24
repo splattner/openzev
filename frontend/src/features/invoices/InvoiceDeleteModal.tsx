@@ -29,7 +29,7 @@ export function InvoiceDeleteModal({ isOpen, isPending, onCancel, onConfirm }: I
     >
       <div
         style={{
-          backgroundColor: 'white',
+          backgroundColor: 'var(--surface-card)',
           borderRadius: '0.5rem',
           boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)',
           maxWidth: '400px',
@@ -38,8 +38,8 @@ export function InvoiceDeleteModal({ isOpen, isPending, onCancel, onConfirm }: I
         }}
         onClick={(event) => event.stopPropagation()}
       >
-        <h2 style={{ margin: '0 0 1rem 0', color: '#dc2626' }}>{t('pages.invoices.deleteModal.title')}</h2>
-        <p style={{ margin: '0 0 1.5rem 0', color: '#374151' }}>
+        <h2 style={{ margin: '0 0 1rem 0', color: 'var(--danger-600)' }}>{t('pages.invoices.deleteModal.title')}</h2>
+        <p style={{ margin: '0 0 1.5rem 0', color: 'var(--ink-soft)' }}>
           {t('pages.invoices.deleteModal.message')}
         </p>
         <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>

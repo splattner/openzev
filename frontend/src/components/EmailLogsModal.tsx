@@ -12,9 +12,9 @@ interface EmailLogsModalProps {
 }
 
 const statusColors: Record<string, string> = {
-    pending: '#f59e0b',  // amber
-    sent: '#10b981',     // green
-    failed: '#ef4444',   // red
+    pending: 'var(--warning-800)',  // amber
+    sent: 'var(--success-600)',     // green
+    failed: 'var(--danger-600)',   // red
 }
 
 export function EmailLogsModal({
@@ -63,23 +63,23 @@ export function EmailLogsModal({
                 <h3 style={{ marginBottom: '1.5rem' }}>{t('pages.invoices.emailLogs.title', { number: invoiceNumber })}</h3>
 
                 {emailLogs.length === 0 ? (
-                    <p style={{ color: '#888', textAlign: 'center', padding: '2rem 0' }}>{t('pages.invoices.emailLogs.empty')}</p>
+                    <p style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '2rem 0' }}>{t('pages.invoices.emailLogs.empty')}</p>
                 ) : (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                         {emailLogs.map((log) => (
                             <div
                                 key={log.id}
                                 style={{
-                                    border: '1px solid #ddd',
+                                    border: '1px solid var(--border-default)',
                                     borderRadius: '0.4rem',
                                     padding: '1rem',
-                                    backgroundColor: '#f9f9f9',
+                                    backgroundColor: 'var(--surface)',
                                 }}
                             >
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
                                     <div>
                                         <strong>{log.recipient}</strong>
-                                        <div style={{ fontSize: '0.85rem', color: '#888', marginTop: '0.25rem' }}>
+                                        <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
                                             {t('pages.invoices.emailLogs.subject', { subject: log.subject })}
                                         </div>
                                     </div>
@@ -88,8 +88,8 @@ export function EmailLogsModal({
                                             display: 'inline-block',
                                             padding: '0.35rem 0.8rem',
                                             borderRadius: '0.3rem',
-                                            backgroundColor: statusColors[log.status] ?? '#9ca3af',
-                                            color: '#fff',
+                                            backgroundColor: statusColors[log.status] ?? 'var(--text-muted)',
+                                            color: 'var(--white)',
                                             fontSize: '0.8rem',
                                             fontWeight: '600',
                                             textAlign: 'center',
@@ -100,7 +100,7 @@ export function EmailLogsModal({
                                     </div>
                                 </div>
 
-                                <div style={{ fontSize: '0.85rem', color: '#666', marginBottom: '0.5rem' }}>
+                                <div style={{ fontSize: '0.85rem', color: 'var(--text-body)', marginBottom: '0.5rem' }}>
                                     <div>{t('pages.invoices.emailLogs.queued')} {formatDateTime(log.created_at, settings)}</div>
                                     {log.sent_at && <div>{t('pages.invoices.emailLogs.sent')} {formatDateTime(log.sent_at, settings)}</div>}
                                 </div>
@@ -108,12 +108,12 @@ export function EmailLogsModal({
                                 {log.error_message && (
                                     <div
                                         style={{
-                                            backgroundColor: '#fee2e2',
-                                            border: '1px solid #fca5a5',
+                                            backgroundColor: 'var(--danger-100)',
+                                            border: '1px solid var(--danger-300)',
                                             borderRadius: '0.3rem',
                                             padding: '0.5rem 0.75rem',
                                             fontSize: '0.85rem',
-                                            color: '#991b1b',
+                                            color: 'var(--danger-700)',
                                             marginBottom: '0.5rem',
                                             fontFamily: 'monospace',
                                         }}

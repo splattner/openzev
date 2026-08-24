@@ -175,9 +175,9 @@ export function AccountProfilePage() {
             <h1>{t('account.title')}</h1>
 
             {user?.must_change_password && (
-                <div className="card" style={{ marginBottom: '1.5rem', border: '1px solid #f59e0b', background: '#fffbeb', maxWidth: '1000px' }}>
-                    <h2 style={{ marginTop: 0, color: '#92400e' }}>{t('account.passwordChangeRequired')}</h2>
-                    <p style={{ marginBottom: 0, color: '#78350f' }}>
+                <div className="card" style={{ marginBottom: '1.5rem', border: '1px solid var(--gold)', background: 'var(--warning-100)', maxWidth: '1000px' }}>
+                    <h2 style={{ marginTop: 0, color: 'var(--warning-800)' }}>{t('account.passwordChangeRequired')}</h2>
+                    <p style={{ marginBottom: 0, color: 'var(--warning-800)' }}>
                         {location.state && (location.state as { forcePasswordChange?: boolean }).forcePasswordChange
                             ? t('account.passwordChangeRequiredDescription')
                             : t('account.passwordChangeRequiredDescription')}
@@ -196,9 +196,9 @@ export function AccountProfilePage() {
                                 type="text"
                                 value={user?.username || ''}
                                 disabled
-                                style={{ backgroundColor: '#f3f4f6', cursor: 'not-allowed' }}
+                                style={{ backgroundColor: 'var(--surface)', cursor: 'not-allowed' }}
                             />
-                            <small style={{ color: '#6b7280', marginTop: '0.25rem', display: 'block' }}>
+                            <small style={{ color: 'var(--text-muted)', marginTop: '0.25rem', display: 'block' }}>
                                 {t('account.usernameReadOnly')}
                             </small>
                         </div>
@@ -271,7 +271,7 @@ export function AccountProfilePage() {
                                 placeholder={t('account.enterNewPassword')}
                                 required
                             />
-                            <small style={{ color: '#6b7280', marginTop: '0.25rem', display: 'block' }}>
+                            <small style={{ color: 'var(--text-muted)', marginTop: '0.25rem', display: 'block' }}>
                                 {t('account.passwordMinLength')}
                             </small>
                         </div>
@@ -300,7 +300,7 @@ export function AccountProfilePage() {
                     {/* Stated rather than left to be discovered: both answers
                         are defensible, and the one nobody tells you about is
                         the one that surprises somebody. */}
-                    <small style={{ color: '#6b7280', marginTop: '1rem', display: 'block' }}>
+                    <small style={{ color: 'var(--text-muted)', marginTop: '1rem', display: 'block' }}>
                         {t('account.apiKeys.passwordChangeNote')}
                     </small>
                 </div>
@@ -333,7 +333,7 @@ export function AccountProfilePage() {
                                 <div>
                                     <strong>{provider.display_name}</strong>
                                     {linked && (
-                                        <small style={{ display: 'block', color: '#6b7280' }}>
+                                        <small style={{ display: 'block', color: 'var(--text-muted)' }}>
                                             {t('account.linkedSince', {
                                                 date: new Date(linked.created_at).toLocaleDateString(),
                                             })}

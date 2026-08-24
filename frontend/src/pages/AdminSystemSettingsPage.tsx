@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { FormControlLabel, Switch, Tab, Tabs } from '@mui/material'
+import { Switch, Tabs } from '@mantine/core'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faCheck, faPen, faPlus, faTrash, faXmark } from '@fortawesome/free-solid-svg-icons'
 import { useSearchParams } from 'react-router-dom'
@@ -240,30 +240,14 @@ export function AdminSystemSettingsPage() {
             <section className="card" style={{ paddingBottom: '0.5rem' }}>
                 <Tabs
                     value={activeTab}
-                    onChange={(_, value) => setActiveTab(value as SystemSettingsTab)}
-                    variant="scrollable"
-                    allowScrollButtonsMobile
-                    sx={{
-                        minHeight: 0,
-                        '& .MuiTab-root': {
-                            alignItems: 'flex-start',
-                            minHeight: 0,
-                            paddingInline: 0,
-                            marginRight: '1.5rem',
-                            textTransform: 'none',
-                            fontSize: '0.95rem',
-                            fontWeight: 700,
-                        },
-                        '& .MuiTabs-indicator': {
-                            backgroundColor: '#0f172a',
-                            height: '3px',
-                            borderRadius: '999px',
-                        },
-                    }}
+                    onChange={(value) => setActiveTab(getValidTab(value ?? 'regional'))}
+                    keepMounted={false}
                 >
-                    <Tab value="regional" label={t('adminSystemSettings.tabs.regional.label')} />
-                    <Tab value="features" label={t('adminSystemSettings.tabs.features.label')} />
-                    <Tab value="oauth" label={t('adminSystemSettings.tabs.oauth.label')} />
+                    <Tabs.List>
+                        <Tabs.Tab value="regional">{t('adminSystemSettings.tabs.regional.label')}</Tabs.Tab>
+                        <Tabs.Tab value="features">{t('adminSystemSettings.tabs.features.label')}</Tabs.Tab>
+                        <Tabs.Tab value="oauth">{t('adminSystemSettings.tabs.oauth.label')}</Tabs.Tab>
+                    </Tabs.List>
                 </Tabs>
                 <p className="muted" style={{ marginBottom: 0 }}>{tabDescription}</p>
             </section>
@@ -323,7 +307,7 @@ export function AdminSystemSettingsPage() {
                                 </select>
                             </label>
 
-                            <div className="card" style={{ background: 'var(--color-bg-soft, #f8fafc)' }}>
+                            <div className="card" style={{ background: 'var(--surface)' }}>
                                 <h3 style={{ marginTop: 0 }}>{t('adminSystemSettings.regional.previewTitle')}</h3>
                                 <p style={{ marginBottom: '0.35rem' }}>
                                     <strong>{t('adminSystemSettings.regional.previewShort')}</strong> {formatDateByPattern(previewDate, regionalForm.date_format_short)}
@@ -573,8 +557,12 @@ export function AdminSystemSettingsPage() {
                         <input type="text" name="scope" value={oauthForm.scope} onChange={handleOAuthChange} required />
                     </label>
 
-                    <FormControlLabel
-                        control={<Switch name="enabled" checked={oauthForm.enabled} onChange={handleOAuthChange} />}
+                    <Switch
+                        name="enabled"
+                        checked={oauthForm.enabled}
+                        onChange={(event) =>
+                            setOauthForm((previous) => ({ ...previous, enabled: event.currentTarget.checked }))
+                        }
                         label={t('adminOAuth.fieldEnabled')}
                     />
 
