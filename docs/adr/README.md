@@ -17,6 +17,8 @@ This directory captures key architectural decisions for OpenZEV.
 - [0011: Asynchronous bulk invoice and PDF generation](0011-async-bulk-invoice-generation.md)
 - [0012: Participant address geocoding via public Nominatim, cached not persisted](0012-participant-geocoding-via-nominatim.md)
 - [0013: Extract shared local-pool allocation service](0013-shared-allocation-service.md)
+- [0014: Print parity via shared tokens and real-PDF previews](0014-print-parity-and-ui-tokens.md)
+- [0015: Retire MUI — TanStack Table and full Mantine consolidation](0015-retire-mui-tanstack-table.md)
 
 ## Conventions
 

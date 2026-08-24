@@ -62,6 +62,7 @@ Baseline specs describe the current implementation. They must be kept in sync:
 | Audit events, scoped visibility, redaction | `2026-05-audit-log-and-operational-traceability.md` |
 | Whole-ZEV export/import archive | `2026-08-zev-transfer-archive.md` |
 | Contract PDF design, shared PDF design base | `2026-08-contract-pdf-redesign.md` |
+| UI design system, shared tokens, print parity, PDF previews | `2026-08-ui-redesign-pdf-style.md` |
 
 ## Reference specs
 
@@ -93,6 +94,7 @@ These specs describe the current major product capabilities and should be update
 - `2026-05-audit-log-and-operational-traceability.md`
 - `2026-08-zev-transfer-archive.md`
 - `2026-08-contract-pdf-redesign.md`
+- `2026-08-ui-redesign-pdf-style.md`
 
 ## Frontend reference specs
 
