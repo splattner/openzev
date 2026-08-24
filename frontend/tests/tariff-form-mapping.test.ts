@@ -58,10 +58,27 @@ describe('tariff form mapping', () => {
       energy_type: 'local',
       fixed_price_chf: null,
       percentage: null,
+      // Not a shared fee mode, so split_key is forced to 'equal' regardless
+      // of the form value — it only means something for SHARED_* tariffs.
+      split_key: 'equal',
       valid_from: defaultTariffFormValues.valid_from,
       valid_to: null,
       notes: '',
     })
+  })
+
+  it('preserves split_key for a shared fee, and ignores it for a non-shared one', () => {
+    const shared = mapTariffFormValuesToInput(
+      { ...defaultTariffFormValues, billing_mode: 'shared_monthly_fee', fixed_price_chf: '90.00', split_key: 'weight' },
+      'z-1',
+    )
+    expect(shared.split_key).toBe('weight')
+
+    const nonShared = mapTariffFormValuesToInput(
+      { ...defaultTariffFormValues, billing_mode: 'monthly_fee', fixed_price_chf: '10.00', split_key: 'weight' },
+      'z-1',
+    )
+    expect(nonShared.split_key).toBe('equal')
   })
 
   it('maps tariff period api model and form values correctly', () => {

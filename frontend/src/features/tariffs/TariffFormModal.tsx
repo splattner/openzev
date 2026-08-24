@@ -62,6 +62,10 @@ export function TariffFormModal({
     name: 'billing_mode',
   })
   const isSharedFee = SHARED_FEE_MODES.includes(billingMode)
+  const splitKey = useWatch({
+    control: form.control,
+    name: 'split_key',
+  })
   // An existing tariff is one version of a series; its identity fields are
   // fixed. Creating a new tariff still sets them freely.
   const isVersion = Boolean(initialTariff)
@@ -158,9 +162,23 @@ export function TariffFormModal({
           <label>
             <span>{t(FIXED_PRICE_LABELS[billingMode] ?? 'pages.tariffs.form.monthlyFee')}</span>
             <input type="number" step="0.01" {...form.register('fixed_price_chf')} required />
-            {isSharedFee && <small className="muted">{t('pages.tariffs.form.sharedFeeHint')}</small>}
+            {isSharedFee && (
+              <small className="muted">
+                {t(splitKey === 'weight' ? 'pages.tariffs.form.sharedFeeHintWeight' : 'pages.tariffs.form.sharedFeeHint')}
+              </small>
+            )}
           </label>
         ) : null}
+
+        {isSharedFee && (
+          <label>
+            <span>{t('pages.tariffs.form.splitKey')}</span>
+            <select {...form.register('split_key')}>
+              <option value="equal">{t('pages.tariffs.form.splitKeyEqual')}</option>
+              <option value="weight">{t('pages.tariffs.form.splitKeyWeight')}</option>
+            </select>
+          </label>
+        )}
 
         <label>
           <span>{t('pages.tariffs.form.validFrom')}</span>

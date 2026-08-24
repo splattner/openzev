@@ -27,7 +27,7 @@ from allocation.read_model import (
 from allocation.split import split_consumption, split_production
 from allocation.windows import AssignmentWindows
 from zev.models import Zev, Participant, MeteringPoint, MeteringPointAssignment
-from tariffs.models import BillingMode, EnergyType, PeriodType, Tariff, TariffCategory
+from tariffs.models import BillingMode, EnergyType, PeriodType, SplitKey, Tariff, TariffCategory
 from metering.models import MeterReading, ReadingDirection
 from .models import Invoice, InvoiceItem, InvoiceStatus
 
@@ -679,21 +679,33 @@ def _price_fixed_fees(participant, tariffs, period_start, period_end, accumulato
             unit_price = unit_price / Decimal("12")
 
         if shared:
-            shares = _count_active_participants_by_month(
-                participant.zev, tariff, period_start, period_end)
+            # split_key picks the denominator: WEIGHT normalizes by
+            # allocation_weight (community-meter allocation always uses
+            # weight; this is what lets a SHARED_* fee opt into the same
+            # key). EQUAL is today's headcount split — the numerator is 1
+            # and the denominator is the same participant count, so it is
+            # arithmetically identical to the pre-split_key behaviour.
+            if tariff.split_key == SplitKey.WEIGHT:
+                shares = _allocation_weight_sum_by_month(
+                    participant.zev, period_start, period_end)
+                numerator = participant.allocation_weight
+            else:
+                shares = _count_active_participants_by_month(
+                    participant.zev, tariff, period_start, period_end)
+                numerator = Decimal("1")
             total = Decimal("0")
             charged_months = 0
             for month, billed_from, billed_to in _billable_months(tariff, period_start, period_end):
-                count = shares.get(month)
+                denominator = shares.get(month)
                 # Only the months this participant was actually a member of:
                 # the denominator is community-wide, but the numerator is not.
                 # Charging every month the fee was live would bill a mid-period
                 # joiner for the months before they arrived.
-                if not count or not _overlaps(
+                if not denominator or not _overlaps(
                     participant.valid_from, participant.valid_to, billed_from, billed_to
                 ):
                     continue
-                total += unit_price / count
+                total += unit_price * numerator / denominator
                 charged_months += 1
             if charged_months == 0:
                 continue

@@ -368,6 +368,7 @@ export interface Tariff {
     energy_type?: 'local' | 'grid' | 'feed_in' | null
     fixed_price_chf?: string | null
     percentage?: string | null
+    split_key: 'equal' | 'weight'
     valid_from: string
     valid_to?: string | null
     notes?: string
@@ -381,6 +382,7 @@ export interface TariffInput {
     energy_type?: 'local' | 'grid' | 'feed_in' | null
     fixed_price_chf?: string | null
     percentage?: string | null
+    split_key?: 'equal' | 'weight'
     valid_from: string
     valid_to?: string | null
     notes?: string

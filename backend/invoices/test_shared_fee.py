@@ -15,7 +15,7 @@ from decimal import Decimal
 
 import pytest
 
-from tariffs.models import BillingMode, TariffCategory
+from tariffs.models import BillingMode, SplitKey, TariffCategory
 from testing import factories
 
 from .engine import (
@@ -34,17 +34,19 @@ FEB = date(2026, 2, 1)
 MAR = date(2026, 3, 1)
 
 
-def shared_tariff(zev, *, price="90.00", yearly=False, valid_from=JAN, valid_to=None):
+def shared_tariff(zev, *, price="90.00", yearly=False, valid_from=JAN, valid_to=None,
+                   split_key=SplitKey.EQUAL, name="Verwaltungsgebühr"):
     """A shared fee of ``price`` per month (or per year) for the whole ZEV."""
     return factories.TariffFactory(
         zev=zev,
-        name="Verwaltungsgebühr",
+        name=name,
         category=TariffCategory.METERING,
         billing_mode=BillingMode.SHARED_YEARLY_FEE if yearly else BillingMode.SHARED_MONTHLY_FEE,
         energy_type=None,
         fixed_price_chf=Decimal(price),
         valid_from=valid_from,
         valid_to=valid_to,
+        split_key=split_key,
     )
 
 
@@ -340,3 +342,147 @@ def test_a_shared_yearly_fee_says_so():
     assert line.description == (
         "Verwaltungsgebühr (3 monthly installments of annual fee, share of community costs)"
     )
+
+
+# ---------------------------------------------------------------------------
+# split_key (shared metering points, docs/specs/2026-08-shared-metering-points.md)
+# ---------------------------------------------------------------------------
+
+
+def test_equal_key_ignores_weights_entirely():
+    """The isolation guarantee: unequal weights set, split_key=equal — the
+    amounts must be identical to today's headcount split, byte for byte."""
+    zev = factories.ZevFactory()
+    a, b, c = participants(zev, 3)
+    a.allocation_weight = Decimal("10")
+    a.save(update_fields=["allocation_weight"])
+    b.allocation_weight = Decimal("1")
+    b.save(update_fields=["allocation_weight"])
+    shared_tariff(zev, price="90.00", split_key=SplitKey.EQUAL)
+
+    lines = [fee_line(generate_invoice(p, JAN, JAN_END)) for p in (a, b, c)]
+
+    assert [line.total_chf for line in lines] == [Decimal("30.00")] * 3
+
+
+def test_weight_key_splits_by_weight():
+    zev = factories.ZevFactory()
+    heavy, light = participants(zev, 2)
+    heavy.allocation_weight = Decimal("3")
+    heavy.save(update_fields=["allocation_weight"])
+    light.allocation_weight = Decimal("1")
+    light.save(update_fields=["allocation_weight"])
+    shared_tariff(zev, price="80.00", split_key=SplitKey.WEIGHT)
+
+    heavy_line = fee_line(generate_invoice(heavy, JAN, JAN_END))
+    light_line = fee_line(generate_invoice(light, JAN, JAN_END))
+
+    # Weight 3 of 4 total: 80 * 3/4 = 60; weight 1 of 4: 80 * 1/4 = 20.
+    assert heavy_line.total_chf == Decimal("60.00")
+    assert light_line.total_chf == Decimal("20.00")
+
+
+def test_split_key_defaults_to_equal():
+    """A tariff created without naming a key bills as it does today."""
+    zev = factories.ZevFactory()
+    a, b = participants(zev, 2)
+    a.allocation_weight = Decimal("5")
+    a.save(update_fields=["allocation_weight"])
+    tariff = factories.TariffFactory(
+        zev=zev, name="Default Key Fee", category=TariffCategory.METERING,
+        billing_mode=BillingMode.SHARED_MONTHLY_FEE, energy_type=None,
+        fixed_price_chf=Decimal("60.00"), valid_from=JAN,
+    )
+
+    assert tariff.split_key == SplitKey.EQUAL
+    line = fee_line(generate_invoice(a, JAN, JAN_END))
+    assert line.total_chf == Decimal("30.00")
+
+
+def test_two_shared_tariffs_can_use_different_keys():
+    """One equal and one weight tariff in the same ZEV, same invoice, both
+    correct — the case split_key exists for."""
+    zev = factories.ZevFactory()
+    heavy, light = participants(zev, 2)
+    heavy.allocation_weight = Decimal("3")
+    heavy.save(update_fields=["allocation_weight"])
+    light.allocation_weight = Decimal("1")
+    light.save(update_fields=["allocation_weight"])
+    shared_tariff(zev, price="80.00", split_key=SplitKey.WEIGHT, name="Lift Electricity")
+    shared_tariff(zev, price="40.00", split_key=SplitKey.EQUAL, name="Metering Administration")
+
+    heavy_lines = {i.description.split(" (")[0]: i for i in generate_invoice(heavy, JAN, JAN_END).items.all()}
+    light_lines = {i.description.split(" (")[0]: i for i in generate_invoice(light, JAN, JAN_END).items.all()}
+
+    # Weight-keyed: 80 split 3:1 -> 60 / 20.
+    assert heavy_lines["Lift Electricity"].total_chf == Decimal("60.00")
+    assert light_lines["Lift Electricity"].total_chf == Decimal("20.00")
+    # Equal-keyed: 40 split evenly regardless of weight -> 20 / 20.
+    assert heavy_lines["Metering Administration"].total_chf == Decimal("20.00")
+    assert light_lines["Metering Administration"].total_chf == Decimal("20.00")
+
+
+def test_default_weights_reproduce_equal_split_under_weight_key():
+    """With all weights at their default (1), WEIGHT and EQUAL agree."""
+    zev = factories.ZevFactory()
+    members = participants(zev, 3)
+    shared_tariff(zev, price="90.00", split_key=SplitKey.WEIGHT)
+
+    lines = [fee_line(generate_invoice(p, JAN, JAN_END)) for p in members]
+
+    assert [line.total_chf for line in lines] == [Decimal("30.00")] * 3
+
+
+def test_joiner_shifts_weight_sum_only_from_their_own_month():
+    zev = factories.ZevFactory()
+    founders = participants(zev, 2)
+    joiner, = participants(zev, 1, valid_from=FEB)
+    for p in founders:
+        p.allocation_weight = Decimal("1")
+        p.save(update_fields=["allocation_weight"])
+    joiner.allocation_weight = Decimal("2")
+    joiner.save(update_fields=["allocation_weight"])
+    shared_tariff(zev, price="120.00", split_key=SplitKey.WEIGHT)
+
+    founder_line = fee_line(generate_invoice(founders[0], JAN, MAR_END))
+    joiner_line = fee_line(generate_invoice(joiner, JAN, MAR_END))
+
+    # January: weight sum 2 (founders only) -> founder gets 120 * 1/2 = 60.
+    # Feb+Mar: weight sum 4 (1+1+2) -> founder gets 120 * 1/4 = 30 each.
+    assert founder_line.total_chf == Decimal("120.00")  # 60 + 30 + 30
+    # Joiner: only Feb+Mar, at weight 2 of 4 -> 120 * 2/4 = 60 each.
+    assert joiner_line.total_chf == Decimal("120.00")  # 60 + 60
+
+
+def test_tiny_weight_bills_almost_nothing():
+    zev = factories.ZevFactory()
+    tiny, rest = participants(zev, 2)
+    tiny.allocation_weight = Decimal("0.0001")
+    tiny.save(update_fields=["allocation_weight"])
+    rest.allocation_weight = Decimal("1")
+    rest.save(update_fields=["allocation_weight"])
+    shared_tariff(zev, price="100.00", split_key=SplitKey.WEIGHT)
+
+    tiny_line = fee_line(generate_invoice(tiny, JAN, JAN_END))
+
+    # 100 * 0.0001 / 1.0001, rounded to the centime, is negligible.
+    assert tiny_line.total_chf < Decimal("0.02")
+    assert tiny_line.total_chf >= Decimal("0.00")
+
+
+def test_an_indivisible_weighted_share_leaves_the_rappen_shortfall():
+    """Same documented rounding convention as the equal-key variant: a share
+    that doesn't divide evenly is quantized per line, and the community
+    collects a hair under the source amount."""
+    zev = factories.ZevFactory()
+    a, b, c = participants(zev, 3)
+    for p in (a, b, c):
+        p.allocation_weight = Decimal("1")
+        p.save(update_fields=["allocation_weight"])
+    shared_tariff(zev, price="100.00", split_key=SplitKey.WEIGHT)
+
+    total = sum(
+        fee_line(generate_invoice(p, JAN, JAN_END)).total_chf for p in (a, b, c)
+    )
+
+    assert total == Decimal("99.99")

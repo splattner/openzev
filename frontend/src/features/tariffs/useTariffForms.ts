@@ -9,6 +9,7 @@ export type TariffFormValues = {
   energy_type: NonNullable<TariffInput['energy_type']>
   fixed_price_chf: string
   percentage: string
+  split_key: NonNullable<TariffInput['split_key']>
   valid_from: string
   valid_to: string
   notes: string
@@ -40,6 +41,7 @@ export const tariffFormSchema = z
     energy_type: z.enum(['local', 'grid', 'feed_in']),
     fixed_price_chf: z.string(),
     percentage: z.string(),
+    split_key: z.enum(['equal', 'weight']),
     valid_from: z.string().trim().min(1),
     valid_to: z.string(),
     notes: z.string(),
@@ -106,6 +108,7 @@ export const defaultTariffFormValues: TariffFormValues = {
   energy_type: 'local',
   fixed_price_chf: '',
   percentage: '',
+  split_key: 'equal',
   valid_from: todayLocalIso(),
   valid_to: '',
   notes: '',
@@ -128,6 +131,7 @@ export function mapTariffToFormValues(tariff: Tariff): TariffFormValues {
     energy_type: tariff.energy_type || 'local',
     fixed_price_chf: tariff.fixed_price_chf ? String(tariff.fixed_price_chf) : '',
     percentage: tariff.percentage ? String(tariff.percentage) : '',
+    split_key: tariff.split_key || 'equal',
     valid_from: tariff.valid_from,
     valid_to: tariff.valid_to || '',
     notes: tariff.notes || '',
@@ -136,6 +140,7 @@ export function mapTariffToFormValues(tariff: Tariff): TariffFormValues {
 
 export function mapTariffFormValuesToInput(values: TariffFormValues, zevId: string): TariffInput {
   const isEnergyBased = values.billing_mode === 'energy' || values.billing_mode === 'percentage_of_energy'
+  const isShared = values.billing_mode === 'shared_monthly_fee' || values.billing_mode === 'shared_yearly_fee'
 
   return {
     zev: zevId,
@@ -145,6 +150,7 @@ export function mapTariffFormValuesToInput(values: TariffFormValues, zevId: stri
     energy_type: isEnergyBased ? values.energy_type : null,
     fixed_price_chf: isEnergyBased ? null : (values.fixed_price_chf || null),
     percentage: values.billing_mode === 'percentage_of_energy' ? (values.percentage || null) : null,
+    split_key: isShared ? values.split_key : 'equal',
     valid_from: values.valid_from,
     valid_to: values.valid_to || null,
     notes: values.notes,
