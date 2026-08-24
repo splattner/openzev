@@ -108,7 +108,8 @@ decides who pays for it:
 > special case.
 
 Assignment rows set to `Community` are marked with a **Community** badge in
-the metering points list.
+the metering points list — visible on the common-area meter in the
+[page screenshot above](#what-is-a-metering-point).
 
 ### Switching a meter to Community
 

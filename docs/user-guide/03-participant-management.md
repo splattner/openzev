@@ -92,6 +92,8 @@ The default is `1`. Leave the field empty when adding a participant and every
 member shares common costs equally — the behaviour you get if you never touch
 this setting at all.
 
+![Allocation weight on the participant form](screenshots/03b-participant-allocation-weight.png)
+
 Each participant card shows the resulting share, for example:
 
 ```

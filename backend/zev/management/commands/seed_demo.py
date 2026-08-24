@@ -27,6 +27,7 @@ from invoices.models import Invoice, InvoiceStatus
 from metering.models import ImportSource, MeterReading, ReadingDirection, ReadingResolution
 from tariffs.models import BillingMode, EnergyType, PeriodType, Tariff, TariffCategory, TariffPeriod
 from zev.models import (
+    AllocationMode,
     BillingInterval,
     InvoiceLanguage,
     MeteringPoint,
@@ -229,10 +230,35 @@ class Command(BaseCommand):
             meter_type=MeteringPointType.CONSUMPTION,
             location_description="Apartment 2 consumption meter",
         )
+        # Allgemeinstrom: the shared draw nobody uses alone. Held by the owner
+        # (who acts as the Verwaltung here) but allocated across the community
+        # by weight, which is what makes the demo show off shared metering.
+        common_area_cons = self._upsert_metering_point(
+            zev=zev,
+            meter_id="CH-DEMO-COMMON-0001",
+            meter_type=MeteringPointType.CONSUMPTION,
+            location_description="Common area: stairwell, lift, laundry",
+        )
 
         self._ensure_assignment(owner_prod, owner_participant, start_date)
         self._ensure_assignment(participant_one_cons, participant_one, start_date)
         self._ensure_assignment(participant_two_cons, participant_two, start_date)
+        self._ensure_assignment(
+            common_area_cons, owner_participant, start_date,
+            allocation_mode=AllocationMode.COMMUNITY,
+        )
+
+        # Deliberately unequal so the demo shows a real weighted split rather
+        # than an equal one that looks the same either way: 1 / 1 / 2 -> 25 %,
+        # 25 %, 50 % of every common-area cost.
+        for participant, weight in (
+            (owner_participant, Decimal("1")),
+            (participant_one, Decimal("1")),
+            (participant_two, Decimal("2")),
+        ):
+            if participant.allocation_weight != weight:
+                participant.allocation_weight = weight
+                participant.save(update_fields=["allocation_weight"])
 
         self._seed_tariffs(zev, start_date)
 
@@ -242,6 +268,7 @@ class Command(BaseCommand):
             production_meter=owner_prod,
             consumer_one_meter=participant_one_cons,
             consumer_two_meter=participant_two_cons,
+            common_area_meter=common_area_cons,
         )
 
         invoice_period_start, invoice_period_end = previous_quarter(end_date)
@@ -249,7 +276,10 @@ class Command(BaseCommand):
 
         production_total = MeterReading.objects.filter(metering_point=owner_prod).aggregate(total=Sum("energy_kwh"))["total"]
         consumption_total = MeterReading.objects.filter(
-            metering_point__in=[participant_one_cons, participant_two_cons]
+            metering_point__in=[participant_one_cons, participant_two_cons, common_area_cons]
+        ).aggregate(total=Sum("energy_kwh"))["total"]
+        common_area_total = MeterReading.objects.filter(
+            metering_point=common_area_cons
         ).aggregate(total=Sum("energy_kwh"))["total"]
 
         self.stdout.write(
@@ -277,6 +307,7 @@ class Command(BaseCommand):
                         f"Deleted existing demo readings: {deleted_readings}",
                         f"Production total: {production_total} kWh",
                         f"Consumption total: {consumption_total} kWh",
+                        f"  of which common area (split 25/25/50 by weight): {common_area_total} kWh",
                         f"Net export total: {(production_total - consumption_total).quantize(Decimal('0.0001'))} kWh",
                     ]
                 )
@@ -385,7 +416,13 @@ class Command(BaseCommand):
         meter.save()
         return meter
 
-    def _ensure_assignment(self, meter: MeteringPoint, participant: Participant, valid_from: date) -> None:
+    def _ensure_assignment(
+        self,
+        meter: MeteringPoint,
+        participant: Participant,
+        valid_from: date,
+        allocation_mode: str = AllocationMode.PERSONAL,
+    ) -> None:
         # The seed window moves every quarter. Drop the prior open-ended window
         # first so the new one cannot trip the model's non-overlap guard on save.
         with transaction.atomic():
@@ -395,6 +432,7 @@ class Command(BaseCommand):
                 participant=participant,
                 valid_from=valid_from,
                 valid_to=None,
+                allocation_mode=allocation_mode,
             )
 
     def _seed_tariffs(self, zev: Zev, valid_from: date) -> None:
@@ -608,12 +646,15 @@ class Command(BaseCommand):
         production_meter: MeteringPoint,
         consumer_one_meter: MeteringPoint,
         consumer_two_meter: MeteringPoint,
+        common_area_meter: MeteringPoint,
     ) -> int:
         start_dt = datetime.combine(start_date, time.min, tzinfo=UTC)
         stop_dt = datetime.combine(end_date + timedelta(days=1), time.min, tzinfo=UTC)
 
         deleted, _ = MeterReading.objects.filter(
-            metering_point__in=[production_meter, consumer_one_meter, consumer_two_meter],
+            metering_point__in=[
+                production_meter, consumer_one_meter, consumer_two_meter, common_area_meter,
+            ],
             timestamp__gte=start_dt,
             timestamp__lt=stop_dt,
         ).delete()
@@ -636,6 +677,16 @@ class Command(BaseCommand):
                     metering_point=consumer_two_meter,
                     timestamp=timestamp,
                     energy_kwh=self._consumer_two_kwh(timestamp, day_index),
+                    direction=ReadingDirection.IN,
+                    resolution=ReadingResolution.FIFTEEN_MIN,
+                    import_source=ImportSource.MANUAL,
+                )
+            )
+            readings.append(
+                MeterReading(
+                    metering_point=common_area_meter,
+                    timestamp=timestamp,
+                    energy_kwh=self._common_area_kwh(timestamp, day_index),
                     direction=ReadingDirection.IN,
                     resolution=ReadingResolution.FIFTEEN_MIN,
                     import_source=ImportSource.MANUAL,
@@ -673,6 +724,27 @@ class Command(BaseCommand):
 
     def _cloud_factor(self, day_index: int) -> float:
         return 0.78 + ((day_index * 17) % 23) / 100.0
+
+    def _common_area_kwh(self, timestamp: datetime, day_index: int) -> Decimal:
+        """Allgemeinstrom: a small round-the-clock base plus stairwell lighting.
+
+        Deliberately flat and modest next to the apartment profiles — a common
+        area draws continuously (lift standby, cellar, ventilation) and peaks
+        when people come and go after dark, rather than tracking a household's
+        cooking and laundry. Weekends are slightly quieter, not busier.
+        """
+        hour = timestamp.hour + timestamp.minute / 60.0
+        weekday = timestamp.weekday()
+        base = 0.022
+        # Stairwell and entrance lighting: morning before daylight, evening after.
+        morning = 0.028 * self._gaussian(hour, 6.8, 1.1)
+        evening = 0.046 * self._gaussian(hour, 19.8, 2.6)
+        # Laundry room, mostly used on weekdays and Saturday mornings.
+        laundry = (0.034 if weekday < 6 else 0.0) * self._gaussian(hour, 10.5, 1.8)
+        variation = ((day_index % 7) - 3) * 0.0012
+        quieter_at_weekends = 0.94 if weekday >= 5 else 1.0
+        value = (base + morning + evening + laundry + variation) * quieter_at_weekends
+        return Decimal(str(round(max(value, 0.004), 4)))
 
     def _consumer_one_kwh(self, timestamp: datetime, day_index: int) -> Decimal:
         hour = timestamp.hour + timestamp.minute / 60.0

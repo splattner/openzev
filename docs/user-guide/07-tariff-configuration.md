@@ -164,6 +164,8 @@ example, billing the caretaker contract by floor area rather than per head.
 With every participant left at the default weight of `1`, both keys produce
 exactly the same amounts.
 
+![Split key selector on a shared fee tariff](screenshots/07c-tariff-split-key.png)
+
 > **Switching the key changes what people pay.** The selector only appears for
 > the two shared modes, and the change is recorded in the audit log along with
 > the rest of the tariff edit. Regenerate draft invoices to apply it.
