@@ -5,7 +5,7 @@ import {
     fetchContractPdfTemplate,
     fetchInvoicePdfTemplate,
     fetchAnnualStatementPdfTemplate,
-    previewPdfTemplate,
+    previewPdfTemplateBlob,
     resetContractPdfTemplate,
     resetInvoicePdfTemplate,
     resetAnnualStatementPdfTemplate,
@@ -16,6 +16,7 @@ import {
 import { queryKeys } from '../lib/api/queryKeys'
 import type { PdfTemplateResponse } from '../types/api'
 import { useToast } from '../lib/toast'
+import { PdfPreview } from '../components/PdfPreview'
 
 const PDF_TEMPLATE_TABS = ['invoice', 'contract', 'annual_statement'] as const
 
@@ -29,19 +30,24 @@ interface FieldGroup {
 function FieldReference({ groups }: { groups: FieldGroup[] }) {
     const { t } = useTranslation()
     return (
-        <aside className="card page-stack" style={{ maxHeight: '80vh', overflowY: 'auto' }}>
+        <aside
+            className="card page-stack"
+            style={{ maxHeight: '80vh', overflowY: 'auto', width: '100%' }}
+            tabIndex={0}
+            aria-label={t('admin.fieldReference')}
+        >
             <h4 style={{ margin: 0 }}>{t('admin.availableFields')}</h4>
             {groups.map((group) => (
                 <div key={group.title}>
                     <h5 style={{ margin: '0.75rem 0 0.25rem' }}>{group.title}</h5>
-                    <table style={{ width: '100%', fontSize: '0.82rem', borderCollapse: 'collapse' }}>
+                    <table style={{ width: '100%', fontSize: '0.82rem', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
                         <tbody>
                             {group.fields.map((f) => (
-                                <tr key={f.variable} style={{ borderBottom: '1px solid var(--color-border, #e5e7eb)' }}>
-                                    <td style={{ padding: '0.25rem 0.5rem 0.25rem 0', fontFamily: 'monospace', whiteSpace: 'nowrap' }}>
+                                <tr key={f.variable} style={{ borderBottom: '1px solid var(--border-default)' }}>
+                                    <td style={{ padding: '0.25rem 0.4rem 0.25rem 0', fontFamily: 'monospace', overflowWrap: 'anywhere', width: '52%' }}>
                                         {f.variable}
                                     </td>
-                                    <td className="muted" style={{ padding: '0.25rem 0' }}>
+                                    <td className="muted" style={{ padding: '0.25rem 0', overflowWrap: 'anywhere', lineHeight: 1.35 }}>
                                         {f.description}
                                     </td>
                                 </tr>
@@ -145,12 +151,7 @@ function TemplateTextarea({
                     return (
                         <span
                             key={i}
-                            style={{
-                                pointerEvents: 'auto',
-                                cursor: 'help',
-                                borderRadius: '3px',
-                                background: 'rgba(0, 102, 204, 0.08)',
-                            }}
+                            className="template-var-chip"
                             onMouseEnter={(e) => {
                                 const rect = (e.target as HTMLElement).getBoundingClientRect()
                                 const containerRect = containerRef.current?.getBoundingClientRect() ?? rect
@@ -169,20 +170,8 @@ function TemplateTextarea({
             </div>
             {tooltip && (
                 <div
-                    style={{
-                        position: 'absolute',
-                        left: tooltip.x,
-                        top: tooltip.y,
-                        background: 'var(--color-bg-tooltip, #1e293b)',
-                        color: '#fff',
-                        padding: '0.25rem 0.5rem',
-                        borderRadius: '4px',
-                        fontSize: '0.78rem',
-                        whiteSpace: 'nowrap',
-                        pointerEvents: 'none',
-                        zIndex: 10,
-                        boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-                    }}
+                    className="template-var-tooltip"
+                    style={{ left: tooltip.x, top: tooltip.y }}
                 >
                     {tooltip.text}
                 </div>
@@ -216,11 +205,16 @@ function TemplateEditor({
 }) {
     const { t } = useTranslation()
     const [content, setContent] = useState('')
-    const [showPreview, setShowPreview] = useState(false)
-    const [previewHtml, setPreviewHtml] = useState('')
-    const [previewLoading, setPreviewLoading] = useState(false)
+    const [showPreview, setShowPreview] = useState(true)
+    const [debugSource, setDebugSource] = useState(false)
+    const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+    const [rendering, setRendering] = useState(false)
     const [previewError, setPreviewError] = useState('')
-    const iframeRef = useRef<HTMLIFrameElement>(null)
+    // Guards against out-of-order responses: only the latest request may
+    // replace the frame; superseded ones are aborted and their blobs revoked.
+    const revisionRef = useRef(0)
+    const urlRef = useRef<string | null>(null)
+    const abortRef = useRef<AbortController | null>(null)
 
     useEffect(() => {
         if (data?.content != null) {
@@ -228,34 +222,68 @@ function TemplateEditor({
         }
     }, [data])
 
-    const handlePreview = useCallback(async () => {
-        if (showPreview) {
-            setShowPreview(false)
-            return
-        }
-        setPreviewLoading(true)
-        setPreviewError('')
-        try {
-            const result = await previewPdfTemplate(content, templateType)
-            setPreviewHtml(result.html)
-            setShowPreview(true)
-        } catch {
-            setPreviewError(t('admin.previewError'))
-        } finally {
-            setPreviewLoading(false)
-        }
-    }, [showPreview, content, templateType, t])
-
-    useEffect(() => {
-        if (showPreview && iframeRef.current) {
-            const doc = iframeRef.current.contentDocument
-            if (doc) {
-                doc.open()
-                doc.write(previewHtml)
-                doc.close()
+    // Single render path shared by the debounced auto-render and the explicit
+    // Render button: owns the revision guard, the abort controller and the
+    // object-URL lifecycle. The source text is passed in so the callback stays
+    // stable across content edits.
+    const renderPreview = useCallback(
+        async (source: string) => {
+            const revision = ++revisionRef.current
+            const controller = new AbortController()
+            abortRef.current?.abort()
+            abortRef.current = controller
+            setRendering(true)
+            setPreviewError('')
+            try {
+                const blob = await previewPdfTemplateBlob(source, templateType, controller.signal)
+                if (revision !== revisionRef.current) return // superseded
+                const url = URL.createObjectURL(blob)
+                const previous = urlRef.current
+                urlRef.current = url
+                setPreviewUrl(url)
+                setRendering(false)
+                // Revoke the replaced URL only after the new frame had time to load.
+                if (previous) window.setTimeout(() => URL.revokeObjectURL(previous), 10_000)
+            } catch (err) {
+                if (controller.signal.aborted || revision !== revisionRef.current) return
+                setRendering(false)
+                const status = (err as { response?: { status?: number } }).response?.status
+                let detail = ''
+                const errData = (err as { response?: { data?: unknown } }).response?.data
+                if (errData instanceof Blob) {
+                    try {
+                        detail = (JSON.parse(await errData.text()) as { error?: string }).error ?? ''
+                    } catch {
+                        /* non-JSON body */
+                    }
+                }
+                setPreviewError(detail || t(status === 400 ? 'admin.previewRenderError' : 'admin.previewError'))
             }
-        }
-    }, [showPreview, previewHtml])
+        },
+        [templateType, t],
+    )
+
+    // Debounced auto-render whenever the preview view is open and the content
+    // changes (typing happens in the separate editor view, so in practice this
+    // fires once on entering the preview and after each editor round-trip).
+    // The previous object URL stays visible with a transient "re-rendering…"
+    // state until the replacement frame has loaded.
+    useEffect(() => {
+        if (!showPreview || debugSource) return
+        if (!content.trim()) return
+        const timer = window.setTimeout(() => void renderPreview(content), 700)
+        return () => window.clearTimeout(timer)
+    }, [content, showPreview, debugSource, renderPreview])
+
+    // Cleanup on unmount.
+    useEffect(
+        () => () => {
+            revisionRef.current += 1
+            abortRef.current?.abort()
+            if (urlRef.current) URL.revokeObjectURL(urlRef.current)
+        },
+        [],
+    )
 
     return (
         <div className="content-with-aside">
@@ -275,7 +303,6 @@ function TemplateEditor({
                                 {t('admin.staleTemplate')}
                             </div>
                         )}
-                        <p className="muted">{data.template_name}</p>
                         {!showPreview && (
                             <label>
                                 <span>{t('admin.templateContent')}</span>
@@ -295,21 +322,54 @@ function TemplateEditor({
                             </p>
                         )}
                         {showPreview && (
-                            <div>
-                                <span className="muted" style={{ display: 'block', marginBottom: '0.5rem' }}>{t('admin.previewLabel')}</span>
-                                <iframe
-                                    ref={iframeRef}
-                                    title={t('admin.previewLabel')}
-                                    sandbox="allow-same-origin"
-                                    style={{
-                                        width: '100%',
-                                        minHeight: '28rem',
-                                        height: '70vh',
-                                        border: '1px solid #cbd5e1',
-                                        borderRadius: '0.9rem',
-                                        background: '#fff',
-                                    }}
-                                />
+                            <div className="page-stack">
+                                <div className="actions-row">
+                                    <button
+                                        className={`button button-compact ${debugSource ? 'button-secondary' : ''}`}
+                                        type="button"
+                                        aria-pressed={!debugSource}
+                                        onClick={() => setDebugSource(false)}
+                                    >
+                                        {t('pdf.previewTitle')}
+                                    </button>
+                                    <button
+                                        className={`button button-compact ${debugSource ? '' : 'button-secondary'}`}
+                                        type="button"
+                                        aria-pressed={debugSource}
+                                        onClick={() => setDebugSource(true)}
+                                    >
+                                        {t('admin.previewSource')}
+                                    </button>
+                                    {rendering && (
+                                        <span className="muted" role="status">{t('admin.previewRerendering')}</span>
+                                    )}
+                                    <span style={{ flex: 1 }} />
+                                    <button
+                                        className="button button-secondary button-compact"
+                                        type="button"
+                                        disabled={rendering || debugSource}
+                                        onClick={() => void renderPreview(content)}
+                                    >
+                                        {t('admin.previewRenderNow')}
+                                    </button>
+                                </div>
+                                {debugSource ? (
+                                    // Escaped source text — server-rendered admin HTML is
+                                    // never written into a document or executed.
+                                    <pre
+                                        className="template-editor"
+                                        style={{
+                                            whiteSpace: 'pre-wrap',
+                                            wordBreak: 'break-word',
+                                            maxHeight: '70vh',
+                                            overflowY: 'auto',
+                                        }}
+                                    >
+                                        {content}
+                                    </pre>
+                                ) : (
+                                    <PdfPreview src={previewUrl} title={t('admin.previewLabel')} height="70vh" />
+                                )}
                             </div>
                         )}
                         {previewError && <p className="error-banner">{previewError}</p>}
@@ -325,14 +385,9 @@ function TemplateEditor({
                             <button
                                 className="button button-secondary"
                                 type="button"
-                                disabled={previewLoading}
-                                onClick={handlePreview}
+                                onClick={() => setShowPreview((v) => !v)}
                             >
-                                {previewLoading
-                                    ? t('common.loading')
-                                    : showPreview
-                                      ? t('admin.backToEditor')
-                                      : t('admin.preview')}
+                                {showPreview ? t('admin.backToEditor') : t('admin.preview')}
                             </button>
                             {data.is_customized && (
                                 <button
@@ -731,7 +786,7 @@ export function AdminPdfTemplatesPage() {
                 role="tablist"
                 aria-label={t('admin.pdfTemplates')}
                 onKeyDown={handleTabKeyDown}
-                style={{ display: 'flex', gap: '1rem', borderBottom: '1px solid var(--color-border, #e5e7eb)', marginBottom: '1.5rem' }}
+                style={{ display: 'flex', gap: '1rem', borderBottom: '1px solid var(--border-default)', marginBottom: '1.5rem' }}
             >
                 {PDF_TEMPLATE_TABS.map((tab) => (
                     <button
@@ -745,13 +800,13 @@ export function AdminPdfTemplatesPage() {
                         onClick={() => setActiveTab(tab)}
                         style={{
                             background: 'transparent',
-                            color: activeTab === tab ? 'var(--color-text, #000)' : 'var(--color-text-muted, #888)',
+                            color: activeTab === tab ? 'var(--text-primary)' : 'var(--text-muted)',
                             padding: '0.75rem 1rem',
                             fontSize: '1rem',
                             fontWeight: activeTab === tab ? 600 : 400,
                             cursor: 'pointer',
                             border: 'none',
-                            borderBlockEnd: activeTab === tab ? '2px solid var(--color-primary, #0066cc)' : 'none',
+                            borderBlockEnd: activeTab === tab ? '2px solid var(--interactive)' : 'none',
                         }}
                     >
                         {tabLabels[tab]}

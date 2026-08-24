@@ -19,11 +19,12 @@ from weasyprint.urls import URLFetcher
 from accounts.models import UserRole
 from audit.models import AuditActionCategory, AuditEvent, AuditEventStatus
 from invoices.contract_pdf import generate_contract_pdf
-from invoices.pdf_render import ALLOWED_URL_PROTOCOLS, render_pdf
+from invoices.pdf_render import ALLOWED_URL_PROTOCOLS
 from invoices.test_helpers import make_participant, make_zev
 from testing.helpers import authenticate as auth, make_user
 
 from .models import EMAIL_TEMPLATE_DEFAULTS, EmailTemplate, PdfTemplate
+from .views_templates import MAX_TEMPLATE_CHARS
 
 PDF_TEMPLATE_ENDPOINTS = [
     ("pdf-template", "invoices/invoice_pdf.html", "template.invoice_pdf"),
@@ -196,6 +197,54 @@ class PdfTemplatePreviewTests(TestCase):
         self.assertEqual(resp.status_code, 400)
         self.assertIn("Unsupported template type", resp.data["error"])
 
+    def test_preview_ignores_external_resource_references(self):
+        """Admin-supplied template content must not read local files or make
+        network calls during PDF rendering; a rejected resource degrades like
+        a missing one instead of failing the render."""
+        content = (
+            "<html><body>"
+            '<img src="file:///etc/passwd">'
+            '<img src="http://example.invalid/x.png">'
+            "</body></html>"
+        )
+        resp = self.client.post(
+            "/api/v1/invoices/invoices/preview-pdf-template/",
+            {"content": content, "output": "pdf"},
+            format="json",
+        )
+
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp["Content-Type"], "application/pdf")
+        self.assertTrue(resp.getvalue().startswith(b"%PDF-"))
+
+    def test_accept_pdf_header_does_not_fail_content_negotiation(self):
+        """Regression: the browser client requests previews with
+        ``Accept: application/pdf``. The endpoint answers with opaque PDF
+        bytes (or JSON errors) — never via a DRF renderer matching that
+        media type — so negotiation must fall back instead of answering 406
+        before the view body even runs."""
+        url = "/api/v1/invoices/invoices/preview-pdf-template/"
+
+        resp = self.client.post(
+            url,
+            {"content": "<p>rendered</p>", "output": "pdf"},
+            format="json",
+            HTTP_ACCEPT="application/pdf",
+        )
+
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp["Content-Type"], "application/pdf")
+        self.assertTrue(resp.getvalue().startswith(b"%PDF-"))
+
+        resp = self.client.post(
+            url,
+            {"content": "   "},
+            format="json",
+            HTTP_ACCEPT="application/pdf",
+        )
+
+        self.assertEqual(resp.status_code, 400)
+
     def test_broken_template_returns_400_not_500(self):
         resp = self.client.post(
             "/api/v1/invoices/invoices/preview-pdf-template/",
@@ -212,6 +261,70 @@ class PdfTemplatePreviewTests(TestCase):
         )
 
         self.assertEqual(resp.status_code, 400)
+
+    def test_preview_pdf_output_returns_pdf_bytes(self):
+        content = "<html><body><h1>{{ invoice.invoice_number }}</h1></body></html>"
+        url = "/api/v1/invoices/invoices/preview-pdf-template/"
+        for post_kwargs in (
+            {"data": {"content": content, "output": "pdf"}, "format": "json"},
+            {"path": url + "?output=pdf", "data": {"content": content}, "format": "json"},
+        ):
+            with self.subTest(query="output=pdf" in post_kwargs.get("path", "")):
+                resp = self.client.post(post_kwargs.get("path", url), **{k: v for k, v in post_kwargs.items() if k != "path"})
+
+                self.assertEqual(resp.status_code, 200)
+                self.assertEqual(resp["Content-Type"], "application/pdf")
+                self.assertTrue(resp["Content-Disposition"].startswith("inline"))
+                self.assertTrue(resp.getvalue().startswith(b"%PDF-"))
+
+    def test_preview_pdf_rejects_broken_template_with_400(self):
+        for payload in (
+            {"content": "{% not_a_tag %}", "output": "pdf"},
+            {"content": "{% not_a_tag %}", "output": "html"},
+        ):
+            with self.subTest(output=payload["output"]):
+                resp = self.client.post(
+                    "/api/v1/invoices/invoices/preview-pdf-template/", payload, format="json"
+                )
+
+                self.assertEqual(resp.status_code, 400)
+                self.assertIn("Template rendering error", resp.data["error"])
+                self.assertFalse(PdfTemplate.objects.exists())
+
+    def test_preview_rejects_oversized_content(self):
+        resp = self.client.post(
+            "/api/v1/invoices/invoices/preview-pdf-template/",
+            {"content": "x" * (MAX_TEMPLATE_CHARS + 1), "output": "pdf"},
+            format="json",
+        )
+
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn("preview cap", resp.data["error"])
+
+    def test_preview_rejects_unknown_output(self):
+        resp = self.client.post(
+            "/api/v1/invoices/invoices/preview-pdf-template/",
+            {"content": "<p>x</p>", "output": "docx"},
+            format="json",
+        )
+
+        self.assertEqual(resp.status_code, 400)
+
+    def test_preview_denials_are_not_audit_logged(self):
+        """Preview is stateless — unlike the mutation views it has no denial_audit
+        override, so a non-admin 403 must not write a GOVERNANCE event."""
+        client = APIClient()
+        auth(client, make_user("preview_participant", UserRole.PARTICIPANT))
+        before = AuditEvent.objects.filter(status=AuditEventStatus.DENIED).count()
+
+        resp = client.post(
+            "/api/v1/invoices/invoices/preview-pdf-template/",
+            {"content": "<p>x</p>", "output": "pdf"},
+            format="json",
+        )
+
+        self.assertEqual(resp.status_code, 403)
+        self.assertEqual(AuditEvent.objects.filter(status=AuditEventStatus.DENIED).count(), before)
 
 
 class PdfTemplateAdminTests(TestCase):
@@ -279,6 +392,19 @@ class PdfTemplateOverrideIntegrityTests(TestCase):
 
         self.assertEqual(resp.status_code, 400)
         self.assertIn("Template rendering error", resp.data["error"])
+        self.assertFalse(PdfTemplate.objects.exists())
+
+    def test_oversized_override_is_rejected_and_nothing_is_stored(self):
+        """The save path enforces the same content cap as the preview, because
+        a stored override renders through the same WeasyPrint pipeline."""
+        url = "/api/v1/invoices/invoices/contract-pdf-template/"
+
+        resp = self.client.patch(
+            url, {"content": "x" * (MAX_TEMPLATE_CHARS + 1)}, format="json"
+        )
+
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn("cap", resp.data["error"])
         self.assertFalse(PdfTemplate.objects.exists())
 
     def test_valid_override_is_stored_with_default_digest_and_not_stale(self):
@@ -408,16 +534,52 @@ class PdfRenderFetchPolicyTests(TestCase):
         # urllib assigns no HTTP status to data: responses; the body is the proof.
         self.assertEqual(response.read(), b"hello")
 
-    def test_render_pdf_degrades_past_external_references(self):
-        """A rejected resource degrades like a missing one instead of failing
-        the render, for stored documents and the stateless preview alike."""
-        html = (
-            "<html><body>"
-            '<img src="file:///etc/passwd">'
-            '<img src="http://example.invalid/x.png">'
-            "</body></html>"
-        )
+class InvoicePdfDownloadTests(TestCase):
+    def setUp(self):
+        from invoices.test_helpers import make_invoice
 
-        pdf = render_pdf(html)
+        self.client = APIClient()
+        self.owner = make_user("pdfdl_owner", UserRole.ZEV_OWNER)
+        self.participant_user = make_user("pdfdl_participant", UserRole.PARTICIPANT)
+        self.stranger = make_user("pdfdl_stranger", UserRole.ZEV_OWNER)
+        self.zev = make_zev(self.owner, "PDF DL ZEV")
+        self.participant = make_participant(self.zev, user=self.participant_user,
+                                            first="Pdf", last="Downloader")
+        self.invoice = make_invoice(self.zev, self.participant)
 
-        self.assertTrue(pdf.startswith(b"%PDF-"))
+    def _attach_pdf(self, invoice):
+        from django.core.files.base import ContentFile
+        invoice.pdf_file.save("test.pdf", ContentFile(b"%PDF-1.4 fake"), save=True)
+
+    def _url(self, invoice):
+        return f"/api/v1/invoices/invoices/{invoice.pk}/pdf/"
+
+    def test_pdf_returns_200_pdf_for_owner(self):
+        self._attach_pdf(self.invoice)
+        auth(self.client, self.owner)
+        resp = self.client.get(self._url(self.invoice))
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp["Content-Type"], "application/pdf")
+        self.assertTrue(b"".join(resp.streaming_content).startswith(b"%PDF"))
+
+    def test_pdf_returns_200_for_own_participant(self):
+        self._attach_pdf(self.invoice)
+        auth(self.client, self.participant_user)
+        resp = self.client.get(self._url(self.invoice))
+        self.assertEqual(resp.status_code, 200)
+
+    def test_pdf_returns_404_when_no_pdf_file(self):
+        auth(self.client, self.owner)
+        resp = self.client.get(self._url(self.invoice))
+        self.assertEqual(resp.status_code, 404)
+
+    def test_pdf_returns_404_for_out_of_scope(self):
+        self._attach_pdf(self.invoice)
+        auth(self.client, self.stranger)
+        resp = self.client.get(self._url(self.invoice))
+        self.assertEqual(resp.status_code, 404)
+
+    def test_pdf_returns_401_for_anonymous(self):
+        self._attach_pdf(self.invoice)
+        resp = self.client.get(self._url(self.invoice))
+        self.assertEqual(resp.status_code, 401)

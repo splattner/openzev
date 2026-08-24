@@ -12,6 +12,12 @@
 //   quarter-hour → Viertelstunde (DE), quart d'heure (FR), quarto d'ora (IT)
 //   load profile → Lastgang (DE), courbe de charge (FR), profilo di carico (IT)
 export const en = {
+    pdf: {
+        previewTitle: 'PDF preview',
+        openInNewTab: 'Open in new tab',
+        noDocument: 'No document available yet.',
+        generateError: 'Failed to generate the PDF.',
+    },
     app: {
         title: 'OpenZEV',
         subtitle: 'Swiss (v)ZEV billing platform',
@@ -128,8 +134,14 @@ export const en = {
     },
     common: {
         loading: 'Loading...',
-        error: 'Something went wrong.',
         empty: 'No data yet.',
+        pagination: {
+            range: '{{from}}–{{to}} of {{total}}',
+            rowsPerPage: 'Rows',
+            previous: 'Previous page',
+            next: 'Next page',
+        },
+        error: 'Something went wrong.',
         apiUrl: 'API Base URL',
         language: 'Language',
         actions: 'Actions',
@@ -193,6 +205,7 @@ export const en = {
         failed: 'Failed',
     },
     admin: {
+        fieldReference: 'Field reference',
         pdfTemplates: 'Manage PDF templates',
         pdfTemplatesDescription: 'Edit the HTML templates used to generate invoice and contract PDFs.',
         templateContent: 'Template content',
@@ -205,6 +218,10 @@ export const en = {
         backToEditor: 'Back to editor',
         previewLabel: 'Preview (sample data)',
         previewError: 'Failed to render template preview.',
+        previewSource: 'Source',
+        previewRerendering: 'Re-rendering…',
+        previewRenderNow: 'Render now',
+        previewRenderError: 'Template rendering failed.',
         staleTemplate: 'This customization is based on an older default template — review it or reset it to the current default.',
         templateIncludeHint: 'Keep the line {% include "pdf/shared_pdf_base.html" %} — it provides the shared print design.',
         availableFields: 'Available fields',
@@ -1397,6 +1414,7 @@ export const en = {
                 assignmentRemoveFailed: 'Failed to remove assignment.',
                 selectZev: 'Select a ZEV before saving the metering point.',
                 selectParticipant: 'Select a participant.',
+                missingValidFrom: 'Valid from date is required.',
             },
         },
         accounts: {
@@ -1633,6 +1651,7 @@ export const en = {
             description: 'Visualize energy readings and monitor data quality per metering point.',
             meteringPoint: 'Metering Point *',
             selectMeteringPoint: 'Select metering point…',
+            noPointSelected: 'Select a metering point above to view its energy readings.',
             allMeteringPoints: 'All metering points…',
             meterIdOptional: 'Meter ID (optional)',
             resolution: 'Resolution',
@@ -1715,6 +1734,9 @@ export const en = {
         invoiceDetail: {
             title: 'Invoice {{number}}',
             backToInvoices: 'Back to Invoices',
+            generatePdf: 'Generate PDF',
+            loading: 'Loading invoice details…',
+            loadError: 'Failed to load invoice details.',
             status: 'Status',
             total: 'Total',
             subtotal: 'Subtotal',
@@ -1804,6 +1826,14 @@ export const en = {
             invoicesSection: 'Invoices',
             loadingInvoices: 'Loading invoices…',
             failedInvoices: 'Failed to load invoices.',
+            openInvoices: {
+                title: 'Open Invoices',
+                empty: 'No open invoices.',
+                overdue: 'Overdue',
+                open: 'Open',
+                outstanding: '{{openCount}} open · {{overdueCount}} overdue · CHF {{amount}} outstanding',
+                viewAll: 'View all invoices',
+            },
             noInvoices: 'No invoices available.',
             invoiceCol: {
                 invoice: 'Invoice',

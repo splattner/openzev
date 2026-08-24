@@ -1,0 +1,12 @@
+[
+  "index.css@alpha",
+  "components/FormModal.tsx@alpha",
+  "components/ConfirmDialog.tsx@alpha",
+  "components/EmailLogsModal.tsx@alpha",
+  "features/invoices/InvoiceDeleteModal.tsx@alpha",
+  "features/audit/AuditEventDrawer.tsx@alpha",
+  "pages/MeteringChartPage.tsx@alpha",
+  "features/feasibility/ParticipantRowsEditor.tsx@alpha",
+  "invoices/invoice_pdf.html@alpha",
+  "contracts/participant_contract_pdf.html@alpha"
+]

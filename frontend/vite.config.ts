@@ -40,7 +40,7 @@ export default defineConfig({
         path,
         {
           // Dev parity with the production nginx (fullstack-nginx.conf):
-          // document embeds fetch /media same-origin instead of cross-origin.
+          // document embeds fetch authenticated API blob instead of /media/.
           target: process.env.VITE_DEV_PROXY_TARGET ?? 'http://backend:8000',
           changeOrigin: true,
         },

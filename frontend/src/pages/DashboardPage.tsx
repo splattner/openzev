@@ -18,7 +18,7 @@ import {
     fetchHourlyProfile,
     fetchMeteringDashboardSummary,
 } from '../lib/api/metering'
-import { downloadAnnualStatement, downloadAllAnnualStatements, downloadFinancialSummary, fetchInvoices } from '../lib/api/invoices'
+import { downloadAnnualStatement, downloadAllAnnualStatements, downloadFinancialSummary, fetchInvoices, openInvoicePdf } from '../lib/api/invoices'
 import { queryKeys } from '../lib/api/queryKeys'
 import { downloadBlob } from '../lib/downloadBlob'
 import { formatIsoDate } from '../lib/dates'
@@ -611,17 +611,16 @@ export function DashboardPage() {
                                                     >
                                                         {t('pages.dashboard.viewDetails')}
                                                     </Link>
-                                                    <a
-                                                        href={invoice.pdf_url ?? undefined}
-                                                        target="_blank"
-                                                        rel="noreferrer"
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => openInvoicePdf(invoice.id)}
                                                         className="button button-primary"
                                                         style={{ textDecoration: 'none', padding: '0.3rem 0.5rem', lineHeight: 1 }}
                                                         aria-label={t('pages.dashboard.openInvoicePdf', { number: invoice.invoice_number })}
                                                         title={t('common.openPdf')}
                                                     >
                                                         📄
-                                                    </a>
+                                                    </button>
                                                 </div>
                                             </td>
                                         </tr>

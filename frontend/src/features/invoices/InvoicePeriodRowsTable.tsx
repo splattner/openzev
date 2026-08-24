@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next'
 import { ActionMenu, type ActionMenuItem } from '../../components/ActionMenu'
 import { getLatestEmailLog } from './emailLogs'
 import { invoiceStatusBadgeClass } from './invoiceStatus'
+import { openInvoicePdf } from '../../lib/api/invoices'
 import type { InvoicePeriodParticipantRow } from '../../types/api'
 
 function emailStatusBadgeClass(status: string): string {
@@ -130,10 +131,10 @@ export function InvoicePeriodRowsTable({
                   {invoice ? (
                     invoice.pdf_url ? (
                       <div className="invoice-cell-stack">
-                        <a href={invoice.pdf_url} target="_blank" rel="noreferrer" className="table-inline-link">
+                        <button type="button" onClick={() => { if (invoice) openInvoicePdf(invoice.id) }} className="table-inline-link">
                           <FontAwesomeIcon icon={faFilePdf} fixedWidth />
                           {t('pages.invoices.openPdf')}
-                        </a>
+                        </button>
                         <span className="badge badge-success">{t('pages.invoices.pdfReady')}</span>
                       </div>
                     ) : (

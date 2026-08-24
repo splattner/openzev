@@ -437,7 +437,14 @@ UI elements:
    except users with `role = 'admin'`, with the `searchRestricted` hint shown.
 6. Dense table with timestamp, summary, ZEV (name resolved from the options
    query, raw UUID as fallback), category, action, target, actor, status.
-7. Detail drawer or modal showing summary, reason, diff, and metadata.
+7. Pagination row (page label + Zurück/Weiter buttons) below the table,
+   rendered only when the result spans more than one page: DRF
+   PageNumberPagination returns `next = previous = null` exactly when
+   `count <= PAGE_SIZE` (50), so on single-page results the pager is hidden
+   entirely instead of showing two permanently disabled buttons. When shown,
+   Zurück is disabled on the first page and Weiter on the last page
+   (`!data.previous` / `!data.next`).
+8. Detail drawer or modal showing summary, reason, diff, and metadata.
 
 The page follows the same admin CRUD/table conventions used by existing admin
 pages and should reuse shared components where available.

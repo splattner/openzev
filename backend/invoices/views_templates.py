@@ -16,12 +16,14 @@ The URLs are unchanged; see ``invoices/urls.py``.
 """
 
 import hashlib
+import logging
 import re
 
 from django.conf import settings
+from django.http import HttpResponse
 from django.template import Context, Template
 from django.template import engines
-from rest_framework import status
+from rest_framework import exceptions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -30,6 +32,7 @@ from audit.models import AuditActionCategory, AuditEventStatus
 from audit.services import record_audit_event
 
 from .models import EMAIL_TEMPLATE_DEFAULTS, EmailTemplate, PdfTemplate
+from .pdf_render import render_pdf
 from .template_context import (
     build_sample_annual_statement_context,
     build_sample_contract_context,
@@ -46,8 +49,15 @@ SAMPLE_CONTEXTS = {
 # Preview accepts exactly these template_type values. The PATCH save path
 # keeps the helper's invoice fallback (its template_type arrives from fixed
 # URL routes), but the preview reads template_type from the request body,
-# where an unknown value must not silently render the invoice sample context.
+# where an unknown value must not silently render the invoice sample
+# context (nor flow into the Content-Disposition filename).
 PREVIEW_TEMPLATE_TYPES = frozenset(SAMPLE_CONTEXTS) | {"invoice"}
+
+# Shared content cap for the whole-document template endpoints: the stateless
+# preview and the persisted PATCH both feed the same WeasyPrint pipeline, so a
+# pasted megabyte-scale document must be rejected in both places before it can
+# pin a worker (at preview time, or later at document/email render time).
+MAX_TEMPLATE_CHARS = 500_000
 
 
 def _read_default_template(template_name: str) -> str:
@@ -57,6 +67,8 @@ def _read_default_template(template_name: str) -> str:
 
 
 INVALID_VAR_PATTERN = re.compile(r"__INVALID_TPL_VAR__:([A-Za-z0-9_.]+)")
+
+logger = logging.getLogger(__name__)
 
 
 def _render_with_sample_context(template_type: str, content: str, *, strict: bool = False) -> str:
@@ -187,6 +199,11 @@ class PdfTemplateView(_AdminTemplateView):
         content = request.data.get("content")
         if not isinstance(content, str) or not content.strip():
             return Response({"error": "Template content is required."}, status=status.HTTP_400_BAD_REQUEST)
+        if len(content) > MAX_TEMPLATE_CHARS:
+            return Response(
+                {"error": f"Template content exceeds the {MAX_TEMPLATE_CHARS}-character cap."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         # Validate before storing: a broken override or one that references
         # unknown context keys must never be persisted, or every document
         # render would fail later (in production, at email time). Strict mode
@@ -222,20 +239,50 @@ class PdfTemplateView(_AdminTemplateView):
 
 
 class PdfTemplatePreviewView(_AdminTemplateView):
-    """Render a PDF template with sample data and return the HTML preview.
+    """Render a PDF template with sample data and return an HTML or PDF preview.
 
-    POST body: { "content": "<html>...", "template_type": "invoice" | "contract" | "annual_statement" }
-    Returns: { "html": "<rendered html>" }
+    POST body: { "content": "<html>...", "template_type": "invoice" | "contract" |
+    "annual_statement", "output": "html" | "pdf" }
+
+    ``output`` defaults to ``html`` for backwards compatibility (returns
+    ``{ "html": ... }``); ``output: "pdf"`` (also accepted as ``?output=pdf``)
+    pipes the rendered HTML through the same WeasyPrint pipeline used for issued
+    documents and returns ``application/pdf`` bytes inline. Preview is stateless:
+    no ``PdfTemplate`` row is written, and sample data is synthetic, so there is
+    no tenant scoping. Content is capped to bound WeasyPrint work.
     """
+
+    # Content is capped at MAX_TEMPLATE_CHARS (module constant) to bound
+    # WeasyPrint work — same cap as the PATCH save path.
+
+    def perform_content_negotiation(self, request, force=False):
+        """Fall back to the default renderer instead of answering 406 when the
+        client's Accept header matches no DRF renderer (the browser preview
+        sends ``Accept: application/pdf``). The success payloads here are
+        opaque WeasyPrint bytes produced outside DRF renderers anyway; the
+        fallback renderer is only used for error responses."""
+        try:
+            return super().perform_content_negotiation(request, force)
+        except exceptions.NotAcceptable:
+            renderer = self.renderer_classes[0]()
+            return renderer, renderer.media_type
 
     def post(self, request, *args, **kwargs):
         content = request.data.get("content")
         template_type = request.data.get("template_type", "invoice")
+        output = request.data.get("output") or request.query_params.get("output") or "html"
 
         if not isinstance(content, str) or not content.strip():
             return Response({"error": "Template content is required."}, status=status.HTTP_400_BAD_REQUEST)
         if not isinstance(template_type, str) or template_type not in PREVIEW_TEMPLATE_TYPES:
             return Response({"error": "Unsupported template type."}, status=status.HTTP_400_BAD_REQUEST)
+        if len(content) > MAX_TEMPLATE_CHARS:
+            return Response(
+                {"error": f"Template content exceeds the {MAX_TEMPLATE_CHARS}-character preview cap."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if output not in ("html", "pdf"):
+            return Response({"error": "Unsupported output format."}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
             rendered = _render_with_sample_context(template_type, content)
@@ -244,6 +291,21 @@ class PdfTemplatePreviewView(_AdminTemplateView):
                 {"error": f"Template rendering error: {exc}"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+
+        if output == "pdf":
+            try:
+                pdf_bytes = render_pdf(rendered)
+            except Exception:
+                # Detail (potentially including server paths) goes to the log
+                # only; the admin gets an unhelpful-but-safe message.
+                logger.exception("PDF preview rendering failed")
+                return Response(
+                    {"error": "PDF rendering failed."},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                )
+            response = HttpResponse(pdf_bytes, content_type="application/pdf")
+            response["Content-Disposition"] = f'inline; filename="preview-{template_type}.pdf"'
+            return response
 
         return Response({"html": rendered})
 

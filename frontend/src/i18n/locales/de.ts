@@ -3,6 +3,12 @@
 //   Formatspezifikationen: %d.%m.%Y, %Y-%m-%d etc.
 //   Einheiten: kWh, kW, kVA, CHF
 export const de = {
+    pdf: {
+        previewTitle: 'PDF-Vorschau',
+        openInNewTab: 'In neuem Tab öffnen',
+        noDocument: 'Noch kein Dokument verfügbar.',
+        generateError: 'PDF konnte nicht erstellt werden.',
+    },
     app: {
         title: 'OpenZEV',
         subtitle: 'Schweizer (v)ZEV-Abrechnungsplattform',
@@ -119,8 +125,14 @@ export const de = {
     },
     common: {
         loading: 'Wird geladen...',
+        empty: 'Keine Daten vorhanden.',
+        pagination: {
+            range: '{{from}}–{{to}} von {{total}}',
+            rowsPerPage: 'Zeilen',
+            previous: 'Vorherige Seite',
+            next: 'Nächste Seite',
+        },
         error: 'Etwas ist schief gelaufen.',
-        empty: 'Noch keine Daten.',
         apiUrl: 'API-Basis-URL',
         language: 'Sprache',
         actions: 'Aktionen',
@@ -184,6 +196,7 @@ export const de = {
         failed: 'Fehlgeschlagen',
     },
     admin: {
+        fieldReference: 'Feldreferenz',
         pdfTemplates: 'PDF-Vorlagen verwalten',
         pdfTemplatesDescription: 'Bearbeiten Sie die HTML-Vorlagen für Rechnungs- und Vertrags-PDFs.',
         templateContent: 'Vorlageninhalt',
@@ -196,6 +209,10 @@ export const de = {
         backToEditor: 'Zurück zum Editor',
         previewLabel: 'Vorschau (Beispieldaten)',
         previewError: 'Vorschau konnte nicht gerendert werden.',
+        previewSource: 'Quelltext',
+        previewRerendering: 'Wird neu gerendert…',
+        previewRenderNow: 'Jetzt rendern',
+        previewRenderError: 'Vorlage konnte nicht gerendert werden.',
         staleTemplate: 'Diese Anpassung basiert auf einer älteren Standardvorlage — überprüfen Sie sie oder setzen Sie sie auf die aktuelle Vorlage zurück.',
         templateIncludeHint: 'Behalten Sie die Zeile {% include "pdf/shared_pdf_base.html" %} bei — sie liefert das gemeinsame Druckdesign.',
         availableFields: 'Verfügbare Felder',
@@ -1386,6 +1403,7 @@ export const de = {
                 assignmentRemoveFailed: 'Zuweisung konnte nicht entfernt werden.',
                 selectZev: 'Bitte wählen Sie vor dem Speichern des Zählpunkts ein ZEV aus.',
                 selectParticipant: 'Bitte wählen Sie einen Teilnehmer aus.',
+                missingValidFrom: 'Das Gültig-ab-Datum ist erforderlich.',
             },
         },
         accounts: {
@@ -1622,6 +1640,7 @@ export const de = {
             description: 'Energiewerte visualisieren und Datenqualität pro Messstelle überwachen.',
             meteringPoint: 'Messstelle *',
             selectMeteringPoint: 'Messstelle auswählen…',
+            noPointSelected: 'Wählen Sie oben eine Messstelle aus, um ihre Energieablesungen zu sehen.',
             allMeteringPoints: 'Alle Messstellen…',
             meterIdOptional: 'Zähler-ID (optional)',
             resolution: 'Auflösung',
@@ -1704,6 +1723,9 @@ export const de = {
         invoiceDetail: {
             title: 'Rechnung {{number}}',
             backToInvoices: 'Zurück zu den Rechnungen',
+            generatePdf: 'PDF erstellen',
+            loading: 'Rechnungsdetails werden geladen…',
+            loadError: 'Rechnungsdetails konnten nicht geladen werden.',
             status: 'Status',
             total: 'Gesamt',
             subtotal: 'Zwischensumme',
@@ -1793,6 +1815,14 @@ export const de = {
             invoicesSection: 'Rechnungen',
             loadingInvoices: 'Rechnungen werden geladen…',
             failedInvoices: 'Rechnungen konnten nicht geladen werden.',
+            openInvoices: {
+                title: 'Offene Rechnungen',
+                empty: 'Keine offenen Rechnungen.',
+                overdue: 'Überfällig',
+                open: 'Offen',
+                outstanding: '{{openCount}} offen · {{overdueCount}} überfällig · CHF {{amount}} ausstehend',
+                viewAll: 'Alle Rechnungen anzeigen',
+            },
             noInvoices: 'Keine Rechnungen verfügbar.',
             invoiceCol: {
                 invoice: 'Rechnung',

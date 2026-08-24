@@ -31,6 +31,18 @@ jobs:
             - name: Run lint
               run: npm run lint
 
+            - name: Lint styles (no raw hex)
+              run: npm run lint:style
+
+            - name: Hex sweep (tokens SSOT enforcement)
+              run: node ../scripts/check-frontend-hex.mjs
+
+            - name: Check design tokens
+              run: node ../scripts/generate-tokens.mjs --check
+
+            - name: Token idempotence test
+              run: node --test ../design/tokens.test.mjs
+
             - name: Run unit tests
               run: npm run test:unit
 

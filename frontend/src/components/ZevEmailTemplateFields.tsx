@@ -16,6 +16,7 @@ const TEMPLATE_VARIABLES: { variable: string; descriptionKey: string }[] = [
     { variable: '{invoice_number}', descriptionKey: 'admin.emailTemplates.fields.invoiceNumber' },
     { variable: '{period_start}', descriptionKey: 'admin.emailTemplates.fields.periodStart' },
     { variable: '{period_end}', descriptionKey: 'admin.emailTemplates.fields.periodEnd' },
+    { variable: '{due_date}', descriptionKey: 'admin.emailTemplates.fields.dueDate' },
     { variable: '{total_chf}', descriptionKey: 'admin.emailTemplates.fields.totalChf' },
     { variable: '{zev_name}', descriptionKey: 'admin.emailTemplates.fields.zevName' },
 ]
@@ -58,15 +59,18 @@ export function ZevEmailTemplateFields({
                             placeholder={globalSubject}
                             onChange={(event) => onSubjectTemplateChange(event.target.value)}
                         />
-                        <button
-                            type="button"
-                            className="button button-secondary"
-                            disabled={!subjectTemplate}
-                            onClick={() => onSubjectTemplateChange('')}
-                            title={t('pages.zevSettings.resetToGlobalDefault')}
-                        >
-                            {t('admin.resetToDefault')}
-                        </button>
+                        {/* Empty field = already at the global default, so
+                            the reset action is meaningless and stays hidden. */}
+                        {subjectTemplate !== '' && (
+                            <button
+                                type="button"
+                                className="button button-secondary"
+                                onClick={() => onSubjectTemplateChange('')}
+                                title={t('pages.zevSettings.resetToGlobalDefault')}
+                            >
+                                {t('admin.resetToDefault')}
+                            </button>
+                        )}
                     </div>
                 </label>
 
@@ -80,32 +84,37 @@ export function ZevEmailTemplateFields({
                             placeholder={globalBody}
                             onChange={(event) => onBodyTemplateChange(event.target.value)}
                         />
-                        <button
-                            type="button"
-                            className="button button-secondary"
-                            disabled={!bodyTemplate}
-                            onClick={() => onBodyTemplateChange('')}
-                            title={t('pages.zevSettings.resetToGlobalDefault')}
-                        >
-                            {t('admin.resetToDefault')}
-                        </button>
+                        {bodyTemplate !== '' && (
+                            <button
+                                type="button"
+                                className="button button-secondary"
+                                onClick={() => onBodyTemplateChange('')}
+                                title={t('pages.zevSettings.resetToGlobalDefault')}
+                            >
+                                {t('admin.resetToDefault')}
+                            </button>
+                        )}
                     </div>
                 </label>
 
                 <details open>
                     <summary style={{ cursor: 'pointer' }}>{t('admin.availableFields')}</summary>
-                    <table style={{ marginTop: '0.75rem', width: '100%' }}>
+                    <table style={{ marginTop: '0.75rem', width: '100%', fontSize: '0.78rem', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
                         <thead>
                             <tr>
-                                <th style={{ textAlign: 'left', padding: '0.4rem 0.75rem' }}>{t('admin.emailTemplates.variable')}</th>
-                                <th style={{ textAlign: 'left', padding: '0.4rem 0.75rem' }}>{t('admin.emailTemplates.fieldDescription')}</th>
+                                <th style={{ textAlign: 'left', padding: '0.4rem 0.4rem 0.4rem 0' }}>{t('admin.emailTemplates.variable')}</th>
+                                <th style={{ textAlign: 'left', padding: '0.4rem 0', overflowWrap: 'anywhere' }}>{t('admin.emailTemplates.fieldDescription')}</th>
                             </tr>
                         </thead>
                         <tbody>
                             {TEMPLATE_VARIABLES.map(({ variable, descriptionKey }) => (
-                                <tr key={variable}>
-                                    <td style={{ padding: '0.4rem 0.75rem' }}>{variable}</td>
-                                    <td style={{ padding: '0.4rem 0.75rem' }}>{t(descriptionKey)}</td>
+                                <tr key={variable} style={{ borderBottom: '1px solid var(--border-default)' }}>
+                                    <td style={{ padding: '0.3rem 0.4rem 0.3rem 0', fontFamily: 'monospace', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={variable}>
+                                        {variable}
+                                    </td>
+                                    <td className="muted" style={{ padding: '0.3rem 0', overflowWrap: 'anywhere', lineHeight: 1.35 }}>
+                                        {t(descriptionKey)}
+                                    </td>
                                 </tr>
                             ))}
                         </tbody>

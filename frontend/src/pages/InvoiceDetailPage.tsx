@@ -1,14 +1,53 @@
 import { useQuery } from '@tanstack/react-query'
+import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { fetchInvoice } from '../lib/api/invoices'
+import { fetchInvoice, fetchInvoicePdfBlob, generateInvoicePdf } from '../lib/api/invoices'
 import { queryKeys } from '../lib/api/queryKeys'
 import { formatShortDate, useAppSettings } from '../lib/appSettings'
+import { PdfPreview } from '../components/PdfPreview'
 
-function humanizeType(type: string): string {
-    return type
-        .replace(/_/g, ' ')
-        .replace(/\b\w/g, (char) => char.toUpperCase())
+/** Authenticated blob-fetch of the stored PDF artifact → object URL.
+ * Fetches from the API endpoint (not /media/) so auth + 401-refresh works
+ * everywhere, including Helm/prod where DEBUG=False has no static() serving. */
+function useInvoicePdfUrl(invoiceId: string | undefined, hasPdf: boolean): {
+    url: string | null
+    loading: boolean
+    error: boolean
+} {
+    const [url, setUrl] = useState<string | null>(null)
+    const [loading, setLoading] = useState(false)
+    const [error, setError] = useState(false)
+
+    useEffect(() => {
+        if (!invoiceId || !hasPdf) {
+            setUrl(null)
+            return
+        }
+        let objectUrl: string | null = null
+        let cancelled = false
+        setLoading(true)
+        setError(false)
+        void fetchInvoicePdfBlob(invoiceId)
+            .then((blob) => {
+                if (cancelled) return
+                if (blob.type !== 'application/pdf') throw new Error('Not a PDF')
+                objectUrl = URL.createObjectURL(blob)
+                setUrl(objectUrl)
+            })
+            .catch(() => {
+                if (!cancelled) setError(true)
+            })
+            .finally(() => {
+                if (!cancelled) setLoading(false)
+            })
+        return () => {
+            cancelled = true
+            if (objectUrl) URL.revokeObjectURL(objectUrl)
+        }
+    }, [invoiceId, hasPdf])
+
+    return { url, loading, error }
 }
 
 export function InvoiceDetailPage() {
@@ -22,6 +61,14 @@ export function InvoiceDetailPage() {
         enabled: !!invoiceId,
     })
 
+    const [generating, setGenerating] = useState(false)
+    const [generateError, setGenerateError] = useState(false)
+
+    // Whether the invoice has a stored PDF artifact (drives the "PDF exists?" branch).
+    const pdfExists = invoiceQuery.data?.pdf_url != null
+
+    const { url: pdfObjectUrl, loading: pdfLoading, error: pdfError } = useInvoicePdfUrl(invoiceId, pdfExists)
+
     if (invoiceQuery.isLoading) {
         return <div className="card">{t('common.loading')}</div>
     }
@@ -30,16 +77,21 @@ export function InvoiceDetailPage() {
     }
 
     const inv = invoiceQuery.data
-    const groupedItems = Object.entries(
-        (inv.items || []).reduce<Record<string, NonNullable<typeof inv.items>>>((groups, item) => {
-            const key = item.tariff_category || 'energy'
-            if (!groups[key]) {
-                groups[key] = []
-            }
-            groups[key].push(item)
-            return groups
-        }, {}),
-    )
+
+    const handleGeneratePdf = async () => {
+        if (!invoiceId) return
+        setGenerating(true)
+        setGenerateError(false)
+        try {
+            await generateInvoicePdf(invoiceId)
+            // Re-fetch the invoice so the new `pdf_url` drives the embed.
+            await invoiceQuery.refetch()
+        } catch {
+            setGenerateError(true)
+        } finally {
+            setGenerating(false)
+        }
+    }
 
     return (
         <div className="page-stack">
@@ -56,7 +108,7 @@ export function InvoiceDetailPage() {
             </header>
 
             <section className="grid grid-4">
-                <div className="card"><strong>{t('pages.invoiceDetail.status')}</strong><div>{t(`invoice.status.${inv.status}`)}</div></div>
+                <div className="card"><strong>{t('pages.invoiceDetail.status')}</strong><div><span className={`badge badge-${inv.status}`}>{t(`invoice.status.${inv.status}`)}</span></div></div>
                 <div className="card"><strong>{t('pages.invoiceDetail.total')}</strong><div>CHF {inv.total_chf}</div></div>
                 <div className="card"><strong>{t('pages.invoiceDetail.subtotal')}</strong><div>CHF {inv.subtotal_chf ?? '-'}</div></div>
                 <div className="card"><strong>{t('pages.invoiceDetail.vat')}</strong><div>CHF {inv.vat_chf ?? '-'}</div></div>
@@ -71,50 +123,27 @@ export function InvoiceDetailPage() {
                 </div>
             </section>
 
-            <section className="table-card">
-                <h3 style={{ marginTop: 0, padding: '1rem 1rem 0' }}>{t('pages.invoiceDetail.lineItems')}</h3>
-                {groupedItems.length ? groupedItems.map(([category, items]) => {
-                    const subtotal = items.reduce((sum, item) => sum + Number(item.total_chf), 0)
-                    const categoryLabel = t(`pages.invoiceDetail.categories.${category}` as Parameters<typeof t>[0], { defaultValue: category })
-                    return (
-                        <div key={category} style={{ padding: '1rem' }}>
-                            <h4 style={{ margin: '0 0 0.75rem' }}>{categoryLabel}</h4>
-                            <table>
-                                <thead>
-                                    <tr>
-                                        <th>{t('pages.invoiceDetail.col.type')}</th>
-                                        <th>{t('pages.invoiceDetail.col.description')}</th>
-                                        <th>{t('pages.invoiceDetail.col.quantity')}</th>
-                                        <th>{t('pages.invoiceDetail.col.unit')}</th>
-                                        <th>{t('pages.invoiceDetail.col.unitPrice')}</th>
-                                        <th>{t('pages.invoiceDetail.col.total')}</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {items.map((item) => (
-                                        <tr key={item.id}>
-                                            <td>
-                                                {t(`pages.invoiceDetail.itemTypes.${item.item_type}` as Parameters<typeof t>[0], {
-                                                    defaultValue: humanizeType(item.item_type),
-                                                })}
-                                            </td>
-                                            <td>{item.description}</td>
-                                            <td>{item.quantity_kwh}</td>
-                                            <td>{item.unit}</td>
-                                            <td>{item.unit_price_chf}</td>
-                                            <td>{item.total_chf}</td>
-                                        </tr>
-                                    ))}
-                                    <tr>
-                                        <td colSpan={5}><strong>{categoryLabel} subtotal</strong></td>
-                                        <td><strong>{subtotal.toFixed(2)}</strong></td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
+            {/* The document itself: the stored PDF artifact, not an HTML facsimile
+                that would drift from the issued document. Line-item detail lives
+                in the embedded PDF. */}
+            <section aria-label={t('pdf.previewTitle')} className="page-stack">
+                {pdfExists ? (
+                    pdfError ? (
+                        <div className="error-banner">{t('common.error')}</div>
+                    ) : pdfLoading ? (
+                        <div className="card">{t('common.loading')}</div>
+                    ) : (
+                        <PdfPreview src={pdfObjectUrl} title={t('pages.invoiceDetail.title', { number: inv.invoice_number })} />
                     )
-                }) : (
-                    <div style={{ padding: '1rem' }}>{t('pages.invoiceDetail.noItems')}</div>
+                ) : (
+                    <div className="card" style={{ display: 'flex', gap: '1rem', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <p className="muted" style={{ margin: 0 }}>
+                            {generateError ? <span className="text-error">{t('pdf.generateError')}</span> : t('pdf.noDocument')}
+                        </p>
+                        <button className="button" type="button" disabled={generating || pdfLoading} onClick={handleGeneratePdf}>
+                            {generating ? t('common.loading') : t('pages.invoiceDetail.generatePdf')}
+                        </button>
+                    </div>
                 )}
             </section>
         </div>

@@ -315,14 +315,20 @@ The invoice, contract, and annual-statement PDF templates are editable via the a
 | `GET` | `/invoices/invoices/annual-statement-pdf-template/` | `admin` only | Return current content + `is_customized` flag |
 | `PATCH` | `/invoices/invoices/annual-statement-pdf-template/` | `admin` only | Save content to database |
 | `DELETE` | `/invoices/invoices/annual-statement-pdf-template/` | `admin` only | Remove DB override; reverts to on-disk default |
+#### Invoice PDF download
+
+| Method | URL | Permission | Description |
+|---|---|---|---|
+| `GET` | `/invoices/invoices/{id}/pdf/` | `IsAuthenticated` + queryset ZEV scoping (owner/participant see own invoices, admin all) | Serve stored PDF artifact via `FileResponse` (`application/pdf`); 404 when no `pdf_file` or out of scope |
+
 
 #### Template preview
 
 | Method | URL | Permission | Description |
 |---|---|---|---|
-| `POST` | `/invoices/invoices/preview-pdf-template/` | `admin` only | Render submitted template content with sample data and return the rendered HTML |
+| `POST` | `/invoices/invoices/preview-pdf-template/` | `admin` only | Render submitted template content with sample data; returns rendered HTML or real PDF bytes |
 
-Request body: `{ "content": "<html>...", "template_type": "invoice" | "contract" | "annual_statement" }` (defaults to `invoice`). The sample context comes from `build_sample_invoice_context()`, `build_sample_contract_context()`, or `build_sample_annual_statement_context()` in `invoices/template_context.py`. Response: `{ "html": "<rendered html>" }`. Template rendering errors return `400` with `{ "error": "Template rendering error: ..." }`; missing/blank content returns `400`; unknown `template_type` values return `400`.
+Request body: `{ "content": "<html>...", "template_type": "invoice" | "contract" | "annual_statement" }` (defaults to `invoice`) plus `"output": "html" | "pdf"` (defaults to `html`). The sample context comes from `build_sample_invoice_context()`, `build_sample_contract_context()`, or `build_sample_annual_statement_context()` in `invoices/template_context.py`. With `output: "html"` the response is `{ "html": "<rendered html>" }`; with `output: "pdf"` the same content runs through the WeasyPrint pipeline (`render_pdf()`) and the response is raw `application/pdf` bytes rendered from sample data. Template rendering errors return `400` with `{ "error": "Template rendering error: ..." }`; missing/blank content returns `400`; unknown `template_type`/`output` values return `400`; content above `MAX_PREVIEW_CHARS` (500,000) returns `400`; a PDF-stage failure returns a generic `500` (details logged server-side).
 
 **Response shape (GET and PATCH):**
 
@@ -654,6 +660,11 @@ Strips legacy period suffixes from `description` on serialization.
 - Invoice action button visibility by role and status
 - Email status display and retry button behavior
 - Period overview metering completeness indicators
+- Batch toolbar (`InvoiceBatchToolbar`): "Alle PDFs herunterladen" renders only
+  when the period has at least one PDF (`pdfCount > 0`); "Weitere Sammelaktionen"
+  renders only when at least one non-recommended batch item is enabled. In
+  periods with nothing to act on (e.g. future periods) both are hidden, not
+  disabled; disabled state is reserved for transient `anyBatchPending`.
 - Build and type checks (`npm run build`)
 
 ### Manual verification

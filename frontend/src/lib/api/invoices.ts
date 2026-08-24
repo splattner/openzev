@@ -11,7 +11,7 @@ import { api } from './client'
 
 export async function fetchInvoices(zevId?: string): Promise<PaginatedResponse<Invoice>> {
   const { data } = await api.get<PaginatedResponse<Invoice>>('/invoices/invoices/', {
-    // Backend narrows by ?zev_id= on top of role scoping (issue 411); without it,
+    // Backend narrows by ?zev_id= on top of role scoping (issue #411); without it,
     // admins and multi-ZEV owners get every ZEV they can see.
     params: zevId ? { zev_id: zevId } : undefined,
   })
@@ -132,6 +132,26 @@ export async function generateInvoicePdf(invoiceId: string): Promise<{ pdf_url: 
   return data
 }
 
+/** Fetch the authenticated PDF blob via the API (not /media/). */
+export async function fetchInvoicePdfBlob(invoiceId: string): Promise<Blob> {
+  const response = await api.get<Blob>(`/invoices/invoices/${invoiceId}/pdf/`, {
+    responseType: 'blob',
+  })
+  return response.data
+}
+
+/** Fetch the PDF blob and open it in a new tab via object URL. */
+export async function openInvoicePdf(invoiceId: string): Promise<void> {
+  const blob = await fetchInvoicePdfBlob(invoiceId)
+  const url = URL.createObjectURL(blob)
+  const anchor = document.createElement('a')
+  anchor.href = url
+  anchor.target = '_blank'
+  anchor.rel = 'noreferrer'
+  anchor.click()
+  setTimeout(() => URL.revokeObjectURL(url), 60000)
+}
+
 export async function sendInvoiceEmail(invoiceId: string, email?: string): Promise<{ detail: string }> {
   const { data } = await api.post<{ detail: string }>(`/invoices/invoices/${invoiceId}/send-email/`, { email })
   return data
@@ -216,9 +236,19 @@ export async function resetAnnualStatementPdfTemplate(): Promise<PdfTemplateResp
   return data
 }
 
-export async function previewPdfTemplate(content: string, templateType: 'invoice' | 'contract' | 'annual_statement'): Promise<{ html: string }> {
-  const { data } = await api.post<{ html: string }>('/invoices/invoices/preview-pdf-template/', { content, template_type: templateType })
-  return data
+/** Real-PDF preview: runs the same WeasyPrint pipeline as issued documents and
+ * returns the raw bytes as a Blob for an object-URL iframe. */
+export async function previewPdfTemplateBlob(
+  content: string,
+  templateType: 'invoice' | 'contract' | 'annual_statement',
+  signal?: AbortSignal,
+): Promise<Blob> {
+  const response = await api.post(
+    '/invoices/invoices/preview-pdf-template/',
+    { content, template_type: templateType, output: 'pdf' },
+    { responseType: 'blob', headers: { Accept: 'application/pdf' }, signal },
+  )
+  return response.data as Blob
 }
 
 export async function fetchEmailTemplate(templateKey: string): Promise<EmailTemplateResponse> {

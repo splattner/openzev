@@ -3,6 +3,12 @@
 //   Spécifications de format : %d.%m.%Y, %Y-%m-%d, etc.
 //   Symboles d'unités : kWh, kW, kVA, CHF
 export const fr = {
+    pdf: {
+        previewTitle: 'Aperçu PDF',
+        openInNewTab: 'Ouvrir dans un nouvel onglet',
+        noDocument: 'Aucun document disponible pour le moment.',
+        generateError: 'Échec de la génération du PDF.',
+    },
     app: {
         title: 'OpenZEV',
         subtitle: 'Plateforme de facturation RCP/RCPv suisse',
@@ -119,8 +125,14 @@ export const fr = {
     },
     common: {
         loading: 'Chargement...',
+        empty: 'Aucune donnée.',
+        pagination: {
+            range: '{{from}}–{{to}} sur {{total}}',
+            rowsPerPage: 'Lignes',
+            previous: 'Page précédente',
+            next: 'Page suivante',
+        },
         error: 'Une erreur s\'est produite.',
-        empty: 'Aucune donnée pour le moment.',
         apiUrl: 'URL de base de l\'API',
         language: 'Langue',
         actions: 'Actions',
@@ -184,6 +196,7 @@ export const fr = {
         failed: 'Échec',
     },
     admin: {
+        fieldReference: 'Référence des champs',
         pdfTemplates: 'Gérer les modèles PDF',
         pdfTemplatesDescription: 'Modifiez les modèles HTML utilisés pour générer les factures et les contrats PDF.',
         templateContent: 'Contenu du modèle',
@@ -196,6 +209,10 @@ export const fr = {
         backToEditor: 'Retour à l\'éditeur',
         previewLabel: 'Aperçu (données d\'exemple)',
         previewError: 'Impossible de rendre l\'aperçu du modèle.',
+        previewSource: 'Source',
+        previewRerendering: 'Nouveau rendu…',
+        previewRenderNow: 'Rendre maintenant',
+        previewRenderError: 'Échec du rendu du modèle.',
         staleTemplate: 'Cette personnalisation repose sur un modèle par défaut plus ancien — vérifiez-la ou réinitialisez-la au modèle par défaut actuel.',
         templateIncludeHint: 'Conservez la ligne {% include "pdf/shared_pdf_base.html" %} — elle fournit le design d\'impression commun.',
         availableFields: 'Champs disponibles',
@@ -1386,6 +1403,7 @@ export const fr = {
                 assignmentRemoveFailed: 'Échec de la suppression de l’attribution.',
                 selectZev: 'Veuillez sélectionner un RCP avant d’enregistrer le point de mesure.',
                 selectParticipant: 'Veuillez sélectionner un participant.',
+                missingValidFrom: 'La date de début de validité est requise.',
             },
         },
         accounts: {
@@ -1622,6 +1640,7 @@ export const fr = {
             description: 'Visualiser les relevés d\'énergie et surveiller la qualité des données par point de mesure.',
             meteringPoint: 'Point de mesure *',
             selectMeteringPoint: 'Sélectionner un point de mesure…',
+            noPointSelected: 'Sélectionnez un point de mesure ci-dessus pour consulter ses relevés d\'énergie.',
             allMeteringPoints: 'Tous les points de mesure…',
             meterIdOptional: 'ID du compteur (optionnel)',
             resolution: 'Résolution',
@@ -1704,6 +1723,9 @@ export const fr = {
         invoiceDetail: {
             title: 'Facture {{number}}',
             backToInvoices: 'Retour aux factures',
+            generatePdf: 'Générer le PDF',
+            loading: 'Chargement des détails de la facture…',
+            loadError: 'Échec du chargement des détails de la facture.',
             status: 'Statut',
             total: 'Total',
             subtotal: 'Sous-total',
@@ -1793,6 +1815,14 @@ export const fr = {
             invoicesSection: 'Factures',
             loadingInvoices: 'Chargement des factures…',
             failedInvoices: 'Impossible de charger les factures.',
+            openInvoices: {
+                title: 'Factures ouvertes',
+                empty: 'Aucune facture ouverte.',
+                overdue: 'En retard',
+                open: 'Ouverte',
+                outstanding: '{{openCount}} ouverte(s) · {{overdueCount}} en retard · CHF {{amount}} impayé',
+                viewAll: 'Voir toutes les factures',
+            },
             noInvoices: 'Aucune facture disponible.',
             invoiceCol: {
                 invoice: 'Facture',

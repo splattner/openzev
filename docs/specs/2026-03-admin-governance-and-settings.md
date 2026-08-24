@@ -211,7 +211,7 @@ All three PDF template endpoints are served by `PdfTemplateView` (`views_templat
 | `/api/v1/invoices/invoices/pdf-template/` | DELETE | `IsAdmin` | Deletes the DB override (reverts to on-disk default); audit-logged (`template.invoice_pdf.reset`). Returns `{ template_name, content, is_customized: false, detail }` with the default content |
 | `/api/v1/invoices/invoices/contract-pdf-template/` | GET/PATCH/DELETE | same | Same behaviour for `contracts/participant_contract_pdf.html` (audit prefix `template.contract_pdf`) |
 | `/api/v1/invoices/invoices/annual-statement-pdf-template/` | GET/PATCH/DELETE | same | Same behaviour for `invoices/annual_statement_pdf.html` (audit prefix `template.annual_statement_pdf`) |
-| `/api/v1/invoices/invoices/preview-pdf-template/` | POST | `IsAdmin` | Renders submitted `content` with sample data (`template_type`: `invoice` (default) / `contract` / `annual_statement`) and returns `{ html }`. Unknown `template_type`, render errors, or missing content → `400` |
+| `/api/v1/invoices/invoices/preview-pdf-template/` | POST | `IsAdmin` | Renders submitted `content` with sample data (`template_type`: `invoice` (default) / `contract` / `annual_statement`; `output`: `html` (default) / `pdf`). `html` returns `{ html }`; `pdf` runs the same WeasyPrint pipeline and returns raw `application/pdf` bytes. Render errors, missing content, unknown `template_type`/`output`, or content above `MAX_PREVIEW_CHARS` (500,000) → `400`; PDF-stage failures → generic `500` |
 
 **Implementation:** The default content is read from the Django template loader via `_read_default_template(template_name)`. PDF rendering prefers the DB override (`invoices.pdf._render_template`); see §8.
 
@@ -365,7 +365,7 @@ remain available as redirects into the corresponding tab of
 
 - Query: `useQuery({ queryKey: ['dashboard'], queryFn: fetchDashboardStats, refetchInterval: 30000 })` — auto-refreshes every 30 seconds.
 - Displays 4 key metric cards: total ZEVs, total participants, total revenue (CHF), pending emails (with failed count highlight).
-- Invoice status breakdown: colour-coded grid of draft/approved/sent/paid/cancelled counts.
+- Invoice status breakdown: 5-tile grid (`draft/approved/sent/paid/cancelled`) using the desaturated workflow palette from the invoice badges (`frontend/src/index.css` — `.status-tile-draft/.status-tile-cancelled` → `var(--status-neutral)`, `.status-tile-approved/.status-tile-sent` → `var(--status-info)`, `.status-tile-paid` → `var(--status-success)`) with dark ink text (`var(--ink-soft)` / `var(--success-700)`) instead of saturated fills with white text.
 - Email statistics: total/sent/pending/failed with colour-coded cards.
 
 ### 9.4 AdminSystemSettingsPage
@@ -402,7 +402,7 @@ redirect to the matching tab on this page.
 
 - Query: `useQuery({ queryKey: ['vat-rates'], queryFn: fetchVatRates })`.
 - **Summary cards:** three `StatCard` components above the form — configured rate count, today's active rate (percentage, or the translated "none" label), and count of scheduled rates with `valid_from` in the future.
-- **Create/Edit form:** 3 fields (rate %, valid_from DatePicker with app-settings format, valid_to DatePicker optional). Default rate: `8.1`. The frontend converts percentage to fraction before sending (`(percentage / 100).toFixed(4)`). Date pickers are MUI X `DatePicker` components inheriting the app-level `LocalizationProvider` supplied by `DateLocaleProvider` (`frontend/src/components/DateLocaleProvider.tsx`, mounted in `main.tsx`): `adapterLocale` (dayjs calendar names/format) and `localeText` (picker UI text such as "Choose date", from `@mui/x-date-pickers/locales` de/fr/it bundles, mirroring `lib/dataGridLocale.ts`) both follow the active UI language. Submitting an empty valid_from is rejected client-side with a toast (`adminVatSettings.messages.missingValidFrom`).
+- **Create/Edit form:** 3 fields (rate %, valid_from date input with app-settings format, valid_to date input optional). Default rate: `8.1`. The frontend converts percentage to fraction before sending (`(percentage / 100).toFixed(4)`). Dates use the shared `CivilDateInput` (`frontend/src/components/CivilDateInput.tsx`, a Mantine `DatePickerInput` typing civil dates in the app's configured format); calendar localization comes from the app-level Mantine `DatesProvider` supplied by `DateLocaleProvider` (`frontend/src/components/DateLocaleProvider.tsx`, mounted in `main.tsx`), which maps the active UI language to a dayjs locale for month names, weekday order, and picker text. Submitting an empty valid_from is rejected client-side with a toast (`adminVatSettings.messages.missingValidFrom`).
 - **Rate table:** displays rate as percentage (`(rate × 100).toFixed(2)%`), valid_from (formatted), valid_to (formatted or "Open"), with Edit/Delete buttons.
 - **Delete:** Uses `ConfirmDialog` component for destructive confirmation.
 - **Validation feedback:** API errors (overlap, invalid range) displayed via toast.
@@ -414,7 +414,7 @@ redirect to the matching tab on this page.
 - Tabbed editor with three tabs: invoice (`fetchInvoicePdfTemplate`), contract (`fetchContractPdfTemplate`), and annual statement (`fetchAnnualStatementPdfTemplate`); each tab has its own query, save mutation, and reset mutation.
 - Each tab shows the template name, an `is_customized` badge when a DB override exists, and a large monospace `TemplateTextarea` with an overlay that highlights `{{ }}`/`{% %}` template variables and shows field-description tooltips on hover.
 - A `FieldReference` sidebar lists the available context variables per template type (invoice, participant, ZEV, owner, line-item loops, charts/savings, translations).
-- **Preview:** `previewPdfTemplate(content, templateType)` POSTs the current editor content to `preview-pdf-template/` and renders the returned HTML in an iframe (new-window option available); render errors show an error banner.
+- **Preview:** `previewPdfTemplateBlob(content, templateType, signal)` POSTs the current editor content to `preview-pdf-template/` with `output: "pdf"`, fetches the returned bytes as a Blob, and renders them in an iframe via an object URL inside `PdfPreview` (the app's shared authenticated document embed). A source toggle shows the escaped rendered HTML as text; render errors show an error banner.
 - **Save** sends the content string to the matching update endpoint; success toast displays the `detail` message from the response.
 - **Reset to default** (visible only when `is_customized`) calls the DELETE endpoint, reverts the editor to the on-disk default, and toasts the result.
 
@@ -436,7 +436,7 @@ Two form sections sharing the same submit mutation (`updateZev`):
 - Subject line input with placeholder showing system default
 - Body textarea (10 rows) with placeholder showing system default
 - Reset buttons to clear custom templates (reverts to system default)
-- Expandable `<details>` section listing all 6 available template variables with descriptions
+- Expandable `<details>` section listing all 7 available template variables with descriptions — `{invoice_number}`, `{zev_name}`, `{participant_name}`, `{period_start}`, `{period_end}`, `{due_date}` (empty string when the invoice has no due date), `{total_chf}` — matching the variable set documented in `2026-03-invoice-lifecycle-and-communication.md` §"Template variables" and rendered with the shared redesign tokens (monospace variable column, muted descriptions, `--border-default` row separators) like the `FieldReference` sidebars on the admin template pages
 
 ### 9.8 TypeScript types
 
@@ -519,7 +519,7 @@ interface PdfTemplateResponse {
 | `fetchAnnualStatementPdfTemplate()` | GET | `/invoices/invoices/annual-statement-pdf-template/` |
 | `updateAnnualStatementPdfTemplate(content)` | PATCH | `/invoices/invoices/annual-statement-pdf-template/` |
 | `resetAnnualStatementPdfTemplate()` | DELETE | `/invoices/invoices/annual-statement-pdf-template/` |
-| `previewPdfTemplate(content, templateType)` | POST | `/invoices/invoices/preview-pdf-template/` |
+| `previewPdfTemplateBlob(content, templateType, signal)` | POST | `/invoices/invoices/preview-pdf-template/` |
 
 ---
 
@@ -587,7 +587,7 @@ Tests cover dashboard access (`test_invoice_dashboard_is_admin_only`) confirming
 
 - AdminSystemSettingsPage: tab selector switches between regional settings, feature flags, and OAuth providers. Regional format selector renders all 4 options per format type, preview updates live, and save mutation calls `updateAppSettings`.
 - AdminVatSettingsPage: form validates percentage 0–100, converts to fraction, create/edit/delete flows work. Overlap errors display as toast.
-- AdminPdfTemplatesPage: three template tabs (invoice/contract/annual statement) load server content, save sends updated content, preview renders sample-data HTML, reset-to-default reverts customized templates.
+- AdminPdfTemplatesPage: three template tabs (invoice/contract/annual statement) load server content, save sends updated content, preview renders a real sample-data PDF (`output: "pdf"`), reset-to-default reverts customized templates.
 - AdminDashboardPage: stats display, auto-refresh at 30s interval.
 - ZevSettingsPage: general settings + email template sections both submit via `updateZev`. Reset buttons clear custom templates. Template variable reference is visible.
 

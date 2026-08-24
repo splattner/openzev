@@ -7,7 +7,7 @@ from rest_framework import mixins, viewsets, status
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from django.http import HttpResponse
+from django.http import FileResponse, HttpResponse
 from accounts.permissions import IsZevOwnerOrAdmin
 from allocation.errors import AllocationError
 from zev.models import Zev, Participant
@@ -298,6 +298,25 @@ class InvoiceViewSet(
                 "period_end": period_end.isoformat(),
                 "rows": rows,
             }
+        )
+
+    @action(detail=True, methods=["get"], url_path="pdf",
+            permission_classes=[IsAuthenticated])
+    def download_pdf(self, request, pk=None):
+        """Serve the stored PDF artifact, authenticated and ZEV-scoped.
+
+        Replaces same-origin /media/ fetches that break in production
+        (DEBUG=False drops static() serving; nginx returns SPA HTML instead).
+        Queryset scoping enforces owner/participant access.
+        """
+        invoice = self.get_object()
+        if not invoice.pdf_file:
+            return Response(
+                {"error": "No PDF generated yet."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        return FileResponse(
+            invoice.pdf_file.open("rb"), content_type="application/pdf"
         )
 
     @action(detail=True, methods=["post"], url_path="generate-pdf",

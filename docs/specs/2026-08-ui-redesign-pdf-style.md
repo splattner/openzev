@@ -514,7 +514,7 @@ Order: Dashboard → invoices list → participants → metering/imports → tar
 
 ### Backend — `invoices/test_template_admin.py` / `invoices/test_pdf.py` delta
 
-Existing suites stay green (contract: 48 tests in `test_contract_context.py`; template admin: 35 in `test_template_admin.py`, 10 of them added or rewritten by this spec's preview/fetch work; invoice: `InvoicePdfRenderingTests` etc.).
+Existing suites stay green (contract: 48 tests in `test_contract_context.py`; template admin: 40 in `test_template_admin.py`, 15 of them added or rewritten by this spec's preview/fetch/PDF-download work; invoice: `InvoicePdfRenderingTests` etc.).
 
 **`PdfTemplatePreviewTests`** ( `invoices/test_template_admin.py`) — 11 tests:
 
@@ -533,6 +533,16 @@ Existing suites stay green (contract: 48 tests in `test_contract_context.py`; te
 | `test_accept_pdf_header_does_not_fail_content_negotiation` | `Accept: application/pdf` on the JSON path falls back to the default renderer instead of answering 406 |
 
 **`PdfRenderFetchPolicyTests`** (same module) — pins the `render_pdf` protocol boundary at the fetcher itself: `file:`/`http:`/`https:`/`ftp:` URLs raise, `data:` URIs fetch. Non-admin denial on the preview is additionally covered by the `ALL_ENDPOINTS` permission loops at the top of the module.
+
+**`InvoicePdfDownloadTests`** (same module, 5 tests) — authenticated `GET /invoices/{id}/pdf/` endpoint:
+
+| Test | Asserts |
+|---|---|
+| `test_pdf_returns_200_pdf_for_owner` | ZEV owner → 200 `application/pdf`, streaming body starts `%PDF-` |
+| `test_pdf_returns_200_for_own_participant` | participant assigned to that invoice → 200 |
+| `test_pdf_returns_404_when_no_pdf_file` | invoice with no stored `pdf_file` → 404 |
+| `test_pdf_returns_404_for_out_of_scope` | user not in the invoice's ZEV scope → 404 (not 403) |
+| `test_pdf_returns_401_for_anonymous` | unauthenticated → 401 |
 
 **Staleness after token move** — `test_get_flags_override_saved_against_an_older_default_as_stale` now covers the post-move default (digest over `shared_pdf_base.html` + `_tokens.css`), so a release that changes a token file flags stale overrides.
 
