@@ -9,6 +9,13 @@ import { queryKeys } from '../lib/api/queryKeys'
 import { LanguageSelector } from './LanguageSelector'
 import pkg from '../../package.json'
 
+/** Nav sections grouped under the "(v)ZEV verwalten" accordion. */
+const MANAGE_SECTION_PREFIXES = ['/participants', '/zev-settings', '/metering-points', '/metering-data']
+
+function isManageSectionPath(pathname: string): boolean {
+    return MANAGE_SECTION_PREFIXES.some((prefix) => pathname.startsWith(prefix))
+}
+
 export function Layout() {
     const { t } = useTranslation()
     const { user, logout, isImpersonating, impersonator, stopImpersonation } = useAuth()
@@ -23,13 +30,7 @@ export function Layout() {
     const [isUserMenuOpen, setIsUserMenuOpen] = useState(false)
     const [isZevMenuOpen, setIsZevMenuOpen] = useState(false)
     const [isStoppingImpersonation, setIsStoppingImpersonation] = useState(false)
-    const [isManageNavOpen, setIsManageNavOpen] = useState(
-        location.pathname.startsWith('/participants') ||
-        location.pathname.startsWith('/zev-settings') ||
-        location.pathname.startsWith('/metering-points') ||
-        location.pathname.startsWith('/metering-data') ||
-        location.pathname.startsWith('/audit-logs'),
-    )
+    const [isManageNavOpen, setIsManageNavOpen] = useState(isManageSectionPath(location.pathname))
     const [isAdminNavOpen, setIsAdminNavOpen] = useState(location.pathname.startsWith('/admin'))
     const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
         if (typeof window === 'undefined') {
@@ -45,13 +46,7 @@ export function Layout() {
         if (location.pathname.startsWith('/admin')) {
             setIsAdminNavOpen(true)
             setIsManageNavOpen(false)
-        } else if (
-            location.pathname.startsWith('/participants') ||
-            location.pathname.startsWith('/zev-settings') ||
-            location.pathname.startsWith('/metering-points') ||
-            location.pathname.startsWith('/metering-data') ||
-            location.pathname.startsWith('/audit-logs')
-        ) {
+        } else if (isManageSectionPath(location.pathname)) {
             setIsManageNavOpen(true)
             setIsAdminNavOpen(false)
         }
@@ -93,12 +88,7 @@ export function Layout() {
     const displayName = `${user?.first_name ?? ''} ${user?.last_name ?? ''}`.trim() || user?.username || ''
     const canManage = user?.role === 'admin' || user?.role === 'zev_owner'
     const adminIsActive = location.pathname.startsWith('/admin')
-    const manageIsActive =
-        location.pathname.startsWith('/participants') ||
-        location.pathname.startsWith('/zev-settings') ||
-        location.pathname.startsWith('/metering-points') ||
-        location.pathname.startsWith('/metering-data') ||
-        location.pathname.startsWith('/audit-logs')
+    const manageIsActive = isManageSectionPath(location.pathname)
 
     const ownerById = new Map((usersQuery.data?.results ?? []).map((candidate) => [candidate.id, candidate]))
     const selectedZevOwner = selectedZev ? ownerById.get(selectedZev.owner) : undefined
@@ -286,7 +276,7 @@ export function Layout() {
                                         </button>
                                         {isAdminNavOpen && (
                                             <div className="nav-sublist">
-                                                <NavLink to="/admin" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`} title={t('nav.adminOverview')}>
+                                                <NavLink to="/admin" end className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`} title={t('nav.adminOverview')}>
                                                     <span className="nav-icon"><OverviewIcon /></span>
                                                     <span className="nav-label">{t('nav.adminOverview')}</span>
                                                 </NavLink>
@@ -306,10 +296,6 @@ export function Layout() {
                                                     <span className="nav-icon"><InvoiceIcon /></span>
                                                     <span className="nav-label">{t('nav.adminInvoices')}</span>
                                                 </NavLink>
-                                                <NavLink to="/admin/audit-logs" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`} title={t('nav.adminAuditLogs')}>
-                                                    <span className="nav-icon"><AuditIcon /></span>
-                                                    <span className="nav-label">{t('nav.adminAuditLogs')}</span>
-                                                </NavLink>
                                                 <NavLink to="/admin/system-settings" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`} title={t('nav.adminSystemSettings')}>
                                                     <span className="nav-icon"><SettingsIcon /></span>
                                                     <span className="nav-label">{t('nav.adminSystemSettings')}</span>
@@ -325,6 +311,10 @@ export function Layout() {
                                                 <NavLink to="/admin/email-templates" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`} title={t('nav.adminEmailTemplates')}>
                                                     <span className="nav-icon"><MailIcon /></span>
                                                     <span className="nav-label">{t('nav.adminEmailTemplates')}</span>
+                                                </NavLink>
+                                                <NavLink to="/admin/audit-logs" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`} title={t('nav.adminAuditLogs')}>
+                                                    <span className="nav-icon"><AuditIcon /></span>
+                                                    <span className="nav-label">{t('nav.adminAuditLogs')}</span>
                                                 </NavLink>
                                             </div>
                                         )}
