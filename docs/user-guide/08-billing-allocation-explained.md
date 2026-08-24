@@ -194,6 +194,70 @@ own, so the community may end up a centime or two short: CHF 100 across 3
 participants bills 33.33 each and collects CHF 99.99. See
 [Rounding and VAT](#rounding-and-vat) below.
 
+A shared fee can also be divided by **allocation weight** instead of per head —
+see [Split key](07-tariff-configuration.md#how-a-shared-fee-is-split). The
+month-by-month logic above is identical; only the denominator changes.
+
+## Common-Area (Community) Metering Points
+
+Everything above attributes each reading to **one** participant: whoever held
+the meter at that moment. A common-area meter — stairwell, lift, laundry,
+shared heat pump — measures energy nobody uses alone.
+
+Marking an assignment as
+[Community](04-metering-points.md#shared-common-area-metering-points) changes
+how those readings are billed:
+
+1. **Price once.** The meter's reading is split into local and grid energy
+   against the community pool, and priced with the ordinary tariffs — exactly
+   the same arithmetic as any other meter. Nothing special happens here.
+2. **Allocate second.** The resulting kWh and francs are then divided between
+   every eligible participant by their
+   [allocation weight](03-participant-management.md#allocation-weight).
+
+The holder of record gets no special treatment: they pay their weighted share
+like everybody else.
+
+**Example — a 12 kWh common-area draw on one day, four participants:**
+
+| Participant | Weight | Share | Billed |
+| --- | --- | --- | --- |
+| Alice | 1 | 12.5 % | 1.5 kWh |
+| Bob | 1 | 12.5 % | 1.5 kWh |
+| Carol | 2 | 25.0 % | 3.0 kWh |
+| Dave | 4 | 50.0 % | 6.0 kWh |
+| **Total** | **8** | **100 %** | **12 kWh** |
+
+These kWh are added to each participant's own `total_local_kwh` /
+`total_grid_kwh` totals, and their invoice lines carry a
+**Gemeinschaftsanteil** (*Community share*) marker so the shared portion is
+visible next to their personal consumption.
+
+### Eligibility is checked per day
+
+Community energy uses the reading's **date**, not the month. A participant who
+joins on 16 February pays nothing towards common-area energy measured on
+15 February, and a leaver's share stops on their leave date.
+
+> **Fees work per month, energy per day.** A per-metering-point fee on a
+> community meter is a monthly charge, so anyone who was a member for *any*
+> part of the month shares it. Community *energy* is date-accurate. This is the
+> same distinction that already applies to personal fees versus personal
+> energy.
+
+### Production is shared symmetrically
+
+If the community meter is a production or bidirectional meter, its output is
+credited to eligible participants using the same weights and the same
+eligibility rule as consumption.
+
+### A meter can change mid-period
+
+Allocation is resolved per reading, so a meter that is `Personal` in January
+and `Community` from February bills correctly on both sides: the holder is
+charged in full for January, and February is split. Nothing is lost and
+nothing is billed twice.
+
 ## Rounding and VAT
 
 **Precision:**

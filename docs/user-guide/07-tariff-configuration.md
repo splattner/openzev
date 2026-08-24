@@ -115,7 +115,10 @@ Flat monthly, quarterly, or annual charges (not energy-dependent).
 **Charge types:**
 - **Monthly fee** — CHF X per month, charged to *each* participant
 - **Yearly fee** — CHF X per year, charged to each participant (paid monthly as CHF X/12)
-- **Per-metering-point fee** — CHF Y per active meter per month
+- **Per-metering-point fee** — CHF Y per active meter per month. A
+  [community metering point](04-metering-points.md#shared-common-area-metering-points)
+  is charged once and split across the community by allocation weight, instead
+  of being charged to its holder.
 - **Shared monthly fee** — CHF X per month for the *whole community*, divided between the participants
 - **Shared yearly fee** — CHF X per year for the whole community, divided and paid monthly
 
@@ -138,12 +141,37 @@ attributable to a participant's consumption or meters.
 > the **whole community** pays. Entering CHF 20 intending "per person" will bill
 > the community CHF 20 in total, not CHF 20 each.
 
-**How the split works:**
+#### How a shared fee is split
 
 - The amount is divided between the participants **active in each billed month**.
 - The division is recalculated every month, so somebody joining in February does
   not change what January cost.
 - Each participant is charged only for the months they were actually a member.
+
+**Split key.** When you pick one of the two shared billing modes, a **Split
+key** selector appears with two options:
+
+| Split key | Divides the amount by |
+| --- | --- |
+| **Equally between participants** (default) | Headcount — everybody pays the same share |
+| **By allocation weight** | Each participant's [allocation weight](03-participant-management.md#allocation-weight) |
+
+`Equally` is the original behaviour and stays the default, so existing shared
+fees are untouched. Choose *By allocation weight* when the community has agreed
+that a joint cost should follow the same key as common-area energy — for
+example, billing the caretaker contract by floor area rather than per head.
+
+With every participant left at the default weight of `1`, both keys produce
+exactly the same amounts.
+
+> **Switching the key changes what people pay.** The selector only appears for
+> the two shared modes, and the change is recorded in the audit log along with
+> the rest of the tariff edit. Regenerate draft invoices to apply it.
+
+The split key applies **only** to the two shared fee modes. Per-metering-point
+fees on a [community metering point](04-metering-points.md#shared-common-area-metering-points)
+always divide by allocation weight — there is nothing to configure, because the
+cost belongs to a shared *meter* rather than to the community as a whole.
 
 For a worked example of how a shared fee splits as members join and leave, and
 how rounding works, see

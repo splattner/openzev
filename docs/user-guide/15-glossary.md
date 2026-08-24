@@ -13,6 +13,15 @@ System administrator role with unrestricted access to all ZEVs, settings, and us
 **Allocation**
 Distribution of community energy production among participants proportional to their consumption at each timestamp. See [How Energy Allocation Works](08-billing-allocation-explained.md).
 
+**Allocation Mode**
+Setting on a metering point assignment deciding who pays for that meter: `Personal` (the assigned participant alone, the default) or `Community` (split across every participant by allocation weight). See [Metering Points](04-metering-points.md#shared-common-area-metering-points).
+
+**Allocation Weight**
+A plain relative number per participant deciding how much of a shared cost they carry — not a percentage and not a Wertquote. Defaults to `1`, which splits shared costs equally. See [Managing Participants](03-participant-management.md#allocation-weight).
+
+**Allgemeinstrom**
+German for common-area electricity: stairwell lighting, lift, laundry, shared heat pump. In OpenZEV, billed by marking the meter's assignment as `Community`. See [Metering Points](04-metering-points.md#shared-common-area-metering-points).
+
 ## B
 
 **Billing Interval**
@@ -25,6 +34,12 @@ A metering point that measures both consumption (IN) and production (OUT). Commo
 
 **Community**
 See **ZEV**.
+
+**Community Metering Point**
+A metering point whose assignment allocation mode is `Community`: its energy and per-metering-point fees are split across every eligible participant by allocation weight instead of being billed to its holder. The holder of record is unchanged. See [Metering Points](04-metering-points.md#shared-common-area-metering-points).
+
+**Community Share** (*Gemeinschaftsanteil*)
+The marker on an invoice line item showing that the amount is this participant's weighted share of a community metering point, rather than their own consumption.
 
 **Consumption**
 Energy drawn from the grid or ZEV production. Measured by consumption meters (type `IN`).
@@ -147,7 +162,10 @@ The fraction of local energy vs. total consumption. Example: 60 kWh local ÷ 100
 Invoice delivered to participant (email sent). Status: `Sent`. See [Invoice Management](09-invoice-management.md).
 
 **Shared Fee**
-A fixed fee where the configured amount is what the **whole community** pays, divided between the participants active in each billed month — rather than what each participant pays. Used for jointly carried costs such as a caretaker contract or insurance. See [Tariff Configuration](07-tariff-configuration.md#shared-fees).
+A fixed fee where the configured amount is what the **whole community** pays, divided between the participants active in each billed month — rather than what each participant pays. Used for jointly carried costs such as a caretaker contract or insurance.
+
+**Split Key**
+Setting on a shared fee tariff choosing how the amount is divided: equally between participants (the default) or by allocation weight. See [Tariff Configuration](07-tariff-configuration.md#how-a-shared-fee-is-split). See [Tariff Configuration](07-tariff-configuration.md#shared-fees).
 
 ## T
 
@@ -171,6 +189,11 @@ Value Added Tax. In Switzerland, 8.1% (standard rate). OpenZEV applies VAT if ZE
 
 **Validity Period**
 Date range during which a participant or a participant-meter assignment is active. Defined by **Valid From** and **Valid To** dates.
+
+## W
+
+**Wertquote**
+The legal value quota of a property share under Art. 712e ZGB. OpenZEV does **not** model it: the allocation weight is a plain relative number a community sets for itself. You may enter value quotas as weights, but that is a community decision, not a legal mapping the system enforces.
 
 ## Z
 

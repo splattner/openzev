@@ -41,6 +41,7 @@ OpenZEV supports three metering point types:
 4. Configure participant assignment window (if applicable):
    - **Valid From:** Assignment start date
    - **Valid To:** Assignment end date (leave empty for ongoing)
+   - **Allocation:** `Personal` (default) or `Community` — see below
 
 ## Data Resolution
 
@@ -86,6 +87,71 @@ Assignment validity affects:
 - Old assignment: **Valid To** = 2026-12-31
 - New assignment: **Valid From** = 2027-01-01
 - Result: No billing gaps or overlaps
+
+## Shared (Common-Area) Metering Points
+
+A common-area meter — *Allgemeinstrom*: stairwell lighting, lift, laundry,
+heat pump, the shared grid connection — measures energy the whole community
+uses, not one household's. Every assignment has an **Allocation** setting that
+decides who pays for it:
+
+| Allocation | Who pays |
+| --- | --- |
+| **Personal** (default) | The assigned participant alone. This is how every meter behaved before this setting existed. |
+| **Community** | Every participant of the ZEV, split by their [allocation weight](03-participant-management.md#allocation-weight). |
+
+> **The assigned participant does not change.** A community meter still has a
+> holder of record — usually the *Verwaltung* or a caretaker participant — who
+> stays responsible for the meter in the UI, in data-quality checks, and in
+> the audit log. `Community` changes only **who is billed**, not who holds it.
+> The holder pays their own weighted share like everybody else, with no
+> special case.
+
+Assignment rows set to `Community` are marked with a **Community** badge in
+the metering points list.
+
+### Switching a meter to Community
+
+1. Go to **Metering Points**
+2. Find the meter and click **Edit** on its assignment row
+3. Set **Allocation** to `Community`
+4. Click **Save Assignment**
+
+Regenerate any **draft** invoices for affected periods to pick up the change.
+Invoices that have already been sent are protected and will not change — see
+[Invoice Management](09-invoice-management.md).
+
+### Switching mid-period is safe
+
+Allocation is resolved **per reading**, not per invoice. A meter that is
+`Personal` in January and `Community` from February bills correctly on both
+sides of the change: January's readings go to the holder in full, February's
+are split across the community. No readings are lost and none are billed
+twice.
+
+### What gets split
+
+For a `Community` meter, all of the following are divided by allocation weight:
+
+- Energy consumed (both the local/solar share and the grid share), including
+  any levies and percentage-based tariffs on it
+- Energy produced, if the meter is a production or bidirectional meter —
+  credits follow the same weights as charges
+- Per-metering-point fees (see [Tariff Configuration](07-tariff-configuration.md))
+
+Invoice lines for a community share are labelled **Gemeinschaftsanteil**
+(*Community share* / *Part communautaire* / *Quota comunitaria*), so they are
+easy to tell apart from a participant's own consumption.
+
+### Eligibility is date-accurate
+
+A participant only shares readings from days they were actually a member. A
+mid-period joiner pays nothing towards community energy measured before their
+join date, and a leaver's share stops on their leave date.
+
+> **Note:** An **inactive** community meter (`Is Active` = false) bills nobody
+> for per-metering-point fees, exactly like an inactive personal meter. Its
+> historical readings still count towards the community energy pool.
 
 ## Viewing Metering Point Details
 
