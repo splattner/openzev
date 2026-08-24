@@ -25,13 +25,13 @@ or count them as it sees fit.
 
 import uuid
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 
 from django.db import models
 
 from metering.models import MeterReading, ReadingDirection
-from zev.models import MeteringPoint, MeteringPointType
+from zev.models import MeteringPoint, MeteringPointType, Participant
 
 from .split import (
     ConsumptionSplit,
@@ -51,6 +51,43 @@ _KINDS = {
     CONSUMPTION: (CONSUMPTION_METER_TYPES, ReadingDirection.IN),
     PRODUCTION: (PRODUCTION_METER_TYPES, ReadingDirection.OUT),
 }
+
+
+def eligible_participant_shares(zev, period_start: date, period_end: date) -> dict[date, dict[uuid.UUID, Decimal]]:
+    """Each eligible participant's normalized weight share, per calendar date.
+
+    ``date -> {participant_id: share}``, the shares for one date summing to 1.
+    A date with no eligible participant is absent from the dict entirely —
+    never present with an empty or zero-summing mapping — so a consumer
+    distributing a community reading for that date can tell "there was
+    nobody to distribute to" apart from a bug that silently distributed to
+    no one.
+
+    Shared across every consumer that must split a community-allocated
+    reading across participants (PDF stats, dashboards, annual statement,
+    hourly profiles, and eventually the invoice engine itself) rather than
+    each re-deriving eligibility and weight independently — the same reason
+    this module centralizes the reading fetch/resolve/split core. Date
+    granularity matches ``AssignmentWindows.participant_on`` and the reading
+    attribution the rest of this module already uses.
+    """
+    windows = list(
+        Participant.objects.filter(zev=zev).values_list("id", "valid_from", "valid_to", "allocation_weight")
+    )
+
+    shares: dict[date, dict[uuid.UUID, Decimal]] = {}
+    cursor = period_start
+    while cursor <= period_end:
+        eligible = [
+            (participant_id, weight) for participant_id, valid_from, valid_to, weight in windows
+            if valid_from <= cursor and (valid_to is None or valid_to >= cursor)
+        ]
+        if eligible:
+            total_weight = sum(weight for _pid, weight in eligible)
+            shares[cursor] = {pid: weight / total_weight for pid, weight in eligible}
+        cursor += timedelta(days=1)
+
+    return shares
 
 
 def community_totals_by_timestamp(zev, start_dt: datetime, end_dt: datetime) -> tuple[dict, dict]:
@@ -92,13 +129,19 @@ class AllocatedReading:
     timestamp; ``zev_consumption_kwh``/``zev_production_kwh`` are the physical
     community totals the split was computed against. ``holder_id`` is the
     participant's UUID (``Participant.id`` is a ``UUIDField``) or ``None`` for a
-    gap reading (no assignment active at the timestamp). ``split`` is ``None``
-    when the caller passed ``with_split=False``.
+    gap reading (no assignment active at the timestamp) — the literal holder of
+    record even when ``allocation_mode`` is ``"community"``, kept for
+    provenance. ``allocation_mode`` is ``"personal"``/``"community"``, or
+    ``None`` for a gap reading. Consumers that must not attribute a community
+    reading to its holder personally should branch on ``allocation_mode``
+    rather than assuming a non-``None`` ``holder_id`` means "bill this person".
+    ``split`` is ``None`` when the caller passed ``with_split=False``.
     """
 
     metering_point_id: uuid.UUID
     timestamp: datetime
     holder_id: uuid.UUID | None
+    allocation_mode: str | None
     energy_kwh: Decimal
     zev_consumption_kwh: Decimal
     zev_production_kwh: Decimal
@@ -175,10 +218,12 @@ def iter_allocated_readings(
             split = split_consumption(energy_kwh, zev_consumption, zev_production)
         else:
             split = split_production(energy_kwh, zev_production, zev_consumption)
+        resolution = windows.assignment_at(metering_point_id, ts)
         yield AllocatedReading(
             metering_point_id=metering_point_id,
             timestamp=ts,
-            holder_id=windows.participant_at(metering_point_id, ts),
+            holder_id=resolution.holder_id if resolution is not None else None,
+            allocation_mode=resolution.allocation_mode if resolution is not None else None,
             energy_kwh=energy_kwh,
             zev_consumption_kwh=zev_consumption,
             zev_production_kwh=zev_production,

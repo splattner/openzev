@@ -762,3 +762,100 @@ class ChartDataEndpointTests(TestCase):
 		resp = self.client.get("/api/v1/metering/readings/chart-data/")
 
 		self.assertEqual(resp.status_code, 400)
+
+
+class SharedMeteringDashboardTests(TestCase):
+	"""A community-allocated meter distributes its energy across every eligible
+	participant by weight in the dashboards and hourly profile, instead of
+	being attributed wholly to its holder of record (shared metering points,
+	docs/specs/2026-08-shared-metering-points.md §7.7)."""
+
+	def setUp(self):
+		self.client = APIClient()
+		self.owner = make_user("sm_dash_owner", UserRole.ZEV_OWNER)
+		self.zev = Zev.objects.create(name="Shared Dash ZEV", owner=self.owner, zev_type="vzev", invoice_prefix="SD")
+
+		self.alice_user = make_user("sm_dash_alice", UserRole.PARTICIPANT)
+		self.alice = Participant.objects.create(
+			zev=self.zev, user=self.alice_user, first_name="Alice", last_name="Muster",
+			email="sm.alice@example.com", valid_from=date(2026, 1, 1), allocation_weight=Decimal("3"),
+		)
+		self.bob = Participant.objects.create(
+			zev=self.zev, first_name="Bob", last_name="Beispiel",
+			email="sm.bob@example.com", valid_from=date(2026, 1, 1), allocation_weight=Decimal("1"),
+		)
+
+		self.community_mp = MeteringPoint.objects.create(
+			zev=self.zev, meter_id="CH-SD-COMMUNITY-1", meter_type=MeteringPointType.CONSUMPTION,
+		)
+		MeteringPointAssignment.objects.create(
+			metering_point=self.community_mp, participant=self.alice,
+			valid_from=date(2026, 1, 1), allocation_mode=AllocationMode.COMMUNITY,
+		)
+		MeterReading.objects.create(
+			metering_point=self.community_mp,
+			timestamp=datetime(2026, 1, 1, 12, 0, tzinfo=timezone.utc),
+			energy_kwh=Decimal("8.0000"), direction=ReadingDirection.IN,
+			resolution=ReadingResolution.FIFTEEN_MIN,
+		)
+
+	def test_owner_dashboard_distributes_community_energy_by_weight(self):
+		auth(self.client, self.owner)
+		resp = self.client.get(
+			"/api/v1/metering/readings/dashboard-summary/",
+			{"zev_id": str(self.zev.id), "date_from": "2026-01-01", "date_to": "2026-01-01", "bucket": "day"},
+		)
+
+		self.assertEqual(resp.status_code, 200)
+		by_id = {s["participant_id"]: s for s in resp.data["participant_stats"]}
+		self.assertEqual(set(by_id), {str(self.alice.id), str(self.bob.id)})
+		# Alice weight 3, Bob weight 1 of 4 total: 8 kWh split 6 / 2 — the holder
+		# (Alice) gets her weighted share, not the whole reading.
+		self.assertAlmostEqual(by_id[str(self.alice.id)]["total_consumed_kwh"], 6.0)
+		self.assertAlmostEqual(by_id[str(self.bob.id)]["total_consumed_kwh"], 2.0)
+
+	def test_participant_dashboard_zev_wide_stats_show_a_community_only_participant(self):
+		"""Bob holds no metering point of his own — his only stake in the ZEV
+		is a community share — so ``totals`` (his own literal readings) stays
+		0 by design; the ZEV-wide breakdown must still carry his weighted
+		share rather than being empty or omitting him entirely.
+
+		Before the fix, zev_ids for this section was derived from the
+		participant's own (holder-scoped) readings queryset, which is empty
+		for a community-only participant — making the whole ZEV invisible to
+		them here, not just their own row."""
+		bob_user = make_user("sm_dash_bob", UserRole.PARTICIPANT)
+		self.bob.user = bob_user
+		self.bob.save(update_fields=["user"])
+		auth(self.client, bob_user)
+
+		resp = self.client.get(
+			"/api/v1/metering/readings/dashboard-summary/",
+			{"date_from": "2026-01-01", "date_to": "2026-01-01", "bucket": "day"},
+		)
+
+		self.assertEqual(resp.status_code, 200)
+		self.assertAlmostEqual(resp.data["totals"]["total_consumed_kwh"], 0.0)
+		by_id = {s["participant_id"]: s for s in resp.data["zev_participant_stats"]}
+		self.assertEqual(set(by_id), {str(self.alice.id), str(self.bob.id)})
+		self.assertAlmostEqual(by_id[str(self.alice.id)]["total_consumed_kwh"], 6.0)
+		self.assertAlmostEqual(by_id[str(self.bob.id)]["total_consumed_kwh"], 2.0)
+
+	def test_hourly_profile_distributes_community_energy_by_weight(self):
+		auth(self.client, self.owner)
+		resp = self.client.get(
+			"/api/v1/metering/readings/hourly-profile/",
+			{
+				"zev_id": str(self.zev.id), "participant_id": str(self.bob.id),
+				"date_from": "2026-01-01", "date_to": "2026-01-01",
+			},
+		)
+
+		self.assertEqual(resp.status_code, 200)
+		profile = resp.data["hourly_profile"]
+		self.assertIsNotNone(profile)
+		hour_12 = next(h for h in profile if h["hour"] == 12)
+		# Bob's 1/4 share of the 8 kWh reading, all local (no production meter,
+		# so the whole community pool draws from the grid... but the pool total
+		# equals the meter's own consumption here, making it fully local).
+		self.assertAlmostEqual(hour_12["from_zev_kwh"] + hour_12["from_grid_kwh"], 2.0)

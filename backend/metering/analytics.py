@@ -12,10 +12,15 @@ from decimal import Decimal, ROUND_HALF_UP
 from django.db.models import Max, Min, Q, Sum
 
 from allocation.errors import OverlappingAssignmentWindowsError
-from allocation.read_model import CONSUMPTION_METER_TYPES, community_totals_by_timestamp
+from allocation.read_model import (
+    CONSUMPTION_METER_TYPES,
+    community_totals_by_timestamp,
+    eligible_participant_shares,
+)
 from allocation.split import split_consumption, split_production
 from allocation.windows import AssignmentWindows
 from zev.models import (
+    AllocationMode,
     Participant,
     MeteringPoint,
     MeteringPointAssignment,
@@ -53,6 +58,45 @@ def _assignment_windows_for_readings(qs, start: date_type, end: date_type) -> As
         "allocation_mode", "id",
     )
     return AssignmentWindows(rows)
+
+
+def _community_shares_by_zev(metering_point_ids, start: date_type, end: date_type) -> dict:
+    """``eligible_participant_shares`` per ZEV touched by ``metering_point_ids``.
+
+    A dashboard queryset can span more than one ZEV (a participant or an
+    admin viewing several communities' meters at once), and share
+    normalization is inherently per-ZEV — one extra query maps metering
+    points to their ZEV, then one ``eligible_participant_shares`` call per
+    distinct ZEV (almost always exactly one). Returns
+    ``(mp_to_zev, shares_by_zev)``.
+    """
+    mp_to_zev = dict(
+        MeteringPoint.objects.filter(id__in=metering_point_ids).values_list("id", "zev_id")
+    )
+    shares_by_zev = {
+        zev_id: eligible_participant_shares(zev_id, start, end)
+        for zev_id in set(mp_to_zev.values())
+    }
+    return mp_to_zev, shares_by_zev
+
+
+def _distribute_reading(windows, mp_to_zev, shares_by_zev, metering_point_id, ts):
+    """``(participant_id, share)`` pairs a reading at ``(mp, ts)`` attributes to.
+
+    A personal assignment yields exactly one pair with ``share=1``; a
+    community assignment yields one pair per eligible participant, weighted
+    by ``allocation_weight``; a gap (no assignment covers ``ts``) yields
+    nothing — matches ``assignment_at``'s contract of distinguishing a true
+    gap from a community window rather than conflating both under ``None``.
+    """
+    resolution = windows.assignment_at(metering_point_id, ts)
+    if resolution is None:
+        return []
+    if resolution.allocation_mode == AllocationMode.COMMUNITY:
+        zev_id = mp_to_zev.get(metering_point_id)
+        day = ts.astimezone(dt_timezone.utc).date()
+        return list(shares_by_zev.get(zev_id, {}).get(day, {}).items())
+    return [(resolution.holder_id, Decimal("1"))]
 
 
 def _participant_names(participant_ids) -> dict[str, str]:
@@ -152,6 +196,9 @@ def owner_dashboard_summary(qs, trunc_fn, selected_participant_id):
     window_start, window_end = _qs_bounds(qs, today)
     windows = _assignment_windows_for_readings(qs, window_start, window_end)
     names = _participant_names(windows.participant_ids)
+    mp_to_zev, shares_by_zev = _community_shares_by_zev(
+        qs.values_list("metering_point_id", flat=True).distinct(), window_start, window_end,
+    )
 
     participant_rows = (
         base.filter(direction="in")
@@ -177,11 +224,6 @@ def owner_dashboard_summary(qs, trunc_fn, selected_participant_id):
 
     participant_map = {}
     for row in participant_rows:
-        pid = windows.participant_at(row["metering_point_id"], row["timestamp"])
-        if pid is None:
-            # Reading fell outside every assignment (gap): it belongs to no one.
-            continue
-        pid = str(pid)
         ts = row["timestamp"]
         bucket_key = row["bucket"].isoformat()
         consumed = row["consumed_kwh"] or Decimal("0")
@@ -191,44 +233,44 @@ def owner_dashboard_summary(qs, trunc_fn, selected_participant_id):
         total_produced = zev_at_ts.get("produced_kwh", Decimal("0"))
         from_zev, from_grid = split_consumption(consumed, total_consumed, total_produced)
 
-        if pid not in participant_map:
-            participant_map[pid] = {
-                "participant_id": pid,
-                "participant_name": names.get(pid, ""),
-                "total_consumed_kwh": Decimal("0"),
-                "total_produced_kwh": Decimal("0"),
-                "from_zev_kwh": Decimal("0"),
-                "from_grid_kwh": Decimal("0"),
-                "total_exported_kwh": Decimal("0"),
-                "timeline_map": {},
-            }
-        participant_map[pid]["total_consumed_kwh"] += consumed
-        participant_map[pid]["from_zev_kwh"] += from_zev
-        participant_map[pid]["from_grid_kwh"] += from_grid
+        for raw_pid, share in _distribute_reading(
+            windows, mp_to_zev, shares_by_zev, row["metering_point_id"], ts,
+        ):
+            pid = str(raw_pid)
+            if pid not in participant_map:
+                participant_map[pid] = {
+                    "participant_id": pid,
+                    "participant_name": names.get(pid, ""),
+                    "total_consumed_kwh": Decimal("0"),
+                    "total_produced_kwh": Decimal("0"),
+                    "from_zev_kwh": Decimal("0"),
+                    "from_grid_kwh": Decimal("0"),
+                    "total_exported_kwh": Decimal("0"),
+                    "timeline_map": {},
+                }
+            participant_map[pid]["total_consumed_kwh"] += consumed * share
+            participant_map[pid]["from_zev_kwh"] += from_zev * share
+            participant_map[pid]["from_grid_kwh"] += from_grid * share
 
-        if bucket_key not in participant_map[pid]["timeline_map"]:
-            participant_map[pid]["timeline_map"][bucket_key] = {
-                "bucket": bucket_key,
-                "consumed_kwh": Decimal("0"),
-                "produced_kwh": Decimal("0"),
-                "imported_kwh": Decimal("0"),
-                "exported_kwh": Decimal("0"),
-            }
-        participant_map[pid]["timeline_map"][bucket_key]["consumed_kwh"] += consumed
-        participant_map[pid]["timeline_map"][bucket_key]["imported_kwh"] += from_grid
+            if bucket_key not in participant_map[pid]["timeline_map"]:
+                participant_map[pid]["timeline_map"][bucket_key] = {
+                    "bucket": bucket_key,
+                    "consumed_kwh": Decimal("0"),
+                    "produced_kwh": Decimal("0"),
+                    "imported_kwh": Decimal("0"),
+                    "exported_kwh": Decimal("0"),
+                }
+            participant_map[pid]["timeline_map"][bucket_key]["consumed_kwh"] += consumed * share
+            participant_map[pid]["timeline_map"][bucket_key]["imported_kwh"] += from_grid * share
 
     for row in participant_production_rows:
-        pid = windows.participant_at(row["metering_point_id"], row["timestamp"])
-        if pid is None:
-            continue
-        pid = str(pid)
+        ts = row["timestamp"]
         bucket_key = row["bucket"].isoformat()
         produced = row["produced_kwh"] or Decimal("0")
 
         # Exported per timestamp = the producer's share of what the ZEV could
         # not consume locally — mirrors what the engine bills as feed-in
         # (ADR 0013), so the chart reconciles with the invoice.
-        ts = row["timestamp"]
         zev_at_ts = ts_pivot.get(ts, {})
         _, exported = split_production(
             produced,
@@ -236,30 +278,34 @@ def owner_dashboard_summary(qs, trunc_fn, selected_participant_id):
             zev_at_ts.get("consumed_kwh", Decimal("0")),
         )
 
-        if pid not in participant_map:
-            participant_map[pid] = {
-                "participant_id": pid,
-                "participant_name": names.get(pid, ""),
-                "total_consumed_kwh": Decimal("0"),
-                "total_produced_kwh": Decimal("0"),
-                "from_zev_kwh": Decimal("0"),
-                "from_grid_kwh": Decimal("0"),
-                "total_exported_kwh": Decimal("0"),
-                "timeline_map": {},
-            }
-        participant_map[pid]["total_produced_kwh"] += produced
-        participant_map[pid]["total_exported_kwh"] += exported
+        for raw_pid, share in _distribute_reading(
+            windows, mp_to_zev, shares_by_zev, row["metering_point_id"], ts,
+        ):
+            pid = str(raw_pid)
+            if pid not in participant_map:
+                participant_map[pid] = {
+                    "participant_id": pid,
+                    "participant_name": names.get(pid, ""),
+                    "total_consumed_kwh": Decimal("0"),
+                    "total_produced_kwh": Decimal("0"),
+                    "from_zev_kwh": Decimal("0"),
+                    "from_grid_kwh": Decimal("0"),
+                    "total_exported_kwh": Decimal("0"),
+                    "timeline_map": {},
+                }
+            participant_map[pid]["total_produced_kwh"] += produced * share
+            participant_map[pid]["total_exported_kwh"] += exported * share
 
-        if bucket_key not in participant_map[pid]["timeline_map"]:
-            participant_map[pid]["timeline_map"][bucket_key] = {
-                "bucket": bucket_key,
-                "consumed_kwh": Decimal("0"),
-                "produced_kwh": Decimal("0"),
-                "imported_kwh": Decimal("0"),
-                "exported_kwh": Decimal("0"),
-            }
-        participant_map[pid]["timeline_map"][bucket_key]["produced_kwh"] += produced
-        participant_map[pid]["timeline_map"][bucket_key]["exported_kwh"] += exported
+            if bucket_key not in participant_map[pid]["timeline_map"]:
+                participant_map[pid]["timeline_map"][bucket_key] = {
+                    "bucket": bucket_key,
+                    "consumed_kwh": Decimal("0"),
+                    "produced_kwh": Decimal("0"),
+                    "imported_kwh": Decimal("0"),
+                    "exported_kwh": Decimal("0"),
+                }
+            participant_map[pid]["timeline_map"][bucket_key]["produced_kwh"] += produced * share
+            participant_map[pid]["timeline_map"][bucket_key]["exported_kwh"] += exported * share
 
     participant_stats = sorted(
         [
@@ -342,6 +388,9 @@ def participant_dashboard_summary(participant_qs, zev_qs, trunc_fn, user, zev_id
         .order_by("id")
         .values_list("id", flat=True)
     )
+    mp_to_zev, shares_by_zev = _community_shares_by_zev(
+        participant_qs.values_list("metering_point_id", flat=True).distinct(), window_start, window_end,
+    )
 
     participant_rows = (
         base.filter(direction="in")
@@ -375,14 +424,21 @@ def participant_dashboard_summary(participant_qs, zev_qs, trunc_fn, user, zev_id
     }
 
     for row in participant_rows:
-        pid = windows.participant_at(row["metering_point_id"], row["timestamp"])
-        if pid is None or pid not in current_participant_ids:
-            # Reading predates this participant's assignment (or sits in a gap,
-            # or belongs to a different participant after a transfer).
+        ts = row["timestamp"]
+        # This participant's own share of the reading: 1 for a personal
+        # assignment they hold, their normalized weight share for a
+        # community assignment (0 if they aren't eligible on this date), 0
+        # for a gap or somebody else's meter.
+        my_share = sum(
+            share for raw_pid, share in _distribute_reading(
+                windows, mp_to_zev, shares_by_zev, row["metering_point_id"], ts,
+            )
+            if raw_pid in current_participant_ids
+        )
+        if my_share == 0:
             continue
         bucket_key = row["bucket"].isoformat()
-        ts = row["timestamp"]
-        participant_consumed = row["consumed_kwh"] or Decimal("0")
+        participant_consumed = (row["consumed_kwh"] or Decimal("0")) * my_share
         zev_consumed = zev_pivot.get(ts, {}).get("consumed", Decimal("0"))
         zev_produced = zev_pivot.get(ts, {}).get("produced", Decimal("0"))
         consumed_from_zev, imported_from_grid = split_consumption(
@@ -433,6 +489,9 @@ def participant_dashboard_summary(participant_qs, zev_qs, trunc_fn, user, zev_id
     zev_window_start, zev_window_end = _qs_bounds(zev_qs, today)
     zev_windows = _assignment_windows_for_readings(zev_qs, zev_window_start, zev_window_end)
     zev_names = _participant_names(zev_windows.participant_ids)
+    zev_mp_to_zev, zev_shares_by_zev = _community_shares_by_zev(
+        zev_qs.values_list("metering_point_id", flat=True).distinct(), zev_window_start, zev_window_end,
+    )
 
     all_consumption_rows = (
         zev_qs.annotate(bucket=trunc_fn("timestamp"))
@@ -457,45 +516,46 @@ def participant_dashboard_summary(participant_qs, zev_qs, trunc_fn, user, zev_id
 
     all_p_map = {}
     for row in all_consumption_rows:
-        pid = zev_windows.participant_at(row["metering_point_id"], row["timestamp"])
-        if pid is None:
-            continue
-        pid = str(pid)
         ts = row["timestamp"]
         consumed = row["consumed_kwh"] or Decimal("0")
         zev_at_ts = zev_pivot.get(ts, {})
         total_consumed = zev_at_ts.get("consumed", Decimal("0"))
         total_produced = zev_at_ts.get("produced", Decimal("0"))
         from_zev, from_grid = split_consumption(consumed, total_consumed, total_produced)
-        if pid not in all_p_map:
-            all_p_map[pid] = {
-                "participant_id": pid,
-                "participant_name": zev_names.get(pid, ""),
-                "total_consumed_kwh": Decimal("0"),
-                "total_produced_kwh": Decimal("0"),
-                "from_zev_kwh": Decimal("0"),
-                "from_grid_kwh": Decimal("0"),
-            }
-        all_p_map[pid]["total_consumed_kwh"] += consumed
-        all_p_map[pid]["from_zev_kwh"] += from_zev
-        all_p_map[pid]["from_grid_kwh"] += from_grid
+        for raw_pid, share in _distribute_reading(
+            zev_windows, zev_mp_to_zev, zev_shares_by_zev, row["metering_point_id"], ts,
+        ):
+            pid = str(raw_pid)
+            if pid not in all_p_map:
+                all_p_map[pid] = {
+                    "participant_id": pid,
+                    "participant_name": zev_names.get(pid, ""),
+                    "total_consumed_kwh": Decimal("0"),
+                    "total_produced_kwh": Decimal("0"),
+                    "from_zev_kwh": Decimal("0"),
+                    "from_grid_kwh": Decimal("0"),
+                }
+            all_p_map[pid]["total_consumed_kwh"] += consumed * share
+            all_p_map[pid]["from_zev_kwh"] += from_zev * share
+            all_p_map[pid]["from_grid_kwh"] += from_grid * share
 
     for row in all_production_rows:
-        pid = zev_windows.participant_at(row["metering_point_id"], row["timestamp"])
-        if pid is None:
-            continue
-        pid = str(pid)
+        ts = row["timestamp"]
         produced = row["produced_kwh"] or Decimal("0")
-        if pid not in all_p_map:
-            all_p_map[pid] = {
-                "participant_id": pid,
-                "participant_name": zev_names.get(pid, ""),
-                "total_consumed_kwh": Decimal("0"),
-                "total_produced_kwh": Decimal("0"),
-                "from_zev_kwh": Decimal("0"),
-                "from_grid_kwh": Decimal("0"),
-            }
-        all_p_map[pid]["total_produced_kwh"] += produced
+        for raw_pid, share in _distribute_reading(
+            zev_windows, zev_mp_to_zev, zev_shares_by_zev, row["metering_point_id"], ts,
+        ):
+            pid = str(raw_pid)
+            if pid not in all_p_map:
+                all_p_map[pid] = {
+                    "participant_id": pid,
+                    "participant_name": zev_names.get(pid, ""),
+                    "total_consumed_kwh": Decimal("0"),
+                    "total_produced_kwh": Decimal("0"),
+                    "from_zev_kwh": Decimal("0"),
+                    "from_grid_kwh": Decimal("0"),
+                }
+            all_p_map[pid]["total_produced_kwh"] += produced * share
 
     zev_participant_stats = sorted(
         [
@@ -541,14 +601,32 @@ def compute_hourly_profile(selected_zev_id, participant_ids, start_dt, end_dt, p
 
     Returns ``{"hourly_profile": list}`` or ``{"hourly_profile": None}``.
     """
+    # A meter matters here if one of the selected participants personally
+    # holds it, OR it is community-allocated (any participant of the ZEV may
+    # be weight-eligible for a share, regardless of who the literal holder
+    # is) — otherwise a community-only participant's meter never reaches the
+    # profile at all. Two flat queries unioned in Python rather than one
+    # composite Q(...)|Q(...) filter: both conditions traverse the same
+    # ``assignments`` relation, and Django's multi-valued-join semantics for
+    # OR-ed conditions on one relation are easy to get subtly wrong.
+    _mp_window = Q(valid_to__isnull=True) | Q(valid_to__gte=ps)
+    personal_mp_ids = MeteringPointAssignment.objects.filter(
+        _mp_window,
+        metering_point__zev_id=selected_zev_id,
+        metering_point__meter_type__in=CONSUMPTION_METER_TYPES,
+        participant_id__in=participant_ids,
+        valid_from__lte=pe,
+    ).values_list("metering_point_id", flat=True)
+    community_mp_ids = MeteringPointAssignment.objects.filter(
+        _mp_window,
+        metering_point__zev_id=selected_zev_id,
+        metering_point__meter_type__in=CONSUMPTION_METER_TYPES,
+        allocation_mode=AllocationMode.COMMUNITY,
+        valid_from__lte=pe,
+    ).values_list("metering_point_id", flat=True)
     consumption_mps = MeteringPoint.objects.filter(
-        zev_id=selected_zev_id,
-        meter_type__in=CONSUMPTION_METER_TYPES,
-        assignments__participant_id__in=participant_ids,
-        assignments__valid_from__lte=pe,
-    ).filter(
-        Q(assignments__valid_to__isnull=True) | Q(assignments__valid_to__gte=ps)
-    ).distinct()
+        id__in=set(personal_mp_ids) | set(community_mp_ids)
+    )
 
     participant_readings_qs = MeterReading.objects.filter(
         metering_point__in=consumption_mps,
@@ -566,10 +644,14 @@ def compute_hourly_profile(selected_zev_id, participant_ids, start_dt, end_dt, p
         return {"hourly_profile": None}
 
     # Per-timestamp attribution: a reading only counts while one of the
-    # selected participants held the metering point at its timestamp (ADR 0013).
+    # selected participants held the metering point at its timestamp (ADR 0013)
+    # — personally, or by a weighted community share.
     participant_ids_set = {str(pid) for pid in participant_ids}
     windows = _assignment_windows_for_readings(
         participant_readings_qs, ps, pe
+    )
+    mp_to_zev, shares_by_zev = _community_shares_by_zev(
+        participant_readings_qs.values_list("metering_point_id", flat=True).distinct(), ps, pe,
     )
 
     # The pool covers every metering point of the ZEV regardless of assignment
@@ -586,13 +668,20 @@ def compute_hourly_profile(selected_zev_id, participant_ids, start_dt, end_dt, p
 
     for reading in participant_readings:
         ts = reading.timestamp
-        holder = windows.participant_at(reading.metering_point_id, ts)
-        if holder is None or str(holder) not in participant_ids_set:
-            # Reading predates the selected participant's assignment (or falls
-            # in a gap): it must not shape their profile.
+        # The selected participants' combined share: 1 if one of them
+        # personally holds the meter, their normalized weight share for a
+        # community assignment, 0 for a gap or somebody else's meter — it
+        # must not shape their profile.
+        my_share = sum(
+            share for raw_pid, share in _distribute_reading(
+                windows, mp_to_zev, shares_by_zev, reading.metering_point_id, ts,
+            )
+            if str(raw_pid) in participant_ids_set
+        )
+        if my_share == 0:
             continue
         hour = ts.hour
-        p_kwh = reading.energy_kwh
+        p_kwh = reading.energy_kwh * my_share
         zev_cons = zev_cons_by_ts.get(ts, Decimal("0"))
         zev_prod = zev_prod_by_ts.get(ts, Decimal("0"))
         r_local, r_grid = split_consumption(p_kwh, zev_cons, zev_prod)

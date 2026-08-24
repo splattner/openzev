@@ -15,13 +15,14 @@ from allocation.read_model import (
     CONSUMPTION_METER_TYPES,
     PRODUCTION_METER_TYPES,
     community_totals_by_timestamp,
+    eligible_participant_shares,
 )
 from allocation.split import split_consumption
 from allocation.windows import AssignmentWindows
 from .pdf_render import render_pdf
 
 from metering.models import MeterReading, ReadingDirection
-from zev.models import MeteringPointAssignment
+from zev.models import AllocationMode, MeteringPointAssignment
 from .models import Invoice, InvoiceStatus
 from .pdf import _format_date_value, _render_template
 
@@ -192,10 +193,16 @@ def _compute_monthly_data(participant, zev, year: int, tr: dict) -> tuple[list[d
     year_start_dt = datetime(year, 1, 1, tzinfo=dt_timezone.utc)
     year_end_dt = datetime(year + 1, 1, 1, tzinfo=dt_timezone.utc)
 
-    # All metering point assignments for this participant in this year
+    # This participant's own assignments, plus every community-allocated
+    # assignment in the ZEV regardless of who literally holds it — a meter
+    # this participant is only weight-eligible for (not the holder of
+    # record) must still reach the readings fetch and the windows below, or
+    # a community-only stake in the ZEV never shows up here at all (the same
+    # gap fixed for the dashboards in metering/analytics.py and views.py).
     assignments = list(
         MeteringPointAssignment.objects.filter(
-            participant=participant,
+            Q(participant=participant) | Q(allocation_mode=AllocationMode.COMMUNITY),
+            metering_point__zev=zev,
             valid_from__lte=year_end,
         ).filter(
             Q(valid_to__isnull=True) | Q(valid_to__gte=year_start)
@@ -248,11 +255,28 @@ def _compute_monthly_data(participant, zev, year: int, tr: dict) -> tuple[list[d
     # ── Per-timestamp attribution windows (ADR 0013) ────────────────────────
     # Readings are only counted for the participant while their assignment is
     # active at the reading's timestamp — a mid-year transfer must not hand
-    # the new holder the old holder's readings.
+    # the new holder the old holder's readings. ``a.participant_id`` is the
+    # literal holder (which may be someone else, for a community window);
+    # ``_participant_share`` below is what decides this participant's own
+    # cut, personal or weighted.
     windows = AssignmentWindows(
-        (a.metering_point_id, a.valid_from, a.valid_to, participant.id, a.allocation_mode, a.id)
+        (a.metering_point_id, a.valid_from, a.valid_to, a.participant_id, a.allocation_mode, a.id)
         for a in assignments
     )
+    shares_by_date = eligible_participant_shares(zev, year_start, year_end)
+
+    def _participant_share(metering_point_id, ts) -> Decimal:
+        """This participant's share of a reading at (mp, ts): 1 for a
+        personal assignment they hold, their normalized weight share for a
+        community assignment (0 if not eligible that date), 0 for a gap or
+        somebody else's personal meter."""
+        resolution = windows.assignment_at(metering_point_id, ts)
+        if resolution is None:
+            return Decimal("0")
+        if resolution.allocation_mode == AllocationMode.COMMUNITY:
+            day = ts.astimezone(dt_timezone.utc).date()
+            return shares_by_date.get(day, {}).get(participant.id, Decimal("0"))
+        return Decimal("1") if resolution.holder_id == participant.id else Decimal("0")
 
     # ── Accumulate per-timestamp, bucket into months ────────────────────────
     month_acc = {m: {"consumed": Decimal("0"), "from_zev": Decimal("0"),
@@ -262,10 +286,11 @@ def _compute_monthly_data(participant, zev, year: int, tr: dict) -> tuple[list[d
     # Consumption with local-pool allocation per timestamp
     for row in participant_consumption_rows:
         ts = row["timestamp"]
-        if not windows.is_held_by(participant.id, row["metering_point_id"], ts):
+        share = _participant_share(row["metering_point_id"], ts)
+        if share == 0:
             continue
         month_num = ts.month
-        consumed = row["consumed_kwh"] or Decimal("0")
+        consumed = (row["consumed_kwh"] or Decimal("0")) * share
 
         zev_consumed = zev_consumption_by_ts.get(ts, Decimal("0"))
         zev_produced = zev_production_by_ts.get(ts, Decimal("0"))
@@ -278,10 +303,11 @@ def _compute_monthly_data(participant, zev, year: int, tr: dict) -> tuple[list[d
     # Production (just sum per month, no allocation needed)
     for row in participant_production_rows:
         ts = row["timestamp"]
-        if not windows.is_held_by(participant.id, row["metering_point_id"], ts):
+        share = _participant_share(row["metering_point_id"], ts)
+        if share == 0:
             continue
         month_num = ts.month
-        produced = row["produced_kwh"] or Decimal("0")
+        produced = (row["produced_kwh"] or Decimal("0")) * share
         month_acc[month_num]["produced"] += produced
 
     # ── Build output rows ───────────────────────────────────────────────────

@@ -203,7 +203,13 @@ class MeterReadingViewSet(ZevScopedQuerySetMixin, viewsets.ModelViewSet):
             return Response(result)
 
         # participant path
-        zev_ids = qs.values_list("metering_point__zev_id", flat=True).distinct()
+        # Derived from the participant's own membership, not from qs: a
+        # participant whose only stake in a ZEV is a community-allocated
+        # share (no personally held metering point) has an empty qs, which
+        # would otherwise make the whole ZEV invisible to them here — the
+        # zev-wide section below is unscoped by literal holdership on
+        # purpose (shared metering points, #387).
+        zev_ids = Participant.objects.filter(user=user).values_list("zev_id", flat=True).distinct()
         zev_qs = MeterReading.objects.filter(metering_point__zev_id__in=zev_ids)
         if date_from:
             zev_qs = zev_qs.filter(timestamp__gte=datetime.combine(date_type.fromisoformat(date_from), datetime.min.time(), tzinfo=dt_timezone.utc))

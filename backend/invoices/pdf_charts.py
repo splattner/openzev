@@ -502,11 +502,12 @@ def _build_hourly_profile_chart_svg(invoice, tr: dict) -> str | None:
     from allocation.read_model import (
         CONSUMPTION_METER_TYPES as _CONS_METER_TYPES,
         community_totals_by_timestamp,
+        eligible_participant_shares,
     )
     from allocation.split import split_consumption
     from allocation.windows import AssignmentWindows
     from metering.models import MeterReading, ReadingDirection, ReadingResolution
-    from zev.models import MeteringPoint as _MP
+    from zev.models import AllocationMode, MeteringPoint as _MP, MeteringPointAssignment as _MPA
 
     ps = invoice.period_start
     pe = invoice.period_end
@@ -517,14 +518,27 @@ def _build_hourly_profile_chart_svg(invoice, tr: dict) -> str | None:
     end_dt = _period_to_dt(pe) + _dt.timedelta(days=1)
 
     # ── Participant consumption readings ────────────────────────────────────
-    consumption_mps = _MP.objects.filter(
-        zev=zev,
-        meter_type__in=_CONS_METER_TYPES,
-        assignments__participant=participant,
-        assignments__valid_from__lte=pe,
-    ).filter(
-        _dj.Q(assignments__valid_to__isnull=True) | _dj.Q(assignments__valid_to__gte=ps)
-    ).distinct()
+    # A meter matters here if this participant personally holds it, OR it is
+    # community-allocated (they may be weight-eligible regardless of who the
+    # literal holder is) — otherwise a community-only stake never reaches the
+    # chart. Two flat queries unioned in Python, matching the same fix in
+    # metering.analytics.compute_hourly_profile (shared metering points, #387).
+    _mp_window = _dj.Q(valid_to__isnull=True) | _dj.Q(valid_to__gte=ps)
+    personal_mp_ids = _MPA.objects.filter(
+        _mp_window,
+        metering_point__zev=zev,
+        metering_point__meter_type__in=_CONS_METER_TYPES,
+        participant=participant,
+        valid_from__lte=pe,
+    ).values_list("metering_point_id", flat=True)
+    community_mp_ids = _MPA.objects.filter(
+        _mp_window,
+        metering_point__zev=zev,
+        metering_point__meter_type__in=_CONS_METER_TYPES,
+        allocation_mode=AllocationMode.COMMUNITY,
+        valid_from__lte=pe,
+    ).values_list("metering_point_id", flat=True)
+    consumption_mps = _MP.objects.filter(id__in=set(personal_mp_ids) | set(community_mp_ids))
     participant_readings = list(
         MeterReading.objects.filter(
             metering_point__in=consumption_mps,
@@ -536,7 +550,8 @@ def _build_hourly_profile_chart_svg(invoice, tr: dict) -> str | None:
     if not participant_readings:
         return None
 
-    windows = AssignmentWindows.for_participant(participant, ps, pe)
+    windows = AssignmentWindows.for_zev(zev, ps, pe)
+    shares_by_date = eligible_participant_shares(zev, ps, pe)
 
     # Only show chart when sub-daily data is present
     resolutions = {r.resolution for r in participant_readings}
@@ -556,12 +571,22 @@ def _build_hourly_profile_chart_svg(invoice, tr: dict) -> str | None:
 
     for reading in participant_readings:
         ts = reading.timestamp
-        if not windows.is_held_by(participant.id, reading.metering_point_id, ts):
-            # Reading predates this participant's assignment (or falls in an
-            # assignment gap): it must not shape their profile.
+        # This participant's share: 1 for a personal assignment they hold,
+        # their normalized weight share for a community assignment (0 if not
+        # eligible that date), 0 for a gap or somebody else's personal
+        # meter — it must not shape their profile.
+        resolution = windows.assignment_at(reading.metering_point_id, ts)
+        if resolution is None:
+            continue
+        if resolution.allocation_mode == AllocationMode.COMMUNITY:
+            day = ts.astimezone(_dt.timezone.utc).date()
+            share = shares_by_date.get(day, {}).get(participant.id, _Dec("0"))
+        else:
+            share = _Dec("1") if resolution.holder_id == participant.id else _Dec("0")
+        if share == 0:
             continue
         hour = ts.hour
-        p_kwh = reading.energy_kwh
+        p_kwh = reading.energy_kwh * share
         zev_cons = zev_cons_by_ts.get(ts, _Dec("0"))
         zev_prod = zev_prod_by_ts.get(ts, _Dec("0"))
         r_local, r_grid = split_consumption(p_kwh, zev_cons, zev_prod)

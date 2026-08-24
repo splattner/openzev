@@ -7,6 +7,7 @@ from allocation.read_model import (
     CONSUMPTION,
     PRODUCTION,
     community_totals_by_timestamp,
+    eligible_participant_shares,
     iter_allocated_readings,
 )
 from allocation.windows import AssignmentWindows
@@ -107,6 +108,10 @@ def _compute_period_participant_stats(invoice) -> tuple[dict, list[dict]]:
     # left the ZEV must keep their name in the period stats.
     participant_names = _participant_names(windows.participant_ids)
 
+    # Weight shares for community-allocated readings, keyed by UTC civil date
+    # — matches participant_on/assignment_at's date granularity. Fetched once
+    # regardless of whether this period has any community meter.
+    shares_by_date = eligible_participant_shares(zev, ps, pe)
 
     participant_map: dict[str, dict] = {}
 
@@ -128,6 +133,14 @@ def _compute_period_participant_stats(invoice) -> tuple[dict, list[dict]]:
     ):
         if reading.holder_id is None:
             continue
+        if reading.allocation_mode == "community":
+            day = reading.timestamp.astimezone(_dt.timezone.utc).date()
+            for pid, share in shares_by_date.get(day, {}).items():
+                entry = _entry(str(pid))
+                entry["total_consumed_kwh"] += reading.energy_kwh * share
+                entry["from_zev_kwh"] += reading.split.local_kwh * share
+                entry["from_grid_kwh"] += reading.split.grid_kwh * share
+            continue
         entry = _entry(str(reading.holder_id))
         entry["total_consumed_kwh"] += reading.energy_kwh
         entry["from_zev_kwh"] += reading.split.local_kwh
@@ -145,6 +158,11 @@ def _compute_period_participant_stats(invoice) -> tuple[dict, list[dict]]:
         with_split=False,
     ):
         if reading.holder_id is None:
+            continue
+        if reading.allocation_mode == "community":
+            day = reading.timestamp.astimezone(_dt.timezone.utc).date()
+            for pid, share in shares_by_date.get(day, {}).items():
+                _entry(str(pid))["total_produced_kwh"] += reading.energy_kwh * share
             continue
         _entry(str(reading.holder_id))["total_produced_kwh"] += reading.energy_kwh
 

@@ -111,13 +111,20 @@ class AllocationQueryCountTests(_ReconciliationBase):
         )
 
     def test_pdf_stats_query_count(self):
+        # 6 -> 7: eligible_participant_shares (shared metering points, #387)
+        # adds one Participant fetch, still a single query regardless of how
+        # many readings or how many months the period spans.
         invoice = generate_invoice(self.alice, PERIOD_START, PERIOD_END)
-        self._call_at_most(6, _compute_period_participant_stats, invoice)
+        self._call_at_most(7, _compute_period_participant_stats, invoice)
 
     def test_pdf_charts_hourly_profile_query_count(self):
+        # 4 -> 7: shared metering points (#387) adds the personal/community
+        # metering-point-id split (two queries, replacing one) plus
+        # eligible_participant_shares (one query) — all still single
+        # fetches, not per-reading.
         invoice = generate_invoice(self.alice, PERIOD_START, PERIOD_END)
         self._call_at_most(
-            4, _build_hourly_profile_chart_svg, invoice, INVOICE_TRANSLATIONS["de"]
+            7, _build_hourly_profile_chart_svg, invoice, INVOICE_TRANSLATIONS["de"]
         )
 
     def test_annual_statement_monthly_data_query_count(self):
@@ -127,4 +134,8 @@ class AllocationQueryCountTests(_ReconciliationBase):
         )
 
     def test_owner_dashboard_query_count(self):
-        self._call_at_most(6, self._analytics)
+        # 6 -> 8: _community_shares_by_zev (shared metering points, #387) adds
+        # two queries — a metering-point-to-ZEV mapping, then one
+        # eligible_participant_shares fetch per distinct ZEV touched (this
+        # fixture has one) — both still single fetches, not per-reading.
+        self._call_at_most(8, self._analytics)

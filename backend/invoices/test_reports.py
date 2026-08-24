@@ -323,3 +323,76 @@ class AnnualStatementMonthlyDataTests(TestCase):
         # February shows the post-assignment reading, fully local.
         self.assertEqual(feb["consumed_kwh"], "4.00")
         self.assertEqual(feb["from_zev_kwh"], "4.00")
+
+    def test_community_meter_contributes_only_the_participants_weighted_share(self):
+        """A community meter this participant does not literally hold must
+        still reach their statement, at their weighted share — not zero
+        (they're not the holder) and not the full reading (they'd be
+        double-counted against the holder's own share).
+
+        Shared metering points, docs/specs/2026-08-shared-metering-points.md
+        §7.7: broadens the fetch beyond this participant's own assignments,
+        and replaces the literal is_held_by gate with a mode-aware one.
+        """
+        from invoices.annual_statement import _compute_monthly_data
+        from metering.models import MeterReading, ReadingDirection, ReadingResolution
+        from zev.models import AllocationMode, MeteringPoint, MeteringPointAssignment, MeteringPointType
+
+        holder = make_participant(self.zev, first="Hans", last="Halter")
+        self.participant.allocation_weight = Decimal("1")
+        self.participant.save(update_fields=["allocation_weight"])
+        holder.allocation_weight = Decimal("3")
+        holder.save(update_fields=["allocation_weight"])
+
+        community_mp = MeteringPoint.objects.create(
+            zev=self.zev, meter_id="CH00000000000000000000000000REP03",
+            meter_type=MeteringPointType.CONSUMPTION)
+        MeteringPointAssignment.objects.create(
+            metering_point=community_mp, participant=holder,
+            valid_from=date(2026, 1, 1), allocation_mode=AllocationMode.COMMUNITY,
+        )
+        MeterReading.objects.create(
+            metering_point=community_mp,
+            timestamp=datetime(2026, 1, 15, 12, 0, tzinfo=dt_timezone.utc),
+            energy_kwh=Decimal("8"), direction=ReadingDirection.IN,
+            resolution=ReadingResolution.DAILY,
+        )
+
+        monthly, _totals = _compute_monthly_data(self.participant, self.zev, 2026, self.tr)
+
+        # Weight 1 of 4 total (1 + 3): this participant's share is 8 * 1/4 = 2.
+        self.assertEqual(monthly[0]["consumed_kwh"], "2.00")
+
+    def test_community_holder_is_not_double_billed_alongside_their_share(self):
+        """The literal holder of a community meter must be billed only their
+        own weighted share, not the full reading on top of it — the
+        double-counting bug the original spec draft had (§7.3's fix, applied
+        here via the mode-aware gate)."""
+        from invoices.annual_statement import _compute_monthly_data
+        from metering.models import MeterReading, ReadingDirection, ReadingResolution
+        from zev.models import AllocationMode, MeteringPoint, MeteringPointAssignment, MeteringPointType
+
+        other = make_participant(self.zev, first="Otto", last="Other")
+        self.participant.allocation_weight = Decimal("3")
+        self.participant.save(update_fields=["allocation_weight"])
+        other.allocation_weight = Decimal("1")
+        other.save(update_fields=["allocation_weight"])
+
+        community_mp = MeteringPoint.objects.create(
+            zev=self.zev, meter_id="CH00000000000000000000000000REP04",
+            meter_type=MeteringPointType.CONSUMPTION)
+        MeteringPointAssignment.objects.create(
+            metering_point=community_mp, participant=self.participant,
+            valid_from=date(2026, 1, 1), allocation_mode=AllocationMode.COMMUNITY,
+        )
+        MeterReading.objects.create(
+            metering_point=community_mp,
+            timestamp=datetime(2026, 1, 15, 12, 0, tzinfo=dt_timezone.utc),
+            energy_kwh=Decimal("8"), direction=ReadingDirection.IN,
+            resolution=ReadingResolution.DAILY,
+        )
+
+        monthly, _totals = _compute_monthly_data(self.participant, self.zev, 2026, self.tr)
+
+        # Weight 3 of 4 total: the holder's own share is 8 * 3/4 = 6, not 8.
+        self.assertEqual(monthly[0]["consumed_kwh"], "6.00")

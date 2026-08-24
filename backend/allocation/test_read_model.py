@@ -19,13 +19,14 @@ from allocation.read_model import (
     CONSUMPTION,
     PRODUCTION,
     community_totals_by_timestamp,
+    eligible_participant_shares,
     iter_allocated_readings,
 )
 from allocation.split import split_consumption, split_production
 from allocation.windows import AssignmentWindows
 from metering.models import MeterReading, ReadingDirection
 from testing.helpers import make_named_participant
-from zev.models import MeteringPoint, MeteringPointAssignment, MeteringPointType, Zev
+from zev.models import AllocationMode, MeteringPoint, MeteringPointAssignment, MeteringPointType, Zev
 
 User = get_user_model()
 
@@ -263,3 +264,159 @@ class ReadModelTests(TestCase):
             list(iter_allocated_readings(
                 self.zev, START_DT, END_DT, kind="bogus", windows=self.windows
             ))
+
+
+class SharedReadModelTests(TestCase):
+    """Pins the read-model contract for community-allocated readings (shared
+    metering points, docs/specs/2026-08-shared-metering-points.md §7.7)."""
+
+    def setUp(self):
+        self.owner = User.objects.create_user(
+            username="shared_readmodel_owner", password="pass1234", role=UserRole.ZEV_OWNER
+        )
+        self.zev = Zev.objects.create(
+            name="Shared ReadModel ZEV", owner=self.owner, zev_type="vzev",
+            start_date=PERIOD_START, billing_interval="monthly", invoice_prefix="SR",
+        )
+        self.zev.refresh_from_db()
+
+        self.alice = make_named_participant(self.zev, "Alice Muster", PERIOD_START)
+        self.community_mp = MeteringPoint.objects.create(
+            zev=self.zev, meter_type=MeteringPointType.CONSUMPTION, meter_id="CH-SR-COMMUNITY-1",
+        )
+        MeteringPointAssignment.objects.create(
+            metering_point=self.community_mp, participant=self.alice,
+            valid_from=PERIOD_START, allocation_mode=AllocationMode.COMMUNITY,
+        )
+        MeterReading.objects.create(
+            metering_point=self.community_mp, timestamp=_ts(date(2026, 1, 5)),
+            energy_kwh=Decimal("4"), direction=ReadingDirection.IN,
+        )
+
+        self.windows = AssignmentWindows.for_zev(self.zev, PERIOD_START, PERIOD_END)
+
+    def test_community_readings_carry_mode_and_literal_holder(self):
+        """A community reading resolves to its literal holder (provenance)
+        and carries allocation_mode='community' — the two things a consumer
+        needs to distribute it instead of attributing it to the holder."""
+        readings = {
+            (r.metering_point_id, r.timestamp): r
+            for r in iter_allocated_readings(
+                self.zev, START_DT, END_DT, kind=CONSUMPTION, windows=self.windows,
+            )
+        }
+        reading = readings[(self.community_mp.id, _ts(date(2026, 1, 5)))]
+
+        self.assertEqual(reading.holder_id, self.alice.id)
+        self.assertEqual(reading.allocation_mode, "community")
+
+    def test_community_readings_split_against_the_physical_pool(self):
+        """Split math is unchanged for community meters: allocation_mode only
+        changes how a consumer attributes the reading, never the physical
+        split against the community pool."""
+        cons_by_ts, prod_by_ts = community_totals_by_timestamp(self.zev, START_DT, END_DT)
+        readings = {
+            (r.metering_point_id, r.timestamp): r
+            for r in iter_allocated_readings(
+                self.zev, START_DT, END_DT, kind=CONSUMPTION, windows=self.windows,
+                consumption_by_ts=cons_by_ts, production_by_ts=prod_by_ts,
+            )
+        }
+        reading = readings[(self.community_mp.id, _ts(date(2026, 1, 5)))]
+        expected = split_consumption(
+            Decimal("4"), cons_by_ts[_ts(date(2026, 1, 5))], prod_by_ts.get(_ts(date(2026, 1, 5)), Decimal("0")),
+        )
+
+        self.assertEqual(reading.split, expected)
+
+    def test_community_readings_are_distinct_from_gap_readings(self):
+        """A community reading and a gap reading both carry a non-attributing
+        signal, but consumers must be able to tell them apart: a gap has
+        holder_id=None, a community reading has a real holder_id and
+        allocation_mode='community'."""
+        gap_mp = MeteringPoint.objects.create(
+            zev=self.zev, meter_type=MeteringPointType.CONSUMPTION, meter_id="CH-SR-GAP-1",
+        )
+        MeterReading.objects.create(
+            metering_point=gap_mp, timestamp=_ts(date(2026, 1, 5)),
+            energy_kwh=Decimal("2"), direction=ReadingDirection.IN,
+        )
+        windows = AssignmentWindows.for_zev(self.zev, PERIOD_START, PERIOD_END)
+        readings = {
+            (r.metering_point_id, r.timestamp): r
+            for r in iter_allocated_readings(
+                self.zev, START_DT, END_DT, kind=CONSUMPTION, windows=windows,
+            )
+        }
+
+        gap = readings[(gap_mp.id, _ts(date(2026, 1, 5)))]
+        community = readings[(self.community_mp.id, _ts(date(2026, 1, 5)))]
+
+        self.assertIsNone(gap.holder_id)
+        self.assertIsNone(gap.allocation_mode)
+        self.assertIsNotNone(community.holder_id)
+        self.assertEqual(community.allocation_mode, "community")
+
+
+class EligibleParticipantSharesTests(TestCase):
+    """Unit tests for eligible_participant_shares — the shared "who's
+    eligible and at what weight, per date" primitive every community-reading
+    consumer uses."""
+
+    def setUp(self):
+        self.owner = User.objects.create_user(
+            username="shares_owner", password="pass1234", role=UserRole.ZEV_OWNER
+        )
+        self.zev = Zev.objects.create(
+            name="Shares ZEV", owner=self.owner, zev_type="vzev",
+            start_date=PERIOD_START, billing_interval="monthly", invoice_prefix="SH",
+        )
+        self.zev.refresh_from_db()
+
+    def _participant(self, name, valid_from, valid_to=None, weight="1"):
+        p = make_named_participant(self.zev, name, valid_from, valid_to)
+        p.allocation_weight = Decimal(weight)
+        p.save(update_fields=["allocation_weight"])
+        return p
+
+    def test_default_weights_split_evenly(self):
+        self._participant("Alice Muster", PERIOD_START)
+        self._participant("Bob Beispiel", PERIOD_START)
+
+        shares = eligible_participant_shares(self.zev, PERIOD_START, PERIOD_END)
+
+        day_shares = shares[date(2026, 1, 5)]
+        self.assertEqual(set(day_shares.values()), {Decimal("0.5")})
+        self.assertEqual(sum(day_shares.values()), Decimal("1"))
+
+    def test_unequal_weights_produce_proportional_shares(self):
+        alice = self._participant("Alice Muster", PERIOD_START, weight="3")
+        bob = self._participant("Bob Beispiel", PERIOD_START, weight="1")
+
+        shares = eligible_participant_shares(self.zev, PERIOD_START, PERIOD_END)
+
+        day_shares = shares[date(2026, 1, 5)]
+        self.assertEqual(day_shares[alice.id], Decimal("0.75"))
+        self.assertEqual(day_shares[bob.id], Decimal("0.25"))
+        self.assertEqual(sum(day_shares.values()), Decimal("1"))
+
+    def test_joiner_only_appears_from_their_join_date(self):
+        alice = self._participant("Alice Muster", PERIOD_START)
+        bob = self._participant("Bob Beispiel", date(2026, 1, 16))
+
+        shares = eligible_participant_shares(self.zev, PERIOD_START, PERIOD_END)
+
+        self.assertEqual(shares[date(2026, 1, 15)], {alice.id: Decimal("1")})
+        self.assertEqual(shares[date(2026, 1, 16)], {alice.id: Decimal("0.5"), bob.id: Decimal("0.5")})
+
+    def test_date_with_no_eligible_participant_is_absent(self):
+        self._participant("Alice Muster", date(2026, 1, 10), date(2026, 1, 20))
+
+        shares = eligible_participant_shares(self.zev, PERIOD_START, PERIOD_END)
+
+        self.assertIn(date(2026, 1, 10), shares)
+        self.assertNotIn(date(2026, 1, 1), shares)
+        self.assertNotIn(date(2026, 1, 31), shares)
+
+    def test_a_zev_with_no_participants_returns_empty(self):
+        self.assertEqual(eligible_participant_shares(self.zev, PERIOD_START, PERIOD_END), {})

@@ -504,6 +504,49 @@ class InvoicePdfQrTests(TestCase):
         self.assertEqual(chart.count('data-hour="10"'), 1)
         self.assertNotIn('fill="#c9891a" data-hour', chart)
 
+    def test_hourly_profile_reaches_a_community_only_participant(self):
+        """A participant with no personally-held meter — their only stake in
+        the ZEV is a community share — must still get a chart. Before the fix
+        (shared metering points, docs/specs/2026-08-shared-metering-points.md
+        §7.7), consumption_mps was scoped to literal holders only, so this
+        participant's readings queryset was empty and the function returned
+        None before ever reaching the attribution logic."""
+        from metering.models import MeterReading, ReadingDirection, ReadingResolution
+        from zev.models import AllocationMode, MeteringPoint, MeteringPointAssignment, MeteringPointType
+
+        holder = Participant.objects.create(
+            zev=self.zev, first_name="Hans", last_name="Halter",
+            email="hans@example.com", valid_from=date(2026, 1, 1),
+            allocation_weight=Decimal("3"),
+        )
+        self.participant.allocation_weight = Decimal("1")
+        self.participant.save(update_fields=["allocation_weight"])
+
+        invoice = self._invoice()
+        invoice.total_local_kwh = Decimal("10.00")
+        invoice.total_grid_kwh = Decimal("20.00")
+        invoice.save(update_fields=["total_local_kwh", "total_grid_kwh"])
+
+        community_mp = MeteringPoint.objects.create(
+            zev=self.zev, meter_id="CH00000000000000000000000000TEST05",
+            meter_type=MeteringPointType.CONSUMPTION,
+        )
+        MeteringPointAssignment.objects.create(
+            metering_point=community_mp, participant=holder,
+            valid_from=date(2026, 1, 1), allocation_mode=AllocationMode.COMMUNITY,
+        )
+        MeterReading.objects.create(
+            metering_point=community_mp,
+            timestamp=datetime(2026, 1, 15, 9, 0, tzinfo=dt_timezone.utc),
+            energy_kwh=Decimal("5.0000"), direction=ReadingDirection.IN,
+            resolution=ReadingResolution.HOURLY,
+        )
+
+        chart = _build_hourly_profile_chart_svg(invoice, INVOICE_TRANSLATIONS["de"])
+
+        self.assertIsNotNone(chart)
+        self.assertIn('data-hour="9"', chart)
+
     def test_period_window_uses_utc_not_local_tz(self):
         """pdf_stats and pdf_charts must query the same UTC range as the engine."""
         from datetime import timedelta
