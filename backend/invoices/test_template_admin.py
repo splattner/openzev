@@ -14,10 +14,12 @@ drop them.
 
 from django.test import TestCase
 from rest_framework.test import APIClient
+from weasyprint.urls import URLFetcher
 
 from accounts.models import UserRole
 from audit.models import AuditActionCategory, AuditEvent, AuditEventStatus
 from invoices.contract_pdf import generate_contract_pdf
+from invoices.pdf_render import ALLOWED_URL_PROTOCOLS, render_pdf
 from invoices.test_helpers import make_participant, make_zev
 from testing.helpers import authenticate as auth, make_user
 
@@ -180,15 +182,19 @@ class PdfTemplatePreviewTests(TestCase):
                 self.assertEqual(resp.status_code, 200)
                 self.assertEqual(resp.data["html"], "<p>rendered</p>")
 
-    def test_unknown_template_type_falls_back_to_the_invoice_context(self):
+    def test_unknown_template_type_is_rejected(self):
+        """The preview reads template_type from the request body, so an unknown
+        value must 400 rather than silently render the invoice sample context
+        (the PATCH save path keeps the helper's fallback; its template_type
+        arrives from fixed URL routes)."""
         resp = self.client.post(
             "/api/v1/invoices/invoices/preview-pdf-template/",
             {"content": "{{ invoice.invoice_number }}", "template_type": "nonsense"},
             format="json",
         )
 
-        self.assertEqual(resp.status_code, 200)
-        self.assertTrue(resp.data["html"].strip())
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn("Unsupported template type", resp.data["error"])
 
     def test_broken_template_returns_400_not_500(self):
         resp = self.client.post(
@@ -372,3 +378,46 @@ class PdfTemplateOverrideIntegrityTests(TestCase):
 
         pdf = generate_contract_pdf(self._contract_participant())
         self.assertTrue(pdf.startswith(b"%PDF"))
+
+
+class PdfRenderFetchPolicyTests(TestCase):
+    """render_pdf's fetch policy: embedded data: URIs only.
+
+    Every shipped template is fully inline, so no legitimate render needs
+    another protocol; the allowlist is the boundary that keeps admin-editable
+    template content from reading local files or reaching the network.
+    """
+
+    def test_rejects_file_http_and_ftp_urls(self):
+        fetcher = URLFetcher(allowed_protocols=ALLOWED_URL_PROTOCOLS)
+        for url in (
+            "file:///etc/passwd",
+            "http://example.com/x.png",
+            "https://example.com/a.css",
+            "ftp://example.com/f",
+        ):
+            with self.subTest(url=url):
+                with self.assertRaises(ValueError):
+                    fetcher(url)
+
+    def test_allows_data_uris(self):
+        fetcher = URLFetcher(allowed_protocols=ALLOWED_URL_PROTOCOLS)
+
+        response = fetcher("data:text/plain,hello")
+
+        # urllib assigns no HTTP status to data: responses; the body is the proof.
+        self.assertEqual(response.read(), b"hello")
+
+    def test_render_pdf_degrades_past_external_references(self):
+        """A rejected resource degrades like a missing one instead of failing
+        the render, for stored documents and the stateless preview alike."""
+        html = (
+            "<html><body>"
+            '<img src="file:///etc/passwd">'
+            '<img src="http://example.invalid/x.png">'
+            "</body></html>"
+        )
+
+        pdf = render_pdf(html)
+
+        self.assertTrue(pdf.startswith(b"%PDF-"))

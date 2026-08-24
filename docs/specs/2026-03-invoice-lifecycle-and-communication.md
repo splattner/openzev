@@ -322,7 +322,7 @@ The invoice, contract, and annual-statement PDF templates are editable via the a
 |---|---|---|---|
 | `POST` | `/invoices/invoices/preview-pdf-template/` | `admin` only | Render submitted template content with sample data and return the rendered HTML |
 
-Request body: `{ "content": "<html>...", "template_type": "invoice" | "contract" | "annual_statement" }` (defaults to `invoice`). The sample context comes from `build_sample_invoice_context()`, `build_sample_contract_context()`, or `build_sample_annual_statement_context()` in `invoices/template_context.py`. Response: `{ "html": "<rendered html>" }`. Template rendering errors return `400` with `{ "error": "Template rendering error: ..." }`; missing/blank content returns `400`.
+Request body: `{ "content": "<html>...", "template_type": "invoice" | "contract" | "annual_statement" }` (defaults to `invoice`). The sample context comes from `build_sample_invoice_context()`, `build_sample_contract_context()`, or `build_sample_annual_statement_context()` in `invoices/template_context.py`. Response: `{ "html": "<rendered html>" }`. Template rendering errors return `400` with `{ "error": "Template rendering error: ..." }`; missing/blank content returns `400`; unknown `template_type` values return `400`.
 
 **Response shape (GET and PATCH):**
 
@@ -442,7 +442,7 @@ Admin-only endpoints manage the global `EmailTemplate` overrides (§3.5) for the
 2. Look up `PdfTemplate` by `template_name` in the database.
    - If a DB record exists: render using `django.template.Template(content).render(Context(context))`.
    - Otherwise: render from the on-disk default using `render_to_string(template_name, context)`.
-3. Convert HTML → PDF via WeasyPrint through `render_pdf()` in `invoices/pdf_render.py`, which emits **PDF/A-3b** (`PDF_VARIANT = "pdf/a-3b"`) — a long-term archival format suitable for Swiss GeBüV retention, with WeasyPrint adding the XMP identification, sRGB OutputIntent, and font subsets. The same helper renders contract, annual statement, and financial summary PDFs.
+3. Convert HTML → PDF via WeasyPrint through `render_pdf()` in `invoices/pdf_render.py`, which emits **PDF/A-3b** (`PDF_VARIANT = "pdf/a-3b"`) — a long-term archival format suitable for Swiss GeBüV retention, with WeasyPrint adding the XMP identification, sRGB OutputIntent, and font subsets. The same helper renders contract, annual statement, and financial summary PDFs. Because template content is admin-editable, the WeasyPrint fetcher is restricted to `data:` URIs (`ALLOWED_URL_PROTOCOLS` in `pdf_render.py`) — templates embed images as data URIs and cannot make the renderer read local files or request remote URLs.
 4. Save PDF to `invoice.pdf_file` (`invoices/pdf/invoice_{number}.pdf`).
 
 ### 8.2 Template context

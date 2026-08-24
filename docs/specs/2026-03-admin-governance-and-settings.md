@@ -211,7 +211,7 @@ All three PDF template endpoints are served by `PdfTemplateView` (`views_templat
 | `/api/v1/invoices/invoices/pdf-template/` | DELETE | `IsAdmin` | Deletes the DB override (reverts to on-disk default); audit-logged (`template.invoice_pdf.reset`). Returns `{ template_name, content, is_customized: false, detail }` with the default content |
 | `/api/v1/invoices/invoices/contract-pdf-template/` | GET/PATCH/DELETE | same | Same behaviour for `contracts/participant_contract_pdf.html` (audit prefix `template.contract_pdf`) |
 | `/api/v1/invoices/invoices/annual-statement-pdf-template/` | GET/PATCH/DELETE | same | Same behaviour for `invoices/annual_statement_pdf.html` (audit prefix `template.annual_statement_pdf`) |
-| `/api/v1/invoices/invoices/preview-pdf-template/` | POST | `IsAdmin` | Renders submitted `content` with sample data (`template_type`: `invoice` (default) / `contract` / `annual_statement`) and returns `{ html }`. Render errors or missing content → `400` |
+| `/api/v1/invoices/invoices/preview-pdf-template/` | POST | `IsAdmin` | Renders submitted `content` with sample data (`template_type`: `invoice` (default) / `contract` / `annual_statement`) and returns `{ html }`. Unknown `template_type`, render errors, or missing content → `400` |
 
 **Implementation:** The default content is read from the Django template loader via `_read_default_template(template_name)`. PDF rendering prefers the DB override (`invoices.pdf._render_template`); see §8.
 

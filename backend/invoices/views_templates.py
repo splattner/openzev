@@ -43,6 +43,12 @@ SAMPLE_CONTEXTS = {
     "annual_statement": build_sample_annual_statement_context,
 }
 
+# Preview accepts exactly these template_type values. The PATCH save path
+# keeps the helper's invoice fallback (its template_type arrives from fixed
+# URL routes), but the preview reads template_type from the request body,
+# where an unknown value must not silently render the invoice sample context.
+PREVIEW_TEMPLATE_TYPES = frozenset(SAMPLE_CONTEXTS) | {"invoice"}
+
 
 def _read_default_template(template_name: str) -> str:
     """Read the on-disk (default) content for a template."""
@@ -56,10 +62,11 @@ INVALID_VAR_PATTERN = re.compile(r"__INVALID_TPL_VAR__:([A-Za-z0-9_.]+)")
 def _render_with_sample_context(template_type: str, content: str, *, strict: bool = False) -> str:
     """Render a template body against its sample context.
 
-    Used by the preview endpoint and, on save, by ``PdfTemplateView.patch`` so
-    a broken template or a context-key drift is rejected at edit time instead
-    of failing at document-render time. Unknown template types fall back to the
-    invoice sample context (mirrors the historical preview behaviour).
+    Used by the PATCH save path (``PdfTemplateView.patch``) so a broken
+    template or a context-key drift is rejected at edit time instead of
+    failing at document-render time. The preview endpoint validates
+    ``template_type`` against ``PREVIEW_TEMPLATE_TYPES`` before calling this
+    helper, so unknown types never reach here.
 
     In ``strict`` mode (save-time validation) the template renders through the
     ``strict-validation`` engine, whose ``string_if_invalid`` turns unknown
@@ -227,6 +234,8 @@ class PdfTemplatePreviewView(_AdminTemplateView):
 
         if not isinstance(content, str) or not content.strip():
             return Response({"error": "Template content is required."}, status=status.HTTP_400_BAD_REQUEST)
+        if not isinstance(template_type, str) or template_type not in PREVIEW_TEMPLATE_TYPES:
+            return Response({"error": "Unsupported template type."}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
             rendered = _render_with_sample_context(template_type, content)
