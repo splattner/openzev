@@ -3,19 +3,24 @@
 from .engine import _period_to_dt
 from .pdf_stats import _compute_period_participant_stats
 
-# Shared palette for SVG charts — matches the invoice template brand.
-_CHART_LOCAL = "#1f5c3a"
-_CHART_GRID = "#c9891a"
-_CHART_INK = "#0f172a"
-_CHART_MUTED = "#64748b"
-_CHART_GRIDLINE = "#e8edeb"
-_CHART_AXIS = "#94a3b8"
-_CHART_BG = "#fbfcfb"
-_CHART_LABEL = "#334155"
-
-# Flow-diagram-specific colors not covered by the chart palette.
-_FLOW_LOCAL_CONS = "#0e7490"
-_FLOW_GRID_EXP = "#7c3aed"
+# Shared palette — generated from design/tokens.json (single source of truth).
+# Do not edit hex literals here; edit design/tokens.json and run scripts/generate-tokens.mjs.
+from .generated_chart_tokens import (  # used by this module internally
+    _CHART_AXIS,
+    _CHART_BG,
+    _CHART_GRID,
+    _CHART_GRIDLINE,
+    _CHART_INK,
+    _CHART_LABEL,
+    _CHART_LABEL_ON_FILL,
+    _CHART_LOCAL,
+    _CHART_MUTED,
+    _FLOW_GRID_EXP,
+    _FLOW_LOCAL_CONS,
+    _OTHERS_COLOR,
+    CONS_COLORS,
+    PROD_COLORS,
+)
 
 # Approximate pixel width per character at 7.5pt font — used for legend layout.
 _PX_PER_CHAR = 4.2
@@ -77,9 +82,7 @@ def _build_energy_flow_svg(invoice, tr: dict) -> str | None:
         return None
 
     # ── Node definitions ───────────────────────────────────────────────────
-    PROD_COLORS = [_CHART_LOCAL, "#2f7a4d", "#15803d", "#0f766e", "#3d8b5c", "#4d9b6a"]
-    CONS_COLORS = ["#1d4ed8", "#2563eb", "#1e40af", "#4f46e5", "#3b82f6", "#6366f1"]
-    OTHERS_COLOR = _CHART_AXIS
+    OTHERS_COLOR = _OTHERS_COLOR
     TOTAL_PROD_C = _CHART_LOCAL
     LOCAL_CONS_C = _FLOW_LOCAL_CONS
     GRID_IMP_C = _CHART_GRID
@@ -422,7 +425,7 @@ def _build_energy_chart_svg(invoice, tr: dict) -> str | None:
         if wl > 16:
             svg.append(
                 f'<text x="{xl + wl / 2:.1f}" y="{by + bar_h / 2 + 3:.1f}"'
-                f' text-anchor="middle" font-size="6.5" fill="#fff" font-weight="600">'
+                f' text-anchor="middle" font-size="6.5" fill="{_CHART_LABEL_ON_FILL}" font-weight="600">'
                 f'{local:.1f}</text>'
             )
 
@@ -443,7 +446,7 @@ def _build_energy_chart_svg(invoice, tr: dict) -> str | None:
         if wg > 16:
             svg.append(
                 f'<text x="{xg + wg / 2:.1f}" y="{by + bar_h / 2 + 3:.1f}"'
-                f' text-anchor="middle" font-size="6.5" fill="#fff" font-weight="600">'
+                f' text-anchor="middle" font-size="6.5" fill="{_CHART_LABEL_ON_FILL}" font-weight="600">'
                 f'{grid:.1f}</text>'
             )
 
@@ -522,7 +525,7 @@ def _build_hourly_profile_chart_svg(invoice, tr: dict) -> str | None:
     # community-allocated (they may be weight-eligible regardless of who the
     # literal holder is) — otherwise a community-only stake never reaches the
     # chart. Two flat queries unioned in Python, matching the same fix in
-    # metering.analytics.compute_hourly_profile (shared metering points, #387).
+    # metering.analytics.compute_hourly_profile (shared metering points, issue 387).
     _mp_window = _dj.Q(valid_to__isnull=True) | _dj.Q(valid_to__gte=ps)
     personal_mp_ids = _MPA.objects.filter(
         _mp_window,
@@ -650,7 +653,7 @@ def _build_hourly_profile_chart_svg(invoice, tr: dict) -> str | None:
     day_w = group_w * 12
     svg.append(
         f'<rect x="{day_x:.1f}" y="{MT}" width="{day_w:.1f}" height="{ch}"'
-        f' fill="#eef5f0" opacity="0.7"/>'
+        f' fill="{_CHART_GRIDLINE}" opacity="0.7"/>'
     )
 
     # X-axis baseline — on top of the band

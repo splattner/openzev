@@ -11,16 +11,17 @@ import {
     YAxis,
 } from 'recharts'
 import type { FeasibilityFairPriceRange, FeasibilityPriceSensitivityPoint } from '../../types/api'
-import { AXIS_COLOR, ANNOTATION_COLOR } from '../../lib/chartTokens'
+import { ANNOTATION_COLOR, AXIS_COLOR, CHART_GRIDLINE, CHART_MUTED, CONS_COLORS, PROD_COLORS } from '../../lib/chartTokens'
+import { CHART_AXIS_TICK, CHART_TOOLTIP_STYLE, CHF_Y_AXIS_LABEL, ChartLegendSwatch, chartAxisLabel } from '../../lib/chartTheme'
 
 // Categorical pair (two distinct parties, not a polarity) — validated
 // colorblind-safe (worst adjacent CVD deltaE 30.3, normal-vision 33.3).
 // Green already means "producer/local energy" throughout the app (PDF
 // invoices, dashboard); blue already means "consumer/self-consumption benefit"
 // in the other feasibility charts.
-const PRODUCER_COLOR = '#16a34a'
-const CONSUMER_COLOR = '#2563eb'
-const FAIR_RANGE_FILL = '#9ca3af'
+const PRODUCER_COLOR = PROD_COLORS[0]
+const CONSUMER_COLOR = CONS_COLORS[0]
+const FAIR_RANGE_FILL = CHART_MUTED
 
 type Props = {
     priceSensitivity: FeasibilityPriceSensitivityPoint[]
@@ -40,7 +41,7 @@ function CustomTooltip({
     if (!active || !payload?.length) return null
     const point = payload[0].payload
     return (
-        <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 6, padding: '0.5rem 0.7rem', fontSize: '0.82rem' }}>
+        <div style={CHART_TOOLTIP_STYLE}>
             <p style={{ margin: 0, fontWeight: 600 }}>
                 {point.pricePct.toFixed(0)}% ({point.priceChf.toFixed(3)} CHF/kWh)
             </p>
@@ -78,29 +79,29 @@ export function FeasibilityPriceSensitivityChart({
                 {t('pages.feasibility.chart.priceSensitivityDescription')}
             </p>
             <div style={{ display: 'flex', gap: '1rem', marginBottom: '0.4rem', fontSize: '0.78rem' }}>
-                <span><span style={{ display: 'inline-block', width: 9, height: 9, background: PRODUCER_COLOR, borderRadius: 2, marginRight: 4 }} />{t('pages.feasibility.chart.producerGain')}</span>
-                <span><span style={{ display: 'inline-block', width: 9, height: 9, background: CONSUMER_COLOR, borderRadius: 2, marginRight: 4 }} />{t('pages.feasibility.chart.consumerSavingsShort')}</span>
+                <span><ChartLegendSwatch color={PRODUCER_COLOR} />{t('pages.feasibility.chart.producerGain')}</span>
+                <span><ChartLegendSwatch color={CONSUMER_COLOR} />{t('pages.feasibility.chart.consumerSavingsShort')}</span>
                 {fairRangePct && (
-                    <span><span style={{ display: 'inline-block', width: 9, height: 9, background: FAIR_RANGE_FILL, opacity: 0.4, borderRadius: 2, marginRight: 4 }} />{t('pages.feasibility.chart.fairRange')}</span>
+                    <span><ChartLegendSwatch color={FAIR_RANGE_FILL} opacity={0.4} />{t('pages.feasibility.chart.fairRange')}</span>
                 )}
             </div>
             <ResponsiveContainer width="100%" height={240}>
                 <LineChart data={data} margin={{ top: 28, right: 20, left: 10, bottom: 10 }}>
-                    <CartesianGrid stroke="#e5e7eb" vertical={false} />
+                    <CartesianGrid stroke={CHART_GRIDLINE} vertical={false} />
                     <XAxis
                         dataKey="pricePct"
                         type="number"
                         domain={[0, 100]}
                         tickFormatter={(v: number) => `${v.toFixed(0)}%`}
                         stroke={AXIS_COLOR}
-                        tick={{ fontSize: 11, fill: '#374151' }}
-                        label={{ value: t('pages.feasibility.chart.internalPriceAxis'), position: 'insideBottom', offset: -5, fontSize: 11, fill: '#6b7280' }}
+                        tick={CHART_AXIS_TICK}
+                        label={chartAxisLabel(t('pages.feasibility.chart.internalPriceAxis'))}
                     />
                     <YAxis
                         tickFormatter={(v: number) => v.toFixed(0)}
                         stroke={AXIS_COLOR}
-                        tick={{ fontSize: 11, fill: '#374151' }}
-                        label={{ value: 'CHF', angle: -90, position: 'insideLeft', fontSize: 11, fill: '#6b7280' }}
+                        tick={CHART_AXIS_TICK}
+                        label={CHF_Y_AXIS_LABEL}
                     />
                     <Tooltip content={<CustomTooltip />} />
                     {fairRangePct && (

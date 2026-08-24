@@ -20,26 +20,7 @@ How to use:
 {% endcomment %}
 <style>
     /* ══ 1. Tokens & base ════════════════════════════════════ */
-    :root {
-        --ink: #0f172a;
-        --ink-soft: #334155;
-        --muted: #64748b;
-        --line: #e2e8f0;
-        --line-subtle: #f1f5f9;
-        --surface: #f8faf7;
-        --brand: #143828;
-        --brand-deep: #0d2b1d;
-        --brand-mid: #1f5c3a;
-        --brand-pale: #e8f0ec;
-        --brand-glow: #d4e0d7;
-        --gold: #bfa05a;
-        --brand-accent: #9ec3ac;
-        --brand-light: #d6ead9;
-        --brand-muted: #c8dccf;
-        --zebra: #f3f6f2;
-        --chart-surface: #fbfcfb;
-        --subtotal-color: #24352c;
-    }
+    {% include "pdf/_tokens.css" %}
 
     * {
         box-sizing: border-box;

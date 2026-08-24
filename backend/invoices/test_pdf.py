@@ -23,11 +23,8 @@ from .pdf import (
     _render_template,
     generate_pdf,
 )
+from .generated_chart_tokens import _CHART_BG, _CHART_INK, _CHART_LABEL, _CHART_MUTED
 from .pdf_charts import (
-    _CHART_BG,
-    _CHART_INK,
-    _CHART_LABEL,
-    _CHART_MUTED,
     _build_energy_chart_svg,
     _build_energy_flow_svg,
     _build_hourly_profile_chart_svg,

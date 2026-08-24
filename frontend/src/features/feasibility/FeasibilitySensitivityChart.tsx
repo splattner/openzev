@@ -11,13 +11,14 @@ import {
     YAxis,
 } from 'recharts'
 import type { FeasibilitySensitivityPoint } from '../../types/api'
-import { AXIS_COLOR, ANNOTATION_COLOR } from '../../lib/chartTokens'
+import { ANNOTATION_COLOR, AXIS_COLOR, CHART_GRIDLINE, CHART_INK, DIVERGING_POSITIVE, NEGATIVE_COLOR } from '../../lib/chartTokens'
+import { CHART_AXIS_TICK, CHART_TOOLTIP_STYLE, CHF_Y_AXIS_LABEL, chartAxisLabel } from '../../lib/chartTheme'
 
 // Blue/red diverging pair — validated colorblind-safe (worst adjacent CVD deltaE
 // 29.9, normal-vision 38.2; see dataviz skill's validate_palette.js). Green/red
 // was rejected here: it fails the deuteranopia check (deltaE 5.0).
-const LINE_COLOR = '#2563eb'
-const NEGATIVE_COLOR = '#dc2626'
+const LINE_COLOR = DIVERGING_POSITIVE
+
 
 type Props = {
     sensitivity: FeasibilitySensitivityPoint[]
@@ -31,7 +32,7 @@ function CustomTooltip({ active, payload }: { active?: boolean; payload?: Array<
     if (!active || !payload?.length) return null
     const point = payload[0]
     return (
-        <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 6, padding: '0.5rem 0.7rem', fontSize: '0.82rem' }}>
+        <div style={CHART_TOOLTIP_STYLE}>
             <p style={{ margin: 0, fontWeight: 600 }}>{point.payload.ratePct.toFixed(0)}% {t('pages.feasibility.chart.selfConsumptionShort')}</p>
             <p style={{ margin: 0, color: point.value < 0 ? NEGATIVE_COLOR : LINE_COLOR }}>
                 CHF {point.value.toFixed(2)}
@@ -56,24 +57,24 @@ export function FeasibilitySensitivityChart({ sensitivity, currentRatePct, curre
             </p>
             <ResponsiveContainer width="100%" height={240}>
                 <LineChart data={data} margin={{ top: 28, right: 20, left: 10, bottom: 10 }}>
-                    <CartesianGrid stroke="#e5e7eb" vertical={false} />
+                    <CartesianGrid stroke={CHART_GRIDLINE} vertical={false} />
                     <XAxis
                         dataKey="ratePct"
                         type="number"
                         domain={[0, 100]}
                         tickFormatter={(v: number) => `${v.toFixed(0)}%`}
                         stroke={AXIS_COLOR}
-                        tick={{ fontSize: 11, fill: '#374151' }}
-                        label={{ value: t('pages.feasibility.chart.selfConsumptionAxis'), position: 'insideBottom', offset: -5, fontSize: 11, fill: '#6b7280' }}
+                        tick={CHART_AXIS_TICK}
+                        label={chartAxisLabel(t('pages.feasibility.chart.selfConsumptionAxis'))}
                     />
                     <YAxis
                         tickFormatter={(v: number) => v.toFixed(0)}
                         stroke={AXIS_COLOR}
-                        tick={{ fontSize: 11, fill: '#374151' }}
-                        label={{ value: 'CHF', angle: -90, position: 'insideLeft', fontSize: 11, fill: '#6b7280' }}
+                        tick={CHART_AXIS_TICK}
+                        label={CHF_Y_AXIS_LABEL}
                     />
                     <Tooltip content={<CustomTooltip />} />
-                    <ReferenceLine y={0} stroke="#d1d5db" strokeWidth={1} />
+                    <ReferenceLine y={0} stroke={CHART_GRIDLINE} strokeWidth={1} />
                     {breakEvenRatePct !== null && (
                         <ReferenceLine
                             x={breakEvenRatePct}
@@ -88,9 +89,9 @@ export function FeasibilitySensitivityChart({ sensitivity, currentRatePct, curre
                         y={currentNetBenefitChf}
                         r={5}
                         fill={currentNetBenefitChf < 0 ? NEGATIVE_COLOR : LINE_COLOR}
-                        stroke="#fff"
+                        stroke="var(--surface-card)"
                         strokeWidth={2}
-                        label={{ value: t('pages.feasibility.chart.yourScenario'), position: 'top', fontSize: 11, fontWeight: 600, fill: '#111827' }}
+                        label={{ value: t('pages.feasibility.chart.yourScenario'), position: 'top', fontSize: 11, fontWeight: 600, fill: CHART_INK }}
                     />
                 </LineChart>
             </ResponsiveContainer>

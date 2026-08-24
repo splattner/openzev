@@ -561,7 +561,7 @@ def _allocation_weight_sum_by_month(
     participant who is a member of the calendar month but not of the part of
     it the tariff actually bills. They would sit in the denominator while
     their own numerator loop skips them, so the community would recover less
-    than the full fee (issue #465).
+    than the full fee (issue 465).
 
     Counted per month, not once over the period: a joiner in February must not
     dilute January's share. Read from ZEV membership, never from sibling

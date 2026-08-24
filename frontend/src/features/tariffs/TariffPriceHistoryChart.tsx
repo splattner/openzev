@@ -12,22 +12,23 @@ import {
     YAxis,
 } from 'recharts'
 import { formatShortDate } from '../../lib/appSettings'
-import { AXIS_COLOR } from '../../lib/chartTokens'
 import { formatUtcIsoDate, todayLocalIso } from '../../lib/dates'
 import type { AppSettings, TariffSeries } from '../../types/api'
 import { buildPriceHistory, type BandKey, type PriceUnit } from './priceHistory'
+import { AXIS_COLOR, CHART_GRID, CHART_GRIDLINE, CONS_COLORS, FLOW_LOCAL_CONS, NEGATIVE_COLOR } from '../../lib/chartTokens'
 
-// Blue and orange are the colourblind-safe pair and carry the two bands that
-// actually co-occur (HT and NT). Flat never shares a version with HT/NT in
-// practice, so its blue can be reused without an ambiguous adjacency.
+// Blue (consumer series) and amber (chart grid accent) are the colourblind-safe
+// pair from the shared palette and carry the two bands that actually co-occur
+// (HT and NT). Flat never shares a version with HT/NT in practice, so its blue
+// can be reused without an ambiguous adjacency.
 const BAND_COLOR: Record<BandKey, string> = {
-    flat: '#2563eb',
-    high: '#ea580c',
-    low: '#0891b2',
-    amount: '#2563eb',
-    effective: '#2563eb',
+    flat: CONS_COLORS[0],
+    high: CHART_GRID,
+    low: FLOW_LOCAL_CONS,
+    amount: CONS_COLORS[0],
+    effective: CONS_COLORS[0],
 }
-const GAP_FILL = '#ef4444'
+const GAP_FILL = NEGATIVE_COLOR
 
 type Props = {
     series: TariffSeries
@@ -79,7 +80,7 @@ export function TariffPriceHistoryChart({ series, allSeries, settings }: Props) 
 
             <ResponsiveContainer width="100%" height={220}>
                 <LineChart data={data} margin={{ top: 8, right: 16, left: 4, bottom: 4 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                    <CartesianGrid strokeDasharray="3 3" stroke={CHART_GRIDLINE} />
                     {/* Shade uncovered stretches: nothing was billed there, and the
                         broken line alone does not say why. */}
                     {history.gaps.map((gap) => (

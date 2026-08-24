@@ -9,8 +9,12 @@ import type {
 } from '../../types/api'
 import { api } from './client'
 
-export async function fetchInvoices(): Promise<PaginatedResponse<Invoice>> {
-  const { data } = await api.get<PaginatedResponse<Invoice>>('/invoices/invoices/')
+export async function fetchInvoices(zevId?: string): Promise<PaginatedResponse<Invoice>> {
+  const { data } = await api.get<PaginatedResponse<Invoice>>('/invoices/invoices/', {
+    // Backend narrows by ?zev_id= on top of role scoping (issue 411); without it,
+    // admins and multi-ZEV owners get every ZEV they can see.
+    params: zevId ? { zev_id: zevId } : undefined,
+  })
   return data
 }
 

@@ -23,6 +23,13 @@ from .pdf_render import render_pdf
 
 from metering.models import MeterReading, ReadingDirection
 from zev.models import AllocationMode, MeteringPointAssignment
+from .generated_chart_tokens import (
+    _CHART_GRID,
+    _CHART_GRIDLINE,
+    _CHART_LABEL,
+    _CHART_LOCAL,
+    _CHART_MUTED,
+)
 from .models import Invoice, InvoiceStatus
 from .pdf import _format_date_value, _render_template
 
@@ -441,11 +448,11 @@ def _build_monthly_chart_svg(monthly_data: list[dict], tr: dict) -> str | None:
         y_pos = margin_t + bar_area_h - (bar_area_h * i / 4)
         svg_parts.append(
             f'<text x="{margin_l - 5}" y="{y_pos + 3}" text-anchor="end" '
-            f'font-size="7" fill="#888">{y_val:.0f}</text>'
+            f'font-size="7" fill="{_CHART_MUTED}">{y_val:.0f}</text>'
         )
         svg_parts.append(
             f'<line x1="{margin_l}" y1="{y_pos}" x2="{chart_w - 10}" y2="{y_pos}" '
-            f'stroke="#eee" stroke-width="0.5"/>'
+            f'stroke="{_CHART_GRIDLINE}" stroke-width="0.5"/>'
         )
 
     # Bars
@@ -458,16 +465,16 @@ def _build_monthly_chart_svg(monthly_data: list[dict], tr: dict) -> str | None:
         if zev_h > 0:
             svg_parts.append(
                 f'<rect x="{x:.1f}" y="{zev_y:.1f}" width="{bar_w:.1f}" height="{zev_h:.1f}" '
-                f'fill="#4caf50" rx="1"/>'
+                f'fill="{_CHART_LOCAL}" rx="1"/>'
             )
 
-        # Grid portion (top, blue-grey)
+        # Grid portion (top, amber)
         grid_h = (grid_val / max_val) * bar_area_h if max_val > 0 else 0
         grid_y = zev_y - grid_h
         if grid_h > 0:
             svg_parts.append(
                 f'<rect x="{x:.1f}" y="{grid_y:.1f}" width="{bar_w:.1f}" height="{grid_h:.1f}" '
-                f'fill="#90a4ae" rx="1"/>'
+                f'fill="{_CHART_GRID}" rx="1"/>'
             )
 
         # Month label (abbreviated)
@@ -475,16 +482,16 @@ def _build_monthly_chart_svg(monthly_data: list[dict], tr: dict) -> str | None:
         label_x = x + bar_w / 2
         svg_parts.append(
             f'<text x="{label_x:.1f}" y="{margin_t + bar_area_h + 15}" text-anchor="middle" '
-            f'font-size="7" fill="#666">{label}</text>'
+            f'font-size="7" fill="{_CHART_LABEL}">{label}</text>'
         )
 
     # Legend
     legend_y = chart_h - 5
     svg_parts.append(
-        f'<rect x="{margin_l}" y="{legend_y - 6}" width="8" height="8" fill="#4caf50" rx="1"/>'
-        f'<text x="{margin_l + 11}" y="{legend_y}" font-size="7" fill="#666">{tr["from_zev_col"]}</text>'
-        f'<rect x="{margin_l + 80}" y="{legend_y - 6}" width="8" height="8" fill="#90a4ae" rx="1"/>'
-        f'<text x="{margin_l + 93}" y="{legend_y}" font-size="7" fill="#666">{tr["from_grid_col"]}</text>'
+        f'<rect x="{margin_l}" y="{legend_y - 6}" width="8" height="8" fill="{_CHART_LOCAL}" rx="1"/>'
+        f'<text x="{margin_l + 11}" y="{legend_y}" font-size="7" fill="{_CHART_LABEL}">{tr["from_zev_col"]}</text>'
+        f'<rect x="{margin_l + 80}" y="{legend_y - 6}" width="8" height="8" fill="{_CHART_GRID}" rx="1"/>'
+        f'<text x="{margin_l + 93}" y="{legend_y}" font-size="7" fill="{_CHART_LABEL}">{tr["from_grid_col"]}</text>'
     )
 
     svg_parts.append("</svg>")

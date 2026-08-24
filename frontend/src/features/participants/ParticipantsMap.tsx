@@ -4,6 +4,7 @@ import { useEffect, useMemo } from 'react'
 import { GeoJSON, MapContainer, TileLayer, useMap } from 'react-leaflet'
 import { useTranslation } from 'react-i18next'
 import type { ParticipantBuildingFootprint } from '../../types/api'
+import { FLOW_LOCAL_CONS } from '../../lib/chartTokens'
 
 export interface ParticipantMapEntry {
     id: string
@@ -42,8 +43,6 @@ export function countMissingBbox(entries: ParticipantMapEntry[]): number {
 
 const SWITZERLAND_CENTER: [number, number] = [46.8182, 8.2275]
 const DEFAULT_ZOOM = 7
-const FOOTPRINT_STYLE: L.PathOptions = { color: '#0ea5e9', weight: 2, fillOpacity: 0.25 }
-
 function FitToGroups({ groups }: { groups: ParticipantMapGroup[] }) {
     const map = useMap()
 
@@ -105,7 +104,7 @@ export function ParticipantsMap({ participants }: ParticipantsMapProps) {
                         <GeoJSON
                             key={group.participants.map((participant) => participant.id).join('-')}
                             data={group.footprint}
-                            style={() => FOOTPRINT_STYLE}
+                            style={{ color: FLOW_LOCAL_CONS, weight: 2, fillOpacity: 0.25 }}
                             onEachFeature={bindGroupPopup(group)}
                         />
                     ))}

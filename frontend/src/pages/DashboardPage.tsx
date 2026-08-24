@@ -21,6 +21,8 @@ import {
 import { downloadAnnualStatement, downloadAllAnnualStatements, downloadFinancialSummary, fetchInvoices } from '../lib/api/invoices'
 import { queryKeys } from '../lib/api/queryKeys'
 import { downloadBlob } from '../lib/downloadBlob'
+import { formatIsoDate } from '../lib/dates'
+import { isInvoiceOverdue, selectOpenInvoices, sumTotalChf } from '../features/invoices/openInvoices'
 import { formatMeteringBucketLabel } from '../lib/meteringLabels'
 import { formatShortDate, useAppSettings } from '../lib/appSettings'
 import { useAuth } from '../lib/auth'
@@ -32,6 +34,7 @@ import {
     type BillingInterval,
     getCurrentBillingPeriod,
 } from '../lib/billingPeriod'
+import { CHART_GRID, CHART_LABEL, CHART_LOCAL, FLOW_GRID_EXP, FLOW_LOCAL_CONS } from '../lib/chartTokens'
 
 export function DashboardPage() {
     const { t } = useTranslation()
@@ -78,10 +81,12 @@ export function DashboardPage() {
             }),
         enabled: user?.role === 'participant' || (isZevScopedRole && !!selectedZevId),
     })
-    const participantInvoicesQuery = useQuery({
+    const invoicesQuery = useQuery({
         queryKey: queryKeys.invoices.list(selectedZevId || undefined),
-        queryFn: fetchInvoices,
-        enabled: user?.role === 'participant',
+        queryFn: () => fetchInvoices(selectedZevId || undefined),
+        // Participants see their own invoices server-side; owner/admin read
+        // the selected ZEV's invoices for the open-invoice exception list.
+        enabled: user?.role === 'participant' || (isZevScopedRole && !!selectedZevId),
     })
     const hourlyProfileQuery = useQuery({
         queryKey: queryKeys.metering.hourlyProfile(period.from, period.to, selectedZevId || undefined, selectedParticipantId || undefined),
@@ -127,11 +132,27 @@ export function DashboardPage() {
     )
     const participantInvoicesWithPdf = useMemo(
         () =>
-            (participantInvoicesQuery.data?.results ?? []).filter(
+            (invoicesQuery.data?.results ?? []).filter(
                 (invoice) => ['approved', 'sent', 'paid'].includes(invoice.status) && !!invoice.pdf_url,
             ),
-        [participantInvoicesQuery.data],
+        [invoicesQuery.data],
     )
+    const today = useMemo(() => formatIsoDate(new Date()), [])
+    const openInvoices = useMemo(
+        () => selectOpenInvoices(invoicesQuery.data?.results ?? []),
+        [invoicesQuery.data],
+    )
+    const openOverdueCount = useMemo(
+        () => openInvoices.filter((invoice) => isInvoiceOverdue(invoice, today)).length,
+        [openInvoices, today],
+    )
+    const ownerSelfConsumption = useMemo(() => {
+        if (summary?.role !== 'zev_owner') return null
+        const { produced_kwh, exported_kwh } = summary.zev_totals
+        if (produced_kwh <= 0) return null
+        const localKwh = Math.max(0, produced_kwh - exported_kwh)
+        return { pct: (localKwh / produced_kwh) * 100, localKwh, producedKwh: produced_kwh }
+    }, [summary])
 
     const annualStatementMutation = useMutation({
         mutationFn: (year: number) => downloadAnnualStatement({ year }),
@@ -235,6 +256,26 @@ export function DashboardPage() {
 
             {summary && summary.role === 'zev_owner' && (
                 <>
+                    {/* Hero + KPI row (spec §5.1): always ZEV-wide, even when a
+                        participant drill-down filters the charts below. */}
+                    <section className="kpi-row">
+                        <StatCard
+                            accent
+                            label={t('pages.dashboard.stats.selfConsumptionRate')}
+                            value={ownerSelfConsumption ? `${ownerSelfConsumption.pct.toFixed(1)} %` : '—'}
+                            hint={ownerSelfConsumption
+                                ? t('pages.dashboard.hints.selfConsumption', {
+                                    local: ownerSelfConsumption.localKwh.toFixed(0),
+                                    total: ownerSelfConsumption.producedKwh.toFixed(0),
+                                })
+                                : undefined}
+                        />
+                        <StatCard label={t('pages.dashboard.stats.producedInZev')} value={`${summary.zev_totals.produced_kwh.toFixed(2)} kWh`} />
+                        <StatCard label={t('pages.dashboard.stats.consumedInZev')} value={`${summary.zev_totals.consumed_kwh.toFixed(2)} kWh`} />
+                        <StatCard label={t('pages.dashboard.stats.importedFromGrid')} value={`${summary.zev_totals.imported_kwh.toFixed(2)} kWh`} />
+                        <StatCard label={t('pages.dashboard.stats.exportedToGrid')} value={`${summary.zev_totals.exported_kwh.toFixed(2)} kWh`} />
+                    </section>
+
                     {summary.participant_stats.length > 0 && (
                         <section className="card">
                             <h3 style={{ marginTop: 0 }}>
@@ -249,6 +290,49 @@ export function DashboardPage() {
                         </section>
                     )}
 
+                    {/* Short exception list (spec §5.1): invoices still awaiting
+                        payment. Reads the first page of the scoped list — a
+                        backend status filter is deliberately out of scope. */}
+                    <section className="card">
+                        <h3 style={{ marginTop: 0 }}>{t('pages.dashboard.openInvoices.title')}</h3>
+                        {invoicesQuery.isLoading ? (
+                            <p className="muted">{t('pages.dashboard.loadingInvoices')}</p>
+                        ) : invoicesQuery.isError ? (
+                            <p className="muted">{t('pages.dashboard.failedInvoices')}</p>
+                        ) : openInvoices.length === 0 ? (
+                            <p className="muted">{t('pages.dashboard.openInvoices.empty')}</p>
+                        ) : (
+                            <>
+                                <ul className="open-invoices-list">
+                                    {openInvoices.slice(0, 5).map((invoice) => (
+                                        <li key={invoice.id}>
+                                            <span className="open-invoice-main">
+                                                <span className="open-invoice-number">{invoice.invoice_number}</span>
+                                                <span className="open-invoice-participant">{invoice.participant_name}</span>
+                                            </span>
+                                            <span className="open-invoice-amount">CHF {invoice.total_chf}</span>
+                                            {isInvoiceOverdue(invoice, today) ? (
+                                                <span className="badge badge-danger">{t('pages.dashboard.openInvoices.overdue')}</span>
+                                            ) : (
+                                                <span className="badge badge-info">{t('pages.dashboard.openInvoices.open')}</span>
+                                            )}
+                                        </li>
+                                    ))}
+                                </ul>
+                                <div className="open-invoices-foot">
+                                    <span>
+                                        {t('pages.dashboard.openInvoices.outstanding', {
+                                            openCount: openInvoices.length,
+                                            overdueCount: openOverdueCount,
+                                            amount: sumTotalChf(openInvoices).toFixed(2),
+                                        })}
+                                    </span>
+                                    <Link to="/invoices">{t('pages.dashboard.openInvoices.viewAll')}</Link>
+                                </div>
+                            </>
+                        )}
+                    </section>
+
                     <section className="card">
                         <h3 style={{ marginTop: 0 }}>
                             {t('pages.dashboard.energyBalance')}
@@ -260,7 +344,7 @@ export function DashboardPage() {
                         ) : (
                             <div className="form-grid" style={{ gap: '2rem' }}>
                                 <div>
-                                    <p style={{ margin: '0 0 0.5rem', fontWeight: 600, fontSize: '0.875rem', color: '#374151' }}>{t('pages.dashboard.consumption')}</p>
+                                    <p style={{ margin: '0 0 0.5rem', fontWeight: 600, fontSize: '0.875rem', color: CHART_LABEL }}>{t('pages.dashboard.consumption')}</p>
                                     <ResponsiveContainer width="100%" height={300}>
                                         <BarChart data={ownerChartData} margin={{ top: 4, right: 4, bottom: 4, left: 0 }}>
                                             <CartesianGrid strokeDasharray="3 3" vertical={false} />
@@ -268,13 +352,13 @@ export function DashboardPage() {
                                             <YAxis tick={{ fontSize: 10 }} unit=" kWh" width={60} />
                                             <Tooltip formatter={(v) => `${Number(v).toFixed(2)} kWh`} labelFormatter={formatBucketTooltipLabel} />
                                             <Legend />
-                                            <Bar dataKey="locally_consumed" name={t('pages.dashboard.chart.fromZev')} stackId="c" fill="#16a34a" />
-                                            <Bar dataKey="imported_kwh" name={t('pages.dashboard.chart.fromGrid')} stackId="c" fill="#f59e0b" radius={[3, 3, 0, 0]} />
+                                            <Bar dataKey="locally_consumed" name={t('pages.dashboard.chart.fromZev')} stackId="c" fill={CHART_LOCAL} />
+                                            <Bar dataKey="imported_kwh" name={t('pages.dashboard.chart.fromGrid')} stackId="c" fill={CHART_GRID} radius={[3, 3, 0, 0]} />
                                         </BarChart>
                                     </ResponsiveContainer>
                                 </div>
                                 <div>
-                                    <p style={{ margin: '0 0 0.5rem', fontWeight: 600, fontSize: '0.875rem', color: '#374151' }}>{t('pages.dashboard.production')}</p>
+                                    <p style={{ margin: '0 0 0.5rem', fontWeight: 600, fontSize: '0.875rem', color: CHART_LABEL }}>{t('pages.dashboard.production')}</p>
                                     <ResponsiveContainer width="100%" height={300}>
                                         <ComposedChart data={ownerChartData} margin={{ top: 4, right: 50, bottom: 4, left: 0 }}>
                                             <CartesianGrid strokeDasharray="3 3" vertical={false} />
@@ -290,9 +374,9 @@ export function DashboardPage() {
                                                 }
                                             />
                                             <Legend />
-                                            <Bar yAxisId="kwh" dataKey="locally_produced" name={t('pages.dashboard.chart.usedLocally')} stackId="p" fill="#16a34a" />
-                                            <Bar yAxisId="kwh" dataKey="exported_kwh" name={t('pages.dashboard.chart.exported')} stackId="p" fill="#8b5cf6" radius={[3, 3, 0, 0]} />
-                                            <Line yAxisId="pct" type="monotone" dataKey="self_consumption_rate" name={t('pages.dashboard.chart.selfConsumedPct')} stroke="#0ea5e9" dot={false} strokeWidth={2} connectNulls />
+                                            <Bar yAxisId="kwh" dataKey="locally_produced" name={t('pages.dashboard.chart.usedLocally')} stackId="p" fill={CHART_LOCAL} />
+                                            <Bar yAxisId="kwh" dataKey="exported_kwh" name={t('pages.dashboard.chart.exported')} stackId="p" fill={FLOW_GRID_EXP} radius={[3, 3, 0, 0]} />
+                                            <Line yAxisId="pct" type="monotone" dataKey="self_consumption_rate" name={t('pages.dashboard.chart.selfConsumedPct')} stroke={FLOW_LOCAL_CONS} dot={false} strokeWidth={2} connectNulls />
                                         </ComposedChart>
                                     </ResponsiveContainer>
                                 </div>
@@ -321,14 +405,14 @@ export function DashboardPage() {
                                             key={participant.participant_id}
                                             onClick={() => setSelectedParticipantId(participant.participant_id)}
                                             style={{
-                                                borderTop: '1px solid var(--color-border, #e5e7eb)',
+                                                borderTop: '1px solid var(--border-default)',
                                                 cursor: 'pointer',
-                                                backgroundColor: selectedParticipantId === participant.participant_id ? 'var(--color-bg-hover, #f3f4f6)' : 'transparent',
+                                                backgroundColor: selectedParticipantId === participant.participant_id ? 'var(--surface)' : 'transparent',
                                                 transition: 'background-color 150ms ease-in-out',
                                             }}
                                             onMouseEnter={(e) => {
                                                 if (selectedParticipantId !== participant.participant_id) {
-                                                    e.currentTarget.style.backgroundColor = 'var(--color-bg-hover, #f0f1f3)'
+                                                    e.currentTarget.style.backgroundColor = 'var(--surface)'
                                                 }
                                             }}
                                             onMouseLeave={(e) => {
@@ -363,8 +447,8 @@ export function DashboardPage() {
                                     <YAxis tick={{ fontSize: 11 }} unit=" kWh" width={60} />
                                     <Tooltip formatter={(v) => `${Number(v).toFixed(4)} kWh`} />
                                     <Legend />
-                                    <Bar dataKey="from_zev_kwh" name={t('pages.dashboard.chart.fromZev')} stackId="c" fill="#16a34a" />
-                                    <Bar dataKey="from_grid_kwh" name={t('pages.dashboard.chart.fromGrid')} stackId="c" fill="#f59e0b" radius={[3, 3, 0, 0]} />
+                                    <Bar dataKey="from_zev_kwh" name={t('pages.dashboard.chart.fromZev')} stackId="c" fill={CHART_LOCAL} />
+                                    <Bar dataKey="from_grid_kwh" name={t('pages.dashboard.chart.fromGrid')} stackId="c" fill={CHART_GRID} radius={[3, 3, 0, 0]} />
                                 </BarChart>
                             </ResponsiveContainer>
                         </section>
@@ -397,7 +481,7 @@ export function DashboardPage() {
                             </button>
                         </div>
                         {allAnnualStatementsMutation.isError && (
-                            <p className="muted" style={{ color: 'var(--color-danger, #dc2626)', marginTop: '0.5rem' }}>
+                            <p className="muted" style={{ color: 'var(--danger-600)', marginTop: '0.5rem' }}>
                                 {t('pages.dashboard.annualStatement.error')}
                             </p>
                         )}
@@ -430,7 +514,7 @@ export function DashboardPage() {
                             </button>
                         </div>
                         {financialSummaryMutation.isError && (
-                            <p className="muted" style={{ color: 'var(--color-danger, #dc2626)', marginTop: '0.5rem' }}>
+                            <p className="muted" style={{ color: 'var(--danger-600)', marginTop: '0.5rem' }}>
                                 {t('pages.dashboard.financialSummary.error')}
                             </p>
                         )}
@@ -469,8 +553,8 @@ export function DashboardPage() {
                                     <YAxis tick={{ fontSize: 11 }} unit=" kWh" width={60} />
                                     <Tooltip formatter={(v) => `${Number(v).toFixed(2)} kWh`} labelFormatter={formatBucketTooltipLabel} />
                                     <Legend />
-                                    <Bar dataKey="consumed_from_zev_kwh" name={t('pages.dashboard.chart.fromZev')} stackId="c" fill="#16a34a" />
-                                    <Bar dataKey="imported_from_grid_kwh" name={t('pages.dashboard.chart.fromGrid')} stackId="c" fill="#f59e0b" radius={[3, 3, 0, 0]} />
+                                    <Bar dataKey="consumed_from_zev_kwh" name={t('pages.dashboard.chart.fromZev')} stackId="c" fill={CHART_LOCAL} />
+                                    <Bar dataKey="imported_from_grid_kwh" name={t('pages.dashboard.chart.fromGrid')} stackId="c" fill={CHART_GRID} radius={[3, 3, 0, 0]} />
                                 </BarChart>
                             </ResponsiveContainer>
                         )}
@@ -487,8 +571,8 @@ export function DashboardPage() {
                                     <YAxis tick={{ fontSize: 11 }} unit=" kWh" width={60} />
                                     <Tooltip formatter={(v) => `${Number(v).toFixed(4)} kWh`} />
                                     <Legend />
-                                    <Bar dataKey="from_zev_kwh" name={t('pages.dashboard.chart.fromZev')} stackId="c" fill="#16a34a" />
-                                    <Bar dataKey="from_grid_kwh" name={t('pages.dashboard.chart.fromGrid')} stackId="c" fill="#f59e0b" radius={[3, 3, 0, 0]} />
+                                    <Bar dataKey="from_zev_kwh" name={t('pages.dashboard.chart.fromZev')} stackId="c" fill={CHART_LOCAL} />
+                                    <Bar dataKey="from_grid_kwh" name={t('pages.dashboard.chart.fromGrid')} stackId="c" fill={CHART_GRID} radius={[3, 3, 0, 0]} />
                                 </BarChart>
                             </ResponsiveContainer>
                         </section>
@@ -496,9 +580,9 @@ export function DashboardPage() {
 
                     <section className="card">
                         <h3 style={{ marginTop: 0 }}>{t('pages.dashboard.invoicesSection')}</h3>
-                        {participantInvoicesQuery.isLoading ? (
+                        {invoicesQuery.isLoading ? (
                             <p className="muted">{t('pages.dashboard.loadingInvoices')}</p>
-                        ) : participantInvoicesQuery.isError ? (
+                        ) : invoicesQuery.isError ? (
                             <p className="muted">{t('pages.dashboard.failedInvoices')}</p>
                         ) : participantInvoicesWithPdf.length === 0 ? (
                             <p className="muted">{t('pages.dashboard.noInvoices')}</p>
@@ -514,7 +598,7 @@ export function DashboardPage() {
                                 </thead>
                                 <tbody>
                                     {participantInvoicesWithPdf.map((invoice) => (
-                                        <tr key={invoice.id} style={{ borderTop: '1px solid var(--color-border, #e5e7eb)' }}>
+                                        <tr key={invoice.id} style={{ borderTop: '1px solid var(--border-default)' }}>
                                             <td style={{ padding: '0.5rem 0.6rem' }}>{invoice.invoice_number}</td>
                                             <td style={{ padding: '0.5rem 0.6rem' }}>{formatShortDate(invoice.period_start, settings)} → {formatShortDate(invoice.period_end, settings)}</td>
                                             <td style={{ textAlign: 'right', padding: '0.5rem 0.6rem' }}>CHF {invoice.total_chf}</td>
@@ -574,7 +658,7 @@ export function DashboardPage() {
                             </button>
                         </div>
                         {annualStatementMutation.isError && (
-                            <p className="muted" style={{ color: 'var(--color-danger, #dc2626)', marginTop: '0.5rem' }}>
+                            <p className="muted" style={{ color: 'var(--danger-600)', marginTop: '0.5rem' }}>
                                 {t('pages.dashboard.annualStatement.error')}
                             </p>
                         )}
@@ -607,7 +691,7 @@ export function DashboardPage() {
                             </button>
                         </div>
                         {financialSummaryMutation.isError && (
-                            <p className="muted" style={{ color: 'var(--color-danger, #dc2626)', marginTop: '0.5rem' }}>
+                            <p className="muted" style={{ color: 'var(--danger-600)', marginTop: '0.5rem' }}>
                                 {t('pages.dashboard.financialSummary.error')}
                             </p>
                         )}

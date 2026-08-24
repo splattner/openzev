@@ -27,6 +27,7 @@ import {
 import { useAppSettings } from '../lib/appSettings'
 import { formatMeteringBucketLabel } from '../lib/meteringLabels'
 import type { AppSettings, ChartDataPoint } from '../types/api'
+import { CHART_GRID, CONS_COLORS, NEGATIVE_COLOR, PROD_COLORS } from '../lib/chartTokens'
 
 // ── Summary stat card ─────────────────────────────────────────────────────────
 
@@ -34,7 +35,7 @@ function StatBadge({ label, value, color }: { label: string; value: string; colo
     return (
         <div
             style={{
-                background: 'var(--color-surface, #fff)',
+                background: 'var(--surface-card)',
                 border: `2px solid ${color}`,
                 borderRadius: 8,
                 padding: '0.6rem 1.2rem',
@@ -66,8 +67,8 @@ function CustomTooltip({
     return (
         <div
             style={{
-                background: 'var(--color-surface, #fff)',
-                border: '1px solid var(--color-border, #e0e0e0)',
+                background: 'var(--surface-card)',
+                border: '1px solid var(--border-default)',
                 borderRadius: 6,
                 padding: '0.6rem 0.9rem',
                 fontSize: '0.85rem',
@@ -176,13 +177,13 @@ export function MeteringChartPage() {
             </header>
 
             {/* ── Tabs ──────────────────────────────────────────────────────────── */}
-            <div style={{ display: 'flex', gap: '1rem', borderBottom: '1px solid var(--color-border, #e5e7eb)', marginBottom: '1.5rem' }}>
+            <div style={{ display: 'flex', gap: '1rem', borderBottom: '1px solid var(--border-default)', marginBottom: '1.5rem' }}>
                 <button
                     onClick={() => setActiveTab('chart')}
                     style={{
                         background: activeTab === 'chart' ? 'transparent' : 'transparent',
-                        color: activeTab === 'chart' ? 'var(--color-text, #000)' : 'var(--color-text-muted, #888)',
-                        borderBottom: activeTab === 'chart' ? '2px solid var(--color-primary, #0066cc)' : 'none',
+                        color: activeTab === 'chart' ? 'var(--text-primary)' : 'var(--text-muted)',
+                        borderBottom: activeTab === 'chart' ? '2px solid var(--interactive)' : 'none',
                         padding: '0.75rem 1rem',
                         fontSize: '1rem',
                         fontWeight: activeTab === 'chart' ? 600 : 400,
@@ -196,8 +197,8 @@ export function MeteringChartPage() {
                     onClick={() => setActiveTab('quality')}
                     style={{
                         background: activeTab === 'quality' ? 'transparent' : 'transparent',
-                        color: activeTab === 'quality' ? 'var(--color-text, #000)' : 'var(--color-text-muted, #888)',
-                        borderBottom: activeTab === 'quality' ? '2px solid var(--color-primary, #0066cc)' : 'none',
+                        color: activeTab === 'quality' ? 'var(--text-primary)' : 'var(--text-muted)',
+                        borderBottom: activeTab === 'quality' ? '2px solid var(--interactive)' : 'none',
                         padding: '0.75rem 1rem',
                         fontSize: '1rem',
                         fontWeight: activeTab === 'quality' ? 600 : 400,
@@ -298,8 +299,8 @@ export function MeteringChartPage() {
                 <>
                     {/* ── No selection placeholder ──────────────────────────────────────── */}
                     {!selectedMpId && (
-                        <div className="card" style={{ textAlign: 'center', padding: '3rem 1rem', color: 'var(--color-text-muted, #888)' }}>
-                            Select a metering point above to view its energy readings.
+                        <div className="card" style={{ textAlign: 'center', padding: '3rem 1rem', color: 'var(--text-muted)' }}>
+                            {t('pages.meteringData.noPointSelected')}
                         </div>
                     )}
 
@@ -322,30 +323,30 @@ export function MeteringChartPage() {
                                     <StatBadge
                                         label={t('pages.meteringData.stats.meterId')}
                                         value={selectedMp.meter_id}
-                                        color="var(--color-text, #222)"
+                                        color="var(--text-primary)"
                                     />
                                 )}
                                 <StatBadge
                                     label={t('pages.meteringData.stats.totalConsumption')}
                                     value={`${totalIn.toFixed(2)} kWh`}
-                                    color="#059669"
+                                    color={PROD_COLORS[0]}
                                 />
                                 {hasOut && (
                                     <StatBadge
                                         label={t('pages.meteringData.stats.totalFeedIn')}
                                         value={`${totalOut.toFixed(2)} kWh`}
-                                        color="#0284c7"
+                                        color={CONS_COLORS[0]}
                                     />
                                 )}
                                 <StatBadge
                                     label={t('pages.meteringData.stats.dataPoints')}
                                     value={String(data.length)}
-                                    color="var(--color-text-muted, #888)"
+                                    color="var(--text-muted)"
                                 />
                             </div>
 
                             {data.length === 0 ? (
-                                <div className="card" style={{ textAlign: 'center', padding: '2rem', color: 'var(--color-text-muted, #888)' }}>
+                                <div className="card" style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
                                     {t('pages.meteringData.noReadings')}
                                 </div>
                             ) : (
@@ -378,7 +379,7 @@ export function MeteringChartPage() {
                                             <Bar
                                                 dataKey="in_kwh"
                                                 name={t('pages.meteringData.series.consumption')}
-                                                fill="#059669"
+                                                fill={PROD_COLORS[0]}
                                                 radius={[3, 3, 0, 0]}
                                                 maxBarSize={48}
                                             />
@@ -386,7 +387,7 @@ export function MeteringChartPage() {
                                                 <Bar
                                                     dataKey="out_kwh"
                                                     name={t('pages.meteringData.series.feedIn')}
-                                                    fill="#0284c7"
+                                                    fill={CONS_COLORS[0]}
                                                     radius={[3, 3, 0, 0]}
                                                     maxBarSize={48}
                                                 />
@@ -421,30 +422,30 @@ export function MeteringChartPage() {
                     {qualityQuery.isSuccess && qualityQuery.data && (
                         <>
                             {qualityQuery.data.metering_points.length === 0 ? (
-                                <div className="card" style={{ textAlign: 'center', padding: '2rem', color: 'var(--color-text-muted, #888)' }}>
+                                <div className="card" style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
                                     {t('meteringDataQuality.noData')}
                                 </div>
                             ) : (
                                 <>
                                     {/* Summary cards */}
                                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
-                                        <div style={{ background: '#dcfce7', border: '1px solid #86efac', borderRadius: '8px', padding: '1rem', textAlign: 'center' }}>
-                                            <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#166534' }}>
+                                        <div style={{ background: 'var(--success-100)', border: '1px solid var(--success-200)', borderRadius: '8px', padding: '1rem', textAlign: 'center' }}>
+                                            <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'var(--success-700)' }}>
                                                 {qualityQuery.data.metering_points.filter((mp) => mp.severity === 'green').length}
                                             </div>
-                                            <div style={{ fontSize: '0.875rem', color: '#34d399' }}>{t('meteringDataQuality.severityGreen')}</div>
+                                            <div style={{ fontSize: '0.875rem', color: 'var(--brand-mid)' }}>{t('meteringDataQuality.severityGreen')}</div>
                                         </div>
-                                        <div style={{ background: '#fef3c7', border: '1px solid #fcd34d', borderRadius: '8px', padding: '1rem', textAlign: 'center' }}>
-                                            <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#854d0e' }}>
+                                        <div style={{ background: 'var(--warning-100)', border: '1px solid var(--warning-200)', borderRadius: '8px', padding: '1rem', textAlign: 'center' }}>
+                                            <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'var(--warning-800)' }}>
                                                 {qualityQuery.data.metering_points.filter((mp) => mp.severity === 'yellow').length}
                                             </div>
-                                            <div style={{ fontSize: '0.875rem', color: '#f59e0b' }}>{t('meteringDataQuality.severityYellow')}</div>
+                                            <div style={{ fontSize: '0.875rem', color: 'var(--warning-800)' }}>{t('meteringDataQuality.severityYellow')}</div>
                                         </div>
-                                        <div style={{ background: '#fee2e2', border: '1px solid #fca5a5', borderRadius: '8px', padding: '1rem', textAlign: 'center' }}>
-                                            <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#7f1d1d' }}>
+                                        <div style={{ background: 'var(--danger-100)', border: '1px solid var(--danger-300)', borderRadius: '8px', padding: '1rem', textAlign: 'center' }}>
+                                            <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'var(--danger-700)' }}>
                                                 {qualityQuery.data.metering_points.filter((mp) => mp.severity === 'red').length}
                                             </div>
-                                            <div style={{ fontSize: '0.875rem', color: '#ef4444' }}>{t('meteringDataQuality.severityRed')}</div>
+                                            <div style={{ fontSize: '0.875rem', color: 'var(--danger-600)' }}>{t('meteringDataQuality.severityRed')}</div>
                                         </div>
                                     </div>
 
@@ -467,14 +468,16 @@ export function MeteringChartPage() {
                                                         <td>{mp.participant_name}</td>
                                                         <td>
                                                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                                                <div style={{ width: '80px', height: '20px', background: '#f0f0f0', borderRadius: '4px', overflow: 'hidden' }}>
+                                                                <div style={{ width: '80px', height: '20px', background: 'var(--line-subtle)', borderRadius: '4px', overflow: 'hidden' }}>
                                                                     <div
                                                                         style={{
                                                                             height: '100%',
                                                                             background:
-                                                                                mp.severity === 'green' ? '#10b981' :
-                                                                                mp.severity === 'yellow' ? '#f59e0b' :
-                                                                                '#ef4444',
+                                                                                mp.severity === 'green'
+                                                                                    ? PROD_COLORS[0]
+                                                                                    : mp.severity === 'yellow'
+                                                                                      ? CHART_GRID
+                                                                                      : NEGATIVE_COLOR,
                                                                             width: `${mp.data_completeness}%`,
                                                                         }}
                                                                     />
@@ -491,13 +494,17 @@ export function MeteringChartPage() {
                                                                     fontSize: '0.875rem',
                                                                     fontWeight: 'bold',
                                                                     background:
-                                                                        mp.severity === 'green' ? '#dcfce7' :
-                                                                        mp.severity === 'yellow' ? '#fef3c7' :
-                                                                        '#fee2e2',
+                                                                        mp.severity === 'green'
+                                                                                    ? 'var(--success-100)'
+                                                                                    : mp.severity === 'yellow'
+                                                                                      ? 'var(--warning-100)'
+                                                                                      : 'var(--danger-100)',
                                                                     color:
-                                                                        mp.severity === 'green' ? '#166534' :
-                                                                        mp.severity === 'yellow' ? '#854d0e' :
-                                                                        '#7f1d1d',
+                                                                        mp.severity === 'green'
+                                                                                    ? 'var(--success-700)'
+                                                                                    : mp.severity === 'yellow'
+                                                                                      ? 'var(--warning-800)'
+                                                                                      : 'var(--danger-700)',
                                                                 }}
                                                             >
                                                                 {t(`meteringDataQuality.severity${mp.severity.charAt(0).toUpperCase() + mp.severity.slice(1)}`)}
@@ -515,11 +522,11 @@ export function MeteringChartPage() {
                                                         </td>
                                                         <td style={{ fontSize: '0.875rem' }}>
                                                             {mp.gaps.length === 0 ? (
-                                                                <span style={{ color: '#10b981' }}>{t('meteringDataQuality.noGaps')}</span>
+                                                                <span style={{ color: 'var(--success-600)' }}>{t('meteringDataQuality.noGaps')}</span>
                                                             ) : (
                                                                 <div>
                                                                     {mp.gaps.slice(0, 1).map((gap, idx) => (
-                                                                        <div key={idx} style={{ color: '#666' }}>
+                                                                        <div key={idx} style={{ color: 'var(--text-body)' }}>
                                                                             {gap.start_date === gap.end_date ? (
                                                                                 <>{gap.start_date}</>
                                                                             ) : (
@@ -530,7 +537,7 @@ export function MeteringChartPage() {
                                                                         </div>
                                                                     ))}
                                                                     {mp.gaps.length > 1 && (
-                                                                        <div style={{ color: '#999', fontSize: '0.8em' }}>
+                                                                        <div style={{ color: 'var(--text-muted)', fontSize: '0.8em' }}>
                                                                             +{mp.gaps.length - 1} {t('meteringDataQuality.moreGaps')}
                                                                         </div>
                                                                     )}

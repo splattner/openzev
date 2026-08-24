@@ -9,11 +9,8 @@ import {
     XAxis,
     YAxis,
 } from 'recharts'
-import { AXIS_COLOR, ANNOTATION_COLOR } from '../../lib/chartTokens'
-
-// Same validated blue/red diverging pair as the sensitivity chart.
-const POSITIVE_COLOR = '#2563eb'
-const NEGATIVE_COLOR = '#dc2626'
+import { ANNOTATION_COLOR, AXIS_COLOR, CHART_GRIDLINE, DIVERGING_POSITIVE, NEGATIVE_COLOR, POSITIVE_COLOR } from '../../lib/chartTokens'
+import { CHART_AXIS_TICK, CHART_TOOLTIP_STYLE, CHF_Y_AXIS_LABEL, ChartLegendSwatch, chartAxisLabel } from '../../lib/chartTheme'
 
 type BarShapeProps = {
     x?: number
@@ -30,7 +27,7 @@ type BarShapeProps = {
 function DivergingBarShape({ x = 0, y = 0, width = 0, height = 0, payload }: BarShapeProps) {
     const isNegative = (payload?.value ?? 0) < 0
     const r = Math.max(0, Math.min(4, width / 2, Math.abs(height)))
-    const fill = isNegative ? NEGATIVE_COLOR : POSITIVE_COLOR
+    const fill = isNegative ? NEGATIVE_COLOR : DIVERGING_POSITIVE
 
     const path = isNegative
         ? `M${x},${y} L${x + width},${y} L${x + width},${y + height - r}
@@ -48,9 +45,9 @@ function CustomTooltip({ active, payload }: { active?: boolean; payload?: Array<
     if (!active || !payload?.length) return null
     const point = payload[0]
     return (
-        <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 6, padding: '0.5rem 0.7rem', fontSize: '0.82rem' }}>
+        <div style={CHART_TOOLTIP_STYLE}>
             <p style={{ margin: 0, fontWeight: 600 }}>{t('pages.feasibility.chart.yearLabel', { year: point.payload.year })}</p>
-            <p style={{ margin: 0, color: point.value < 0 ? NEGATIVE_COLOR : POSITIVE_COLOR }}>
+            <p style={{ margin: 0, color: point.value < 0 ? NEGATIVE_COLOR : DIVERGING_POSITIVE }}>
                 CHF {point.value.toFixed(2)}
             </p>
         </div>
@@ -74,29 +71,29 @@ export function FeasibilityCashflowChart({ cashflowByYear, paybackYears }: Props
                 {t('pages.feasibility.chart.cashflowDescription')}
             </p>
             <div style={{ display: 'flex', gap: '1rem', marginBottom: '0.4rem', fontSize: '0.78rem' }}>
-                <span><span style={{ display: 'inline-block', width: 9, height: 9, background: POSITIVE_COLOR, borderRadius: 2, marginRight: 4 }} />{t('pages.feasibility.chart.cumulativeSurplus')}</span>
-                <span><span style={{ display: 'inline-block', width: 9, height: 9, background: NEGATIVE_COLOR, borderRadius: 2, marginRight: 4 }} />{t('pages.feasibility.chart.cumulativeDeficit')}</span>
+                <span><ChartLegendSwatch color={POSITIVE_COLOR} />{t('pages.feasibility.chart.cumulativeSurplus')}</span>
+                <span><ChartLegendSwatch color={NEGATIVE_COLOR} />{t('pages.feasibility.chart.cumulativeDeficit')}</span>
             </div>
             <ResponsiveContainer width="100%" height={240}>
                 <BarChart data={data} margin={{ top: 28, right: 20, left: 10, bottom: 10 }}>
-                    <CartesianGrid stroke="#e5e7eb" vertical={false} />
+                    <CartesianGrid stroke={CHART_GRIDLINE} vertical={false} />
                     <XAxis
                         dataKey="year"
                         type="number"
                         domain={[0, horizonYears]}
                         allowDecimals={false}
                         stroke={AXIS_COLOR}
-                        tick={{ fontSize: 11, fill: '#374151' }}
-                        label={{ value: t('pages.feasibility.chart.yearAxis'), position: 'insideBottom', offset: -5, fontSize: 11, fill: '#6b7280' }}
+                        tick={CHART_AXIS_TICK}
+                        label={chartAxisLabel(t('pages.feasibility.chart.yearAxis'))}
                     />
                     <YAxis
                         tickFormatter={(v: number) => v.toFixed(0)}
                         stroke={AXIS_COLOR}
-                        tick={{ fontSize: 11, fill: '#374151' }}
-                        label={{ value: 'CHF', angle: -90, position: 'insideLeft', fontSize: 11, fill: '#6b7280' }}
+                        tick={CHART_AXIS_TICK}
+                        label={CHF_Y_AXIS_LABEL}
                     />
                     <Tooltip content={<CustomTooltip />} />
-                    <ReferenceLine y={0} stroke="#d1d5db" strokeWidth={1} />
+                    <ReferenceLine y={0} stroke={CHART_GRIDLINE} strokeWidth={1} />
                     {paybackYears !== null && paybackYears <= horizonYears && (
                         <ReferenceLine
                             x={paybackYears}

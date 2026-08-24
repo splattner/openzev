@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { CHART_GRID, CHART_INK, CHART_MUTED, CONS_COLORS, FLOW_GRID_EXP, FLOW_LOCAL_CONS, OTHERS_COLOR, PROD_COLORS } from '../lib/chartTokens'
+
 interface EnergyFlowChartProps {
     totals: {
         produced_kwh: number
@@ -19,13 +21,6 @@ interface EnergyFlowChartProps {
     /** When set, show this participant individually and aggregate all others into "Others" */
     highlightParticipantId?: string
 }
-
-const PRODUCER_COLORS = ['#16a34a', '#22c55e', '#15803d', '#059669', '#4ade80', '#34d399']
-const CONSUMER_COLORS = ['#2563eb', '#3b82f6', '#1d4ed8', '#6366f1', '#60a5fa', '#818cf8', '#93c5fd']
-const TOTAL_PROD_COLOR = '#16a34a'
-const LOCAL_CONS_COLOR = '#0ea5e9'
-const GRID_IMPORT_COLOR = '#f59e0b'
-const GRID_EXPORT_COLOR = '#8b5cf6'
 
 const VIEW_W = 960
 const PAD_TOP = 28
@@ -81,7 +76,6 @@ function sankeyPath(x1: number, sy: number, x2: number, ty: number, thickness: n
     ].join(' ')
 }
 
-const OTHERS_COLOR = '#94a3b8'
 
 export function EnergyFlowChart({ totals, participantStats, highlightParticipantId }: EnergyFlowChartProps) {
     const { t } = useTranslation()
@@ -137,7 +131,7 @@ export function EnergyFlowChart({ totals, participantStats, highlightParticipant
                         id: `prod-${p.participant_id}`,
                         label: p.participant_name || `Producer ${i + 1}`,
                         value: p.total_produced_kwh * scaleFactor,
-                        color: PRODUCER_COLORS[i % PRODUCER_COLORS.length],
+                        color: PROD_COLORS[i % PROD_COLORS.length],
                         col: 0,
                     })
                 })
@@ -147,7 +141,7 @@ export function EnergyFlowChart({ totals, participantStats, highlightParticipant
                         id: 'prod-other',
                         label: t('pages.dashboard.energyFlow.localProduction'),
                         value: remainder,
-                        color: PRODUCER_COLORS[producers.length % PRODUCER_COLORS.length],
+                        color: PROD_COLORS[producers.length % PROD_COLORS.length],
                         col: 0,
                     })
                 }
@@ -156,7 +150,7 @@ export function EnergyFlowChart({ totals, participantStats, highlightParticipant
                     id: 'prod-local',
                     label: t('pages.dashboard.energyFlow.localProduction'),
                     value: totalProduced,
-                    color: TOTAL_PROD_COLOR,
+                    color: PROD_COLORS[0],
                     col: 0,
                 })
             }
@@ -169,7 +163,7 @@ export function EnergyFlowChart({ totals, participantStats, highlightParticipant
                 id: 'total-prod',
                 label: t('pages.dashboard.energyFlow.totalLocalProduction'),
                 value: totalProduced,
-                color: TOTAL_PROD_COLOR,
+                color: PROD_COLORS[0],
                 col: 1,
             })
         }
@@ -183,7 +177,7 @@ export function EnergyFlowChart({ totals, participantStats, highlightParticipant
                 id: 'local-cons',
                 label: t('pages.dashboard.energyFlow.localConsumption'),
                 value: localCons,
-                color: LOCAL_CONS_COLOR,
+                color: FLOW_LOCAL_CONS,
                 col: 2,
                 pct: `${selfConsumptionPct.toFixed(1)}%`,
             })
@@ -193,7 +187,7 @@ export function EnergyFlowChart({ totals, participantStats, highlightParticipant
                 id: 'grid-export',
                 label: t('pages.dashboard.energyFlow.gridExport'),
                 value: gridExport,
-                color: GRID_EXPORT_COLOR,
+                color: FLOW_GRID_EXP,
                 col: 2,
                 pct: `${exportPct.toFixed(1)}%`,
             })
@@ -206,7 +200,7 @@ export function EnergyFlowChart({ totals, participantStats, highlightParticipant
                 id: 'grid-import',
                 label: t('pages.dashboard.energyFlow.gridImport'),
                 value: gridImport,
-                color: GRID_IMPORT_COLOR,
+                color: CHART_GRID,
                 col: 3,
             })
         }
@@ -216,7 +210,7 @@ export function EnergyFlowChart({ totals, participantStats, highlightParticipant
             id: `cons-${p.participant_id}`,
             label: p.participant_name || `Consumer ${i + 1}`,
             value: p.total_consumed_kwh,
-            color: p.participant_id === '__others__' ? OTHERS_COLOR : CONSUMER_COLORS[i % CONSUMER_COLORS.length],
+            color: p.participant_id === '__others__' ? OTHERS_COLOR : CONS_COLORS[i % CONS_COLORS.length],
             col: 4,
         }))
 
@@ -273,10 +267,10 @@ export function EnergyFlowChart({ totals, participantStats, highlightParticipant
 
         // Col 1 -> Col 2: total production -> local consumption + grid export
         if (nMap['total-prod'] && nMap['local-cons']) {
-            rawLinks.push({ id: 'total-prod->local-cons', sourceId: 'total-prod', targetId: 'local-cons', value: localCons, color: LOCAL_CONS_COLOR })
+            rawLinks.push({ id: 'total-prod->local-cons', sourceId: 'total-prod', targetId: 'local-cons', value: localCons, color: FLOW_LOCAL_CONS })
         }
         if (nMap['total-prod'] && nMap['grid-export']) {
-            rawLinks.push({ id: 'total-prod->grid-export', sourceId: 'total-prod', targetId: 'grid-export', value: gridExport, color: GRID_EXPORT_COLOR })
+            rawLinks.push({ id: 'total-prod->grid-export', sourceId: 'total-prod', targetId: 'grid-export', value: gridExport, color: FLOW_GRID_EXP })
         }
 
         // Col 2 -> Col 4: local consumption -> consumers (from_zev share)
@@ -285,7 +279,7 @@ export function EnergyFlowChart({ totals, participantStats, highlightParticipant
                 if (c.from_zev_kwh < 0.01) continue
                 const tid = `cons-${c.participant_id}`
                 if (!nMap[tid]) continue
-                rawLinks.push({ id: `local-cons->${tid}`, sourceId: 'local-cons', targetId: tid, value: c.from_zev_kwh, color: LOCAL_CONS_COLOR })
+                rawLinks.push({ id: `local-cons->${tid}`, sourceId: 'local-cons', targetId: tid, value: c.from_zev_kwh, color: FLOW_LOCAL_CONS })
             }
         }
 
@@ -295,7 +289,7 @@ export function EnergyFlowChart({ totals, participantStats, highlightParticipant
                 if (c.from_grid_kwh < 0.01) continue
                 const tid = `cons-${c.participant_id}`
                 if (!nMap[tid]) continue
-                rawLinks.push({ id: `grid-import->${tid}`, sourceId: 'grid-import', targetId: tid, value: c.from_grid_kwh, color: GRID_IMPORT_COLOR })
+                rawLinks.push({ id: `grid-import->${tid}`, sourceId: 'grid-import', targetId: tid, value: c.from_grid_kwh, color: CHART_GRID })
             }
         }
 
@@ -379,7 +373,7 @@ export function EnergyFlowChart({ totals, participantStats, highlightParticipant
                                 textAnchor="middle"
                                 dominantBaseline="central"
                                 fontSize={9}
-                                fill="#374151"
+                                fill={CHART_INK}
                                 fillOpacity={0.85}
                                 style={{ pointerEvents: 'none' }}
                             >
@@ -409,22 +403,22 @@ export function EnergyFlowChart({ totals, participantStats, highlightParticipant
 
                         {isLeft && (
                             <>
-                                <text className="sankey-participant-label" x={x - 8} y={n.y + n.h / 2 - 6} textAnchor="end" dominantBaseline="central" fontSize={11} fill="#374151">{n.label}</text>
-                                <text x={x - 8} y={n.y + n.h / 2 + 7} textAnchor="end" dominantBaseline="central" fontSize={10} fill="#9ca3af">{n.value.toFixed(1)} kWh</text>
+                                <text className="sankey-participant-label" x={x - 8} y={n.y + n.h / 2 - 6} textAnchor="end" dominantBaseline="central" fontSize={11} fill={CHART_INK}>{n.label}</text>
+                                <text x={x - 8} y={n.y + n.h / 2 + 7} textAnchor="end" dominantBaseline="central" fontSize={10} fill={CHART_MUTED}>{n.value.toFixed(1)} kWh</text>
                             </>
                         )}
 
                         {isRight && (
                             <>
-                                <text className="sankey-participant-label" x={x + BAR_W + 8} y={n.y + n.h / 2 - 6} textAnchor="start" dominantBaseline="central" fontSize={11} fill="#374151">{n.label}</text>
-                                <text x={x + BAR_W + 8} y={n.y + n.h / 2 + 7} textAnchor="start" dominantBaseline="central" fontSize={10} fill="#9ca3af">{n.value.toFixed(1)} kWh</text>
+                                <text className="sankey-participant-label" x={x + BAR_W + 8} y={n.y + n.h / 2 - 6} textAnchor="start" dominantBaseline="central" fontSize={11} fill={CHART_INK}>{n.label}</text>
+                                <text x={x + BAR_W + 8} y={n.y + n.h / 2 + 7} textAnchor="start" dominantBaseline="central" fontSize={10} fill={CHART_MUTED}>{n.value.toFixed(1)} kWh</text>
                             </>
                         )}
 
                         {isMid && (
                             <>
-                                <text x={x + BAR_W / 2} y={n.y + n.h + 14} textAnchor="middle" fontSize={10} fill="#374151">{n.label}</text>
-                                <text x={x + BAR_W / 2} y={n.y + n.h + 26} textAnchor="middle" fontSize={9} fill="#9ca3af">{n.value.toFixed(1)} kWh</text>
+                                <text x={x + BAR_W / 2} y={n.y + n.h + 14} textAnchor="middle" fontSize={10} fill={CHART_INK}>{n.label}</text>
+                                <text x={x + BAR_W / 2} y={n.y + n.h + 26} textAnchor="middle" fontSize={9} fill={CHART_MUTED}>{n.value.toFixed(1)} kWh</text>
                                 {n.pct && (
                                     <text x={x + BAR_W / 2} y={n.y + n.h + 38} textAnchor="middle" fontSize={10} fontWeight={600} fill={n.color}>{n.pct}</text>
                                 )}

@@ -163,11 +163,14 @@ are emitted as separate rows.
 A Django template partial containing one `<style>` block with the common print
 design system, extracted verbatim from the invoice template:
 
-- **Design tokens** — `:root` variables: `--ink`, `--ink-soft`, `--muted`,
-  `--line`, `--line-subtle`, `--surface`, `--brand`, `--brand-deep`,
+- **Design tokens** — `{% include "pdf/_tokens.css" %}` inside the `<style>`
+  block pulls in the generated `:root` variables (`--ink`, `--ink-soft`,
+  `--muted`, `--line`, `--line-subtle`, `--surface`, `--brand`, `--brand-deep`,
   `--brand-mid`, `--brand-pale`, `--brand-glow`, `--gold`, `--brand-accent`,
   `--brand-light`, `--brand-muted`, `--zebra`, `--chart-surface`,
-  `--subtotal-color`.
+  `--subtotal-color`, plus UI status fills). The hex source is
+  `design/tokens.json`; regenerate via `scripts/generate-tokens.mjs`
+  (see `2026-08-ui-redesign-pdf-style.md`).
 - **Base** — `*` reset, `body` font stack (`Helvetica Neue`, 9.5 pt, `--ink`).
 - **Utilities** — `.eyebrow`, `.visually-hidden`.
 - **Document header anatomy** — `.document-header` (flex, bottom border,

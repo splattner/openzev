@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
+import { CHART_LOCAL, FLOW_LOCAL_CONS } from '../lib/chartTokens'
 import { Fragment, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
@@ -100,9 +101,6 @@ function HourGrid({
 
 // ── Intraday sparkline ──────────────────────────────────────────────────────────
 
-const IN_COLOR = '#059669'
-const OUT_COLOR = '#0284c7'
-
 function SparkTooltip({
     active,
     payload,
@@ -134,12 +132,12 @@ function DaySparkline({ intervals, hasIn, hasOut }: { intervals: IntervalRow[]; 
                 <AreaChart data={intervals} margin={{ top: 8, right: 12, left: 4, bottom: 0 }}>
                     <defs>
                         <linearGradient id="rawSparkIn" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="0%" stopColor={IN_COLOR} stopOpacity={0.28} />
-                            <stop offset="100%" stopColor={IN_COLOR} stopOpacity={0} />
+                            <stop offset="0%" stopColor={CHART_LOCAL} stopOpacity={0.28} />
+                            <stop offset="100%" stopColor={CHART_LOCAL} stopOpacity={0} />
                         </linearGradient>
                         <linearGradient id="rawSparkOut" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="0%" stopColor={OUT_COLOR} stopOpacity={0.28} />
-                            <stop offset="100%" stopColor={OUT_COLOR} stopOpacity={0} />
+                            <stop offset="0%" stopColor={FLOW_LOCAL_CONS} stopOpacity={0.28} />
+                            <stop offset="100%" stopColor={FLOW_LOCAL_CONS} stopOpacity={0} />
                         </linearGradient>
                     </defs>
                     <XAxis
@@ -157,7 +155,7 @@ function DaySparkline({ intervals, hasIn, hasOut }: { intervals: IntervalRow[]; 
                             type="monotone"
                             dataKey="in"
                             name={t('pages.meteringData.series.consumption')}
-                            stroke={IN_COLOR}
+                            stroke={CHART_LOCAL}
                             strokeWidth={1.5}
                             fill="url(#rawSparkIn)"
                             dot={false}
@@ -169,7 +167,7 @@ function DaySparkline({ intervals, hasIn, hasOut }: { intervals: IntervalRow[]; 
                             type="monotone"
                             dataKey="out"
                             name={t('pages.meteringData.series.feedIn')}
-                            stroke={OUT_COLOR}
+                            stroke={FLOW_LOCAL_CONS}
                             strokeWidth={1.5}
                             fill="url(#rawSparkOut)"
                             dot={false}
