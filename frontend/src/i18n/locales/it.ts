@@ -1042,7 +1042,11 @@ export const it = {
                 validFrom: 'Valido dal',
                 validTo: 'Valido al',
                 notes: 'Note',
+                allocationWeight: 'Peso di allocazione',
+                allocationWeightHint: 'Un peso relativo per ripartire i costi di un contatore comunitario, non una percentuale o un permille. Lascia vuoto per il valore predefinito (1).',
             },
+            weightShare: '{{percent}} % — {{weight}} di {{total}} pesi',
+            weightShareHint: 'La quota di questo partecipante nei costi dei contatori comunitari, in base al suo peso di allocazione rispetto al totale dello ZEV.',
             warnings: {
                 noEmail: 'Nessuna e-mail',
                 noAddress: 'Nessun indirizzo',
@@ -1305,6 +1309,7 @@ export const it = {
             typeLabel: 'Tipo:',
             moreActions: 'Altro',
             openEnded: 'Senza fine',
+            communityBadge: 'Comunitario',
             assignmentState: {
                 current: 'Corrente',
                 upcoming: 'In arrivo',
@@ -1333,6 +1338,10 @@ export const it = {
                 validTo: 'Valido al',
                 validToHint: "Lascia 'Valido al' vuoto per un'assegnazione aperta (in corso).",
                 selectParticipant: 'Seleziona partecipante',
+                allocationMode: 'Allocazione',
+                allocationModePersonal: 'Personale',
+                allocationModeCommunity: 'Comunitaria',
+                allocationModeHint: "Con l'allocazione comunitaria, l'energia e le tariffe di questo contatore vengono ripartite tra tutti i partecipanti in base al loro peso di allocazione, invece di essere addebitate solo al partecipante assegnato.",
             },
             assignCol: {
                 participant: 'Partecipante',

@@ -1053,7 +1053,11 @@ export const en = {
                 validFrom: 'Valid from',
                 validTo: 'Valid to',
                 notes: 'Notes',
+                allocationWeight: 'Allocation weight',
+                allocationWeightHint: 'A relative weight for splitting community-meter costs, not a percentage or per-mille. Leave empty for the default (1).',
             },
+            weightShare: '{{percent}} % — {{weight}} of {{total}} weights',
+            weightShareHint: 'This participant\'s share of community-meter costs, based on their allocation weight relative to the ZEV total.',
             warnings: {
                 noEmail: 'No email',
                 noAddress: 'No address',
@@ -1316,6 +1320,7 @@ export const en = {
             assignmentCount: 'Assignments: {{count}}',
             moreActions: 'More',
             openEnded: 'Open-ended',
+            communityBadge: 'Community',
             assignmentState: {
                 current: 'Current',
                 upcoming: 'Upcoming',
@@ -1344,6 +1349,10 @@ export const en = {
                 validTo: 'Valid to',
                 validToHint: 'Leave Valid to empty for an open-ended (current) assignment.',
                 selectParticipant: 'Select participant',
+                allocationMode: 'Allocation',
+                allocationModePersonal: 'Personal',
+                allocationModeCommunity: 'Community',
+                allocationModeHint: 'Community splits this meter\'s energy and fees across every participant by their allocation weight, instead of billing the assigned participant alone.',
             },
             assignCol: {
                 participant: 'Participant',

@@ -171,6 +171,11 @@ export function MeteringPointsList({
                               <span className={assignmentStateBadgeClass(assignmentState)}>
                                 {t(`pages.meteringPoints.assignmentState.${assignmentState}`)}
                               </span>
+                              {assignment.allocation_mode === 'community' && (
+                                <span className="badge badge-info">
+                                  {t('pages.meteringPoints.communityBadge')}
+                                </span>
+                              )}
                             </div>
                             <div className="muted">
                               {formatShortDate(assignment.valid_from, settings)} -{' '}

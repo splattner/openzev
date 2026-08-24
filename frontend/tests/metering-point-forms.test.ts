@@ -26,6 +26,7 @@ describe('metering point form helpers', () => {
     expect(form.participant).toBe('')
     expect(form.valid_to).toBeNull()
     expect(form.valid_from).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+    expect(form.allocation_mode).toBe('personal')
   })
 
   it('classifies assignment state correctly', () => {

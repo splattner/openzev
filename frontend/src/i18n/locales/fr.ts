@@ -1042,7 +1042,11 @@ export const fr = {
                 validFrom: 'Valide depuis',
                 validTo: "Valide jusqu'à",
                 notes: 'Notes',
+                allocationWeight: "Pondération d'attribution",
+                allocationWeightHint: "Une pondération relative pour répartir les coûts d'un compteur communautaire, pas un pourcentage ni un pour-mille. Laissez vide pour la valeur par défaut (1).",
             },
+            weightShare: '{{percent}} % — {{weight}} sur {{total}} pondérations',
+            weightShareHint: "La part de ce participant dans les coûts des compteurs communautaires, basée sur sa pondération d'attribution relative au total du ZEV.",
             warnings: {
                 noEmail: 'Aucun e-mail',
                 noAddress: 'Aucune adresse',
@@ -1305,6 +1309,7 @@ export const fr = {
             typeLabel: 'Type :',
             moreActions: 'Plus',
             openEnded: 'Ouverte',
+            communityBadge: 'Communautaire',
             assignmentState: {
                 current: 'Actuelle',
                 upcoming: 'À venir',
@@ -1333,6 +1338,10 @@ export const fr = {
                 validTo: "Valide jusqu'à",
                 validToHint: "Laissez 'Valide jusqu'à' vide pour une attribution ouverte (en cours).",
                 selectParticipant: 'Sélectionner un participant',
+                allocationMode: 'Répartition',
+                allocationModePersonal: 'Personnelle',
+                allocationModeCommunity: 'Communautaire',
+                allocationModeHint: "En mode communautaire, l'énergie et les frais de ce compteur sont répartis entre tous les participants selon leur pondération d'attribution, au lieu d'être facturés uniquement au participant assigné.",
             },
             assignCol: {
                 participant: 'Participant',

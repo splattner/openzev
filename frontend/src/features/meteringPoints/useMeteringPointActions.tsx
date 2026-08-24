@@ -243,6 +243,7 @@ export function useMeteringPointActions({
             participant: assignment.participant,
             valid_from: assignment.valid_from,
             valid_to: assignment.valid_to ?? null,
+            allocation_mode: assignment.allocation_mode,
         })
         setShowAssignModal(true)
     }

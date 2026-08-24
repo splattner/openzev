@@ -130,6 +130,7 @@ Extends `AbstractUser` (Django `accounts.models`).
 | `valid_from` | `DateField` | Start of participation |
 | `valid_to` | `DateField` (nullable) | End of participation (open = active) |
 | `notes` | `TextField` | |
+| `allocation_weight` | `DecimalField(12, 4)`, `MinValueValidator(0.0001)` | Default `1`. Unitless relative weight for splitting a `COMMUNITY`-mode metering point's costs and a `weight`-keyed `SHARED_*` tariff (`SPEC-2026-08-shared-metering-points`) — never a percentage, per-mille, or Wertquote |
 | `created_at` | `DateTimeField` (auto) | |
 | `updated_at` | `DateTimeField` (auto) | |
 

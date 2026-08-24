@@ -271,6 +271,7 @@ export interface Participant {
     metering_points?: MeteringPoint[]
     has_metering_point_assignment?: boolean
     building_footprint?: ParticipantBuildingFootprint | null
+    allocation_weight: string
 }
 
 export interface ParticipantAccountCreateResult {
@@ -293,6 +294,7 @@ export interface ParticipantInput {
     address_line1?: string
     address_line2?: string
     notes?: string
+    allocation_weight?: string
 }
 
 export interface MeteringPoint {
@@ -320,6 +322,7 @@ export interface MeteringPointAssignment {
     valid_to?: string | null
     created_at: string
     updated_at: string
+    allocation_mode: 'personal' | 'community'
 }
 
 export interface MeteringPointAssignmentInput {
@@ -327,6 +330,7 @@ export interface MeteringPointAssignmentInput {
     participant: string
     valid_from: string
     valid_to?: string | null
+    allocation_mode: 'personal' | 'community'
 }
 
 export type DataQualitySeverity = 'green' | 'yellow' | 'red'

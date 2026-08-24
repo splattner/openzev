@@ -15,22 +15,37 @@ export type ParticipantFormValues = {
   notes: string
   valid_from: string
   valid_to: string
+  allocation_weight: string
 }
 
-export const participantFormSchema = z.object({
-  title: z.enum(['', 'mr', 'mrs', 'ms', 'dr', 'prof']),
-  first_name: z.string().trim().min(1),
-  last_name: z.string().trim().min(1),
-  email: z.string().trim().email(),
-  phone: z.string(),
-  address_line1: z.string(),
-  address_line2: z.string(),
-  postal_code: z.string(),
-  city: z.string(),
-  notes: z.string(),
-  valid_from: z.string().trim().min(1),
-  valid_to: z.string(),
-})
+export const participantFormSchema = z
+  .object({
+    title: z.enum(['', 'mr', 'mrs', 'ms', 'dr', 'prof']),
+    first_name: z.string().trim().min(1),
+    last_name: z.string().trim().min(1),
+    email: z.string().trim().email(),
+    phone: z.string(),
+    address_line1: z.string(),
+    address_line2: z.string(),
+    postal_code: z.string(),
+    city: z.string(),
+    notes: z.string(),
+    valid_from: z.string().trim().min(1),
+    valid_to: z.string(),
+    allocation_weight: z.string(),
+  })
+  .superRefine((values, ctx) => {
+    // Empty is valid — it lets the backend default to 1. A non-empty value
+    // must be a plain positive decimal: this is a relative weight, never a
+    // percentage, per-mille, or Wertquote (§5.2).
+    if (values.allocation_weight && !(Number(values.allocation_weight) > 0)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['allocation_weight'],
+        message: 'Allocation weight must be a positive number.',
+      })
+    }
+  })
 
 export const defaultParticipantFormValues: ParticipantFormValues = {
   title: '',
@@ -45,6 +60,7 @@ export const defaultParticipantFormValues: ParticipantFormValues = {
   notes: '',
   valid_from: todayLocalIso(),
   valid_to: '',
+  allocation_weight: '',
 }
 
 export function mapParticipantToFormValues(participant: Participant): ParticipantFormValues {
@@ -61,6 +77,7 @@ export function mapParticipantToFormValues(participant: Participant): Participan
     notes: participant.notes || '',
     valid_from: participant.valid_from,
     valid_to: participant.valid_to || '',
+    allocation_weight: participant.allocation_weight || '',
   }
 }
 
@@ -79,5 +96,6 @@ export function mapParticipantFormValuesToInput(values: ParticipantFormValues, z
     notes: values.notes,
     valid_from: values.valid_from,
     valid_to: values.valid_to || null,
+    allocation_weight: values.allocation_weight || undefined,
   }
 }

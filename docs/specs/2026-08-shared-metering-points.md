@@ -1,7 +1,7 @@
 # Feature Spec: Shared metering points with cost-allocation weights
 
 - Spec ID: SPEC-2026-08-shared-metering-points
-- Status: Draft
+- Status: Approved
 - Scope: Major
 - Type: Feature
 - Owners: spalinger

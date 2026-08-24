@@ -93,6 +93,7 @@ Defined in `zev.models`.
 | `participant` | FK → `Participant` (`CASCADE`) | Assigned participant |
 | `valid_from` | `DateField` | Start of assignment (inclusive) |
 | `valid_to` | `DateField` (nullable) | End of assignment (inclusive); `null` = open-ended |
+| `allocation_mode` | `CharField(10)` choices `AllocationMode` | `personal` (default) or `community`. Does not change who holds the meter — `participant` stays the holder of record; it changes only who pays. `community` splits the meter's costs across every eligible participant by `Participant.allocation_weight` instead of billing the holder alone (`SPEC-2026-08-shared-metering-points`) |
 | `created_at` | `DateTimeField` (auto) | Creation timestamp |
 | `updated_at` | `DateTimeField` (auto) | Last modification timestamp |
 
@@ -300,6 +301,7 @@ interface MeteringPointAssignment {
   valid_to?: string | null
   created_at: string
   updated_at: string
+  allocation_mode: 'personal' | 'community'
 }
 ```
 

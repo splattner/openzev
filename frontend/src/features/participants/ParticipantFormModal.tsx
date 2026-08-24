@@ -105,6 +105,13 @@ export function ParticipantFormModal({
           <span>{t('pages.participants.form.validTo')}</span>
           <input type="date" {...form.register('valid_to')} />
         </label>
+        <label>
+          <span>{t('pages.participants.form.allocationWeight')}</span>
+          <input type="number" step="any" min="0" placeholder="1" {...form.register('allocation_weight')} />
+        </label>
+        <p className="muted" style={{ gridColumn: '1 / -1', margin: 0, fontSize: '0.82rem' }}>
+          {t('pages.participants.form.allocationWeightHint')}
+        </p>
         <label style={{ gridColumn: '1 / -1' }}>
           <span>{t('pages.participants.form.notes')}</span>
           <textarea {...form.register('notes')} rows={3} />
@@ -116,6 +123,7 @@ export function ParticipantFormModal({
               || form.formState.errors.last_name?.message
               || form.formState.errors.email?.message
               || form.formState.errors.valid_from?.message
+              || form.formState.errors.allocation_weight?.message
               || t('common.error')}
           </div>
         )}

@@ -60,6 +60,14 @@ export function ParticipantCardsSection({
 }: ParticipantCardsSectionProps) {
     const { t } = useTranslation()
 
+    // Community-wide weight total: an informational indicator only, computed
+    // from every card in the section (not the filtered/searched subset) so a
+    // search or filter never changes the denominator participants see.
+    const totalWeight = participantCards.reduce(
+        (sum, { participant }) => sum + Number(participant.allocation_weight || '1'),
+        0,
+    )
+
     if (participantCards.length === 0) {
         return (
             <section className="card" style={{ display: 'grid', gap: '0.75rem' }}>
@@ -94,6 +102,8 @@ export function ParticipantCardsSection({
     return (
         <div className="table-card participant-card-list">
             {filteredParticipants.map(({ participant, warnings, ownerRow, validityState, displayName, address }) => {
+                const weight = Number(participant.allocation_weight || '1')
+                const weightSharePercent = totalWeight > 0 ? (weight / totalWeight) * 100 : 0
                 const menuItems: ActionMenuItem[] = []
 
                 menuItems.push({
@@ -182,6 +192,16 @@ export function ParticipantCardsSection({
                                     <div className="participant-card-label">{t('pages.participants.section.validity')}</div>
                                     <div>{formatShortDate(participant.valid_from, settings)}</div>
                                     <div className="muted">{participant.valid_to ? formatShortDate(participant.valid_to, settings) : t('pages.participants.openEnded')}</div>
+                                </div>
+                                <div className="participant-card-section">
+                                    <div className="participant-card-label">{t('pages.participants.form.allocationWeight')}</div>
+                                    <div title={t('pages.participants.weightShareHint')}>
+                                        {t('pages.participants.weightShare', {
+                                            percent: weightSharePercent.toFixed(4),
+                                            weight: weight.toFixed(4),
+                                            total: totalWeight.toFixed(4),
+                                        })}
+                                    </div>
                                 </div>
                             </div>
 

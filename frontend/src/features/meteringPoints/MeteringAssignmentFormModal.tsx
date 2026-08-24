@@ -75,6 +75,25 @@ export function MeteringAssignmentFormModal({
           {t('pages.meteringPoints.assignForm.validToHint')}
         </p>
 
+        <label style={{ gridColumn: '1 / -1' }}>
+          <span>{t('pages.meteringPoints.assignForm.allocationMode')}</span>
+          <select
+            value={form.allocation_mode}
+            onChange={(event) =>
+              setForm((previous) => ({
+                ...previous,
+                allocation_mode: event.target.value as MeteringPointAssignmentInput['allocation_mode'],
+              }))
+            }
+          >
+            <option value="personal">{t('pages.meteringPoints.assignForm.allocationModePersonal')}</option>
+            <option value="community">{t('pages.meteringPoints.assignForm.allocationModeCommunity')}</option>
+          </select>
+        </label>
+        <p className="muted" style={{ gridColumn: '1 / -1', margin: 0, fontSize: '0.82rem' }}>
+          {t('pages.meteringPoints.assignForm.allocationModeHint')}
+        </p>
+
         <div
           style={{
             gridColumn: '1 / -1',

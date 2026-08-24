@@ -1042,7 +1042,11 @@ export const de = {
                 validFrom: 'Gültig ab',
                 validTo: 'Gültig bis',
                 notes: 'Notizen',
+                allocationWeight: 'Zuteilungsgewicht',
+                allocationWeightHint: 'Ein relatives Gewicht zur Aufteilung der Kosten eines Gemeinschaftszählers, keine Prozent- oder Promilleangabe. Leer lassen für den Standardwert (1).',
             },
+            weightShare: '{{percent}} % — {{weight}} von {{total}} Gewichten',
+            weightShareHint: 'Der Anteil dieses Teilnehmers an den Kosten von Gemeinschaftszählern, basierend auf seinem Zuteilungsgewicht im Verhältnis zur ZEV-Gesamtheit.',
             warnings: {
                 noEmail: 'Keine E-Mail',
                 noAddress: 'Keine Adresse',
@@ -1305,6 +1309,7 @@ export const de = {
             typeLabel: 'Typ:',
             moreActions: 'Mehr',
             openEnded: 'Offen',
+            communityBadge: 'Gemeinschaft',
             assignmentState: {
                 current: 'Aktuell',
                 upcoming: 'Bevorstehend',
@@ -1333,6 +1338,10 @@ export const de = {
                 validTo: 'Gültig bis',
                 validToHint: 'Lassen Sie "Gültig bis" leer für eine unbegrenzte (aktuelle) Zuweisung.',
                 selectParticipant: 'Teilnehmer auswählen',
+                allocationMode: 'Zuteilung',
+                allocationModePersonal: 'Persönlich',
+                allocationModeCommunity: 'Gemeinschaft',
+                allocationModeHint: 'Bei Gemeinschaft werden Energie und Gebühren dieses Zählers anteilig nach Gewichtung auf alle Teilnehmer verteilt, statt allein dem zugewiesenen Teilnehmer verrechnet zu werden.',
             },
             assignCol: {
                 participant: 'Teilnehmer',

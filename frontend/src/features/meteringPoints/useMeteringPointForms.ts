@@ -14,6 +14,7 @@ export const defaultAssignmentForm = (meteringPointId = ''): MeteringPointAssign
   participant: '',
   valid_from: todayLocalIso(),
   valid_to: null,
+  allocation_mode: 'personal',
 })
 
 export type MeteringPointStatusFilter = 'all' | 'active' | 'inactive'
