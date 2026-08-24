@@ -106,8 +106,14 @@ class AllocationQueryCountTests(_ReconciliationBase):
 
     def test_engine_generate_invoice_query_count(self):
         # Windows fetch + readings fetch + tariff lookup + invoice writes.
+        # 13 -> 17: shared metering points (#387) add four queries — a
+        # community consumption and a community production reading fetch,
+        # plus one Participant fetch each for the date- and month-granular
+        # allocation-weight sums (_allocation_weight_sum_by_date/_by_month) —
+        # still a single query each regardless of how many community
+        # readings or how many months the period spans.
         self._call_at_most(
-            13, generate_invoice, self.alice, PERIOD_START, PERIOD_END
+            17, generate_invoice, self.alice, PERIOD_START, PERIOD_END
         )
 
     def test_pdf_stats_query_count(self):

@@ -27,7 +27,7 @@ from invoices.pdf_stats import _compute_period_participant_stats
 from metering.analytics import owner_dashboard_summary
 from metering.models import MeterReading, ReadingDirection
 from testing.helpers import make_named_participant
-from zev.models import MeteringPoint, MeteringPointAssignment, MeteringPointType, Zev
+from zev.models import AllocationMode, MeteringPoint, MeteringPointAssignment, MeteringPointType, Zev
 
 User = get_user_model()
 
@@ -45,10 +45,10 @@ class _ReconciliationBase(TestCase):
             zev=self.zev, meter_type=meter_type, meter_id=meter_id,
         )
 
-    def _assign(self, metering_point, participant, valid_from, valid_to=None):
+    def _assign(self, metering_point, participant, valid_from, valid_to=None, mode=AllocationMode.PERSONAL):
         return MeteringPointAssignment.objects.create(
             metering_point=metering_point, participant=participant,
-            valid_from=valid_from, valid_to=valid_to,
+            valid_from=valid_from, valid_to=valid_to, allocation_mode=mode,
         )
 
     def _reading(self, metering_point, day, kwh, direction):
@@ -657,3 +657,78 @@ class AnnualStatementDirectionTypePairingTests(_ReconciliationBase):
         consumption pool."""
         self._reading(self.production_mp, date(2026, 1, 5), "6", ReadingDirection.IN)
         self._assert_statement_agrees_with_engine()
+
+
+class CommunityMeterReconciliationTests(_ReconciliationBase):
+    """Every consumer must agree once a metering point is community-allocated
+    (#387): the engine, ``pdf_stats``, and ``analytics`` must attribute the
+    same weighted share to each participant, and no single holder — including
+    the meter's holder of record — may be attributed the full amount.
+    """
+
+    def setUp(self):
+        self.owner = User.objects.create_user(
+            username="recon_community", password="pass1234", role=UserRole.ZEV_OWNER
+        )
+        self.zev = Zev.objects.create(
+            name="Community Recon ZEV",
+            owner=self.owner,
+            zev_type="vzev",
+            start_date=PERIOD_START,
+            billing_interval="monthly",
+            invoice_prefix="CR",
+        )
+        self.zev.refresh_from_db()
+        # Equal weights (the default): a straightforward 50/50 split makes the
+        # cross-consumer comparison easy to state exactly.
+        self.alice = make_named_participant(self.zev, "Alice Muster", PERIOD_START)
+        self.bob = make_named_participant(self.zev, "Bob Beispiel", PERIOD_START)
+
+        self.community_mp = self._mp(MeteringPointType.CONSUMPTION, "CH-CR-COMM-1")
+        # Alice is the holder of record, but that must not make her liable
+        # for more than her weight share (§1.1: no holder special case).
+        self._assign(self.community_mp, self.alice, PERIOD_START, mode=AllocationMode.COMMUNITY)
+
+        self._consumption(self.community_mp, date(2026, 1, 5), "10")
+
+    def test_all_consumers_reconcile_with_a_community_meter(self):
+        alice_invoice, bob_invoice = self._invoices()
+
+        # Engine: split 50/50, no production anywhere so it is all grid.
+        self.assertSameEnergy(alice_invoice.total_grid_kwh, "5")
+        self.assertSameEnergy(bob_invoice.total_grid_kwh, "5")
+
+        alice_pdf = self._pdf_stats(alice_invoice)["Alice Muster"]
+        bob_pdf = self._pdf_stats(bob_invoice)["Bob Beispiel"]
+        self.assertSameEnergy(alice_invoice.total_grid_kwh, alice_pdf["from_grid_kwh"])
+        self.assertSameEnergy(bob_invoice.total_grid_kwh, bob_pdf["from_grid_kwh"])
+        self.assertSameEnergy(self._invoice_consumed(alice_invoice), alice_pdf["total_consumed_kwh"])
+        self.assertSameEnergy(self._invoice_consumed(bob_invoice), bob_pdf["total_consumed_kwh"])
+
+        result = self._analytics()
+        by_id = {s["participant_id"]: s for s in result["participant_stats"]}
+        self.assertSameEnergy(alice_invoice.total_grid_kwh, by_id[str(self.alice.id)]["from_grid_kwh"])
+        self.assertSameEnergy(bob_invoice.total_grid_kwh, by_id[str(self.bob.id)]["from_grid_kwh"])
+
+        # The physical pool total is unsplit: the dashboard's ZEV-wide figure
+        # is still the full 10 kWh (ADR 0013), only the per-participant
+        # attribution is weighted.
+        self.assertSameEnergy(result["totals"]["consumed_kwh"], "10")
+
+    def test_community_meter_energy_is_attributed_to_no_single_holder(self):
+        alice_invoice, bob_invoice = self._invoices()
+
+        # The holder of record (Alice) is billed exactly her weight share,
+        # not the full reading — in every consumer, not just the engine.
+        self.assertSameEnergy(alice_invoice.total_grid_kwh, "5")
+
+        alice_pdf = self._pdf_stats(alice_invoice)["Alice Muster"]
+        self.assertSameEnergy(alice_pdf["from_grid_kwh"], "5")
+
+        result = self._analytics()
+        by_id = {s["participant_id"]: s for s in result["participant_stats"]}
+        self.assertSameEnergy(by_id[str(self.alice.id)]["from_grid_kwh"], "5")
+
+        # Bob, who never holds the meter, is billed the same share.
+        self.assertSameEnergy(bob_invoice.total_grid_kwh, "5")
+        self.assertSameEnergy(by_id[str(self.bob.id)]["from_grid_kwh"], "5")

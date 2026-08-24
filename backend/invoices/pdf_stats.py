@@ -103,15 +103,20 @@ def _compute_period_participant_stats(invoice) -> tuple[dict, list[dict]]:
     # assignment gap (holder None) belong to no participant.
     windows = AssignmentWindows.for_zev(zev, ps, pe)
 
-    # Names are keyed off the assignment windows, not the current participant
-    # list: the invoice is a historical document, and a holder who has since
-    # left the ZEV must keep their name in the period stats.
-    participant_names = _participant_names(windows.participant_ids)
-
     # Weight shares for community-allocated readings, keyed by UTC civil date
     # — matches participant_on/assignment_at's date granularity. Fetched once
     # regardless of whether this period has any community meter.
     shares_by_date = eligible_participant_shares(zev, ps, pe)
+
+    # Names are keyed off the assignment windows *and* every participant who
+    # ever receives a community share — not just literal holders, since a
+    # community-only participant (never the holder of record for any meter)
+    # would otherwise appear with an empty name. The invoice is a historical
+    # document, so a holder who has since left the ZEV must keep their name.
+    share_participant_ids = {
+        pid for day_shares in shares_by_date.values() for pid in day_shares
+    }
+    participant_names = _participant_names(windows.participant_ids | share_participant_ids)
 
     participant_map: dict[str, dict] = {}
 

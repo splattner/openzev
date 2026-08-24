@@ -984,6 +984,38 @@ class InvoicePdfRenderingTests(TestCase):
             self.assertGreater(len(pdf), 1000, f"PDF for {lang} is too small")
             self.assertEqual(self._page_count(pdf), 2, f"PDF for {lang} should be 2 pages (invoice + insights)")
 
+    def test_shared_lines_render_with_marker(self):
+        """A community-allocated line item's marker text must actually reach
+        the rendered PDF, in every invoice language (§7.6) — not just the
+        description string the engine builds (covered in
+        ``test_shared_metering.py``)."""
+        from pypdf import PdfReader
+
+        markers = {
+            "de": "Gemeinschaftsanteil",
+            "fr": "Part communautaire",
+            "it": "Quota comunitaria",
+            "en": "Community share",
+        }
+        for lang, marker in markers.items():
+            with self.subTest(lang=lang):
+                self.zev.invoice_language = lang
+                self.zev.save(update_fields=["invoice_language"])
+                invoice = self._invoice(invoice_number=f"Q-SHARED-{lang.upper()}")
+                InvoiceItem.objects.create(
+                    invoice=invoice, item_type=InvoiceItem.ItemType.GRID_ENERGY,
+                    tariff_category=TariffCategory.ENERGY,
+                    description=f"Netzenergie ({marker})",
+                    quantity_kwh=Decimal("5.00"), unit="kWh",
+                    unit_price_chf=Decimal("0.20000"), total_chf=Decimal("1.00"),
+                )
+
+                pdf = generate_pdf(invoice)
+                reader = PdfReader(io.BytesIO(pdf))
+                text = "\n".join(page.extract_text() for page in reader.pages)
+
+                self.assertIn(marker, text)
+
     # ── QR-Rechnung placement tests ──────────────────────────────────────
     # The Swiss payment slip must be exactly 106 mm tall and flush with the
     # page bottom.  We verify this by parsing the PDF content stream for the

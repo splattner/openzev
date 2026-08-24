@@ -26,7 +26,7 @@ from allocation.read_model import (
 )
 from allocation.split import split_consumption, split_production
 from allocation.windows import AssignmentWindows
-from zev.models import Zev, Participant, MeteringPoint, MeteringPointAssignment
+from zev.models import AllocationMode, Zev, Participant, MeteringPoint, MeteringPointAssignment
 from tariffs.models import BillingMode, EnergyType, PeriodType, SplitKey, Tariff, TariffCategory
 from metering.models import MeterReading, ReadingDirection
 from .models import Invoice, InvoiceItem, InvoiceStatus
@@ -47,26 +47,40 @@ logger = logging.getLogger(__name__)
 class PeriodReadings(NamedTuple):
     """Everything the pricing loops need to read, fetched once per invoice.
 
-    The two ``*_by_ts`` maps are community-wide totals per timestamp; the two
-    querysets are the individual participant's own readings. ``assignment_windows``
-    resolves which of those readings the participant actually held at their
-    timestamp (readings before an assignment started — or inside a gap — are
-    skipped by the pricing loops).
+    The two ``*_by_ts`` maps are community-wide totals per timestamp; the four
+    querysets are the individual participant's own readings and the ZEV's
+    community-allocated readings. ``assignment_windows`` is ZEV-wide (not
+    participant-scoped) so it can resolve *any* window at a given timestamp —
+    the participant's own, another participant's, or a community one — which
+    is what lets the pricing loops tell a true gap apart from energy that
+    simply belongs to somebody, or something, else (§7.3).
+
+    ``weight_sum_by_date``/``weight_sum_by_month`` are the community's
+    allocation-weight denominators for the invoice period, used to turn a
+    community reading's price into this participant's share.
     """
 
     participant_consumption: models.QuerySet
     participant_production: models.QuerySet
+    community_consumption: models.QuerySet
+    community_production: models.QuerySet
     zev_consumption_by_ts: dict
     zev_production_by_ts: dict
+    weight_sum_by_date: dict
+    weight_sum_by_month: dict
     assignment_windows: AssignmentWindows
 
 
-def _assigned_metering_points(zev, meter_types, period_start, period_end, participant=None):
+def _assigned_metering_points(zev, meter_types, period_start, period_end, participant=None, allocation_mode=None):
     """Metering points of ``meter_types`` assigned during the period.
 
     An assignment counts if it began on or before the period ended and had not
     already finished before it began. Passing ``participant`` narrows this to
-    one member; omitting it covers the whole community.
+    one member; omitting it covers the whole community. Passing
+    ``allocation_mode`` narrows to metering points with at least one matching
+    assignment in the period — the per-reading gate still decides whether a
+    *specific* reading's window actually matches, since one meter's mode can
+    change mid-period (§7.3).
 
     Bidirectional points appear in both the consumption and production sets,
     which is how a single meter can feed the pool and draw from it.
@@ -78,6 +92,8 @@ def _assigned_metering_points(zev, meter_types, period_start, period_end, partic
     }
     if participant is not None:
         filters["assignments__participant"] = participant
+    if allocation_mode is not None:
+        filters["assignments__allocation_mode"] = allocation_mode
     return MeteringPoint.objects.filter(**filters).filter(
         models.Q(assignments__valid_to__isnull=True)
         | models.Q(assignments__valid_to__gte=period_start)
@@ -105,6 +121,12 @@ def _gather_period_readings(participant, period_start, period_end) -> PeriodRead
             participant=participant,
         )
 
+    def community_points(meter_types):
+        return _assigned_metering_points(
+            zev, meter_types, period_start, period_end,
+            allocation_mode=AllocationMode.COMMUNITY,
+        )
+
     # Physical community pool totals per timestamp — every metering point of
     # the ZEV regardless of assignment (ADR 0013): a never-assigned meter still
     # feeds the community pool, even though its readings are billed to nobody.
@@ -117,9 +139,19 @@ def _gather_period_readings(participant, period_start, period_end) -> PeriodRead
             own_points(CONSUMPTION_METER_TYPES), start_dt, end_dt, ReadingDirection.IN),
         participant_production=_readings_in_period(
             own_points(PRODUCTION_METER_TYPES), start_dt, end_dt, ReadingDirection.OUT),
+        community_consumption=_readings_in_period(
+            community_points(CONSUMPTION_METER_TYPES), start_dt, end_dt, ReadingDirection.IN),
+        community_production=_readings_in_period(
+            community_points(PRODUCTION_METER_TYPES), start_dt, end_dt, ReadingDirection.OUT),
         zev_consumption_by_ts=zev_consumption_by_ts,
         zev_production_by_ts=zev_production_by_ts,
-        assignment_windows=AssignmentWindows.for_participant(participant, period_start, period_end),
+        weight_sum_by_date=_allocation_weight_sum_by_date(zev, period_start, period_end),
+        weight_sum_by_month=_allocation_weight_sum_by_month(zev, period_start, period_end),
+        # ZEV-wide, not participant-scoped: the personal loops must be able to
+        # resolve *any* window at a reading's timestamp — another
+        # participant's, or a community one — to tell a true gap apart from
+        # energy that simply belongs to somebody, or something, else (§7.3).
+        assignment_windows=AssignmentWindows.for_zev(zev, period_start, period_end),
     )
 
 
@@ -219,6 +251,7 @@ class ItemAccumulator:
                 "total": Decimal("0"),
                 "unit": unit,
                 "base_total": Decimal("0"),
+                "bucket": bucket,
             }
         entry["quantity"] += quantity
         entry["total"] += total
@@ -315,6 +348,15 @@ def _count_billable_months(tariff: Tariff, period_start: date, period_end: date)
 
 
 def _count_billable_metering_points_by_month(participant: Participant, tariff: Tariff, period_start: date, period_end: date) -> int:
+    """How many of the participant's own metering points each billed month covers.
+
+    Excludes ``COMMUNITY``-mode assignments **for the month in question**, not
+    with a blanket join filter — the same per-window care as the mode-aware
+    gate in ``generate_invoice`` (§7.3/§7.5): a meter personal in one month and
+    community the next must count in the first month and be excluded from the
+    second. A community meter's fee is charged separately, split by weight,
+    in ``_price_fixed_fees``.
+    """
     overlap_start = max(period_start, tariff.valid_from)
     overlap_end = min(period_end, tariff.valid_to or period_end)
     if overlap_start > overlap_end:
@@ -326,7 +368,7 @@ def _count_billable_metering_points_by_month(participant: Participant, tariff: T
         MeteringPointAssignment.objects.filter(
             participant=participant,
             metering_point__is_active=True,
-        ).values_list("metering_point_id", "valid_from", "valid_to")
+        ).values_list("metering_point_id", "valid_from", "valid_to", "allocation_mode")
     )
 
     total_metering_points = 0
@@ -340,19 +382,68 @@ def _count_billable_metering_points_by_month(participant: Participant, tariff: T
         month_start = max(month_first_day, overlap_start)
         month_end = min(month_last_day, overlap_end)
         month_has_active = any(
-            vf <= month_last_day and (vt is None or vt >= month_first_day)
-            for _mp_id, vf, vt in assignments
+            vf <= month_last_day and (vt is None or vt >= month_first_day) and mode == AllocationMode.PERSONAL
+            for _mp_id, vf, vt, mode in assignments
         )
         if month_start <= month_end and month_has_active:
             total_metering_points += len({
                 mp_id
-                for mp_id, vf, vt in assignments
-                if vf <= month_end and (vt is None or vt >= month_start)
+                for mp_id, vf, vt, mode in assignments
+                if vf <= month_end and (vt is None or vt >= month_start) and mode == AllocationMode.PERSONAL
             })
 
         cursor = next_month
 
     return total_metering_points
+
+
+def _count_community_metering_points_by_month(zev: Zev, tariff: Tariff, period_start: date, period_end: date) -> dict[date, int]:
+    """Active, ``COMMUNITY``-mode metering points billable each month.
+
+    Mirrors ``_count_billable_metering_points_by_month`` but is ZEV-wide
+    rather than participant-scoped, and counts only ``COMMUNITY`` windows —
+    the two counts are deliberately disjoint per month, so together they
+    account for every active metering point exactly once. Feeds the
+    per-metering-point community contribution (§7.5): each active community
+    meter's fee is charged once per month, then divided between eligible
+    participants by weight. Keyed by the first day of the month; a month with
+    no active community meter is absent, not zero.
+    """
+    overlap_start = max(period_start, tariff.valid_from)
+    overlap_end = min(period_end, tariff.valid_to or period_end)
+    if overlap_start > overlap_end:
+        return {}
+
+    assignments = list(
+        MeteringPointAssignment.objects.filter(
+            metering_point__zev=zev,
+            metering_point__is_active=True,
+            allocation_mode=AllocationMode.COMMUNITY,
+        ).values_list("metering_point_id", "valid_from", "valid_to")
+    )
+
+    counts: dict[date, int] = {}
+    cursor = _month_start(overlap_start)
+    last_month = _month_start(overlap_end)
+    while cursor <= last_month:
+        next_month = _next_month(cursor)
+        month_first_day = cursor
+        month_last_day = next_month - timedelta(days=1)
+
+        month_start = max(month_first_day, overlap_start)
+        month_end = min(month_last_day, overlap_end)
+        if month_start <= month_end:
+            count = len({
+                mp_id
+                for mp_id, vf, vt in assignments
+                if vf <= month_end and (vt is None or vt >= month_start)
+            })
+            if count:
+                counts[cursor] = count
+
+        cursor = next_month
+
+    return counts
 
 
 def _overlaps(valid_from: date, valid_to: date | None, start: date, end: date) -> bool:
@@ -520,6 +611,7 @@ DESCRIPTION_TRANSLATIONS: dict[str, dict] = {
         "shared_yearly_sg": "monatliche Rate der Jahresgebühr, Gemeinschaftskosten anteilig",
         "shared_yearly_pl": "monatliche Raten der Jahresgebühr, Gemeinschaftskosten anteilig",
         "pct_of": "von CHF",
+        "community_marker": "Gemeinschaftsanteil",
     },
     "fr": {
         "yearly_fee_sg": "mensualité de la redevance annuelle",
@@ -535,6 +627,7 @@ DESCRIPTION_TRANSLATIONS: dict[str, dict] = {
         "shared_yearly_sg": "mensualité de la redevance annuelle, quote-part des frais communs",
         "shared_yearly_pl": "mensualités de la redevance annuelle, quote-part des frais communs",
         "pct_of": "de CHF",
+        "community_marker": "Part communautaire",
     },
     "it": {
         "yearly_fee_sg": "rata mensile della tariffa annuale",
@@ -550,6 +643,7 @@ DESCRIPTION_TRANSLATIONS: dict[str, dict] = {
         "shared_yearly_sg": "rata mensile della tariffa annuale, quota dei costi comuni",
         "shared_yearly_pl": "rate mensili della tariffa annuale, quota dei costi comuni",
         "pct_of": "di CHF",
+        "community_marker": "Quota comunitaria",
     },
     "en": {
         "yearly_fee_sg": "monthly installment of annual fee",
@@ -565,6 +659,7 @@ DESCRIPTION_TRANSLATIONS: dict[str, dict] = {
         "shared_yearly_sg": "monthly installment of annual fee, share of community costs",
         "shared_yearly_pl": "monthly installments of annual fee, share of community costs",
         "pct_of": "of CHF",
+        "community_marker": "Community share",
     },
 }
 
@@ -577,20 +672,29 @@ def _build_description(
     lang: str = "de",
     *,
     base_rate: Decimal | None = None,
+    bucket: str = "default",
 ) -> str:
+    t = DESCRIPTION_TRANSLATIONS.get(lang, DESCRIPTION_TRANSLATIONS["de"])
+    # Every "shared" bucket ("shared", "shared_producer_credit") is a
+    # community-metering-point line (§7.6) — distinct from the pre-existing
+    # SHARED_MONTHLY_FEE/SHARED_YEARLY_FEE wording above, which already names
+    # itself as a community cost and is never tagged with this marker.
+    community = bucket.startswith("shared")
+    marker = t["community_marker"]
+
     if tariff.billing_mode == BillingMode.ENERGY:
-        return tariff.name
+        return f"{tariff.name} ({marker})" if community else tariff.name
     if tariff.billing_mode == BillingMode.PERCENTAGE_OF_ENERGY:
         pct = tariff.percentage or Decimal("0")
         # Format: remove trailing zeros (50.00 → 50, 33.50 → 33.5)
         pct_str = f"{pct:f}".rstrip("0").rstrip(".")
         if base_rate is not None:
-            t = DESCRIPTION_TRANSLATIONS.get(lang, DESCRIPTION_TRANSLATIONS["de"])
             base_str = f"{base_rate:f}".rstrip("0").rstrip(".")
-            return f"{tariff.name} ({pct_str}% {t['pct_of']} {base_str}/kWh)"
-        return f"{tariff.name} ({pct_str}%)"
+            suffix = f", {marker}" if community else ""
+            return f"{tariff.name} ({pct_str}% {t['pct_of']} {base_str}/kWh{suffix})"
+        suffix = f", {marker}" if community else ""
+        return f"{tariff.name} ({pct_str}%{suffix})"
 
-    t = DESCRIPTION_TRANSLATIONS.get(lang, DESCRIPTION_TRANSLATIONS["de"])
     months = int(quantity)
 
     if tariff.billing_mode == BillingMode.YEARLY_FEE:
@@ -599,10 +703,14 @@ def _build_description(
 
     if tariff.billing_mode == BillingMode.PER_METERING_POINT_YEARLY_FEE:
         suffix = t["mp_yearly_sg"] if months == 1 else t["mp_yearly_pl"]
+        if community:
+            suffix = f"{suffix}, {marker}"
         return f"{tariff.name} ({months} {suffix})"
 
     if tariff.billing_mode == BillingMode.PER_METERING_POINT_MONTHLY_FEE:
         suffix = t["mp_monthly_sg"] if months == 1 else t["mp_monthly_pl"]
+        if community:
+            suffix = f"{suffix}, {marker}"
         return f"{tariff.name} ({months} {suffix})"
 
     # The shared modes carry no participant count in the text: the denominator
@@ -644,9 +752,14 @@ def _price_fixed_fees(participant, tariffs, period_start, period_end, accumulato
     multiply that by how many points the participant held in those months.
     Yearly fees are charged as twelfths.
 
-    The shared variants divide one community-wide amount between the members
-    active in each month, so their total is built month by month rather than as
-    ``quantity * unit_price``.
+    The ``SHARED_*`` modes divide one community-wide amount between the
+    members active in each month, so their total is built month by month
+    rather than as ``quantity * unit_price``. The per-metering-point modes
+    bill personal and community metering points separately (§7.5): the
+    personal count excludes ``COMMUNITY``-mode assignments, and each active
+    community meter contributes its own weight-split ``bucket="shared"``
+    line — ``split_key`` plays no part here, since a community meter's cost
+    always allocates by weight.
     """
     for tariff in tariffs:
         if tariff.billing_mode in _ENERGY_BILLING_MODES:
@@ -666,17 +779,46 @@ def _price_fixed_fees(participant, tariffs, period_start, period_end, accumulato
             BillingMode.SHARED_YEARLY_FEE,
         )
 
-        if per_metering_point:
-            quantity = Decimal(_count_billable_metering_points_by_month(
-                participant, tariff, period_start, period_end))
-            if quantity <= 0:
-                continue
-        else:
-            quantity = Decimal(month_count)
-
         unit_price = tariff.fixed_price_chf or Decimal("0")
         if yearly:
             unit_price = unit_price / Decimal("12")
+
+        if per_metering_point:
+            # Personal and community metering points are counted, and billed,
+            # separately (§7.5): the split_key mechanism above is only for
+            # SHARED_* fees, since the cost being divided here belongs to a
+            # community *meter*, which always allocates by weight.
+            quantity = Decimal(_count_billable_metering_points_by_month(
+                participant, tariff, period_start, period_end))
+            if quantity > 0:
+                accumulator.add(
+                    tariff=tariff, quantity=quantity, total=quantity * unit_price, unit="month",
+                )
+
+            community_counts = _count_community_metering_points_by_month(
+                participant.zev, tariff, period_start, period_end)
+            if community_counts:
+                weight_sums = _allocation_weight_sum_by_month(
+                    participant.zev, period_start, period_end)
+                shared_total = Decimal("0")
+                shared_months = 0
+                for month, billed_from, billed_to in _billable_months(tariff, period_start, period_end):
+                    count = community_counts.get(month)
+                    denominator = weight_sums.get(month)
+                    if not count or not denominator or not _overlaps(
+                        participant.valid_from, participant.valid_to, billed_from, billed_to
+                    ):
+                        continue
+                    shared_total += unit_price * Decimal(count) * participant.allocation_weight / denominator
+                    shared_months += 1
+                if shared_months > 0:
+                    accumulator.add(
+                        tariff=tariff, quantity=Decimal(shared_months), total=shared_total,
+                        unit="month", bucket="shared",
+                    )
+            continue
+
+        quantity = Decimal(month_count)
 
         if shared:
             # split_key picks the denominator: WEIGHT normalizes by
@@ -754,6 +896,7 @@ def _build_item_payloads(accumulator) -> tuple[list, Decimal]:
             "unit_price": unit_price,
             "total": quantized_total,
             "base_rate": (raw_base_total / quantity).quantize(Decimal("0.00001"), rounding=ROUND_HALF_UP) if quantity and raw_base_total else None,
+            "bucket": entry["bucket"],
         })
 
     return payloads, subtotal.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
@@ -790,11 +933,17 @@ def generate_invoice(participant: Participant, period_start: date, period_end: d
 
     for reading in readings.participant_consumption.order_by("timestamp").iterator():
         ts = reading.timestamp
-        if not readings.assignment_windows.is_held_by(participant.id, reading.metering_point_id, ts):
-            # Reading predates this participant's assignment (or falls in an
-            # assignment gap): it belongs to nobody in this billing run.
+        resolution = readings.assignment_windows.assignment_at(reading.metering_point_id, ts)
+        if resolution is None:
+            # A true gap: no assignment covers this timestamp. Belongs to
+            # nobody in this billing run.
             skipped_consumption_readings += 1
             skipped_consumption_kwh += reading.energy_kwh
+            continue
+        if resolution.allocation_mode != AllocationMode.PERSONAL or resolution.holder_id != participant.id:
+            # Community energy (billed in the community loop below) or
+            # somebody else's meter (billed on their own invoice) — neither
+            # is a gap, so the skip counters must not count it (§7.3).
             continue
         participant_kwh = reading.energy_kwh
         zev_consumption_at_ts = zev_consumption_by_ts.get(ts, Decimal("0"))
@@ -846,9 +995,12 @@ def generate_invoice(participant: Participant, period_start: date, period_end: d
 
     for reading in readings.participant_production.order_by("timestamp").iterator():
         ts = reading.timestamp
-        if not readings.assignment_windows.is_held_by(participant.id, reading.metering_point_id, ts):
+        resolution = readings.assignment_windows.assignment_at(reading.metering_point_id, ts)
+        if resolution is None:
             skipped_production_readings += 1
             skipped_production_kwh += reading.energy_kwh
+            continue
+        if resolution.allocation_mode != AllocationMode.PERSONAL or resolution.holder_id != participant.id:
             continue
         produced_kwh = reading.energy_kwh
 
@@ -896,6 +1048,126 @@ def generate_invoice(participant: Participant, period_start: date, period_end: d
                     quantity=exported_kwh,
                     total=-(exported_kwh * price),
                     unit="kWh",
+                )
+
+    # ─── Community-allocated energy (§7.4) ─────────────────────────────────
+    # Price once, allocate second: each community reading is priced with the
+    # ordinary tariff resolution and split against the same physical ZEV
+    # totals used above (which already include community meters), then the
+    # resulting kWh/CHF are divided by this participant's date-granular
+    # weight share. Fed into the same open accumulators as the personal
+    # loops, so total_local_kwh/total_grid_kwh/total_feed_in_kwh include
+    # shared energy.
+    for reading in readings.community_consumption.order_by("timestamp").iterator():
+        ts = reading.timestamp
+        resolution = readings.assignment_windows.assignment_at(reading.metering_point_id, ts)
+        if resolution is None or resolution.allocation_mode != AllocationMode.COMMUNITY:
+            continue  # gap, or this window is personal — billed elsewhere
+        day = ts.date()
+        if not _overlaps(participant.valid_from, participant.valid_to, day, day):
+            continue  # a mid-period joiner/leaver pays no share outside their own membership
+        weight_sum = readings.weight_sum_by_date.get(day)
+        if not weight_sum:
+            continue
+        share = participant.allocation_weight / weight_sum
+
+        zev_consumption_at_ts = zev_consumption_by_ts.get(ts, Decimal("0"))
+        zev_production_at_ts = zev_production_by_ts.get(ts, Decimal("0"))
+        r_local, r_grid = split_consumption(
+            reading.energy_kwh, zev_consumption_at_ts, zev_production_at_ts
+        )
+        shared_local = r_local * share
+        shared_grid = r_grid * share
+
+        local_kwh_acc += shared_local
+        grid_kwh_acc += shared_grid
+
+        grid_base_price_sum = sum(
+            (_get_tariff_price(t, ts) or Decimal("0"))
+            for t in tariffs.energy(EnergyType.GRID, ts.date())
+        )
+
+        for energy_type, quantity in ((EnergyType.LOCAL, shared_local), (EnergyType.GRID, shared_grid)):
+            if quantity <= 0:
+                continue
+            for tariff in tariffs.energy(energy_type, ts.date()):
+                price = _get_tariff_price(tariff, ts) or Decimal("0")
+                items_accumulator.add(
+                    tariff=tariff,
+                    quantity=quantity,
+                    total=quantity * price,
+                    unit="kWh",
+                    bucket="shared",
+                )
+            for tariff in tariffs.percentage(energy_type, ts.date()):
+                effective_price = grid_base_price_sum * (tariff.percentage / Decimal("100"))
+                items_accumulator.add(
+                    tariff=tariff,
+                    quantity=quantity,
+                    total=quantity * effective_price,
+                    unit="kWh",
+                    base_total=quantity * grid_base_price_sum,
+                    bucket="shared",
+                )
+
+    for reading in readings.community_production.order_by("timestamp").iterator():
+        ts = reading.timestamp
+        resolution = readings.assignment_windows.assignment_at(reading.metering_point_id, ts)
+        if resolution is None or resolution.allocation_mode != AllocationMode.COMMUNITY:
+            continue
+        day = ts.date()
+        if not _overlaps(participant.valid_from, participant.valid_to, day, day):
+            continue
+        weight_sum = readings.weight_sum_by_date.get(day)
+        if not weight_sum:
+            continue
+        share = participant.allocation_weight / weight_sum
+
+        zev_production_at_ts = zev_production_by_ts.get(ts, Decimal("0"))
+        zev_consumption_at_ts = zev_consumption_by_ts.get(ts, Decimal("0"))
+        local_sold_kwh, exported_kwh = split_production(
+            reading.energy_kwh, zev_production_at_ts, zev_consumption_at_ts
+        )
+        shared_local_sold = local_sold_kwh * share
+        shared_exported = exported_kwh * share
+
+        exported_kwh_acc += shared_exported
+
+        grid_base_price_sum = sum(
+            (_get_tariff_price(t, ts) or Decimal("0"))
+            for t in tariffs.energy(EnergyType.GRID, ts.date())
+        )
+
+        if shared_local_sold > 0:
+            for tariff in tariffs.energy(EnergyType.LOCAL, ts.date()):
+                price = _get_tariff_price(tariff, ts) or Decimal("0")
+                items_accumulator.add(
+                    tariff=tariff,
+                    quantity=shared_local_sold,
+                    total=-(shared_local_sold * price),
+                    unit="kWh",
+                    bucket="shared_producer_credit",
+                )
+            for tariff in tariffs.percentage(EnergyType.LOCAL, ts.date()):
+                effective_price = grid_base_price_sum * (tariff.percentage / Decimal("100"))
+                items_accumulator.add(
+                    tariff=tariff,
+                    quantity=shared_local_sold,
+                    total=-(shared_local_sold * effective_price),
+                    unit="kWh",
+                    base_total=(shared_local_sold * grid_base_price_sum),
+                    bucket="shared_producer_credit",
+                )
+
+        if shared_exported > 0:
+            for tariff in tariffs.energy(EnergyType.FEED_IN, ts.date()):
+                price = _get_tariff_price(tariff, ts) or Decimal("0")
+                items_accumulator.add(
+                    tariff=tariff,
+                    quantity=shared_exported,
+                    total=-(shared_exported * price),
+                    unit="kWh",
+                    bucket="shared",
                 )
 
     _price_fixed_fees(participant, tariffs_list, period_start, period_end, items_accumulator)
@@ -953,7 +1225,7 @@ def generate_invoice(participant: Participant, period_start: date, period_end: d
             tariff_category=tariff.category,
             description=_build_description(
                 tariff, period_start, period_end, payload["quantity"], lang,
-                base_rate=payload.get("base_rate"),
+                base_rate=payload.get("base_rate"), bucket=payload["bucket"],
             ),
             quantity_kwh=payload["quantity"],
             unit=payload["unit"],
