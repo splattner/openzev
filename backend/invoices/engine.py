@@ -423,6 +423,72 @@ def _count_active_participants_by_month(zev: Zev, tariff: Tariff, period_start: 
     return counts
 
 
+def _allocation_weight_sum_by_month(zev: Zev, period_start: date, period_end: date) -> dict[date, Decimal]:
+    """Sum of ``Participant.allocation_weight`` active in each billed month.
+
+    Counted per month, not once over the period — same rationale as
+    ``_count_active_participants_by_month``: a joiner in February must not
+    dilute January's share. Read from ZEV membership, never from sibling
+    invoices, so generating one participant's invoice alone yields the same
+    share as a full run.
+
+    Unlike ``_count_active_participants_by_month`` this takes no ``tariff``:
+    it feeds both weight-keyed SHARED_* fees (which look up their own
+    tariff-clipped months here) and per-metering-point community fees, and
+    is computed once over the whole invoice period rather than once per
+    tariff. A month with no eligible participant is absent, not zero, so a
+    caller cannot divide by it.
+    """
+    windows = list(
+        Participant.objects.filter(zev=zev).values_list("valid_from", "valid_to", "allocation_weight")
+    )
+
+    sums: dict[date, Decimal] = {}
+    cursor = _month_start(period_start)
+    last_month = _month_start(period_end)
+    while cursor <= last_month:
+        next_month = _next_month(cursor)
+        billed_from = max(cursor, period_start)
+        billed_to = min(next_month - timedelta(days=1), period_end)
+        total = sum(
+            (weight for valid_from, valid_to, weight in windows
+             if _overlaps(valid_from, valid_to, billed_from, billed_to)),
+            Decimal("0"),
+        )
+        if total > 0:
+            sums[cursor] = total
+        cursor = next_month
+
+    return sums
+
+
+def _allocation_weight_sum_by_date(zev: Zev, period_start: date, period_end: date) -> dict[date, Decimal]:
+    """Sum of ``Participant.allocation_weight`` active on each calendar date.
+
+    Date-granular, matching ``participant_on``: feeds shared energy, levies
+    and credits, so a mid-period joiner's share starts exactly on their join
+    date rather than at the start of the month. A date with no eligible
+    participant is absent, not zero.
+    """
+    windows = list(
+        Participant.objects.filter(zev=zev).values_list("valid_from", "valid_to", "allocation_weight")
+    )
+
+    sums: dict[date, Decimal] = {}
+    cursor = period_start
+    while cursor <= period_end:
+        total = sum(
+            (weight for valid_from, valid_to, weight in windows
+             if valid_from <= cursor and (valid_to is None or valid_to >= cursor)),
+            Decimal("0"),
+        )
+        if total > 0:
+            sums[cursor] = total
+        cursor += timedelta(days=1)
+
+    return sums
+
+
 _ENERGY_BILLING_MODES = {BillingMode.ENERGY, BillingMode.PERCENTAGE_OF_ENERGY}
 _SHARED_BILLING_MODES = {BillingMode.SHARED_MONTHLY_FEE, BillingMode.SHARED_YEARLY_FEE}
 
