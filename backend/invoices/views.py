@@ -312,7 +312,7 @@ class InvoiceViewSet(
             summary=f"Generated PDF for invoice {_invoice_target_display(invoice)}.",
             invoice=invoice,
         )
-        return Response({"pdf_url": request.build_absolute_uri(invoice.pdf_file.url)})
+        return Response({"pdf_url": request.build_absolute_uri(f"/api/v1/invoices/invoices/{invoice.pk}/pdf/")})
 
     @action(detail=True, methods=["post"], url_path="send-email",
             permission_classes=[IsAuthenticated, IsZevOwnerOrAdmin])

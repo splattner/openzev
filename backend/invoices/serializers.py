@@ -65,7 +65,9 @@ class InvoiceSerializer(serializers.ModelSerializer):
         if obj.pdf_file:
             request = self.context.get("request")
             if request:
-                return request.build_absolute_uri(obj.pdf_file.url)
+                return request.build_absolute_uri(
+                    f"/api/v1/invoices/invoices/{obj.pk}/pdf/"
+                )
         return None
 
 
