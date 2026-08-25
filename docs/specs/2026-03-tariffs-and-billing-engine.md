@@ -84,7 +84,12 @@ helpers live in `tariffs/series.py`.
 Every version of one series must agree on `category`, `billing_mode`, and
 `energy_type` (`SERIES_FIELDS`), enforced in `Tariff.clean()`.  Without that,
 "the same tariff over time" would be meaningless and comparing versions could
-compare a local-energy rate against a grid fee.
+compare a local-energy rate against a grid fee.  `split_key` is **not** in
+`SERIES_FIELDS`: a series may change its split key across versions (for
+example switching a shared fee from headcount to weight).  `new_version` and
+`duplicate` still copy `split_key` from the source — without that copy a
+weight-split shared fee silently reverts to the model default `equal` on the
+new row, and every subsequent invoice under that version splits by headcount.
 
 **Prices are not on the tariff.**  For `energy` mode they live on
 `TariffPeriod`; for fixed-fee modes on `fixed_price_chf`; a
@@ -996,6 +1001,7 @@ community energy to a single participant.
 | Gaps reported / absent; series scoped to the caller's ZEVs; `?zev_id=` filter | §6.1a |
 | New version closes the predecessor the day before and leaves no gap | §3.1.1 |
 | New version copies HT/NT bands including times; can set new prices in one call; fixed-fee amount overridable | §6.1a |
+| New version and duplicate preserve `split_key` (`weight` and `equal`) | §3.1.1 |
 | Mid-chain insert is capped against its successor | §3.1.1 |
 | Duplicate starts a separate series without touching the source; refuses a blank or identical name | §6.1a |
 | Rename renames every version; refuses a name already in use; identical name is a no-op | §6.1a |

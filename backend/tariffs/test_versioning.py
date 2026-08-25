@@ -12,7 +12,7 @@ from decimal import Decimal
 
 import pytest
 
-from tariffs.models import BillingMode, EnergyType, PeriodType, Tariff, TariffCategory
+from tariffs.models import BillingMode, EnergyType, PeriodType, SplitKey, Tariff, TariffCategory
 from testing import factories
 from testing.helpers import authenticate as auth
 from rest_framework.test import APIClient
@@ -295,6 +295,39 @@ def test_new_version_is_refused_on_another_owners_tariff(owner_client):
     assert response.status_code == 404
 
 
+def _shared_fee(zev, *, name="Lift Electricity", split_key):
+    return factories.TariffFactory(
+        zev=zev, name=name, category=TariffCategory.METERING,
+        billing_mode=BillingMode.SHARED_MONTHLY_FEE, energy_type=None,
+        fixed_price_chf=Decimal("80.00"), valid_from=date(2026, 1, 1),
+        split_key=split_key,
+    )
+
+
+def test_a_new_version_preserves_weight_split_key(owner_client):
+    """Without this copy, a weight-split shared fee silently reverts to
+    headcount on every invoice issued under the new version."""
+    client, zev = owner_client
+    original = _shared_fee(zev, split_key=SplitKey.WEIGHT)
+
+    response = client.post(url(original, "new-version"), {"valid_from": "2027-01-01"}, format="json")
+
+    assert response.status_code == 201, response.data
+    assert response.data["split_key"] == SplitKey.WEIGHT
+    assert Tariff.objects.get(pk=response.data["id"]).split_key == SplitKey.WEIGHT
+
+
+def test_a_new_version_preserves_equal_split_key(owner_client):
+    client, zev = owner_client
+    original = _shared_fee(zev, split_key=SplitKey.EQUAL)
+
+    response = client.post(url(original, "new-version"), {"valid_from": "2027-01-01"}, format="json")
+
+    assert response.status_code == 201, response.data
+    assert response.data["split_key"] == SplitKey.EQUAL
+    assert Tariff.objects.get(pk=response.data["id"]).split_key == SplitKey.EQUAL
+
+
 # ---------------------------------------------------------------------------
 # duplicate
 # ---------------------------------------------------------------------------
@@ -333,6 +366,31 @@ def test_duplicate_refuses_the_source_name(owner_client):
 
     assert response.status_code == 400
     assert "new-version" in str(response.data["name"])
+
+
+def test_duplicate_preserves_weight_split_key(owner_client):
+    client, zev = owner_client
+    original = _shared_fee(zev, split_key=SplitKey.WEIGHT)
+
+    response = client.post(url(original, "duplicate"), {"name": "Lift Electricity Copy"}, format="json")
+
+    assert response.status_code == 201, response.data
+    assert response.data["split_key"] == SplitKey.WEIGHT
+    copy = Tariff.objects.get(pk=response.data["id"])
+    assert copy.split_key == SplitKey.WEIGHT
+    original.refresh_from_db()
+    assert original.split_key == SplitKey.WEIGHT
+
+
+def test_duplicate_preserves_equal_split_key(owner_client):
+    client, zev = owner_client
+    original = _shared_fee(zev, split_key=SplitKey.EQUAL)
+
+    response = client.post(url(original, "duplicate"), {"name": "Lift Electricity Copy"}, format="json")
+
+    assert response.status_code == 201, response.data
+    assert response.data["split_key"] == SplitKey.EQUAL
+    assert Tariff.objects.get(pk=response.data["id"]).split_key == SplitKey.EQUAL
 
 
 # ---------------------------------------------------------------------------
