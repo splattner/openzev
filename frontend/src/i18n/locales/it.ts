@@ -138,6 +138,8 @@ export const it = {
         edit: 'Modifica',
         delete: 'Elimina',
         cancel: 'Annulla',
+        confirm: 'Conferma',
+        processing: 'Elaborazione…',
         save: 'Salva',
         create: 'Crea',
         yes: 'Sì',
@@ -1069,6 +1071,9 @@ export const it = {
             },
             weightShare: '{{percent}} % — {{weight}} di {{total}} pesi',
             weightShareHint: 'La quota di questo partecipante nei costi dei contatori comunitari, in base al suo peso di allocazione rispetto al totale dello ZEV.',
+            validation: {
+                allocationWeightPositive: 'Il peso di allocazione deve essere un numero positivo.',
+            },
             warnings: {
                 noEmail: 'Nessuna e-mail',
                 noAddress: 'Nessun indirizzo',

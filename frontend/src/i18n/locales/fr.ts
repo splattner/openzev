@@ -138,6 +138,8 @@ export const fr = {
         edit: 'Modifier',
         delete: 'Supprimer',
         cancel: 'Annuler',
+        confirm: 'Confirmer',
+        processing: 'Traitement…',
         save: 'Enregistrer',
         create: 'Créer',
         yes: 'Oui',
@@ -1069,6 +1071,9 @@ export const fr = {
             },
             weightShare: '{{percent}} % — {{weight}} sur {{total}} pondérations',
             weightShareHint: "La part de ce participant dans les coûts des compteurs communautaires, basée sur sa pondération d'attribution relative au total du ZEV.",
+            validation: {
+                allocationWeightPositive: 'Le poids d’allocation doit être un nombre positif.',
+            },
             warnings: {
                 noEmail: 'Aucun e-mail',
                 noAddress: 'Aucune adresse',

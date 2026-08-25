@@ -147,6 +147,8 @@ export const en = {
         edit: 'Edit',
         delete: 'Delete',
         cancel: 'Cancel',
+        confirm: 'Confirm',
+        processing: 'Processing...',
         save: 'Save',
         create: 'Create',
         yes: 'Yes',
@@ -1080,6 +1082,9 @@ export const en = {
             },
             weightShare: '{{percent}} % — {{weight}} of {{total}} weights',
             weightShareHint: 'This participant\'s share of community-meter costs, based on their allocation weight relative to the ZEV total.',
+            validation: {
+                allocationWeightPositive: 'Allocation weight must be a positive number.',
+            },
             warnings: {
                 noEmail: 'No email',
                 noAddress: 'No address',

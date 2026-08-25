@@ -347,10 +347,10 @@ export function DashboardPage() {
                                             <YAxis yAxisId="pct" orientation="right" tick={{ fontSize: 10 }} unit="%" width={44} domain={[0, 100]} />
                                             <Tooltip
                                                 labelFormatter={formatBucketTooltipLabel}
-                                                formatter={(v, name) =>
-                                                    name === 'Self-consumed %'
-                                                        ? [`${Number(v).toFixed(1)}%`, name]
-                                                        : [`${Number(v).toFixed(2)} kWh`, name]
+                                                formatter={(v, _name, props) =>
+                                                    props?.dataKey === 'self_consumption_rate'
+                                                        ? [`${Number(v).toFixed(1)}%`, t('pages.dashboard.chart.selfConsumedPct')]
+                                                        : [`${Number(v).toFixed(2)} kWh`, _name]
                                                 }
                                             />
                                             <Legend />

@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import i18n from '../../i18n'
 import { todayLocalIso } from '../../lib/dates'
 import type { Participant, ParticipantInput } from '../../types/api'
 
@@ -42,7 +43,7 @@ export const participantFormSchema = z
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ['allocation_weight'],
-        message: 'Allocation weight must be a positive number.',
+        message: i18n.t('pages.participants.validation.allocationWeightPositive'),
       })
     }
   })

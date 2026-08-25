@@ -1,4 +1,6 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
+import { useToast } from '../lib/toast'
 
 interface ConfirmDialogOptions {
     title: string
@@ -11,6 +13,8 @@ interface ConfirmDialogOptions {
 }
 
 export function useConfirmDialog() {
+    const { t } = useTranslation()
+    const { pushToast } = useToast()
     const [dialog, setDialog] = useState<ConfirmDialogOptions | null>(null)
     const [isLoading, setIsLoading] = useState(false)
 
@@ -25,6 +29,9 @@ export function useConfirmDialog() {
             if (result instanceof Promise) {
                 await result
             }
+            setDialog(null)
+        } catch {
+            pushToast(t('common.error'), 'error')
             setDialog(null)
         } finally {
             setIsLoading(false)
@@ -42,13 +49,14 @@ export function useConfirmDialog() {
 export function ConfirmDialog({
     title,
     message,
-    confirmText = 'Confirm',
-    cancelText = 'Cancel',
+    confirmText,
+    cancelText,
     isDangerous = false,
     isLoading = false,
     onConfirm,
     onCancel,
 }: ConfirmDialogOptions & { isLoading?: boolean; onConfirm: () => void; onCancel: () => void }) {
+    const { t } = useTranslation()
     return (
         <div
             style={{
@@ -80,7 +88,7 @@ export function ConfirmDialog({
                         disabled={isLoading}
                         type="button"
                     >
-                        {cancelText}
+                        {cancelText || t('common.cancel')}
                     </button>
                     <button
                         className={`button ${isDangerous ? 'danger' : ''}`}
@@ -88,7 +96,7 @@ export function ConfirmDialog({
                         disabled={isLoading}
                         type="button"
                     >
-                        {isLoading ? 'Processing...' : confirmText}
+                        {isLoading ? t('common.processing') : (confirmText || t('common.confirm'))}
                     </button>
                 </div>
             </div>

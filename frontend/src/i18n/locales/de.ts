@@ -138,6 +138,8 @@ export const de = {
         edit: 'Bearbeiten',
         delete: 'Löschen',
         cancel: 'Abbrechen',
+        confirm: 'Bestätigen',
+        processing: 'Wird verarbeitet…',
         save: 'Speichern',
         create: 'Erstellen',
         yes: 'Ja',
@@ -1069,6 +1071,9 @@ export const de = {
             },
             weightShare: '{{percent}} % — {{weight}} von {{total}} Gewichten',
             weightShareHint: 'Der Anteil dieses Teilnehmers an den Kosten von Gemeinschaftszählern, basierend auf seinem Zuteilungsgewicht im Verhältnis zur ZEV-Gesamtheit.',
+            validation: {
+                allocationWeightPositive: 'Das Allokationsgewicht muss eine positive Zahl sein.',
+            },
             warnings: {
                 noEmail: 'Keine E-Mail',
                 noAddress: 'Keine Adresse',
