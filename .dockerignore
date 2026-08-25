@@ -1,0 +1,36 @@
+# Build-context whitelist.
+#
+# All three image builds use the repository root as their context
+# (docker-compose*.yml all set `context: .`), but between them the Dockerfiles
+# only ever COPY from frontend/, backend/ and docker/. Without this file every
+# build ships ~930 MB, dominated by .venv (425 MB), frontend/node_modules
+# (376 MB) and .git (94 MB) — none of which any Dockerfile reads.
+#
+# Deny everything, then re-admit exactly the three trees that are COPY'd. A new
+# top-level directory therefore cannot silently inflate the context again, and a
+# Dockerfile that starts needing one fails loudly instead of quietly bloating.
+*
+!backend
+!docker
+!frontend
+
+# node_modules is a correctness problem, not only a size one: frontend/Dockerfile
+# runs `npm ci` and *then* `COPY frontend .`, so a host node_modules would
+# overwrite the freshly installed tree — potentially with packages built for a
+# different platform or Node version.
+**/node_modules
+frontend/dist
+
+# Local developer state. These are runtime artifacts or secrets and must never
+# be baked into an image: a dev database, uploaded participant PDFs, virtualenvs,
+# tool caches and env files.
+**/.venv
+**/__pycache__
+**/*.py[cod]
+**/.pytest_cache
+**/.ruff_cache
+**/.vite
+backend/db.sqlite3
+backend/media
+**/.env
+**/.env.*
