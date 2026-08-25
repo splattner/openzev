@@ -55,10 +55,16 @@ async function navigateTo(page: Page, urlPath: string) {
 /**
  * Step back one billing period.
  *
- * Pages open on the *current* period, which is still in progress and carries no
- * invoices. `seed_demo` bills the previous complete quarter, so the captures
- * that should show real data step back once. Matches the arrow icon rather than
- * the button label, which is translated.
+ * The dashboard and metering-data pages open on the *current* period
+ * (`getCurrentBillingPeriod`), which is still in progress and carries no
+ * readings worth showing, so those captures step back once to reach the
+ * quarter `seed_demo` fills.
+ *
+ * The invoices page is deliberately **not** among them: it already opens on
+ * the last complete period (`getPreviousBillingPeriod`), so stepping back
+ * there would overshoot into an empty one.
+ *
+ * Matches the arrow icon rather than the button label, which is translated.
  */
 async function goToPreviousPeriod(page: Page) {
   await page.locator('button:has(svg[data-icon="arrow-left"])').first().click()
@@ -505,8 +511,10 @@ test.describe('User Guide Screenshots', () => {
   test('08-invoices', async ({ page }) => {
     await navigateTo(page, '/invoices')
     await page.waitForSelector('table, .card', { timeout: 10_000 })
-    // Invoices are seeded for the last complete period, not the current one.
-    await goToPreviousPeriod(page)
+    // No step back here: InvoicesPage already opens on the last *complete*
+    // period (getPreviousBillingPeriod), which is the one seed_demo bills.
+    // Stepping back again would land a period earlier and capture an empty
+    // table.
     await screenshot(page, '08-invoices', 'invoices')
   })
 
