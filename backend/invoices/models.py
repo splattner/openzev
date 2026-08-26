@@ -43,7 +43,7 @@ class Invoice(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        ordering = ["-period_end", "participant"]
+        ordering = ["-period_end", "participant", "id"]
         constraints = [
             # Numbering is per-ZEV: each community counts its invoices from 1,
             # so the number only needs to be unique within the ZEV.

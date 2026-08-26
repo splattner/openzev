@@ -5,6 +5,7 @@ from datetime import date as date_type
 
 from rest_framework import mixins, viewsets, status
 from rest_framework.decorators import action
+from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from django.http import FileResponse, HttpResponse
@@ -80,10 +81,41 @@ class InvoiceViewSet(
     participant_filter = "participant__user"
 
     def get_queryset(self):
-        # Participants see only their own invoices
+        # Participants see only their own invoices.
         return self.scope_queryset(
             Invoice.objects.select_related("participant", "zev").prefetch_related("items", "email_logs")
         )
+
+    def filter_queryset(self, queryset):
+        # ?status= is a list-view filter, not scoping: it only narrows this
+        # queryset, never widens it, and must not 404 detail routes like
+        # retrieve/pdf/approve that reuse get_queryset via get_object().
+        queryset = super().filter_queryset(queryset)
+        if self.action != "list":
+            return queryset
+        raw_statuses = self.request.query_params.getlist("status")
+        if not raw_statuses:
+            return queryset
+        statuses = [
+            value.strip()
+            for raw in raw_statuses
+            for value in raw.split(",")
+            if value.strip()
+        ]
+        if not statuses:
+            return queryset
+        unknown = [value for value in statuses if value not in InvoiceStatus.values]
+        if unknown:
+            raise ValidationError(
+                {
+                    "status": [
+                        "Unknown status value(s): "
+                        + ", ".join(f"'{value}'" for value in unknown)
+                        + f". Expected one of: {', '.join(InvoiceStatus.values)}."
+                    ]
+                }
+            )
+        return queryset.filter(status__in=statuses)
 
     def destroy(self, request, *args, **kwargs):
         invoice = self.get_object()

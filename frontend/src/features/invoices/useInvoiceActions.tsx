@@ -89,6 +89,12 @@ export function useInvoiceActions({
         void queryClient.invalidateQueries({ queryKey: periodOverviewInvalidationKey })
     }, [periodOverviewInvalidationKey, queryClient])
 
+    // Invalidate the ['invoices','list'] prefix so both the unfiltered lists
+    // and the dashboard's status-filtered key are refreshed.
+    const invalidateInvoicesList = useCallback(() => {
+        void queryClient.invalidateQueries({ queryKey: ['invoices', 'list'] })
+    }, [queryClient])
+
     // ── Single invoice mutations ──────────────────────────────────────────────
 
     const generateMutation = useMutation({
@@ -96,6 +102,7 @@ export function useInvoiceActions({
         onSuccess: () => {
             pushToast(t('pages.invoices.messages.generated'), 'success')
             invalidatePeriodOverview()
+            invalidateInvoicesList()
         },
         onError: (error) => pushToast(formatApiError(error, t('pages.invoices.messages.generateFailed')), 'error'),
     })
@@ -114,6 +121,7 @@ export function useInvoiceActions({
         onSuccess: () => {
             pushToast(t('pages.invoices.messages.approved'), 'success')
             invalidatePeriodOverview()
+            invalidateInvoicesList()
         },
         onError: (error) => pushToast(formatApiError(error, t('pages.invoices.messages.approveFailed')), 'error'),
     })
@@ -123,6 +131,7 @@ export function useInvoiceActions({
         onSuccess: () => {
             pushToast(t('pages.invoices.messages.deleted'), 'success')
             invalidatePeriodOverview()
+            invalidateInvoicesList()
         },
         onError: (error) => pushToast(formatApiError(error, t('pages.invoices.messages.deleteFailed')), 'error'),
     })
@@ -134,6 +143,7 @@ export function useInvoiceActions({
             setPollingInvoiceId(invoiceId)
             setEmailPollingStartedAt(Date.now())
             invalidatePeriodOverview()
+            invalidateInvoicesList()
         },
         onError: (error) => pushToast(formatApiError(error, t('pages.invoices.messages.sendEmailFailed')), 'error'),
     })
@@ -143,6 +153,7 @@ export function useInvoiceActions({
         onSuccess: () => {
             pushToast(t('pages.invoices.markedSent'), 'success')
             invalidatePeriodOverview()
+            invalidateInvoicesList()
         },
         onError: (error) => pushToast(formatApiError(error, t('pages.invoices.messages.markSentFailed')), 'error'),
     })
@@ -152,6 +163,7 @@ export function useInvoiceActions({
         onSuccess: () => {
             pushToast(t('pages.invoices.messages.markedPaid'), 'success')
             invalidatePeriodOverview()
+            invalidateInvoicesList()
         },
         onError: (error) => pushToast(formatApiError(error, t('pages.invoices.messages.markPaidFailed')), 'error'),
     })
@@ -164,6 +176,7 @@ export function useInvoiceActions({
             setPollingInvoiceId(variables.invoiceId)
             setEmailPollingStartedAt(Date.now())
             invalidatePeriodOverview()
+            invalidateInvoicesList()
         },
         onError: (error) => pushToast(formatApiError(error, t('pages.invoices.messages.retryEmailFailed')), 'error'),
     })
@@ -187,6 +200,7 @@ export function useInvoiceActions({
         onSuccess: (result) => {
             pushToast(t('pages.invoices.batch.generateAllQueued', { n: result.participant_count }), 'success')
             invalidatePeriodOverview()
+            invalidateInvoicesList()
             scheduleOverviewRefresh()
         },
         onError: (error) => pushToast(formatApiError(error, t('pages.invoices.batch.generateAllFailed')), 'error'),
@@ -197,6 +211,7 @@ export function useInvoiceActions({
         onSuccess: (result) => {
             pushToast(t('pages.invoices.batch.approvedAll', { n: result.approved }), 'success')
             invalidatePeriodOverview()
+            invalidateInvoicesList()
         },
         onError: (error) => pushToast(formatApiError(error, t('pages.invoices.batch.approveAllFailed')), 'error'),
     })
@@ -209,6 +224,7 @@ export function useInvoiceActions({
                 : t('pages.invoices.batch.sentAll', { n: result.queued })
             pushToast(msg, 'success')
             invalidatePeriodOverview()
+            invalidateInvoicesList()
         },
         onError: (error) => pushToast(formatApiError(error, t('pages.invoices.batch.sendAllFailed')), 'error'),
     })
@@ -255,6 +271,7 @@ export function useInvoiceActions({
                     setPollingInvoiceId(null)
                     setEmailPollingStartedAt(null)
                     invalidatePeriodOverview()
+                    invalidateInvoicesList()
                     if (lastEmailLog.status === 'sent') {
                         pushToast(t('pages.invoices.messages.emailSentSuccess'), 'success')
                     }
@@ -273,13 +290,14 @@ export function useInvoiceActions({
 
                 // Update the query cache with the latest invoice data
                 invalidatePeriodOverview()
+                invalidateInvoicesList()
             } catch (error) {
                 console.error('Error polling invoice status:', error)
             }
         }, 2000) // Poll every 2 seconds
 
         return () => clearInterval(pollInterval)
-    }, [pollingInvoiceId, emailPollingStartedAt, periodOverviewInvalidationKey, invalidatePeriodOverview, pushToast, t])
+    }, [pollingInvoiceId, emailPollingStartedAt, periodOverviewInvalidationKey, invalidatePeriodOverview, invalidateInvoicesList, pushToast, t])
 
     useEffect(() => {
         if (!pollingInvoiceId || !emailPollingStartedAt) return

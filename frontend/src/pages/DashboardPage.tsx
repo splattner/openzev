@@ -23,6 +23,7 @@ import { queryKeys } from '../lib/api/queryKeys'
 import { downloadBlob } from '../lib/downloadBlob'
 import { formatIsoDate } from '../lib/dates'
 import { isInvoiceOverdue, selectOpenInvoices, sumTotalChf } from '../features/invoices/openInvoices'
+import { OPEN_INVOICE_STATUSES } from '../features/invoices/invoiceStatus'
 import { formatMeteringBucketLabel } from '../lib/meteringLabels'
 import { formatShortDate, useAppSettings } from '../lib/appSettings'
 import { useAuth } from '../lib/auth'
@@ -81,9 +82,10 @@ export function DashboardPage() {
             }),
         enabled: user?.role === 'participant' || (isZevScopedRole && !!selectedZevId),
     })
+    const openInvoiceStatusFilter = isZevScopedRole ? OPEN_INVOICE_STATUSES.join(',') : undefined
     const invoicesQuery = useQuery({
-        queryKey: queryKeys.invoices.list(selectedZevId || undefined),
-        queryFn: () => fetchInvoices(selectedZevId || undefined),
+        queryKey: queryKeys.invoices.list(selectedZevId || undefined, openInvoiceStatusFilter),
+        queryFn: () => fetchInvoices(selectedZevId || undefined, { status: openInvoiceStatusFilter }),
         // Participants see their own invoices server-side; owner/admin read
         // the selected ZEV's invoices for the open-invoice exception list.
         enabled: user?.role === 'participant' || (isZevScopedRole && !!selectedZevId),
@@ -290,9 +292,10 @@ export function DashboardPage() {
                         </section>
                     )}
 
-                    {/* Short exception list (spec §5.1): invoices still awaiting
-                        payment. Reads the first page of the scoped list — a
-                        backend status filter is deliberately out of scope. */}
+                    {/* Short exception list (spec §5.1): open invoices still
+                        awaiting payment, filtered server-side so later pages
+                        are not dropped; selectOpenInvoices is a client-side
+                        fallback. */}
                     <section className="card">
                         <h3 style={{ marginTop: 0 }}>{t('pages.dashboard.openInvoices.title')}</h3>
                         {invoicesQuery.isLoading ? (

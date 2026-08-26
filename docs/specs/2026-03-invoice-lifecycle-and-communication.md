@@ -74,7 +74,7 @@ lifecycle from scratch.
 | `created_at` | `DateTimeField` (auto) | Creation timestamp |
 | `updated_at` | `DateTimeField` (auto) | Last modification timestamp |
 
-Ordering: `["-period_end", "participant"]`.
+Ordering: `["-period_end", "participant", "id"]` (the `id` tie-break keeps pagination stable).
 
 ### 3.2 InvoiceItem
 
@@ -201,7 +201,7 @@ All invoice endpoints are routed under `/api/v1/invoices/invoices/` via a DRF `G
 
 | Method | URL | Permission | Description |
 |---|---|---|---|
-| `GET` | `/invoices/` | Authenticated | List invoices (scoped by role, see §6) |
+| `GET` | `/invoices/` | Authenticated | List invoices (scoped by role, see §6); optional `status` filter — comma-separated `InvoiceStatus` values (e.g. `approved,sent`), conjunctive with role/`zev_id` scoping; unknown → `400` with `status` in the body |
 | `GET` | `/invoices/{id}/` | Authenticated | Retrieve single invoice (with items + email_logs) |
 | `DELETE` | `/invoices/{id}/` | ZEV owner or admin | Delete (see §4.5 rules) |
 
@@ -627,6 +627,7 @@ Strips legacy period suffixes from `description` on serialization.
 
 | File | Test class | Validates |
 |---|---|---|
+| `test_invoice_list_filter.py` | `InvoiceStatusFilterTests`, `InvoiceStatusFilterScopingTests` | §5.1: comma-separated `?status=` (single/repeated values, whitespace tolerance, empty = absent, all unknown values → 400, list-only so detail routes are unaffected), status × `zev_id` + role scoping (participant cannot enumerate another ZEV's open invoices), composes with pagination |
 | `tests.py` | `InvoiceRBACTests` | §6: admin sees all, owner sees own ZEV, participant sees own invoices; participant cannot approve/cancel; PDF template access restricted to admin; deletion rules by role and status; generic POST create returns 405 (creation only via generate); serializer ignores forged billing/workflow fields |
 | `tests.py` | `InvoiceBillingIntegrationTests` | §5.2: end-to-end generation via API with metering data; allocation failures reported as 400, not the 409 duplicate-invoice message |
 | `test_workflow.py` | `InvoiceWorkflowTests` | §4.2: approve draft ✓, approve non-draft ✗, mark-sent from approved ✓, mark-sent from draft ✗, mark-paid from sent ✓, mark-paid from draft ✗, cancel from draft/approved/sent ✓, cancel from paid ✗, cancel already-cancelled ✗ |

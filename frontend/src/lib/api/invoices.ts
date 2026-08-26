@@ -9,10 +9,16 @@ import type {
 import { api } from './client'
 import { fetchAllPages } from './pagination'
 
-export async function fetchInvoices(zevId?: string): Promise<Invoice[]> {
+export async function fetchInvoices(
+  zevId?: string,
+  options?: { status?: string },
+): Promise<Invoice[]> {
   // Backend narrows by ?zev_id= on top of role scoping (issue #411); without it,
   // admins and multi-ZEV owners get every ZEV they can see.
-  return fetchAllPages<Invoice>('/invoices/invoices/', zevId ? { zev_id: zevId } : undefined)
+  return fetchAllPages<Invoice>('/invoices/invoices/', {
+    ...(zevId ? { zev_id: zevId } : {}),
+    ...(options?.status ? { status: options.status } : {}),
+  })
 }
 
 export async function fetchInvoice(invoiceId: string): Promise<Invoice> {
