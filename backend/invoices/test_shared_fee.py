@@ -552,3 +552,36 @@ def test_weighted_shared_fee_denominator_still_tracks_the_billed_window():
                   split_key=SplitKey.WEIGHT)
 
     assert fee_line(generate_invoice(stayer, JAN, JAN_END)).total_chf == Decimal("50.00")
+
+
+# ---------------------------------------------------------------------------
+# Zero-value shares (regression: bogus "N Monate / CHF 0.00" lines)
+# ---------------------------------------------------------------------------
+
+def test_a_zero_weight_member_gets_no_shared_fee_line():
+    """A zero-weight member of a WEIGHT-split fee is an active month member
+    (charged_months > 0), but their share computes to 0.00 — they get no line,
+    matching the bucket="shared" per-metering-point rule (§4.6.4)."""
+    zev = factories.ZevFactory()
+    full = factories.ParticipantFactory(zev=zev, valid_from=JAN)
+    zero = factories.ParticipantFactory(
+        zev=zev, valid_from=JAN, allocation_weight=Decimal("0"))
+    shared_tariff(zev, price="80.00", split_key=SplitKey.WEIGHT)
+
+    assert fee_line(generate_invoice(zero, JAN, JAN_END)) is None
+    # The paying member is unaffected: weight sum excludes the zero-weight
+    # member, so the full fee still lands on them.
+    assert fee_line(generate_invoice(full, JAN, JAN_END)).total_chf == Decimal("80.00")
+
+
+def test_an_exact_half_cent_share_survives_the_zero_line_gate():
+    """The exclusion gate must quantize with the renderer's ROUND_HALF_UP, not
+    Python quantize()'s default banker's rounding: a share of exactly 0.005
+    bills as 0.01 and stays on the invoice instead of silently vanishing."""
+    zev = factories.ZevFactory()
+    billed = factories.ParticipantFactory(zev=zev, valid_from=JAN)
+    factories.ParticipantFactory(zev=zev, valid_from=JAN)  # weight-sum denominator
+    shared_tariff(zev, price="0.01", split_key=SplitKey.WEIGHT)
+
+    line = fee_line(generate_invoice(billed, JAN, JAN_END))
+    assert line.total_chf == Decimal("0.01")

@@ -21,6 +21,7 @@ pays for what — was therefore never executed with a share other than 1.
 These tests pin it before the pricing engine is refactored.
 """
 
+import logging
 from datetime import date, datetime, timezone
 from decimal import Decimal
 
@@ -29,7 +30,7 @@ import pytest
 from metering.models import MeterReading, ReadingDirection
 from tariffs.models import EnergyType
 from testing import factories
-from zev.models import MeteringPointType
+from zev.models import AllocationMode, MeteringPointType
 
 from .engine import generate_invoice
 
@@ -370,3 +371,66 @@ def test_a_producer_transferred_mid_period_keeps_its_export_credit():
     assert _local_credit(a_invoice) == Decimal("-0.30")
     assert b_invoice.total_feed_in_kwh == Decimal("0.0000")
     assert _local_credit(b_invoice) == Decimal("-0.50")
+
+
+def test_gap_readings_on_community_meters_land_in_their_own_counters(caplog):
+    """§4.3 'gap visibility' covers shared meters: a reading falling into a
+    hole between two COMMUNITY windows of a meter the billed member does not
+    hold increments the community counter (count + kWh), and the personal
+    counters stay untouched."""
+    community = Community()
+    community.producer((T1, "10"))  # keeps the ZEV pool honest
+    holder = factories.ParticipantFactory(zev=community.zev, valid_from=PERIOD_START)
+    other_holder = factories.ParticipantFactory(
+        zev=community.zev, valid_from=PERIOD_START)
+    shared_meter = factories.MeteringPointFactory(
+        zev=community.zev, meter_type=MeteringPointType.CONSUMPTION)
+    factories.MeteringPointAssignmentFactory(
+        metering_point=shared_meter, participant=holder,
+        valid_from=date(2026, 1, 1), valid_to=date(2026, 1, 10),
+        allocation_mode=AllocationMode.COMMUNITY)
+    factories.MeteringPointAssignmentFactory(
+        metering_point=shared_meter, participant=other_holder,
+        valid_from=date(2026, 1, 20), valid_to=None,
+        allocation_mode=AllocationMode.COMMUNITY)
+    MeterReading.objects.create(
+        metering_point=shared_meter,
+        timestamp=datetime(2026, 1, 15, 12, 0, tzinfo=timezone.utc),
+        energy_kwh=Decimal("2"), direction=ReadingDirection.IN)
+    billed = factories.ParticipantFactory(zev=community.zev, valid_from=PERIOD_START)
+
+    with caplog.at_level(logging.WARNING, logger="invoices.engine"):
+        generate_invoice(billed, PERIOD_START, PERIOD_END)
+
+    assert "0 personal consumption reading(s)" in caplog.text
+    assert "1 community consumption reading(s) / 2.0000 kWh" in caplog.text
+    assert "0 community production reading(s)" in caplog.text
+
+
+def test_a_gap_reading_on_a_mixed_mode_meter_is_counted_only_once(caplog):
+    """A meter held personally AND community-wide in the same period appears
+    in both reading querysets; its gap readings must be counted exactly once
+    (personal side wins), so the four counters partition the gaps (§4.3)."""
+    community = Community()
+    community.producer((T1, "10"))
+    member = factories.ParticipantFactory(zev=community.zev, valid_from=PERIOD_START)
+    shared_meter = factories.MeteringPointFactory(
+        zev=community.zev, meter_type=MeteringPointType.CONSUMPTION)
+    factories.MeteringPointAssignmentFactory(
+        metering_point=shared_meter, participant=member,
+        valid_from=date(2026, 1, 1), valid_to=date(2026, 1, 10),
+        allocation_mode=AllocationMode.PERSONAL)
+    factories.MeteringPointAssignmentFactory(
+        metering_point=shared_meter, participant=member,
+        valid_from=date(2026, 1, 20), valid_to=None,
+        allocation_mode=AllocationMode.COMMUNITY)
+    MeterReading.objects.create(
+        metering_point=shared_meter,
+        timestamp=datetime(2026, 1, 15, 12, 0, tzinfo=timezone.utc),
+        energy_kwh=Decimal("2"), direction=ReadingDirection.IN)
+
+    with caplog.at_level(logging.WARNING, logger="invoices.engine"):
+        generate_invoice(member, PERIOD_START, PERIOD_END)
+
+    assert "1 personal consumption reading(s) / 2.0000 kWh" in caplog.text
+    assert "0 community consumption reading(s)" in caplog.text

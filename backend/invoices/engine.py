@@ -402,13 +402,18 @@ def _count_community_metering_points_by_month(zev: Zev, tariff: Tariff, period_s
     """Active, ``COMMUNITY``-mode metering points billable each month.
 
     Mirrors ``_count_billable_metering_points_by_month`` but is ZEV-wide
-    rather than participant-scoped, and counts only ``COMMUNITY`` windows —
-    the two counts are deliberately disjoint per month, so together they
-    account for every active metering point exactly once. Feeds the
-    per-metering-point community contribution (§7.5): each active community
-    meter's fee is charged once per month, then divided between eligible
-    participants by weight. Keyed by the first day of the month; a month with
-    no active community meter is absent, not zero.
+    rather than participant-scoped, and counts only ``COMMUNITY`` windows.
+
+    Known limitation: a meter whose allocation mode switches mid-month is
+    counted by both this function and the personal count for that month
+    (each counts any window touching the month), so its per-metering-point
+    fee bills twice; the counts are disjoint only when mode switches fall
+    on month boundaries.
+
+    Feeds the per-metering-point community contribution (§7.5): each active
+    community meter's fee is charged once per month, then divided between
+    eligible participants by weight. Keyed by the first day of the month; a
+    month with no active community meter is absent, not zero.
     """
     overlap_start = max(period_start, tariff.valid_from)
     overlap_end = min(period_end, tariff.valid_to or period_end)
@@ -863,7 +868,7 @@ def _price_fixed_fees(participant, tariffs, period_start, period_end, accumulato
                         continue
                     shared_total += unit_price * Decimal(count) * participant.allocation_weight / denominator
                     shared_months += 1
-                if shared_months > 0:
+                if shared_months > 0 and not _is_zero_chf(shared_total):
                     accumulator.add(
                         tariff=tariff, quantity=Decimal(shared_months), total=shared_total,
                         unit="month", bucket="shared",
@@ -902,11 +907,16 @@ def _price_fixed_fees(participant, tariffs, period_start, period_end, accumulato
                     continue
                 total += unit_price * numerator / denominator
                 charged_months += 1
-            if charged_months == 0:
+            # Same exclusion as the bucket="shared" per-metering-point gate
+            # above: skip months without membership, and shares that round to
+            # CHF 0.00 — a zero-weight member of a WEIGHT-split fee would
+            # otherwise get a "N Monate / CHF 0.00" line.
+            if charged_months == 0 or _is_zero_chf(total):
                 continue
-            # Quantity is the months this participant is charged for, so the
-            # line reads "2 months" and the derived unit price comes out as
-            # their average monthly share — the figure they want to see.
+            # Quantity is the months this participant is charged for, so
+            # the line reads "2 months" and the derived unit price comes
+            # out as their average monthly share — the figure they want
+            # to see.
             quantity = Decimal(charged_months)
         else:
             total = quantity * unit_price
@@ -955,6 +965,23 @@ def _build_item_payloads(accumulator) -> tuple[list, Decimal]:
     return payloads, subtotal.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
 
+def _utc_date(ts: datetime) -> date:
+    """UTC civil date of a reading timestamp.
+
+    Assignment matching, tariff lookup, and completeness all key on this
+    (ADR 0007). Importers write UTC-aware timestamps; a naive datetime is
+    taken as UTC (bare ``astimezone`` would assume the host timezone).
+    """
+    if ts.tzinfo is None:
+        ts = ts.replace(tzinfo=tz.utc)
+    return ts.astimezone(tz.utc).date()
+
+
+def _is_zero_chf(total: Decimal) -> bool:
+    """Whether ``total`` renders as CHF 0.00 under §5 rounding."""
+    return total.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP) == 0
+
+
 @transaction.atomic
 def generate_invoice(participant: Participant, period_start: date, period_end: date) -> Invoice:
     """
@@ -982,6 +1009,11 @@ def generate_invoice(participant: Participant, period_start: date, period_end: d
     skipped_consumption_readings = 0
     skipped_consumption_kwh = Decimal("0")
 
+    # Reading ids already counted as personal gaps: a mixed-mode meter is in
+    # both the personal and the community queryset, and its gap readings must
+    # be counted exactly once, so the community loops skip them.
+    personal_gap_reading_ids: set = set()
+
     items_accumulator = ItemAccumulator()
 
     for reading in readings.participant_consumption.order_by("timestamp").iterator():
@@ -990,6 +1022,7 @@ def generate_invoice(participant: Participant, period_start: date, period_end: d
         if resolution is None:
             # A true gap: no assignment covers this timestamp. Belongs to
             # nobody in this billing run.
+            personal_gap_reading_ids.add(reading.id)
             skipped_consumption_readings += 1
             skipped_consumption_kwh += reading.energy_kwh
             continue
@@ -1009,18 +1042,20 @@ def generate_invoice(participant: Participant, period_start: date, period_end: d
         local_kwh_acc += r_local
         grid_kwh_acc += r_grid
 
+        day = _utc_date(ts)
+
         # Compute GRID energy base sum once per timestamp.
         # Percentage-of-energy tariffs price any energy type as a fraction of
         # what a participant would normally pay for grid energy.
         grid_base_price_sum = sum(
             (_get_tariff_price(t, ts) or Decimal("0"))
-            for t in tariffs.energy(EnergyType.GRID, ts.date())
+            for t in tariffs.energy(EnergyType.GRID, day)
         )
 
         for energy_type, quantity in ((EnergyType.LOCAL, r_local), (EnergyType.GRID, r_grid)):
             if quantity <= 0:
                 continue
-            for tariff in tariffs.energy(energy_type, ts.date()):
+            for tariff in tariffs.energy(energy_type, day):
                 price = _get_tariff_price(tariff, ts) or Decimal("0")
                 items_accumulator.add(
                     tariff=tariff,
@@ -1031,7 +1066,7 @@ def generate_invoice(participant: Participant, period_start: date, period_end: d
 
             # Percentage-of-energy tariffs: base is always the GRID rate sum,
             # applied to whichever energy_type the tariff is configured for.
-            for tariff in tariffs.percentage(energy_type, ts.date()):
+            for tariff in tariffs.percentage(energy_type, day):
                 effective_price = grid_base_price_sum * (tariff.percentage / Decimal("100"))
                 items_accumulator.add(
                     tariff=tariff,
@@ -1050,6 +1085,7 @@ def generate_invoice(participant: Participant, period_start: date, period_end: d
         ts = reading.timestamp
         resolution = readings.assignment_windows.assignment_at(reading.metering_point_id, ts)
         if resolution is None:
+            personal_gap_reading_ids.add(reading.id)
             skipped_production_readings += 1
             skipped_production_kwh += reading.energy_kwh
             continue
@@ -1066,13 +1102,15 @@ def generate_invoice(participant: Participant, period_start: date, period_end: d
 
         exported_kwh_acc += exported_kwh
 
+        day = _utc_date(ts)
+
         grid_base_price_sum = sum(
             (_get_tariff_price(t, ts) or Decimal("0"))
-            for t in tariffs.energy(EnergyType.GRID, ts.date())
+            for t in tariffs.energy(EnergyType.GRID, day)
         )
 
         if local_sold_kwh > 0:
-            for tariff in tariffs.energy(EnergyType.LOCAL, ts.date()):
+            for tariff in tariffs.energy(EnergyType.LOCAL, day):
                 price = _get_tariff_price(tariff, ts) or Decimal("0")
                 items_accumulator.add(
                     tariff=tariff,
@@ -1082,7 +1120,7 @@ def generate_invoice(participant: Participant, period_start: date, period_end: d
                     bucket="producer_credit",
                 )
 
-            for tariff in tariffs.percentage(EnergyType.LOCAL, ts.date()):
+            for tariff in tariffs.percentage(EnergyType.LOCAL, day):
                 effective_price = grid_base_price_sum * (tariff.percentage / Decimal("100"))
                 items_accumulator.add(
                     tariff=tariff,
@@ -1094,7 +1132,7 @@ def generate_invoice(participant: Participant, period_start: date, period_end: d
                 )
 
         if exported_kwh > 0:
-            for tariff in tariffs.energy(EnergyType.FEED_IN, ts.date()):
+            for tariff in tariffs.energy(EnergyType.FEED_IN, day):
                 price = _get_tariff_price(tariff, ts) or Decimal("0")
                 items_accumulator.add(
                     tariff=tariff,
@@ -1111,12 +1149,22 @@ def generate_invoice(participant: Participant, period_start: date, period_end: d
     # weight share. Fed into the same open accumulators as the personal
     # loops, so total_local_kwh/total_grid_kwh/total_feed_in_kwh include
     # shared energy.
+    skipped_community_consumption_readings = 0
+    skipped_community_consumption_kwh = Decimal("0")
     for reading in readings.community_consumption.order_by("timestamp").iterator():
         ts = reading.timestamp
         resolution = readings.assignment_windows.assignment_at(reading.metering_point_id, ts)
-        if resolution is None or resolution.allocation_mode != AllocationMode.COMMUNITY:
-            continue  # gap, or this window is personal — billed elsewhere
-        day = ts.date()
+        if resolution is None:
+            # A true gap: no assignment covers this timestamp — belongs to
+            # nobody. Counted here only if the personal loops did not already
+            # count it (a mixed-mode meter appears in both querysets).
+            if reading.id not in personal_gap_reading_ids:
+                skipped_community_consumption_readings += 1
+                skipped_community_consumption_kwh += reading.energy_kwh
+            continue
+        if resolution.allocation_mode != AllocationMode.COMMUNITY:
+            continue  # personal window — billed in the personal loop above
+        day = _utc_date(ts)
         if not _overlaps(participant.valid_from, participant.valid_to, day, day):
             continue  # a mid-period joiner/leaver pays no share outside their own membership
         weight_sum = readings.weight_sum_by_date.get(day)
@@ -1137,13 +1185,13 @@ def generate_invoice(participant: Participant, period_start: date, period_end: d
 
         grid_base_price_sum = sum(
             (_get_tariff_price(t, ts) or Decimal("0"))
-            for t in tariffs.energy(EnergyType.GRID, ts.date())
+            for t in tariffs.energy(EnergyType.GRID, day)
         )
 
         for energy_type, quantity in ((EnergyType.LOCAL, shared_local), (EnergyType.GRID, shared_grid)):
             if quantity <= 0:
                 continue
-            for tariff in tariffs.energy(energy_type, ts.date()):
+            for tariff in tariffs.energy(energy_type, day):
                 price = _get_tariff_price(tariff, ts) or Decimal("0")
                 items_accumulator.add(
                     tariff=tariff,
@@ -1152,7 +1200,7 @@ def generate_invoice(participant: Participant, period_start: date, period_end: d
                     unit="kWh",
                     bucket="shared",
                 )
-            for tariff in tariffs.percentage(energy_type, ts.date()):
+            for tariff in tariffs.percentage(energy_type, day):
                 effective_price = grid_base_price_sum * (tariff.percentage / Decimal("100"))
                 items_accumulator.add(
                     tariff=tariff,
@@ -1163,12 +1211,19 @@ def generate_invoice(participant: Participant, period_start: date, period_end: d
                     bucket="shared",
                 )
 
+    skipped_community_production_readings = 0
+    skipped_community_production_kwh = Decimal("0")
     for reading in readings.community_production.order_by("timestamp").iterator():
         ts = reading.timestamp
         resolution = readings.assignment_windows.assignment_at(reading.metering_point_id, ts)
-        if resolution is None or resolution.allocation_mode != AllocationMode.COMMUNITY:
+        if resolution is None:
+            if reading.id not in personal_gap_reading_ids:
+                skipped_community_production_readings += 1
+                skipped_community_production_kwh += reading.energy_kwh
             continue
-        day = ts.date()
+        if resolution.allocation_mode != AllocationMode.COMMUNITY:
+            continue
+        day = _utc_date(ts)
         if not _overlaps(participant.valid_from, participant.valid_to, day, day):
             continue
         weight_sum = readings.weight_sum_by_date.get(day)
@@ -1188,11 +1243,11 @@ def generate_invoice(participant: Participant, period_start: date, period_end: d
 
         grid_base_price_sum = sum(
             (_get_tariff_price(t, ts) or Decimal("0"))
-            for t in tariffs.energy(EnergyType.GRID, ts.date())
+            for t in tariffs.energy(EnergyType.GRID, day)
         )
 
         if shared_local_sold > 0:
-            for tariff in tariffs.energy(EnergyType.LOCAL, ts.date()):
+            for tariff in tariffs.energy(EnergyType.LOCAL, day):
                 price = _get_tariff_price(tariff, ts) or Decimal("0")
                 items_accumulator.add(
                     tariff=tariff,
@@ -1201,7 +1256,7 @@ def generate_invoice(participant: Participant, period_start: date, period_end: d
                     unit="kWh",
                     bucket="shared_producer_credit",
                 )
-            for tariff in tariffs.percentage(EnergyType.LOCAL, ts.date()):
+            for tariff in tariffs.percentage(EnergyType.LOCAL, day):
                 effective_price = grid_base_price_sum * (tariff.percentage / Decimal("100"))
                 items_accumulator.add(
                     tariff=tariff,
@@ -1213,7 +1268,7 @@ def generate_invoice(participant: Participant, period_start: date, period_end: d
                 )
 
         if shared_exported > 0:
-            for tariff in tariffs.energy(EnergyType.FEED_IN, ts.date()):
+            for tariff in tariffs.energy(EnergyType.FEED_IN, day):
                 price = _get_tariff_price(tariff, ts) or Decimal("0")
                 items_accumulator.add(
                     tariff=tariff,
@@ -1225,11 +1280,14 @@ def generate_invoice(participant: Participant, period_start: date, period_end: d
 
     _price_fixed_fees(participant, tariffs_list, period_start, period_end, items_accumulator)
 
-    if skipped_consumption_readings or skipped_production_readings:
+    if skipped_consumption_readings or skipped_production_readings or \
+       skipped_community_consumption_readings or skipped_community_production_readings:
         logger.warning(
-            "Invoice for participant %s (period %s..%s) excluded %d consumption "
-            "reading(s) / %s kWh and %d production reading(s) / %s kWh that fall "
-            "outside assignment windows (gaps or unassigned metering points)",
+            "Invoice for participant %s (period %s..%s) excluded %d personal consumption "
+            "reading(s) / %s kWh, %d personal production reading(s) / %s kWh, "
+            "%d community consumption reading(s) / %s kWh and "
+            "%d community production reading(s) / %s kWh "
+            "that fall in assignment gaps within the period",
             participant.id,
             period_start,
             period_end,
@@ -1237,6 +1295,10 @@ def generate_invoice(participant: Participant, period_start: date, period_end: d
             skipped_consumption_kwh,
             skipped_production_readings,
             skipped_production_kwh,
+            skipped_community_consumption_readings,
+            skipped_community_consumption_kwh,
+            skipped_community_production_readings,
+            skipped_community_production_kwh,
         )
 
     local_kwh = local_kwh_acc.quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP)

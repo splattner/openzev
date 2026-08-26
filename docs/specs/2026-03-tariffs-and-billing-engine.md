@@ -303,11 +303,11 @@ Before shared metering points (`SPEC-2026-08-shared-metering-points`), this gate
 
 **Pool coverage:** the pool is physical — `zev_consumption_at_ts`/`zev_production_at_ts` sum over **every** metering point of the ZEV, with or without an assignment in the period and regardless of the `is_active` flag. A never-assigned meter feeds the pool but is billed to nobody; a deactivated meter (`is_active = False`) still feeds the pool, and its readings are still attributed to its assignment holder — deactivation does not remove a meter from allocation. This matches across the engine, dashboards, PDFs, and annual statement (ADR 0013 pool decision). `is_active` gates only per-metering-point fixed-fee counting (§4.6.2) and list/admin filtering, never the energy pool. A metering point with no assignment overlapping the period still counts in the pool but is billed to nobody; that is a data-quality condition rather than a valid steady state — every metering point should have a holder for each period it has readings (a common-area *Allgemein* meter is assigned to a community / Verwaltung participant), and such holder-less readings are surfaced by the metering data-quality status check.
 
-**Assignment matching** uses the *UTC civil date* of the reading's timestamp (`ts.date()`), consistent with period, tariff, and completeness conventions (ADR 0007 — all timestamps are stored and queried in UTC). A reading at 22:30 UTC on the day an assignment ends still belongs to that day's holder even though Zurich is already on the next civil day.
+**Assignment matching** uses the *UTC civil date* of the reading's timestamp (`_utc_date(ts)` — `ts.astimezone(tz.utc).date()`), consistent with period, tariff, and completeness conventions (ADR 0007 — all timestamps are stored and queried in UTC). A reading at 22:30 UTC on the day an assignment ends still belongs to that day's holder even though Zurich is already on the next civil day.
 
 **Fail-fast contracts** (implemented in `allocation/split.py`): all inputs must be `Decimal` (`TypeError` otherwise) and non-negative (`InvalidAllocationInputError`); a participant's draw above the community's total consumption, a producer's output above the community's total production, or a participant's share above the total in `proportional_share`, raises `InvalidAllocationInputError` — with consistent data these are impossible (the total includes the participant's own reading), so they indicate duplicate readings or the wrong metering-point scope. No arithmetic is clamped silently. All allocation failures (`InvalidAllocationInputError`, and `OverlappingAssignmentWindowsError` from the assignment-window index) derive from `AllocationError` (a `ValueError`), so the billing API reports them as HTTP `400` with the underlying message instead of the `409` reserved for an existing invoice (ADR 0013).
 
-**Gap visibility:** the engine counts skipped readings and their kWh (consumption and production separately) and logs a warning when any exist, so unattributed energy does not vanish unnoticed.
+**Gap visibility:** the engine counts skipped readings and their kWh — personal consumption, personal production, community consumption, and community production separately — and logs a warning when any exist, so unattributed energy does not vanish unnoticed. Covered are readings in *intra-period* gaps of metering points assigned somewhere in the period: both reading querysets require an assignment overlapping the period, so a never-assigned meter is not covered here (it surfaces via the metering data-quality status check instead). The four counters partition the gap readings: a meter held both personally and community-wide appears in both querysets, and its gap readings are counted exactly once, on the personal side.
 
 ### 4.3a Community-allocated energy (shared metering points)
 
@@ -321,7 +321,7 @@ FOR EACH community reading (metering points with a COMMUNITY assignment overlapp
     IF resolution is None OR resolution.allocation_mode != COMMUNITY:
         SKIP    (a gap, or this window is personal — billed in §4.3 instead)
 
-    day = ts.date()
+    day = _utc_date(ts)
     IF NOT (participant.valid_from ≤ day ≤ participant.valid_to or open-ended):
         SKIP    (a mid-period joiner pays no share of readings before their join date;
                  a leaver's share stops at their leave date)
@@ -350,7 +350,7 @@ After computing `r_local` and `r_grid` for a reading at timestamp `ts`:
 
 For each `(energy_type, quantity)` in `{(local, r_local), (grid, r_grid)}` where `quantity > 0`:
 
-1. Find all tariffs where `billing_mode = energy`, `energy_type` matches, and tariff is active on `ts.date()`.
+1. Find all tariffs where `billing_mode = energy`, `energy_type` matches, and tariff is active on `_utc_date(ts)`.
 2. For each matching tariff, resolve the price via period matching (§3.2).
 3. Accumulate: `quantity` kWh at `quantity × price` CHF.
 
@@ -358,8 +358,8 @@ For each `(energy_type, quantity)` in `{(local, r_local), (grid, r_grid)}` where
 
 These tariffs price energy as a percentage of the **grid base price sum**.
 
-1. **Grid base price sum** = sum of `price_chf_per_kwh` at `ts` for all tariffs where `billing_mode = energy` AND `energy_type = grid` AND active at `ts.date()`.
-2. For each percentage tariff active at `ts.date()` whose `energy_type` matches:
+1. **Grid base price sum** = sum of `price_chf_per_kwh` at `ts` for all tariffs where `billing_mode = energy` AND `energy_type = grid` AND active at `_utc_date(ts)`.
+2. For each percentage tariff active at `_utc_date(ts)` whose `energy_type` matches:
    - `effective_price = grid_base_price_sum × (tariff.percentage / 100)`
    - Accumulate: `quantity` kWh at `quantity × effective_price` CHF.
    - Also track `base_total = quantity × grid_base_price_sum` (used for description rendering).
@@ -456,6 +456,15 @@ own weight — the same key a `COMMUNITY`-mode metering point always uses
 (§4.6.4). With every weight at the default `1`, `weight` and `equal` agree
 exactly.
 
+**Exclusion of zero-value shares:** a member whose charged months produce a
+share that rounds to CHF 0.00 (half-up, like every rendered amount) gets no
+line item at all — the same rule as the per-metering-point gate in §4.6.4.
+This covers a zero-weight member under `split_key = weight`, who previously
+received a bogus "`N Monate / CHF 0.00`" line. The rule is scoped to the
+weight-split shared paths: a plainly configured fee with
+`fixed_price_chf = 0` still renders its CHF 0.00 line, because there the
+line's point is to show that the fee exists.
+
 **Both denominators are clamped to the same months as the numerator** — the
 overlap of the invoice period *and this tariff's own validity*, not the period
 alone. A tariff clipped inside the period (a version starting mid-month, which
@@ -551,7 +560,7 @@ for each billable month M in community_counts:
     total += unit_price × community_counts[M] × participant.allocation_weight / weight_sum
     shared_months += 1
 
-if shared_months > 0:
+if shared_months > 0 and round_half_up(total, 0.01) != 0:
     add a second line item: quantity = shared_months, total = total, bucket = "shared"
 ```
 
@@ -559,6 +568,15 @@ if shared_months > 0:
 billing modes. The cost being divided belongs to a community *metering
 point*, which always allocates by weight (§1.1 of the feature spec). A
 per-assignment split key is a documented follow-up, out of scope.
+
+**Known limitation:** a meter whose allocation mode switches PERSONAL→COMMUNITY
+(or back) mid-month is counted by *both* the personal count (§4.6.2) and
+this community count for that month — each counts any window touching the
+month — so its per-metering-point fee bills twice for the transition month.
+The counts are disjoint only when mode switches fall on month boundaries.
+Fixing it requires day-granular fee proration, which contradicts §4.6.1
+(months are not prorated); a fix is therefore a specced billing-model
+decision, tracked separately.
 
 Both weight-split paths (this one and §4.6.3) resolve their denominator per
 tariff but share **one** fetch of the ZEV's participant membership rows per
@@ -963,7 +981,7 @@ weighted consumption/production splits (incl. the holder-of-record paying no
 more than their own share, and a sole participant carrying a meter alone);
 kWh-total conservation within rounding; a meter personal in one month and
 community the next billing correctly on both sides with no double count and no
-lost readings (§4.3a); community readings excluded from the gap/skip counters;
+lost readings (§4.3a); community readings tracked in their own gap/skip counters;
 per-metering-point community fees, including `is_active` mirroring and
 exclusivity with the personal count (§4.6.4); a mid-period joiner/leaver's
 date-granular energy share vs. the month-granular fee share; the description
