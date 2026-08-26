@@ -43,7 +43,7 @@ export function AdminVatSettingsPage() {
         queryFn: fetchVatRates,
     })
 
-    const vatRates = vatRatesQuery.data?.results ?? EMPTY_VAT_RATES
+    const vatRates = vatRatesQuery.data ?? EMPTY_VAT_RATES
     const today = todayLocalIso()
 
     const activeVatRate = useMemo(

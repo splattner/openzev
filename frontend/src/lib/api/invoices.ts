@@ -4,18 +4,15 @@ import type {
   EmailTemplateResponse,
   Invoice,
   InvoicePeriodOverview,
-  PaginatedResponse,
   PdfTemplateResponse,
 } from '../../types/api'
 import { api } from './client'
+import { fetchAllPages } from './pagination'
 
-export async function fetchInvoices(zevId?: string): Promise<PaginatedResponse<Invoice>> {
-  const { data } = await api.get<PaginatedResponse<Invoice>>('/invoices/invoices/', {
-    // Backend narrows by ?zev_id= on top of role scoping (issue #411); without it,
-    // admins and multi-ZEV owners get every ZEV they can see.
-    params: zevId ? { zev_id: zevId } : undefined,
-  })
-  return data
+export async function fetchInvoices(zevId?: string): Promise<Invoice[]> {
+  // Backend narrows by ?zev_id= on top of role scoping (issue #411); without it,
+  // admins and multi-ZEV owners get every ZEV they can see.
+  return fetchAllPages<Invoice>('/invoices/invoices/', zevId ? { zev_id: zevId } : undefined)
 }
 
 export async function fetchInvoice(invoiceId: string): Promise<Invoice> {

@@ -4,7 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { fetchZevs } from '../src/lib/api/zev'
 import { ManagedZevProvider, resolveManagedSelection, useManagedZev } from '../src/lib/managedZev'
-import type { PaginatedResponse, User, UserRole, Zev } from '../src/types/api'
+import type { User, UserRole, Zev } from '../src/types/api'
 
 type IdOnly = Pick<Zev, 'id'>
 
@@ -172,7 +172,7 @@ const userWithRole = (role: UserRole): User => ({
 describe('ManagedZevProvider selection persistence', () => {
     let container: HTMLDivElement
     let root: ReturnType<typeof createRoot>
-    let resolveFetch: ((value: PaginatedResponse<Zev>) => void) | undefined
+    let resolveFetch: ((value: Zev[]) => void) | undefined
 
     beforeEach(() => {
         ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
@@ -218,7 +218,7 @@ describe('ManagedZevProvider selection persistence', () => {
 
     function deferFetch() {
         vi.mocked(fetchZevs).mockImplementation(
-            () => new Promise<PaginatedResponse<Zev>>((resolve) => { resolveFetch = resolve }),
+            () => new Promise<Zev[]>((resolve) => { resolveFetch = resolve }),
         )
     }
 
@@ -229,12 +229,7 @@ describe('ManagedZevProvider selection persistence', () => {
      */
     function resolveTwoZevs() {
         return act(async () => {
-            resolveFetch?.({
-                count: 2,
-                next: null,
-                previous: null,
-                results: [fullZev('own1', 1), fullZev('own2', 1)],
-            })
+            resolveFetch?.([fullZev('own1', 1), fullZev('own2', 1)])
             await new Promise((resolve) => setTimeout(resolve, 0))
             await new Promise((resolve) => setTimeout(resolve, 0))
         })

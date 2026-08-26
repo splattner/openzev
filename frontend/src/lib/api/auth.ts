@@ -12,7 +12,6 @@ import type {
   OAuthProvider,
   OAuthProviderConfig,
   OAuthProviderConfigInput,
-  PaginatedResponse,
   RegisterInput,
   SocialAccount,
   User,
@@ -21,6 +20,7 @@ import type {
   VatRateInput,
 } from '../../types/api'
 import { api } from './client'
+import { fetchAllPages } from './pagination'
 
 export async function login(email: string, password: string): Promise<void> {
   await api.post('/auth/token/', { email, password })
@@ -45,9 +45,8 @@ export async function updateAppSettings(payload: AppSettingsInput): Promise<AppS
   return data
 }
 
-export async function fetchVatRates(): Promise<PaginatedResponse<VatRate>> {
-  const { data } = await api.get<PaginatedResponse<VatRate>>('/auth/vat-rates/')
-  return data
+export async function fetchVatRates(): Promise<VatRate[]> {
+  return fetchAllPages<VatRate>('/auth/vat-rates/')
 }
 
 export async function createVatRate(payload: VatRateInput): Promise<VatRate> {
@@ -79,9 +78,8 @@ export async function updateFeatureFlag(id: number, payload: FeatureFlagInput): 
   return data
 }
 
-export async function fetchUsers(): Promise<PaginatedResponse<User>> {
-  const { data } = await api.get<PaginatedResponse<User>>('/auth/users/')
-  return data
+export async function fetchUsers(): Promise<User[]> {
+  return fetchAllPages<User>('/auth/users/')
 }
 
 export async function impersonateParticipant(userId: number): Promise<ImpersonationResult> {
@@ -157,8 +155,7 @@ export async function deleteSocialAccount(id: number): Promise<void> {
 }
 
 export async function fetchOAuthProviderConfigs(): Promise<OAuthProviderConfig[]> {
-  const { data } = await api.get<PaginatedResponse<OAuthProviderConfig>>('/auth/oauth/providers/config/')
-  return data.results
+  return fetchAllPages<OAuthProviderConfig>('/auth/oauth/providers/config/')
 }
 
 export async function createOAuthProviderConfig(payload: OAuthProviderConfigInput): Promise<OAuthProviderConfig> {
@@ -176,8 +173,7 @@ export async function deleteOAuthProviderConfig(id: number): Promise<void> {
 }
 
 export async function fetchApiKeys(): Promise<ApiKey[]> {
-  const { data } = await api.get<PaginatedResponse<ApiKey>>('/auth/me/api-keys/')
-  return data.results
+  return fetchAllPages<ApiKey>('/auth/me/api-keys/')
 }
 
 /**
@@ -204,8 +200,7 @@ export async function fetchAllApiKeys(filters: AdminApiKeyFilters = {}): Promise
   const params: Record<string, string> = {}
   if (filters.user) params.user = String(filters.user)
   if (filters.status) params.status = filters.status
-  const { data } = await api.get<PaginatedResponse<AdminApiKey>>('/auth/api-keys/', { params })
-  return data.results
+  return fetchAllPages<AdminApiKey>('/auth/api-keys/', params)
 }
 
 /** Revoke any user's key. Admin only; takes effect on the key's next request. */

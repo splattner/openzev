@@ -6,15 +6,14 @@ import type {
   ImportLog,
   ImportPreviewResult,
   MeteringDashboardSummary,
-  PaginatedResponse,
   RawMeteringDailyRow,
   RawMeteringReading,
 } from '../../types/api'
 import { api } from './client'
+import { fetchAllPages } from './pagination'
 
-export async function fetchImportLogs(): Promise<PaginatedResponse<ImportLog>> {
-  const { data } = await api.get<PaginatedResponse<ImportLog>>('/metering/import-logs/')
-  return data
+export async function fetchImportLogs(): Promise<ImportLog[]> {
+  return fetchAllPages<ImportLog>('/metering/import-logs/')
 }
 
 export async function deleteImportLog(id: string): Promise<ImportDeletionResult> {

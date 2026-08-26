@@ -106,7 +106,7 @@ export function ParticipantsPage() {
     const invitationMutation = useMutation({
         mutationFn: sendParticipantInvitation,
         onSuccess: (result, participantId) => {
-            const participant = data?.results.find((entry) => entry.id === participantId)
+            const participant = data?.find((entry) => entry.id === participantId)
             pushToast(
                 t('pages.participants.messages.invitationSent', {
                     email: participant?.email || '',
@@ -181,8 +181,8 @@ export function ParticipantsPage() {
     if (isLoading) return <div className="card">{t('common.loading')}</div>
     if (isError) return <div className="card error-banner">{t('common.error')}</div>
 
-    const participants = (data?.results ?? []).filter((participant) => !isManagedScope || !selectedZevId || participant.zev === selectedZevId)
-    const ownerIdByZevId = new Map((zevsQuery.data?.results ?? []).map((zev) => [zev.id, zev.owner]))
+    const participants = (data ?? []).filter((participant) => !isManagedScope || !selectedZevId || participant.zev === selectedZevId)
+    const ownerIdByZevId = new Map((zevsQuery.data ?? []).map((zev) => [zev.id, zev.owner]))
     const isOwnerParticipant = (participant: Participant) => ownerIdByZevId.get(participant.zev) === participant.user
     const editingParticipant = participants.find((participant) => participant.id === editingId)
     const todayIso = todayLocalIso()

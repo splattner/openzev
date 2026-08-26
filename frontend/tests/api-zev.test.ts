@@ -25,7 +25,7 @@ describe('zev api module', () => {
     })
 
     const result = await fetchMeteringPointAssignments()
-    expect(result.results).toEqual([])
+    expect(result).toEqual([])
   })
 
   it('fetches metering point assignments with metering_point filter', async () => {
@@ -35,7 +35,7 @@ describe('zev api module', () => {
     })
 
     const result = await fetchMeteringPointAssignments('mp-1')
-    expect(result.count).toBe(1)
+    expect(result).toEqual([{ id: 'a-1' }])
   })
 
   it('downloads participant contract and revokes generated object URL', async () => {

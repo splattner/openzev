@@ -3,7 +3,6 @@ import type {
   MeteringPointAssignment,
   MeteringPointAssignmentInput,
   MeteringPointInput,
-  PaginatedResponse,
   Participant,
   ParticipantAccountCreateResult,
   ParticipantInput,
@@ -15,6 +14,7 @@ import type {
 } from '../../types/api'
 import { api } from './client'
 import { downloadBlob } from '../downloadBlob'
+import { fetchAllPages } from './pagination'
 
 export async function createSelfSetupZev(
   payload: SelfSetupZevInput,
@@ -23,9 +23,8 @@ export async function createSelfSetupZev(
   return data
 }
 
-export async function fetchZevs(): Promise<PaginatedResponse<Zev>> {
-  const { data } = await api.get<PaginatedResponse<Zev>>('/zev/zevs/')
-  return data
+export async function fetchZevs(): Promise<Zev[]> {
+  return fetchAllPages<Zev>('/zev/zevs/')
 }
 
 export async function createZev(payload: ZevInput): Promise<Zev> {
@@ -47,9 +46,8 @@ export async function deleteZev(id: string): Promise<void> {
   await api.delete(`/zev/zevs/${id}/`)
 }
 
-export async function fetchParticipants(): Promise<PaginatedResponse<Participant>> {
-  const { data } = await api.get<PaginatedResponse<Participant>>('/zev/participants/')
-  return data
+export async function fetchParticipants(): Promise<Participant[]> {
+  return fetchAllPages<Participant>('/zev/participants/')
 }
 
 export async function createParticipant(payload: ParticipantInput): Promise<Participant> {
@@ -91,9 +89,8 @@ export async function downloadParticipantContractPdf(participantId: string, file
   downloadBlob(response.data as Blob, filename)
 }
 
-export async function fetchMeteringPoints(): Promise<PaginatedResponse<MeteringPoint>> {
-  const { data } = await api.get<PaginatedResponse<MeteringPoint>>('/zev/metering-points/')
-  return data
+export async function fetchMeteringPoints(): Promise<MeteringPoint[]> {
+  return fetchAllPages<MeteringPoint>('/zev/metering-points/')
 }
 
 export async function createMeteringPoint(payload: MeteringPointInput): Promise<MeteringPoint> {
@@ -118,10 +115,9 @@ export async function deleteMeteringPointReadings(
   return data
 }
 
-export async function fetchMeteringPointAssignments(meteringPointId?: string): Promise<PaginatedResponse<MeteringPointAssignment>> {
+export async function fetchMeteringPointAssignments(meteringPointId?: string): Promise<MeteringPointAssignment[]> {
   const params = meteringPointId ? { metering_point: meteringPointId } : {}
-  const { data } = await api.get<PaginatedResponse<MeteringPointAssignment>>('/zev/metering-point-assignments/', { params })
-  return data
+  return fetchAllPages<MeteringPointAssignment>('/zev/metering-point-assignments/', params)
 }
 
 export async function createMeteringPointAssignment(payload: MeteringPointAssignmentInput): Promise<MeteringPointAssignment> {

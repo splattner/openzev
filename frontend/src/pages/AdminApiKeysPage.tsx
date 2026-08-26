@@ -34,7 +34,7 @@ export function AdminApiKeysPage() {
     })
 
     const keys = keysQuery.data ?? []
-    const users = usersQuery.data?.results ?? []
+    const users = usersQuery.data ?? []
 
     const revokeMutation = useMutation({
         mutationFn: (id: string) => revokeAnyApiKey(id),

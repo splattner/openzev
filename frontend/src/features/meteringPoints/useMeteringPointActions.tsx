@@ -339,14 +339,14 @@ export function useMeteringPointActions({
     const participantNameById = useMemo(
         () =>
             new Map(
-                (participantsQuery.data?.results ?? []).map((p) => [p.id, `${p.first_name} ${p.last_name}`]),
+                (participantsQuery.data ?? []).map((p) => [p.id, `${p.first_name} ${p.last_name}`]),
             ),
         [participantsQuery.data],
     )
 
     const assignmentsByMeteringPoint = useMemo(() => {
         const map = new Map<string, MeteringPointAssignment[]>()
-        for (const a of assignmentsQuery.data?.results ?? []) {
+        for (const a of assignmentsQuery.data ?? []) {
             const list = map.get(a.metering_point) ?? []
             list.push(a)
             map.set(a.metering_point, list)
@@ -355,13 +355,13 @@ export function useMeteringPointActions({
     }, [assignmentsQuery.data])
 
     const assignParticipants = useMemo(() => {
-        if (!selectedMpId) return participantsQuery.data?.results ?? []
-        const mp = meteringPointsQuery.data?.results.find((m) => m.id === selectedMpId)
-        if (!mp) return participantsQuery.data?.results ?? []
-        return (participantsQuery.data?.results ?? []).filter((p) => p.zev === mp.zev)
+        if (!selectedMpId) return participantsQuery.data ?? []
+        const mp = meteringPointsQuery.data?.find((m) => m.id === selectedMpId)
+        if (!mp) return participantsQuery.data ?? []
+        return (participantsQuery.data ?? []).filter((p) => p.zev === mp.zev)
     }, [selectedMpId, meteringPointsQuery.data, participantsQuery.data])
 
-    const scopedMeteringPoints = (meteringPointsQuery.data?.results ?? []).filter(
+    const scopedMeteringPoints = (meteringPointsQuery.data ?? []).filter(
         (point) => !canManageMeteringPoints || !selectedZevId || point.zev === selectedZevId,
     )
 

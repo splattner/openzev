@@ -131,10 +131,10 @@ export function MeteringChartPage() {
         enabled: true,
     })
 
-    const meteringPoints = (mpQuery.data?.results ?? []).filter(
+    const meteringPoints = (mpQuery.data ?? []).filter(
         (meteringPoint) => !isManagedScope || !selectedZevId || meteringPoint.zev === selectedZevId,
     )
-    const zevNameById = new Map((zevsQuery.data?.results ?? []).map((z) => [z.id, z.name]))
+    const zevNameById = new Map((zevsQuery.data ?? []).map((z) => [z.id, z.name]))
 
     const data: ChartDataPoint[] = chartQuery.data ?? []
 

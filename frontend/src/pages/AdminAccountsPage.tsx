@@ -224,9 +224,9 @@ export function AdminAccountsPage() {
         return <div className="card error-banner">{t('pages.accounts.loadFailed')}</div>
     }
 
-    const users = usersQuery.data?.results ?? []
-    const participants = participantsQuery.data?.results ?? []
-    const zevNameById = new Map((zevsQuery.data?.results ?? []).map((zev) => [zev.id, zev.name]))
+    const users = usersQuery.data ?? []
+    const participants = participantsQuery.data ?? []
+    const zevNameById = new Map((zevsQuery.data ?? []).map((zev) => [zev.id, zev.name]))
     const userById = new Map(users.map((entry) => [entry.id, entry]))
 
     const participantByUserId = new Map<number, Participant>()

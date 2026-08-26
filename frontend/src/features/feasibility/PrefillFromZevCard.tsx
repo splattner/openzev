@@ -18,7 +18,7 @@ export function PrefillFromZevCard({ onPrefillLoaded }: Props) {
     const [selectedZevId, setSelectedZevId] = useState('')
 
     const zevsQuery = useQuery({ queryKey: queryKeys.zev.list(), queryFn: fetchZevs })
-    const zevs = zevsQuery.data?.results ?? []
+    const zevs = zevsQuery.data ?? []
 
     const prefillMutation = useMutation({
         mutationFn: fetchFeasibilityPrefill,

@@ -348,14 +348,14 @@ export function ZevListPage() {
     if (isLoading) return <div className="card">{t('common.loading')}</div>
     if (isError) return <div className="card error-banner">{t('common.error')}</div>
 
-    const ownerNameById = new Map((usersQuery.data?.results ?? []).map((candidate) => [candidate.id, `${candidate.first_name} ${candidate.last_name}`]))
-    const linkedParticipantsForTarget = (participantsQuery.data?.results ?? []).filter((participant) => (
+    const ownerNameById = new Map((usersQuery.data ?? []).map((candidate) => [candidate.id, `${candidate.first_name} ${candidate.last_name}`]))
+    const linkedParticipantsForTarget = (participantsQuery.data ?? []).filter((participant) => (
         participant.zev === ownerTargetZev?.id && participant.user != null
     ))
     const ownerCandidates = linkedParticipantsForTarget
         .map((participant) => {
             const linkedUserId = participant.user as number
-            const linkedUser = usersQuery.data?.results.find((candidate) => candidate.id === linkedUserId)
+            const linkedUser = usersQuery.data?.find((candidate) => candidate.id === linkedUserId)
             return {
                 participant,
                 userId: linkedUserId,
@@ -808,7 +808,7 @@ export function ZevListPage() {
                         </tr>
                     </thead>
                     <tbody>
-                        {data?.results.length ? data.results.map((zev) => (
+                        {data?.length ? data.map((zev) => (
                             <tr key={zev.id}>
                                 <td>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>

@@ -70,11 +70,11 @@ export function ManagedZevProvider({ children }: { children: ReactNode }) {
     })
 
     const managedZevs = useMemo(() => {
-        const allZevs = zevsQuery.data?.results ?? []
+        const allZevs = zevsQuery.data ?? []
         if (isAdmin) return allZevs
         if (isOwner && user) return allZevs.filter((zev) => zev.owner === user.id)
         return []
-    }, [isAdmin, isOwner, user, zevsQuery.data?.results])
+    }, [isAdmin, isOwner, user, zevsQuery.data])
 
     // Restore the persisted selection directly, so it survives the loading
     // phase instead of being raced by the reconcile effect below.

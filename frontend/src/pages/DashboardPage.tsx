@@ -132,14 +132,14 @@ export function DashboardPage() {
     )
     const participantInvoicesWithPdf = useMemo(
         () =>
-            (invoicesQuery.data?.results ?? []).filter(
+            (invoicesQuery.data ?? []).filter(
                 (invoice) => ['approved', 'sent', 'paid'].includes(invoice.status) && !!invoice.pdf_url,
             ),
         [invoicesQuery.data],
     )
     const today = useMemo(() => formatIsoDate(new Date()), [])
     const openInvoices = useMemo(
-        () => selectOpenInvoices(invoicesQuery.data?.results ?? []),
+        () => selectOpenInvoices(invoicesQuery.data ?? []),
         [invoicesQuery.data],
     )
     const openOverdueCount = useMemo(

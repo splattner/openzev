@@ -102,8 +102,8 @@ export function ImportsPage() {
     const [bulkDeleteTo, setBulkDeleteTo] = useState('')
 
     const scopedZevId = isManagedScope ? selectedZevId : zevId
-    const availableZevs = (zevsQuery.data?.results ?? []).filter((zev) => !isManagedScope || !selectedZevId || zev.id === selectedZevId)
-    const importLogs = (data?.results ?? []).filter((log) => !isManagedScope || !selectedZevId || log.zev === selectedZevId)
+    const availableZevs = (zevsQuery.data ?? []).filter((zev) => !isManagedScope || !selectedZevId || zev.id === selectedZevId)
+    const importLogs = (data ?? []).filter((log) => !isManagedScope || !selectedZevId || log.zev === selectedZevId)
 
     const previewMutation = useMutation({
         mutationFn: previewCsvImport,

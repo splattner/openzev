@@ -90,7 +90,7 @@ export function Layout() {
     const adminIsActive = location.pathname.startsWith('/admin')
     const manageIsActive = isManageSectionPath(location.pathname)
 
-    const ownerById = new Map((usersQuery.data?.results ?? []).map((candidate) => [candidate.id, candidate]))
+    const ownerById = new Map((usersQuery.data ?? []).map((candidate) => [candidate.id, candidate]))
     const selectedZevOwner = selectedZev ? ownerById.get(selectedZev.owner) : undefined
     const effectiveOwner = selectedZevOwner ?? (user?.role === 'zev_owner' ? user : undefined)
     const selectedZevOwnerName = effectiveOwner

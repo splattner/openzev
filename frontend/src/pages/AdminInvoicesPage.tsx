@@ -51,7 +51,7 @@ export function AdminInvoicesPage() {
         })
     }, [confirm, deleteInvoiceAsync, t])
 
-    const invoices = invoicesQuery.data?.results ?? EMPTY_INVOICES
+    const invoices = invoicesQuery.data ?? EMPTY_INVOICES
 
     const rows = useMemo(
         () =>
