@@ -622,8 +622,8 @@ The sidebar (`Layout.tsx`) shows sections conditionally:
 **Behaviour:**
 - Fetches ZEV list only if `canManageZev` (admin or zev_owner).
 - `admin` → all ZEVs; can switch via dropdown (`isSelectable = true`).
-- `zev_owner` → only owned ZEVs; auto-selects first owned ZEV
-  (`isSelectable = false`).
+- `zev_owner` → only owned ZEVs. One ZEV: pin it (`isSelectable = false`).
+  Two or more: switch among them (`isSelectable = true`).
 - `participant` / `guest` → empty list, no selection.
 - Persists selected ZEV ID in `localStorage` key `openzev.selectedZevId`.
 - Auto-fallback: if stored ID is no longer valid, select first available ZEV.

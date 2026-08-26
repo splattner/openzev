@@ -3,7 +3,9 @@ import { useQuery } from '@tanstack/react-query'
 import { fetchZevs } from './api/zev'
 import { queryKeys } from './api/queryKeys'
 import { useAuth } from './auth'
-import type { Zev } from '../types/api'
+import type { UserRole, Zev } from '../types/api'
+
+const STORAGE_KEY = 'openzev.selectedZevId'
 
 interface ManagedZevContextValue {
     managedZevs: Zev[]
@@ -12,6 +14,45 @@ interface ManagedZevContextValue {
     isSelectable: boolean
     isLoading: boolean
     setSelectedZevId: (zevId: string) => void
+}
+
+interface ManagedSelectionInput {
+    role?: UserRole
+    managedZevs: ReadonlyArray<Pick<Zev, 'id'>>
+    currentId: string
+}
+
+interface ManagedSelection {
+    /** User may switch between managed ZEVs. */
+    isSelectable: boolean
+    /** Reconciled selection: keeps the current ID while it is still managed, otherwise falls back to the first managed ZEV. */
+    selection: string
+    /** Whether a user-initiated selection request targets a managed ZEV. */
+    isAllowedId: (zevId: string) => boolean
+}
+
+/**
+ * Admin: always switch. Owner: switch only with 2+ ZEVs. Else: no selection.
+ * (No hooks, unit-testable.)
+ */
+export function resolveManagedSelection({
+    role,
+    managedZevs,
+    currentId,
+}: ManagedSelectionInput): ManagedSelection {
+    const isAdmin = role === 'admin'
+    const isOwner = role === 'zev_owner'
+    const canManage = isAdmin || isOwner
+    const allowedIds = new Set(managedZevs.map((zev) => zev.id))
+
+    return {
+        isSelectable: isAdmin || (isOwner && managedZevs.length > 1),
+        selection:
+            canManage && managedZevs.length > 0
+                ? (allowedIds.has(currentId) ? currentId : managedZevs[0].id)
+                : '',
+        isAllowedId: (zevId) => canManage && allowedIds.has(zevId),
+    }
 }
 
 const ManagedZevContext = createContext<ManagedZevContextValue | undefined>(undefined)
@@ -35,42 +76,33 @@ export function ManagedZevProvider({ children }: { children: ReactNode }) {
         return []
     }, [isAdmin, isOwner, user, zevsQuery.data?.results])
 
-    const [selectedZevId, setSelectedZevIdState] = useState('')
+    // Restore the persisted selection directly, so it survives the loading
+    // phase instead of being raced by the reconcile effect below.
+    const [selectedZevId, setSelectedZevIdState] = useState(
+        () => window.localStorage.getItem(STORAGE_KEY) ?? '',
+    )
+
+    const resolution = useMemo(
+        () =>
+            resolveManagedSelection({
+                role: user?.role,
+                managedZevs,
+                currentId: selectedZevId,
+            }),
+        [user?.role, managedZevs, selectedZevId],
+    )
 
     useEffect(() => {
-        const stored = window.localStorage.getItem('openzev.selectedZevId')
-        if (stored) {
-            setSelectedZevIdState(stored)
+        // Don't erase a restored ID while the managed list is still loading.
+        if (canManageZev && zevsQuery.isLoading) return
+        if (selectedZevId === resolution.selection) return
+        setSelectedZevIdState(resolution.selection)
+        if (resolution.selection) {
+            window.localStorage.setItem(STORAGE_KEY, resolution.selection)
+        } else {
+            window.localStorage.removeItem(STORAGE_KEY)
         }
-    }, [])
-
-    useEffect(() => {
-        if (!canManageZev) {
-            setSelectedZevIdState('')
-            return
-        }
-
-        if (!managedZevs.length) {
-            setSelectedZevIdState('')
-            return
-        }
-
-        if (isOwner) {
-            const ownedZevId = managedZevs[0].id
-            if (selectedZevId !== ownedZevId) {
-                setSelectedZevIdState(ownedZevId)
-                window.localStorage.setItem('openzev.selectedZevId', ownedZevId)
-            }
-            return
-        }
-
-        const isCurrentValid = managedZevs.some((zev) => zev.id === selectedZevId)
-        if (!isCurrentValid) {
-            const fallback = managedZevs[0].id
-            setSelectedZevIdState(fallback)
-            window.localStorage.setItem('openzev.selectedZevId', fallback)
-        }
-    }, [canManageZev, managedZevs, selectedZevId, isOwner])
+    }, [canManageZev, zevsQuery.isLoading, selectedZevId, resolution])
 
     const selectedZev = managedZevs.find((zev) => zev.id === selectedZevId) ?? null
 
@@ -79,15 +111,15 @@ export function ManagedZevProvider({ children }: { children: ReactNode }) {
             managedZevs,
             selectedZevId,
             selectedZev,
-            isSelectable: isAdmin,
+            isSelectable: resolution.isSelectable,
             isLoading: zevsQuery.isLoading,
             setSelectedZevId: (zevId: string) => {
-                if (!isAdmin) return
+                if (!resolution.isAllowedId(zevId)) return
                 setSelectedZevIdState(zevId)
-                window.localStorage.setItem('openzev.selectedZevId', zevId)
+                window.localStorage.setItem(STORAGE_KEY, zevId)
             },
         }),
-        [managedZevs, selectedZevId, selectedZev, isAdmin, zevsQuery.isLoading],
+        [managedZevs, selectedZevId, selectedZev, resolution, zevsQuery.isLoading],
     )
 
     return <ManagedZevContext.Provider value={value}>{children}</ManagedZevContext.Provider>
