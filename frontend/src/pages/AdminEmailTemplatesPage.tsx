@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Tabs } from '@mantine/core'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
@@ -193,37 +194,32 @@ export function AdminEmailTemplatesPage() {
                 </p>
             </header>
 
-            <div style={{ display: 'flex', gap: '1rem', borderBottom: '1px solid var(--border-default)', marginBottom: '1.5rem' }}>
-                {tabs.map((tab) => (
-                    <button
-                        key={tab.key}
-                        onClick={() => setActiveTab(tab.key)}
-                        style={{
-                            background: 'transparent',
-                            color: activeTab === tab.key ? 'var(--text-primary)' : 'var(--text-muted)',
-                            padding: '0.75rem 1rem',
-                            fontSize: '1rem',
-                            fontWeight: activeTab === tab.key ? 600 : 400,
-                            cursor: 'pointer',
-                            border: 'none',
-                            borderBlockEnd: activeTab === tab.key ? '2px solid var(--interactive)' : 'none',
-                        }}
-                    >
-                        {tab.label}
-                    </button>
-                ))}
-            </div>
+            <Tabs
+                classNames={{ root: 'app-tabs', list: 'app-tabs-list', tab: 'app-tabs-tab' }}
+                value={activeTab}
+                keepMounted={false}
+                onChange={(value) => {
+                    if (value) setActiveTab(value as TemplateKey)
+                }}
+            >
+                <Tabs.List aria-label={t('admin.emailTemplates.title')}>
+                    {tabs.map((tab) => (
+                        <Tabs.Tab key={tab.key} value={tab.key}>
+                            {tab.label}
+                        </Tabs.Tab>
+                    ))}
+                </Tabs.List>
 
-            {tabs.map((tab) =>
-                activeTab === tab.key ? (
-                    <EmailTemplateEditor
-                        key={tab.key}
-                        templateKey={tab.key}
-                        title={tab.label}
-                        fields={tab.fields}
-                    />
-                ) : null,
-            )}
+                {tabs.map((tab) => (
+                    <Tabs.Panel key={tab.key} value={tab.key}>
+                        <EmailTemplateEditor
+                            templateKey={tab.key}
+                            title={tab.label}
+                            fields={tab.fields}
+                        />
+                    </Tabs.Panel>
+                ))}
+            </Tabs>
         </div>
     )
 }

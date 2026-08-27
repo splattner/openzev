@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
+import { Tabs } from '@mantine/core'
 import { useCallback, useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
@@ -96,8 +97,7 @@ export function MeteringChartPage() {
     const isManagedScope = user?.role === 'admin' || user?.role === 'zev_owner'
     const interval: BillingInterval = (selectedZev?.billing_interval as BillingInterval) ?? 'monthly'
 
-    // Tab state
-    const [activeTab, setActiveTab] = useState<'chart' | 'quality'>('chart')
+    const activeTab = searchParams.get('tab') === 'quality' ? 'quality' : 'chart'
 
     // Controlled state
     const [selectedMpId, setSelectedMpId] = useState<string>(searchParams.get('metering_point') ?? '')
@@ -142,15 +142,28 @@ export function MeteringChartPage() {
     const totalOut = data.reduce((sum, d) => sum + d.out_kwh, 0)
     const hasOut = data.some((d) => d.out_kwh > 0)
 
-    // Sync the selected MP to the URL
+    // Sync the selected metering point to the URL
     const handleMpChange = useCallback((id: string) => {
         setSelectedMpId(id)
+        const next = new URLSearchParams(searchParams)
         if (id) {
-            setSearchParams({ metering_point: id }, { replace: true })
+            next.set('metering_point', id)
         } else {
-            setSearchParams({}, { replace: true })
+            next.delete('metering_point')
         }
-    }, [setSearchParams])
+        setSearchParams(next, { replace: true })
+    }, [searchParams, setSearchParams])
+
+    // ?tab=quality makes the quality view shareable
+    const handleTabChange = (value: string | null) => {
+        const next = new URLSearchParams(searchParams)
+        if (value === 'quality') {
+            next.set('tab', 'quality')
+        } else {
+            next.delete('tab')
+        }
+        setSearchParams(next, { replace: true })
+    }
 
     const selectedMp = meteringPoints.find((m) => m.id === selectedMpId)
 
@@ -176,385 +189,354 @@ export function MeteringChartPage() {
                 <p className="muted">{t('pages.meteringData.description')}</p>
             </header>
 
-            {/* ── Tabs ──────────────────────────────────────────────────────────── */}
-            <div style={{ display: 'flex', gap: '1rem', borderBottom: '1px solid var(--border-default)', marginBottom: '1.5rem' }}>
-                <button
-                    onClick={() => setActiveTab('chart')}
-                    style={{
-                        background: activeTab === 'chart' ? 'transparent' : 'transparent',
-                        color: activeTab === 'chart' ? 'var(--text-primary)' : 'var(--text-muted)',
-                        borderBottom: activeTab === 'chart' ? '2px solid var(--interactive)' : 'none',
-                        padding: '0.75rem 1rem',
-                        fontSize: '1rem',
-                        fontWeight: activeTab === 'chart' ? 600 : 400,
-                        cursor: 'pointer',
-                        border: 'none',
-                    }}
-                >
-                    {t('nav.meteringData')}
-                </button>
-                <button
-                    onClick={() => setActiveTab('quality')}
-                    style={{
-                        background: activeTab === 'quality' ? 'transparent' : 'transparent',
-                        color: activeTab === 'quality' ? 'var(--text-primary)' : 'var(--text-muted)',
-                        borderBottom: activeTab === 'quality' ? '2px solid var(--interactive)' : 'none',
-                        padding: '0.75rem 1rem',
-                        fontSize: '1rem',
-                        fontWeight: activeTab === 'quality' ? 600 : 400,
-                        cursor: 'pointer',
-                        border: 'none',
-                    }}
-                >
-                    {t('nav.meteringDataQuality')}
-                </button>
-            </div>
-
-            {/* ── Controls ──────────────────────────────────────────────────────── */}
-            <div
-                className="card"
-                style={{
-                    display: 'grid',
-                    gap: '1rem',
-                }}
+            <Tabs
+                classNames={{ root: 'app-tabs', list: 'app-tabs-list', tab: 'app-tabs-tab' }}
+                value={activeTab}
+                keepMounted={false}
+                onChange={handleTabChange}
             >
-                <PeriodSelector
-                    interval={interval}
-                    from={period.from}
-                    to={period.to}
-                    onChange={setPeriod}
-                />
+                <Tabs.List aria-label={t('pages.meteringData.title')}>
+                    <Tabs.Tab value="chart">{t('nav.meteringData')}</Tabs.Tab>
+                    <Tabs.Tab value="quality">{t('nav.meteringDataQuality')}</Tabs.Tab>
+                </Tabs.List>
 
-                {activeTab === 'chart' && (
-                    <div
-                        className="inline-form"
-                        style={{
-                            display: 'grid',
-                            gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-                            gap: '1rem',
-                            alignItems: 'end',
-                        }}
-                    >
-                        <label>
-                            <span>{t('pages.meteringData.meteringPoint')}</span>
-                            <select
-                                value={selectedMpId}
-                                onChange={(e) => handleMpChange(e.target.value)}
-                            >
-                                <option value="">{t('pages.meteringData.selectMeteringPoint')}</option>
-                                {meteringPoints.map((mp) => (
-                                    <option key={mp.id} value={mp.id}>
-                                        {mp.meter_id}
-                                        {zevNameById.has(mp.zev) ? ` (${zevNameById.get(mp.zev)})` : ''}
-                                    </option>
-                                ))}
-                            </select>
-                        </label>
+                <div
+                    className="card"
+                    style={{
+                        display: 'grid',
+                        gap: '1rem',
+                    }}
+                >
+                    <PeriodSelector
+                        interval={interval}
+                        from={period.from}
+                        to={period.to}
+                        onChange={setPeriod}
+                    />
 
-                        <label>
-                            <span>{t('pages.meteringData.resolution')}</span>
-                            <select
-                                value={bucket}
-                                onChange={(e) => setBucket(e.target.value as 'day' | 'hour' | 'month')}
-                            >
-                                <option value="hour">{t('pages.meteringData.resolutions.hour')}</option>
-                                <option value="day">{t('pages.meteringData.resolutions.day')}</option>
-                                <option value="month">{t('pages.meteringData.resolutions.month')}</option>
-                            </select>
-                        </label>
-                    </div>
-                )}
+                    {activeTab === 'chart' && (
+                        <div
+                            className="inline-form"
+                            style={{
+                                display: 'grid',
+                                gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+                                gap: '1rem',
+                                alignItems: 'end',
+                            }}
+                        >
+                            <label>
+                                <span>{t('pages.meteringData.meteringPoint')}</span>
+                                <select
+                                    value={selectedMpId}
+                                    onChange={(e) => handleMpChange(e.target.value)}
+                                >
+                                    <option value="">{t('pages.meteringData.selectMeteringPoint')}</option>
+                                    {meteringPoints.map((mp) => (
+                                        <option key={mp.id} value={mp.id}>
+                                            {mp.meter_id}
+                                            {zevNameById.has(mp.zev) ? ` (${zevNameById.get(mp.zev)})` : ''}
+                                        </option>
+                                    ))}
+                                </select>
+                            </label>
 
-                {activeTab === 'quality' && (
-                    <div
-                        className="inline-form"
-                        style={{
-                            display: 'grid',
-                            gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-                            gap: '1rem',
-                            alignItems: 'end',
-                        }}
-                    >
-                        <label>
-                            <span>{t('pages.meteringData.meterIdOptional')}</span>
-                            <select
-                                value={selectedMpId}
-                                onChange={(e) => handleMpChange(e.target.value)}
-                            >
-                                <option value="">{t('pages.meteringData.allMeteringPoints')}</option>
-                                {meteringPoints.map((mp) => (
-                                    <option key={mp.id} value={mp.id}>
-                                        {mp.meter_id}
-                                        {zevNameById.has(mp.zev) ? ` (${zevNameById.get(mp.zev)})` : ''}
-                                    </option>
-                                ))}
-                            </select>
-                        </label>
-                    </div>
-                )}
-            </div>
-
-            {/* ── Chart Tab ─────────────────────────────────────────────────────── */}
-            {activeTab === 'chart' && (
-                <>
-                    {/* ── No selection placeholder ──────────────────────────────────────── */}
-                    {!selectedMpId && (
-                        <div className="card" style={{ textAlign: 'center', padding: '3rem 1rem', color: 'var(--text-muted)' }}>
-                            {t('pages.meteringData.noPointSelected')}
+                            <label>
+                                <span>{t('pages.meteringData.resolution')}</span>
+                                <select
+                                    value={bucket}
+                                    onChange={(e) => setBucket(e.target.value as 'day' | 'hour' | 'month')}
+                                >
+                                    <option value="hour">{t('pages.meteringData.resolutions.hour')}</option>
+                                    <option value="day">{t('pages.meteringData.resolutions.day')}</option>
+                                    <option value="month">{t('pages.meteringData.resolutions.month')}</option>
+                                </select>
+                            </label>
                         </div>
                     )}
 
-                    {/* ── Loading / error ───────────────────────────────────────────────── */}
-                    {selectedMpId && chartQuery.isLoading && (
-                        <div className="card" style={{ textAlign: 'center', padding: '2rem' }}>
-                            {t('pages.meteringData.loadingChart')}
+                    {activeTab === 'quality' && (
+                        <div
+                            className="inline-form"
+                            style={{
+                                display: 'grid',
+                                gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+                                gap: '1rem',
+                                alignItems: 'end',
+                            }}
+                        >
+                            <label>
+                                <span>{t('pages.meteringData.meterIdOptional')}</span>
+                                <select
+                                    value={selectedMpId}
+                                    onChange={(e) => handleMpChange(e.target.value)}
+                                >
+                                    <option value="">{t('pages.meteringData.allMeteringPoints')}</option>
+                                    {meteringPoints.map((mp) => (
+                                        <option key={mp.id} value={mp.id}>
+                                            {mp.meter_id}
+                                            {zevNameById.has(mp.zev) ? ` (${zevNameById.get(mp.zev)})` : ''}
+                                        </option>
+                                    ))}
+                                </select>
+                            </label>
                         </div>
                     )}
-                    {selectedMpId && chartQuery.isError && (
-                        <div className="card error-banner">{t('pages.meteringData.chartError')}</div>
-                    )}
+                </div>
 
-                    {/* ── Results ───────────────────────────────────────────────────────── */}
-                    {selectedMpId && chartQuery.isSuccess && (
-                        <>
-                            {/* Summary stats */}
-                            <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
-                                {selectedMp && (
-                                    <StatBadge
-                                        label={t('pages.meteringData.stats.meterId')}
-                                        value={selectedMp.meter_id}
-                                        color="var(--text-primary)"
-                                    />
-                                )}
-                                <StatBadge
-                                    label={t('pages.meteringData.stats.totalConsumption')}
-                                    value={`${totalIn.toFixed(2)} kWh`}
-                                    color={PROD_COLORS[0]}
-                                />
-                                {hasOut && (
-                                    <StatBadge
-                                        label={t('pages.meteringData.stats.totalFeedIn')}
-                                        value={`${totalOut.toFixed(2)} kWh`}
-                                        color={CONS_COLORS[0]}
-                                    />
-                                )}
-                                <StatBadge
-                                    label={t('pages.meteringData.stats.dataPoints')}
-                                    value={String(data.length)}
-                                    color="var(--text-muted)"
-                                />
+                <Tabs.Panel value="chart">
+                    <div className="page-stack">
+                        {!selectedMpId && (
+                            <div className="card" style={{ textAlign: 'center', padding: '3rem 1rem', color: 'var(--text-muted)' }}>
+                                {t('pages.meteringData.noPointSelected')}
                             </div>
+                        )}
 
-                            {data.length === 0 ? (
-                                <div className="card" style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
-                                    {t('pages.meteringData.noReadings')}
+                        {selectedMpId && chartQuery.isLoading && (
+                            <div className="card" style={{ textAlign: 'center', padding: '2rem' }}>
+                                {t('pages.meteringData.loadingChart')}
+                            </div>
+                        )}
+                        {selectedMpId && chartQuery.isError && (
+                            <div className="card error-banner">{t('pages.meteringData.chartError')}</div>
+                        )}
+
+                        {selectedMpId && chartQuery.isSuccess && (
+                            <>
+                                <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+                                    {selectedMp && (
+                                        <StatBadge
+                                            label={t('pages.meteringData.stats.meterId')}
+                                            value={selectedMp.meter_id}
+                                            color="var(--text-primary)"
+                                        />
+                                    )}
+                                    <StatBadge
+                                        label={t('pages.meteringData.stats.totalConsumption')}
+                                        value={`${totalIn.toFixed(2)} kWh`}
+                                        color={PROD_COLORS[0]}
+                                    />
+                                    {hasOut && (
+                                        <StatBadge
+                                            label={t('pages.meteringData.stats.totalFeedIn')}
+                                            value={`${totalOut.toFixed(2)} kWh`}
+                                            color={CONS_COLORS[0]}
+                                        />
+                                    )}
+                                    <StatBadge
+                                        label={t('pages.meteringData.stats.dataPoints')}
+                                        value={String(data.length)}
+                                        color="var(--text-muted)"
+                                    />
                                 </div>
-                            ) : (
-                                <div className="card" style={{ padding: '1.5rem' }}>
-                                    <ResponsiveContainer width="100%" height={380}>
-                                        <BarChart
-                                            data={data}
-                                            margin={{ top: 8, right: 16, left: 0, bottom: 8 }}
-                                            barCategoryGap="20%"
-                                        >
-                                            <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                                            <XAxis
-                                                dataKey="bucket"
-                                                tickFormatter={tickFormatter}
-                                                tick={{ fontSize: 11 }}
-                                                tickLine={false}
-                                                interval="preserveStartEnd"
-                                            />
-                                            <YAxis
-                                                unit=" kWh"
-                                                tick={{ fontSize: 11 }}
-                                                tickLine={false}
-                                                axisLine={false}
-                                                width={72}
-                                            />
-                                            <Tooltip
-                                                content={<CustomTooltip resolution={bucket} settings={settings} />}
-                                            />
-                                            <Legend />
-                                            <Bar
-                                                dataKey="in_kwh"
-                                                name={t('pages.meteringData.series.consumption')}
-                                                fill={PROD_COLORS[0]}
-                                                radius={[3, 3, 0, 0]}
-                                                maxBarSize={48}
-                                            />
-                                            {hasOut && (
+
+                                {data.length === 0 ? (
+                                    <div className="card" style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
+                                        {t('pages.meteringData.noReadings')}
+                                    </div>
+                                ) : (
+                                    <div className="card" style={{ padding: '1.5rem' }}>
+                                        <ResponsiveContainer width="100%" height={380}>
+                                            <BarChart
+                                                data={data}
+                                                margin={{ top: 8, right: 16, left: 0, bottom: 8 }}
+                                                barCategoryGap="20%"
+                                            >
+                                                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                                                <XAxis
+                                                    dataKey="bucket"
+                                                    tickFormatter={tickFormatter}
+                                                    tick={{ fontSize: 11 }}
+                                                    tickLine={false}
+                                                    interval="preserveStartEnd"
+                                                />
+                                                <YAxis
+                                                    unit=" kWh"
+                                                    tick={{ fontSize: 11 }}
+                                                    tickLine={false}
+                                                    axisLine={false}
+                                                    width={72}
+                                                />
+                                                <Tooltip
+                                                    content={<CustomTooltip resolution={bucket} settings={settings} />}
+                                                />
+                                                <Legend />
                                                 <Bar
-                                                    dataKey="out_kwh"
-                                                    name={t('pages.meteringData.series.feedIn')}
-                                                    fill={CONS_COLORS[0]}
+                                                    dataKey="in_kwh"
+                                                    name={t('pages.meteringData.series.consumption')}
+                                                    fill={PROD_COLORS[0]}
                                                     radius={[3, 3, 0, 0]}
                                                     maxBarSize={48}
                                                 />
-                                            )}
-                                        </BarChart>
-                                    </ResponsiveContainer>
-                                </div>
-                            )}
-
-                            <RawMeteringTable
-                                meteringPointId={selectedMpId}
-                                dateFrom={period.from}
-                                dateTo={period.to}
-                                hasOut={hasOut}
-                            />
-                        </>
-                    )}
-                </>
-            )}
-
-            {/* ── Data Quality Tab ──────────────────────────────────────────────── */}
-            {activeTab === 'quality' && (
-                <>
-                    {qualityQuery.isLoading && (
-                        <div className="card" style={{ textAlign: 'center', padding: '2rem' }}>
-                            {t('common.loading')}
-                        </div>
-                    )}
-                    {qualityQuery.isError && (
-                        <div className="card error-banner">{formatApiError(qualityQuery.error as any)}</div>
-                    )}
-                    {qualityQuery.isSuccess && qualityQuery.data && (
-                        <>
-                            {qualityQuery.data.metering_points.length === 0 ? (
-                                <div className="card" style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
-                                    {t('meteringDataQuality.noData')}
-                                </div>
-                            ) : (
-                                <>
-                                    {/* Summary cards */}
-                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
-                                        <div style={{ background: 'var(--success-100)', border: '1px solid var(--success-200)', borderRadius: '8px', padding: '1rem', textAlign: 'center' }}>
-                                            <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'var(--success-700)' }}>
-                                                {qualityQuery.data.metering_points.filter((mp) => mp.severity === 'green').length}
-                                            </div>
-                                            <div style={{ fontSize: '0.875rem', color: 'var(--brand-mid)' }}>{t('meteringDataQuality.severityGreen')}</div>
-                                        </div>
-                                        <div style={{ background: 'var(--warning-100)', border: '1px solid var(--warning-200)', borderRadius: '8px', padding: '1rem', textAlign: 'center' }}>
-                                            <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'var(--warning-800)' }}>
-                                                {qualityQuery.data.metering_points.filter((mp) => mp.severity === 'yellow').length}
-                                            </div>
-                                            <div style={{ fontSize: '0.875rem', color: 'var(--warning-800)' }}>{t('meteringDataQuality.severityYellow')}</div>
-                                        </div>
-                                        <div style={{ background: 'var(--danger-100)', border: '1px solid var(--danger-300)', borderRadius: '8px', padding: '1rem', textAlign: 'center' }}>
-                                            <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'var(--danger-700)' }}>
-                                                {qualityQuery.data.metering_points.filter((mp) => mp.severity === 'red').length}
-                                            </div>
-                                            <div style={{ fontSize: '0.875rem', color: 'var(--danger-600)' }}>{t('meteringDataQuality.severityRed')}</div>
-                                        </div>
+                                                {hasOut && (
+                                                    <Bar
+                                                        dataKey="out_kwh"
+                                                        name={t('pages.meteringData.series.feedIn')}
+                                                        fill={CONS_COLORS[0]}
+                                                        radius={[3, 3, 0, 0]}
+                                                        maxBarSize={48}
+                                                    />
+                                                )}
+                                            </BarChart>
+                                        </ResponsiveContainer>
                                     </div>
+                                )}
 
-                                    {/* Quality table */}
-                                    <div className="table-card">
-                                        <table>
-                                            <thead>
-                                                <tr>
-                                                    <th>{t('meteringDataQuality.meterId')}</th>
-                                                    <th>{t('meteringDataQuality.participant')}</th>
-                                                    <th>{t('meteringDataQuality.dataCompleteness')}</th>
-                                                    <th>{t('meteringDataQuality.status')}</th>
-                                                    <th>{t('meteringDataQuality.gaps')}</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {qualityQuery.data.metering_points.map((mp) => (
-                                                    <tr key={mp.id}>
-                                                        <td style={{ fontFamily: 'monospace', fontSize: '0.9em' }}>{mp.meter_id}</td>
-                                                        <td>{mp.participant_name}</td>
-                                                        <td>
-                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                                                <div style={{ width: '80px', height: '20px', background: 'var(--line-subtle)', borderRadius: '4px', overflow: 'hidden' }}>
-                                                                    <div
-                                                                        style={{
-                                                                            height: '100%',
-                                                                            background:
-                                                                                mp.severity === 'green'
-                                                                                    ? PROD_COLORS[0]
-                                                                                    : mp.severity === 'yellow'
-                                                                                      ? CHART_GRID
-                                                                                      : NEGATIVE_COLOR,
-                                                                            width: `${mp.data_completeness}%`,
-                                                                        }}
-                                                                    />
-                                                                </div>
-                                                                <span style={{ fontSize: '0.875rem', fontWeight: 'bold' }}>{mp.data_completeness}%</span>
-                                                            </div>
-                                                        </td>
-                                                        <td>
-                                                            <span
-                                                                style={{
-                                                                    display: 'inline-block',
-                                                                    padding: '0.25rem 0.75rem',
-                                                                    borderRadius: '4px',
-                                                                    fontSize: '0.875rem',
-                                                                    fontWeight: 'bold',
-                                                                    background:
-                                                                        mp.severity === 'green'
-                                                                                    ? 'var(--success-100)'
-                                                                                    : mp.severity === 'yellow'
-                                                                                      ? 'var(--warning-100)'
-                                                                                      : 'var(--danger-100)',
-                                                                    color:
-                                                                        mp.severity === 'green'
-                                                                                    ? 'var(--success-700)'
-                                                                                    : mp.severity === 'yellow'
-                                                                                      ? 'var(--warning-800)'
-                                                                                      : 'var(--danger-700)',
-                                                                }}
-                                                            >
-                                                                {t(`meteringDataQuality.severity${mp.severity.charAt(0).toUpperCase() + mp.severity.slice(1)}`)}
-                                                            </span>
-                                                            {mp.assignment_overlap && (
-                                                                <div className="metering-dq-warning">
-                                                                    {t('meteringDataQuality.assignmentOverlapWarning')}
-                                                                </div>
-                                                            )}
-                                                            {mp.unassigned_readings > 0 && (
-                                                                <div className="metering-dq-warning">
-                                                                    {t('meteringDataQuality.unassignedWarning', { readings: mp.unassigned_readings, days: mp.unassigned_days })}
-                                                                </div>
-                                                            )}
-                                                        </td>
-                                                        <td style={{ fontSize: '0.875rem' }}>
-                                                            {mp.gaps.length === 0 ? (
-                                                                <span style={{ color: 'var(--success-600)' }}>{t('meteringDataQuality.noGaps')}</span>
-                                                            ) : (
-                                                                <div>
-                                                                    {mp.gaps.slice(0, 1).map((gap, idx) => (
-                                                                        <div key={idx} style={{ color: 'var(--text-body)' }}>
-                                                                            {gap.start_date === gap.end_date ? (
-                                                                                <>{gap.start_date}</>
-                                                                            ) : (
-                                                                                <>
-                                                                                    {gap.start_date} → {gap.end_date}
-                                                                                </>
-                                                                            )}
-                                                                        </div>
-                                                                    ))}
-                                                                    {mp.gaps.length > 1 && (
-                                                                        <div style={{ color: 'var(--text-muted)', fontSize: '0.8em' }}>
-                                                                            +{mp.gaps.length - 1} {t('meteringDataQuality.moreGaps')}
-                                                                        </div>
-                                                                    )}
-                                                                </div>
-                                                            )}
-                                                        </td>
+                                <RawMeteringTable
+                                    meteringPointId={selectedMpId}
+                                    dateFrom={period.from}
+                                    dateTo={period.to}
+                                    hasOut={hasOut}
+                                />
+                            </>
+                        )}
+                    </div>
+                </Tabs.Panel>
+
+                <Tabs.Panel value="quality">
+                    <div className="page-stack">
+                        {qualityQuery.isLoading && (
+                            <div className="card" style={{ textAlign: 'center', padding: '2rem' }}>
+                                {t('common.loading')}
+                            </div>
+                        )}
+                        {qualityQuery.isError && (
+                            <div className="card error-banner">{formatApiError(qualityQuery.error as any)}</div>
+                        )}
+                        {qualityQuery.isSuccess && qualityQuery.data && (
+                            <>
+                                {qualityQuery.data.metering_points.length === 0 ? (
+                                    <div className="card" style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
+                                        {t('meteringDataQuality.noData')}
+                                    </div>
+                                ) : (
+                                    <>
+                                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
+                                            <div style={{ background: 'var(--success-100)', border: '1px solid var(--success-200)', borderRadius: '8px', padding: '1rem', textAlign: 'center' }}>
+                                                <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'var(--success-700)' }}>
+                                                    {qualityQuery.data.metering_points.filter((mp) => mp.severity === 'green').length}
+                                                </div>
+                                                <div style={{ fontSize: '0.875rem', color: 'var(--brand-mid)' }}>{t('meteringDataQuality.severityGreen')}</div>
+                                            </div>
+                                            <div style={{ background: 'var(--warning-100)', border: '1px solid var(--warning-200)', borderRadius: '8px', padding: '1rem', textAlign: 'center' }}>
+                                                <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'var(--warning-800)' }}>
+                                                    {qualityQuery.data.metering_points.filter((mp) => mp.severity === 'yellow').length}
+                                                </div>
+                                                <div style={{ fontSize: '0.875rem', color: 'var(--warning-800)' }}>{t('meteringDataQuality.severityYellow')}</div>
+                                            </div>
+                                            <div style={{ background: 'var(--danger-100)', border: '1px solid var(--danger-300)', borderRadius: '8px', padding: '1rem', textAlign: 'center' }}>
+                                                <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'var(--danger-700)' }}>
+                                                    {qualityQuery.data.metering_points.filter((mp) => mp.severity === 'red').length}
+                                                </div>
+                                                <div style={{ fontSize: '0.875rem', color: 'var(--danger-600)' }}>{t('meteringDataQuality.severityRed')}</div>
+                                            </div>
+                                        </div>
+
+                                        <div className="table-card">
+                                            <table>
+                                                <thead>
+                                                    <tr>
+                                                        <th>{t('meteringDataQuality.meterId')}</th>
+                                                        <th>{t('meteringDataQuality.participant')}</th>
+                                                        <th>{t('meteringDataQuality.dataCompleteness')}</th>
+                                                        <th>{t('meteringDataQuality.status')}</th>
+                                                        <th>{t('meteringDataQuality.gaps')}</th>
                                                     </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                </>
-                            )}
-                        </>
-                    )}
-                </>
-            )}
+                                                </thead>
+                                                <tbody>
+                                                    {qualityQuery.data.metering_points.map((mp) => (
+                                                        <tr key={mp.id}>
+                                                            <td style={{ fontFamily: 'monospace', fontSize: '0.9em' }}>{mp.meter_id}</td>
+                                                            <td>{mp.participant_name}</td>
+                                                            <td>
+                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                                                    <div style={{ width: '80px', height: '20px', background: 'var(--line-subtle)', borderRadius: '4px', overflow: 'hidden' }}>
+                                                                        <div
+                                                                            style={{
+                                                                                height: '100%',
+                                                                                background:
+                                                                                    mp.severity === 'green'
+                                                                                        ? PROD_COLORS[0]
+                                                                                        : mp.severity === 'yellow'
+                                                                                          ? CHART_GRID
+                                                                                          : NEGATIVE_COLOR,
+                                                                                width: `${mp.data_completeness}%`,
+                                                                            }}
+                                                                        />
+                                                                    </div>
+                                                                    <span style={{ fontSize: '0.875rem', fontWeight: 'bold' }}>{mp.data_completeness}%</span>
+                                                                </div>
+                                                            </td>
+                                                            <td>
+                                                                <span
+                                                                    style={{
+                                                                        display: 'inline-block',
+                                                                        padding: '0.25rem 0.75rem',
+                                                                        borderRadius: '4px',
+                                                                        fontSize: '0.875rem',
+                                                                        fontWeight: 'bold',
+                                                                        background:
+                                                                            mp.severity === 'green'
+                                                                                        ? 'var(--success-100)'
+                                                                                        : mp.severity === 'yellow'
+                                                                                          ? 'var(--warning-100)'
+                                                                                          : 'var(--danger-100)',
+                                                                        color:
+                                                                            mp.severity === 'green'
+                                                                                        ? 'var(--success-700)'
+                                                                                        : mp.severity === 'yellow'
+                                                                                          ? 'var(--warning-800)'
+                                                                                          : 'var(--danger-700)',
+                                                                    }}
+                                                                >
+                                                                    {t(`meteringDataQuality.severity${mp.severity.charAt(0).toUpperCase() + mp.severity.slice(1)}`)}
+                                                                </span>
+                                                                {mp.assignment_overlap && (
+                                                                    <div className="metering-dq-warning">
+                                                                        {t('meteringDataQuality.assignmentOverlapWarning')}
+                                                                    </div>
+                                                                )}
+                                                                {mp.unassigned_readings > 0 && (
+                                                                    <div className="metering-dq-warning">
+                                                                        {t('meteringDataQuality.unassignedWarning', { readings: mp.unassigned_readings, days: mp.unassigned_days })}
+                                                                    </div>
+                                                                )}
+                                                            </td>
+                                                            <td style={{ fontSize: '0.875rem' }}>
+                                                                {mp.gaps.length === 0 ? (
+                                                                    <span style={{ color: 'var(--success-600)' }}>{t('meteringDataQuality.noGaps')}</span>
+                                                                ) : (
+                                                                    <div>
+                                                                        {mp.gaps.slice(0, 1).map((gap, idx) => (
+                                                                            <div key={idx} style={{ color: 'var(--text-body)' }}>
+                                                                                {gap.start_date === gap.end_date ? (
+                                                                                    <>{gap.start_date}</>
+                                                                                ) : (
+                                                                                    <>
+                                                                                        {gap.start_date} → {gap.end_date}
+                                                                                    </>
+                                                                                )}
+                                                                            </div>
+                                                                        ))}
+                                                                        {mp.gaps.length > 1 && (
+                                                                            <div style={{ color: 'var(--text-muted)', fontSize: '0.8em' }}>
+                                                                                +{mp.gaps.length - 1} {t('meteringDataQuality.moreGaps')}
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
+                                                                )}
+                                                            </td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </>
+                                )}
+                            </>
+                        )}
+                    </div>
+                </Tabs.Panel>
+            </Tabs>
         </div>
     )
 }

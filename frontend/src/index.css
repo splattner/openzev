@@ -2794,3 +2794,41 @@ h3 {
   margin: 0 0 0.5rem;
   font-size: 0.85rem;
 }
+
+/* ── Mantine Tabs (.app-tabs) ────────────────────────────────────────────── */
+
+/* Mantine v9 only emits hashed classes, so these hooks are applied via the
+   Tabs classNames prop: root app-tabs, list app-tabs-list, tab app-tabs-tab. */
+.app-tabs {
+  display: grid;
+  gap: 1.5rem;
+}
+
+.app-tabs-list {
+  gap: 1rem;
+}
+
+.app-tabs-list::before {
+  border-color: var(--border-default);
+}
+
+.app-tabs-tab {
+  padding: 0.75rem 1rem;
+  font-size: 1rem;
+  color: var(--text-muted);
+}
+
+.app-tabs-tab:hover {
+  background-color: transparent;
+  color: var(--text-primary);
+}
+
+.app-tabs-tab:not([data-active]):hover {
+  border-color: transparent;
+}
+
+.app-tabs-tab[data-active] {
+  color: var(--text-primary);
+  font-weight: 600;
+  border-bottom-color: var(--interactive);
+}

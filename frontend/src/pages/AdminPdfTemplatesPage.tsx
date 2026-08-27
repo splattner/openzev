@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Tabs } from '@mantine/core'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
@@ -420,22 +421,6 @@ export function AdminPdfTemplatesPage() {
         annual_statement: t('admin.annualStatementTemplate'),
     }
 
-    const handleTabKeyDown = useCallback(
-        (event: React.KeyboardEvent<HTMLDivElement>) => {
-            const index = PDF_TEMPLATE_TABS.indexOf(activeTab)
-            let next: number | null = null
-            if (event.key === 'ArrowRight') next = (index + 1) % PDF_TEMPLATE_TABS.length
-            else if (event.key === 'ArrowLeft') next = (index - 1 + PDF_TEMPLATE_TABS.length) % PDF_TEMPLATE_TABS.length
-            else if (event.key === 'Home') next = 0
-            else if (event.key === 'End') next = PDF_TEMPLATE_TABS.length - 1
-            if (next === null) return
-            event.preventDefault()
-            setActiveTab(PDF_TEMPLATE_TABS[next])
-            document.getElementById(`pdf-template-tab-${PDF_TEMPLATE_TABS[next]}`)?.focus()
-        },
-        [activeTab],
-    )
-
     const invoiceFieldGroups: FieldGroup[] = [
         {
             title: t('admin.fields.invoiceObject'),
@@ -782,44 +767,23 @@ export function AdminPdfTemplatesPage() {
                 </p>
             </header>
 
-            <div
-                role="tablist"
-                aria-label={t('admin.pdfTemplates')}
-                onKeyDown={handleTabKeyDown}
-                style={{ display: 'flex', gap: '1rem', borderBottom: '1px solid var(--border-default)', marginBottom: '1.5rem' }}
+            <Tabs
+                classNames={{ root: 'app-tabs', list: 'app-tabs-list', tab: 'app-tabs-tab' }}
+                value={activeTab}
+                keepMounted={false}
+                onChange={(value) => {
+                    if (value) setActiveTab(value as PdfTemplateTab)
+                }}
             >
-                {PDF_TEMPLATE_TABS.map((tab) => (
-                    <button
-                        key={tab}
-                        type="button"
-                        role="tab"
-                        id={`pdf-template-tab-${tab}`}
-                        aria-selected={activeTab === tab}
-                        aria-controls={`pdf-template-panel-${tab}`}
-                        tabIndex={activeTab === tab ? 0 : -1}
-                        onClick={() => setActiveTab(tab)}
-                        style={{
-                            background: 'transparent',
-                            color: activeTab === tab ? 'var(--text-primary)' : 'var(--text-muted)',
-                            padding: '0.75rem 1rem',
-                            fontSize: '1rem',
-                            fontWeight: activeTab === tab ? 600 : 400,
-                            cursor: 'pointer',
-                            border: 'none',
-                            borderBlockEnd: activeTab === tab ? '2px solid var(--interactive)' : 'none',
-                        }}
-                    >
-                        {tabLabels[tab]}
-                    </button>
-                ))}
-            </div>
+                <Tabs.List aria-label={t('admin.pdfTemplates')}>
+                    {PDF_TEMPLATE_TABS.map((tab) => (
+                        <Tabs.Tab key={tab} value={tab}>
+                            {tabLabels[tab]}
+                        </Tabs.Tab>
+                    ))}
+                </Tabs.List>
 
-            {activeTab === 'invoice' && (
-                <div
-                    id="pdf-template-panel-invoice"
-                    role="tabpanel"
-                    aria-labelledby="pdf-template-tab-invoice"
-                >
+                <Tabs.Panel value="invoice">
                     <TemplateEditor
                         data={invoiceTemplateQuery.data}
                         isLoading={invoiceTemplateQuery.isLoading}
@@ -832,15 +796,9 @@ export function AdminPdfTemplatesPage() {
                         fieldGroups={invoiceFieldGroups}
                         templateType="invoice"
                     />
-                </div>
-            )}
+                </Tabs.Panel>
 
-            {activeTab === 'contract' && (
-                <div
-                    id="pdf-template-panel-contract"
-                    role="tabpanel"
-                    aria-labelledby="pdf-template-tab-contract"
-                >
+                <Tabs.Panel value="contract">
                     <TemplateEditor
                         data={contractTemplateQuery.data}
                         isLoading={contractTemplateQuery.isLoading}
@@ -853,15 +811,9 @@ export function AdminPdfTemplatesPage() {
                         fieldGroups={contractFieldGroups}
                         templateType="contract"
                     />
-                </div>
-            )}
+                </Tabs.Panel>
 
-            {activeTab === 'annual_statement' && (
-                <div
-                    id="pdf-template-panel-annual_statement"
-                    role="tabpanel"
-                    aria-labelledby="pdf-template-tab-annual_statement"
-                >
+                <Tabs.Panel value="annual_statement">
                     <TemplateEditor
                         data={annualStatementTemplateQuery.data}
                         isLoading={annualStatementTemplateQuery.isLoading}
@@ -874,8 +826,8 @@ export function AdminPdfTemplatesPage() {
                         fieldGroups={annualStatementFieldGroups}
                         templateType="annual_statement"
                     />
-                </div>
-            )}
+                </Tabs.Panel>
+            </Tabs>
         </div>
     )
 }
