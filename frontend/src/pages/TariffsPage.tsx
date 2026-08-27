@@ -16,6 +16,7 @@ import { todayLocalIso } from '../lib/dates'
 import { useAppSettings } from '../lib/appSettings'
 import { useAuth } from '../lib/auth'
 import { useManagedZev } from '../lib/managedZev'
+import { PageSkeleton } from '../components/PageSkeleton'
 import { useTranslation } from 'react-i18next'
 import { useToast } from '../lib/toast'
 import type { Tariff, TariffPeriod } from '../types/api'
@@ -195,7 +196,15 @@ export function TariffsPage() {
     const versions = useTariffVersions({ selectedZevId, queryClient, pushToast, t })
 
     if (seriesQuery.isLoading) {
-        return <div className="card">{t('common.loading')}</div>
+        return (
+            <div className="page-stack">
+                <header>
+                    <h2>{t('pages.tariffs.title')}</h2>
+                    <p className="muted">{t('pages.tariffs.description')}</p>
+                </header>
+                <PageSkeleton variant="table" />
+            </div>
+        )
     }
 
     if (seriesQuery.isError) {

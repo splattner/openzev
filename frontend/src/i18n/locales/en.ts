@@ -513,6 +513,11 @@ export const en = {
             startDescription: 'Step-by-step flow with column mapping and preview checks.',
             loading: 'Loading import logs...',
             loadFailed: 'Failed to load import logs.',
+            emptyState: {
+                title: 'No imports yet',
+                description: 'Start your first import to bring metering data into this ZEV.',
+                createAction: 'Start import',
+            },
             noRows: 'No import logs yet.',
             columns: {
                 created: 'Created',
@@ -1029,6 +1034,7 @@ export const en = {
                 title: 'No participants yet',
                 description: 'Create your first participant to start assignments and invoicing.',
                 createAction: 'Create first participant',
+                meteringPointsAction: 'Go to metering points',
             },
             noResults: {
                 title: 'No participants match these filters',
@@ -1518,6 +1524,11 @@ export const en = {
             title: 'ZEVs',
             description: 'Communities you can manage in OpenZEV.',
             newZev: 'New ZEV',
+            emptyState: {
+                title: 'No ZEVs yet',
+                description: 'Create your first ZEV community to start managing participants and metering points.',
+                createAction: 'Create ZEV',
+            },
             adminOnly: 'Only admins can create new ZEVs.',
             validation: {
                 zevNameRequired: 'ZEV name is required.',
@@ -1536,7 +1547,6 @@ export const en = {
             },
             editModalTitle: 'Edit ZEV',
             saveZev: 'Save ZEV',
-            noZevs: 'No ZEVs yet.',
             col: {
                 name: 'Name',
                 owner: 'Owner',

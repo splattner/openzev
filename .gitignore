@@ -13,3 +13,4 @@ frontend/dist/
 .vscode/
 .pytest_cache/
 .coverage
+*.rdb

@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
+import { PageSkeleton } from '../components/PageSkeleton'
 import { useTranslation } from 'react-i18next'
 import { fetchInvoice, fetchInvoicePdfBlob, generateInvoicePdf } from '../lib/api/invoices'
 import { queryKeys } from '../lib/api/queryKeys'
@@ -70,7 +71,7 @@ export function InvoiceDetailPage() {
     const { url: pdfObjectUrl, loading: pdfLoading, error: pdfError } = useInvoicePdfUrl(invoiceId, pdfExists)
 
     if (invoiceQuery.isLoading) {
-        return <div className="card">{t('common.loading')}</div>
+        return <PageSkeleton variant="page" />
     }
     if (invoiceQuery.isError || !invoiceQuery.data) {
         return <div className="card error-banner">{t('common.error')}</div>
@@ -131,7 +132,7 @@ export function InvoiceDetailPage() {
                     pdfError ? (
                         <div className="error-banner">{t('common.error')}</div>
                     ) : pdfLoading ? (
-                        <div className="card">{t('common.loading')}</div>
+                        <PageSkeleton variant="card" />
                     ) : (
                         <PdfPreview src={pdfObjectUrl} title={t('pages.invoiceDetail.title', { number: inv.invoice_number })} />
                     )

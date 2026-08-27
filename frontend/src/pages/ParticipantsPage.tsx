@@ -24,6 +24,7 @@ import { useAppSettings } from '../lib/appSettings'
 import { useAuth } from '../lib/auth'
 import { useManagedZev } from '../lib/managedZev'
 import { queryKeys } from '../lib/api/queryKeys'
+import { PageSkeleton } from '../components/PageSkeleton'
 import { useTranslation } from 'react-i18next'
 import { useToast } from '../lib/toast'
 import { todayLocalIso } from '../lib/dates'
@@ -178,7 +179,16 @@ export function ParticipantsPage() {
         ].filter(Boolean).join(', ')
     }
 
-    if (isLoading) return <div className="card">{t('common.loading')}</div>
+    if (isLoading)
+        return (
+            <div className="page-stack">
+                <header>
+                    <h2>{t('pages.participants.title')}</h2>
+                    <p className="muted">{t('pages.participants.description')}</p>
+                </header>
+                <PageSkeleton variant="cardList" />
+            </div>
+        )
     if (isError) return <div className="card error-banner">{t('common.error')}</div>
 
     const participants = (data ?? []).filter((participant) => !isManagedScope || !selectedZevId || participant.zev === selectedZevId)
@@ -222,7 +232,6 @@ export function ParticipantsPage() {
     const ownerCount = participantCards.filter((entry) => entry.ownerRow).length
     const warningCount = participantCards.filter((entry) => entry.warnings.length > 0).length
     const noMeteringCount = participantCards.filter((entry) => !entry.participant.has_metering_point_assignment).length
-    const hasFilters = !!normalizedSearch || readinessFilter !== 'all'
 
     function clearFilters() {
         setSearchTerm('')
@@ -292,7 +301,6 @@ export function ParticipantsPage() {
             <ParticipantCardsSection
                 participantCards={participantCards}
                 filteredParticipants={filteredParticipants}
-                hasFilters={hasFilters}
                 settings={settings}
                 onOpenCreateModal={openCreateModal}
                 onClearFilters={clearFilters}

@@ -9,6 +9,7 @@ import {
     faTriangleExclamation,
 } from '@fortawesome/free-solid-svg-icons'
 import { useTranslation } from 'react-i18next'
+import { EmptyState } from '../../components/EmptyState'
 import { ActionMenu, type ActionMenuItem } from '../../components/ActionMenu'
 import { formatShortDate } from '../../lib/appSettings'
 import type { AppSettings, Participant } from '../../types/api'
@@ -26,7 +27,6 @@ type ParticipantCardEntry = {
 type ParticipantCardsSectionProps = {
     participantCards: ParticipantCardEntry[]
     filteredParticipants: ParticipantCardEntry[]
-    hasFilters: boolean
     settings: AppSettings
     onOpenCreateModal: () => void
     onClearFilters: () => void
@@ -47,7 +47,6 @@ function participantValidityBadgeClass(state: ParticipantValidityState): string 
 export function ParticipantCardsSection({
     participantCards,
     filteredParticipants,
-    hasFilters,
     settings,
     onOpenCreateModal,
     onClearFilters,
@@ -70,32 +69,29 @@ export function ParticipantCardsSection({
 
     if (participantCards.length === 0) {
         return (
-            <section className="card" style={{ display: 'grid', gap: '0.75rem' }}>
-                <h3 style={{ margin: 0 }}>{t('pages.participants.emptyState.title')}</h3>
-                <p className="muted" style={{ margin: 0 }}>{t('pages.participants.emptyState.description')}</p>
-                <div>
-                    <button className="button button-primary" type="button" onClick={onOpenCreateModal}>
-                        <FontAwesomeIcon icon={faPlus} fixedWidth />
-                        {t('pages.participants.emptyState.createAction')}
-                    </button>
-                </div>
-            </section>
+            <EmptyState
+                titleKey="pages.participants.emptyState.title"
+                descriptionKey="pages.participants.emptyState.description"
+                actions={[
+                    {
+                        labelKey: 'pages.participants.emptyState.createAction',
+                        onClick: onOpenCreateModal,
+                        variant: 'primary',
+                        icon: faPlus,
+                    },
+                    { labelKey: 'pages.participants.emptyState.meteringPointsAction', to: '/metering-points', variant: 'secondary' },
+                ]}
+            />
         )
     }
 
     if (filteredParticipants.length === 0) {
         return (
-            <section className="card" style={{ display: 'grid', gap: '0.75rem' }}>
-                <h3 style={{ margin: 0 }}>{t('pages.participants.noResults.title')}</h3>
-                <p className="muted" style={{ margin: 0 }}>{t('pages.participants.noResults.description')}</p>
-                {hasFilters && (
-                    <div>
-                        <button className="button button-secondary" type="button" onClick={onClearFilters}>
-                            {t('pages.participants.filters.clear')}
-                        </button>
-                    </div>
-                )}
-            </section>
+            <EmptyState
+                titleKey="pages.participants.noResults.title"
+                descriptionKey="pages.participants.noResults.description"
+                actions={[{ labelKey: 'pages.participants.filters.clear', onClick: onClearFilters, variant: 'secondary' }]}
+            />
         )
     }
 

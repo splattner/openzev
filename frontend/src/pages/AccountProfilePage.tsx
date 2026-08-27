@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useSearchParams } from 'react-router-dom'
+import { Skeleton } from '@mantine/core'
+import { useReducedMotion } from '@mantine/hooks'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '../lib/auth'
 import { useToast } from '../lib/toast'
@@ -11,6 +13,7 @@ import { ApiKeysSection } from '../features/account/ApiKeysSection'
 
 export function AccountProfilePage() {
     const { t } = useTranslation()
+    const animate = !useReducedMotion()
     const [searchParams, setSearchParams] = useSearchParams()
     const { user, refreshUser } = useAuth()
     const { pushToast } = useToast()
@@ -294,7 +297,12 @@ export function AccountProfilePage() {
                     <h2>{t('account.linkedAccountsSection')}</h2>
                     <p className="muted" style={{ marginBottom: '1.5rem' }}>{t('account.linkedAccountsDescription')}</p>
 
-                    {oauthProvidersQuery.isLoading && <p className="muted">{t('common.loading')}</p>}
+                    {oauthProvidersQuery.isLoading && (
+                        <div style={{ display: 'grid', gap: '0.5rem' }}>
+                            <Skeleton className="skeleton-block" animate={animate} height={14} width="60%" />
+                            <Skeleton className="skeleton-block" animate={animate} height={14} width="40%" />
+                        </div>
+                    )}
 
                     {!oauthProvidersQuery.isLoading && (oauthProvidersQuery.data ?? []).length === 0 && (
                         <p className="muted">{t('account.noProviders')}</p>

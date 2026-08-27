@@ -28,6 +28,7 @@ import { formatMeteringBucketLabel } from '../lib/meteringLabels'
 import { formatShortDate, useAppSettings } from '../lib/appSettings'
 import { useAuth } from '../lib/auth'
 import { useManagedZev } from '../lib/managedZev'
+import { PageSkeleton } from '../components/PageSkeleton'
 import { StatCard } from '../components/StatCard'
 import { PeriodSelector } from '../components/PeriodSelector'
 import { EnergyFlowChart } from '../components/EnergyFlowChart'
@@ -253,7 +254,7 @@ export function DashboardPage() {
                 <div className="card">{t('pages.dashboard.selectZev')}</div>
             )}
 
-            {summaryQuery.isLoading && <div className="card">{t('pages.dashboard.loadingAnalytics')}</div>}
+            {summaryQuery.isLoading && <PageSkeleton variant="kpiRow" />}
             {summaryQuery.isError && <div className="card error-banner">{t('pages.dashboard.failedAnalytics')}</div>}
 
             {summary && summary.role === 'zev_owner' && (
@@ -299,7 +300,7 @@ export function DashboardPage() {
                     <section className="card">
                         <h3 style={{ marginTop: 0 }}>{t('pages.dashboard.openInvoices.title')}</h3>
                         {invoicesQuery.isLoading ? (
-                            <p className="muted">{t('pages.dashboard.loadingInvoices')}</p>
+                            <PageSkeleton variant="tableRows" />
                         ) : invoicesQuery.isError ? (
                             <p className="muted">{t('pages.dashboard.failedInvoices')}</p>
                         ) : openInvoices.length === 0 ? (
@@ -584,7 +585,7 @@ export function DashboardPage() {
                     <section className="card">
                         <h3 style={{ marginTop: 0 }}>{t('pages.dashboard.invoicesSection')}</h3>
                         {invoicesQuery.isLoading ? (
-                            <p className="muted">{t('pages.dashboard.loadingInvoices')}</p>
+                            <PageSkeleton variant="tableRows" />
                         ) : invoicesQuery.isError ? (
                             <p className="muted">{t('pages.dashboard.failedInvoices')}</p>
                         ) : participantInvoicesWithPdf.length === 0 ? (

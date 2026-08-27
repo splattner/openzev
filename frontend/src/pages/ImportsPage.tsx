@@ -30,6 +30,8 @@ import { useManagedZev } from '../lib/managedZev'
 import { useTranslation } from 'react-i18next'
 import { useToast } from '../lib/toast'
 import type { ImportLog, ImportPreviewResult } from '../types/api'
+import { EmptyState } from '../components/EmptyState'
+import { PageSkeleton } from '../components/PageSkeleton'
 import { DataTable } from '../components/DataTable'
 import type { ColumnDef } from '@tanstack/react-table'
 
@@ -402,7 +404,16 @@ export function ImportsPage() {
         })
     }
 
-    if (isLoading) return <div className="card">{t('pages.imports.loading')}</div>
+    if (isLoading)
+        return (
+            <div className="page-stack">
+                <header>
+                    <h2>{t('pages.imports.title')}</h2>
+                    <p className="muted">{t('pages.imports.description')}</p>
+                </header>
+                <PageSkeleton variant="table" />
+            </div>
+        )
     if (isError) return <div className="card error-banner">{t('pages.imports.loadFailed')}</div>
 
     return (
@@ -672,16 +683,26 @@ export function ImportsPage() {
                 </div>
             </FormModal>
 
-            <div className="table-card" style={{ width: '100%' }}>
-                <DataTable
-                    data={importLogRows}
-                    columns={importLogColumns}
-                    getRowId={(row) => row.id}
-                    enableSorting={false}
-                    initialPageSize={25}
-                    emptyMessage={t('pages.imports.noRows')}
+            {importLogRows.length === 0 ? (
+                <EmptyState
+                    titleKey="pages.imports.emptyState.title"
+                    descriptionKey="pages.imports.emptyState.description"
+                    actions={[
+                        { labelKey: 'pages.imports.emptyState.createAction', onClick: () => setWizardOpen(true), variant: 'primary', icon: faPlus },
+                    ]}
                 />
-            </div>
+            ) : (
+                <div className="table-card" style={{ width: '100%' }}>
+                    <DataTable
+                        data={importLogRows}
+                        columns={importLogColumns}
+                        getRowId={(row) => row.id}
+                        enableSorting={false}
+                        initialPageSize={25}
+                        emptyMessage={t('pages.imports.noRows')}
+                    />
+                </div>
+            )}
 
             <FormModal isOpen={showBulkDeleteModal} title={t('pages.imports.delete.bulkModalTitle')} onClose={closeBulkDeleteModal} maxWidth="640px">
                 <div className="page-stack" style={{ gap: '1rem' }}>

@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Tabs } from '@mantine/core'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { PageSkeleton } from '../components/PageSkeleton'
 import { useTranslation } from 'react-i18next'
 import {
     fetchContractPdfTemplate,
@@ -295,7 +296,7 @@ function TemplateEditor({
                         <span className="badge badge-info">{t('admin.customized')}</span>
                     )}
                 </div>
-                {isLoading && <p>{t('common.loading')}</p>}
+                {isLoading && <PageSkeleton variant="card" />}
                 {isError && <p className="error-banner">{t('common.error')}</p>}
                 {data && (
                     <>

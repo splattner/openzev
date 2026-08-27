@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Switch, Tabs } from '@mantine/core'
+import { Skeleton, Switch, Tabs } from '@mantine/core'
+import { useReducedMotion } from '@mantine/hooks'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faCheck, faPen, faPlus, faTrash, faXmark } from '@fortawesome/free-solid-svg-icons'
 import { useSearchParams } from 'react-router-dom'
@@ -52,6 +53,7 @@ function getValidTab(value: string | null): SystemSettingsTab {
 
 export function AdminSystemSettingsPage() {
     const { t } = useTranslation()
+    const animate = !useReducedMotion()
     const [searchParams, setSearchParams] = useSearchParams()
     const queryClient = useQueryClient()
     const { pushToast } = useToast()
@@ -402,7 +404,12 @@ export function AdminSystemSettingsPage() {
                         </button>
                     </div>
 
-                    {oauthProvidersQuery.isLoading && <p className="muted">{t('common.loading')}</p>}
+                    {oauthProvidersQuery.isLoading && (
+                        <div style={{ display: 'grid', gap: '0.5rem' }}>
+                            <Skeleton className="skeleton-block" animate={animate} height={14} width="60%" />
+                            <Skeleton className="skeleton-block" animate={animate} height={14} width="40%" />
+                        </div>
+                    )}
                     {oauthProvidersQuery.isError && <p className="error-banner">{t('adminSystemSettings.oauth.loadError')}</p>}
                     {!oauthProvidersQuery.isLoading && providers.length === 0 && <p className="muted">{t('adminOAuth.noProviders')}</p>}
 

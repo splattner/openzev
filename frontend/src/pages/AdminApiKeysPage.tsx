@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { PageSkeleton } from '../components/PageSkeleton'
 import { useTranslation } from 'react-i18next'
 import { fetchAllApiKeys, fetchUsers, revokeAnyApiKey } from '../lib/api/auth'
 import { formatApiError } from '../lib/api/errors'
@@ -130,7 +131,7 @@ export function AdminApiKeysPage() {
             </section>
 
             {keysQuery.isLoading ? (
-                <div className="card">{t('common.loading')}</div>
+                <PageSkeleton variant="table" />
             ) : keysQuery.isError ? (
                 <div className="card error-banner">{t('common.error')}</div>
             ) : keys.length === 0 ? (

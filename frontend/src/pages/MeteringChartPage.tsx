@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Tabs } from '@mantine/core'
 import { useCallback, useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
+import { PageSkeleton } from '../components/PageSkeleton'
 import { useTranslation } from 'react-i18next'
 import {
     Bar,
@@ -394,11 +395,7 @@ export function MeteringChartPage() {
 
                 <Tabs.Panel value="quality">
                     <div className="page-stack">
-                        {qualityQuery.isLoading && (
-                            <div className="card" style={{ textAlign: 'center', padding: '2rem' }}>
-                                {t('common.loading')}
-                            </div>
-                        )}
+                        {qualityQuery.isLoading && <PageSkeleton variant="table" />}
                         {qualityQuery.isError && (
                             <div className="card error-banner">{formatApiError(qualityQuery.error as any)}</div>
                         )}

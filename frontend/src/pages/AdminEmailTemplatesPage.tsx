@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Tabs } from '@mantine/core'
 import { useEffect, useState } from 'react'
+import { PageSkeleton } from '../components/PageSkeleton'
 import { useTranslation } from 'react-i18next'
 import {
     fetchEmailTemplate,
@@ -103,7 +104,7 @@ function EmailTemplateEditor({
                         <span className="badge badge-info">{t('admin.customized')}</span>
                     )}
                 </div>
-                {query.isLoading && <p>{t('common.loading')}</p>}
+                {query.isLoading && <PageSkeleton variant="card" />}
                 {query.isError && <p className="error-banner">{t('common.error')}</p>}
                 {query.data && (
                     <>

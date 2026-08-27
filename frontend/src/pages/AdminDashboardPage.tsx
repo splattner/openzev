@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { StatCard } from '../components/StatCard'
 import { fetchDashboardStats } from '../lib/api/invoices'
+import { PageSkeleton } from '../components/PageSkeleton'
 import { queryKeys } from '../lib/api/queryKeys'
 import { formatChf } from '../lib/numbers'
 
@@ -13,18 +14,47 @@ export function AdminDashboardPage() {
         refetchInterval: 30000,
     })
 
+    const header = (
+        <header>
+            <p className="eyebrow">{t('nav.adminConsole')}</p>
+            <h2>{t('nav.adminOverview')}</h2>
+        </header>
+    )
+
+    if (isLoading) {
+        return (
+            <div className="page-stack">
+                {header}
+                <PageSkeleton variant="kpiRow" />
+            </div>
+        )
+    }
+
+    // Full-page error only when there is nothing to show; a failed background
+    // poll keeps `data` populated.
+    if (error && !stats) {
+        return (
+            <div className="page-stack">
+                {header}
+                <div className="card error-banner">{t('common.error')}</div>
+            </div>
+        )
+    }
+
+    if (!stats) {
+        return (
+            <div className="page-stack">
+                {header}
+                <p className="muted">{t('common.noData')}</p>
+            </div>
+        )
+    }
+
     return (
         <div className="page-stack">
-            <header>
-                <p className="eyebrow">{t('nav.adminConsole')}</p>
-                <h2>{t('nav.adminOverview')}</h2>
-            </header>
-
-            {isLoading && <p className="muted">{t('common.loading')}</p>}
+            {header}
 
             {error && <div className="card error-banner">{t('common.error')}</div>}
-
-            {!isLoading && !error && !stats && <p className="muted">{t('common.noData')}</p>}
 
             {stats && (
                 <>
