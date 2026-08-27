@@ -952,5 +952,6 @@ lists the test classes per module (test counts are the `test_*` methods).
 12. Frontend `ProtectedRoute` enforces role-based route access; navigation
     visibility matches role capabilities.
 13. `ManagedZevProvider` scopes all management pages to the selected ZEV.
-14. Full RBAC matrix (list, create, update, delete, unauthenticated) is covered
+14. Shared frontend helpers keep pages deduplicated: `frontend/src/lib/clipboard.ts` (`copyToClipboard`) consolidates direct `navigator.clipboard.writeText` calls and is used by `AdminAccountsPage`, `ApiKeysSection` and `ZevListPage`; `frontend/src/lib/participantTitle.ts` (`getTitleLabelMap`) is the single source of title (Mr/Ms/…) label maps used by `AdminAccountsPage` and `ParticipantsPage`; `frontend/src/lib/options.ts` exports `BILLING_INTERVAL_OPTIONS`, `ZEV_TYPE_OPTIONS`, `METER_TYPE_OPTIONS` (validated by `frontend/tests/options.test.ts`). `ZevListPage` stores its copy-feedback timeout in a ref and clears it on unmount/close so repeated copies don't race.
+15. Full RBAC matrix (list, create, update, delete, unauthenticated) is covered
     by automated tests.

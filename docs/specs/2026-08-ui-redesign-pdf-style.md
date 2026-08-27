@@ -699,7 +699,11 @@ Existing suites stay green (contract: 48 tests in `test_contract_context.py`; te
   context and model help text always supported) and still used pre-redesign
   table styling; it now lists all 7 variables and shares the token-styled
    field-table treatment of the admin template pages (admin-governance
-   baseline spec §9.7 updated accordingly). The four-locale keyboard/a11y
+   baseline spec §9.7 updated accordingly). It has since been consolidated
+   further: the variable list is rendered by the shared `EmailFieldReference`
+   component, styled via the dedicated `.email-field-reference` CSS class in
+   `frontend/src/index.css` (monospace variable column with ellipsis, fixed
+   table layout, 50% first column). The four-locale keyboard/a11y
    pass is complete (below).
 
 - **Four-locale keyboard/a11y pass** — executed in two steps. Static WCAG

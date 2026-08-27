@@ -111,6 +111,60 @@ label {
   white-space: nowrap;
 }
 
+.email-field-reference {
+  width: 100%;
+  font-size: 0.78rem;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.email-field-reference thead th {
+  white-space: normal;
+  padding: 0.4rem;
+}
+
+.email-field-reference td {
+  overflow-wrap: anywhere;
+  line-height: 1.35;
+  vertical-align: top;
+}
+
+.email-field-reference td:first-child {
+  font-family: monospace;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  width: 50%;
+}
+
+.field-reference-aside {
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.field-reference-aside h4 {
+  margin: 0;
+}
+
+.field-reference-aside .muted {
+  font-size: 0.78rem;
+  margin: 0;
+  line-height: 1.35;
+}
+
+.mono-editor {
+  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+  font-size: 0.9rem;
+}
+
+.field-reference-details summary {
+  cursor: pointer;
+}
+
+.field-reference-details-content {
+  margin-top: 0.75rem;
+}
+
 .page-stack tbody tr,
 .data-table tbody tr {
   height: 2.25rem;

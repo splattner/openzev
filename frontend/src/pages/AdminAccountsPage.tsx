@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faCheck, faCopy, faEllipsis, faLink, faPen, faPlus, faTrash, faUser, faXmark } from '@fortawesome/free-solid-svg-icons'
-import { useState, type FormEvent } from 'react'
+import { useMemo, useState, type FormEvent } from 'react'
 import { ActionMenu } from '../components/ActionMenu'
 import { ConfirmDialog, useConfirmDialog } from '../components/ConfirmDialog'
 import { StatCard } from '../components/StatCard'
@@ -19,6 +19,9 @@ import { queryKeys } from '../lib/api/queryKeys'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '../lib/auth'
 import { useToast } from '../lib/toast'
+import { copyToClipboard } from '../lib/clipboard'
+import { formatParticipantName } from '../lib/participantFormat'
+import { getTitleLabelMap } from '../lib/participantTitle'
 import type { Participant, User, UserInput } from '../types/api'
 
 const defaultEditUserForm: UserInput = {
@@ -36,6 +39,8 @@ export function AdminAccountsPage() {
     const { pushToast } = useToast()
     const { t } = useTranslation()
     const { dialog, confirm, handleConfirm, handleCancel, isLoading: dialogLoading } = useConfirmDialog()
+
+    const titleLabelByValue = useMemo(() => getTitleLabelMap(t), [t])
 
     const usersQuery = useQuery({ queryKey: queryKeys.auth.users(), queryFn: fetchUsers })
     const participantsQuery = useQuery({ queryKey: queryKeys.zev.participants(), queryFn: fetchParticipants })
@@ -145,16 +150,13 @@ export function AdminAccountsPage() {
     }
 
     function participantName(participant: Participant) {
-        return [participant.first_name, participant.last_name].filter(Boolean).join(' ')
+        const titleLabel = participant.title ? (titleLabelByValue[participant.title as keyof typeof titleLabelByValue] ?? '') : ''
+        return formatParticipantName(participant, titleLabel)
     }
 
     async function copyValue(value: string, successMessage: string) {
-        try {
-            await navigator.clipboard.writeText(value)
-            pushToast(successMessage, 'success')
-        } catch {
-            pushToast(t('pages.accounts.feedback.copyFailed'), 'error')
-        }
+        const ok = await copyToClipboard(value)
+        pushToast(ok ? successMessage : t('pages.accounts.feedback.copyFailed'), ok ? 'success' : 'error')
     }
 
     function openLinkModal(participant: Participant) {
@@ -246,7 +248,7 @@ export function AdminAccountsPage() {
         if (zevComparison !== 0) {
             return zevComparison
         }
-        return participantName(left).localeCompare(participantName(right))
+        return formatParticipantName(left).localeCompare(formatParticipantName(right))
     })
 
     const sortedUnlinkedAccounts = [...unlinkedAccounts].sort((left, right) => left.username.localeCompare(right.username))

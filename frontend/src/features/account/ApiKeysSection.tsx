@@ -5,6 +5,7 @@ import { createApiKey, fetchApiKeys, revokeApiKey } from '../../lib/api/auth'
 import { queryKeys } from '../../lib/api/queryKeys'
 import { formatDateTime, useAppSettings } from '../../lib/appSettings'
 import { useToast } from '../../lib/toast'
+import { copyToClipboard } from '../../lib/clipboard'
 import type { ApiKeyWithSecret } from '../../types/api'
 import { apiKeyStatus, expiryFromDays } from './apiKeyStatus'
 
@@ -64,12 +65,9 @@ export function ApiKeysSection({ onRevoke }: Props) {
     })
 
     async function handleCopy(secret: string) {
-        try {
-            await navigator.clipboard.writeText(secret)
-            setCopied(true)
-        } catch {
-            pushToast(t('account.apiKeys.copyFailed'), 'error')
-        }
+        const ok = await copyToClipboard(secret)
+        if (ok) setCopied(true)
+        else pushToast(t('account.apiKeys.copyFailed'), 'error')
     }
 
     const keys = keysQuery.data ?? []

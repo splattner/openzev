@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useRef, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import {
     faArrowLeft,
@@ -27,6 +27,9 @@ import { queryKeys } from '../lib/api/queryKeys'
 import { useTranslation } from 'react-i18next'
 import { todayLocalIso } from '../lib/dates'
 import { getDefaultZevForm, mapZevToForm } from '../lib/zevForm'
+import { copyToClipboard } from '../lib/clipboard'
+import { BILLING_INTERVAL_OPTIONS, METER_TYPE_OPTIONS, ZEV_TYPE_OPTIONS } from '../lib/options'
+import { TITLE_KEYS } from '../lib/participantTitle'
 import type { OwnerMeteringPointInput, Zev, ZevInput, ZevWizardInput, ZevWizardResult } from '../types/api'
 
 const defaultCreateForm = (): ZevWizardInput => ({
@@ -93,6 +96,7 @@ export function ZevListPage() {
     const [createdCredentials, setCreatedCredentials] = useState<ZevWizardResult['owner'] | null>(null)
     const [createdZevName, setCreatedZevName] = useState<string>('')
     const [copyFeedback, setCopyFeedback] = useState<string | null>(null)
+    const copyFeedbackTimeoutRef = useRef<number | null>(null)
     const [expandedMeteringPointIndex, setExpandedMeteringPointIndex] = useState<number | null>(null)
     const [editingMeteringPointData, setEditingMeteringPointData] = useState<OwnerMeteringPointInput | null>(null)
     const [ownerTargetZev, setOwnerTargetZev] = useState<Zev | null>(null)
@@ -188,6 +192,7 @@ export function ZevListPage() {
         setEditingMeteringPointData(null)
         setCreatedCredentials(null)
         setCreatedZevName('')
+        if (copyFeedbackTimeoutRef.current) window.clearTimeout(copyFeedbackTimeoutRef.current)
         setCopyFeedback(null)
         createSubmittedRef.current = false
         if (wizardStep === 5) {
@@ -195,16 +200,16 @@ export function ZevListPage() {
         }
     }
 
-    async function copyToClipboard(value: string, label: string) {
-        try {
-            await navigator.clipboard.writeText(value)
-            setCopyFeedback(t('common.copyFeedback.copied', { label }))
-            window.setTimeout(() => setCopyFeedback(null), 2000)
-        } catch {
-            setCopyFeedback(t('common.copyFeedback.error', { label }))
-            window.setTimeout(() => setCopyFeedback(null), 2000)
-        }
+    async function copyToClipboardWithFeedback(value: string, label: string) {
+        const ok = await copyToClipboard(value)
+        setCopyFeedback(t(ok ? 'common.copyFeedback.copied' : 'common.copyFeedback.error', { label }))
+        if (copyFeedbackTimeoutRef.current) window.clearTimeout(copyFeedbackTimeoutRef.current)
+        copyFeedbackTimeoutRef.current = window.setTimeout(() => setCopyFeedback(null), 2000)
     }
+
+    useEffect(() => () => {
+        if (copyFeedbackTimeoutRef.current) window.clearTimeout(copyFeedbackTimeoutRef.current)
+    }, [])
 
     function submitEdit(event: FormEvent<HTMLFormElement>) {
         event.preventDefault()
@@ -429,17 +434,21 @@ export function ZevListPage() {
                             <label>
                                 <span>{t('pages.zevs.form.zevType')}</span>
                                 <select value={createForm.zev_type} onChange={(event) => setCreateForm((previous) => ({ ...previous, zev_type: event.target.value as ZevInput['zev_type'] }))}>
-                                    <option value="vzev">{t('pages.zevs.zevTypes.vzev')}</option>
-                                    <option value="zev">{t('pages.zevs.zevTypes.zev')}</option>
+                                    {ZEV_TYPE_OPTIONS.map((option) => (
+                                        <option key={option.value} value={option.value}>
+                                            {t(option.labelKey)}
+                                        </option>
+                                    ))}
                                 </select>
                             </label>
                             <label>
                                 <span>{t('pages.zevs.form.billingInterval')}</span>
                                 <select value={createForm.billing_interval} onChange={(event) => setCreateForm((previous) => ({ ...previous, billing_interval: event.target.value as ZevInput['billing_interval'] }))}>
-                                    <option value="monthly">{t('pages.zevs.billingIntervals.monthly')}</option>
-                                    <option value="quarterly">{t('pages.zevs.billingIntervals.quarterly')}</option>
-                                    <option value="semi_annual">{t('pages.zevs.billingIntervals.semi_annual')}</option>
-                                    <option value="annual">{t('pages.zevs.billingIntervals.annual')}</option>
+                                    {BILLING_INTERVAL_OPTIONS.map((option) => (
+                                        <option key={option.value} value={option.value}>
+                                            {t(option.labelKey)}
+                                        </option>
+                                    ))}
                                 </select>
                             </label>
                             <label className="grid-span-full">
@@ -459,11 +468,9 @@ export function ZevListPage() {
                                 <span>{t('pages.zevs.form.title')}</span>
                                 <select value={createForm.owner.title ?? ''} onChange={(event) => setCreateForm((previous) => ({ ...previous, owner: { ...previous.owner, title: event.target.value as ZevWizardInput['owner']['title'] } }))}>
                                     <option value="">{t('pages.zevs.titles.none')}</option>
-                                    <option value="mr">{t('pages.zevs.titles.mr')}</option>
-                                    <option value="mrs">{t('pages.zevs.titles.mrs')}</option>
-                                    <option value="ms">{t('pages.zevs.titles.ms')}</option>
-                                    <option value="dr">{t('pages.zevs.titles.dr')}</option>
-                                    <option value="prof">{t('pages.zevs.titles.prof')}</option>
+                                    {TITLE_KEYS.map((k) => (
+                                        <option key={k} value={k}>{t(`pages.zevs.titles.${k}` as Parameters<typeof t>[0])}</option>
+                                    ))}
                                 </select>
                             </label>
                             <label>
@@ -539,9 +546,11 @@ export function ZevListPage() {
                                                 value={editingMeteringPointData.meter_type}
                                                 onChange={(event) => updateEditingMeteringPoint({ meter_type: event.target.value as OwnerMeteringPointInput['meter_type'] })}
                                             >
-                                                <option value="consumption">{t('pages.zevs.meterTypes.consumption')}</option>
-                                                <option value="production">{t('pages.zevs.meterTypes.production')}</option>
-                                                <option value="bidirectional">{t('pages.zevs.meterTypes.bidirectional')}</option>
+                                                {METER_TYPE_OPTIONS.map((option) => (
+                                                    <option key={option.value} value={option.value}>
+                                                        {t(option.labelKey)}
+                                                    </option>
+                                                ))}
                                             </select>
                                         </label>
                                         <label className="grid-span-full">
@@ -635,7 +644,7 @@ export function ZevListPage() {
                                     <button
                                         className="button button-secondary"
                                         type="button"
-                                        onClick={() => copyToClipboard(createdCredentials.username, t('pages.zevs.wizard.usernameLabel'))}
+                                        onClick={() => copyToClipboardWithFeedback(createdCredentials.username, t('pages.zevs.wizard.usernameLabel'))}
                                     >
                                         <FontAwesomeIcon icon={faCopy} fixedWidth />
                                         {t('pages.zevs.wizard.copyUsername')}
@@ -648,7 +657,7 @@ export function ZevListPage() {
                                     <button
                                         className="button button-secondary"
                                         type="button"
-                                        onClick={() => copyToClipboard(createdCredentials.temporary_password, t('pages.zevs.wizard.passwordLabel'))}
+                                        onClick={() => copyToClipboardWithFeedback(createdCredentials.temporary_password, t('pages.zevs.wizard.passwordLabel'))}
                                     >
                                         <FontAwesomeIcon icon={faCopy} fixedWidth />
                                         {t('pages.zevs.wizard.copyPassword')}

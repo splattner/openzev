@@ -2,6 +2,7 @@ import { Switch } from '@mantine/core'
 import { type Dispatch, type FormEvent, type SetStateAction } from 'react'
 import { useTranslation } from 'react-i18next'
 import { FormModal } from '../../components/FormModal'
+import { METER_TYPE_OPTIONS } from '../../lib/options'
 import type { MeteringPointInput } from '../../types/api'
 
 type MeteringPointFormModalProps = {
@@ -47,9 +48,11 @@ export function MeteringPointFormModal({
               setForm((previous) => ({ ...previous, meter_type: event.target.value as MeteringPointInput['meter_type'] }))
             }
           >
-            <option value="consumption">{t('pages.meteringPoints.meterTypes.consumption')}</option>
-            <option value="production">{t('pages.meteringPoints.meterTypes.production')}</option>
-            <option value="bidirectional">{t('pages.meteringPoints.meterTypes.bidirectional')}</option>
+            {METER_TYPE_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {t(option.labelKey)}
+              </option>
+            ))}
           </select>
         </label>
 

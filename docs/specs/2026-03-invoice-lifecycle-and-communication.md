@@ -666,6 +666,7 @@ Strips legacy period suffixes from `description` on serialization.
   renders only when at least one non-recommended batch item is enabled. In
   periods with nothing to act on (e.g. future periods) both are hidden, not
   disabled; disabled state is reserved for transient `anyBatchPending`.
+- Email field reference is shared: `frontend/src/lib/emailTemplateFields.ts` defines `EMAIL_TEMPLATE_FIELDS`; `frontend/src/components/EmailFieldReference.tsx` (`email-field-reference`) is used by `ZevEmailTemplateFields` and `AdminEmailTemplatesPage`.
 - Build and type checks (`npm run build`)
 
 ### Manual verification

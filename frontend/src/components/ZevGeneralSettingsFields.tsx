@@ -1,5 +1,6 @@
 import { CivilDateInput } from './CivilDateInput'
 import { useTranslation } from 'react-i18next'
+import { BILLING_INTERVAL_OPTIONS, ZEV_TYPE_OPTIONS } from '../lib/options'
 import type { ZevInput } from '../types/api'
 
 type ZevGeneralSettingsFieldsProps = {
@@ -38,8 +39,11 @@ export function ZevGeneralSettingsFields({ form, onChange }: ZevGeneralSettingsF
                             value={form.zev_type}
                             onChange={(event) => onChange({ zev_type: event.target.value as ZevInput['zev_type'] })}
                         >
-                            <option value="zev">{t('pages.zevSettings.fields.zevTypeZev')}</option>
-                            <option value="vzev">{t('pages.zevSettings.fields.zevTypeVzev')}</option>
+                            {ZEV_TYPE_OPTIONS.map((option) => (
+                                <option key={option.value} value={option.value}>
+                                    {t(option.labelKey)}
+                                </option>
+                            ))}
                         </select>
                     </label>
                     <label>
@@ -50,10 +54,11 @@ export function ZevGeneralSettingsFields({ form, onChange }: ZevGeneralSettingsF
                                 onChange({ billing_interval: event.target.value as ZevInput['billing_interval'] })
                             }
                         >
-                            <option value="monthly">{t('pages.zevSettings.fields.billingMonthly')}</option>
-                            <option value="quarterly">{t('pages.zevSettings.fields.billingQuarterly')}</option>
-                            <option value="semi_annual">{t('pages.zevSettings.fields.billingSemiAnnual')}</option>
-                            <option value="annual">{t('pages.zevSettings.fields.billingAnnual')}</option>
+                            {BILLING_INTERVAL_OPTIONS.map((option) => (
+                                <option key={option.value} value={option.value}>
+                                    {t(option.labelKey)}
+                                </option>
+                            ))}
                         </select>
                     </label>
                     <label>

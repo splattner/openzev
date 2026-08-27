@@ -3,6 +3,7 @@ import { useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 import { FormModal } from '../../components/FormModal'
+import { TITLE_KEYS } from '../../lib/participantTitle'
 import type { Participant, ParticipantInput } from '../../types/api'
 import {
   defaultParticipantFormValues,
@@ -47,11 +48,7 @@ export function ParticipantFormModal({
 
   const titleOptions = [
     { value: '' as const, label: t('pages.zevs.titles.none') },
-    { value: 'mr' as const, label: t('pages.zevs.titles.mr') },
-    { value: 'mrs' as const, label: t('pages.zevs.titles.mrs') },
-    { value: 'ms' as const, label: t('pages.zevs.titles.ms') },
-    { value: 'dr' as const, label: t('pages.zevs.titles.dr') },
-    { value: 'prof' as const, label: t('pages.zevs.titles.prof') },
+    ...TITLE_KEYS.map((k) => ({ value: k, label: t(`pages.zevs.titles.${k}` as Parameters<typeof t>[0]) })),
   ]
 
   return (

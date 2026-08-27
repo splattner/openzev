@@ -437,7 +437,7 @@ Two form sections sharing the same submit mutation (`updateZev`):
 - Subject line input with placeholder showing system default
 - Body textarea (10 rows) with placeholder showing system default
 - Reset buttons to clear custom templates (reverts to system default)
-- Expandable `<details>` section listing all 7 available template variables with descriptions — `{invoice_number}`, `{zev_name}`, `{participant_name}`, `{period_start}`, `{period_end}`, `{due_date}` (empty string when the invoice has no due date), `{total_chf}` — matching the variable set documented in `2026-03-invoice-lifecycle-and-communication.md` §"Template variables" and rendered with the shared redesign tokens (monospace variable column, muted descriptions, `--border-default` row separators) like the `FieldReference` sidebars on the admin template pages
+- Expandable section rendering the shared `EmailFieldReference` component (from `frontend/src/components/EmailFieldReference.tsx`) listing all available template variables with descriptions — `{invoice_number}`, `{zev_name}`, `{participant_name}`, `{period_start}`, `{period_end}`, `{due_date}` (empty string when the invoice has no due date), `{total_chf}` — matching the variable set documented in `2026-03-invoice-lifecycle-and-communication.md` §"Template variables". The component is styled via the dedicated `.email-field-reference` CSS class in `frontend/src/index.css` (monospace variable column with ellipsis, fixed table layout) and is the same component used by `AdminEmailTemplatesPage`
 
 ### 9.8 TypeScript types
 

@@ -27,6 +27,8 @@ import { queryKeys } from '../lib/api/queryKeys'
 import { useTranslation } from 'react-i18next'
 import { useToast } from '../lib/toast'
 import { todayLocalIso } from '../lib/dates'
+import { formatParticipantName } from '../lib/participantFormat'
+import { getTitleLabelMap } from '../lib/participantTitle'
 import type { Participant, ParticipantInput } from '../types/api'
 
 function getParticipantValidityState(participant: Participant, todayIso: string): ParticipantValidityState {
@@ -55,16 +57,7 @@ export function ParticipantsPage() {
     const [readinessFilter, setReadinessFilter] = useState<ParticipantReadinessFilter>('all')
     const [credentialsNotice, setCredentialsNotice] = useState<ParticipantCredentialsNoticeData | null>(null)
 
-    const titleLabelByValue = useMemo(
-        () => ({
-            mr: t('pages.zevs.titles.mr'),
-            mrs: t('pages.zevs.titles.mrs'),
-            ms: t('pages.zevs.titles.ms'),
-            dr: t('pages.zevs.titles.dr'),
-            prof: t('pages.zevs.titles.prof'),
-        }),
-        [t],
-    )
+    const titleLabelByValue = useMemo(() => getTitleLabelMap(t), [t])
 
     const createMutation = useMutation({
         mutationFn: createParticipant,
@@ -123,9 +116,9 @@ export function ParticipantsPage() {
         onError: (error) => pushToast(formatApiError(error, t('pages.participants.messages.invitationFailed')), 'error'),
     })
 
-    function formatParticipantName(participant: Participant): string {
-        const titleLabel = participant.title ? titleLabelByValue[participant.title] : ''
-        return [titleLabel, participant.first_name, participant.last_name].filter(Boolean).join(' ')
+    function formatParticipantNameWithTitle(participant: Participant): string {
+        const titleLabel = participant.title ? (titleLabelByValue[participant.title as keyof typeof titleLabelByValue] ?? '') : ''
+        return formatParticipantName(participant, titleLabel)
     }
 
     function startEdit(participant: Participant) {
@@ -197,7 +190,7 @@ export function ParticipantsPage() {
                 warnings,
                 ownerRow,
                 validityState,
-                displayName: formatParticipantName(participant),
+                displayName: formatParticipantNameWithTitle(participant),
                 address: formatParticipantAddress(participant),
             }
         })
