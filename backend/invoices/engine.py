@@ -348,29 +348,72 @@ def _count_billable_months(tariff: Tariff, period_start: date, period_end: date)
     return _count_intersecting_months(overlap_start, overlap_end)
 
 
+def _last_overlapping_window(windows: list[tuple], month_start: date, month_end: date):
+    """The window that owns one metering point's fee for a month.
+
+    ``windows`` is ``(valid_from, valid_to, allocation_mode, participant_id)``
+    for a single metering point; ``month_start``/``month_end`` are the part of
+    the calendar month actually billed (already clamped to the tariff/period
+    overlap).  Returns ``(valid_from, mode, participant_id)`` of the window
+    with the latest ``valid_from`` among those overlapping that range, or
+    ``None`` if none overlaps it.
+
+    The non-overlap rule (``MeteringPointAssignment._validate_no_overlap``)
+    allows at most one window per metering point at any date, so "last to
+    start" is unambiguous.  This is the tie-break that keeps the personal
+    and community per-metering-point counts disjoint when a mode switch — or
+    a holder change — falls inside a month: the last window to start owns
+    the whole month, billed on whichever side it names.  §4.6.1 already
+    commits to a tie-break of this shape — months are never prorated, so one
+    side always gets the full month.
+    """
+    best: tuple[date, object, object] | None = None
+    for valid_from, valid_to, mode, participant_id in windows:
+        if valid_from > month_end or (valid_to is not None and valid_to < month_start):
+            continue
+        if best is None or valid_from > best[0]:
+            best = (valid_from, mode, participant_id)
+    return best
+
 def _count_billable_metering_points_by_month(participant: Participant, tariff: Tariff, period_start: date, period_end: date) -> int:
     """How many of the participant's own metering points each billed month covers.
 
-    Excludes ``COMMUNITY``-mode assignments **for the month in question**, not
-    with a blanket join filter — the same per-window care as the mode-aware
-    gate in ``generate_invoice`` (§7.3/§7.5): a meter personal in one month and
-    community the next must count in the first month and be excluded from the
-    second. A community meter's fee is charged separately, split by weight,
-    in ``_price_fixed_fees``.
+    A metering point counts for a month only if it has an ``is_active``
+    assignment to the participant that owns the month with a ``PERSONAL``
+    window (``_last_overlapping_window``) — the same per-window care as the
+    mode-aware gate in ``generate_invoice`` (§7.3/§7.5): a meter personal in
+    one month and community the next counts in the first month and is
+    excluded from the second.  The ownership rule also keeps this count
+    disjoint from the community count (§4.6.4) when a mode switch falls
+    inside a month: the month belongs to exactly one side.  A community
+    meter's fee is charged separately, split by weight, in
+    ``_price_fixed_fees``.
     """
     overlap_start = max(period_start, tariff.valid_from)
     overlap_end = min(period_end, tariff.valid_to or period_end)
     if overlap_start > overlap_end:
         return 0
 
-    # Single fetch: month-by-month activity is computed in Python instead of
-    # issuing two queries per month.
-    assignments = list(
+    # Two fetches, however many months are billed: first the participant's
+    # own assignments (which metering points are "theirs" at all), then the
+    # FULL window history of those metering points.  Ownership needs every
+    # window: a later COMMUNITY window held by the same participant must
+    # supersede an earlier PERSONAL one, and a window held by somebody else
+    # must be visible too, or the two counters would bill the month twice.
+    own_mp_ids = set(
         MeteringPointAssignment.objects.filter(
             participant=participant,
             metering_point__is_active=True,
-        ).values_list("metering_point_id", "valid_from", "valid_to", "allocation_mode")
+        ).values_list("metering_point_id", flat=True)
     )
+    if not own_mp_ids:
+        return 0
+    windows_by_mp: dict = {}
+    for mp_id, vf, vt, mode, pid in MeteringPointAssignment.objects.filter(
+        metering_point_id__in=own_mp_ids,
+        metering_point__is_active=True,
+    ).values_list("metering_point_id", "valid_from", "valid_to", "allocation_mode", "participant_id"):
+        windows_by_mp.setdefault(mp_id, []).append((vf, vt, mode, pid))
 
     total_metering_points = 0
     cursor = _month_start(overlap_start)
@@ -382,16 +425,11 @@ def _count_billable_metering_points_by_month(participant: Participant, tariff: T
 
         month_start = max(month_first_day, overlap_start)
         month_end = min(month_last_day, overlap_end)
-        month_has_active = any(
-            vf <= month_last_day and (vt is None or vt >= month_first_day) and mode == AllocationMode.PERSONAL
-            for _mp_id, vf, vt, mode in assignments
-        )
-        if month_start <= month_end and month_has_active:
-            total_metering_points += len({
-                mp_id
-                for mp_id, vf, vt, mode in assignments
-                if vf <= month_end and (vt is None or vt >= month_start) and mode == AllocationMode.PERSONAL
-            })
+        if month_start <= month_end:
+            for mp_id in own_mp_ids:
+                owner = _last_overlapping_window(windows_by_mp.get(mp_id, []), month_start, month_end)
+                if owner is not None and owner[1] == AllocationMode.PERSONAL and owner[2] == participant.id:
+                    total_metering_points += 1
 
         cursor = next_month
 
@@ -399,18 +437,16 @@ def _count_billable_metering_points_by_month(participant: Participant, tariff: T
 
 
 def _count_community_metering_points_by_month(zev: Zev, tariff: Tariff, period_start: date, period_end: date) -> dict[date, int]:
-    """Active, ``COMMUNITY``-mode metering points billable each month.
+    """Active metering points whose owning window is ``COMMUNITY``, per month.
 
     Mirrors ``_count_billable_metering_points_by_month`` but is ZEV-wide
-    rather than participant-scoped, and counts only ``COMMUNITY`` windows.
+    rather than participant-scoped.  All modes are fetched on purpose —
+    dropping the ``COMMUNITY`` filter lets the ownership pick see a
+    superseding ``PERSONAL`` window: a meter whose mode switches mid-month
+    is billed by whichever side owns the month
+    (``_last_overlapping_window``), never by both.
 
-    Known limitation: a meter whose allocation mode switches mid-month is
-    counted by both this function and the personal count for that month
-    (each counts any window touching the month), so its per-metering-point
-    fee bills twice; the counts are disjoint only when mode switches fall
-    on month boundaries.
-
-    Feeds the per-metering-point community contribution (§7.5): each active
+    Feeds the per-metering-point community contribution (§7.5): each
     community meter's fee is charged once per month, then divided between
     eligible participants by weight. Keyed by the first day of the month; a
     month with no active community meter is absent, not zero.
@@ -420,13 +456,12 @@ def _count_community_metering_points_by_month(zev: Zev, tariff: Tariff, period_s
     if overlap_start > overlap_end:
         return {}
 
-    assignments = list(
-        MeteringPointAssignment.objects.filter(
-            metering_point__zev=zev,
-            metering_point__is_active=True,
-            allocation_mode=AllocationMode.COMMUNITY,
-        ).values_list("metering_point_id", "valid_from", "valid_to")
-    )
+    windows_by_mp: dict = {}
+    for mp_id, vf, vt, mode, pid in MeteringPointAssignment.objects.filter(
+        metering_point__zev=zev,
+        metering_point__is_active=True,
+    ).values_list("metering_point_id", "valid_from", "valid_to", "allocation_mode", "participant_id"):
+        windows_by_mp.setdefault(mp_id, []).append((vf, vt, mode, pid))
 
     counts: dict[date, int] = {}
     cursor = _month_start(overlap_start)
@@ -439,11 +474,12 @@ def _count_community_metering_points_by_month(zev: Zev, tariff: Tariff, period_s
         month_start = max(month_first_day, overlap_start)
         month_end = min(month_last_day, overlap_end)
         if month_start <= month_end:
-            count = len({
-                mp_id
-                for mp_id, vf, vt in assignments
-                if vf <= month_end and (vt is None or vt >= month_start)
-            })
+            count = sum(
+                1
+                for mp_id, windows in windows_by_mp.items()
+                if (owner := _last_overlapping_window(windows, month_start, month_end)) is not None
+                and owner[1] == AllocationMode.COMMUNITY
+            )
             if count:
                 counts[cursor] = count
 
@@ -798,10 +834,11 @@ def _price_fixed_fees(participant, tariffs, period_start, period_end, accumulato
     The ``SHARED_*`` modes divide one community-wide amount between the
     members active in each month, so their total is built month by month
     rather than as ``quantity * unit_price``. The per-metering-point modes
-    bill personal and community metering points separately (§7.5): the
-    personal count excludes ``COMMUNITY``-mode assignments, and each active
-    community meter contributes its own weight-split ``bucket="shared"``
-    line — ``split_key`` plays no part here, since a community meter's cost
+    bill personal and community metering points separately (§7.5): month
+    ownership (``_last_overlapping_window``) makes the two counts disjoint
+    even when a mode switch or holder change falls inside a month, and each
+    community-owned meter-month contributes a weight-split ``bucket="shared"``
+    share — ``split_key`` plays no part here, since a community meter's cost
     always allocates by weight.
 
     Both weight-split paths share one fetch of the ZEV's participant windows,
@@ -907,10 +944,13 @@ def _price_fixed_fees(participant, tariffs, period_start, period_end, accumulato
                     continue
                 total += unit_price * numerator / denominator
                 charged_months += 1
-            # Same exclusion as the bucket="shared" per-metering-point gate
-            # above: skip months without membership, and shares that round to
+            # Skip months without membership, and shares that round to
             # CHF 0.00 — a zero-weight member of a WEIGHT-split fee would
-            # otherwise get a "N Monate / CHF 0.00" line.
+            # otherwise get a "N Monate / CHF 0.00" line, and a shared fee
+            # configured at CHF 0.00 (either split key) would print a zero
+            # share of nothing (§4.6.3).  Plain, non-shared fees keep their
+            # CHF 0.00 line: there the point of the line is to show the fee
+            # exists, and they never reach this branch.
             if charged_months == 0 or _is_zero_chf(total):
                 continue
             # Quantity is the months this participant is charged for, so
@@ -1008,10 +1048,13 @@ def generate_invoice(participant: Participant, period_start: date, period_end: d
 
     skipped_consumption_readings = 0
     skipped_consumption_kwh = Decimal("0")
-
     # Reading ids already counted as personal gaps: a mixed-mode meter is in
     # both the personal and the community queryset, and its gap readings must
-    # be counted exactly once, so the community loops skip them.
+    # be counted exactly once, so the community loops skip them.  The set
+    # holds only gap readings — bounded by the assignment gaps in the period,
+    # not by the reading volume: even a year-long unassigned stretch at
+    # 15-minute resolution is ~35k UUIDs (~4 MB) — which is why the loops can
+    # stream everything else with ``.iterator()`` and still deduplicate here.
     personal_gap_reading_ids: set = set()
 
     items_accumulator = ItemAccumulator()

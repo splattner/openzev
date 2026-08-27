@@ -585,3 +585,17 @@ def test_an_exact_half_cent_share_survives_the_zero_line_gate():
 
     line = fee_line(generate_invoice(billed, JAN, JAN_END))
     assert line.total_chf == Decimal("0.01")
+
+
+def test_a_shared_fee_configured_at_zero_chf_gets_no_line_either():
+    """The gate covers every shared path, not just weight-split ones: a
+    SHARED_* fee deliberately configured at CHF 0.00 under split_key = equal
+    has the same nothing-to-bill shape as a zero-weight member, so it is
+    suppressed too (§4.6.3). Plain non-shared fees keep their CHF 0.00 line
+    (test_zero_and_negative_fixed_fees_are_handled_consistently)."""
+    zev = factories.ZevFactory()
+    member = factories.ParticipantFactory(zev=zev, valid_from=JAN)
+    factories.ParticipantFactory(zev=zev, valid_from=JAN)
+    shared_tariff(zev, price="0.00", split_key=SplitKey.EQUAL)
+
+    assert fee_line(generate_invoice(member, JAN, JAN_END)) is None

@@ -452,12 +452,21 @@ allocate the participant's share:
 
 ### 7.5 Per-metering-point fees
 
-- `_count_billable_metering_points_by_month` excludes assignments whose
-  `allocation_mode` is `COMMUNITY` **for the month in question** — the same
-  per-window care as §7.3, not a blanket join exclusion. It keeps its
-  `metering_point__is_active=True` filter.
+- Month ownership decides which side bills each meter-month: for every
+  calendar month, the assignment window with the latest `valid_from` among
+  those overlapping the month owns it — unambiguous because the non-overlap
+  rule (§4) allows one window per metering point per date. The personal
+  count (`_count_billable_metering_points_by_month`) bills only months owned
+  by a `PERSONAL`-mode window assigned to the participant; the community
+  count (`_count_community_metering_points_by_month`) bills only months owned
+  by a `COMMUNITY`-mode window. The two counts are therefore disjoint by
+  construction: a mid-month mode switch or holder change bills the month
+  exactly once, on the side of the owning window — the same per-window care
+  as §7.3, not a blanket join exclusion. Both keep their
+  `metering_point__is_active=True` filter, and both must fetch every window
+  of the metering point so a superseding window can take ownership.
 - New: for each per-metering-point tariff, each month, each **active**
-  community metering point contributes
+  community-owned metering point contributes
   `unit_price * allocation_weight_i / weight_sum(month)` to the participant's
   `bucket="shared"` line of that tariff (inactive community meters bill
   nobody). Meter fees are month-granular: the fee is a monthly charge, so a

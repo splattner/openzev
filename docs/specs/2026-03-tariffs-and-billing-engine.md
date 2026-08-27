@@ -434,7 +434,7 @@ Months are **not prorated**: touching any day in a month counts the full month.
 **Metering-point-months:** for each billable calendar month in the tariff overlap, count the number of **distinct active metering points** assigned to the participant during that month. A metering point counts for a month if:
 - It has an active assignment to the participant overlapping that month.
 - `metering_point.is_active = True`.
-- The assignment's `allocation_mode` is `PERSONAL` **during that month** — a `COMMUNITY`-mode window is excluded from this personal count and billed separately in §4.6.4, with the same per-window care as the §4.3 energy gate (a meter personal in one month and community the next counts in the first and is excluded from the second).
+- The window that **owns** the month (see §4.6.4) is a `PERSONAL`-mode assignment to the participant — a month owned by a `COMMUNITY`-mode window (or by another participant's window) is excluded from this personal count and billed separately in §4.6.4, with the same per-window care as the §4.3 energy gate (a meter personal in one month and community the next counts in the first and is excluded from the second). Ownership makes the counts disjoint by construction: a mid-month mode switch or holder change bills the month exactly once, on whichever side the owning window names.
 
 Sum across all months to get the total metering-point-months.
 
@@ -460,9 +460,10 @@ exactly.
 share that rounds to CHF 0.00 (half-up, like every rendered amount) gets no
 line item at all — the same rule as the per-metering-point gate in §4.6.4.
 This covers a zero-weight member under `split_key = weight`, who previously
-received a bogus "`N Monate / CHF 0.00`" line. The rule is scoped to the
-weight-split shared paths: a plainly configured fee with
-`fixed_price_chf = 0` still renders its CHF 0.00 line, because there the
+received a bogus "`N Monate / CHF 0.00`" line, and equally a `SHARED_*` fee
+configured at `fixed_price_chf = 0` under *either* split key — both shapes
+bill nothing. The rule is scoped to the shared paths: a plain, non-shared fee
+with `fixed_price_chf = 0` still renders its CHF 0.00 line, because there the
 line's point is to show that the fee exists.
 
 **Both denominators are clamped to the same months as the numerator** — the
@@ -542,14 +543,39 @@ member.
 #### 4.6.4 Community metering-point fees
 
 For `per_metering_point_monthly_fee` and `per_metering_point_yearly_fee`,
-each **active** `COMMUNITY`-mode metering point contributes its own
-fee — split by weight, month-granular — in addition to (not instead of) the
-participant's personal metering-point-months count from §4.6.2:
+each **active** metering point whose month is *community-owned* (defined
+below) contributes its own fee — split by weight, month-granular — in
+addition to (not instead of) the participant's personal
+metering-point-months count from §4.6.2:
+
+**Window ownership of a month.** Every calendar month, every active metering
+point is owned by exactly one assignment window: the one with the latest
+`valid_from` among the windows overlapping that month. The non-overlap rule
+(`MeteringPointAssignment._validate_no_overlap`) allows at most one
+assignment per metering point at any date, so "last to start" is
+unambiguous. Ownership is
+what keeps the personal count (§4.6.2) and this community count disjoint by
+construction: each meter-month is billed on exactly one side, named by the
+owning window's `allocation_mode`. A meter whose mode switches mid-month
+(PERSONAL→COMMUNITY or back) — or whose holder changes mid-month — bills the
+transition month exactly once, on the side of the window that starts latest
+in that month. §4.6.1 already commits to a tie-break of this shape: months
+are never prorated, so one side always gets the full month; this rule merely
+decides *which* side. When every mode switch falls on a month boundary the
+ownership pick degenerates to plain per-mode window counting, so
+single-mode meters are unchanged — including `PERSONAL` → gap, where the
+last overlapping window is still the personal one.
+
+The community count must see *every* window of a metering point — including
+`PERSONAL` windows and windows held by other participants — so a superseding
+window can take ownership; filtering the fetch by mode would bring the
+double-bill back. The personal count likewise needs the full history of the
+participant's own metering points, for the same reason.
 
 ```
-community_counts = for each billable month M, count distinct active COMMUNITY-mode
-                    metering points of the ZEV whose window overlaps M
-                    (metering_point.is_active = True; an inactive community meter bills nobody)
+community_counts = for each billable month M, count distinct active metering points
+                    of the ZEV whose month-owning window (§4.6.4) is COMMUNITY-mode
+                    (metering_point.is_active = True; an inactive meter bills nobody)
 
 total = 0
 shared_months = 0
@@ -568,15 +594,6 @@ if shared_months > 0 and round_half_up(total, 0.01) != 0:
 billing modes. The cost being divided belongs to a community *metering
 point*, which always allocates by weight (§1.1 of the feature spec). A
 per-assignment split key is a documented follow-up, out of scope.
-
-**Known limitation:** a meter whose allocation mode switches PERSONAL→COMMUNITY
-(or back) mid-month is counted by *both* the personal count (§4.6.2) and
-this community count for that month — each counts any window touching the
-month — so its per-metering-point fee bills twice for the transition month.
-The counts are disjoint only when mode switches fall on month boundaries.
-Fixing it requires day-granular fee proration, which contradicts §4.6.1
-(months are not prorated); a fix is therefore a specced billing-model
-decision, tracked separately.
 
 Both weight-split paths (this one and §4.6.3) resolve their denominator per
 tariff but share **one** fetch of the ZEV's participant membership rows per
@@ -972,6 +989,7 @@ The description renders as: `"Surcharge 50% (50% von CHF 0.32/kWh)"` (German).
 | CHF 100 across 3 participants recovers 99.99 | §4.6.3 documented rounding shortfall |
 | Description text and average-share unit price | §7.2 |
 | `equal` key ignores weights entirely (isolation guarantee); `weight` key splits by weight; default is `equal`; two shared tariffs can use different keys in the same invoice; default weights reproduce the equal split under `weight`; a joiner shifts the weight-sum denominator only from their own month; a negligible-weight member bills almost nothing; an indivisible weighted share leaves the documented rappen shortfall | §4.6.3 `split_key` (`SPEC-2026-08-shared-metering-points` §7.2) |
+| Zero-value shares get no line: a zero-weight member, an exact half-cent share surviving the gate (ROUND_HALF_UP, not banker's rounding), and a shared fee configured at CHF 0.00 under either split key | §4.6.3 zero-value gate |
 | A tariff starting mid-month: both keys agree, a full ZEV run recovers the whole fee, and a member active *inside* the billed window still dilutes it | §4.6.3 tariff-clamped denominators (regression, #465) |
 
 ### Backend (`invoices/test_shared_metering.py`)
@@ -982,8 +1000,10 @@ more than their own share, and a sole participant carrying a meter alone);
 kWh-total conservation within rounding; a meter personal in one month and
 community the next billing correctly on both sides with no double count and no
 lost readings (§4.3a); community readings tracked in their own gap/skip counters;
-per-metering-point community fees, including `is_active` mirroring and
-exclusivity with the personal count (§4.6.4); a mid-period joiner/leaver's
+per-metering-point community fees, including `is_active` mirroring, the
+disjoint-by-construction month ownership tie-break — a mid-month mode switch
+or holder change bills the month exactly once, on the side of the last window
+to start (§4.6.4); a mid-period joiner/leaver's
 date-granular energy share vs. the month-granular fee share; the description
 marker in all four locales; single-participant regeneration reproducing a full
 run's share.

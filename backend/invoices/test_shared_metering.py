@@ -384,6 +384,90 @@ class PerMeteringPointCommunityFeeTests(_SharedMeteringBase, TestCase):
         shared_fee = next(i for i in self._fee_items(alice_invoice) if i.total_chf != Decimal("0.00"))
         self.assertEqual(shared_fee.total_chf, Decimal("5.00"))
 
+    def test_mid_month_mode_switch_bills_the_month_once_on_the_last_side(self):
+        """The §4.6.4 tie-break: PERSONAL Jan 1-15, COMMUNITY Jan 16-31 on one
+        meter must bill January exactly once. The last window to start owns the
+        month, so it lands on the community side — split by weight — instead
+        of being billed twice (a personal line on top of the shared one)."""
+        alice = self._participant("Alice Muster", weight="1")
+        bob = self._participant("Bob Beispiel", weight="1")
+        mp = self._mp(MeteringPointType.CONSUMPTION, "CH-SM-PMP-5")
+        self._assign(mp, alice, JAN, date(2026, 1, 15), mode=AllocationMode.PERSONAL)
+        self._assign(mp, alice, date(2026, 1, 16), mode=AllocationMode.COMMUNITY)
+        self._mp_fee_tariff(price="10.00")
+
+        alice_invoice = generate_invoice(alice, JAN, JAN_END)
+        bob_invoice = generate_invoice(bob, JAN, JAN_END)
+
+        alice_fees = self._fee_items(alice_invoice)
+        # No personal line: the month is owned by the community window.
+        self.assertEqual([i for i in alice_fees if i.total_chf == Decimal("10.00")], [])
+        alice_shared = next(i for i in alice_fees if i.total_chf == Decimal("5.00"))
+        bob_shared = self._fee_items(bob_invoice)[0]
+        self.assertEqual(alice_shared.total_chf, Decimal("5.00"))
+        self.assertEqual(bob_shared.total_chf, Decimal("5.00"))
+        # Recovered exactly once — the overcharge this used to be.
+        self.assertEqual(alice_shared.total_chf + bob_shared.total_chf, Decimal("10.00"))
+
+    def test_mid_month_mode_switch_back_bills_the_month_once_personally(self):
+        """The symmetric direction: COMMUNITY Jan 1-15, PERSONAL Jan 16-31.
+        The personal window starts last, so the holder pays the whole month
+        alone and nobody gets a shared line."""
+        alice = self._participant("Alice Muster", weight="1")
+        bob = self._participant("Bob Beispiel", weight="1")
+        mp = self._mp(MeteringPointType.CONSUMPTION, "CH-SM-PMP-6")
+        self._assign(mp, alice, JAN, date(2026, 1, 15), mode=AllocationMode.COMMUNITY)
+        self._assign(mp, alice, date(2026, 1, 16), mode=AllocationMode.PERSONAL)
+        self._mp_fee_tariff(price="10.00")
+
+        alice_invoice = generate_invoice(alice, JAN, JAN_END)
+        bob_invoice = generate_invoice(bob, JAN, JAN_END)
+
+        alice_fees = self._fee_items(alice_invoice)
+        self.assertEqual(len(alice_fees), 1)
+        self.assertEqual(alice_fees[0].total_chf, Decimal("10.00"))
+        self.assertEqual(self._fee_items(bob_invoice), [])
+
+    def test_month_boundary_mode_switch_still_bills_both_months(self):
+        """Ownership is per month, so a switch on a month boundary keeps the
+        pre-existing behaviour: each month bills on its own side."""
+        alice = self._participant("Alice Muster", weight="1")
+        bob = self._participant("Bob Beispiel", weight="1")
+        mp = self._mp(MeteringPointType.CONSUMPTION, "CH-SM-PMP-7")
+        self._assign(mp, alice, JAN, JAN_END, mode=AllocationMode.PERSONAL)
+        self._assign(mp, alice, date(2026, 2, 1), mode=AllocationMode.COMMUNITY)
+        self._mp_fee_tariff(price="10.00")
+
+        alice_invoice = generate_invoice(alice, JAN, date(2026, 2, 28))
+        bob_invoice = generate_invoice(bob, JAN, date(2026, 2, 28))
+
+        alice_fees = self._fee_items(alice_invoice)
+        personal_line = next(i for i in alice_fees if i.total_chf == Decimal("10.00"))
+        shared_line = next(i for i in alice_fees if i.total_chf == Decimal("5.00"))
+        self.assertEqual(len(alice_fees), 2)
+        self.assertEqual(personal_line.quantity_kwh, Decimal("1.0000"))  # Jan only
+        self.assertEqual(shared_line.quantity_kwh, Decimal("1.0000"))   # Feb only
+        self.assertEqual(self._fee_items(bob_invoice)[0].total_chf, Decimal("5.00"))
+
+    def test_holder_change_mid_month_bills_the_month_once(self):
+        """The ownership rule is about windows, not modes: a meter handed over
+        mid-month bills the whole month to the later holder only — the same
+        last-window tie-break that fixes the mode-switch overcharge."""
+        alice = self._participant("Alice Muster", valid_from=JAN, valid_to=date(2026, 1, 15), weight="1")
+        bob = self._participant("Bob Beispiel", valid_from=JAN, weight="1")
+        mp = self._mp(MeteringPointType.CONSUMPTION, "CH-SM-PMP-8")
+        self._assign(mp, alice, JAN, date(2026, 1, 15), mode=AllocationMode.PERSONAL)
+        self._assign(mp, bob, date(2026, 1, 16), mode=AllocationMode.PERSONAL)
+        self._mp_fee_tariff(price="10.00")
+
+        alice_invoice = generate_invoice(alice, JAN, JAN_END)
+        bob_invoice = generate_invoice(bob, JAN, JAN_END)
+
+        self.assertEqual(self._fee_items(alice_invoice), [])
+        bob_fees = self._fee_items(bob_invoice)
+        self.assertEqual(len(bob_fees), 1)
+        self.assertEqual(bob_fees[0].total_chf, Decimal("10.00"))
+
 
 class InvoiceTotalsAndDescriptionTests(_SharedMeteringBase, TestCase):
     def test_invoice_kwh_totals_include_shared_energy(self):
