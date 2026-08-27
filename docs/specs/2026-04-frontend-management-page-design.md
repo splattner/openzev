@@ -50,7 +50,7 @@ in the frontend.
 ### Out of scope
 
 - Marketing or public-auth screens (`LoginPage`, verification, OAuth callback)
-- Admin settings/editor screens that are document-like rather than CRUD management lists
+- Admin settings/editor screens that are document-like rather than CRUD management lists (the admin email/PDF template editors and the admin system settings tabs are covered as tab examples in §7.2)
 - Backend API, serializer, permission, or data model changes
 - A separate component library extraction or token system split from `index.css`
 
@@ -94,6 +94,7 @@ defined by shared frontend primitives and CSS contracts.
 | `frontend/src/components/FormModal.tsx` | `FormModal` | Generic modal shell for CRUD forms and small workflow dialogs. |
 | `frontend/src/components/BillingPeriodSelector.tsx` | `BillingPeriodSelector` | Specialized period-navigation control for invoice workflows; uses the same button language as management-page actions. |
 | `frontend/src/components/StatCard.tsx` | `StatCard` | Summary-stat card for page-level counts and metrics. Renders a `stat-label`, an `h3` value, and an optional muted `hint`. Pages must use it instead of hand-rolled `.stat-card` markup so summary stats stay visually consistent. |
+| `@mantine/core` `Tabs` (`classNames` `app-tabs`/`app-tabs-list`/`app-tabs-tab`) | `Tabs`, `Tabs.List`, `Tabs.Tab`, `Tabs.Panel` | Mantine Tabs + the `app-tabs` classNames for mutually exclusive, document-like views. Mantine v9 emits hashed classes only, so the hooks must be passed via `classNames={{ root: 'app-tabs', list: 'app-tabs-list', tab: 'app-tabs-tab' }}`. All tab content renders as `Tabs.Panel` inside the same `Tabs` root (root `keepMounted={false}` when inactive content must unmount; shared controls may sit between list and panels) so every tab's `aria-controls` resolves to a real `tabpanel`. No hand-rolled strips. |
 
 ### 4.2 CSS contracts
 
@@ -109,6 +110,7 @@ language and should be reused instead of ad hoc page-local CSS when possible:
 | `.button`, `.button-secondary`, `.button-danger`, `.button-compact` | Shared button system (flat `var(--interactive)` fill since SPEC-2026-08-ui-redesign-pdf-style Phase 2; hover `var(--interactive-hover)`) |
 | `.badge`, `.badge-neutral`, `.badge-info`, `.badge-success`, `.badge-danger`, `.badge-warning` (+ invoice workflow variants `.badge-draft/.badge-approved/.badge-sent/.badge-paid/.badge-cancelled`) | Small semantic status/category labels — filled desaturated fills from the generated `--status-*` semantics, never gold-on-white |
 | `.actions-row`, `.actions-row-wrap`, `.actions-row-end` | Inline action layouts |
+| `.app-tabs`, `.app-tabs-list`, `.app-tabs-tab` | Token styling for Mantine `Tabs`: root grid rhythm (1.5rem gap), 1rem tab gap, muted labels with a 2px `--interactive` underline when active; applied via the `classNames` prop. |
 | `.participant-*`, `.metering-*`, `.tariff-*`, `.invoice-*` | Page-family-specific structural patterns that are already in active use |
 
 Tables additionally follow the operational contract introduced by the UI
@@ -199,7 +201,10 @@ Default rule:
 Current application:
 
 - `TariffsPage` uses category sections for `energy`, `grid_fees`, `levies`, and `metering`.
-- `AdminEmailTemplatesPage` is a valid tab example because each tab is a separate template editor document.
+- `MeteringChartPage` uses tabs for chart versus quality views over the same period selection.
+- `AdminEmailTemplatesPage` and `AdminPdfTemplatesPage` are valid tab examples because each tab is a separate template editor document.
+- Tab strips use Mantine `Tabs` with the `.app-tabs` contract and render their content as `Tabs.Panel` inside the same root; hand-rolled tab strips are not permitted.
+- `AdminSystemSettingsPage` predates this contract (default-styled `Tabs` embedded in a card, panels rendered outside the root) and is pending migration.
 
 ### 7.3 Action hierarchy
 
