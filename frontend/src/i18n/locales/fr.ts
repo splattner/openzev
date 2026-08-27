@@ -346,6 +346,7 @@ export const fr = {
     },
     account: {
         title: 'Compte',
+        titleDescription: 'Gérez votre profil, votre mot de passe, vos comptes liés et vos clés API.',
         profileSection: 'Profil',
         passwordSection: 'Changer le mot de passe',
         username: 'Nom d\'utilisateur',

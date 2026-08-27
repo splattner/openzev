@@ -109,6 +109,7 @@ language and should be reused instead of ad hoc page-local CSS when possible:
 | `.card`, `.table-card`, `.stat-card` | Primary container surfaces |
 | `.button`, `.button-secondary`, `.button-danger`, `.button-compact` | Shared button system (flat `var(--interactive)` fill since SPEC-2026-08-ui-redesign-pdf-style Phase 2; hover `var(--interactive-hover)`) |
 | `.badge`, `.badge-neutral`, `.badge-info`, `.badge-success`, `.badge-danger`, `.badge-warning` (+ invoice workflow variants `.badge-draft/.badge-approved/.badge-sent/.badge-paid/.badge-cancelled`) | Small semantic status/category labels — filled desaturated fills from the generated `--status-*` semantics, never gold-on-white |
+| `.error-banner`, `.warning-banner` | Page-level error/warning callouts — error states render as `card error-banner`, warnings as `.warning-banner` (filled desaturated `--danger-100` / `--warning-100` fills; no inline gold borders) |
 | `.actions-row`, `.actions-row-wrap`, `.actions-row-end` | Inline action layouts |
 | `.app-tabs`, `.app-tabs-list`, `.app-tabs-tab` | Token styling for Mantine `Tabs`: root grid rhythm (1.5rem gap), 1rem tab gap, muted labels with a 2px `--interactive` underline when active; applied via the `classNames` prop. |
 | `.participant-*`, `.metering-*`, `.tariff-*`, `.invoice-*` | Page-family-specific structural patterns that are already in active use |

@@ -355,6 +355,7 @@ export const en = {
     },
     account: {
         title: 'Account',
+        titleDescription: 'Manage your profile, password, linked accounts, and API keys.',
         profileSection: 'Profile',
         passwordSection: 'Change Password',
         username: 'Username',

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useLocation, useSearchParams } from 'react-router-dom'
+import { useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '../lib/auth'
 import { useToast } from '../lib/toast'
@@ -11,14 +11,12 @@ import { ApiKeysSection } from '../features/account/ApiKeysSection'
 
 export function AccountProfilePage() {
     const { t } = useTranslation()
-    const location = useLocation()
     const [searchParams, setSearchParams] = useSearchParams()
     const { user, refreshUser } = useAuth()
     const { pushToast } = useToast()
     const queryClient = useQueryClient()
     const { dialog, confirm, handleConfirm, handleCancel, isLoading: dialogLoading } = useConfirmDialog()
 
-    // Social accounts & OAuth providers
     const socialAccountsQuery = useQuery({
         queryKey: queryKeys.auth.socialAccounts(),
         queryFn: fetchSocialAccounts,
@@ -47,14 +45,12 @@ export function AccountProfilePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
 
-    // Profile form state
     const [profileForm, setProfileForm] = useState({
         email: user?.email || '',
         first_name: user?.first_name || '',
         last_name: user?.last_name || '',
     })
 
-    // Password form state
     const [passwordForm, setPasswordForm] = useState({
         oldPassword: '',
         newPassword: '',
@@ -71,7 +67,6 @@ export function AccountProfilePage() {
         })
     }, [user])
 
-    // Profile update mutation
     const profileMutation = useMutation({
         mutationFn: () => updateProfile(profileForm),
         onSuccess: () => {
@@ -84,7 +79,6 @@ export function AccountProfilePage() {
         },
     })
 
-    // Password change mutation
     const passwordMutation = useMutation({
         mutationFn: () => changePassword(passwordForm.oldPassword, passwordForm.newPassword),
         onSuccess: async () => {
@@ -98,7 +92,6 @@ export function AccountProfilePage() {
         },
     })
 
-    // Social account unlink mutation
     const unlinkMutation = useMutation({
         mutationFn: (id: number) => deleteSocialAccount(id),
         onSuccess: () => {
@@ -149,7 +142,6 @@ export function AccountProfilePage() {
     const handlePasswordSubmit = (e: React.FormEvent) => {
         e.preventDefault()
 
-        // Validation
         if (!passwordForm.oldPassword.trim()) {
             pushToast(t('account.oldPasswordRequired'), 'error')
             return
@@ -171,60 +163,58 @@ export function AccountProfilePage() {
     }
 
     return (
-        <div className="page">
-            <h1>{t('account.title')}</h1>
+        <div className="page-stack">
+            <header>
+                <h2>{t('account.title')}</h2>
+                <p className="muted">{t('account.titleDescription')}</p>
+            </header>
 
             {user?.must_change_password && (
-                <div className="card" style={{ marginBottom: '1.5rem', border: '1px solid var(--gold)', background: 'var(--warning-100)', maxWidth: '1000px' }}>
-                    <h2 style={{ marginTop: 0, color: 'var(--warning-800)' }}>{t('account.passwordChangeRequired')}</h2>
-                    <p style={{ marginBottom: 0, color: 'var(--warning-800)' }}>
-                        {location.state && (location.state as { forcePasswordChange?: boolean }).forcePasswordChange
-                            ? t('account.passwordChangeRequiredDescription')
-                            : t('account.passwordChangeRequiredDescription')}
-                    </p>
+                <div className="warning-banner" role="alert" style={{ display: 'grid', gap: '0.35rem' }}>
+                    <strong>{t('account.passwordChangeRequired')}</strong>
+                    <p style={{ margin: 0 }}>{t('account.passwordChangeRequiredDescription')}</p>
                 </div>
             )}
 
             <div className="form-grid" style={{ gap: '2rem', maxWidth: '1000px' }}>
-                {/* Profile Section */}
                 <div className="card">
-                    <h2 style={{ marginTop: 0 }}>{t('account.profileSection')}</h2>
+                    <h2>{t('account.profileSection')}</h2>
                     <form onSubmit={handleProfileSubmit}>
-                        <div className="form-group">
-                            <label>{t('account.username')}</label>
+                        <label>
+                            <span>{t('account.username')}</span>
                             <input
                                 type="text"
                                 value={user?.username || ''}
                                 disabled
                                 style={{ backgroundColor: 'var(--surface)', cursor: 'not-allowed' }}
                             />
-                            <small style={{ color: 'var(--text-muted)', marginTop: '0.25rem', display: 'block' }}>
+                            <small className="muted">
                                 {t('account.usernameReadOnly')}
                             </small>
-                        </div>
+                        </label>
 
-                        <div className="form-group">
-                            <label>{t('account.firstName')}</label>
+                        <label>
+                            <span>{t('account.firstName')}</span>
                             <input
                                 type="text"
                                 name="first_name"
                                 value={profileForm.first_name}
                                 onChange={handleProfileChange}
                             />
-                        </div>
+                        </label>
 
-                        <div className="form-group">
-                            <label>{t('account.lastName')}</label>
+                        <label>
+                            <span>{t('account.lastName')}</span>
                             <input
                                 type="text"
                                 name="last_name"
                                 value={profileForm.last_name}
                                 onChange={handleProfileChange}
                             />
-                        </div>
+                        </label>
 
-                        <div className="form-group">
-                            <label>{t('account.email')}</label>
+                        <label>
+                            <span>{t('account.email')}</span>
                             <input
                                 type="email"
                                 name="email"
@@ -232,7 +222,7 @@ export function AccountProfilePage() {
                                 onChange={handleProfileChange}
                                 required
                             />
-                        </div>
+                        </label>
 
                         <button
                             type="submit"
@@ -245,12 +235,11 @@ export function AccountProfilePage() {
                     </form>
                 </div>
 
-                {/* Password Section */}
                 <div className="card">
-                    <h2 style={{ marginTop: 0 }}>{t('account.passwordSection')}</h2>
+                    <h2>{t('account.passwordSection')}</h2>
                     <form onSubmit={handlePasswordSubmit}>
-                        <div className="form-group">
-                            <label>{t('account.oldPassword')}</label>
+                        <label>
+                            <span>{t('account.oldPassword')}</span>
                             <input
                                 type="password"
                                 name="oldPassword"
@@ -259,10 +248,10 @@ export function AccountProfilePage() {
                                 placeholder={t('account.enterCurrentPassword')}
                                 required
                             />
-                        </div>
+                        </label>
 
-                        <div className="form-group">
-                            <label>{t('account.newPassword')}</label>
+                        <label>
+                            <span>{t('account.newPassword')}</span>
                             <input
                                 type="password"
                                 name="newPassword"
@@ -271,13 +260,13 @@ export function AccountProfilePage() {
                                 placeholder={t('account.enterNewPassword')}
                                 required
                             />
-                            <small style={{ color: 'var(--text-muted)', marginTop: '0.25rem', display: 'block' }}>
+                            <small className="muted">
                                 {t('account.passwordMinLength')}
                             </small>
-                        </div>
+                        </label>
 
-                        <div className="form-group">
-                            <label>{t('account.confirmPassword')}</label>
+                        <label>
+                            <span>{t('account.confirmPassword')}</span>
                             <input
                                 type="password"
                                 name="confirmPassword"
@@ -286,7 +275,7 @@ export function AccountProfilePage() {
                                 placeholder={t('account.reenterNewPassword')}
                                 required
                             />
-                        </div>
+                        </label>
 
                         <button
                             type="submit"
@@ -297,16 +286,12 @@ export function AccountProfilePage() {
                             {passwordMutation.isPending ? t('common.saving') : t('account.changePassword')}
                         </button>
                     </form>
-                    {/* Stated rather than left to be discovered: both answers
-                        are defensible, and the one nobody tells you about is
-                        the one that surprises somebody. */}
-                    <small style={{ color: 'var(--text-muted)', marginTop: '1rem', display: 'block' }}>
+                    <small className="muted" style={{ marginTop: '1rem', display: 'block' }}>
                         {t('account.apiKeys.passwordChangeNote')}
                     </small>
                 </div>
-                {/* Linked Accounts Section */}
                 <div className="card">
-                    <h2 style={{ marginTop: 0 }}>{t('account.linkedAccountsSection')}</h2>
+                    <h2>{t('account.linkedAccountsSection')}</h2>
                     <p className="muted" style={{ marginBottom: '1.5rem' }}>{t('account.linkedAccountsDescription')}</p>
 
                     {oauthProvidersQuery.isLoading && <p className="muted">{t('common.loading')}</p>}
@@ -333,7 +318,7 @@ export function AccountProfilePage() {
                                 <div>
                                     <strong>{provider.display_name}</strong>
                                     {linked && (
-                                        <small style={{ display: 'block', color: 'var(--text-muted)' }}>
+                                        <small className="muted" style={{ display: 'block' }}>
                                             {t('account.linkedSince', {
                                                 date: new Date(linked.created_at).toLocaleDateString(),
                                             })}
@@ -343,7 +328,7 @@ export function AccountProfilePage() {
                                 {linked ? (
                                     <button
                                         type="button"
-                                        className="button button-sm button-danger"
+                                        className="button button-danger button-compact"
                                         disabled={unlinkMutation.isPending}
                                         onClick={() => void handleUnlink(linked.id, provider.display_name)}
                                     >
@@ -352,7 +337,7 @@ export function AccountProfilePage() {
                                 ) : (
                                     <button
                                         type="button"
-                                        className="button button-sm button-secondary"
+                                        className="button button-secondary button-compact"
                                         disabled={linkingProvider !== null}
                                         onClick={() => void handleLink(provider.name)}
                                     >

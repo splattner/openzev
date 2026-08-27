@@ -76,22 +76,13 @@ export function ApiKeysSection({ onRevoke }: Props) {
 
     return (
         <div className="card">
-            <h2 style={{ marginTop: 0 }}>{t('account.apiKeys.section')}</h2>
+            <h2>{t('account.apiKeys.section')}</h2>
             <p className="muted" style={{ marginBottom: '1.5rem' }}>{t('account.apiKeys.description')}</p>
 
             {freshSecret && (
-                <div
-                    className="api-key-secret"
-                    style={{
-                        border: '1px solid var(--gold)',
-                        background: 'var(--warning-100)',
-                        borderRadius: '6px',
-                        padding: '1rem',
-                        marginBottom: '1.5rem',
-                    }}
-                >
-                    <strong style={{ color: 'var(--warning-800)' }}>{t('account.apiKeys.secretShownOnceTitle')}</strong>
-                    <p style={{ color: 'var(--warning-800)', marginTop: '0.5rem' }}>
+                <div className="warning-banner" role="alert">
+                    <strong>{t('account.apiKeys.secretShownOnceTitle')}</strong>
+                    <p style={{ marginTop: '0.5rem' }}>
                         {t('account.apiKeys.secretShownOnceBody')}
                     </p>
                     <code
@@ -107,17 +98,17 @@ export function ApiKeysSection({ onRevoke }: Props) {
                     >
                         {freshSecret.key}
                     </code>
-                    <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.75rem' }}>
+                    <div className="actions-row" style={{ marginTop: '0.75rem' }}>
                         <button
                             type="button"
-                            className="button button-sm button-primary"
+                            className="button button-primary button-compact"
                             onClick={() => void handleCopy(freshSecret.key)}
                         >
                             {copied ? t('account.apiKeys.copied') : t('account.apiKeys.copy')}
                         </button>
                         <button
                             type="button"
-                            className="button button-sm button-secondary"
+                            className="button button-secondary button-compact"
                             onClick={() => setFreshSecret(null)}
                         >
                             {t('account.apiKeys.dismissSecret')}
@@ -138,21 +129,19 @@ export function ApiKeysSection({ onRevoke }: Props) {
                     }}
                     style={{ marginBottom: '1.5rem' }}
                 >
-                    <div className="form-group">
-                        <label htmlFor="api-key-name">{t('account.apiKeys.nameLabel')}</label>
+                    <label>
+                        <span>{t('account.apiKeys.nameLabel')}</span>
                         <input
-                            id="api-key-name"
                             type="text"
                             value={name}
                             onChange={(event) => setName(event.target.value)}
                             placeholder={t('account.apiKeys.namePlaceholder')}
                         />
-                    </div>
+                    </label>
 
-                    <div className="form-group">
-                        <label htmlFor="api-key-expiry">{t('account.apiKeys.expiryLabel')}</label>
+                    <label>
+                        <span>{t('account.apiKeys.expiryLabel')}</span>
                         <select
-                            id="api-key-expiry"
                             value={expiryDays === null ? 'never' : String(expiryDays)}
                             onChange={(event) =>
                                 setExpiryDays(event.target.value === 'never' ? null : Number(event.target.value))
@@ -167,23 +156,21 @@ export function ApiKeysSection({ onRevoke }: Props) {
                                 </option>
                             ))}
                         </select>
-                    </div>
+                    </label>
 
-                    <div className="form-group">
-                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                            <input
-                                type="checkbox"
-                                checked={readOnly}
-                                onChange={(event) => setReadOnly(event.target.checked)}
-                            />
-                            {t('account.apiKeys.readOnlyLabel')}
-                        </label>
-                        <small style={{ color: 'var(--text-muted)', marginTop: '0.25rem', display: 'block' }}>
-                            {t('account.apiKeys.readOnlyHint')}
-                        </small>
-                    </div>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <input
+                            type="checkbox"
+                            checked={readOnly}
+                            onChange={(event) => setReadOnly(event.target.checked)}
+                        />
+                        <span>{t('account.apiKeys.readOnlyLabel')}</span>
+                    </label>
+                    <small className="muted" style={{ marginTop: '0.25rem', display: 'block' }}>
+                        {t('account.apiKeys.readOnlyHint')}
+                    </small>
 
-                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <div className="actions-row">
                         <button type="submit" className="button button-primary" disabled={createMutation.isPending}>
                             {createMutation.isPending ? t('common.saving') : t('account.apiKeys.create')}
                         </button>
@@ -246,7 +233,7 @@ export function ApiKeysSection({ onRevoke }: Props) {
                                     )}
                                 </span>
                             )}
-                            <small style={{ display: 'block', color: 'var(--text-muted)' }}>
+                            <small className="muted" style={{ display: 'block' }}>
                                 <code>{key.prefix}</code>
                                 {' · '}
                                 {t('account.apiKeys.createdOn', { date: formatDateTime(key.created_at, settings) })}
@@ -266,7 +253,7 @@ export function ApiKeysSection({ onRevoke }: Props) {
                         </div>
                         <button
                             type="button"
-                            className="button button-sm button-danger"
+                            className="button button-danger button-compact"
                             disabled={revokeMutation.isPending}
                             onClick={() =>
                                 onRevoke({ name: key.name, onConfirm: () => revokeMutation.mutate(key.id) })

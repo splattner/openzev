@@ -346,6 +346,7 @@ export const it = {
     },
     account: {
         title: 'Account',
+        titleDescription: 'Gestisci profilo, password, account collegati e chiavi API.',
         profileSection: 'Profilo',
         passwordSection: 'Cambia password',
         username: 'Nome utente',
