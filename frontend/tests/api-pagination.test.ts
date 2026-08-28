@@ -100,7 +100,7 @@ describe('fetchAllPages', () => {
     expect(apiMock.history.get).toHaveLength(2)
     const followUp = apiMock.history.get[1].url ?? ''
     expect(followUp.startsWith('http')).toBe(false)
-    expect(followUp.endsWith('/zev/zevs/?page=2&ordering=-created_at')).toBe(true)
+    expect(followUp).toBe('/zev/zevs/?page=2&ordering=-created_at')
   })
 
   it('propagates an error raised mid-walk', async () => {
