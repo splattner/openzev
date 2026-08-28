@@ -21,6 +21,7 @@ export const queryKeys = {
     series: (zevId?: string) => ['tariffs', 'series', zevId ?? 'all'] as const,
   },
   invoices: {
+    lists: () => ['invoices', 'list'] as const,
     list: (zevId?: string, status?: string) => ['invoices', 'list', zevId ?? 'all', status ?? 'all'] as const,
     detail: (invoiceId: string) => ['invoices', 'detail', invoiceId] as const,
     dashboard: () => ['invoices', 'dashboard'] as const,

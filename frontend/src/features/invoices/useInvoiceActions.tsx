@@ -92,7 +92,7 @@ export function useInvoiceActions({
     // Invalidate the ['invoices','list'] prefix so both the unfiltered lists
     // and the dashboard's status-filtered key are refreshed.
     const invalidateInvoicesList = useCallback(() => {
-        void queryClient.invalidateQueries({ queryKey: ['invoices', 'list'] })
+        void queryClient.invalidateQueries({ queryKey: queryKeys.invoices.lists() })
     }, [queryClient])
 
     // ── Single invoice mutations ──────────────────────────────────────────────

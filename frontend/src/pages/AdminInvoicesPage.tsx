@@ -31,7 +31,7 @@ export function AdminInvoicesPage() {
         mutationFn: (id: string) => deleteInvoice(id),
         onSuccess: () => {
             // Prefix invalidation also refreshes the dashboard's status-filtered list.
-            void queryClient.invalidateQueries({ queryKey: ['invoices', 'list'] })
+            void queryClient.invalidateQueries({ queryKey: queryKeys.invoices.lists() })
             pushToast(t('adminInvoices.deleted'), 'success')
         },
         onError: (error) => pushToast(formatApiError(error), 'error'),
