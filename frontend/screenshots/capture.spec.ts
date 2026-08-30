@@ -502,9 +502,10 @@ test.describe('User Guide Screenshots', () => {
     await screenshotFull(page, '12-admin-regional-settings')
   })
 
-  // 13 — Admin VAT Settings
+  // 13 — Admin VAT Settings (4th tab of System Settings; legacy URL redirects to it)
   test('13-admin-vat-settings', async ({ page }) => {
     await navigateTo(page, '/admin/settings/vat')
+    await page.waitForURL('**/admin/system-settings?tab=vat', { timeout: 10_000 })
     await page.waitForSelector('form, table, .card', { timeout: 10_000 })
     await screenshotFull(page, '13-admin-vat-settings')
   })

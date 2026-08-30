@@ -14,7 +14,6 @@ const AdminInvoicesPage = lazy(async () => ({ default: (await import('./pages/Ad
 const FeasibilityCalculatorPage = lazy(async () => ({ default: (await import('./pages/FeasibilityCalculatorPage')).FeasibilityCalculatorPage }))
 const AuditLogsPage = lazy(async () => ({ default: (await import('./pages/AdminAuditLogsPage')).AuditLogsPage }))
 const AdminSystemSettingsPage = lazy(async () => ({ default: (await import('./pages/AdminSystemSettingsPage')).AdminSystemSettingsPage }))
-const AdminVatSettingsPage = lazy(async () => ({ default: (await import('./pages/AdminVatSettingsPage')).AdminVatSettingsPage }))
 const DashboardPage = lazy(async () => ({ default: (await import('./pages/DashboardPage')).DashboardPage }))
 const ImportsPage = lazy(async () => ({ default: (await import('./pages/ImportsPage')).ImportsPage }))
 const InvoiceDetailPage = lazy(async () => ({ default: (await import('./pages/InvoiceDetailPage')).InvoiceDetailPage }))
@@ -71,14 +70,7 @@ function App() {
               }
             />
             <Route path="admin/settings/regional" element={<Navigate to="/admin/system-settings?tab=regional" replace />} />
-            <Route
-              path="admin/settings/vat"
-              element={
-                <ProtectedRoute allowedRoles={['admin']}>
-                  <AdminVatSettingsPage />
-                </ProtectedRoute>
-              }
-            />
+            <Route path="admin/settings/vat" element={<Navigate to="/admin/system-settings?tab=vat" replace />} />
             <Route
               path="admin/pdf-templates"
               element={

@@ -28,8 +28,9 @@ import { useToast } from '../lib/toast'
 import type { DateTimeFormat, LongDateFormat, OAuthProviderConfig, OAuthProviderConfigInput, ShortDateFormat } from '../types/api'
 import { ConfirmDialog, useConfirmDialog } from '../components/ConfirmDialog'
 import { FormModal } from '../components/FormModal'
+import { VatSettingsSection } from '../features/settings/VatSettingsSection'
 
-type SystemSettingsTab = 'regional' | 'features' | 'oauth'
+type SystemSettingsTab = 'regional' | 'features' | 'oauth' | 'vat'
 
 const EMPTY_OAUTH_FORM: OAuthProviderConfigInput = {
     name: '',
@@ -44,7 +45,7 @@ const EMPTY_OAUTH_FORM: OAuthProviderConfigInput = {
     enabled: true,
 }
 
-const TAB_ORDER: SystemSettingsTab[] = ['regional', 'features', 'oauth']
+const TAB_ORDER: SystemSettingsTab[] = ['regional', 'features', 'oauth', 'vat']
 
 function getValidTab(value: string | null): SystemSettingsTab {
     return TAB_ORDER.includes(value as SystemSettingsTab) ? (value as SystemSettingsTab) : 'regional'
@@ -148,6 +149,8 @@ export function AdminSystemSettingsPage() {
                 return t('adminSystemSettings.tabs.features.description')
             case 'oauth':
                 return t('adminSystemSettings.tabs.oauth.description')
+            case 'vat':
+                return t('adminSystemSettings.tabs.vat.description')
             default:
                 return t('adminSystemSettings.tabs.regional.description')
         }
@@ -247,6 +250,7 @@ export function AdminSystemSettingsPage() {
                         <Tabs.Tab value="regional">{t('adminSystemSettings.tabs.regional.label')}</Tabs.Tab>
                         <Tabs.Tab value="features">{t('adminSystemSettings.tabs.features.label')}</Tabs.Tab>
                         <Tabs.Tab value="oauth">{t('adminSystemSettings.tabs.oauth.label')}</Tabs.Tab>
+                        <Tabs.Tab value="vat">{t('adminSystemSettings.tabs.vat.label')}</Tabs.Tab>
                     </Tabs.List>
                 </Tabs>
                 <p className="muted" style={{ marginBottom: 0 }}>{tabDescription}</p>
@@ -464,6 +468,8 @@ export function AdminSystemSettingsPage() {
                     )}
                 </div>
             )}
+
+            {activeTab === 'vat' && <VatSettingsSection />}
 
             <FormModal
                 isOpen={showOAuthForm}

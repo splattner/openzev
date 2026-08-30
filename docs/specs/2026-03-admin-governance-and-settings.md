@@ -349,13 +349,12 @@ All admin routes are nested under `/admin/*` and wrapped with `<ProtectedRoute a
 | Route | Page component | Purpose |
 |---|---|---|
 | `/admin` | `AdminDashboardPage` | Platform statistics dashboard |
-| `/admin/system-settings` | `AdminSystemSettingsPage` | Tabbed system settings for date formats, feature flags, and OAuth providers |
-| `/admin/settings/vat` | `AdminVatSettingsPage` | VAT rate CRUD |
+| `/admin/system-settings` | `AdminSystemSettingsPage` | Tabbed system settings for date formats, feature flags, OAuth providers, and VAT rates |
 | `/admin/pdf-templates` | `AdminPdfTemplatesPage` | Invoice, contract, and annual-statement HTML template editor |
 | `/admin/accounts` | `AdminAccountsPage` | User account management |
 | `/admin/zevs` | `ZevListPage` | ZEV list management |
 
-Legacy routes `/admin/settings/regional`, `/admin/features`, and `/admin/oauth`
+Legacy routes `/admin/settings/regional`, `/admin/settings/vat`, `/admin/features`, and `/admin/oauth`
 remain available as redirects into the corresponding tab of
 `/admin/system-settings`.
 
@@ -374,8 +373,9 @@ remain available as redirects into the corresponding tab of
 **File:** `frontend/src/pages/AdminSystemSettingsPage.tsx`
 
 - Canonical route: `/admin/system-settings`
-- Uses query-param tabs: `regional`, `features`, `oauth`
+- Uses query-param tabs: `regional`, `features`, `oauth`, `vat`
 - Renders one page shell with a tab bar and per-tab content.
+- `TAB_ORDER = ['regional', 'features', 'oauth', 'vat']`; `getValidTab()` falls back to `regional`.
 - **Regional tab:**
     - Loads current settings from `useAppSettings()`.
     - Form with 3 dropdowns: short date format, long date format, date & time format.
@@ -394,12 +394,11 @@ remain available as redirects into the corresponding tab of
       edit form shows the secret field blank with a hint — a blank submit omits
       the key from the PATCH payload so the stored secret stays unchanged.
 
-Legacy routes `/admin/settings/regional`, `/admin/features`, and `/admin/oauth`
-redirect to the matching tab on this page.
+- **VAT tab:** renders `VatSettingsSection` (`frontend/src/features/settings/VatSettingsSection.tsx`) — legacy routes see §9.2.
 
-### 9.5 AdminVatSettingsPage
+### 9.5 VatSettingsSection (VAT tab)
 
-**File:** `frontend/src/pages/AdminVatSettingsPage.tsx`
+**File:** `frontend/src/features/settings/VatSettingsSection.tsx`
 
 - Query: `useQuery({ queryKey: ['vat-rates'], queryFn: fetchVatRates })`.
 - **Summary cards:** three `StatCard` components above the form — configured rate count, today's active rate (percentage, or the translated "none" label), and count of scheduled rates with `valid_from` in the future.
@@ -586,8 +585,8 @@ Tests cover dashboard access (`test_invoice_dashboard_is_admin_only`) confirming
 
 ### 13.2 Frontend
 
-- AdminSystemSettingsPage: tab selector switches between regional settings, feature flags, and OAuth providers. Regional format selector renders all 4 options per format type, preview updates live, and save mutation calls `updateAppSettings`.
-- AdminVatSettingsPage: form validates percentage 0–100, converts to fraction, create/edit/delete flows work. Overlap errors display as toast.
+- AdminSystemSettingsPage: tab selector switches between regional settings, feature flags, OAuth providers, and VAT rates. Regional format selector renders all 4 options per format type, preview updates live, and save mutation calls `updateAppSettings`.
+- VatSettingsSection (VAT tab): form validates percentage 0–100, converts to fraction, create/edit/delete flows work. Overlap errors display as toast.
 - AdminPdfTemplatesPage: three template tabs (invoice/contract/annual statement) load server content, save sends updated content, preview renders a real sample-data PDF (`output: "pdf"`), reset-to-default reverts customized templates.
 - AdminDashboardPage: stats display, auto-refresh at 30s interval.
 - ZevSettingsPage: general settings + email template sections both submit via `updateZev`. Reset buttons clear custom templates. Template variable reference is visible.

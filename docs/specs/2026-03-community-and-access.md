@@ -583,7 +583,6 @@ On update:
 | `/account` | any authenticated | `AccountProfilePage` |
 | `/admin` | `admin` | `AdminDashboardPage` |
 | `/admin/system-settings` | `admin` | `AdminSystemSettingsPage` |
-| `/admin/settings/vat` | `admin` | `AdminVatSettingsPage` |
 | `/admin/pdf-templates` | `admin` | `AdminPdfTemplatesPage` |
 | `/admin/accounts` | `admin` | `AdminAccountsPage` |
 | `/admin/zevs` | `admin` | `ZevListPage` |
@@ -594,9 +593,9 @@ On update:
 | `/tariffs` | `admin`, `zev_owner` | `TariffsPage` |
 | `/invoices` | `admin`, `zev_owner` | `InvoicesPage` |
 
-Legacy admin routes `/admin/settings/regional`, `/admin/features`, and
-`/admin/oauth` redirect into tabs on `/admin/system-settings` and remain
-admin-only.
+Legacy admin routes `/admin/settings/regional`, `/admin/settings/vat`,
+`/admin/features`, and `/admin/oauth` redirect into tabs on
+`/admin/system-settings` and remain admin-only.
 | `/invoices/:invoiceId` | any authenticated | `InvoiceDetailPage` |
 | `/imports` | `admin`, `zev_owner` | `ImportsPage` |
 | `/login` | public | `LoginPage` |

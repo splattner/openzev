@@ -34,7 +34,6 @@ export const en = {
         adminFeatures: 'Features',
         adminOAuth: 'OAuth Providers',
         adminSystemSettings: 'System Settings',
-        adminVatSettings: 'VAT Settings',
         adminInvoices: 'Invoices',
         adminAuditLogs: 'Audit Logs',
         auditLogs: 'Audit Logs',
@@ -1908,7 +1907,7 @@ export const en = {
     adminSystemSettings: {
         eyebrow: 'Admin Console',
         title: 'System Settings',
-        description: 'Manage global date formats, feature flags, and OAuth provider configuration from one place.',
+        description: 'Manage global date formats, feature flags, OAuth provider configuration, and VAT rates from one place.',
         summary: {
             featureFlags: 'Feature flags',
             enabledFeatures: '{{count}} enabled',
@@ -1929,6 +1928,10 @@ export const en = {
             oauth: {
                 label: 'OAuth',
                 description: 'Configure social login providers and keep their credentials in one place.',
+            },
+            vat: {
+                label: 'VAT',
+                description: 'Validity-based VAT rates; applied at period end if the ZEV has a VAT number.',
             },
         },
         regional: {
@@ -1951,9 +1954,6 @@ export const en = {
         },
     },
     adminVatSettings: {
-        eyebrow: 'Admin Console',
-        title: 'VAT Management',
-        description: 'Manage global VAT rates by validity range. Invoices use the rate active on the invoice period end date, but only if the ZEV has a VAT number.',
         createTitle: 'Add VAT rate',
         editTitle: 'Edit VAT rate',
         listTitle: 'Configured VAT rates',

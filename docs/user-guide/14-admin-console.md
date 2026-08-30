@@ -29,7 +29,7 @@ Admins can also create a bare ZEV (without the wizard) via the standard CRUD int
 
 ## System Settings
 
-Regional display settings, feature flags, and OAuth providers are consolidated
+Regional display settings, feature flags, OAuth providers, and VAT rates are consolidated
 under **Admin Console → System Settings**.
 
 ### Regional
@@ -64,8 +64,12 @@ Configure external OAuth login providers in **Admin Console → System Settings 
 - **Scope** — Space-separated OIDC scopes (default `openid email profile`)
 - **Enabled** — Toggle to activate or deactivate the provider
 
-> **Note:** The legacy routes `/admin/features` and `/admin/oauth` redirect to
+> **Note:** The legacy routes `/admin/features`, `/admin/oauth`, and `/admin/settings/vat` redirect to
 > the matching tab on the System Settings page.
+
+### VAT
+
+Configure VAT rates in **Admin Console → System Settings → VAT** — the fourth tab. See [VAT Settings](#vat-settings) for validity-window behavior and the workflow.
 
 ## Audit Logs
 
@@ -105,7 +109,7 @@ API keys.
 
 ## VAT Settings
 
-Admins configure VAT rates in **Admin Console → VAT Settings**.
+Admins configure VAT rates in **Admin Console → System Settings → VAT** (fourth tab).
 
 ![VAT settings](screenshots/13-admin-vat-settings.png)
 
@@ -114,7 +118,7 @@ VAT rates are validity-window based — you can set rates for specific time peri
 ### How VAT Works
 
 1. A ZEV owner enters their **VAT Number** (Swiss UID format) in [ZEV Settings](02-zev-setup.md#vat-configuration)
-2. An admin configures the applicable VAT rate(s) in **Admin Console → VAT Settings**
+2. An admin configures the applicable VAT rate(s) in **Admin Console → System Settings → VAT**
 3. When invoices are generated, the system looks up the active rate for the invoice period
 
 If no VAT number is set on the ZEV, or no VAT rate is active for an invoice period, VAT defaults to **0%**.

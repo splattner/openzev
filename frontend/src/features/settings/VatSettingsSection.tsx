@@ -2,17 +2,17 @@ import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faCheck, faPen, faPlus, faTrash, faXmark } from '@fortawesome/free-solid-svg-icons'
-import { createVatRate, deleteVatRate, fetchVatRates, updateVatRate } from '../lib/api/auth'
-import { formatApiError } from '../lib/api/errors'
-import { queryKeys } from '../lib/api/queryKeys'
-import { formatShortDate, useAppSettings } from '../lib/appSettings'
+import { createVatRate, deleteVatRate, fetchVatRates, updateVatRate } from '../../lib/api/auth'
+import { formatApiError } from '../../lib/api/errors'
+import { queryKeys } from '../../lib/api/queryKeys'
+import { formatShortDate, useAppSettings } from '../../lib/appSettings'
 import { useTranslation } from 'react-i18next'
-import { CivilDateInput } from '../components/CivilDateInput'
-import { useToast } from '../lib/toast'
-import { ConfirmDialog, useConfirmDialog } from '../components/ConfirmDialog'
-import { StatCard } from '../components/StatCard'
-import { todayLocalIso } from '../lib/dates'
-import type { VatRate, VatRateInput } from '../types/api'
+import { CivilDateInput } from '../../components/CivilDateInput'
+import { useToast } from '../../lib/toast'
+import { ConfirmDialog, useConfirmDialog } from '../../components/ConfirmDialog'
+import { StatCard } from '../../components/StatCard'
+import { todayLocalIso } from '../../lib/dates'
+import type { VatRate, VatRateInput } from '../../types/api'
 
 type VatRateFormState = {
     rate_percent: string
@@ -20,22 +20,22 @@ type VatRateFormState = {
     valid_to?: string | null
 }
 
-const defaultForm: VatRateFormState = {
+const makeDefaultForm = (): VatRateFormState => ({
     rate_percent: '8.1',
     valid_from: todayLocalIso(),
     valid_to: null,
-}
+})
 
 // Stable empty array so the useMemo calls below keep consistent dependency references.
 const EMPTY_VAT_RATES: VatRate[] = []
 
-export function AdminVatSettingsPage() {
+export function VatSettingsSection() {
     const queryClient = useQueryClient()
     const { pushToast } = useToast()
     const { settings } = useAppSettings()
     const { t } = useTranslation()
     const { dialog, confirm, handleConfirm, handleCancel, isLoading: dialogLoading } = useConfirmDialog()
-    const [form, setForm] = useState<VatRateFormState>(defaultForm)
+    const [form, setForm] = useState<VatRateFormState>(() => makeDefaultForm())
     const [editingId, setEditingId] = useState<number | null>(null)
 
     const vatRatesQuery = useQuery({
@@ -63,7 +63,7 @@ export function AdminVatSettingsPage() {
         },
         onSuccess: (_, variables) => {
             void queryClient.invalidateQueries({ queryKey: queryKeys.auth.vatRates() })
-            setForm(defaultForm)
+            setForm(makeDefaultForm())
             setEditingId(null)
             pushToast(variables.id ? t('adminVatSettings.messages.updated') : t('adminVatSettings.messages.created'), 'success')
         },
@@ -80,7 +80,7 @@ export function AdminVatSettingsPage() {
     })
 
     function resetForm() {
-        setForm(defaultForm)
+        setForm(makeDefaultForm())
         setEditingId(null)
     }
 
@@ -102,15 +102,7 @@ export function AdminVatSettingsPage() {
     }
 
     return (
-        <div className="page-stack">
-            <header>
-                <p className="eyebrow">{t('adminVatSettings.eyebrow')}</p>
-                <h2>{t('adminVatSettings.title')}</h2>
-                <p className="muted">
-                    {t('adminVatSettings.description')}
-                </p>
-            </header>
-
+        <>
             <section
                 style={{
                     display: 'grid',
@@ -259,6 +251,6 @@ export function AdminVatSettingsPage() {
                     onCancel={handleCancel}
                 />
             )}
-        </div>
+        </>
     )
 }

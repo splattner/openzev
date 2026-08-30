@@ -25,7 +25,6 @@ export const it = {
         adminFeatures: 'Funzionalità',
         adminOAuth: 'Provider OAuth',
         adminSystemSettings: 'Impostazioni di sistema',
-        adminVatSettings: 'Impostazioni IVA',
         adminInvoices: 'Fatture',
         adminAuditLogs: 'Log di audit',
         auditLogs: 'Log di audit',
@@ -1897,7 +1896,7 @@ export const it = {
     adminSystemSettings: {
         eyebrow: 'Console di amministrazione',
         title: 'Impostazioni di sistema',
-        description: 'Gestisci da un unico punto i formati data globali, le funzionalità e i provider OAuth.',
+        description: 'Gestisci da un unico punto i formati data globali, le funzionalità, i provider OAuth e le aliquote IVA.',
         summary: {
             featureFlags: 'Feature flag',
             enabledFeatures: '{{count}} attive',
@@ -1918,6 +1917,10 @@ export const it = {
             oauth: {
                 label: 'OAuth',
                 description: 'Configura i provider di accesso sociale e centralizza le relative impostazioni.',
+            },
+            vat: {
+                label: 'IVA',
+                description: 'Aliquote IVA per periodo di validità; applicata a fine periodo solo con numero IVA.',
             },
         },
         regional: {
@@ -1940,9 +1943,6 @@ export const it = {
         },
     },
     adminVatSettings: {
-        eyebrow: 'Console di amministrazione',
-        title: 'Gestione IVA',
-        description: 'Gestisci le aliquote IVA globali per intervallo di validità. Le fatture usano l\'aliquota attiva alla fine del periodo di fatturazione, ma solo se il RCP ha un numero IVA.',
         createTitle: 'Aggiungi aliquota IVA',
         editTitle: 'Modifica aliquota IVA',
         listTitle: 'Aliquote IVA configurate',

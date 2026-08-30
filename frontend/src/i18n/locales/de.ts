@@ -25,7 +25,6 @@ export const de = {
         adminFeatures: 'Funktionen',
         adminOAuth: 'OAuth-Anbieter',
         adminSystemSettings: 'Systemeinstellungen',
-        adminVatSettings: 'MwSt.-Einstellungen',
         adminInvoices: 'Rechnungen',
         adminAuditLogs: 'Audit-Logs',
         auditLogs: 'Audit-Logs',
@@ -1897,7 +1896,7 @@ export const de = {
     adminSystemSettings: {
         eyebrow: 'Admin-Konsole',
         title: 'Systemeinstellungen',
-        description: 'Verwalten Sie globale Datumsformate, Feature-Flags und OAuth-Anbieter an einem Ort.',
+        description: 'Verwalten Sie globale Datumsformate, Feature-Flags, OAuth-Anbieter und MwSt.-Sätze an einem Ort.',
         summary: {
             featureFlags: 'Feature-Flags',
             enabledFeatures: '{{count}} aktiv',
@@ -1918,6 +1917,10 @@ export const de = {
             oauth: {
                 label: 'OAuth',
                 description: 'Konfigurieren Sie Social-Login-Anbieter und verwalten Sie deren Zugangsdaten zentral.',
+            },
+            vat: {
+                label: 'MwSt.',
+                description: 'MwSt.-Sätze nach Gültigkeitszeitraum; gilt am Periodenende nur mit MwSt.-Nummer.',
             },
         },
         regional: {
@@ -1940,9 +1943,6 @@ export const de = {
         },
     },
     adminVatSettings: {
-        eyebrow: 'Admin-Konsole',
-        title: 'MwSt.-Verwaltung',
-        description: 'Verwalten Sie globale MwSt.-Sätze nach Gültigkeitsbereich. Rechnungen verwenden den am Ende des Abrechnungszeitraums aktiven Satz, aber nur wenn der ZEV eine MwSt.-Nummer hat.',
         createTitle: 'MwSt.-Satz hinzufügen',
         editTitle: 'MwSt.-Satz bearbeiten',
         listTitle: 'Konfigurierte MwSt.-Sätze',
