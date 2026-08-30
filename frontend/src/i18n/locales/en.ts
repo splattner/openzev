@@ -198,7 +198,6 @@ export const en = {
     },
     email: {
         statistics: 'Email Statistics',
-        pendingEmails: 'Pending Emails',
         totalEmails: 'Total Emails',
         sent: 'Sent',
         pending: 'Pending',

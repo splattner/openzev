@@ -363,10 +363,11 @@ remain available as redirects into the corresponding tab of
 
 **File:** `frontend/src/pages/AdminDashboardPage.tsx`
 
-- Query: `useQuery({ queryKey: ['dashboard'], queryFn: fetchDashboardStats, refetchInterval: 30000 })` — auto-refreshes every 30 seconds.
-- Displays 4 key metric cards: total ZEVs, total participants, total revenue (CHF), pending emails (with failed count highlight).
-- Invoice status breakdown: 5-tile grid (`draft/approved/sent/paid/cancelled`) using the desaturated workflow palette from the invoice badges (`frontend/src/index.css` — `.status-tile-draft/.status-tile-cancelled` → `var(--status-neutral)`, `.status-tile-approved/.status-tile-sent` → `var(--status-info)`, `.status-tile-paid` → `var(--status-success)`) with dark ink text (`var(--ink-soft)` / `var(--success-700)`) instead of saturated fills with white text.
-- Email statistics: total/sent/pending/failed with colour-coded cards.
+- Query: `useQuery({ queryKey: queryKeys.invoices.dashboard(), queryFn: fetchDashboardStats, refetchInterval: 30000 })` — auto-refreshes every 30 seconds.
+- Header: `eyebrow` + `h2` (page-contract) inside `.page-stack`; loading/error/no-data states are inline (`muted` / `card error-banner`) without separate early returns so the header is always visible.
+- KPI row: three `StatCard` in `.grid.grid-3` — ZEVs, Participants, and Total revenue (`formatChf` from `frontend/src/lib/numbers.ts`, Swiss grouping `de-CH`, e.g. `CHF 1'234.56`) as the single dark `accent` card. Pending/failed email counts are deliberately not repeated here — they live in the Email Statistics breakdown below.
+- Invoice status breakdown: `card` with `h2` + 5-tile grid (`draft/approved/sent/paid/cancelled`) using the desaturated workflow palette from the invoice badges (`frontend/src/index.css` — `.status-tile-draft/.status-tile-cancelled` → `var(--status-neutral)`, `.status-tile-approved/.status-tile-sent` → `var(--status-info)`, `.status-tile-paid` → `var(--status-success)`) with dark ink text (`var(--ink-soft)` / `var(--success-700)`). Intentionally *not* `StatCard` — a flat status-color legend inside a card, like the email tiles.
+- Email statistics: `card` with `h2` + `.grid.grid-4` of four flat `StatCard` (`flat`, no card chrome) — `total` (no tone), `sent`/`pending`/`failed` (`flat` + conditional `tone="success"`/`"warning"`/`"danger"` only when the count is > 0; zero renders neutral to avoid alarmist coloring, unlike the always-colored invoice status legend).
 
 ### 9.4 AdminSystemSettingsPage
 

@@ -1020,6 +1020,31 @@ label {
   color: var(--brand-accent);
 }
 
+.stat-card--success h3 {
+  color: var(--success-600);
+}
+
+.stat-card--warning h3 {
+  color: var(--warning-800);
+}
+
+.stat-card--danger h3 {
+  color: var(--danger-600);
+}
+
+/* Flat: inside .card, no chrome. tone still colors h3. */
+.stat-card.stat-card--flat {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  padding: 0.5rem 0.25rem;
+}
+
+.stat-card.stat-card--flat:hover {
+  transform: none;
+  box-shadow: none;
+}
+
 /* ── Open invoices exception list (dashboard; spec §5.1) ── */
 
 .open-invoices-list {

@@ -189,7 +189,6 @@ export const it = {
     },
     email: {
         statistics: 'Statistiche e-mail',
-        pendingEmails: 'E-mail in sospeso',
         totalEmails: 'Totale e-mail',
         sent: 'Inviato',
         pending: 'In sospeso',

@@ -189,7 +189,6 @@ export const fr = {
     },
     email: {
         statistics: 'Statistiques e-mail',
-        pendingEmails: 'E-mails en attente',
         totalEmails: 'Total des e-mails',
         sent: 'Envoyé',
         pending: 'En attente',

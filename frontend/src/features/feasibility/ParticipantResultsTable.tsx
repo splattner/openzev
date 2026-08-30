@@ -1,12 +1,9 @@
 import { useTranslation } from 'react-i18next'
 import type { FeasibilityParticipantResult } from '../../types/api'
+import { formatChf, formatKwh } from '../../lib/numbers'
 
 type Props = {
     participants: FeasibilityParticipantResult[]
-}
-
-function chf(value: string): string {
-    return `CHF ${Number(value).toFixed(2)}`
 }
 
 export function ParticipantResultsTable({ participants }: Props) {
@@ -30,11 +27,11 @@ export function ParticipantResultsTable({ participants }: Props) {
                     {participants.map((p) => (
                         <tr key={p.name} style={{ borderBottom: '1px solid var(--border-subtle)' }}>
                             <td style={{ padding: '0.4rem 0.6rem' }}>{p.name}</td>
-                            <td style={{ textAlign: 'right', padding: '0.4rem 0.6rem' }}>{Number(p.annual_production_kwh).toFixed(0)} kWh</td>
-                            <td style={{ textAlign: 'right', padding: '0.4rem 0.6rem' }}>{Number(p.annual_consumption_kwh).toFixed(0)} kWh</td>
-                            <td style={{ textAlign: 'right', padding: '0.4rem 0.6rem' }}>{chf(p.producer_gain_chf)}</td>
-                            <td style={{ textAlign: 'right', padding: '0.4rem 0.6rem' }}>{chf(p.consumer_savings_chf)}</td>
-                            <td style={{ textAlign: 'right', padding: '0.4rem 0.6rem', fontWeight: 600 }}>{chf(p.net_benefit_chf)}</td>
+                            <td style={{ textAlign: 'right', padding: '0.4rem 0.6rem' }}>{formatKwh(Number(p.annual_production_kwh), { maxDecimals: 0 })} kWh</td>
+                            <td style={{ textAlign: 'right', padding: '0.4rem 0.6rem' }}>{formatKwh(Number(p.annual_consumption_kwh), { maxDecimals: 0 })} kWh</td>
+                            <td style={{ textAlign: 'right', padding: '0.4rem 0.6rem' }}>{formatChf(Number(p.producer_gain_chf))}</td>
+                            <td style={{ textAlign: 'right', padding: '0.4rem 0.6rem' }}>{formatChf(Number(p.consumer_savings_chf))}</td>
+                            <td style={{ textAlign: 'right', padding: '0.4rem 0.6rem', fontWeight: 600 }}>{formatChf(Number(p.net_benefit_chf))}</td>
                         </tr>
                     ))}
                 </tbody>

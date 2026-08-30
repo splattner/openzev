@@ -25,12 +25,9 @@ import {
 } from '../features/feasibility/useFeasibilityForm'
 import { calculateFeasibility } from '../lib/api/feasibility'
 import { formatApiError } from '../lib/api/errors'
+import { formatChf, formatKwh } from '../lib/numbers'
 
 const DEBOUNCE_MS = 400
-
-function chf(value: string): string {
-    return `CHF ${Number(value).toFixed(2)}`
-}
 
 export function FeasibilityCalculatorPage() {
     const { t } = useTranslation()
@@ -240,7 +237,7 @@ export function FeasibilityCalculatorPage() {
                                     transition: 'opacity 0.15s',
                                 }}
                             >
-                                <StatCard label={t('pages.feasibility.results.annualNetBenefit')} value={chf(result.annual_net_benefit_chf)} />
+                                <StatCard label={t('pages.feasibility.results.annualNetBenefit')} value={formatChf(Number(result.annual_net_benefit_chf))} />
                                 <StatCard
                                     label={t('pages.feasibility.results.payback')}
                                     value={result.payback_years !== null ? t('pages.feasibility.results.years', { count: Number(result.payback_years).toFixed(1) }) : t('pages.feasibility.results.never')}
@@ -249,8 +246,8 @@ export function FeasibilityCalculatorPage() {
                                     label={t('pages.feasibility.results.roi')}
                                     value={result.roi !== null ? `${(Number(result.roi) * 100).toFixed(1)}%` : '—'}
                                 />
-                                <StatCard label={t('pages.feasibility.results.npv')} value={chf(result.npv_chf)} hint={t('pages.feasibility.results.npvHint')} />
-                                <StatCard label={t('pages.feasibility.results.selfConsumed')} value={`${Number(result.self_consumed_kwh).toFixed(0)} kWh`} />
+                                <StatCard label={t('pages.feasibility.results.npv')} value={formatChf(Number(result.npv_chf))} hint={t('pages.feasibility.results.npvHint')} />
+                                <StatCard label={t('pages.feasibility.results.selfConsumed')} value={`${formatKwh(Number(result.self_consumed_kwh), { maxDecimals: 0 })} kWh`} />
                                 <StatCard label={t('pages.feasibility.results.autarky')} value={`${(Number(result.autarky_rate) * 100).toFixed(0)}%`} />
                             </section>
 
@@ -259,15 +256,15 @@ export function FeasibilityCalculatorPage() {
                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                                     <div>
                                         <p className="eyebrow">{t('pages.feasibility.results.consumers')}</p>
-                                        <p style={{ margin: 0 }}>{t('pages.feasibility.results.baselineCost')}: {chf(result.baseline_consumer_cost_chf)}</p>
-                                        <p style={{ margin: 0 }}>{t('pages.feasibility.results.vzevCost')}: {chf(result.vzev_consumer_cost_chf)}</p>
-                                        <p style={{ margin: '0.3rem 0 0', fontWeight: 600 }}>{t('pages.feasibility.results.savings')}: {chf(result.consumer_savings_chf)}</p>
+                                        <p style={{ margin: 0 }}>{t('pages.feasibility.results.baselineCost')}: {formatChf(Number(result.baseline_consumer_cost_chf))}</p>
+                                        <p style={{ margin: 0 }}>{t('pages.feasibility.results.vzevCost')}: {formatChf(Number(result.vzev_consumer_cost_chf))}</p>
+                                        <p style={{ margin: '0.3rem 0 0', fontWeight: 600 }}>{t('pages.feasibility.results.savings')}: {formatChf(Number(result.consumer_savings_chf))}</p>
                                     </div>
                                     <div>
                                         <p className="eyebrow">{t('pages.feasibility.results.producer')}</p>
-                                        <p style={{ margin: 0 }}>{t('pages.feasibility.results.baselineRevenue')}: {chf(result.baseline_producer_revenue_chf)}</p>
-                                        <p style={{ margin: 0 }}>{t('pages.feasibility.results.vzevRevenue')}: {chf(result.vzev_producer_revenue_chf)}</p>
-                                        <p style={{ margin: '0.3rem 0 0', fontWeight: 600 }}>{t('pages.feasibility.results.gain')}: {chf(result.producer_gain_chf)}</p>
+                                        <p style={{ margin: 0 }}>{t('pages.feasibility.results.baselineRevenue')}: {formatChf(Number(result.baseline_producer_revenue_chf))}</p>
+                                        <p style={{ margin: 0 }}>{t('pages.feasibility.results.vzevRevenue')}: {formatChf(Number(result.vzev_producer_revenue_chf))}</p>
+                                        <p style={{ margin: '0.3rem 0 0', fontWeight: 600 }}>{t('pages.feasibility.results.gain')}: {formatChf(Number(result.producer_gain_chf))}</p>
                                     </div>
                                 </div>
                             </section>
