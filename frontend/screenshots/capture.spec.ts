@@ -548,4 +548,15 @@ test.describe('User Guide Screenshots', () => {
     await page.waitForSelector('.data-table, .card', { timeout: 10_000 })
     await screenshotFull(page, '17-admin-invoices')
   })
+
+  // 23 — Reports (owner view on the demo ZEV)
+  test('23-reports', async ({ page }) => {
+    if (!(await pinDemoZev(page))) {
+      test.skip()
+      return
+    }
+    await navigateTo(page, '/reports')
+    await page.waitForSelector('.card', { timeout: 10_000 })
+    await screenshotFull(page, '23-reports')
+  })
 })

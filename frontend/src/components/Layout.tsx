@@ -6,6 +6,7 @@ import { useAuth } from '../lib/auth'
 import { useManagedZev } from '../lib/managedZev'
 import { fetchUsers } from '../lib/api/auth'
 import { queryKeys } from '../lib/api/queryKeys'
+import type { UserRole } from '../types/api'
 import { LanguageSelector } from './LanguageSelector'
 import pkg from '../../package.json'
 
@@ -14,6 +15,14 @@ const MANAGE_SECTION_PREFIXES = ['/participants', '/zev-settings', '/metering-po
 
 function isManageSectionPath(pathname: string): boolean {
     return MANAGE_SECTION_PREFIXES.some((prefix) => pathname.startsWith(prefix))
+}
+
+/**
+ * Nav visibility for /reports: admins and owners get the whole-ZEV view,
+ * participants their own statement — matching the route's allowedRoles.
+ */
+export function canSeeReports(role: UserRole | undefined): boolean {
+    return role === 'admin' || role === 'zev_owner' || role === 'participant'
 }
 
 export function Layout() {
@@ -209,6 +218,17 @@ export function Layout() {
                             >
                                 <span className="nav-icon"><InvoiceIcon /></span>
                                 <span className="nav-label">{t('nav.invoices')}</span>
+                            </NavLink>
+                        )}
+
+                        {canSeeReports(user?.role) && (
+                            <NavLink
+                                to="/reports"
+                                className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}
+                                title={t('nav.reports')}
+                            >
+                                <span className="nav-icon"><ReportsIcon /></span>
+                                <span className="nav-label">{t('nav.reports')}</span>
                             </NavLink>
                         )}
 
@@ -538,6 +558,10 @@ function PdfIcon() {
 
 function MailIcon() {
     return <IconSvg path="M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Zm0 2 8 5 8-5" />
+}
+
+function ReportsIcon() {
+    return <IconSvg path="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zM14 2v6h6M8 13h8M8 17h8M8 9h3" />
 }
 
 function AccountIcon() {

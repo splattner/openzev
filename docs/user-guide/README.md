@@ -26,7 +26,7 @@ Welcome to the OpenZEV user documentation. This guide covers everything you need
 ## Billing and Invoicing
 
 - **[How Energy Allocation and Billing Works](08-billing-allocation-explained.md)** — Understand the timestamp-level allocation model
-- **[Invoice Management](09-invoice-management.md)** — Lifecycle, PDF generation, and tracking
+- **[Invoice Management](09-invoice-management.md)** — Lifecycle, PDF generation, tracking, and yearly reports (annual statements, tax overviews)
 - **[Email Configuration](10-email-configuration.md)** — Templates, delivery, and resend behavior
 
 ## Administration

@@ -18,6 +18,7 @@ const AuditLogsPage = lazy(async () => ({ default: (await import('./pages/AdminA
 const AdminSystemSettingsPage = lazy(async () => ({ default: (await import('./pages/AdminSystemSettingsPage')).AdminSystemSettingsPage }))
 const DashboardPage = lazy(async () => ({ default: (await import('./pages/DashboardPage')).DashboardPage }))
 const ImportsPage = lazy(async () => ({ default: (await import('./pages/ImportsPage')).ImportsPage }))
+const ReportsPage = lazy(async () => ({ default: (await import('./pages/ReportsPage')).ReportsPage }))
 const InvoiceDetailPage = lazy(async () => ({ default: (await import('./pages/InvoiceDetailPage')).InvoiceDetailPage }))
 const InvoicesPage = lazy(async () => ({ default: (await import('./pages/InvoicesPage')).InvoicesPage }))
 const LoginPage = lazy(async () => ({ default: (await import('./pages/LoginPage')).LoginPage }))
@@ -182,6 +183,14 @@ function App() {
               }
             />
             <Route path="invoices/:invoiceId" element={<InvoiceDetailPage />} />
+            <Route
+              path="reports"
+              element={
+                <ProtectedRoute allowedRoles={['admin', 'zev_owner', 'participant']}>
+                  <ReportsPage />
+                </ProtectedRoute>
+              }
+            />
             <Route
               path="feasibility"
               element={

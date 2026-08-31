@@ -2151,6 +2151,10 @@ h3 {
   color: var(--danger-700);
 }
 
+.error-text {
+  color: var(--danger-700);
+}
+
 .warning-banner {
   padding: 0.9rem 1rem;
   border-radius: 0.85rem;

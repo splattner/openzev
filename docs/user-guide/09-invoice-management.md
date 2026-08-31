@@ -156,6 +156,18 @@ Invoices can be deleted to clean up incorrect or test data.
 
 Deletion is permanent; the invoice is removed from the database.
 
+## Annual Statements and Tax Overviews (Reports)
+
+The **Reports** page (`/reports`, sidebar entry **Berichte** / **Reports**) bundles the yearly document downloads that were previously scattered across the dashboard:
+
+![Reports page](screenshots/23-reports.png)
+
+- Pick a **year** in the selector at the top (defaults to the last completed year) — both cards download for that year.
+- **Annual Statement** — as **admin or ZEV owner**: all participants' statements of the selected ZEV as one **ZIP archive**. As **participant**: your own statement as a **PDF**.
+- **Tax Overview** — yearly tax overview for producers (net local-energy revenue and feed-in compensation) as a **PDF**.
+
+The header shows the currently selected ZEV. Reports are only available once a ZEV is selected; participants always receive their own documents.
+
 ## Troubleshooting
 
 ### No participants appear in the period overview

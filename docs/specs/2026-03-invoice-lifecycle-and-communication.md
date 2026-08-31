@@ -242,6 +242,18 @@ the same module.
 | `POST` | `/invoices/send-all/` | `IsZevOwnerOrAdmin` | Queue emails for all approved invoices in a ZEV period; returns `{queued, skipped}`; audit-logged (`invoice.send_all`, status `queued`) |
 | `POST` | `/invoices/download-pdfs/` | `IsZevOwnerOrAdmin` | Download all period invoice PDFs as a single ZIP (`{invoice_number}.pdf` entries); `404` when the period has no PDFs |
 
+#### Annual statement / financial summary downloads (frontend location)
+
+The three download endpoints below are consumed from the **/reports** route (`frontend/src/pages/ReportsPage.tsx`). No backend change.
+
+| Method | URL | Permission | Frontend usage |
+|---|---|---|---|
+| `GET` | `/invoices/invoices/annual-statement/` | Authenticated (participant sees own, admin/owner ZEV-scoped) | Participant "My annual statement" card: `downloadAnnualStatement({year})` (no `zev_id`, backend scopes by participant) |
+| `GET` | `/invoices/invoices/annual-statements-zip/` | `IsZevOwnerOrAdmin` | Admin/owner "Annual statements" card: `downloadAllAnnualStatements({year, zev_id})` — ZIP of all participants for the selected ZEV |
+| `GET` | `/invoices/invoices/financial-summary/` | Authenticated (optional `zev_id` / `participant_id`) | Both roles: `downloadFinancialSummary({year, zev_id?})` — `zev_id` supplied for admin/owner, omitted for participant |
+
+Role branches mirror the former dashboard behavior.
+
 ### 5.5 Period overview
 
 | Method | URL | Permission | Query params |
