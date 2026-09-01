@@ -201,7 +201,7 @@ All invoice endpoints are routed under `/api/v1/invoices/invoices/` via a DRF `G
 
 | Method | URL | Permission | Description |
 |---|---|---|---|
-| `GET` | `/invoices/` | Authenticated | List invoices (scoped by role, see §6); optional `status` filter — comma-separated `InvoiceStatus` values (e.g. `approved,sent`), conjunctive with role/`zev_id` scoping; unknown → `400` with `status` in the body |
+| `GET` | `/invoices/` | Authenticated | List invoices (scoped by role, see §6); optional `status` filter — comma-separated `InvoiceStatus` values (e.g. `approved,sent`), conjunctive with role/`zev_id` scoping; unknown → `400` with `status` in the body. Uses `InvoiceListSerializer` — **no** nested `items`/`email_logs` (see §9.1) |
 | `GET` | `/invoices/{id}/` | Authenticated | Retrieve single invoice (with items + email_logs) |
 | `DELETE` | `/invoices/{id}/` | ZEV owner or admin | Delete (see §4.5 rules) |
 
@@ -577,13 +577,20 @@ Both the PDF rendering and the API serializer strip these suffixes using
 
 ## 9. Serialization
 
-### 9.1 InvoiceSerializer
+### 9.1 InvoiceListSerializer / InvoiceSerializer
 
-Returns all invoice fields plus:
+Two shapes, split by cost. `InvoiceListSerializer` returns all invoice fields plus:
+- `participant_name`: derived from `participant.full_name`.
+- `zev_name`: derived from `zev.name`.
+- `pdf_url`: absolute URL to PDF file (or `null`).
+
+`InvoiceSerializer` subclasses it and adds the nested read-only relations:
 - `items`: nested `InvoiceItemSerializer` (read-only).
 - `email_logs`: nested `EmailLogSerializer` (read-only).
-- `participant_name`: derived from `participant.full_name`.
-- `pdf_url`: absolute URL to PDF file (or `null`).
+
+`InvoiceViewSet.get_serializer_class()` returns the list variant for `action == "list"` and the full one everywhere else (retrieve, the workflow actions that echo an invoice back, and `compute_period_overview`, which builds `InvoiceSerializer` directly). `get_queryset()` matches: the `prefetch_related("items", "email_logs")` is applied for every action *except* `list`, so the database cost drops with the payload rather than being paid for fields that are no longer rendered.
+
+The split exists because the list is the one unbounded read: `AdminInvoicesPage` passes no ZEV filter and walks every invoice in the instance one page at a time, so each nested line item and email-log row is paid for once per invoice across the whole dataset. Measured on 50 invoices × 8 items, one page went from 151.4 KiB to 33.2 KiB (4.6×, 78% smaller) and from 4 queries to 2; at the client walker's 200-page cap that is 29.6 MiB → 6.5 MiB. No list consumer reads the nested arrays — `AdminInvoicesPage` renders `invoice_number`/`zev_name`/`participant_name`/period/`total_chf`/`status`, `DashboardPage` reads `status`/`pdf_url`/`period_*`/`total_chf`. In `frontend/src/types/api.ts` both fields are already optional (`items?`, `email_logs?`), so no frontend change was required. See #488.
 
 Read-only fields: `id`, `invoice_number`, `created_at`, `updated_at`, `pdf_file`, plus all billing-engine/workflow fields that never come from client input: `status`, `total_local_kwh`, `total_grid_kwh`, `total_feed_in_kwh`, `subtotal_chf`, `vat_rate`, `vat_chf`, `total_chf`, `period_start`, `period_end`, `zev`, `participant`, `sent_at`, `due_date`. Generic create/update/partial_update endpoints are not exposed; creation happens only via `generate`/`generate-all`, mutations only via the workflow actions.
 

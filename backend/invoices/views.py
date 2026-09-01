@@ -15,7 +15,8 @@ from zev.models import Zev, Participant
 from zev.scoping import ZevScopedQuerySetMixin
 from .models import Invoice, InvoiceStatus, EmailLog
 from .serializers import (
-    InvoiceSerializer, GenerateInvoiceSerializer, GenerateZevInvoicesSerializer
+    InvoiceListSerializer, InvoiceSerializer, GenerateInvoiceSerializer,
+    GenerateZevInvoicesSerializer
 )
 from .engine import generate_invoice
 from .pdf import save_invoice_pdf
@@ -80,11 +81,24 @@ class InvoiceViewSet(
     zev_owner_filter = "zev__owner"
     participant_filter = "participant__user"
 
+    def get_serializer_class(self):
+        # The list is the one unbounded read here — the admin invoice view has
+        # no ZEV filter, so it walks every invoice in the instance — and none
+        # of its consumers touch the nested items or email logs. Detail reads
+        # and the workflow actions keep the full serializer.
+        if getattr(self, "action", None) == "list":
+            return InvoiceListSerializer
+        return super().get_serializer_class()
+
     def get_queryset(self):
         # Participants see only their own invoices.
-        return self.scope_queryset(
-            Invoice.objects.select_related("participant", "zev").prefetch_related("items", "email_logs")
-        )
+        queryset = Invoice.objects.select_related("participant", "zev")
+        # Prefetching what the list serializer does not render would keep the
+        # database cost the payload change just removed. getattr because schema
+        # generation instantiates the view without an action.
+        if getattr(self, "action", None) != "list":
+            queryset = queryset.prefetch_related("items", "email_logs")
+        return self.scope_queryset(queryset)
 
     def filter_queryset(self, queryset):
         # ?status= is a list-view filter, not scoping: it only narrows this
