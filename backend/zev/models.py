@@ -110,7 +110,7 @@ class Zev(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        ordering = ["name"]
+        ordering = ["name", "id"]
 
     def __str__(self):
         return f"{self.name} ({self.get_zev_type_display()})"
@@ -189,7 +189,7 @@ class Participant(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        ordering = ["last_name", "first_name"]
+        ordering = ["last_name", "first_name", "id"]
 
     @property
     def full_name(self):
@@ -267,7 +267,7 @@ class MeteringPointAssignment(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        ordering = ["-valid_from", "-created_at"]
+        ordering = ["-valid_from", "-created_at", "id"]
         constraints = [
             models.UniqueConstraint(
                 fields=["metering_point", "participant", "valid_from"],

@@ -79,7 +79,7 @@ class InvoiceItem(models.Model):
     sort_order = models.PositiveSmallIntegerField(default=0)
 
     class Meta:
-        ordering = ["sort_order", "item_type", "description"]
+        ordering = ["sort_order", "item_type", "description", "id"]
 
     def __str__(self):
         return f"{self.description}: {self.quantity_kwh} {self.unit} × {self.unit_price_chf} = {self.total_chf} CHF"
@@ -157,7 +157,7 @@ class ContractIssue(models.Model):
     )
 
     class Meta:
-        ordering = ["-version"]
+        ordering = ["-version", "id"]
         constraints = [
             models.UniqueConstraint(
                 fields=["participant", "version"], name="uniq_contract_issue_participant_version"
@@ -265,4 +265,4 @@ class EmailLog(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        ordering = ["-created_at"]
+        ordering = ["-created_at", "id"]

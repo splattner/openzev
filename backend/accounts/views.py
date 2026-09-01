@@ -188,7 +188,11 @@ class UserDetailView(AuditedUpdateMixin, generics.RetrieveUpdateDestroyAPIView):
 
 
 class VatRateListCreateView(generics.ListCreateAPIView):
-    queryset = VatRate.objects.all().order_by("-valid_from", "-created_at")
+    # Trailing "id": an .order_by() replaces Meta.ordering outright, so the
+    # model-level tiebreaker does not reach this paginated list. Without it two
+    # rates sharing valid_from and created_at can straddle a page boundary and
+    # come back twice, or not at all.
+    queryset = VatRate.objects.all().order_by("-valid_from", "-created_at", "id")
     permission_classes = [IsAdmin]
 
     serializer_class = VatRateSerializer
@@ -710,7 +714,10 @@ class AdminApiKeyListView(generics.ListAPIView):
     _VALID_STATUSES = ("active", "revoked")
 
     def get_queryset(self):
-        queryset = ApiKey.objects.select_related("user").order_by("-created_at")
+        # Trailing "id" for the same reason as VatRateListCreateView: this
+        # .order_by() replaces Meta.ordering, and created_at alone is not
+        # unique, so a paginated walk could drop or duplicate a key.
+        queryset = ApiKey.objects.select_related("user").order_by("-created_at", "id")
 
         user_id = self.request.query_params.get("user")
         if user_id:

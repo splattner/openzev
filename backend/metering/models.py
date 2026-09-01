@@ -38,7 +38,7 @@ class MeterReading(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        ordering = ["metering_point", "timestamp"]
+        ordering = ["metering_point", "timestamp", "id"]
         constraints = [
             models.UniqueConstraint(
                 fields=["metering_point", "timestamp", "direction"],
@@ -77,7 +77,7 @@ class ImportLog(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        ordering = ["-created_at"]
+        ordering = ["-created_at", "id"]
 
     def __str__(self):
         target = self.zev.name if self.zev else "multiple/unknown ZEV"

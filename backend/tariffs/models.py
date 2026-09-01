@@ -75,7 +75,7 @@ class Tariff(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        ordering = ["zev", "category", "name", "-valid_from"]
+        ordering = ["zev", "category", "name", "-valid_from", "id"]
 
     def clean(self):
         errors = {}
@@ -155,7 +155,7 @@ class TariffPeriod(models.Model):
     )
 
     class Meta:
-        ordering = ["period_type"]
+        ordering = ["period_type", "id"]
 
     def __str__(self):
         return f"{self.tariff.name} / {self.get_period_type_display()} @ {self.price_chf_per_kwh} CHF/kWh"

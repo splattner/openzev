@@ -84,7 +84,7 @@ class AuditEvent(models.Model):
     metadata_json = models.JSONField(default=dict, blank=True)
 
     class Meta:
-        ordering = ["-created_at"]
+        ordering = ["-created_at", "id"]
         indexes = [
             models.Index(fields=["created_at"], name="audit_evt_created_idx"),
             models.Index(fields=["zev", "created_at"], name="audit_evt_zev_created_idx"),

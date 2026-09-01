@@ -72,7 +72,7 @@ class ApiKey(models.Model):
     revoked_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
-        ordering = ["-created_at"]
+        ordering = ["-created_at", "id"]
         indexes = [models.Index(fields=["user", "-created_at"], name="apikey_user_created_idx")]
 
     def __str__(self):
@@ -103,7 +103,7 @@ class EmailVerificationToken(models.Model):
     consumed_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
-        ordering = ['-created_at']
+        ordering = ["-created_at", "id"]
 
     def is_valid(self) -> bool:
         if self.consumed_at:
@@ -299,7 +299,7 @@ class SocialAccount(models.Model):
 
     class Meta:
         unique_together = ("provider", "uid")
-        ordering = ["provider__name"]
+        ordering = ["provider__name", "id"]
 
     def __str__(self):
         return f"{self.user} @ {self.provider}"
@@ -343,7 +343,7 @@ class VatRate(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        ordering = ["-valid_from", "-created_at"]
+        ordering = ["-valid_from", "-created_at", "id"]
 
     def clean(self):
         if self.valid_to and self.valid_to < self.valid_from:

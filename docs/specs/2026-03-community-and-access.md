@@ -147,6 +147,35 @@ Covered in `2026-03-metering-point-management.md`. Relevant to access:
 - Assignments are constrained within the participant's own validity window.
 - Only one active assignment per metering point at a time.
 
+### 3.7 List ordering must be a total order
+
+Every DRF list endpoint is paginated by the project default
+(`PageNumberPagination`, `PAGE_SIZE = 50`), which is `LIMIT`/`OFFSET`. Page 1
+and page 2 are separate queries, and Postgres makes no promise about the
+relative order of rows that tie on the `ORDER BY` key across separate queries.
+A tie straddling a page boundary can therefore come back on *both* pages or on
+*neither* — silently, with no error.
+
+This was latent while clients only ever fetched page 1. Once the frontend
+started walking the whole chain (`fetchAllPages`, #484), "the complete set"
+could quietly be missing a row (#489).
+
+**Rule:** every `Meta.ordering` must reach a unique column — in practice by
+appending `"id"` unless a unique field is already in the list
+(`MeteringPoint.meter_id`, `FeatureFlag.name`, `OAuthProvider.name`,
+`User.username` are the exceptions that need nothing). The same applies to any
+`.order_by()` in a view, which **replaces** `Meta.ordering` outright rather
+than extending it, so a model-level tiebreaker does not reach it —
+`VatRateListCreateView` and `AdminApiKeyListView` sort for themselves and
+carry their own trailing `"id"`.
+
+Changing `Meta.ordering` generates an `AlterModelOptions` migration, which is
+metadata only and a no-op against the database.
+
+Both halves are pinned by `backend/testing/test_pagination_ordering.py`: a
+model-level check that walks every model in the project's own apps, and
+per-view checks driven through a real request.
+
 ---
 
 ## 4. Roles and permission classes
