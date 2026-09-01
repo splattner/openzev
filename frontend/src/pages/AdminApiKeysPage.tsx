@@ -97,10 +97,9 @@ export function AdminApiKeysPage() {
 
             <section className="card">
                 <div className="form-grid" style={{ gap: '1rem' }}>
-                    <div className="form-group">
-                        <label htmlFor="api-key-user-filter">{t('pages.adminApiKeys.filterUser')}</label>
+                    <label>
+                        <span>{t('pages.adminApiKeys.filterUser')}</span>
                         <select
-                            id="api-key-user-filter"
                             value={userFilter === '' ? '' : String(userFilter)}
                             onChange={(event) =>
                                 setUserFilter(event.target.value === '' ? '' : Number(event.target.value))
@@ -113,12 +112,11 @@ export function AdminApiKeysPage() {
                                 </option>
                             ))}
                         </select>
-                    </div>
+                    </label>
 
-                    <div className="form-group">
-                        <label htmlFor="api-key-status-filter">{t('pages.adminApiKeys.filterStatus')}</label>
+                    <label>
+                        <span>{t('pages.adminApiKeys.filterStatus')}</span>
                         <select
-                            id="api-key-status-filter"
                             value={statusFilter}
                             onChange={(event) => setStatusFilter(event.target.value as StatusFilter)}
                         >
@@ -126,7 +124,7 @@ export function AdminApiKeysPage() {
                             <option value="active">{t('pages.adminApiKeys.statusActive')}</option>
                             <option value="revoked">{t('pages.adminApiKeys.statusRevoked')}</option>
                         </select>
-                    </div>
+                    </label>
                 </div>
             </section>
 
@@ -182,7 +180,7 @@ export function AdminApiKeysPage() {
                                             {!key.is_revoked && (
                                                 <button
                                                     type="button"
-                                                    className="button button-sm button-danger"
+                                                    className="button button-compact button-danger"
                                                     disabled={revokeMutation.isPending}
                                                     onClick={() => handleRevoke(key)}
                                                 >
