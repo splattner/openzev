@@ -42,8 +42,6 @@ export function TransferSectionPicker({
         const count = counts?.[section.name]
 
         return (
-          // .checkbox-row is what stops the global `input { width: 100% }`
-          // from stretching the box and pushing the label to the far right.
           <label
             key={section.name}
             className="checkbox-row"

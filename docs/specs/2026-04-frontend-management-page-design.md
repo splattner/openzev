@@ -118,7 +118,17 @@ language and should be reused instead of ad hoc page-local CSS when possible:
 | `.empty-state` | Empty-state layout (`display:grid; gap:0.75rem` inside `.card`); retired inline-style version from `InvoicesEmptyState` |
 | `.skeleton-block` | Skeleton item radius/spacing bound to tokens; `prefers-reduced-motion: reduce` disables Mantine shimmer via `useReducedMotion() → animate={false}` + `.skeleton-block` CSS |
 | `.skeleton-table-rows` | Grid for `PageSkeleton` table rows (`display:grid; gap:0.6rem`); shared by `table` and `tableRows` variants |
+| `.checkbox-row` | Flex row for a checkbox and its label (`display:flex; align-items:center; gap:0.6rem`) |
 | `.participant-*`, `.metering-*`, `.tariff-*`, `.invoice-*` | Page-family-specific structural patterns that are already in active use |
+
+Form controls: the base `input, select` rule sets `width: 100%`, which is
+written for text fields. `input[type="checkbox"]` and `input[type="radio"]`
+are excluded back to `width: auto` — without that exclusion a checkbox
+stretches across its flex row and pushes its own label to the far right, where
+it wraps (#490). The remaining declarations in that rule (padding, border,
+background) are ignored by the native controls and need no reset. Guarded by
+`frontend/tests/form-control-widths.test.ts`, which resolves the cascade in
+jsdom.
 
 Tables additionally follow the operational contract introduced by the UI
 redesign: sticky `thead`, 36px row rhythm, row-hover on `var(--surface)`, and

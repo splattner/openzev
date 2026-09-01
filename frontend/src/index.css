@@ -51,6 +51,15 @@ select {
   background: var(--white);
 }
 
+/* The rule above is written for text fields. A checkbox or radio inheriting
+   width: 100% stretches across its flex row and shoves its own label to the
+   far right, where it wraps — so restore their intrinsic size. The other
+   declarations above are ignored by the native control and need no reset. */
+input[type="checkbox"],
+input[type="radio"] {
+  width: auto;
+}
+
 label {
   display: grid;
   gap: 0.4rem;
@@ -2076,10 +2085,6 @@ h3 {
   display: flex;
   align-items: center;
   gap: 0.6rem;
-}
-
-.checkbox-row input {
-  width: auto;
 }
 
 .toast-stack {
