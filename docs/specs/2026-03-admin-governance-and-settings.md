@@ -280,14 +280,16 @@ Template variable resolution:
 Uses `CONTRACT_TEMPLATE_NAME = "contracts/participant_contract_pdf.html"` rendered with WeasyPrint.
 
 **Snapshot issuance (redesign, SPEC-2026-08-contract-pdf-redesign):** the
-download endpoint `GET /api/v1/zev/participants/{pk}/contract-pdf/` no longer
+download endpoint `POST /api/v1/zev/participants/{pk}/contract-pdf/` no longer
 generates a throwaway render — it issues or reuses a persisted versioned
 snapshot (`ContractIssue`, migration `invoices/0010`): first download
 mints version 1 with a per-ZEV document number `CTR-YYYY-NNNN`
 (`Zev.contract_counter`, migration `zev/0017`), unchanged re-downloads reuse
 the frozen PDF, data changes mint a new version, and every receipt is
 audited (`contract.issue` / `contract.download`). The response filename
-carries the version: `contract_{last}_{first}_v{n}.pdf`.
+carries the version: `contract_{last}_{first}_v{n}.pdf`. `GET` on the same
+path is a pure read of an already-issued snapshot — issuance is a `POST` so
+the write stays under CSRF protection (#448).
 
 **Multi-language support:** `CONTRACT_TRANSLATIONS` dict with keys `de`, `fr`, `it`, `en`. Language is determined by `zev.invoice_language or "de"`.
 

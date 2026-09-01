@@ -85,13 +85,28 @@ Unchanged from the invoice lifecycle spec (§5.7 of
 | `participant` | Download only their own contract PDF |
 | `guest` | None |
 
-Download endpoint: `GET /api/v1/zev/participants/{pk}/contract-pdf/` — DRF action
+Endpoint: `/api/v1/zev/participants/{pk}/contract-pdf/` — DRF action
 `ParticipantViewSet.contract_pdf` (`zev/views.py`), `IsAuthenticated` plus a
 manual check: `is_admin` or `is_zev_owner` may fetch any participant;
 otherwise `participant.user == request.user` is required (403 otherwise).
 Response is a streamed `application/pdf` attachment named
 `contract_{last_name}_{first_name}_v{version}.pdf` (versioned snapshot, see
 §13).
+
+The read and the write are split across two methods:
+
+| Method | Behaviour |
+| --- | --- |
+| `GET` | Pure read. Streams the latest existing snapshot; `404` when the contract has never been issued. Never mints a version. |
+| `POST` | Issues: version 1 on first use, the frozen snapshot when nothing changed, a new numbered version when the data or template did. |
+
+Issuance is a `POST` because it writes — it mints a per-ZEV document number
+under a row lock, creates a `ContractIssue`, and attributes a `contract.issue`
+audit event to the caller. As a `GET` it was forgeable: `SameSite=Lax` still
+sends the auth cookies on a cross-site top-level navigation, and CSRF
+enforcement deliberately exempts safe methods
+(`CookieJWTAuthentication.authenticate`), so a link on an external page clicked
+by a logged-in owner issued a contract in their name (#448).
 
 Template admin endpoints: `GET|PATCH|DELETE
 /api/v1/invoices/invoices/contract-pdf-template/` — `PdfTemplateView`
@@ -506,7 +521,13 @@ real PDFs (WeasyPrint) and asserting markup with the `<style>` blocks stripped
 | `test_data_change_bumps_version_and_number` | A tariff change mints version 2 with `CTR-2026-0002` and different bytes |
 | `test_document_number_sequence_is_per_zev` | Two ZEVs each start at `CTR-2026-0001` |
 | `test_new_issue_renders_the_stable_document_number_in_the_pdf` | The rendered document embeds the stable `document_id` |
-| `test_contract_pdf_endpoint_streams_the_issued_snapshot` | `GET /api/v1/zev/participants/{pk}/contract-pdf/` streams `application/pdf`, filename carries `_v1`, unchanged re-download adds no issue but writes a `contract.download` audit event |
+| `test_contract_pdf_endpoint_streams_the_issued_snapshot` | `POST /api/v1/zev/participants/{pk}/contract-pdf/` streams `application/pdf`, filename carries `_v1`, unchanged re-download adds no issue but writes a `contract.download` audit event |
+| `test_get_streams_the_existing_snapshot_without_issuing` | `GET` serves the issued snapshot and mints nothing |
+| `test_get_404s_before_the_contract_has_been_issued` | `GET` with no prior issuance returns 404 and creates no `ContractIssue` |
+| `test_get_serves_the_latest_version_after_a_reissue` | `GET` streams `_v2` once a data change has been issued |
+| `ContractPdfCsrfTests::test_cookie_get_never_issues_a_contract` | The forged cross-site request (auth cookies, no CSRF token) mints nothing — regression test for #448 |
+| `ContractPdfCsrfTests::test_cookie_post_without_csrf_is_forbidden` | Cookie-authenticated `POST` without a CSRF token is rejected 403 |
+| `ContractPdfCsrfTests::test_cookie_post_with_csrf_issues` | Cookie-authenticated `POST` with a valid CSRF token issues normally |
 | `test_concurrent_first_issuances_get_distinct_versions` | A request that read `latest` before a competing first issuance committed derives the version from the row visible under the Zev row lock — no `(participant, version)` collision |
 | `test_issue_zev_is_derived_from_the_participant` | `ContractIssue.save()` derives the denormalized `zev` from `participant.zev` |
 
@@ -669,9 +690,10 @@ The contract is no longer a throwaway render of mutable state:
 - **Document numbers** are a per-ZEV sequence `CTR-YYYY-NNNN` from
   `Zev.contract_counter` (migration `zev/0017`, atomic `F()` increment,
   `next_contract_number(year=...)`), exported in the ZEV transfer schema.
-- **Download flow.** `GET /api/v1/zev/participants/{pk}/contract-pdf/`
-  issues on first download and streams the snapshot afterwards; the
-  filename carries the version (`contract_{last}_{first}_v{n}.pdf`). A new
+- **Download flow.** `POST /api/v1/zev/participants/{pk}/contract-pdf/`
+  issues on first download and streams the snapshot afterwards; `GET` is a
+  pure read of an already-issued snapshot (404 before the first issuance).
+  The filename carries the version (`contract_{last}_{first}_v{n}.pdf`). A new
   issuance writes a `contract.issue` PARTICIPANT audit event; an unchanged
   re-download writes a `contract.download` event (with
   `reused_snapshot: true`), so every receipt of the signed document is

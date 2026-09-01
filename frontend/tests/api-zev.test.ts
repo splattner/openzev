@@ -40,7 +40,9 @@ describe('zev api module', () => {
 
   it('downloads participant contract and revokes generated object URL', async () => {
     const blob = new Blob(['pdf-data'], { type: 'application/pdf' })
-    const getSpy = vi.spyOn(api, 'get').mockResolvedValue({ data: blob } as any)
+    // POST, not GET: issuing the contract is a write, so it must stay under
+    // CSRF protection (see #448).
+    const postSpy = vi.spyOn(api, 'post').mockResolvedValue({ data: blob } as any)
     const objectUrl = 'blob:contract-url'
 
     const createUrlSpy = vi.spyOn(URL, 'createObjectURL').mockReturnValue(objectUrl)
@@ -51,7 +53,7 @@ describe('zev api module', () => {
 
     await downloadParticipantContractPdf('participant-1', 'contract.pdf')
 
-    expect(getSpy).toHaveBeenCalledWith('/zev/participants/participant-1/contract-pdf/', { responseType: 'blob' })
+    expect(postSpy).toHaveBeenCalledWith('/zev/participants/participant-1/contract-pdf/', null, { responseType: 'blob' })
     expect(createUrlSpy).toHaveBeenCalledWith(blob)
     expect(appendSpy).toHaveBeenCalledTimes(1)
     expect(clickSpy).toHaveBeenCalledTimes(1)

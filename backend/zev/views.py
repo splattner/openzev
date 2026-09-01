@@ -352,19 +352,78 @@ class ParticipantViewSet(AuditedUpdateMixin, ZevScopedQuerySetMixin, viewsets.Mo
             metadata={"zev_id": zev_id},
         )
 
-    @action(detail=True, methods=["get"], url_path="contract-pdf",
+    def _contract_pdf_access_denied(self, request, participant):
+        """True when the caller may not reach this participant's contract."""
+        if request.user.is_admin or request.user.is_zev_owner:
+            return False
+        return participant.user != request.user
+
+    @staticmethod
+    def _stream_contract_issue(participant, issue):
+        filename = f"contract_{participant.last_name}_{participant.first_name}_v{issue.version}.pdf"
+        response = HttpResponse(issue.pdf, content_type="application/pdf")
+        response["Content-Disposition"] = f'attachment; filename="{filename}"'
+        return response
+
+    def _audit_contract_download(self, request, participant, issue):
+        record_audit_event(
+            request=request,
+            action_category=AuditActionCategory.PARTICIPANT,
+            action_type="contract.download",
+            target_type="zev.Participant",
+            target_id=str(participant.pk),
+            target_display=participant.full_name,
+            summary=f"Downloaded participation contract v{issue.version} ({issue.document_number}).",
+            metadata={
+                "zev_id": str(participant.zev_id),
+                "version": issue.version,
+                "document_number": issue.document_number,
+                "reused_snapshot": True,
+            },
+        )
+
+    # Issuance is a POST, not a GET, because it writes: it mints a per-ZEV
+    # document number under a row lock, creates a ContractIssue and attributes
+    # a contract.issue audit event to the caller. A GET that does that is
+    # forgeable — SameSite=Lax still sends the auth cookies on a cross-site
+    # top-level navigation, and CSRF enforcement deliberately exempts safe
+    # methods (see CookieJWTAuthentication.authenticate), so a link on an
+    # external page clicked by a logged-in owner would issue a contract in
+    # their name. Keeping the write on POST puts it back inside CSRF
+    # protection; GET stays a true read of what was already issued.
+    @action(detail=True, methods=["get", "post"], url_path="contract-pdf",
             permission_classes=[IsAuthenticated])
     def contract_pdf(self, request, pk=None):
-        """Stream the issued participation-contract PDF for this participant.
+        """Read (GET) or issue (POST) the participation-contract PDF.
 
-        The first download issues version 1; unchanged re-downloads reuse the
-        frozen snapshot, and data changes produce a new numbered version.
+        ``GET`` streams the latest existing snapshot and never mints one; it
+        404s when the contract has not been issued yet. ``POST`` issues
+        version 1 on first use, reuses the frozen snapshot when nothing
+        changed, and mints a new numbered version when the data or template
+        did.
         """
-        from invoices.contract_pdf import issue_contract_pdf
         participant = self.get_object()
-        if not request.user.is_admin and not request.user.is_zev_owner:
-            if participant.user != request.user:
-                return Response({"detail": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
+        if self._contract_pdf_access_denied(request, participant):
+            return Response({"detail": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
+
+        if request.method == "GET":
+            from invoices.models import ContractIssue
+
+            issue = (
+                ContractIssue.objects.filter(participant=participant)
+                .order_by("-version")
+                .first()
+            )
+            if issue is None:
+                return Response(
+                    {"detail": "No contract has been issued for this participant yet."},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+            self._audit_contract_download(request, participant, issue)
+            return self._stream_contract_issue(participant, issue)
+
+        from invoices.contract_pdf import issue_contract_pdf
+
         issue, created = issue_contract_pdf(participant, issued_by=request.user)
         if created:
             record_audit_event(
@@ -382,25 +441,8 @@ class ParticipantViewSet(AuditedUpdateMixin, ZevScopedQuerySetMixin, viewsets.Mo
                 },
             )
         else:
-            record_audit_event(
-                request=request,
-                action_category=AuditActionCategory.PARTICIPANT,
-                action_type="contract.download",
-                target_type="zev.Participant",
-                target_id=str(participant.pk),
-                target_display=participant.full_name,
-                summary=f"Downloaded participation contract v{issue.version} ({issue.document_number}).",
-                metadata={
-                    "zev_id": str(participant.zev_id),
-                    "version": issue.version,
-                    "document_number": issue.document_number,
-                    "reused_snapshot": True,
-                },
-            )
-        filename = f"contract_{participant.last_name}_{participant.first_name}_v{issue.version}.pdf"
-        response = HttpResponse(issue.pdf, content_type="application/pdf")
-        response["Content-Disposition"] = f'attachment; filename="{filename}"'
-        return response
+            self._audit_contract_download(request, participant, issue)
+        return self._stream_contract_issue(participant, issue)
 
     @action(detail=True, methods=["post"], url_path="link-account")
     def link_account(self, request, pk=None):

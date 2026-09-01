@@ -553,7 +553,7 @@ class ContractIssuanceTests(TestCase):
         client.force_authenticate(self.owner)
         url = f"/api/v1/zev/participants/{self.participant.pk}/contract-pdf/"
 
-        resp = client.get(url)
+        resp = client.post(url)
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(resp["Content-Type"], "application/pdf")
         self.assertIn("_v1.pdf", resp["Content-Disposition"])
@@ -563,12 +563,127 @@ class ContractIssuanceTests(TestCase):
 
         # Unchanged re-download reuses the snapshot — no new version, no new
         # issuance, but the download itself is audited.
-        resp = client.get(url)
+        resp = client.post(url)
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(ContractIssue.objects.count(), 1)
         download = AuditEvent.objects.get(action_type="contract.download")
         self.assertEqual(download.metadata_json["version"], 1)
         self.assertTrue(download.metadata_json["reused_snapshot"])
+
+    def test_get_streams_the_existing_snapshot_without_issuing(self):
+        """GET is a pure read: it serves what was already issued and never
+        mints a version of its own."""
+        from rest_framework.test import APIClient
+
+        client = APIClient()
+        client.force_authenticate(self.owner)
+        url = f"/api/v1/zev/participants/{self.participant.pk}/contract-pdf/"
+        self.assertEqual(client.post(url).status_code, 200)
+        AuditEvent.objects.all().delete()
+
+        resp = client.get(url)
+
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp["Content-Type"], "application/pdf")
+        self.assertIn("_v1.pdf", resp["Content-Disposition"])
+        self.assertEqual(ContractIssue.objects.count(), 1)
+        self.assertFalse(AuditEvent.objects.filter(action_type="contract.issue").exists())
+        download = AuditEvent.objects.get(action_type="contract.download")
+        self.assertEqual(download.metadata_json["version"], 1)
+
+    def test_get_404s_before_the_contract_has_been_issued(self):
+        """Nothing has been issued yet, so there is nothing to read — and a
+        read must not become the issuance."""
+        from rest_framework.test import APIClient
+
+        client = APIClient()
+        client.force_authenticate(self.owner)
+
+        resp = client.get(f"/api/v1/zev/participants/{self.participant.pk}/contract-pdf/")
+
+        self.assertEqual(resp.status_code, 404)
+        self.assertFalse(ContractIssue.objects.exists())
+        self.assertFalse(AuditEvent.objects.filter(action_type="contract.issue").exists())
+
+    def test_get_serves_the_latest_version_after_a_reissue(self):
+        from rest_framework.test import APIClient
+
+        client = APIClient()
+        client.force_authenticate(self.owner)
+        url = f"/api/v1/zev/participants/{self.participant.pk}/contract-pdf/"
+        self.assertEqual(client.post(url).status_code, 200)
+
+        # A data change makes the next issuance mint v2.
+        self.zev.additional_contract_notes = "Renegotiated terms."
+        self.zev.save()
+        self.assertEqual(client.post(url).status_code, 200)
+        self.assertEqual(ContractIssue.objects.count(), 2)
+
+        resp = client.get(url)
+
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn("_v2.pdf", resp["Content-Disposition"])
+
+
+class ContractPdfCsrfTests(TestCase):
+    """Issuance writes (document number, ContractIssue, audit event), so it
+    must not be reachable by a cross-site link click.
+
+    ``SameSite=Lax`` still sends the auth cookies on a cross-site top-level
+    navigation with a safe method, and CSRF enforcement deliberately exempts
+    safe methods — so a state-changing GET here was forgeable. See #448.
+    """
+
+    def setUp(self):
+        self.owner = make_user("csrf_contract_owner", UserRole.ZEV_OWNER)
+        self.zev = make_zev(self.owner, "CSRF Contract ZEV")
+        self.participant = make_participant(self.zev, first="Csrf", last="Participant")
+        flat_tariff(self.zev, price="0.18000")
+        self.url = f"/api/v1/zev/participants/{self.participant.pk}/contract-pdf/"
+
+    def _cookie_client(self, csrf_token=None):
+        # enforce_csrf_checks=True is load-bearing: without it APIClient sets
+        # _dont_enforce_csrf_checks and the negative test passes spuriously.
+        from django.conf import settings
+        from rest_framework.test import APIClient
+        from rest_framework_simplejwt.tokens import RefreshToken
+
+        from accounts.cookies import ACCESS_COOKIE, REFRESH_COOKIE
+
+        client = APIClient(enforce_csrf_checks=True)
+        refresh = RefreshToken.for_user(self.owner)
+        client.cookies[ACCESS_COOKIE] = str(refresh.access_token)
+        client.cookies[REFRESH_COOKIE] = str(refresh)
+        if csrf_token is not None:
+            client.cookies[settings.CSRF_COOKIE_NAME] = csrf_token
+            client.credentials(HTTP_X_CSRFTOKEN=csrf_token)
+        return client
+
+    def test_cookie_get_never_issues_a_contract(self):
+        """The forged request from the report: auth cookies, no CSRF token.
+        It must not mint anything."""
+        resp = self._cookie_client().get(self.url)
+
+        self.assertEqual(resp.status_code, 404)
+        self.assertFalse(ContractIssue.objects.exists())
+        self.assertFalse(AuditEvent.objects.filter(action_type="contract.issue").exists())
+
+    def test_cookie_post_without_csrf_is_forbidden(self):
+        resp = self._cookie_client().post(self.url)
+
+        self.assertEqual(resp.status_code, 403)
+        self.assertFalse(ContractIssue.objects.exists())
+        self.assertFalse(AuditEvent.objects.filter(action_type="contract.issue").exists())
+
+    def test_cookie_post_with_csrf_issues(self):
+        token = "a" * 32
+
+        resp = self._cookie_client(csrf_token=token).post(self.url)
+
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp["Content-Type"], "application/pdf")
+        issue = ContractIssue.objects.get()
+        self.assertEqual(issue.issued_by, self.owner)
 
 
 class ContractPdfTranslationParityTests(TestCase):

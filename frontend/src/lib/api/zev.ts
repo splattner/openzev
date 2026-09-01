@@ -84,8 +84,11 @@ export async function createParticipantAccount(participantId: string, payload: {
   return data
 }
 
+// POST, not GET: this issues the contract (mints a document number, writes a
+// ContractIssue and an audit event). The backend keeps GET as a pure read of
+// an already-issued snapshot, so the write stays under CSRF protection.
 export async function downloadParticipantContractPdf(participantId: string, filename: string): Promise<void> {
-  const response = await api.get(`/zev/participants/${participantId}/contract-pdf/`, { responseType: 'blob' })
+  const response = await api.post(`/zev/participants/${participantId}/contract-pdf/`, null, { responseType: 'blob' })
   downloadBlob(response.data as Blob, filename)
 }
 

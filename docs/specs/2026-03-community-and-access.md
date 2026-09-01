@@ -547,7 +547,8 @@ On update:
 | Action | URL | Method | Permission | Description |
 |---|---|---|---|---|
 | Send invitation | `/{id}/send-invitation/` | POST | admin + zev_owner | Reset password, send invitation email |
-| Contract PDF | `/{id}/contract-pdf/` | GET | authenticated (self or admin/owner) | Issue or reuse the persisted versioned contract snapshot and stream it as PDF (see SPEC-2026-08-contract-pdf-redesign) |
+| Contract PDF (read) | `/{id}/contract-pdf/` | GET | authenticated (self or admin/owner) | Stream the latest issued contract snapshot; 404 before the first issuance. Never mints a version. |
+| Contract PDF (issue) | `/{id}/contract-pdf/` | POST | authenticated (self or admin/owner) | Issue or reuse the persisted versioned contract snapshot and stream it as PDF (see SPEC-2026-08-contract-pdf-redesign) |
 | Link account | `/{id}/link-account/` | POST | admin only | Link existing user account (participant or guest role only, not already linked elsewhere) |
 | Unlink account | `/{id}/unlink-account/` | POST | admin only | Unlink account, demote user to `guest` role. Blocked if user is the ZEV owner. |
 | Create account | `/{id}/create-account/` | POST | admin only | Create new user account and link to participant |
@@ -663,7 +664,8 @@ The sidebar (`Layout.tsx`) shows sections conditionally:
 | GET / POST | `/participants/` | IsAuthenticated, BaseZevScopedPermission | List/create participants |
 | GET / PATCH / PUT / DELETE | `/participants/{id}/` | IsAuthenticated, BaseZevScopedPermission | Participant detail |
 | POST | `/participants/{id}/send-invitation/` | admin + zev_owner | Send invitation email |
-| GET | `/participants/{id}/contract-pdf/` | IsAuthenticated | Download the participation contract (issues or reuses the persisted versioned snapshot) |
+| GET | `/participants/{id}/contract-pdf/` | IsAuthenticated | Read the issued participation contract (404 before the first issuance; never mints) |
+| POST | `/participants/{id}/contract-pdf/` | IsAuthenticated | Issue the participation contract (issues or reuses the persisted versioned snapshot) |
 | POST | `/participants/{id}/link-account/` | admin only | Link user account to participant |
 | POST | `/participants/{id}/unlink-account/` | admin only | Unlink user account from participant |
 | POST | `/participants/{id}/create-account/` | admin only | Create + link user account |
