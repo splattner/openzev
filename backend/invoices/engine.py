@@ -1373,7 +1373,7 @@ def generate_invoice(participant: Participant, period_start: date, period_end: d
         status=InvoiceStatus.DRAFT,
         total_local_kwh=local_kwh,
         total_grid_kwh=grid_kwh,
-        total_feed_in_kwh=exported_kwh_acc.quantize(Decimal("0.0001")),
+        total_feed_in_kwh=exported_kwh_acc.quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP),
         subtotal_chf=subtotal,
         vat_rate=vat_rate,
         vat_chf=vat_chf,

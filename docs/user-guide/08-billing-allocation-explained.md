@@ -261,7 +261,7 @@ nothing is billed twice.
 ## Rounding and VAT
 
 **Precision:**
-- Energy quantities: 4 decimals (0.0001 kWh)
+- Energy quantities: 4 decimals (0.0001 kWh), rounded half-up
 - Unit prices: 5 decimals (e.g., 0.12345 CHF/kWh)
 - Line item totals: Rounded to 2 decimals (CHF 0.01)
 - Invoice subtotal: Rounded to 2 decimals

@@ -94,6 +94,42 @@ class InvoiceEngineTests(TestCase):
         self.assertEqual(invoice.total_chf, Decimal("1.00"))
         self.assertEqual(invoice.items.count(), 3)
 
+    def test_generate_invoice_rounds_feed_in_half_up(self):
+        """``total_feed_in_kwh`` quantizes with ROUND_HALF_UP like its sibling
+        totals: an exact .00005 tie must round up, not to even (banker's).
+
+        Two producers of 0.0001 kWh each and 0.0001 kWh consumption give the
+        participant an exported share of 0.0001 × 1/2 — a tie at the fifth
+        decimal, which is only reachable through the producer-share split
+        (readings themselves are 4-decimal)."""
+        other_production_mp = MeteringPoint.objects.create(
+            zev=self.zev,
+            meter_id="MP-P-2",
+            meter_type=MeteringPointType.PRODUCTION,
+        )
+        MeterReading.objects.create(
+            metering_point=self.production_mp,
+            timestamp=datetime(2026, 1, 15, 0, 0, tzinfo=timezone.utc),
+            energy_kwh=Decimal("0.0001"),
+            direction=ReadingDirection.OUT,
+        )
+        MeterReading.objects.create(
+            metering_point=other_production_mp,
+            timestamp=datetime(2026, 1, 15, 0, 0, tzinfo=timezone.utc),
+            energy_kwh=Decimal("0.0001"),
+            direction=ReadingDirection.OUT,
+        )
+        MeterReading.objects.create(
+            metering_point=self.consumption_mp,
+            timestamp=datetime(2026, 1, 15, 0, 0, tzinfo=timezone.utc),
+            energy_kwh=Decimal("0.0001"),
+            direction=ReadingDirection.IN,
+        )
+
+        invoice = generate_invoice(self.participant, date(2026, 1, 1), date(2026, 1, 31))
+
+        self.assertEqual(invoice.total_feed_in_kwh, Decimal("0.0001"))
+
     def test_generate_invoice_sets_due_date_from_zev_payment_term(self):
         self.zev.payment_term_days = 14
         self.zev.save(update_fields=["payment_term_days"])

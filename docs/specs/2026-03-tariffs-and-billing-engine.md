@@ -964,6 +964,7 @@ The description renders as: `"Surcharge 50% (50% von CHF 0.32/kWh)"` (German).
 | Per-metering-point monthly and yearly fees | §4.6.2 MP-month accumulation |
 | Percentage-of-energy billing mode | §4.4.2 base-rate computation, symmetric consumer/producer |
 | Multi-producer with export | §4.5 producer share allocation, feed-in credits |
+| Feed-in total half-up rounding | §5 rounding table — a .00005 tie quantizes `total_feed_in_kwh` with `ROUND_HALF_UP`, matching the sibling kWh totals |
 
 ### Backend (`invoices/test_engine_allocation.py`)
 
