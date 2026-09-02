@@ -55,10 +55,19 @@ services:
       POSTGRES_DB: openzev
       POSTGRES_USER: openzev
       POSTGRES_PASSWORD: openzev
+      # Pinned rather than inherited: the image default is
+      # /var/lib/postgresql/$PG_MAJOR/docker, so the major version is baked into
+      # the path and the next major bump would point at an empty directory,
+      # initdb over a volume that still holds the old cluster. A subdirectory of
+      # the mount also keeps lost+found out of initdb's way.
+      PGDATA: /var/lib/postgresql/data/pgdata
     ports:
       - "5432:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql
+      # docker-compose.dev.yml and docker-compose.fullstack.yml must mount this
+      # volume at the same path — they share the name, and a differing path gives
+      # each stack a cluster the others cannot see (#492).
+      - postgres_data:/var/lib/postgresql/data
 
   redis:
     image: redis:8-alpine

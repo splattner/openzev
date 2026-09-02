@@ -159,6 +159,20 @@ Verify PostgreSQL container is healthy:
 docker compose logs db
 ```
 
+### The database looks empty after switching compose files
+
+All three compose files (`docker-compose.yml`, `docker-compose.dev.yml`,
+`docker-compose.fullstack.yml`) share the `postgres_data` volume and mount it at
+`/var/lib/postgresql/data`, with `PGDATA` pinned to the `pgdata` subdirectory —
+so switching between them keeps one database.
+
+Older revisions mounted that volume at different paths in different files, which
+gave each stack a cluster the others could not see: starting one, then the
+other, looked like the database had been wiped. If you are coming from such a
+setup, the first start after upgrading initialises an empty cluster; see the
+upgrade note in the [README](../../README.md#quick-start-docker) for how to
+carry data across.
+
 See [Troubleshooting](12-troubleshooting.md) for more help.
 
 ## Disclaimer

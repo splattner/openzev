@@ -131,6 +131,26 @@ docker compose down
 
 Services: Frontend <http://localhost:8080> · Backend API <http://localhost:8001> · PostgreSQL localhost:5432 · Redis localhost:6379.
 
+> **Upgrading from a stack started before this change:** the Postgres data
+> directory is now pinned to `PGDATA=/var/lib/postgresql/data/pgdata` inside the
+> `postgres_data` volume, and all three compose files mount that volume at the
+> same path. Previously `docker-compose.yml` and `docker-compose.dev.yml`
+> disagreed on the mount path, so the two stacks could not see each other's
+> database. An existing volume holds its cluster at the old location, so the
+> first start after this change initialises an empty one. Dump anything you want
+> to keep first:
+>
+> ```bash
+> docker compose up -d db
+> docker compose exec db pg_dump -U openzev openzev > backup.sql
+> docker compose down -v          # discards the old volume
+> docker compose up -d --build
+> docker compose exec -T db psql -U openzev openzev < backup.sql
+> ```
+>
+> For demo data, `scripts/start-demo-environment.sh` reseeds from scratch and no
+> dump is needed.
+
 For a step-by-step walkthrough — roles, exploring each interface, demo accounts, and resetting demo data — see the [Getting Started guide](docs/user-guide/01-getting-started.md).
 
 ## Optional: Fullstack Container Mode

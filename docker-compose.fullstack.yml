@@ -42,9 +42,13 @@ services:
       POSTGRES_DB: openzev
       POSTGRES_USER: openzev
       POSTGRES_PASSWORD: openzev
+      # Keep in step with docker-compose.yml — see the note there.
+      PGDATA: /var/lib/postgresql/data/pgdata
     ports:
       - "5432:5432"
     volumes:
+      # Same mount path as docker-compose.yml: the volume is shared, and a
+      # differing path silently gives this stack its own cluster (#492).
       - postgres_data:/var/lib/postgresql/data
 
   redis:
