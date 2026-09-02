@@ -1341,6 +1341,7 @@ export const it = {
                 meterId: 'ID contatore *',
                 meterType: 'Tipo di contatore',
                 active: 'Attivo',
+                activeHint: 'Solo stato di inventario — non influisce sulla fatturazione. Per smettere di fatturare un contatore, imposta una data di fine sulla sua assegnazione.',
                 validFrom: 'Valido dal *',
                 validTo: 'Valido al',
                 location: 'Posizione',

@@ -1352,6 +1352,7 @@ export const en = {
                 meterId: 'Meter ID *',
                 meterType: 'Meter type',
                 active: 'Active',
+                activeHint: 'Inventory status only — it does not affect billing. To stop billing a meter, set an end date on its assignment.',
                 validFrom: 'Valid from *',
                 validTo: 'Valid to',
                 location: 'Location',

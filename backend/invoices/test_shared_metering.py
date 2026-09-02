@@ -346,18 +346,48 @@ class PerMeteringPointCommunityFeeTests(_SharedMeteringBase, TestCase):
         self.assertEqual(len(bob_fees), 1)  # no personal meters, only the shared line
         self.assertEqual(bob_fees[0].total_chf, Decimal("5.00"))
 
-    def test_inactive_shared_meter_bills_nobody(self):
+    def test_deactivating_a_shared_meter_does_not_change_the_fee(self):
+        """``is_active`` is an inventory status, not a billing input (#408).
+
+        It used to gate this count, which let an operator action taken today
+        rewrite a past period: deactivate in December and January's already
+        invoiced fee silently dropped to zero. The assignment still runs, so
+        the month is still billable.
+        """
         alice = self._participant("Alice Muster", weight="1")
         self._participant("Bob Beispiel", weight="1")
         community_mp = self._mp(MeteringPointType.CONSUMPTION, "CH-SM-PMP-3")
-        community_mp.is_active = False
-        community_mp.save()
         self._assign(community_mp, alice, JAN, mode=AllocationMode.COMMUNITY)
         self._mp_fee_tariff(price="10.00")
 
-        alice_invoice = generate_invoice(alice, JAN, JAN_END)
+        before = self._fee_items(generate_invoice(alice, JAN, JAN_END))
+        self.assertEqual([item.total_chf for item in before], [Decimal("5.00")])
 
-        self.assertEqual(self._fee_items(alice_invoice), [])
+        community_mp.is_active = False
+        community_mp.save()
+
+        after = self._fee_items(generate_invoice(alice, JAN, JAN_END))
+        self.assertEqual([item.total_chf for item in after], [Decimal("5.00")])
+
+    def test_ending_the_assignment_is_what_stops_the_shared_fee(self):
+        """The lever that does stop billing — and unlike the flag it carries a
+        date, so it stops the fee from the right month onward instead of
+        retroactively for all time."""
+        feb, feb_end = date(2026, 2, 1), date(2026, 2, 28)
+        alice = self._participant("Alice Muster", weight="1")
+        self._participant("Bob Beispiel", weight="1")
+        community_mp = self._mp(MeteringPointType.CONSUMPTION, "CH-SM-PMP-3")
+        self._assign(
+            community_mp, alice, JAN, valid_to=JAN_END, mode=AllocationMode.COMMUNITY,
+        )
+        self._mp_fee_tariff(price="10.00")
+
+        # January is inside the assignment window, February is past its end.
+        self.assertEqual(
+            [item.total_chf for item in self._fee_items(generate_invoice(alice, JAN, JAN_END))],
+            [Decimal("5.00")],
+        )
+        self.assertEqual(self._fee_items(generate_invoice(alice, feb, feb_end)), [])
 
     def test_weighted_energy_and_fee_use_their_respective_time_granularity(self):
         """Energy shares are date-granular; per-metering-point fee shares are

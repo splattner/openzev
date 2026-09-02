@@ -1341,6 +1341,7 @@ export const fr = {
                 meterId: 'ID compteur *',
                 meterType: 'Type de compteur',
                 active: 'Actif',
+                activeHint: 'Statut d’inventaire uniquement — sans effet sur la facturation. Pour cesser de facturer un compteur, définissez une date de fin sur son affectation.',
                 validFrom: 'Valide depuis *',
                 validTo: "Valide jusqu'à",
                 location: 'Emplacement',

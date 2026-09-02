@@ -218,6 +218,55 @@ class InvoiceEngineTests(TestCase):
         self.assertEqual(fixed_items["Metering operation fee (4 Messpunkt-Monate)"].total_chf, Decimal("12.00"))
         self.assertEqual(fixed_items["Metering annual levy (4 monatliche Raten pro Messpunkt)"].total_chf, Decimal("40.00"))
 
+    def test_deactivating_a_meter_does_not_rewrite_a_past_periods_fee(self):
+        """Regression for #408.
+
+        ``MeteringPoint.is_active`` is a present-state boolean; consulting it
+        while pricing a past period let an operator action taken today change
+        what that period cost. Generate, deactivate, regenerate — the amount
+        must not move.
+        """
+        Tariff.objects.create(
+            zev=self.zev,
+            name="Metering operation fee",
+            category=TariffCategory.GRID_FEES,
+            billing_mode=BillingMode.PER_METERING_POINT_MONTHLY_FEE,
+            fixed_price_chf=Decimal("5.00"),
+            valid_from=date(2026, 1, 1),
+        )
+
+        before = generate_invoice(self.participant, date(2026, 1, 1), date(2026, 1, 31))
+        before_total = before.items.get(unit="month").total_chf
+
+        MeteringPoint.objects.filter(zev=self.zev).update(is_active=False)
+
+        after = generate_invoice(self.participant, date(2026, 1, 1), date(2026, 1, 31))
+        after_total = after.items.get(unit="month").total_chf
+
+        self.assertEqual(after_total, before_total)
+
+    def test_ending_the_assignment_stops_the_per_metering_point_fee(self):
+        """The temporal lever that *does* stop the fee, and only from the month
+        after the assignment ends — which is the behaviour ``is_active`` was
+        being misused for."""
+        Tariff.objects.create(
+            zev=self.zev,
+            name="Metering operation fee",
+            category=TariffCategory.GRID_FEES,
+            billing_mode=BillingMode.PER_METERING_POINT_MONTHLY_FEE,
+            fixed_price_chf=Decimal("5.00"),
+            valid_from=date(2026, 1, 1),
+        )
+        MeteringPointAssignment.objects.filter(participant=self.participant).update(
+            valid_to=date(2026, 1, 31)
+        )
+
+        january = generate_invoice(self.participant, date(2026, 1, 1), date(2026, 1, 31))
+        february = generate_invoice(self.participant, date(2026, 2, 1), date(2026, 2, 28))
+
+        self.assertTrue(january.items.filter(unit="month").exists())
+        self.assertFalse(february.items.filter(unit="month").exists())
+
     def test_percentage_of_energy_billing_mode(self):
         """
         Percentage-of-energy tariff: effective price per kWh = sum of all GRID

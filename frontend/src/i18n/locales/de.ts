@@ -1341,6 +1341,7 @@ export const de = {
                 meterId: 'Zähler-ID *',
                 meterType: 'Zählertyp',
                 active: 'Aktiv',
+                activeHint: 'Nur Bestandsstatus — ohne Einfluss auf die Abrechnung. Um einen Zähler nicht mehr abzurechnen, setzen Sie ein Enddatum bei seiner Zuordnung.',
                 validFrom: 'Gültig ab *',
                 validTo: 'Gültig bis',
                 location: 'Standort',

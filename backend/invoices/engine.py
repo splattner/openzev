@@ -378,9 +378,9 @@ def _last_overlapping_window(windows: list[tuple], month_start: date, month_end:
 def _count_billable_metering_points_by_month(participant: Participant, tariff: Tariff, period_start: date, period_end: date) -> int:
     """How many of the participant's own metering points each billed month covers.
 
-    A metering point counts for a month only if it has an ``is_active``
-    assignment to the participant that owns the month with a ``PERSONAL``
-    window (``_last_overlapping_window``) — the same per-window care as the
+    A metering point counts for a month only if the assignment owning that
+    month is the participant's own and ``PERSONAL``
+    (``_last_overlapping_window``) — the same per-window care as the
     mode-aware gate in ``generate_invoice`` (§7.3/§7.5): a meter personal in
     one month and community the next counts in the first month and is
     excluded from the second.  The ownership rule also keeps this count
@@ -388,6 +388,17 @@ def _count_billable_metering_points_by_month(participant: Participant, tariff: T
     inside a month: the month belongs to exactly one side.  A community
     meter's fee is charged separately, split by weight, in
     ``_price_fixed_fees``.
+
+    ``MeteringPoint.is_active`` is deliberately *not* consulted (#408). It is
+    a present-state boolean, and reading it here let an operator action taken
+    today rewrite what a past period cost: deactivating a meter in December
+    silently reduced the fee already invoiced for January.  Every other input
+    to this function is resolved against the billed month, and the fact the
+    flag was standing in for — "this meter stopped being billable on date X" —
+    is what ``MeteringPointAssignment.valid_to`` already records, per month
+    and without rewriting history.  Ending billing means closing the
+    assignment; the flag is an inventory status for the meter list, and #406
+    removed it from the energy pool for the same reason.
     """
     overlap_start = max(period_start, tariff.valid_from)
     overlap_end = min(period_end, tariff.valid_to or period_end)
@@ -403,7 +414,6 @@ def _count_billable_metering_points_by_month(participant: Participant, tariff: T
     own_mp_ids = set(
         MeteringPointAssignment.objects.filter(
             participant=participant,
-            metering_point__is_active=True,
         ).values_list("metering_point_id", flat=True)
     )
     if not own_mp_ids:
@@ -411,7 +421,6 @@ def _count_billable_metering_points_by_month(participant: Participant, tariff: T
     windows_by_mp: dict = {}
     for mp_id, vf, vt, mode, pid in MeteringPointAssignment.objects.filter(
         metering_point_id__in=own_mp_ids,
-        metering_point__is_active=True,
     ).values_list("metering_point_id", "valid_from", "valid_to", "allocation_mode", "participant_id"):
         windows_by_mp.setdefault(mp_id, []).append((vf, vt, mode, pid))
 
@@ -437,10 +446,11 @@ def _count_billable_metering_points_by_month(participant: Participant, tariff: T
 
 
 def _count_community_metering_points_by_month(zev: Zev, tariff: Tariff, period_start: date, period_end: date) -> dict[date, int]:
-    """Active metering points whose owning window is ``COMMUNITY``, per month.
+    """Metering points whose owning window is ``COMMUNITY``, per month.
 
-    Mirrors ``_count_billable_metering_points_by_month`` but is ZEV-wide
-    rather than participant-scoped.  All modes are fetched on purpose —
+    Mirrors ``_count_billable_metering_points_by_month`` — including its
+    deliberate blindness to ``MeteringPoint.is_active`` (#408) — but is
+    ZEV-wide rather than participant-scoped.  All modes are fetched on purpose —
     dropping the ``COMMUNITY`` filter lets the ownership pick see a
     superseding ``PERSONAL`` window: a meter whose mode switches mid-month
     is billed by whichever side owns the month
@@ -449,7 +459,7 @@ def _count_community_metering_points_by_month(zev: Zev, tariff: Tariff, period_s
     Feeds the per-metering-point community contribution (§7.5): each
     community meter's fee is charged once per month, then divided between
     eligible participants by weight. Keyed by the first day of the month; a
-    month with no active community meter is absent, not zero.
+    month with no community meter is absent, not zero.
     """
     overlap_start = max(period_start, tariff.valid_from)
     overlap_end = min(period_end, tariff.valid_to or period_end)
@@ -459,7 +469,6 @@ def _count_community_metering_points_by_month(zev: Zev, tariff: Tariff, period_s
     windows_by_mp: dict = {}
     for mp_id, vf, vt, mode, pid in MeteringPointAssignment.objects.filter(
         metering_point__zev=zev,
-        metering_point__is_active=True,
     ).values_list("metering_point_id", "valid_from", "valid_to", "allocation_mode", "participant_id"):
         windows_by_mp.setdefault(mp_id, []).append((vf, vt, mode, pid))
 

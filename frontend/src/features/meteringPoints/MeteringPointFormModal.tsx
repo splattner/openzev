@@ -61,6 +61,7 @@ export function MeteringPointFormModal({
             checked={form.is_active}
             onChange={(event) => setForm((previous) => ({ ...previous, is_active: event.currentTarget.checked }))}
             label={t('pages.meteringPoints.form.active')}
+            description={t('pages.meteringPoints.form.activeHint')}
           />
         </div>
 

@@ -301,7 +301,7 @@ Before shared metering points (`SPEC-2026-08-shared-metering-points`), this gate
 
 **Key invariant:** at every timestamp, each participant's consumption is split into a **local** portion (energy sourced from ZEV production) and a **grid** portion (energy from the public grid).  The local pool is capped at the lesser of total production and total consumption.  Skipped readings are **excluded from every bill** (ADR 0013): they are not charged to the previous holder, the new holder, or the community; the ZEV-wide pool totals still include them.
 
-**Pool coverage:** the pool is physical — `zev_consumption_at_ts`/`zev_production_at_ts` sum over **every** metering point of the ZEV, with or without an assignment in the period and regardless of the `is_active` flag. A never-assigned meter feeds the pool but is billed to nobody; a deactivated meter (`is_active = False`) still feeds the pool, and its readings are still attributed to its assignment holder — deactivation does not remove a meter from allocation. This matches across the engine, dashboards, PDFs, and annual statement (ADR 0013 pool decision). `is_active` gates only per-metering-point fixed-fee counting (§4.6.2) and list/admin filtering, never the energy pool. A metering point with no assignment overlapping the period still counts in the pool but is billed to nobody; that is a data-quality condition rather than a valid steady state — every metering point should have a holder for each period it has readings (a common-area *Allgemein* meter is assigned to a community / Verwaltung participant), and such holder-less readings are surfaced by the metering data-quality status check.
+**Pool coverage:** the pool is physical — `zev_consumption_at_ts`/`zev_production_at_ts` sum over **every** metering point of the ZEV, with or without an assignment in the period and regardless of the `is_active` flag. A never-assigned meter feeds the pool but is billed to nobody; a deactivated meter (`is_active = False`) still feeds the pool, and its readings are still attributed to its assignment holder — deactivation does not remove a meter from allocation. This matches across the engine, dashboards, PDFs, and annual statement (ADR 0013 pool decision). `is_active` gates nothing in the billing engine at all (§4.6.5) — it is a list/admin status only. A metering point with no assignment overlapping the period still counts in the pool but is billed to nobody; that is a data-quality condition rather than a valid steady state — every metering point should have a holder for each period it has readings (a common-area *Allgemein* meter is assigned to a community / Verwaltung participant), and such holder-less readings are surfaced by the metering data-quality status check.
 
 **Assignment matching** uses the *UTC civil date* of the reading's timestamp (`_utc_date(ts)` — `ts.astimezone(tz.utc).date()`), consistent with period, tariff, and completeness conventions (ADR 0007 — all timestamps are stored and queried in UTC). A reading at 22:30 UTC on the day an assignment ends still belongs to that day's holder even though Zurich is already on the next civil day.
 
@@ -431,9 +431,8 @@ Months are **not prorated**: touching any day in a month counts the full month.
 | `shared_monthly_fee` | `charged_months` (see §4.6.3) | derived — see §4.6.3 |
 | `shared_yearly_fee` | `charged_months` (see §4.6.3) | derived — see §4.6.3 |
 
-**Metering-point-months:** for each billable calendar month in the tariff overlap, count the number of **distinct active metering points** assigned to the participant during that month. A metering point counts for a month if:
-- It has an active assignment to the participant overlapping that month.
-- `metering_point.is_active = True`.
+**Metering-point-months:** for each billable calendar month in the tariff overlap, count the number of **distinct metering points** assigned to the participant during that month. A metering point counts for a month if:
+- It has an assignment to the participant overlapping that month.
 - The window that **owns** the month (see §4.6.4) is a `PERSONAL`-mode assignment to the participant — a month owned by a `COMMUNITY`-mode window (or by another participant's window) is excluded from this personal count and billed separately in §4.6.4, with the same per-window care as the §4.3 energy gate (a meter personal in one month and community the next counts in the first and is excluded from the second). Ownership makes the counts disjoint by construction: a mid-month mode switch or holder change bills the month exactly once, on whichever side the owning window names.
 
 Sum across all months to get the total metering-point-months.
@@ -573,9 +572,9 @@ double-bill back. The personal count likewise needs the full history of the
 participant's own metering points, for the same reason.
 
 ```
-community_counts = for each billable month M, count distinct active metering points
+community_counts = for each billable month M, count distinct metering points
                     of the ZEV whose month-owning window (§4.6.4) is COMMUNITY-mode
-                    (metering_point.is_active = True; an inactive meter bills nobody)
+                    (metering_point.is_active is not consulted — see §4.6.5)
 
 total = 0
 shared_months = 0
@@ -599,6 +598,30 @@ Both weight-split paths (this one and §4.6.3) resolve their denominator per
 tariff but share **one** fetch of the ZEV's participant membership rows per
 invoice: the billed months differ between tariffs, the membership does not, so
 querying per tariff would be an N+1 over the ZEV's tariff list.
+
+#### 4.6.5 `is_active` is not a billing input
+
+Neither fee counter consults `MeteringPoint.is_active` (#408). It is a
+present-state boolean, and reading it while pricing a past period let an
+operator action taken today change what that period cost: deactivating a meter
+in December silently reduced the fee already invoiced for January, and
+regenerating the same period produced a different amount with no record of why.
+
+Every other input to these counters is resolved against the billed month.
+The fact the flag was standing in for — *this meter stopped being billable on
+date X* — is what `MeteringPointAssignment.valid_to` already records, with a
+date, per month, and without rewriting history. **Ending billing for a meter
+means closing its assignment**, not unticking the flag; a meter whose
+assignment still runs is still billed, deactivated or not.
+
+Adding a separate deactivation *date* to `MeteringPoint` was considered and
+rejected: it would duplicate `valid_to` one table over and create two dates
+that can disagree, with no rule for which wins.
+
+`is_active` remains an inventory status — the badge and active/inactive filter
+on the metering-point list, and the Django admin filter. #406 removed it from
+the energy pool for the same reason; this closes the equivalent gap in fee
+counting, leaving it with no behavioural consumer in the engine.
 
 ### 4.7 Item accumulation
 
@@ -1000,7 +1023,7 @@ more than their own share, and a sole participant carrying a meter alone);
 kWh-total conservation within rounding; a meter personal in one month and
 community the next billing correctly on both sides with no double count and no
 lost readings (§4.3a); community readings tracked in their own gap/skip counters;
-per-metering-point community fees, including `is_active` mirroring, the
+per-metering-point community fees, the
 disjoint-by-construction month ownership tie-break — a mid-month mode switch
 or holder change bills the month exactly once, on the side of the last window
 to start (§4.6.4); a mid-period joiner/leaver's

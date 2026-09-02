@@ -317,9 +317,16 @@ operational history must be preserved:
 - Historical readings, assignments, and invoice references remain intact.
 - Deactivation does **not** affect energy allocation (`SPEC-2026-tariffs-billing`,
   ADR 0013): a deactivated meter's readings are still attributed to their
-  assignment holder and still feed the physical community pool. `is_active` is
-  consulted only for per-metering-point fixed-fee counting and for list/admin
-  filtering.
+  assignment holder and still feed the physical community pool.
+- Deactivation does **not** affect billing either, as of #408. `is_active` is
+  a present-state boolean and the billing engine reasons per billed month, so
+  consulting it let a deactivation today rewrite what a past period cost. It is
+  now purely an inventory status: the list badge and active/inactive filter, and
+  the Django admin filter. See `SPEC-2026-tariffs-billing` §4.6.5.
+- **To stop billing a meter, close its assignment** (`valid_to`) rather than
+  deactivating it. That is the field that carries a date, so the fee stops from
+  the right month onward instead of retroactively for every period ever
+  invoiced. Deactivating a meter whose assignment still runs leaves it billable.
 - Hard deletion (`DELETE`) is allowed but cascades to readings and assignments.
 
 **Guidance:** prefer soft deactivation when a meter has historical readings or
