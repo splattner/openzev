@@ -16,6 +16,8 @@ from django.test import TestCase
 from rest_framework.test import APIClient
 from weasyprint.urls import URLFetcher
 
+import pytest
+
 from accounts.models import UserRole
 from audit.models import AuditActionCategory, AuditEvent, AuditEventStatus
 from invoices.contract_pdf import generate_contract_pdf
@@ -470,6 +472,7 @@ class PdfTemplateOverrideIntegrityTests(TestCase):
         zev = make_zev(self.owner, "Override ZEV")
         return make_participant(zev, first="Override", last="Participant")
 
+    @pytest.mark.slow
     def test_override_with_shared_base_include_renders_through_the_real_path(self):
         """The current default already includes the shared design base; stored
         as an override it must keep resolving it via the engine loaders, so the
@@ -490,6 +493,7 @@ class PdfTemplateOverrideIntegrityTests(TestCase):
         self.assertIn("running(footer-meta)", html)  # shared-base CSS survived
         self.assertIn("document-header", html)
 
+    @pytest.mark.slow
     def test_legacy_override_without_include_still_renders(self):
         """Overrides saved before the redesign carry their own full markup and
         no shared-base include; they must still render without error."""

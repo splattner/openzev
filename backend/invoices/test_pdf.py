@@ -5,6 +5,8 @@ from datetime import timezone as dt_timezone
 from decimal import Decimal
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from accounts.models import AppSettings, User, UserRole
 from django.conf import settings
 from django.test import TestCase
@@ -308,6 +310,7 @@ class InvoicePdfQrTests(TestCase):
         self.assertIsNotNone(chart)
         self.assertNotIn("2025", chart)  # draft prior invoice must be excluded
 
+    @pytest.mark.slow
     def test_default_template_uses_dedicated_invoice_and_payment_layouts(self):
         """Verify structural properties of the rendered PDF instead of CSS text."""
         from pypdf import PdfReader
@@ -867,6 +870,7 @@ class InvoicePdfRenderingTests(TestCase):
                 unit_price_chf=Decimal("0.12"), total_chf=Decimal("1.20"),
             )
 
+    @pytest.mark.slow
     def test_short_invoice_renders_two_pages(self):
         """Short invoice: page 1 = invoice+inline QR, page 2 = insights."""
         invoice = self._invoice()
@@ -876,6 +880,7 @@ class InvoicePdfRenderingTests(TestCase):
 
         self.assertEqual(self._page_count(pdf), 2)
 
+    @pytest.mark.slow
     def test_long_invoice_forces_three_pages(self):
         """Long invoice: page 1 = invoice, page 2 = insights, page 3 = payment+QR."""
         invoice = self._invoice()
@@ -885,6 +890,7 @@ class InvoicePdfRenderingTests(TestCase):
 
         self.assertEqual(self._page_count(pdf), 3)
 
+    @pytest.mark.slow
     def test_invoice_with_savings_and_many_items_forces_three_pages(self):
         invoice = self._invoice(
             total_local_kwh=Decimal("100.00"),
@@ -911,6 +917,7 @@ class InvoicePdfRenderingTests(TestCase):
 
         self.assertEqual(self._page_count(pdf), 3)
 
+    @pytest.mark.slow
     def test_realistic_many_levies_invoice_paginates_with_single_slip(self):
         """Maintainer concern: an EVU-style invoice with ~5 Abgaben no longer
         fits on one page. The layout must paginate the line items across pages
@@ -969,6 +976,7 @@ class InvoicePdfRenderingTests(TestCase):
             "Many-line invoice must carry exactly one QR-Rechnung slip",
         )
 
+    @pytest.mark.slow
     def test_all_four_languages_render_without_error(self):
         for lang in ("de", "fr", "it", "en"):
             self.zev.invoice_language = lang
@@ -981,6 +989,7 @@ class InvoicePdfRenderingTests(TestCase):
             self.assertGreater(len(pdf), 1000, f"PDF for {lang} is too small")
             self.assertEqual(self._page_count(pdf), 2, f"PDF for {lang} should be 2 pages (invoice + insights)")
 
+    @pytest.mark.slow
     def test_shared_lines_render_with_marker(self):
         """A community-allocated line item's marker text must actually reach
         the rendered PDF, in every invoice language (§7.6) — not just the
@@ -1035,6 +1044,7 @@ class InvoicePdfRenderingTests(TestCase):
                 return rect
         return None
 
+    @pytest.mark.slow
     def test_inline_qr_is_106mm_high(self):
         """Short invoice: inline QR section must be 106 mm tall."""
         from pypdf import PdfReader
@@ -1053,6 +1063,7 @@ class InvoicePdfRenderingTests(TestCase):
             msg=f"QR height should be ~106 mm, got {height_css * 25.4 / 96:.1f} mm",
         )
 
+    @pytest.mark.slow
     def test_inline_qr_bottom_aligns_with_page_bottom(self):
         """Short invoice: inline QR bottom edge must reach the page bottom."""
         from pypdf import PdfReader
@@ -1074,6 +1085,7 @@ class InvoicePdfRenderingTests(TestCase):
                 f"must be ≤ {self._TOLERANCE_MM} mm",
         )
 
+    @pytest.mark.slow
     def test_separate_payment_qr_is_106mm_high(self):
         """Long invoice: payment page QR section must be 106 mm tall."""
         from pypdf import PdfReader
@@ -1094,6 +1106,7 @@ class InvoicePdfRenderingTests(TestCase):
             msg=f"QR height should be ~106 mm, got {height_css * 25.4 / 96:.1f} mm",
         )
 
+    @pytest.mark.slow
     def test_separate_payment_qr_bottom_aligns_with_page_bottom(self):
         """Long invoice: payment page QR bottom edge must reach page bottom."""
         from pypdf import PdfReader
@@ -1117,6 +1130,7 @@ class InvoicePdfRenderingTests(TestCase):
                 f"must be ≤ {self._TOLERANCE_MM} mm",
         )
 
+    @pytest.mark.slow
     def test_qr_clip_rect_not_found_on_insights_page(self):
         """Insights page must not contain a QR clip rect."""
         from pypdf import PdfReader
@@ -1147,6 +1161,7 @@ class InvoicePdfRenderingTests(TestCase):
                 unit_price_chf=Decimal("0.12"), total_chf=Decimal("1.20"),
             )
 
+    @pytest.mark.slow
     def test_wrapping_descriptions_do_not_duplicate_qr(self):
         """Regression: wrapping rows that overflow the inline estimate must
         not render the payment slip on more than one page.  The fast estimate
@@ -1167,6 +1182,7 @@ class InvoicePdfRenderingTests(TestCase):
             "items wrap and overflow the inline height estimate",
         )
 
+    @pytest.mark.slow
     def test_many_rows_render_single_qr_on_final_page(self):
         """A long invoice (dedicated payment page) must carry exactly one
         slip, flush with the bottom of its page."""

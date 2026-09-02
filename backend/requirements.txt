@@ -22,6 +22,7 @@ djangorestframework==3.17.2
 djangorestframework_simplejwt==5.5.1
 drf-spectacular==0.30.0
 et_xmlfile==2.0.0
+execnet==2.1.2
 factory_boy==3.3.3
 Faker==40.36.0
 fonttools==4.63.0
@@ -48,6 +49,7 @@ pyphen==0.17.2
 pytest==9.1.1
 pytest-cov==7.1.0
 pytest-django==4.12.0
+pytest-xdist==3.8.0
 python-crontab==3.3.0
 python-dateutil==2.9.0.post0  # direct: lenient timestamp parsing in the metering CSV import
 python-stdnum==2.2

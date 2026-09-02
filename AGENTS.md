@@ -28,7 +28,7 @@ This file gives coding agents the minimum project-specific context needed to wor
 From `backend/`:
 
 - Activate venv: `source ../.venv/bin/activate`
-- Run tests: `python -m pytest -q`
+- Run tests: `python -m pytest -q` (parallel; `-n 0` = serial, `-m "not slow"` = skip slow PDF tests; counts: `pytest -v | tail -2`, pipe masks exit code)
 - Run invoice tests only: `python -m pytest invoices -q`
 
 ### Frontend

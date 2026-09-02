@@ -8,6 +8,8 @@ from unittest.mock import patch
 from django.template.loader import render_to_string
 from django.test import TestCase
 
+import pytest
+
 from accounts.models import AppSettings, UserRole, VatRate
 from audit.models import AuditEvent
 from invoices.contract_pdf import (
@@ -377,6 +379,7 @@ class ContractIssuanceTests(TestCase):
             mocked_localdate.return_value = today
             return issue_contract_pdf(self.participant)
 
+    @pytest.mark.slow
     def test_first_download_issues_version_one_with_sequence_number(self):
         issue, created = self._issue()
 
@@ -388,6 +391,7 @@ class ContractIssuanceTests(TestCase):
         self.zev.refresh_from_db()
         self.assertEqual(self.zev.contract_counter, 2)
 
+    @pytest.mark.slow
     def test_unchanged_redownload_reuses_the_frozen_snapshot(self):
         first, _ = self._issue()
         second, created = self._issue()
@@ -397,6 +401,7 @@ class ContractIssuanceTests(TestCase):
         self.assertEqual(second.pdf, first.pdf)
         self.assertEqual(ContractIssue.objects.count(), 1)
 
+    @pytest.mark.slow
     def test_redownload_on_a_later_calendar_day_reuses_the_frozen_snapshot(self):
         """The issue date is frozen into the snapshot (``rendered_on``): a
         re-download reproduces the issued document at that date, so the passing
@@ -454,6 +459,7 @@ class ContractIssuanceTests(TestCase):
         self.assertEqual(gap.metadata_json["reused_document_number"], "CTR-2026-0001")
         self.assertEqual(gap.source, "system")
 
+    @pytest.mark.slow
     def test_contract_issues_survive_participant_and_zev_deletion(self):
         """Issued contracts are an immutable archive: deleting the participant
         or the ZEV retains the snapshot (SET_NULL), so a signed document is
@@ -471,6 +477,7 @@ class ContractIssuanceTests(TestCase):
         self.assertEqual(archived.document_number, "CTR-2026-0001")
         self.assertTrue(archived.pdf.startswith(b"%PDF"))
 
+    @pytest.mark.slow
     def test_data_change_bumps_version_and_number(self):
         first, _ = self._issue()
         flat_tariff(self.zev, price="0.19000")  # a second local tariff changes the render
@@ -481,6 +488,7 @@ class ContractIssuanceTests(TestCase):
         self.assertEqual(second.document_number, "CTR-2026-0002")
         self.assertNotEqual(second.pdf, first.pdf)
 
+    @pytest.mark.slow
     def test_document_number_sequence_is_per_zev(self):
         other_owner = make_user("issue_owner_other", UserRole.ZEV_OWNER)
         other_zev = make_zev(other_owner, "Other Issuance ZEV")
@@ -493,6 +501,7 @@ class ContractIssuanceTests(TestCase):
         self.assertEqual(other_issue.document_number, "CTR-2026-0001")
         self.assertEqual(self._issue()[0].document_number, "CTR-2026-0001")
 
+    @pytest.mark.slow
     def test_new_issue_renders_the_stable_document_number_in_the_pdf(self):
         issue, _ = self._issue()
 
@@ -500,6 +509,7 @@ class ContractIssuanceTests(TestCase):
         html = render_to_string(CONTRACT_TEMPLATE_NAME, context)
         self.assertIn("CTR-2026-0001", html)
 
+    @pytest.mark.slow
     def test_concurrent_first_issuances_get_distinct_versions(self):
         """A request that read ``latest`` before a competing first issuance
         committed must derive the version from the row visible under the Zev
@@ -546,6 +556,7 @@ class ContractIssuanceTests(TestCase):
 
         self.assertEqual(issue.zev, self.zev)
 
+    @pytest.mark.slow
     def test_contract_pdf_endpoint_streams_the_issued_snapshot(self):
         from rest_framework.test import APIClient
 
@@ -570,6 +581,7 @@ class ContractIssuanceTests(TestCase):
         self.assertEqual(download.metadata_json["version"], 1)
         self.assertTrue(download.metadata_json["reused_snapshot"])
 
+    @pytest.mark.slow
     def test_get_streams_the_existing_snapshot_without_issuing(self):
         """GET is a pure read: it serves what was already issued and never
         mints a version of its own."""
@@ -605,6 +617,7 @@ class ContractIssuanceTests(TestCase):
         self.assertFalse(ContractIssue.objects.exists())
         self.assertFalse(AuditEvent.objects.filter(action_type="contract.issue").exists())
 
+    @pytest.mark.slow
     def test_get_serves_the_latest_version_after_a_reissue(self):
         from rest_framework.test import APIClient
 
@@ -675,6 +688,7 @@ class ContractPdfCsrfTests(TestCase):
         self.assertFalse(ContractIssue.objects.exists())
         self.assertFalse(AuditEvent.objects.filter(action_type="contract.issue").exists())
 
+    @pytest.mark.slow
     def test_cookie_post_with_csrf_issues(self):
         token = "a" * 32
 
@@ -801,6 +815,7 @@ class ContractPdfRenderingTests(TestCase):
     def _raw_html(self) -> str:
         return render_to_string(CONTRACT_TEMPLATE_NAME, _build_contract_context(self.participant))
 
+    @pytest.mark.slow
     def test_renders_pdf_in_all_four_languages_with_running_page_machinery(self):
         expected_titles = {
             "de": "Teilnahmevertrag vZEV",
@@ -956,6 +971,7 @@ class ContractPdfRenderingTests(TestCase):
         self.assertIn("resulting change in supply or metering arrangements", markup)
         self.assertIn("credited or charged on the next invoice", markup)
 
+    @pytest.mark.slow
     def test_no_page_is_left_nearly_empty(self):
         """Regression guard for the previous layout where the signatures
         landed alone on a page with only ~180 extracted characters."""
@@ -970,6 +986,7 @@ class ContractPdfRenderingTests(TestCase):
                 f"page {index} carries almost no content ({len(text)} chars)",
             )
 
+    @pytest.mark.slow
     def test_signature_block_is_never_split_across_pages(self):
         """The signature intro and the signing grids must travel as one unit."""
         from pypdf import PdfReader
@@ -998,6 +1015,7 @@ class ContractPdfRenderingTests(TestCase):
         self.assertIn("white-space: pre-line", freetext_rule)
         self.assertIn("overflow-wrap: anywhere", freetext_rule)
 
+    @pytest.mark.slow
     def test_very_long_notes_do_not_balloon_the_document(self):
         """A long free-text note may push the signatures and appendices, but
         the rendered document must stay bounded and complete."""

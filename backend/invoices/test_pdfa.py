@@ -12,6 +12,8 @@ from decimal import Decimal
 
 from django.test import TestCase
 
+import pytest
+
 from accounts.models import User, UserRole
 from tariffs.models import TariffCategory
 from zev.models import Participant, Zev
@@ -88,6 +90,7 @@ class InvoicePdfaTests(TestCase):
             valid_from=date(2026, 1, 1),
         )
 
+    @pytest.mark.slow
     def test_generated_invoice_pdf_is_pdfa(self):
         invoice = Invoice.objects.create(
             invoice_number="Q-00001",
