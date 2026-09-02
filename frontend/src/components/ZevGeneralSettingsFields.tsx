@@ -103,6 +103,16 @@ export function ZevGeneralSettingsFields({ form, onChange }: ZevGeneralSettingsF
                         elcomId={form.grid_operator_elcom_id ?? null}
                         onChange={onChange}
                     />
+                    <label className="grid-span-full">
+                        <span>{t('pages.zevSettings.fields.tariffSourceUrl')}</span>
+                        <input
+                            type="url"
+                            value={form.tariff_source_url ?? ''}
+                            placeholder="https://…/tarife.json"
+                            onChange={(event) => onChange({ tariff_source_url: event.target.value })}
+                        />
+                        <small className="muted">{t('pages.zevSettings.fields.tariffSourceUrlHint')}</small>
+                    </label>
                     <label>
                         <span>{t('pages.zevSettings.fields.gridConnectionPoint')}</span>
                         <input

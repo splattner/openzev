@@ -1,5 +1,5 @@
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faPlus } from '@fortawesome/free-solid-svg-icons'
+import { faDownload, faPlus } from '@fortawesome/free-solid-svg-icons'
 import { useTranslation } from 'react-i18next'
 
 export type TariffValidityFilter = 'valid' | 'all'
@@ -12,6 +12,8 @@ type TariffToolbarProps = {
   validityFilter: TariffValidityFilter
   onValidityFilterChange: (value: TariffValidityFilter) => void
   onOpenCreateTariffModal: () => void
+  /** Absent when no single ZEV is selected — an import needs one target. */
+  onOpenImportModal?: () => void
 }
 
 export function TariffToolbar({
@@ -22,6 +24,7 @@ export function TariffToolbar({
   validityFilter,
   onValidityFilterChange,
   onOpenCreateTariffModal,
+  onOpenImportModal,
 }: TariffToolbarProps) {
   const { t } = useTranslation()
 
@@ -48,6 +51,12 @@ export function TariffToolbar({
         </div>
 
         <div className="actions-row actions-row-wrap">
+          {onOpenImportModal && (
+            <button className="button button-secondary" onClick={onOpenImportModal}>
+              <FontAwesomeIcon icon={faDownload} fixedWidth />
+              {t('pages.tariffs.import.action')}
+            </button>
+          )}
           <button className="button button-primary" onClick={onOpenCreateTariffModal}>
             <FontAwesomeIcon icon={faPlus} fixedWidth />
             {t('pages.tariffs.newTariff')}

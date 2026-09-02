@@ -5,6 +5,7 @@ import { TariffCategorySections } from '../features/tariffs/TariffCategorySectio
 import { useTariffCrud } from '../features/tariffs/useTariffCrud'
 import { TariffEmptyState } from '../features/tariffs/TariffEmptyState'
 import { TariffFormModal } from '../features/tariffs/TariffFormModal'
+import { VseTariffImportModal } from '../features/tariffs/VseTariffImportModal'
 import { TariffPeriodFormModal } from '../features/tariffs/TariffPeriodFormModal'
 import { TariffToolbar, type TariffValidityFilter } from '../features/tariffs/TariffToolbar'
 import { TariffVersionModal } from '../features/tariffs/TariffVersionModal'
@@ -29,10 +30,11 @@ export function TariffsPage() {
     const { dialog, confirm, handleConfirm, handleCancel, isLoading: dialogLoading } = useConfirmDialog()
     const { user } = useAuth()
     const { settings } = useAppSettings()
-    const { selectedZevId } = useManagedZev()
+    const { selectedZevId, selectedZev } = useManagedZev()
     const { t } = useTranslation()
     const isManagedScope = user?.role === 'admin' || user?.role === 'zev_owner'
     const [validityFilter, setValidityFilter] = useState<TariffValidityFilter>('valid')
+    const [showImportModal, setShowImportModal] = useState(false)
     // Shared with the validity badge on each card, so the filter and the badge
     // can never disagree about whether a tariff is in force.
     const today = useMemo(() => todayLocalIso(), [])
@@ -226,7 +228,17 @@ export function TariffsPage() {
                 validityFilter={validityFilter}
                 onValidityFilterChange={setValidityFilter}
                 onOpenCreateTariffModal={openCreateTariffModal}
+                onOpenImportModal={selectedZevId ? () => setShowImportModal(true) : undefined}
             />
+
+            {selectedZevId && (
+                <VseTariffImportModal
+                    isOpen={showImportModal}
+                    onClose={() => setShowImportModal(false)}
+                    zevId={selectedZevId}
+                    initialUrl={selectedZev?.tariff_source_url ?? ''}
+                />
+            )}
 
             <TariffFormModal
                 isOpen={showTariffModal}

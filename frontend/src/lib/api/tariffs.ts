@@ -5,6 +5,8 @@ import type {
   TariffPeriodInput,
   TariffSeries,
   TariffVersionInput,
+  VseTariffImportPreview,
+  VseTariffImportResult,
 } from '../../types/api'
 import { api } from './client'
 
@@ -64,4 +66,33 @@ export async function updateTariffPeriod(id: string, payload: Partial<TariffPeri
 
 export async function deleteTariffPeriod(id: string): Promise<void> {
   await api.delete(`/tariffs/periods/${id}/`)
+}
+
+/**
+ * Read the grid operator's published tariff document and report what importing
+ * it would do — nothing is written. Omitting `url` uses the address stored on
+ * the ZEV.
+ */
+export async function previewVseTariffImport(payload: {
+  zev: string
+  url?: string
+}): Promise<VseTariffImportPreview> {
+  const { data } = await api.post<VseTariffImportPreview>('/tariffs/imports/vse/preview/', payload)
+  return data
+}
+
+/**
+ * Create the selected candidates. Only the keys travel back, not the tariff
+ * data: the server re-fetches the document and refuses the write if
+ * `document_digest` no longer matches what the preview showed.
+ */
+export async function applyVseTariffImport(payload: {
+  zev: string
+  url?: string
+  keys: string[]
+  document_digest: string
+  remember_url?: boolean
+}): Promise<VseTariffImportResult> {
+  const { data } = await api.post<VseTariffImportResult>('/tariffs/imports/vse/apply/', payload)
+  return data
 }

@@ -58,6 +58,13 @@ class Zev(models.Model):
         null=True, blank=True,
         help_text="ElCom operator id, when the grid operator was picked from the official list",
     )
+    # Where this operator publishes its machine-readable tariffs (Art. 7b
+    # StromVV). There is no central registry — every operator hosts its own
+    # address — so it is stored per ZEV and reused for next year's refresh.
+    tariff_source_url = models.URLField(
+        max_length=500, blank=True,
+        help_text="URL of the grid operator's machine-readable tariff publication (VSE/AES standard)",
+    )
     grid_connection_point = models.CharField(max_length=200, blank=True, help_text="Verknüpfungspunkt / EAN")
     billing_interval = models.CharField(
         max_length=20, choices=BillingInterval.choices, default=BillingInterval.MONTHLY

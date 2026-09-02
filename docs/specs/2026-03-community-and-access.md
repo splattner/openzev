@@ -107,6 +107,7 @@ Extends `AbstractUser` (Django `accounts.models`).
 | `zev_type` | `CharField(10)` | `zev` or `vzev` |
 | `grid_operator` | `CharField(200)`, blank | Name of the VNB — free text (see §3.4a) |
 | `grid_operator_elcom_id` | `PositiveIntegerField`, null | ElCom operator id when the name was picked from the official list; null when typed |
+| `tariff_source_url` | `URLField(500)`, blank | Where this operator publishes its machine-readable tariffs (Art. 7b StromVV); used by the tariff import — see `2026-09-vse-tariff-import.md` |
 | `billing_interval` | `CharField(20)` | `monthly`, `quarterly`, `semi_annual`, `annual` |
 | `created_at` | `DateTimeField` (auto) | |
 | `updated_at` | `DateTimeField` (auto) | |
@@ -144,6 +145,12 @@ pointing at a different utility. `ZevSerializer.validate_grid_operator_elcom_id`
 rejects ids that are not in the shipped list; `None` is always valid.
 
 Existing ZEVs needed no backfill — the field is simply null for them.
+
+`tariff_source_url` sits beside these two for the same reason they do: it
+belongs to the operator relationship, not to billing configuration. It is
+per ZEV rather than in `AppSettings` because there is no central registry —
+each operator hosts its own address — and one deployment serves ZEVs on
+different operators.
 
 ### 3.5 Participant
 

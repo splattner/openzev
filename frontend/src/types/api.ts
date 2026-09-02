@@ -78,6 +78,7 @@ export interface Zev {
     zev_type: 'zev' | 'vzev'
     grid_operator: string
     grid_operator_elcom_id?: number | null
+    tariff_source_url?: string
     grid_connection_point?: string
     billing_interval: string
     invoice_prefix?: string
@@ -100,6 +101,7 @@ export interface ZevInput {
     zev_type: 'zev' | 'vzev'
     grid_operator?: string
     grid_operator_elcom_id?: number | null
+    tariff_source_url?: string
     grid_connection_point?: string
     billing_interval: 'monthly' | 'quarterly' | 'semi_annual' | 'annual'
     invoice_prefix?: string
@@ -889,4 +891,59 @@ export interface FeasibilityPrefill {
     retail_price_chf_per_kwh: string | null
     feed_in_price_chf_per_kwh: string | null
     internal_energy_price_chf_per_kwh: string | null
+}
+
+/**
+ * VSE/AES tariff import (Art. 7b StromVV).
+ *
+ * A candidate is a tariff the import *would* create — it carries the status it
+ * would have against this ZEV's existing tariffs, plus everything that could
+ * not be represented, so the user decides before anything is written.
+ */
+export interface VseTariffPeriodPreview {
+    period_type: 'flat' | 'high' | 'low'
+    price_chf_per_kwh: string
+    time_from: string | null
+    time_to: string | null
+    weekdays: string
+}
+
+export type VseTariffCandidateStatus = 'new' | 'new_version' | 'duplicate' | 'conflict' | 'unsupported'
+
+export interface VseTariffCandidate {
+    key: string
+    name: string
+    category: 'energy' | 'grid_fees' | 'levies' | 'metering'
+    billing_mode: string
+    energy_type: string | null
+    fixed_price_chf: string | null
+    valid_from: string
+    valid_to: string | null
+    notes: string
+    periods: VseTariffPeriodPreview[]
+    source_tariff_name: string
+    source_tariff_type: string
+    source_customer_type: string
+    source_voltage_level: number | null
+    standard_basegroup: boolean
+    status: VseTariffCandidateStatus
+    detail: string
+    warnings: string[]
+    recommended: boolean
+    effective_valid_to: string | null
+}
+
+export interface VseTariffImportPreview {
+    dso_name: string
+    dso_number: number | null
+    source_url: string
+    document_digest: string
+    candidates: VseTariffCandidate[]
+    errors: Array<{ tariff: string; error: string }>
+}
+
+export interface VseTariffImportResult {
+    created: Array<{ name: string; category: string; valid_from: string; valid_to: string | null }>
+    skipped: Array<{ name: string; reason: string }>
+    errors: Array<{ name: string; error: string }>
 }

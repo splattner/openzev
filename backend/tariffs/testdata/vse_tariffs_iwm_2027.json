@@ -1,0 +1,1016 @@
+{
+  "dsoName": "InfraWerkeMünsingen",
+  "dsoNumber": 10355012345,
+  "tariffs": [
+    {
+      "tariffName": "Energie Basis Infra Blau",
+      "tariffType": "electricity",
+      "standardBasegroup": true,
+      "tariffForm": "constant",
+      "startDate": "2027-01-01",
+      "endDate": "2027-12-31",
+      "comment": "100% Energie aus Wasser CH/EU. Standardprodukt für unsere Kunden in der Grundversorgung. ",
+      "customerType": "Stromprodukt «BASIS» für Kunden mit einem Anschluss auf Niederspannung (0,4 kV).  Einfach- oder Doppeltarifmessung mit einem jährlichen Strombezug bis 50‘000 kWh",
+      "prices": {
+        "energy": [
+          {
+            "from": "00:00",
+            "to": "00:00",
+            "price": 0.118,
+            "priceUnit": "CHF/kWh"
+          }
+        ]
+      }
+    },
+    {
+      "customerVoltageLevel": 7,
+      "tariffName": "Netznutzung Basis",
+      "tariffType": "grid",
+      "standardBasegroup": true,
+      "tariffForm": "constant",
+      "startDate": "2027-01-01",
+      "endDate": "2027-12-31",
+      "comment": "",
+      "customerType": "Stromprodukt «BASIS» für Kunden mit einem Anschluss auf Niederspannung (0,4 kV).  Einfach- oder Doppeltarifmessung mit einem jährlichen Strombezug bis 50‘000 kWh.",
+      "prices": {
+        "base": {
+          "price": 7,
+          "priceUnit": "CHF/M"
+        },
+        "energy": [
+          {
+            "from": "00:00",
+            "to": "00:00",
+            "price": 0.106,
+            "priceUnit": "CHF/kWh"
+          }
+        ],
+        "power": [
+          {
+            "from": "00:00",
+            "to": "00:00",
+            "price": 0,
+            "priceUnit": "CHF/kW/M"
+          }
+        ],
+        "reactivePower": [
+          {
+            "from": "00:00",
+            "to": "00:00",
+            "price": 0,
+            "priceUnit": "CHF/kVarh"
+          }
+        ],
+        "refundStorage": {
+          "price": 0,
+          "priceUnit": "CHF/kWh"
+        }
+      }
+    },
+    {
+      "tariffName": "Abgaben und Leistungen an das Gemeinwesen für alle Tarife",
+      "tariffType": "regional_fees",
+      "standardBasegroup": false,
+      "tariffForm": "constant",
+      "startDate": "2027-01-01",
+      "endDate": "2027-12-31",
+      "comment": "",
+      "customerType": "Alle Kundengruppen",
+      "prices": {
+        "municipalityTaxes": [
+          {
+            "municipalityNumber": 616,
+            "municipalityName": "Münsingen",
+            "municipalityEnergy": [
+              {
+                "from": "00:00",
+                "to": "00:00",
+                "price": 0.015,
+                "priceUnit": "CHF/kWh"
+              }
+            ],
+            "municipalityComment": "Abgaben und Leistungen an das  Gemeinwesen"
+          }
+        ]
+      }
+    },
+    {
+      "tariffName": "Messtarife Standardzähler für alle Tarife",
+      "tariffType": "metering",
+      "standardBasegroup": false,
+      "tariffForm": "constant",
+      "startDate": "2027-01-01",
+      "endDate": "2027-12-31",
+      "comment": "Standardzähler",
+      "customerType": "Alle Kundengruppen je nach Zählertyp",
+      "prices": {
+        "base": {
+          "price": 7.5,
+          "priceUnit": "CHF/M"
+        }
+      }
+    },
+    {
+      "tariffName": "Messtarife Zähler mit Messwandler für alle Tarife",
+      "tariffType": "metering",
+      "standardBasegroup": false,
+      "tariffForm": "constant",
+      "startDate": "2027-01-01",
+      "endDate": "2027-12-31",
+      "comment": "Zähler mit Messwandler",
+      "customerType": "Alle Kundengruppen je nach Zählertyp",
+      "prices": {
+        "base": {
+          "price": 10,
+          "priceUnit": "CHF/M"
+        }
+      }
+    },
+    {
+      "tariffName": "Messtarife Virtueller Messpunkt für alle Tarife",
+      "tariffType": "metering",
+      "standardBasegroup": false,
+      "tariffForm": "constant",
+      "startDate": "2027-01-01",
+      "endDate": "2027-12-31",
+      "comment": "Virtueller Messpunkt",
+      "customerType": "Alle Kundengruppen je nach Zählertyp",
+      "prices": {
+        "base": {
+          "price": 5,
+          "priceUnit": "CHF/M"
+        }
+      }
+    },
+    {
+      "tariffName": "Energie Leistung Infra Blau",
+      "tariffType": "electricity",
+      "standardBasegroup": false,
+      "tariffForm": "constant",
+      "startDate": "2027-01-01",
+      "endDate": "2027-12-31",
+      "comment": "100% Energie aus Wasser CH/EU",
+      "customerType": " Stromprodukt «LEISTUNG» für Kunden mit einem Anschluss auf Niederspannung (0,4 kV) und ab einem jährlichen Strombezug von 50‘000 kWh bis 100‘000 kWh oder einer Leistung grösser als 30 kVA sowie Leistungs- oder Lastgangmessung. ",
+      "prices": {
+        "energy": [
+          {
+            "from": "00:00",
+            "to": "00:00",
+            "price": 0.121,
+            "priceUnit": "CHF/kWh"
+          }
+        ]
+      }
+    },
+    {
+      "customerVoltageLevel": 7,
+      "tariffName": "Netznutzung Leistung",
+      "tariffType": "grid",
+      "standardBasegroup": false,
+      "tariffForm": "multilevel",
+      "startDate": "2027-01-01",
+      "endDate": "2027-12-31",
+      "comment": "Stromprodukt «LEISTUNG» für Kunden mit einem Anschluss auf Niederspannung (0,4 kV) und ab einem jährli chen Strombezug von 50‘000 kWh bis 100‘000 kWh oder einer Leistung grösser als 30 kVA sowie Leistungs- oder Last gangmessung.",
+      "customerType": "Stromprodukt «LEISTUNG» für Kunden mit einem Anschluss auf Niederspannung (0,4 kV) und ab einem jährli chen Strombezug von 50‘000 kWh bis 100‘000 kWh oder einer Leistung grösser als 30 kVA sowie Leistungs- oder Last gangmessung.",
+      "prices": {
+        "base": {
+          "price": 37.5,
+          "priceUnit": "CHF/M"
+        },
+        "energy": [
+          {
+            "months": [
+              "Jan",
+              "Feb",
+              "Mar",
+              "Apr",
+              "May",
+              "Jun",
+              "Jul",
+              "Aug",
+              "Sep",
+              "Oct",
+              "Nov",
+              "Dec"
+            ],
+            "weekdays": [
+              "Mo",
+              "Tu",
+              "We",
+              "Th",
+              "Fr",
+              "Sa",
+              "Su"
+            ],
+            "from": "07:00",
+            "to": "21:00",
+            "price": 0.073,
+            "priceUnit": "CHF/kWh"
+          },
+          {
+            "months": [
+              "Jan",
+              "Feb",
+              "Mar",
+              "Apr",
+              "May",
+              "Jun",
+              "Jul",
+              "Aug",
+              "Sep",
+              "Oct",
+              "Nov",
+              "Dec"
+            ],
+            "weekdays": [
+              "Mo",
+              "Tu",
+              "We",
+              "Th",
+              "Fr",
+              "Sa",
+              "Su"
+            ],
+            "from": "21:00",
+            "to": "23:59",
+            "price": 0.068,
+            "priceUnit": "CHF/kWh"
+          },
+          {
+            "months": [
+              "Jan",
+              "Feb",
+              "Mar",
+              "Apr",
+              "May",
+              "Jun",
+              "Jul",
+              "Aug",
+              "Sep",
+              "Oct",
+              "Nov",
+              "Dec"
+            ],
+            "weekdays": [
+              "Mo",
+              "Tu",
+              "We",
+              "Th",
+              "Fr",
+              "Sa",
+              "Su"
+            ],
+            "from": "00:00",
+            "to": "07:00",
+            "price": 0.068,
+            "priceUnit": "CHF/kWh"
+          }
+        ],
+        "power": [
+          {
+            "months": [
+              "Jan",
+              "Feb",
+              "Mar",
+              "Apr",
+              "May",
+              "Jun",
+              "Jul",
+              "Aug",
+              "Sep",
+              "Oct",
+              "Nov",
+              "Dec"
+            ],
+            "weekdays": [
+              "Mo",
+              "Tu",
+              "We",
+              "Th",
+              "Fr",
+              "Sa",
+              "Su"
+            ],
+            "from": "00:00",
+            "to": "23:59",
+            "price": 7,
+            "priceUnit": "CHF/kW/M"
+          }
+        ],
+        "reactivePower": [
+          {
+            "months": [
+              "Jan",
+              "Feb",
+              "Mar",
+              "Apr",
+              "May",
+              "Jun",
+              "Jul",
+              "Aug",
+              "Sep",
+              "Oct",
+              "Nov",
+              "Dec"
+            ],
+            "weekdays": [
+              "Mo",
+              "Tu",
+              "We",
+              "Th",
+              "Fr",
+              "Sa",
+              "Su"
+            ],
+            "from": "00:00",
+            "to": "23:59",
+            "price": 0.055,
+            "priceUnit": "CHF/kVarh"
+          }
+        ],
+        "refundStorage": {
+          "price": 0,
+          "priceUnit": "CHF/kWh"
+        }
+      }
+    },
+    {
+      "customerVoltageLevel": 7,
+      "tariffName": "Netznutzung Leistung Plus",
+      "tariffType": "grid",
+      "standardBasegroup": false,
+      "tariffForm": "multilevel",
+      "startDate": "2027-01-01",
+      "endDate": "2027-12-31",
+      "comment": "Stromprodukt «LEISTUNG PLUS» für Kunden mit einem Anschluss auf Niederspannung (0,4 kV) und ab einem  jährlichen Strombezug von 100‘000 kWh bis 1‘000‘000 kWh sowie Leistungs- oder Lastgangmessung.",
+      "customerType": "Stromprodukt «LEISTUNG PLUS» für Kunden mit einem Anschluss auf Niederspannung (0,4 kV) und ab einem  jährlichen Strombezug von 100‘000 kWh bis 1‘000‘000 kWh sowie Leistungs- oder Lastgangmessung.",
+      "prices": {
+        "base": {
+          "price": 37.5,
+          "priceUnit": "CHF/M"
+        },
+        "energy": [
+          {
+            "months": [
+              "Jan",
+              "Feb",
+              "Mar",
+              "Apr",
+              "May",
+              "Jun",
+              "Jul",
+              "Aug",
+              "Sep",
+              "Oct",
+              "Nov",
+              "Dec"
+            ],
+            "weekdays": [
+              "Mo",
+              "Tu",
+              "We",
+              "Th",
+              "Fr",
+              "Sa",
+              "Su"
+            ],
+            "from": "07:00",
+            "to": "21:00",
+            "price": 0.067,
+            "priceUnit": "CHF/kWh"
+          },
+          {
+            "months": [
+              "Jan",
+              "Feb",
+              "Mar",
+              "Apr",
+              "May",
+              "Jun",
+              "Jul",
+              "Aug",
+              "Sep",
+              "Oct",
+              "Nov",
+              "Dec"
+            ],
+            "weekdays": [
+              "Mo",
+              "Tu",
+              "We",
+              "Th",
+              "Fr",
+              "Sa",
+              "Su"
+            ],
+            "from": "21:00",
+            "to": "23:59",
+            "price": 0.063,
+            "priceUnit": "CHF/kWh"
+          },
+          {
+            "months": [
+              "Jan",
+              "Feb",
+              "Mar",
+              "Apr",
+              "May",
+              "Jun",
+              "Jul",
+              "Aug",
+              "Sep",
+              "Oct",
+              "Nov",
+              "Dec"
+            ],
+            "weekdays": [
+              "Mo",
+              "Tu",
+              "We",
+              "Th",
+              "Fr",
+              "Sa",
+              "Su"
+            ],
+            "from": "00:00",
+            "to": "07:00",
+            "price": 0.063,
+            "priceUnit": "CHF/kWh"
+          }
+        ],
+        "power": [
+          {
+            "months": [
+              "Jan",
+              "Feb",
+              "Mar",
+              "Apr",
+              "May",
+              "Jun",
+              "Jul",
+              "Aug",
+              "Sep",
+              "Oct",
+              "Nov",
+              "Dec"
+            ],
+            "weekdays": [
+              "Mo",
+              "Tu",
+              "We",
+              "Th",
+              "Fr",
+              "Sa",
+              "Su"
+            ],
+            "from": "00:00",
+            "to": "23:59",
+            "price": 7,
+            "priceUnit": "CHF/kW/M"
+          }
+        ],
+        "reactivePower": [
+          {
+            "months": [
+              "Jan",
+              "Feb",
+              "Mar",
+              "Apr",
+              "May",
+              "Jun",
+              "Jul",
+              "Aug",
+              "Sep",
+              "Oct",
+              "Nov",
+              "Dec"
+            ],
+            "weekdays": [
+              "Mo",
+              "Tu",
+              "We",
+              "Th",
+              "Fr",
+              "Sa",
+              "Su"
+            ],
+            "from": "00:00",
+            "to": "23:59",
+            "price": 0.055,
+            "priceUnit": "CHF/kVarh"
+          }
+        ],
+        "refundStorage": {
+          "price": 0,
+          "priceUnit": "CHF/kWh"
+        }
+      }
+    },
+    {
+      "customerVoltageLevel": 7,
+      "tariffName": "Netznutzung Industrie",
+      "tariffType": "grid",
+      "standardBasegroup": false,
+      "tariffForm": "multilevel",
+      "startDate": "2027-01-01",
+      "endDate": "2027-12-31",
+      "comment": "",
+      "customerType": "Unser Stromprodukt «INDUSTRIE» für Kunden mit einem Anschluss auf Niederspannung (0,4 kV) und ab einem  jährlichen Strombezug ab 1‘000‘000 kWh.",
+      "prices": {
+        "base": {
+          "price": 47.5,
+          "priceUnit": "CHF/M"
+        },
+        "energy": [
+          {
+            "months": [
+              "Jan",
+              "Feb",
+              "Mar",
+              "Apr",
+              "May",
+              "Jun",
+              "Jul",
+              "Aug",
+              "Sep",
+              "Oct",
+              "Nov",
+              "Dec"
+            ],
+            "weekdays": [
+              "Mo",
+              "Tu",
+              "We",
+              "Th",
+              "Fr",
+              "Sa",
+              "Su"
+            ],
+            "from": "07:00",
+            "to": "21:00",
+            "price": 0.052,
+            "priceUnit": "CHF/kWh"
+          },
+          {
+            "months": [
+              "Jan",
+              "Feb",
+              "Mar",
+              "Apr",
+              "May",
+              "Jun",
+              "Jul",
+              "Aug",
+              "Sep",
+              "Oct",
+              "Nov",
+              "Dec"
+            ],
+            "weekdays": [
+              "Mo",
+              "Tu",
+              "We",
+              "Th",
+              "Fr",
+              "Sa",
+              "Su"
+            ],
+            "from": "21:00",
+            "to": "23:59",
+            "price": 0.048,
+            "priceUnit": "CHF/kWh"
+          },
+          {
+            "months": [
+              "Jan",
+              "Feb",
+              "Mar",
+              "Apr",
+              "May",
+              "Jun",
+              "Jul",
+              "Aug",
+              "Sep",
+              "Oct",
+              "Nov",
+              "Dec"
+            ],
+            "weekdays": [
+              "Mo",
+              "Tu",
+              "We",
+              "Th",
+              "Fr",
+              "Sa",
+              "Su"
+            ],
+            "from": "00:00",
+            "to": "07:00",
+            "price": 0.048,
+            "priceUnit": "CHF/kWh"
+          }
+        ],
+        "power": [
+          {
+            "months": [
+              "Jan",
+              "Feb",
+              "Mar",
+              "Apr",
+              "May",
+              "Jun",
+              "Jul",
+              "Aug",
+              "Sep",
+              "Oct",
+              "Nov",
+              "Dec"
+            ],
+            "weekdays": [
+              "Mo",
+              "Tu",
+              "We",
+              "Th",
+              "Fr",
+              "Sa",
+              "Su"
+            ],
+            "from": "00:00",
+            "to": "23:59",
+            "price": 7,
+            "priceUnit": "CHF/kW/M"
+          }
+        ],
+        "reactivePower": [
+          {
+            "months": [
+              "Jan",
+              "Feb",
+              "Mar",
+              "Apr",
+              "May",
+              "Jun",
+              "Jul",
+              "Aug",
+              "Sep",
+              "Oct",
+              "Nov",
+              "Dec"
+            ],
+            "weekdays": [
+              "Mo",
+              "Tu",
+              "We",
+              "Th",
+              "Fr",
+              "Sa",
+              "Su"
+            ],
+            "from": "00:00",
+            "to": "23:59",
+            "price": 0.055,
+            "priceUnit": "CHF/kVarh"
+          }
+        ],
+        "refundStorage": {
+          "price": 0,
+          "priceUnit": "CHF/kWh"
+        }
+      }
+    },
+    {
+      "customerVoltageLevel": 7,
+      "tariffName": "Netznutzung Temporäre Anschlüsse",
+      "tariffType": "grid",
+      "standardBasegroup": false,
+      "tariffForm": "constant",
+      "startDate": "2027-01-01",
+      "endDate": "2027-12-31",
+      "comment": "",
+      "customerType": " Stromprodukt «TEMPORÄRE ANSCHLÜSSE» gilt für Energielieferungen für Baustellen, Fest- und Sportveranstaltungen, Marktfahrer, sowie provisorische Anschlüsse aller Art bis 30 kVA.",
+      "prices": {
+        "base": {
+          "price": 15,
+          "priceUnit": "CHF/M"
+        },
+        "energy": [
+          {
+            "from": "00:00",
+            "to": "00:00",
+            "price": 0.16,
+            "priceUnit": "CHF/kWh"
+          }
+        ],
+        "power": [
+          {
+            "from": "00:00",
+            "to": "00:00",
+            "price": 0,
+            "priceUnit": "CHF/kW/M"
+          }
+        ],
+        "reactivePower": [
+          {
+            "from": "00:00",
+            "to": "00:00",
+            "price": 0,
+            "priceUnit": "CHF/kVarh"
+          }
+        ],
+        "refundStorage": {
+          "price": 0,
+          "priceUnit": "CHF/kWh"
+        }
+      }
+    },
+    {
+      "tariffName": "Energie Temporäre Anschlüsse Infra Blau",
+      "tariffType": "electricity",
+      "standardBasegroup": false,
+      "tariffForm": "constant",
+      "startDate": "2027-01-01",
+      "endDate": "2027-12-31",
+      "comment": "",
+      "customerType": " Stromprodukt «TEMPORÄRE ANSCHLÜSSE» gilt für Energielieferungen für Baustellen, Fest- und Sportveranstaltungen, Marktfahrer, sowie provisorische Anschlüsse aller Art bis 30 kVA.",
+      "prices": {
+        "base": {
+          "price": 0,
+          "priceUnit": "CHF/M"
+        },
+        "energy": [
+          {
+            "from": "00:00",
+            "to": "00:00",
+            "price": 0.118,
+            "priceUnit": "CHF/kWh"
+          }
+        ]
+      }
+    },
+    {
+      "tariffName": "Energie OEB Infra Orange",
+      "tariffType": "electricity",
+      "standardBasegroup": false,
+      "tariffForm": "constant",
+      "startDate": "2027-01-01",
+      "endDate": "2027-12-31",
+      "comment": "",
+      "customerType": "Stromprodukt «OEB» (Öffentliche Beleuchtung) gilt für die Beleuchtung von öffentlichem Raum (Strassen, Plätze, etc.).",
+      "prices": {
+        "base": {
+          "price": 0,
+          "priceUnit": "CHF/M"
+        },
+        "energy": [
+          {
+            "from": "00:00",
+            "to": "00:00",
+            "price": 0.131,
+            "priceUnit": "CHF/kWh"
+          }
+        ]
+      }
+    },
+    {
+      "customerVoltageLevel": 7,
+      "tariffName": "Netznutzung OEB",
+      "tariffType": "grid",
+      "standardBasegroup": false,
+      "tariffForm": "constant",
+      "startDate": "2027-01-01",
+      "endDate": "2027-12-31",
+      "comment": "",
+      "customerType": "Stromprodukt «OEB» (Öffentliche Beleuchtung) gilt für die Beleuchtung von öffentlichem Raum (Strassen, Plätze, etc.).",
+      "prices": {
+        "base": {
+          "price": 0,
+          "priceUnit": "CHF/M"
+        },
+        "energy": [
+          {
+            "from": "00:00",
+            "to": "00:00",
+            "price": 0.098,
+            "priceUnit": "CHF/kWh"
+          }
+        ],
+        "power": [
+          {
+            "from": "00:00",
+            "to": "00:00",
+            "price": 0,
+            "priceUnit": "CHF/kW/M"
+          }
+        ],
+        "reactivePower": [
+          {
+            "from": "00:00",
+            "to": "00:00",
+            "price": 0,
+            "priceUnit": "CHF/kVarh"
+          }
+        ],
+        "refundStorage": {
+          "price": 0,
+          "priceUnit": "CHF/kWh"
+        }
+      }
+    },
+    {
+      "tariffName": "Energie Basis Infra Orange",
+      "tariffType": "electricity",
+      "standardBasegroup": false,
+      "tariffForm": "constant",
+      "startDate": "2027-01-01",
+      "endDate": "2027-12-31",
+      "comment": "100% Energie aus regionaler Produktion.",
+      "customerType": "Stromprodukt «BASIS» für Kunden mit einem Anschluss auf Niederspannung (0,4 kV).  Einfach- oder Doppeltarifmessung mit einem jährlichen Strombezug bis 50‘000 kWh",
+      "prices": {
+        "energy": [
+          {
+            "from": "00:00",
+            "to": "00:00",
+            "price": 0.138,
+            "priceUnit": "CHF/kWh"
+          }
+        ]
+      }
+    },
+    {
+      "tariffName": "Energie Basis Infra Grün",
+      "tariffType": "electricity",
+      "standardBasegroup": false,
+      "tariffForm": "constant",
+      "startDate": "2027-01-01",
+      "endDate": "2027-12-31",
+      "comment": "100% Energie aus erneuerbarer Energie CH mit Gütesiegel. ",
+      "customerType": "Stromprodukt «BASIS» für Kunden mit einem Anschluss auf Niederspannung (0,4 kV).  Einfach- oder Doppeltarifmessung mit einem jährlichen Strombezug bis 50‘000 kWh",
+      "prices": {
+        "energy": [
+          {
+            "from": "00:00",
+            "to": "00:00",
+            "price": 0.158,
+            "priceUnit": "CHF/kWh"
+          }
+        ]
+      }
+    },
+    {
+      "tariffName": "Energie Leistung Infra Orange",
+      "tariffType": "electricity",
+      "standardBasegroup": false,
+      "tariffForm": "constant",
+      "startDate": "2027-01-01",
+      "endDate": "2027-12-31",
+      "comment": "100% Energie aus regionaler Produktion (regionaler Produktion ergänzt mit Wasserkraft CH)",
+      "customerType": " Stromprodukt «LEISTUNG» für Kunden mit einem Anschluss auf Niederspannung (0,4 kV) und ab einem jährlichen Strombezug von 50‘000 kWh bis 100‘000 kWh oder einer Leistung grösser als 30 kVA sowie Leistungs- oder Lastgangmessung. ",
+      "prices": {
+        "energy": [
+          {
+            "from": "00:00",
+            "to": "00:00",
+            "price": 0.141,
+            "priceUnit": "CHF/kWh"
+          }
+        ]
+      }
+    },
+    {
+      "tariffName": "Energie Leistung Infra Grün",
+      "tariffType": "electricity",
+      "standardBasegroup": false,
+      "tariffForm": "constant",
+      "startDate": "2027-01-01",
+      "endDate": "2027-12-31",
+      "comment": "100% Energie aus erneuerbarer Energie CH mit Gütesiegel (Sonnenenergie & Wasserkraft CH naturemade star)",
+      "customerType": "Stromprodukt «LEISTUNG» für Kunden mit einem Anschluss auf Niederspannung (0,4 kV) und ab einem jährli chen Strombezug von 50‘000 kWh bis 100‘000 kWh oder einer Leistung grösser als 30 kVA sowie Leistungs- oder Last gangmessung.",
+      "prices": {
+        "base": {
+          "price": 0,
+          "priceUnit": "CHF/M"
+        },
+        "energy": [
+          {
+            "from": "00:00",
+            "to": "00:00",
+            "price": 0.161,
+            "priceUnit": "CHF/kWh"
+          }
+        ]
+      }
+    },
+    {
+      "tariffName": "Energie Temporäre Anschlüsse Infra Orange",
+      "tariffType": "electricity",
+      "standardBasegroup": false,
+      "tariffForm": "constant",
+      "startDate": "2027-01-01",
+      "endDate": "2027-12-31",
+      "comment": "100% Energie aus regionaler Produktion ergänzt mit Wasserkraft CH.",
+      "customerType": " Stromprodukt «TEMPORÄRE ANSCHLÜSSE» gilt für Energielieferungen für Baustellen, Fest- und Sportveranstaltungen, Marktfahrer, sowie provisorische Anschlüsse aller Art bis 30 kVA.",
+      "prices": {
+        "base": {
+          "price": 0,
+          "priceUnit": "CHF/M"
+        },
+        "energy": [
+          {
+            "from": "00:00",
+            "to": "00:00",
+            "price": 0.138,
+            "priceUnit": "CHF/kWh"
+          }
+        ]
+      }
+    },
+    {
+      "tariffName": "Energie Temporäre Anschlüsse Infra Grün",
+      "tariffType": "electricity",
+      "standardBasegroup": false,
+      "tariffForm": "constant",
+      "startDate": "2027-01-01",
+      "endDate": "2027-12-31",
+      "comment": "100% Energie aus erneuerbarer Energie CH mit Gütesiegel naturemade star.",
+      "customerType": " Stromprodukt «TEMPORÄRE ANSCHLÜSSE» gilt für Energielieferungen für Baustellen, Fest- und Sportveran staltungen, Marktfahrer, sowie provisorische Anschlüsse aller Art bis 30 kVA.",
+      "prices": {
+        "base": {
+          "price": 0,
+          "priceUnit": "CHF/M"
+        },
+        "energy": [
+          {
+            "from": "00:00",
+            "to": "00:00",
+            "price": 0.158,
+            "priceUnit": "CHF/kWh"
+          }
+        ]
+      }
+    },
+    {
+      "tariffName": "Energie Leistung Plus Infra Orange",
+      "tariffType": "electricity",
+      "standardBasegroup": false,
+      "tariffForm": "constant",
+      "startDate": "2027-01-01",
+      "endDate": "2027-12-31",
+      "comment": "100% Energie aus regionaler Produktion (regionaler Produktion ergänzt mit Wasserkraft CH)",
+      "customerType": " Stromprodukt «LEISTUNG PLUS» für Kunden mit einem Anschluss auf Niederspannung (0,4 kV) und ab einem jährlichen Strombezug von 100‘000 kWh bis 1‘000‘000 kWh sowie Leistungs- oder Lastgangmessung.",
+      "prices": {
+        "energy": [
+          {
+            "from": "00:00",
+            "to": "00:00",
+            "price": 0.141,
+            "priceUnit": "CHF/kWh"
+          }
+        ]
+      }
+    },
+    {
+      "tariffName": "Energie Leistung Plus Infra Grün",
+      "tariffType": "electricity",
+      "standardBasegroup": false,
+      "tariffForm": "constant",
+      "startDate": "2027-01-01",
+      "endDate": "2027-12-31",
+      "comment": "100% Energie aus erneuerbarer Energie CH mit Gütesiegel (Sonnenenergie & Wasserkraft CH naturemade star)",
+      "customerType": "Stromprodukt «LEISTUNG PLUS» für Kunden mit einem Anschluss auf Niederspannung (0,4 kV) und ab einem jährlichen Strombezug von 100‘000 kWh bis 1‘000‘000 kWh sowie Leistungs- oder Lastgangmessung.",
+      "prices": {
+        "base": {
+          "price": 0,
+          "priceUnit": "CHF/M"
+        },
+        "energy": [
+          {
+            "from": "00:00",
+            "to": "00:00",
+            "price": 0.161,
+            "priceUnit": "CHF/kWh"
+          }
+        ]
+      }
+    },
+    {
+      "tariffName": "Energie Leistung Plus Infra Blau",
+      "tariffType": "electricity",
+      "standardBasegroup": false,
+      "tariffForm": "constant",
+      "startDate": "2027-01-01",
+      "endDate": "2027-12-31",
+      "comment": "100% Energie aus Wasser CH/EU",
+      "customerType": " Stromprodukt «LEISTUNG PLUS» für Kunden mit einem Anschluss auf Niederspannung (0,4 kV) und ab einem jährlichen Strombezug von 100‘000 kWh bis 1‘000‘000 kWh sowie Leistungs- oder Lastgangmessung.",
+      "prices": {
+        "energy": [
+          {
+            "from": "00:00",
+            "to": "00:00",
+            "price": 0.121,
+            "priceUnit": "CHF/kWh"
+          }
+        ]
+      }
+    }
+  ]
+}

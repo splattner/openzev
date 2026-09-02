@@ -169,6 +169,28 @@ twice unguarded.
    Match periods where `time_from ≤ time < time_to` and weekday ∈ allowed weekdays.
 3. **Fallback:** if no period matches, use the first period's price (ordered by `period_type`).
 
+### 3.2a Importing bands from a grid operator's publication
+
+Tariffs no longer have to be typed in from a PDF. `POST
+/api/v1/tariffs/imports/vse/preview/` reads a grid operator's Art. 7b StromVV
+tariff publication and reports the `Tariff` + `TariffPeriod` records it would
+create; `.../apply/` creates the ones the user selects. Imported tariffs are
+ordinary tariffs — nothing in this document special-cases them.
+
+Two consequences are worth knowing here, because they follow from the shape of
+`Tariff` and `TariffPeriod` rather than from the import:
+
+- One published tariff carrying both a base fee and a per-kWh price becomes
+  **two** tariffs, because `Tariff` has a single `billing_mode`, named
+  `"… (Grundpreis)"` and `"… (Arbeitspreis)"`.
+- What decides whether a published multi-band tariff fits is the number of
+  **distinct prices**, not the number of windows: `PeriodType` has three slots,
+  so a three-window/two-price document maps onto one `high` and two `low` rows,
+  while three distinct prices cannot be represented at all.
+
+Full mapping table, the constructs that are refused, and the fetch guards:
+`2026-09-vse-tariff-import.md`.
+
 ### 3.3 Energy types
 
 | Value | Meaning |

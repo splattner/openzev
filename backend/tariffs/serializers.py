@@ -77,3 +77,98 @@ class TariffSerializer(serializers.ModelSerializer):
         model = Tariff
         fields = "__all__"
         read_only_fields = ["id", "created_at", "updated_at"]
+
+
+# ── VSE/AES tariff import ────────────────────────────────────────────────────
+#
+# Read-only serializers describing what the importer *would* create. They are
+# hand-written rather than derived from ``Tariff`` because a candidate is not a
+# tariff yet: it carries a status, warnings and provenance that only exist
+# while the user is deciding, and none of which belong on the model.
+
+
+class VseTariffImportPreviewRequestSerializer(serializers.Serializer):
+    zev = serializers.UUIDField()
+    url = serializers.URLField(max_length=500, required=False, allow_blank=True)
+
+
+class VseTariffImportApplyRequestSerializer(serializers.Serializer):
+    zev = serializers.UUIDField()
+    url = serializers.URLField(max_length=500, required=False, allow_blank=True)
+    keys = serializers.ListField(child=serializers.CharField(max_length=300), allow_empty=False)
+    #: The digest the preview returned. The document is fetched again on apply
+    #: rather than trusting tariff data sent by the client, so this is what
+    #: proves the user is confirming the document they actually looked at.
+    document_digest = serializers.CharField(max_length=64)
+    remember_url = serializers.BooleanField(required=False, default=True)
+
+
+class VseTariffPeriodPreviewSerializer(serializers.Serializer):
+    period_type = serializers.CharField()
+    price_chf_per_kwh = serializers.DecimalField(max_digits=8, decimal_places=5)
+    time_from = serializers.TimeField(allow_null=True)
+    time_to = serializers.TimeField(allow_null=True)
+    weekdays = serializers.CharField(allow_blank=True)
+
+
+class VseTariffCandidateSerializer(serializers.Serializer):
+    key = serializers.CharField()
+    name = serializers.CharField()
+    category = serializers.CharField()
+    billing_mode = serializers.CharField()
+    energy_type = serializers.CharField(allow_null=True)
+    fixed_price_chf = serializers.DecimalField(max_digits=10, decimal_places=2, allow_null=True)
+    valid_from = serializers.DateField()
+    valid_to = serializers.DateField(allow_null=True)
+    notes = serializers.CharField(allow_blank=True)
+    periods = VseTariffPeriodPreviewSerializer(many=True)
+
+    source_tariff_name = serializers.CharField(allow_blank=True)
+    source_tariff_type = serializers.CharField(allow_blank=True)
+    source_customer_type = serializers.CharField(allow_blank=True)
+    source_voltage_level = serializers.IntegerField(allow_null=True)
+    standard_basegroup = serializers.BooleanField()
+
+    #: ``new`` / ``new_version`` / ``duplicate`` / ``conflict`` / ``unsupported``
+    status = serializers.CharField()
+    detail = serializers.CharField(allow_blank=True)
+    warnings = serializers.ListField(child=serializers.CharField())
+    recommended = serializers.BooleanField()
+    effective_valid_to = serializers.DateField(allow_null=True)
+
+
+class VseTariffImportErrorSerializer(serializers.Serializer):
+    tariff = serializers.CharField()
+    error = serializers.CharField()
+
+
+class VseTariffImportPreviewSerializer(serializers.Serializer):
+    dso_name = serializers.CharField()
+    dso_number = serializers.IntegerField(allow_null=True)
+    source_url = serializers.CharField()
+    document_digest = serializers.CharField()
+    candidates = VseTariffCandidateSerializer(many=True)
+    errors = VseTariffImportErrorSerializer(many=True)
+
+
+class VseTariffImportCreatedSerializer(serializers.Serializer):
+    name = serializers.CharField()
+    category = serializers.CharField()
+    valid_from = serializers.DateField()
+    valid_to = serializers.DateField(allow_null=True)
+
+
+class VseTariffImportSkippedSerializer(serializers.Serializer):
+    name = serializers.CharField()
+    reason = serializers.CharField()
+
+
+class VseTariffImportAppliedErrorSerializer(serializers.Serializer):
+    name = serializers.CharField()
+    error = serializers.CharField()
+
+
+class VseTariffImportResultSerializer(serializers.Serializer):
+    created = VseTariffImportCreatedSerializer(many=True)
+    skipped = VseTariffImportSkippedSerializer(many=True)
+    errors = VseTariffImportAppliedErrorSerializer(many=True)
