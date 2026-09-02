@@ -157,7 +157,7 @@ All five are pure derivations; hand-editing them is a lint/test error.
 | `backend/invoices/generated_chart_tokens.py` | `charts` block as plain Python constants (same literals as `chartTokens.ts`) | imported by `invoices/pdf_charts.py` and `invoices/annual_statement.py` (its SVG chart) — no duplicated color literals in Python |
 | `backend/templates/pdf/_tokens.css` | `primitives` (same block as `shared_pdf_base.html:23-42`) | `{% include "pdf/_tokens.css" %}` from `shared_pdf_base.html` (or an equivalent `_tokens.html` partial) — the PDF stays the source of the same hex values; no hex drift between screen and print |
 
-`scripts/generate-tokens.mjs` (new, no deps): reads `tokens.json`, validates its schema (required keys; semantics reference existing primitives; hex literals only inside `primitives`), and emits the five files deterministically. A unit test `design/tokens.test.mjs` asserts that regenerating and diffing produces no changes (parity by construction).
+`scripts/generate-tokens.mjs` (new, no deps): reads `tokens.json`, validates its schema (required keys; semantics reference existing primitives; hex literals only inside `primitives`), enforces strictly decreasing WCAG 2.1 relative luminance across the 10-step brand ramp (`--brand-pale` → `--brand-ink`) in both generate and `--check` modes, and emits the five files deterministically. A unit test `design/tokens.test.mjs` asserts that regenerating and diffing produces no changes (parity by construction), and a negative test runs the generator against a temp tree with the historical `--brand-glow` ↔ `--brand-muted` inversion (plus an equal-luminance tie) and asserts non-zero exit with the actionable inversion message in both generate and `--check` modes.
 
 ### 4.3 Chart token parity
 
@@ -552,7 +552,7 @@ Existing suites stay green (contract: 48 tests in `test_contract_context.py`; te
 ### Frontend
 
 - `npm run test:unit` (if present) + `npm run build` green; `stylelint` step green ( `pr-quality.yml`).
-- `scripts/generate-tokens.mjs` idempotence test `design/tokens.test.mjs`: write→read→generate→diff → `0`.
+- `scripts/generate-tokens.mjs` idempotence test `design/tokens.test.mjs`: write→read→generate→diff → `0`; brand-ramp monotonicity negative test: inverted/tied ramp in a temp tree → non-zero exit in both generate and `--check` modes.
 - Playwright `npm run screenshots` (1440×900 de-CH) regenerated — 22/22 captures committed under `docs/user-guide/screenshots/`.
 - Preview editor: revision guard ignores out-of-order responses; superseded requests are aborted (`AbortController`).
 - Date-picker cutover matrix: each of the five converted pickers displays and submits the same plain civil-date format as before (no local-time shift, ADR 0007).
@@ -563,7 +563,7 @@ Existing suites stay green (contract: 48 tests in `test_contract_context.py`; te
 |---|---|---|
 | `lint:style` + color sweep | `npm run lint:style` (stylelint `color-no-hex` on `src/**/*.css`; only the generated `tokens.css` is allowlisted) and `node ../scripts/check-frontend-hex.mjs` (hex **and** `rgb()/rgba()/hsl()/hsla()` sweep across TSX/CSS/backend templates/Python; `@alpha` allowlist entries sanction neutral scrims only) | No new raw color literals in hand-written source |
 | `lint:types` | `npm run build` | No TS regressions |
-| `tokens` | `node scripts/generate-tokens.mjs --check` | No drift between `tokens.json` and generated outputs |
+| `tokens` | `node scripts/generate-tokens.mjs --check` | No drift between `tokens.json` and generated outputs and no brand-ramp luminance inversion |
 
 ### Manual verification
 
@@ -604,7 +604,7 @@ Existing suites stay green (contract: 48 tests in `test_contract_context.py`; te
   `design/tokens.test.mjs`, five committed generated outputs. The generator holds
   zero hex literals: the 10-step Mantine ramp derives from primitives plus
   `charts.prodColors[1]`; `--brand-ink` was added for the darkest step. Chart
-  tokens gained `positiveColor`/`negativeColor` during Phase 3, plus `divergingPositive` (validated blue half of the blue/red diverging pair) during review follow-up.
+  tokens gained `positiveColor`/`negativeColor` during Phase 3, plus `divergingPositive` (validated blue half of the blue/red diverging pair) during review follow-up. The generator also asserts WCAG 2.1 relative-luminance monotonicity (strictly decreasing) across the 10-step ramp (`--brand-pale` → `--brand-ink`) in both generate and `--check` modes, failing on any `--brand-glow` ↔ `--brand-muted` inversion (CI gate via `pr-quality.yml` `--check`).
 - **Phase 1** — full `index.css` token sweep (zero raw hex), sidebar/nav active
   pill + leading bar, flat `.button`, desaturated badges incl. invoice workflow
   variants, global `:focus-visible`. `preview-pdf-template` accepts body

@@ -35,6 +35,15 @@ function assert(cond, msg) {
   if (!cond) throw new Error(msg)
 }
 
+function relativeLuminance(hex) {
+  // WCAG 2.1 relative luminance from sRGB hex (6-digit).
+  const r = parseInt(hex.slice(1, 3), 16) / 255
+  const g = parseInt(hex.slice(3, 5), 16) / 255
+  const b = parseInt(hex.slice(5, 7), 16) / 255
+  const lin = (c) => c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4)
+  return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b)
+}
+
 function validate(tokens) {
   const required = ['primitives', 'semantics', 'themes', 'charts', 'type']
   for (const k of required) {
@@ -168,6 +177,18 @@ function generateMantineTheme(tokens) {
     p['--brand-ink'],                  // 9 darkest
   ]
   for (const v of ramp) assert(HEX_RE.test(v), `Brand ramp entry must be hex, got: ${v}`)
+
+  // Luminance monotonicity: the ramp goes pale (bright) → ink (dark),
+  // so each step must be strictly lower luminance than the previous.
+  for (let i = 1; i < ramp.length; i++) {
+    const lumPrev = relativeLuminance(ramp[i - 1])
+    const lumCurr = relativeLuminance(ramp[i])
+    assert(
+      lumCurr < lumPrev,
+      `Brand ramp inversion at steps ${i}→${i + 1}: ${ramp[i - 1]} (L=${lumPrev.toFixed(4)}) must be lighter than ${ramp[i]} (L=${lumCurr.toFixed(4)})`
+    )
+  }
+
   const fontFamily = tokens.type?.fontFamily?.screen || "'Inter Variable', Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
   const lines = []
   lines.push('// Generated — do not edit. Source: design/tokens.json')
