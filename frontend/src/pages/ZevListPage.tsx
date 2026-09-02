@@ -33,6 +33,7 @@ import { copyToClipboard } from '../lib/clipboard'
 import { BILLING_INTERVAL_OPTIONS, METER_TYPE_OPTIONS, ZEV_TYPE_OPTIONS } from '../lib/options'
 import { TITLE_KEYS } from '../lib/participantTitle'
 import type { OwnerMeteringPointInput, Zev, ZevInput, ZevWizardInput, ZevWizardResult } from '../types/api'
+import { GridOperatorField } from '../features/zev/GridOperatorField'
 
 const defaultCreateForm = (): ZevWizardInput => ({
     name: '',
@@ -462,10 +463,14 @@ export function ZevListPage() {
                                     ))}
                                 </select>
                             </label>
-                            <label className="grid-span-full">
-                                <span>{t('pages.zevs.form.gridOperator')}</span>
-                                <input value={createForm.grid_operator ?? ''} onChange={(event) => setCreateForm((previous) => ({ ...previous, grid_operator: event.target.value }))} />
-                            </label>
+                            <div className="grid-span-full">
+                                <GridOperatorField
+                                    label={t('pages.zevs.form.gridOperator')}
+                                    value={createForm.grid_operator ?? ''}
+                                    elcomId={createForm.grid_operator_elcom_id ?? null}
+                                    onChange={(next) => setCreateForm((previous) => ({ ...previous, ...next }))}
+                                />
+                            </div>
                         </>
                     )}
 

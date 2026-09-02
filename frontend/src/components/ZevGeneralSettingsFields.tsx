@@ -2,6 +2,7 @@ import { CivilDateInput } from './CivilDateInput'
 import { useTranslation } from 'react-i18next'
 import { BILLING_INTERVAL_OPTIONS, ZEV_TYPE_OPTIONS } from '../lib/options'
 import type { ZevInput } from '../types/api'
+import { GridOperatorField } from '../features/zev/GridOperatorField'
 
 type ZevGeneralSettingsFieldsProps = {
     form: ZevInput
@@ -96,13 +97,12 @@ export function ZevGeneralSettingsFields({ form, onChange }: ZevGeneralSettingsF
             <div className="form-section">
                 <p className="form-section-header">{t('pages.zevSettings.sections.gridConnection')}</p>
                 <div className="inline-form grid grid-2">
-                    <label>
-                        <span>{t('pages.zevSettings.fields.gridOperator')}</span>
-                        <input
-                            value={form.grid_operator ?? ''}
-                            onChange={(event) => onChange({ grid_operator: event.target.value })}
-                        />
-                    </label>
+                    <GridOperatorField
+                        label={t('pages.zevSettings.fields.gridOperator')}
+                        value={form.grid_operator ?? ''}
+                        elcomId={form.grid_operator_elcom_id ?? null}
+                        onChange={onChange}
+                    />
                     <label>
                         <span>{t('pages.zevSettings.fields.gridConnectionPoint')}</span>
                         <input

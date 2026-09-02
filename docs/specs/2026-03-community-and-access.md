@@ -105,11 +105,45 @@ Extends `AbstractUser` (Django `accounts.models`).
 | `owner` | FK → `User` (`PROTECT`) | The owning user account |
 | `start_date` | `DateField` | Community start date |
 | `zev_type` | `CharField(10)` | `zev` or `vzev` |
+| `grid_operator` | `CharField(200)`, blank | Name of the VNB — free text (see §3.4a) |
+| `grid_operator_elcom_id` | `PositiveIntegerField`, null | ElCom operator id when the name was picked from the official list; null when typed |
 | `billing_interval` | `CharField(20)` | `monthly`, `quarterly`, `semi_annual`, `annual` |
 | `created_at` | `DateTimeField` (auto) | |
 | `updated_at` | `DateTimeField` (auto) | |
 
-**Ordering:** `["name"]`.
+**Ordering:** `["name", "id"]` — the trailing `id` keeps paginated walks
+stable (§3.7).
+
+### 3.4a Grid operator picker
+
+`grid_operator` stays free text; `grid_operator_elcom_id` records *which*
+official operator it is when the user picked one. The pair exists because the
+same utility was reaching the database as "EKZ", "Elektrizitätswerke des
+Kantons Zürich", or a typo — and the value is printed on contracts and
+invoices via `{{ zev.grid_operator }}`.
+
+**Source.** ElCom publishes its electricity-tariff data as Linked Data on the
+federal LINDAS platform under `TermsOfUse/Open-Use`. `manage.py
+fetch_grid_operators` queries the SPARQL endpoint and writes
+`backend/zev/data/grid_operators.json` (553 operators for 2026, ~82 KB): id,
+name, UID, website, plus the source, cube, licence, period and fetch date.
+
+**Shipped as a fixture, not queried live.** The list changes on a tariff-year
+cadence, and the self-setup wizard is the first form a new owner sees — it
+must not fail because an external SPARQL endpoint is unreachable. Run the
+command once per tariff year and commit the result. It refuses to write when
+fewer than `--min-operators` (default 400) come back, so a changed query or
+cube cannot silently truncate a good fixture.
+
+**A suggestion source, not a constraint.** Deliberately not a foreign key: an
+operator missing from ElCom's tariff cube — a recent merger, a small municipal
+works — must still be enterable. The frontend uses an `Autocomplete`, and
+`grid_operator_elcom_id` is derived from the typed name on every change, so
+editing a picked name by one character drops the id rather than leaving it
+pointing at a different utility. `ZevSerializer.validate_grid_operator_elcom_id`
+rejects ids that are not in the shipped list; `None` is always valid.
+
+Existing ZEVs needed no backfill — the field is simply null for them.
 
 ### 3.5 Participant
 
@@ -690,6 +724,7 @@ The sidebar (`Layout.tsx`) shows sections conditionally:
 | GET / PATCH / PUT / DELETE | `/zevs/{id}/` | IsAuthenticated, ZevManagementPermission | ZEV detail (retrieve uses ZevDetailSerializer with nested participants) |
 | POST | `/zevs/create-with-owner/` | IsAuthenticated, ZevManagementPermission (admin only) | Wizard: create ZEV + owner + metering points |
 | POST | `/zevs/self-setup/` | IsAuthenticated | Self-setup: create ZEV for self-registered owner |
+| GET | `/grid-operators/` | IsAuthenticated | The official ElCom grid-operator list for the ZEV form picker — static reference data, **unpaginated** (see §3.4a) |
 | GET / POST | `/participants/` | IsAuthenticated, BaseZevScopedPermission | List/create participants |
 | GET / PATCH / PUT / DELETE | `/participants/{id}/` | IsAuthenticated, BaseZevScopedPermission | Participant detail |
 | POST | `/participants/{id}/send-invitation/` | admin + zev_owner | Send invitation email |
@@ -837,7 +872,7 @@ interface ImpersonationTokens extends AuthTokens {
 }
 
 interface RegisterInput { username: string; email: string }
-interface SelfSetupZevInput { name: string; start_date: string; zev_type: 'zev'|'vzev'; billing_interval: string; grid_operator?: string }
+interface SelfSetupZevInput { name: string; start_date: string; zev_type: 'zev'|'vzev'; billing_interval: string; grid_operator?: string; grid_operator_elcom_id?: number|null }
 
 interface Zev { id: string; name: string; owner: number; /* + many fields */ }
 interface ZevInput { name: string; start_date: string; owner?: number; zev_type: 'zev'|'vzev'; billing_interval: string; /* + optional fields */ }

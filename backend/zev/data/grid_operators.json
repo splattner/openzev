@@ -1,0 +1,3327 @@
+{
+  "source": "https://lindas.admin.ch/query",
+  "cube": "https://energy.ld.admin.ch/elcom/electricityprice",
+  "licence": "https://ld.admin.ch/vocabulary/TermsOfUse/Open-Use",
+  "period": "2026",
+  "fetched_on": "2026-09-02",
+  "operators": [
+    {
+      "id": 11,
+      "name": "Aare Versorgungs AG (AVAG)",
+      "uid": "CHE-106.844.310",
+      "website": ""
+    },
+    {
+      "id": 5,
+      "name": "AEW Energie AG",
+      "uid": "CHE-105.981.944",
+      "website": "www.aew.ch"
+    },
+    {
+      "id": 6,
+      "name": "AG Elektrizitätswerk Maienfeld",
+      "uid": "CHE-108.732.136",
+      "website": ""
+    },
+    {
+      "id": 2,
+      "name": "AGE SA",
+      "uid": "CHE-108.955.110",
+      "website": "www.age-sa.ch"
+    },
+    {
+      "id": 846,
+      "name": "Albula Netz AG",
+      "uid": "CHE-313.230.373",
+      "website": ""
+    },
+    {
+      "id": 7,
+      "name": "Alpen Energie Dorfgemeinde Meiringen",
+      "uid": "CHE-100.303.375",
+      "website": "www.alpenenergie.swiss"
+    },
+    {
+      "id": 736,
+      "name": "Arbon Energie AG",
+      "uid": "CHE-102.722.524",
+      "website": "www.arbonenergie.ch"
+    },
+    {
+      "id": 109,
+      "name": "Arni Energie AG",
+      "uid": "CHE-269.783.672",
+      "website": "www.arnibe.ch"
+    },
+    {
+      "id": 10,
+      "name": "Arosa Energie",
+      "uid": "CHE-458.596.026",
+      "website": "www.arosaenergie.ch"
+    },
+    {
+      "id": 17,
+      "name": "Azienda Elettrica Comunale Bedretto, Commercio Energia Elettrica",
+      "uid": "CHE-116.338.557",
+      "website": ""
+    },
+    {
+      "id": 28,
+      "name": "AZIENDA ELETTRICA DI MASSAGNO (AEM) SA",
+      "uid": "CHE-109.070.415",
+      "website": "www.aemsa.ch"
+    },
+    {
+      "id": 25,
+      "name": "Azienda Elettrica Grevasalvas",
+      "uid": "CHE-439.680.689",
+      "website": ""
+    },
+    {
+      "id": 16,
+      "name": "Azienda energia comunale",
+      "uid": "CHE-496.470.952",
+      "website": "www.comuneairolo.ch"
+    },
+    {
+      "id": 33,
+      "name": "Azienda Multiservizi Bellinzona (AMB)",
+      "uid": "CHE-483.066.777",
+      "website": "www.amb.ch"
+    },
+    {
+      "id": 31,
+      "name": "Aziende Industriali di Lugano (AIL) SA",
+      "uid": "CHE-105.969.920",
+      "website": "www.ail.ch"
+    },
+    {
+      "id": 32,
+      "name": "Aziende Industriali Mendrisio, Sezione Elettricità",
+      "uid": "CHE-114.866.176",
+      "website": "www.aim.mendrisio.ch"
+    },
+    {
+      "id": 732,
+      "name": "Bereich Verwaltung, SH POWER",
+      "uid": "CHE-130.340.240",
+      "website": "www.shpower.ch"
+    },
+    {
+      "id": 36,
+      "name": "BKW Energie AG",
+      "uid": "CHE-103.258.498",
+      "website": "www.bkw.ch"
+    },
+    {
+      "id": 381,
+      "name": "Burgergemeinde Eischoll, Elektrizitätswerk",
+      "uid": "CHE-115.895.915",
+      "website": "www.eischoll.ch"
+    },
+    {
+      "id": 37,
+      "name": "CKW AG",
+      "uid": "CHE-105.941.235",
+      "website": "www.ckw.ch"
+    },
+    {
+      "id": 690,
+      "name": "Commune de Belmont, Electricité",
+      "uid": "CHE-113.382.680",
+      "website": "www.belmont.ch"
+    },
+    {
+      "id": 3,
+      "name": "Commune de Courchapoix, electricite",
+      "uid": "CHE-112.591.057",
+      "website": ""
+    },
+    {
+      "id": 684,
+      "name": "Commune de Develier, service éléctrique",
+      "uid": "CHE-114.921.349",
+      "website": "www.develier.ch"
+    },
+    {
+      "id": 693,
+      "name": "Commune de Fully, Services industriels",
+      "uid": "CHE-114.918.270",
+      "website": ""
+    },
+    {
+      "id": 700,
+      "name": "Commune de Lutry, Electricité",
+      "uid": "CHE-105.626.437",
+      "website": "www.lutry.ch"
+    },
+    {
+      "id": 706,
+      "name": "Commune de Nods, Electricité",
+      "uid": "CHE-115.257.904",
+      "website": "www.nods.ch"
+    },
+    {
+      "id": 696,
+      "name": "Commune de Paudex, Electricité",
+      "uid": "CHE-108.962.707",
+      "website": ""
+    },
+    {
+      "id": 705,
+      "name": "Commune de Saint-Imier",
+      "uid": "CHE-114.925.241",
+      "website": "www.saint-imier.ch"
+    },
+    {
+      "id": 707,
+      "name": "Commune de Tramelan, électricité",
+      "uid": "CHE-116.263.020",
+      "website": "www.tramelan.ch"
+    },
+    {
+      "id": 42,
+      "name": "Commune Mixte de Lamboing, Service Electricité",
+      "uid": "CHE-108.963.782",
+      "website": ""
+    },
+    {
+      "id": 20,
+      "name": "Comune di Ascona, Azienda Elettrica Comunale",
+      "uid": "CHE-114.878.297",
+      "website": ""
+    },
+    {
+      "id": 817,
+      "name": "Comune di Bregaglia, Azienda Elettrica",
+      "uid": "CHE-115.580.883",
+      "website": ""
+    },
+    {
+      "id": 19,
+      "name": "Comune di Brusio, Erogazione d'Energia Elettrica",
+      "uid": "CHE-113.514.467",
+      "website": "http://www.brusio.ch/sottotitoliamministrazione/amministrazioneufficicomunali.htm#elettrica"
+    },
+    {
+      "id": 13,
+      "name": "Comune di Buseno, Azienda Elettrica",
+      "uid": "CHE-208.244.558",
+      "website": "www.aemoesano.ch"
+    },
+    {
+      "id": 14,
+      "name": "Comune di Cama, Azienda Elettrica Comunale",
+      "uid": "CHE-112.564.126",
+      "website": ""
+    },
+    {
+      "id": 618,
+      "name": "Comune di Poschiavo, Azienda elettrica",
+      "uid": "CHE-113.176.471",
+      "website": ""
+    },
+    {
+      "id": 8,
+      "name": "Comune di Stabio, Elettrica",
+      "uid": "CHE-114.866.325",
+      "website": "www.amstabio.ch"
+    },
+    {
+      "id": 21,
+      "name": "Comune Politico di Mesocco, Azienda Elettrica",
+      "uid": "CHE-113.562.420",
+      "website": ""
+    },
+    {
+      "id": 809,
+      "name": "Consorzio Energia Elettrica Calanca",
+      "uid": "CHE-108.871.878",
+      "website": ""
+    },
+    {
+      "id": 48,
+      "name": "Cooperativa Elettrica di Faido (CEF)",
+      "uid": "CHE-106.887.271",
+      "website": ""
+    },
+    {
+      "id": 59,
+      "name": "die werke versorgung wallisellen ag",
+      "uid": "CHE-109.350.300",
+      "website": "www.diewerke.ch"
+    },
+    {
+      "id": 61,
+      "name": "Dorfkorporation Bronschhofen Strom und Wasser",
+      "uid": "CHE-108.956.397",
+      "website": "www.dk-bronschhofen.ch"
+    },
+    {
+      "id": 64,
+      "name": "Dorfkorporation Ebnat-Kappel",
+      "uid": "CHE-113.559.412",
+      "website": "www.dk-ebnat-kappel.ch"
+    },
+    {
+      "id": 65,
+      "name": "Dorfkorporation Mosnang, Elektrizitäts- und Wasserversorgung",
+      "uid": "CHE-105.603.117",
+      "website": "www.dk-mosnang.ch"
+    },
+    {
+      "id": 66,
+      "name": "Dorfkorporation Schwarzenbach SG, Elektrizität Wasser Gas TV",
+      "uid": "CHE-108.961.033",
+      "website": "www.dk-schwarzenbach.ch"
+    },
+    {
+      "id": 840,
+      "name": "DransGrid SA",
+      "uid": "CHE-416.175.601",
+      "website": ""
+    },
+    {
+      "id": 113,
+      "name": "EBL (Genossenschaft Elektra Baselland)",
+      "uid": "CHE-105.966.413",
+      "website": "www.ebl.ch"
+    },
+    {
+      "id": 425,
+      "name": "ebs Energie AG",
+      "uid": "CHE-105.979.887",
+      "website": "www.ebs.swiss"
+    },
+    {
+      "id": 522,
+      "name": "EDSH Energiedienst Steg-Hohtenn AG",
+      "uid": "CHE-112.692.830",
+      "website": ""
+    },
+    {
+      "id": 409,
+      "name": "EDSR Energiedienste Staldenried AG",
+      "uid": "CHE-115.304.952",
+      "website": "www.staldenried.ch"
+    },
+    {
+      "id": 72,
+      "name": "EE Energia Engiadina",
+      "uid": "CHE-113.534.642",
+      "website": "www.ee-energia-engiadina.ch"
+    },
+    {
+      "id": 489,
+      "name": "EGH Elektro-Genossenschaft Hünenberg",
+      "uid": "CHE-106.915.039",
+      "website": "www.egh.ch"
+    },
+    {
+      "id": 245,
+      "name": "EGW Weiach Elektrizitätsgenossenschaft",
+      "uid": "CHE-100.664.442",
+      "website": ""
+    },
+    {
+      "id": 430,
+      "name": "Einheitsgemeinde Ermatingen, Elektrizitätsversorgung",
+      "uid": "CHE-114.799.226",
+      "website": "www.ermatingen.ch"
+    },
+    {
+      "id": 653,
+      "name": "Einheitsgemeinde Müllheim, Elektrizitätsversorgung",
+      "uid": "CHE-100.616.845",
+      "website": "www.muellheim.ch"
+    },
+    {
+      "id": 456,
+      "name": "Einheitsgemeinde Raperswilen, Elektrizität",
+      "uid": "CHE-115.973.461",
+      "website": "www.raperswilen.ch"
+    },
+    {
+      "id": 450,
+      "name": "Einwohner- & Ortsbürgergemeinde Niederwil AG, Elektrizitätsversorgung",
+      "uid": "CHE-105.334.727",
+      "website": "www.niederwil.ch"
+    },
+    {
+      "id": 248,
+      "name": "Einwohnergemeinde Aarwangen, Elektrizitätsversorgung",
+      "uid": "CHE-114.764.877",
+      "website": "www.aarwangen.ch"
+    },
+    {
+      "id": 524,
+      "name": "Einwohnergemeinde Aegerten, Elektroversorgung",
+      "uid": "CHE-112.563.598",
+      "website": "http://www.aegerten.ch/eva"
+    },
+    {
+      "id": 74,
+      "name": "Einwohnergemeinde Bellmund, Elektrizitätsversorgung",
+      "uid": "CHE-112.558.249",
+      "website": ""
+    },
+    {
+      "id": 116,
+      "name": "Einwohnergemeinde Bettwil, Elektrizitätsversorgung",
+      "uid": "CHE-112.563.977",
+      "website": "www.bettwil.ch"
+    },
+    {
+      "id": 75,
+      "name": "Einwohnergemeinde Biglen, Stromversorgung",
+      "uid": "CHE-112.614.511",
+      "website": "www.biglen.ch"
+    },
+    {
+      "id": 746,
+      "name": "Einwohnergemeinde Birmenstorf AG, Elektrizitätsversorgung",
+      "uid": "CHE-113.535.280",
+      "website": "www.birmenstorf.ch"
+    },
+    {
+      "id": 77,
+      "name": "Einwohnergemeinde Brienz, Elektrizitätsversorgung",
+      "uid": "CHE-114.830.988",
+      "website": "brienz.ch"
+    },
+    {
+      "id": 292,
+      "name": "Einwohnergemeinde Brügg, Elektrizitätsversorgung",
+      "uid": "CHE-114.765.836",
+      "website": "www.bruegg.ch"
+    },
+    {
+      "id": 78,
+      "name": "Einwohnergemeinde Büetigen, Elektroversorgung",
+      "uid": "CHE-112.795.157",
+      "website": ""
+    },
+    {
+      "id": 362,
+      "name": "Einwohnergemeinde Diessbach bei Büren, Elektrizitätsversorgung",
+      "uid": "CHE-106.265.046",
+      "website": "www.diessbach.ch"
+    },
+    {
+      "id": 306,
+      "name": "Einwohnergemeinde Dintikon, Elektrizitätswerk",
+      "uid": "CHE-113.506.545",
+      "website": ""
+    },
+    {
+      "id": 517,
+      "name": "Einwohnergemeinde Ins, Elektrizitätsversorgung",
+      "uid": "CHE-112.571.600",
+      "website": "www.ins.ch"
+    },
+    {
+      "id": 363,
+      "name": "Einwohnergemeinde Kallnach, Stromversorgung",
+      "uid": "CHE-112.610.097",
+      "website": "www.ewkallnach.ch"
+    },
+    {
+      "id": 730,
+      "name": "Einwohnergemeinde Laufenburg, Städt. Elektrizitätsversorung",
+      "uid": "CHE-113.563.135",
+      "website": "www.laufenburg.ch"
+    },
+    {
+      "id": 79,
+      "name": "Einwohnergemeinde Lengnau, Finanzverwaltung, Elektrizität-, Wasser-, Abwasser-, Abfallentsorgung",
+      "uid": "CHE-115.249.709",
+      "website": "www.lengnau.ch"
+    },
+    {
+      "id": 324,
+      "name": "Einwohnergemeinde Madiswil, Elektrizitätsversorgung",
+      "uid": "CHE-112.570.983",
+      "website": "www.madiswil.ch"
+    },
+    {
+      "id": 772,
+      "name": "Einwohnergemeinde Melchnau, Elektrizitätsversorgung",
+      "uid": "CHE-112.550.466",
+      "website": "www.melchnau.ch"
+    },
+    {
+      "id": 582,
+      "name": "Einwohnergemeinde Muhen, Elektrizitaetsversorgung",
+      "uid": "CHE-112.570.428",
+      "website": "www.muhen.ch"
+    },
+    {
+      "id": 734,
+      "name": "Einwohnergemeinde Nidau, Elektrizitätsversorgung",
+      "uid": "CHE-113.518.198",
+      "website": "www.nidau.ch"
+    },
+    {
+      "id": 329,
+      "name": "Einwohnergemeinde Niederbipp, Elektrizitätsversorgung",
+      "uid": "CHE-114.764.110",
+      "website": "www.niederbipp.ch"
+    },
+    {
+      "id": 331,
+      "name": "Einwohnergemeinde Oberdiessbach, Elektrizitätsversorgung",
+      "uid": "CHE-100.628.535",
+      "website": "www.oberdiessbach.ch"
+    },
+    {
+      "id": 530,
+      "name": "Einwohnergemeinde Pieterlen, Stromverkauf",
+      "uid": "CHE-114.916.644",
+      "website": "www.pieterlen.ch"
+    },
+    {
+      "id": 250,
+      "name": "Einwohnergemeinde Port, Elektrizitätversorgung",
+      "uid": "CHE-113.524.661",
+      "website": "www.port.ch"
+    },
+    {
+      "id": 576,
+      "name": "Einwohnergemeinde Roggwil, Elektrizitätswerk",
+      "uid": "CHE-112.558.025",
+      "website": "www.gbr-roggwil.ch"
+    },
+    {
+      "id": 577,
+      "name": "Einwohnergemeinde Safnern, Elektroversorgung",
+      "uid": "CHE-112.588.687",
+      "website": "www.safnern.ch"
+    },
+    {
+      "id": 463,
+      "name": "Einwohnergemeinde Schafisheim, Elektrizitätsversorgung",
+      "uid": "CHE-112.558.462",
+      "website": "www.schafisheim.ch"
+    },
+    {
+      "id": 347,
+      "name": "Einwohnergemeinde Siselen, Elektrizitätsversorgung",
+      "uid": "CHE-112.577.258",
+      "website": "www.siselen.ch"
+    },
+    {
+      "id": 188,
+      "name": "Einwohnergemeinde Sisseln, Strom",
+      "uid": "CHE-112.537.164",
+      "website": "www.sisseln.ch"
+    },
+    {
+      "id": 196,
+      "name": "Einwohnergemeinde Unterlunkhofen, Elektrizitätsversorgung",
+      "uid": "CHE-105.606.162",
+      "website": "www.unterlunkhofen.ch"
+    },
+    {
+      "id": 357,
+      "name": "Einwohnergemeinde Ursenbach, Elektrizitätsversorgung",
+      "uid": "CHE-108.962.096",
+      "website": ""
+    },
+    {
+      "id": 358,
+      "name": "Einwohnergemeinde Villigen, Elektrizitätsversorgung",
+      "uid": "CHE-112.540.568",
+      "website": "www.villigen.ch"
+    },
+    {
+      "id": 578,
+      "name": "Einwohnergemeinde Wilderswil, Elektrizitätsversorgung",
+      "uid": "CHE-112.577.057",
+      "website": "www.wilderswil.ch"
+    },
+    {
+      "id": 579,
+      "name": "Einwohnergemeinde Windisch, Elektrizitätsversorgung",
+      "uid": "CHE-114.795.435",
+      "website": "www.windisch.ch"
+    },
+    {
+      "id": 482,
+      "name": "Einwohnergemeinde Wohlenschwil, Elektrizitätsversorgung",
+      "uid": "CHE-112.546.631",
+      "website": "www.wohlenschwil.ch"
+    },
+    {
+      "id": 483,
+      "name": "Einwohnergemeinde Würenlingen, Elektrizitätsversorgung",
+      "uid": "CHE-109.025.018",
+      "website": "www.wuerenlingen.ch"
+    },
+    {
+      "id": 241,
+      "name": "Einwohnergemeinde Zeihen, Elektra, Elektrizitätsversorgung",
+      "uid": "CHE-112.798.612",
+      "website": "www.zeihen.ch"
+    },
+    {
+      "id": 537,
+      "name": "Einwohnergemeinde Zeiningen, Elektrizitätsversorgung",
+      "uid": "CHE-112.795.878",
+      "website": "www.zeiningen.ch"
+    },
+    {
+      "id": 201,
+      "name": "Einwohnergemeinde Zufikon, Elektrizitätsversorgung",
+      "uid": "CHE-105.627.425",
+      "website": "www.zufikon.ch"
+    },
+    {
+      "id": 838,
+      "name": "EKZ Einsiedeln AG, Dietikon",
+      "uid": "CHE-304.858.957",
+      "website": "http://www.ekz.ch/content/ekz/de/einsiedeln.html"
+    },
+    {
+      "id": 107,
+      "name": "Elektra Andwil Stromversorgung",
+      "uid": "CHE-108.955.972",
+      "website": "www.andwil.ch"
+    },
+    {
+      "id": 114,
+      "name": "Elektra Berg SG, Stromversorgung",
+      "uid": "CHE-108.964.698",
+      "website": "www.bergsg.ch"
+    },
+    {
+      "id": 644,
+      "name": "Elektra Berneck, Stromversorgung",
+      "uid": "CHE-108.960.105",
+      "website": "www.berneck.ch"
+    },
+    {
+      "id": 256,
+      "name": "Elektra Böttstein",
+      "uid": "CHE-103.358.869",
+      "website": "www.elektra-boettstein.ch"
+    },
+    {
+      "id": 105,
+      "name": "ELEKTRA ENERGIE Genossenschaft",
+      "uid": "CHE-107.208.097",
+      "website": "www.elektra-energie.ch"
+    },
+    {
+      "id": 310,
+      "name": "Elektra Fulenbach (EFU)",
+      "uid": "CHE-114.670.785",
+      "website": "www.elektrafulenbach.ch"
+    },
+    {
+      "id": 134,
+      "name": "Elektra Gams Genossenschaft",
+      "uid": "CHE-107.802.366",
+      "website": "www.elektra-gams.ch"
+    },
+    {
+      "id": 86,
+      "name": "ELEKTRA Genossenschaft Abtwil",
+      "uid": "CHE-102.196.593",
+      "website": ""
+    },
+    {
+      "id": 204,
+      "name": "Elektra Genossenschaft Arni-Islisberg",
+      "uid": "CHE-101.730.797",
+      "website": "www.egai.ch"
+    },
+    {
+      "id": 111,
+      "name": "Elektra Genossenschaft Auw",
+      "uid": "CHE-101.947.807",
+      "website": "www.elektra-auw.ch"
+    },
+    {
+      "id": 87,
+      "name": "Elektra Genossenschaft Baldingen",
+      "uid": "CHE-102.120.880",
+      "website": ""
+    },
+    {
+      "id": 600,
+      "name": "Elektra Genossenschaft Holderbank",
+      "uid": "CHE-106.145.844",
+      "website": ""
+    },
+    {
+      "id": 149,
+      "name": "Elektra Genossenschaft Kaiserstuhl",
+      "uid": "CHE-196.566.964",
+      "website": ""
+    },
+    {
+      "id": 152,
+      "name": "Elektra Genossenschaft Leibstadt",
+      "uid": "CHE-102.467.444",
+      "website": "www.leibstadt.ch"
+    },
+    {
+      "id": 170,
+      "name": "Elektra Genossenschaft Oberlunkhofen",
+      "uid": "CHE-102.125.452",
+      "website": "www.oberlunkhofen.ch/elektra"
+    },
+    {
+      "id": 178,
+      "name": "Elektra Genossenschaft Rietheim",
+      "uid": "CHE-480.319.350",
+      "website": "www.egs-strom.ch"
+    },
+    {
+      "id": 834,
+      "name": "Elektra Gretzenbach AG",
+      "uid": "CHE-113.695.647",
+      "website": ""
+    },
+    {
+      "id": 144,
+      "name": "Elektra Hergiswil-Dorf Genossenschaft",
+      "uid": "CHE-102.421.057",
+      "website": "www.elektra-hergiswil.ch"
+    },
+    {
+      "id": 231,
+      "name": "Elektra Horn AG",
+      "uid": "CHE-445.926.634",
+      "website": ""
+    },
+    {
+      "id": 142,
+      "name": "Elektra Häuslenen",
+      "uid": "CHE-108.226.494",
+      "website": "www.haeuslenen.ch"
+    },
+    {
+      "id": 137,
+      "name": "Elektra Kesswil",
+      "uid": "CHE-100.497.061",
+      "website": ""
+    },
+    {
+      "id": 98,
+      "name": "Elektra Korporation EKW",
+      "uid": "CHE-108.923.104",
+      "website": "www.ekw.ch"
+    },
+    {
+      "id": 156,
+      "name": "Elektra Luthern Genossenschaft",
+      "uid": "CHE-102.425.799",
+      "website": ""
+    },
+    {
+      "id": 158,
+      "name": "Elektra Maisprach, Genossenschaft",
+      "uid": "CHE-102.466.077",
+      "website": ""
+    },
+    {
+      "id": 160,
+      "name": "Elektra Mettauertal und Umgebung Genossenschaft (EMU)",
+      "uid": "CHE-101.353.513",
+      "website": "www.emu-hottwil.ch"
+    },
+    {
+      "id": 162,
+      "name": "Elektra Mümliswil-Ramiswil Genossenschaft",
+      "uid": "CHE-103.285.360",
+      "website": "www.elektra-muemliswil.ch"
+    },
+    {
+      "id": 164,
+      "name": "Elektra Neuendorf",
+      "uid": "CHE-272.236.554",
+      "website": "www.neuendorf.ch "
+    },
+    {
+      "id": 166,
+      "name": "Elektra Niederbuchsiten (ENI)",
+      "uid": "CHE-385.653.695",
+      "website": ""
+    },
+    {
+      "id": 167,
+      "name": "Elektra Niederbüren Stromversorgung",
+      "uid": "CHE-108.955.877",
+      "website": "www.niederbueren.ch"
+    },
+    {
+      "id": 168,
+      "name": "Elektra Oberegg",
+      "uid": "CHE-115.866.658",
+      "website": "www.elektra-oberegg.ch"
+    },
+    {
+      "id": 175,
+      "name": "Elektra Opfersei Genossenschaft",
+      "uid": "CHE-100.380.594",
+      "website": ""
+    },
+    {
+      "id": 176,
+      "name": "Elektra Reigoldswil Genossenschaft",
+      "uid": "CHE-106.641.296",
+      "website": "www.elektra-reigoldswil.ch"
+    },
+    {
+      "id": 92,
+      "name": "ELEKTRA REMETSCHWIL, Genossenschaft",
+      "uid": "CHE-102.269.588",
+      "website": ""
+    },
+    {
+      "id": 271,
+      "name": "Elektra Rudolfstetten-Friedlisberg AG",
+      "uid": "CHE-102.773.415",
+      "website": "www.elektra-rf.ch"
+    },
+    {
+      "id": 180,
+      "name": "Elektra Rüderswil Genossenschaft",
+      "uid": "CHE-100.576.536",
+      "website": ""
+    },
+    {
+      "id": 184,
+      "name": "Elektra Schwanden i.E. Genossenschaft",
+      "uid": "CHE-102.302.961",
+      "website": ""
+    },
+    {
+      "id": 185,
+      "name": "Elektra Seeberg-Grasswil-Riedtwil Genossenschaft",
+      "uid": "CHE-102.450.283",
+      "website": ""
+    },
+    {
+      "id": 189,
+      "name": "Elektra Steinebrunn",
+      "uid": "CHE-100.577.062",
+      "website": ""
+    },
+    {
+      "id": 192,
+      "name": "ELEKTRA UFHUSEN Genossenschaft",
+      "uid": "CHE-106.628.060",
+      "website": ""
+    },
+    {
+      "id": 195,
+      "name": "Elektra Untereggen",
+      "uid": "CHE-101.671.574",
+      "website": ""
+    },
+    {
+      "id": 197,
+      "name": "Elektra Walzenhausen",
+      "uid": "CHE-108.954.145",
+      "website": "www.elektra-walzenhausen.ch"
+    },
+    {
+      "id": 96,
+      "name": "Elektra Widen Betriebs AG",
+      "uid": "CHE-426.285.214",
+      "website": "www.widen.ch"
+    },
+    {
+      "id": 199,
+      "name": "Elektra Wolfwil AG",
+      "uid": "CHE-103.975.045",
+      "website": "www.elektra-wolfwil.ch"
+    },
+    {
+      "id": 200,
+      "name": "Elektra Zihlschlacht-Riet",
+      "uid": "CHE-108.963.977",
+      "website": "http://www.elektra-zihlschlacht-riet.ch/"
+    },
+    {
+      "id": 193,
+      "name": "Elektra- und Wasserkorporation Grub SG",
+      "uid": "CHE-103.903.235",
+      "website": "www.ewgrubsg.ch"
+    },
+    {
+      "id": 815,
+      "name": "Elektra-Genossenschaft Homburg",
+      "uid": "CHE-102.266.897",
+      "website": "www.eghomburg.ch"
+    },
+    {
+      "id": 211,
+      "name": "Elektra-Genossenschaft Künten",
+      "uid": "CHE-107.130.868",
+      "website": "www.elektra-kuenten.ch"
+    },
+    {
+      "id": 93,
+      "name": "Elektra-Genossenschaft Rottenschwil-Werd",
+      "uid": "CHE-102.466.226",
+      "website": ""
+    },
+    {
+      "id": 604,
+      "name": "Elektra-Genossenschaft Schönholzerswilen",
+      "uid": "CHE-109.557.597",
+      "website": ""
+    },
+    {
+      "id": 280,
+      "name": "Elektra-Genossenschaft Siglistorf-Wislikofen-Mellstorf",
+      "uid": "CHE-309.184.729",
+      "website": "www.egswm.ch"
+    },
+    {
+      "id": 276,
+      "name": "Elektra-Genossenschaft Sommeri",
+      "uid": "CHE-102.070.696",
+      "website": "http://www.sommeri.ch/"
+    },
+    {
+      "id": 90,
+      "name": "Elektra-Genossenschaft, Fischbach-Göslikon",
+      "uid": "CHE-102.120.437",
+      "website": "www.elektra-figoe.ch"
+    },
+    {
+      "id": 495,
+      "name": "Elektra-Korporation Reute, Elektrische Energie",
+      "uid": "CHE-113.520.901",
+      "website": ""
+    },
+    {
+      "id": 496,
+      "name": "Elektra-Korporation Schachen-Reute",
+      "uid": "CHE-108.963.629",
+      "website": "www.reute.ch"
+    },
+    {
+      "id": 91,
+      "name": "Elektragenossenschaft Mellikon",
+      "uid": "CHE-104.043.575",
+      "website": ""
+    },
+    {
+      "id": 212,
+      "name": "ELEKTRAGENOSSENSCHAFT OLSBERG",
+      "uid": "CHE-100.375.794",
+      "website": ""
+    },
+    {
+      "id": 222,
+      "name": "Elektrakorporation Wagerswil Wagerswil",
+      "uid": "CHE-314.094.902",
+      "website": ""
+    },
+    {
+      "id": 387,
+      "name": "Elektrizitaetswerk Langrickenbach",
+      "uid": "CHE-108.962.593",
+      "website": "www.langrickenbach.ch"
+    },
+    {
+      "id": 590,
+      "name": "Elektrizität Wasser Neuenhof ewn",
+      "uid": "CHE-430.141.802",
+      "website": "www.neuenhof.ch"
+    },
+    {
+      "id": 232,
+      "name": "Elektrizitäts - Genossenschaft Mülligen",
+      "uid": "CHE-102.192.514",
+      "website": "www.egm-strom.ch"
+    },
+    {
+      "id": 797,
+      "name": "Elektrizitäts- und Wasser- Versorgung, Politische Gemeinde Thal",
+      "uid": "CHE-108.955.995",
+      "website": "www.thal.ch"
+    },
+    {
+      "id": 777,
+      "name": "Elektrizitäts- und Wasserwerk der Stadt Buchs (EWB)",
+      "uid": "CHE-113.521.711",
+      "website": "www.ewbuchs.ch"
+    },
+    {
+      "id": 267,
+      "name": "Elektrizitäts-Genossenschaft (EGO) Oberwil i.S.",
+      "uid": "CHE-103.404.707",
+      "website": ""
+    },
+    {
+      "id": 227,
+      "name": "Elektrizitäts-Genossenschaft Aettenschwil",
+      "uid": "CHE-104.092.438",
+      "website": "http://www.elektra-aettenschwil.ch/"
+    },
+    {
+      "id": 254,
+      "name": "Elektrizitäts-Genossenschaft Benzenschwil",
+      "uid": "CHE-100.603.133",
+      "website": ""
+    },
+    {
+      "id": 229,
+      "name": "Elektrizitäts-Genossenschaft Boswil-Bünzen",
+      "uid": "CHE-107.114.757",
+      "website": "www.egbb.ch"
+    },
+    {
+      "id": 262,
+      "name": "Elektrizitäts-Genossenschaft Merenschwand",
+      "uid": "CHE-103.363.907",
+      "website": "www.elektra-merenschwand.ch"
+    },
+    {
+      "id": 269,
+      "name": "Elektrizitäts-Genossenschaft Riniken (EGR)",
+      "uid": "CHE-103.369.695",
+      "website": ""
+    },
+    {
+      "id": 275,
+      "name": "Elektrizitäts-Genossenschaft Siggenthal",
+      "uid": "CHE-100.082.211",
+      "website": "www.egs-strom.ch"
+    },
+    {
+      "id": 228,
+      "name": "Elektrizitätsgenossenschaft Aristau",
+      "uid": "CHE-100.236.247",
+      "website": ""
+    },
+    {
+      "id": 806,
+      "name": "Elektrizitätsgenossenschaft Beinwil/Freiamt",
+      "uid": "CHE-100.202.550",
+      "website": "www.elektra-beinwil.ch"
+    },
+    {
+      "id": 255,
+      "name": "Elektrizitätsgenossenschaft Binn",
+      "uid": "CHE-102.331.477",
+      "website": ""
+    },
+    {
+      "id": 205,
+      "name": "Elektrizitätsgenossenschaft Brüschwil-Sonnenberg",
+      "uid": "CHE-102.404.863",
+      "website": "afelber@bluewin.ch"
+    },
+    {
+      "id": 258,
+      "name": "Elektrizitätsgenossenschaft Bubikon",
+      "uid": "CHE-103.305.347",
+      "website": "www.eg-bubikon.ch"
+    },
+    {
+      "id": 260,
+      "name": "Elektrizitätsgenossenschaft Gsteig",
+      "uid": "CHE-103.413.304",
+      "website": "www.eg-gsteig.ch"
+    },
+    {
+      "id": 145,
+      "name": "Elektrizitätsgenossenschaft Hermetschwil-Staffeln",
+      "uid": "CHE-102.266.791",
+      "website": "www.elektra-hermetschwil.ch"
+    },
+    {
+      "id": 261,
+      "name": "Elektrizitätsgenossenschaft Jonen",
+      "uid": "CHE-104.092.473",
+      "website": "www.elektra-jonen.ch"
+    },
+    {
+      "id": 285,
+      "name": "Elektrizitätsgenossenschaft Marthalen",
+      "uid": "CHE-103.298.345",
+      "website": "www.eg-m.ch"
+    },
+    {
+      "id": 265,
+      "name": "Elektrizitätsgenossenschaft Mühlau",
+      "uid": "CHE-101.689.692",
+      "website": "https://www.elektra-muehlau.ch"
+    },
+    {
+      "id": 268,
+      "name": "Elektrizitätsgenossenschaft Otelfingen",
+      "uid": "CHE-106.954.430",
+      "website": "www.eg-otelfingen.ch"
+    },
+    {
+      "id": 789,
+      "name": "Elektrizitätsgenossenschaft Rümikon EGR",
+      "uid": "CHE-103.310.288",
+      "website": "www.egruemikon.ch"
+    },
+    {
+      "id": 272,
+      "name": "Elektrizitätsgenossenschaft Saas-Balen (EGB)",
+      "uid": "CHE-102.258.998",
+      "website": ""
+    },
+    {
+      "id": 273,
+      "name": "Elektrizitätsgenossenschaft Schangnau",
+      "uid": "CHE-102.451.621",
+      "website": ""
+    },
+    {
+      "id": 284,
+      "name": "Elektrizitätsgenossenschaft Schüpbach",
+      "uid": "CHE-102.373.145",
+      "website": ""
+    },
+    {
+      "id": 186,
+      "name": "Elektrizitätsgenossenschaft Sins",
+      "uid": "CHE-106.292.729",
+      "website": "www.elektra-sins.ch"
+    },
+    {
+      "id": 281,
+      "name": "Elektrizitätsgenossenschaft Zeneggen",
+      "uid": "CHE-104.177.891",
+      "website": "www.zeneggen.ch"
+    },
+    {
+      "id": 286,
+      "name": "Elektrizitätsversorgung Altendorf AG",
+      "uid": "CHE-107.265.333",
+      "website": ""
+    },
+    {
+      "id": 535,
+      "name": "Elektrizitätsversorgung Egerkingen",
+      "uid": "CHE-380.008.406",
+      "website": "www.evegerkingen.ch/"
+    },
+    {
+      "id": 135,
+      "name": "Elektrizitätsversorgung Geltwil",
+      "uid": "CHE-100.202.780",
+      "website": ""
+    },
+    {
+      "id": 315,
+      "name": "Elektrizitätsversorgung Innerthal",
+      "uid": "CHE-115.436.281",
+      "website": "www.innerthal.ch"
+    },
+    {
+      "id": 317,
+      "name": "Elektrizitätsversorgung Kaltbrunn AG",
+      "uid": "CHE-107.286.513",
+      "website": "www.evk.ch"
+    },
+    {
+      "id": 572,
+      "name": "Elektrizitätsversorgung Oberbuchsiten",
+      "uid": "CHE-114.694.739",
+      "website": "www.evoberbuchsiten.ch"
+    },
+    {
+      "id": 349,
+      "name": "Elektrizitätsversorgung Ried-St. Stephan AG",
+      "uid": "CHE-140.621.060",
+      "website": ""
+    },
+    {
+      "id": 544,
+      "name": "Elektrizitätswerk Aadorf",
+      "uid": "CHE-108.953.536",
+      "website": "www.ewaadorf.ch"
+    },
+    {
+      "id": 377,
+      "name": "Elektrizitätswerk der Gemeinde Bergün Filisur",
+      "uid": "CHE-287.674.408",
+      "website": ""
+    },
+    {
+      "id": 565,
+      "name": "Elektrizitätswerk der Stadt Zürich",
+      "uid": "CHE-108.954.978",
+      "website": "www.ewz.ch"
+    },
+    {
+      "id": 426,
+      "name": "Elektrizitätswerk des Kantons Schaffhausen AG",
+      "uid": "CHE-103.184.351",
+      "website": "www.eks.ch"
+    },
+    {
+      "id": 382,
+      "name": "Elektrizitätswerk Göschenen",
+      "uid": "CHE-108.960.192",
+      "website": "www.ew-goeschenen.ch"
+    },
+    {
+      "id": 439,
+      "name": "Elektrizitätswerk Heiden AG",
+      "uid": "CHE-107.067.425",
+      "website": "www.ewheiden.ch"
+    },
+    {
+      "id": 443,
+      "name": "Elektrizitätswerk Jona-Rapperswil AG",
+      "uid": "CHE-105.973.181",
+      "website": "www.ewjr.ch"
+    },
+    {
+      "id": 655,
+      "name": "Elektrizitätswerk Oberglatt",
+      "uid": "CHE-112.496.826",
+      "website": "www.oberglatt.ch"
+    },
+    {
+      "id": 452,
+      "name": "Elektrizitätswerk Obergoms AG",
+      "uid": "CHE-107.914.120",
+      "website": "www.ewobergoms.ch"
+    },
+    {
+      "id": 454,
+      "name": "Elektrizitätswerk Obwalden",
+      "uid": "CHE-108.954.530",
+      "website": "www.ewo.ch"
+    },
+    {
+      "id": 793,
+      "name": "Elektrizitätswerk Randa AG",
+      "uid": "CHE-114.830.072",
+      "website": ""
+    },
+    {
+      "id": 458,
+      "name": "Elektrizitätswerk Reichenburg",
+      "uid": "CHE-108.963.049",
+      "website": "http://www.reichenburg.ch/de/verwaltung/dienstleistungen/?dienst_id=8310"
+    },
+    {
+      "id": 460,
+      "name": "Elektrizitätswerk Rümlang Genossenschaft",
+      "uid": "CHE-106.954.795",
+      "website": "www.ewruemlang.ch"
+    },
+    {
+      "id": 464,
+      "name": "Elektrizitätswerk Schindellegi",
+      "uid": "CHE-112.557.623",
+      "website": ""
+    },
+    {
+      "id": 552,
+      "name": "Elektrizitätswerk Schmerikon AG",
+      "uid": "CHE-107.293.418",
+      "website": "www.ewschmerikon.ch"
+    },
+    {
+      "id": 467,
+      "name": "Elektrizitätswerk Sennwald Genossenschaft",
+      "uid": "CHE-105.900.762",
+      "website": "www.ewsennwald.ch"
+    },
+    {
+      "id": 476,
+      "name": "Elektrizitätswerk Urnäsch AG",
+      "uid": "CHE-107.073.265",
+      "website": ""
+    },
+    {
+      "id": 477,
+      "name": "Elektrizitätswerk Ursern",
+      "uid": "CHE-108.956.291",
+      "website": "www.ew-ursern.ch"
+    },
+    {
+      "id": 478,
+      "name": "Elektrizitätswerk Uznach AG",
+      "uid": "CHE-107.286.938",
+      "website": "www.ewu.ch"
+    },
+    {
+      "id": 417,
+      "name": "Elektrizitätswerk Vals (EW Vals)",
+      "uid": "CHE-112.610.105",
+      "website": "www.vals.ch"
+    },
+    {
+      "id": 455,
+      "name": "Elektrizitätswerk, Ortsgemeinde Quarten",
+      "uid": "CHE-108.953.884",
+      "website": "www.og-quarten.ch/ew-quarten"
+    },
+    {
+      "id": 795,
+      "name": "Elektrizitätswerk-Genossenschaft Riedbach",
+      "uid": "CHE-104.111.314",
+      "website": "www.ewriedbach.ch"
+    },
+    {
+      "id": 486,
+      "name": "Elektrizitätswerke des Kantons Zürich (EKZ)",
+      "uid": "CHE-108.954.688",
+      "website": "www.ekz.ch"
+    },
+    {
+      "id": 900,
+      "name": "Elektro- und Wasserkorporation Wartau EW Wartau",
+      "uid": "CHE-207.747.437",
+      "website": ""
+    },
+    {
+      "id": 491,
+      "name": "Elektro-Genossenschaft Oberrüti",
+      "uid": "CHE-102.468.573",
+      "website": ""
+    },
+    {
+      "id": 492,
+      "name": "Elektro-Genossenschaft Ulisbach",
+      "uid": "CHE-102.280.242",
+      "website": "www.egu-ulisbach.ch"
+    },
+    {
+      "id": 855,
+      "name": "Elektrogenossenschaft Bisisthal",
+      "uid": "CHE-102.351.296",
+      "website": ""
+    },
+    {
+      "id": 263,
+      "name": "Elektrogenossenschaft Moos-Dieselbach",
+      "uid": "CHE-101.671.752",
+      "website": ""
+    },
+    {
+      "id": 497,
+      "name": "Elektrokorporation Wald - St. Peterzell",
+      "uid": "CHE-116.273.975",
+      "website": "www.ek-wald.ch"
+    },
+    {
+      "id": 691,
+      "name": "Eli10 SA",
+      "uid": "CHE-345.543.043",
+      "website": "www.eli10.ch"
+    },
+    {
+      "id": 556,
+      "name": "EnBAG Netze AG",
+      "uid": "CHE-114.571.930",
+      "website": "www.enbag.ch"
+    },
+    {
+      "id": 431,
+      "name": "endigo Holding AG",
+      "uid": "CHE-107.893.647",
+      "website": "www.ewgoms.ch"
+    },
+    {
+      "id": 504,
+      "name": "EnerCom Kirchberg AG",
+      "uid": "CHE-109.287.239",
+      "website": "www.enercomag.ch"
+    },
+    {
+      "id": 505,
+      "name": "energia alpina",
+      "uid": "CHE-112.166.151",
+      "website": "www.energia-alpina.ch"
+    },
+    {
+      "id": 406,
+      "name": "Energia Samedan",
+      "uid": "CHE-403.681.208",
+      "website": "www.samedan.ch"
+    },
+    {
+      "id": 507,
+      "name": "Energie AG Sumiswald",
+      "uid": "CHE-102.720.123",
+      "website": ""
+    },
+    {
+      "id": 525,
+      "name": "Energie Belp AG",
+      "uid": "CHE-110.206.006",
+      "website": "www.energie-belp.ch"
+    },
+    {
+      "id": 73,
+      "name": "Energie Freiamt AG",
+      "uid": "CHE-108.470.597",
+      "website": "www.energie-freiamt.ch"
+    },
+    {
+      "id": 424,
+      "name": "Energie Gossau AG",
+      "uid": "CHE-115.584.036",
+      "website": "www.energiegossau.ch"
+    },
+    {
+      "id": 312,
+      "name": "Energie Grosshöchstetten AG",
+      "uid": "CHE-136.210.765",
+      "website": "www.engh-ag.ch"
+    },
+    {
+      "id": 437,
+      "name": "Energie Grüningen AG",
+      "uid": "CHE-432.239.470",
+      "website": "www.grueningen.ch"
+    },
+    {
+      "id": 750,
+      "name": "Energie Hunzenschwil AG (ENH)",
+      "uid": "CHE-378.786.227",
+      "website": "www.enh.ch"
+    },
+    {
+      "id": 150,
+      "name": "Energie Kestenholz",
+      "uid": "CHE-115.306.879",
+      "website": "www.kestenholz.ch/energie"
+    },
+    {
+      "id": 751,
+      "name": "Energie Kreuzlingen, Stadt Kreuzlingen",
+      "uid": "CHE-113.520.433",
+      "website": "www.energiekreuzlingen.ch"
+    },
+    {
+      "id": 80,
+      "name": "Energie Münchenbuchsee AG",
+      "uid": "CHE-145.457.218",
+      "website": "www.emag.energy"
+    },
+    {
+      "id": 839,
+      "name": "Energie Oberes Fricktal AG",
+      "uid": "CHE-384.428.919",
+      "website": "http://www.eof-ag.ch/"
+    },
+    {
+      "id": 252,
+      "name": "Energie Oberhofen AG",
+      "uid": "CHE-299.323.312",
+      "website": "www.energie-oberhofen.ch"
+    },
+    {
+      "id": 508,
+      "name": "Energie Opfikon AG",
+      "uid": "CHE-109.691.468",
+      "website": "www.energieopfikon.ch"
+    },
+    {
+      "id": 510,
+      "name": "Energie Service Biel/Bienne (ESB)",
+      "uid": "CHE-112.788.105",
+      "website": "www.esb.ch"
+    },
+    {
+      "id": 511,
+      "name": "Energie Thun AG",
+      "uid": "CHE-102.720.608",
+      "website": "www.energiethun.ch"
+    },
+    {
+      "id": 902,
+      "name": "Energie Täsch AG (ETAG)",
+      "uid": "CHE-144.926.972",
+      "website": ""
+    },
+    {
+      "id": 593,
+      "name": "Energie und Wasser, Gemeindewerke Stäfa",
+      "uid": "CHE-108.953.335",
+      "website": "www.gws.ch"
+    },
+    {
+      "id": 518,
+      "name": "ENERGIE USTER AG",
+      "uid": "CHE-103.486.473",
+      "website": "www.energieuster.ch"
+    },
+    {
+      "id": 338,
+      "name": "Energie Versorgung Riggisberg (EVR) AG",
+      "uid": "CHE-414.229.031",
+      "website": "www.evrag.ch"
+    },
+    {
+      "id": 519,
+      "name": "Energie Wasser Bern",
+      "uid": "CHE-109.954.395",
+      "website": "www.ewb.ch"
+    },
+    {
+      "id": 804,
+      "name": "Energie Wettingen AG",
+      "uid": "CHE-336.863.075",
+      "website": "www.energiewettingen.ch"
+    },
+    {
+      "id": 515,
+      "name": "Energie- und Wasserversorgung Oberburg",
+      "uid": "CHE-110.349.410",
+      "website": "www.ew-o.ch"
+    },
+    {
+      "id": 904,
+      "name": "Energiegenossenschaft Diemtigtal",
+      "uid": "CHE-429.785.708",
+      "website": ""
+    },
+    {
+      "id": 366,
+      "name": "energieUri AG",
+      "uid": "CHE-105.966.488",
+      "website": "www.energieuri.ch"
+    },
+    {
+      "id": 76,
+      "name": "Energieversorgung Blumenstein AG (EVB)",
+      "uid": "CHE-173.103.122",
+      "website": "http://www.netzulg.ch/evb"
+    },
+    {
+      "id": 526,
+      "name": "Energieversorgung Büren AG",
+      "uid": "CHE-105.099.561",
+      "website": "www.ev-bueren.ch"
+    },
+    {
+      "id": 615,
+      "name": "Eniwa AG",
+      "uid": "CHE-105.522.039",
+      "website": "https://www.eniwa.ch/"
+    },
+    {
+      "id": 534,
+      "name": "eug Elektra Untergäu Genossenschaft",
+      "uid": "CHE-106.923.903",
+      "website": "www.eug.ch"
+    },
+    {
+      "id": 536,
+      "name": "EV Energieversorgung Biberist",
+      "uid": "CHE-112.528.544",
+      "website": "www.ev-biberist.ch"
+    },
+    {
+      "id": 311,
+      "name": "EV Gebenstorf AG",
+      "uid": "CHE-115.951.347",
+      "website": "http://www.evgebenstorf.ch"
+    },
+    {
+      "id": 538,
+      "name": "EVG Grächen AG",
+      "uid": "CHE-111.699.605",
+      "website": "www.evg-graechen.ch"
+    },
+    {
+      "id": 539,
+      "name": "EVN Energieversorgung Nikolai AG",
+      "uid": "CHE-112.348.953",
+      "website": "www.evnikolai.ch"
+    },
+    {
+      "id": 901,
+      "name": "Evolon AG",
+      "uid": "CHE-292.911.353",
+      "website": ""
+    },
+    {
+      "id": 540,
+      "name": "EVR Energieversorgung Raron AG",
+      "uid": "CHE-111.781.282",
+      "website": "www.evraron.ch"
+    },
+    {
+      "id": 532,
+      "name": "EVS Energieversorgung Schänis AG",
+      "uid": "CHE-109.495.418",
+      "website": "www.ev-schaenis.ch"
+    },
+    {
+      "id": 541,
+      "name": "EVTL Energieversorgung Talschaft Lötschen AG",
+      "uid": "CHE-112.717.252",
+      "website": ""
+    },
+    {
+      "id": 543,
+      "name": "EVWR Energiedienste Visp - Westlich Raron AG",
+      "uid": "CHE-112.125.784",
+      "website": "www.evwr.ch"
+    },
+    {
+      "id": 462,
+      "name": "EW - Samnaun",
+      "uid": "CHE-412.827.971",
+      "website": "www.ewsamnaun.ch"
+    },
+    {
+      "id": 547,
+      "name": "EW Höfe AG",
+      "uid": "CHE-105.979.568",
+      "website": "www.ewh.ch"
+    },
+    {
+      "id": 549,
+      "name": "EW Lachen AG",
+      "uid": "CHE-108.953.387",
+      "website": "www.ewlachen.ch"
+    },
+    {
+      "id": 389,
+      "name": "EW Lindau AG",
+      "uid": "CHE-151.808.792",
+      "website": "www.ewlindau.ch"
+    },
+    {
+      "id": 247,
+      "name": "EW Oftringen AG",
+      "uid": "CHE-114.618.945",
+      "website": "http://www.ewoftringen.ch/"
+    },
+    {
+      "id": 551,
+      "name": "EW Rothrist AG",
+      "uid": "CHE-109.361.060",
+      "website": "www.ewrothrist.ch"
+    },
+    {
+      "id": 553,
+      "name": "EW Sirnach AG",
+      "uid": "CHE-109.564.522",
+      "website": "www.ewsirnach.ch"
+    },
+    {
+      "id": 554,
+      "name": "EW WALD AG",
+      "uid": "CHE-105.685.345",
+      "website": "www.ew-wald.ch"
+    },
+    {
+      "id": 249,
+      "name": "EWD",
+      "uid": "CHE-112.340.928",
+      "website": "www.ewd-derendingen.ch"
+    },
+    {
+      "id": 557,
+      "name": "EWD Elektrizitätswerk Davos AG",
+      "uid": "CHE-103.187.651",
+      "website": "www.ewd.ch"
+    },
+    {
+      "id": 251,
+      "name": "EWK Energie AG",
+      "uid": "CHE-115.185.475",
+      "website": "www.ewk-energie.ch"
+    },
+    {
+      "id": 559,
+      "name": "EWK Herzogenbuchsee AG",
+      "uid": "CHE-105.334.294",
+      "website": "www.ewk.ch"
+    },
+    {
+      "id": 560,
+      "name": "EWL Genossenschaft",
+      "uid": "CHE-105.935.594",
+      "website": "www.ewl.ch"
+    },
+    {
+      "id": 561,
+      "name": "ewl Kabelnetz AG",
+      "uid": "CHE-105.698.649",
+      "website": "www.ewl-luzern.ch"
+    },
+    {
+      "id": 466,
+      "name": "EWS AG",
+      "uid": "CHE-105.925.851",
+      "website": "www.ews.ch"
+    },
+    {
+      "id": 564,
+      "name": "EWS Energie AG",
+      "uid": "CHE-104.848.308",
+      "website": "www.ews-energie.ch"
+    },
+    {
+      "id": 484,
+      "name": "EWZ Elektrizitätswerk Zermatt AG",
+      "uid": "CHE-102.485.991",
+      "website": "www.ewzermatt.ch"
+    },
+    {
+      "id": 566,
+      "name": "Feuerschaugemeinde Appenzell, Energie- und Wasserversorgung",
+      "uid": "CHE-115.152.091",
+      "website": "www.feuerschaugemeinde.ch"
+    },
+    {
+      "id": 567,
+      "name": "Flims Trin Energie AG",
+      "uid": "CHE-416.802.131",
+      "website": "www.ft-energie.ch"
+    },
+    {
+      "id": 568,
+      "name": "Forces Motrices de l'Avançon SA",
+      "uid": "CHE-106.823.147",
+      "website": "www.fma-sa.ch"
+    },
+    {
+      "id": 813,
+      "name": "GEBNET AG",
+      "uid": "CHE-114.961.656",
+      "website": "www.gebnet.ch"
+    },
+    {
+      "id": 295,
+      "name": "Gemeinde Albula/Alvra",
+      "uid": "CHE-261.007.541",
+      "website": ""
+    },
+    {
+      "id": 782,
+      "name": "Gemeinde Amlikon-Bissegg, Stromversorgung",
+      "uid": "CHE-108.965.692",
+      "website": "www.amlikon-bissegg.ch"
+    },
+    {
+      "id": 531,
+      "name": "Gemeinde Andeer, Elektrizitätswesen",
+      "uid": "CHE-112.577.212",
+      "website": ""
+    },
+    {
+      "id": 367,
+      "name": "Gemeinde Andelfingen, Stromversorgung",
+      "uid": "CHE-112.540.663",
+      "website": ""
+    },
+    {
+      "id": 643,
+      "name": "Gemeinde Balgach, Elektrizitätsversorgung",
+      "uid": "CHE-112.851.614",
+      "website": "www.balgach.ch"
+    },
+    {
+      "id": 361,
+      "name": "Gemeinde Bargen BE, Elektrizitätsversorgung",
+      "uid": "CHE-108.964.103",
+      "website": ""
+    },
+    {
+      "id": 88,
+      "name": "Gemeinde Bellikon",
+      "uid": "CHE-115.072.807",
+      "website": "www.elektra-bellikon.ch"
+    },
+    {
+      "id": 236,
+      "name": "Gemeinde Berikon, Elektrizitätsversorgung",
+      "uid": "CHE-112.544.388",
+      "website": "www.berikon.ch"
+    },
+    {
+      "id": 115,
+      "name": "Gemeinde Besenbüren, Elektrizitätsversorgung",
+      "uid": "CHE-112.587.618",
+      "website": ""
+    },
+    {
+      "id": 597,
+      "name": "Gemeinde Brienzwiler, Elekrizität",
+      "uid": "CHE-108.961.004",
+      "website": "www.brienzwiler.ch"
+    },
+    {
+      "id": 293,
+      "name": "Gemeinde Büttikon, Abt. Elektrizitätsversorgung",
+      "uid": "CHE-115.935.897",
+      "website": ""
+    },
+    {
+      "id": 305,
+      "name": "Gemeinde Diessenhofen, Elektrizitätsversorgung",
+      "uid": "CHE-112.538.063",
+      "website": "www.diessenhofen.ch"
+    },
+    {
+      "id": 128,
+      "name": "Gemeinde Eichberg, Elektra",
+      "uid": "CHE-108.961.671",
+      "website": "www.eichberg.ch"
+    },
+    {
+      "id": 297,
+      "name": "Gemeinde Eriswil, Elektrizitätsversorgung",
+      "uid": "CHE-112.843.365",
+      "website": ""
+    },
+    {
+      "id": 646,
+      "name": "Gemeinde Erlen, Elektrizitätsversorgung",
+      "uid": "CHE-108.962.794",
+      "website": "www.erlen.ch"
+    },
+    {
+      "id": 768,
+      "name": "Gemeinde Eschlikon, Elektrizitätswerk",
+      "uid": "CHE-108.957.043",
+      "website": "www.eschlikon.ch"
+    },
+    {
+      "id": 433,
+      "name": "Gemeinde Fehraltorf, Elektrizität",
+      "uid": "CHE-114.765.919",
+      "website": "www.fehraltorf.ch"
+    },
+    {
+      "id": 242,
+      "name": "Gemeinde Galgenen, Elektrizitätsversorgung",
+      "uid": "CHE-114.770.636",
+      "website": "www.galgenen.ch"
+    },
+    {
+      "id": 818,
+      "name": "Gemeinde Gondo-Zwischenberg, Stromversorgung",
+      "uid": "CHE-113.274.843",
+      "website": "www.gondo.ch"
+    },
+    {
+      "id": 383,
+      "name": "Gemeinde Güttingen, Elektrizitätswerk",
+      "uid": "CHE-100.609.259",
+      "website": "www.guettingen.ch"
+    },
+    {
+      "id": 440,
+      "name": "Gemeinde Herrliberg, Elektrizitätsversorgung",
+      "uid": "CHE-112.847.618",
+      "website": "www.herrliberg.ch"
+    },
+    {
+      "id": 316,
+      "name": "Gemeinde Kaisten, Elektrizitätsversorgung",
+      "uid": "CHE-112.544.313",
+      "website": "www.kaisten.ch"
+    },
+    {
+      "id": 238,
+      "name": "Gemeinde Killwangen, Elektrizitätsversorgung",
+      "uid": "CHE-112.577.235",
+      "website": "www.killwangen.ch"
+    },
+    {
+      "id": 527,
+      "name": "Gemeinde Lantsch/Lenz, Elektrizitätsversorgung",
+      "uid": "CHE-112.549.960",
+      "website": "http://www.lantsch-lenz.ch/"
+    },
+    {
+      "id": 447,
+      "name": "Gemeinde Mellingen, Elektrizitätsversorgung",
+      "uid": "CHE-112.798.440",
+      "website": "www.mellingen.ch"
+    },
+    {
+      "id": 328,
+      "name": "Gemeinde Murgenthal, Elektrizitätsversorgung",
+      "uid": "CHE-113.563.885",
+      "website": "www.murgenthal.ch"
+    },
+    {
+      "id": 626,
+      "name": "Gemeinde Männedorf, Energieversorung",
+      "uid": "CHE-116.176.409",
+      "website": "www.maennedorf.ch"
+    },
+    {
+      "id": 330,
+      "name": "Gemeinde Oberbüren, Elektra / Stromversorgung",
+      "uid": "CHE-112.539.097",
+      "website": ""
+    },
+    {
+      "id": 752,
+      "name": "Gemeinde Oberentfelden, Elektrizitätsversorgung",
+      "uid": "CHE-115.256.649",
+      "website": "www.oberentfelden.ch"
+    },
+    {
+      "id": 172,
+      "name": "Gemeinde Oberwil bei Büren, Energieversorgung",
+      "uid": "CHE-112.793.891",
+      "website": ""
+    },
+    {
+      "id": 81,
+      "name": "Gemeinde Oberwil-Lieli, Elektrizitätsversorgung",
+      "uid": "CHE-112.570.316",
+      "website": "www.oberwil-lieli.ch"
+    },
+    {
+      "id": 400,
+      "name": "Gemeinde Rheinwald, Elektrizitätsversorgung",
+      "uid": "CHE-463.751.309",
+      "website": "www.rheinwald.ch"
+    },
+    {
+      "id": 340,
+      "name": "Gemeinde Rupperswil, Elektrizitätsversorgung",
+      "uid": "CHE-112.545.962",
+      "website": "www.rupperswil.ch"
+    },
+    {
+      "id": 857,
+      "name": "Gemeinde S-chanf Energia S-chanf",
+      "uid": "CHE-278.510.400",
+      "website": "http://www.s-chanf.ch/"
+    },
+    {
+      "id": 341,
+      "name": "Gemeinde Saas Almagell, Stromversorgung",
+      "uid": "CHE-112.550.070",
+      "website": "www.saas-almagell.org"
+    },
+    {
+      "id": 404,
+      "name": "Gemeinde Saas-Fee, Elektrizitätsversorgung",
+      "uid": "CHE-113.525.494",
+      "website": "www.3906.ch"
+    },
+    {
+      "id": 342,
+      "name": "Gemeinde Safiental, Stromversorgung",
+      "uid": "CHE-112.557.770",
+      "website": ""
+    },
+    {
+      "id": 375,
+      "name": "Gemeinde Salenstein, Stromversorgung",
+      "uid": "CHE-108.961.435",
+      "website": "www.salenstein.ch"
+    },
+    {
+      "id": 408,
+      "name": "Gemeinde Scharans, Elektrizitätswerk",
+      "uid": "CHE-112.569.106",
+      "website": "www.scharans.ch"
+    },
+    {
+      "id": 780,
+      "name": "Gemeinde Schmitten, Stromversorgung",
+      "uid": "CHE-115.978.642",
+      "website": ""
+    },
+    {
+      "id": 344,
+      "name": "Gemeinde Schöftland, Elektrizitätsversorgung",
+      "uid": "CHE-112.798.233",
+      "website": "www.tbschoeftland.ch"
+    },
+    {
+      "id": 345,
+      "name": "Gemeinde Schübelbach, Elektroversorgung",
+      "uid": "CHE-113.518.488",
+      "website": "www.gemwerke-schuebelbach.ch"
+    },
+    {
+      "id": 225,
+      "name": "Gemeinde Sevelen",
+      "uid": "CHE-115.050.444",
+      "website": "www.sevelen.ch"
+    },
+    {
+      "id": 821,
+      "name": "Gemeinde Sils im Domleschg, Elektrizitätswerk",
+      "uid": "CHE-106.253.669",
+      "website": ""
+    },
+    {
+      "id": 739,
+      "name": "Gemeinde Simplon Dorf, Elektrizitätsversorgung",
+      "uid": "CHE-112.571.132",
+      "website": "www.gemeinde-simplon.ch"
+    },
+    {
+      "id": 348,
+      "name": "Gemeinde Spreitenbach, Elektrizitätsversorgung",
+      "uid": "CHE-114.801.685",
+      "website": "www.spreitenbach.ch"
+    },
+    {
+      "id": 469,
+      "name": "Gemeinde Stalden, Elektrizitätsversorgung",
+      "uid": "CHE-112.799.468",
+      "website": "http://www.stalden.ch/anschlagsbrett/"
+    },
+    {
+      "id": 364,
+      "name": "Gemeinde Staufen, Elektrizitätswerk",
+      "uid": "CHE-112.558.321",
+      "website": "www.staufen.ch"
+    },
+    {
+      "id": 824,
+      "name": "Gemeinde Sufers, Stromverkauf",
+      "uid": "CHE-115.060.827",
+      "website": ""
+    },
+    {
+      "id": 411,
+      "name": "Gemeinde Sulgen, Elektrizitätsversorgung",
+      "uid": "CHE-108.956.954",
+      "website": "www.sulgen.ch"
+    },
+    {
+      "id": 845,
+      "name": "Gemeinde Surses, Elektrizitätsversorgung",
+      "uid": "CHE-174.753.334",
+      "website": ""
+    },
+    {
+      "id": 354,
+      "name": "Gemeinde Teufenthal, Elektrizitätsversorgung",
+      "uid": "CHE-112.614.215",
+      "website": "www.teufenthal.ch"
+    },
+    {
+      "id": 355,
+      "name": "Gemeinde Thalheim, Elektrizitätsversorgung",
+      "uid": "CHE-112.571.304",
+      "website": "https://www.gemeinde-thalheim.ch/verwaltung/online-schalter.html/25"
+    },
+    {
+      "id": 822,
+      "name": "Gemeinde Thusis, Energieversorgung",
+      "uid": "CHE-113.208.148",
+      "website": ""
+    },
+    {
+      "id": 474,
+      "name": "Gemeinde Tuggen, Elektrizitätswerk",
+      "uid": "CHE-108.961.642",
+      "website": "www.tuggen.ch"
+    },
+    {
+      "id": 415,
+      "name": "Gemeinde Törbel, Elektrizitätsversorgung",
+      "uid": "CHE-112.577.181",
+      "website": "http://gemeinde.toerbel.ch/reglemente/"
+    },
+    {
+      "id": 356,
+      "name": "Gemeinde Ueken, Elektrizitätsversorgung",
+      "uid": "CHE-112.537.767",
+      "website": "www.ueken.ch"
+    },
+    {
+      "id": 475,
+      "name": "Gemeinde Unterbäch VS, Elektrizitätswerk",
+      "uid": "CHE-115.977.571",
+      "website": ""
+    },
+    {
+      "id": 502,
+      "name": "Gemeinde Untervaz, Elektroversorgung",
+      "uid": "CHE-115.256.945",
+      "website": "www.untervaz.ch"
+    },
+    {
+      "id": 583,
+      "name": "Gemeinde Vorderthal, Elektrizitätswerkversorgung",
+      "uid": "CHE-116.014.451",
+      "website": "www.vorderthal.ch"
+    },
+    {
+      "id": 422,
+      "name": "Gemeinde Wagenhausen, Elektrizitätsversorgung",
+      "uid": "CHE-108.957.586",
+      "website": "www.wagenhausen.ch"
+    },
+    {
+      "id": 420,
+      "name": "Gemeinde Wangen SZ, Elektrizitätswerk",
+      "uid": "CHE-115.249.566",
+      "website": "www.ewwangensz.ch"
+    },
+    {
+      "id": 575,
+      "name": "Gemeinde Warth-Weiningen, Elektrizitätsversorgung",
+      "uid": "CHE-115.985.139",
+      "website": "www.warth-weiningen.ch"
+    },
+    {
+      "id": 234,
+      "name": "Gemeinde Wuppenau, Elektrizitätsversorgung",
+      "uid": "CHE-330.241.633",
+      "website": "www.wuppenau.ch"
+    },
+    {
+      "id": 57,
+      "name": "Gemeinde Zernez",
+      "uid": "CHE-228.101.985",
+      "website": "www.ee-energia-engiadina.ch"
+    },
+    {
+      "id": 322,
+      "name": "Gemeindebetriebe Lotzwil, Elektrizitätsversorgung",
+      "uid": "CHE-112.543.147",
+      "website": "www.lotzwil.ch"
+    },
+    {
+      "id": 584,
+      "name": "Gemeindewerk Beckenried",
+      "uid": "CHE-113.835.523",
+      "website": "www.gemeindewerk-beckenried.ch"
+    },
+    {
+      "id": 585,
+      "name": "Gemeindewerke Arth Elektrizitäts- und Wasserwerk",
+      "uid": "CHE-108.953.720",
+      "website": "www.gw-arth.ch"
+    },
+    {
+      "id": 588,
+      "name": "Gemeindewerke Erstfeld",
+      "uid": "CHE-106.373.084",
+      "website": "www.gemeindewerke-erstfeld.ch"
+    },
+    {
+      "id": 591,
+      "name": "Gemeindewerke Pfäffikon ZH",
+      "uid": "CHE-116.292.323",
+      "website": "www.gwpzh.ch"
+    },
+    {
+      "id": 592,
+      "name": "Gemeindewerke Rüti (ZH)",
+      "uid": "CHE-108.955.593",
+      "website": "www.gwrueti.ch"
+    },
+    {
+      "id": 594,
+      "name": "Gemeindewerke Villmergen",
+      "uid": "CHE-108.956.405",
+      "website": "www.gwv.ch"
+    },
+    {
+      "id": 685,
+      "name": "Genedis SA",
+      "uid": "CHE-105.901.230",
+      "website": "www.seic-teledis.ch"
+    },
+    {
+      "id": 122,
+      "name": "Genossenschaft \"Elektra\" Buchen-Teuffenthal (EBT)",
+      "uid": "CHE-101.949.410",
+      "website": "http://www.netzulg.ch/ebt"
+    },
+    {
+      "id": 110,
+      "name": "Genossenschaft Elektra Augst",
+      "uid": "CHE-103.869.035",
+      "website": ""
+    },
+    {
+      "id": 123,
+      "name": "genossenschaft elektra busslingen",
+      "uid": "CHE-100.572.780",
+      "website": "www.elektra-busslingen.ch"
+    },
+    {
+      "id": 127,
+      "name": "Genossenschaft Elektra Ehrendingen",
+      "uid": "CHE-104.092.651",
+      "website": "www.elektra-ehrendingen.ch"
+    },
+    {
+      "id": 599,
+      "name": "Genossenschaft ELEKTRA Fislisbach",
+      "uid": "CHE-102.033.896",
+      "website": "http://www.elektra-fislisbach.ch/download"
+    },
+    {
+      "id": 141,
+      "name": "Genossenschaft Elektra Hatswil",
+      "uid": "CHE-102.095.236",
+      "website": "www.elektra-hatswil.ch"
+    },
+    {
+      "id": 147,
+      "name": "Genossenschaft Elektra Itingen",
+      "uid": "CHE-101.666.521",
+      "website": "http://www.elektra-itingen.ch/de/home.html"
+    },
+    {
+      "id": 601,
+      "name": "Genossenschaft Elektra Koppigen-Willadingen",
+      "uid": "CHE-107.154.521",
+      "website": "www.elektra-koppigen.ch"
+    },
+    {
+      "id": 165,
+      "name": "Genossenschaft Elektra Neukirch-Egnach",
+      "uid": "CHE-103.353.292",
+      "website": "www.egnach.ch"
+    },
+    {
+      "id": 171,
+      "name": "Genossenschaft ELEKTRA Oberrohrdorf",
+      "uid": "CHE-103.375.891",
+      "website": "www.eor.ch"
+    },
+    {
+      "id": 173,
+      "name": "Genossenschaft ELEKTRA OEKINGEN HALTEN",
+      "uid": "CHE-106.154.197",
+      "website": "www.eoh.ch"
+    },
+    {
+      "id": 603,
+      "name": "Genossenschaft Elektra Rapperswil",
+      "uid": "CHE-101.883.461",
+      "website": "www.elektra-rapperswil.ch"
+    },
+    {
+      "id": 179,
+      "name": "Genossenschaft Elektra Roggwil-Freidorf",
+      "uid": "CHE-374.453.181",
+      "website": ""
+    },
+    {
+      "id": 187,
+      "name": "Genossenschaft Elektra Sissach",
+      "uid": "CHE-107.259.812",
+      "website": "www.elektra-sissach.ch"
+    },
+    {
+      "id": 190,
+      "name": "Genossenschaft Elektra Thal",
+      "uid": "CHE-106.627.497",
+      "website": "www.elektrathal.ch"
+    },
+    {
+      "id": 279,
+      "name": "Genossenschaft Elektra Vogelsang",
+      "uid": "CHE-102.255.830",
+      "website": ""
+    },
+    {
+      "id": 598,
+      "name": "Genossenschaft Elektra Äusseres Wasseramt EAW",
+      "uid": "CHE-102.170.990",
+      "website": "www.eawenergie.ch"
+    },
+    {
+      "id": 132,
+      "name": "Genossenschaft Elektra, Jegenstorf",
+      "uid": "CHE-102.426.304",
+      "website": "www.elektra.ch"
+    },
+    {
+      "id": 558,
+      "name": "Genossenschaft Elektrizitäts- und Wasserwerk Dozwil",
+      "uid": "CHE-100.713.448",
+      "website": "www.dozwil.ch"
+    },
+    {
+      "id": 405,
+      "name": "Genossenschaft Elektrizitätsversorgung Saas-Grund",
+      "uid": "CHE-103.926.785",
+      "website": ""
+    },
+    {
+      "id": 457,
+      "name": "Genossenschaft Elektrizitätswerk Räterschen EWR",
+      "uid": "CHE-103.310.236",
+      "website": "www.ewraeterschen.ch"
+    },
+    {
+      "id": 856,
+      "name": "Genossenschaft Energie Fischingen",
+      "uid": "CHE-209.750.321",
+      "website": ""
+    },
+    {
+      "id": 244,
+      "name": "Genossenschaft EW Münchwilen (EWM)",
+      "uid": "CHE-107.095.580",
+      "website": "www.ewmuenchwilen.ch"
+    },
+    {
+      "id": 606,
+      "name": "Genossenschaft EW Romanshorn",
+      "uid": "CHE-110.050.738",
+      "website": "www.ewromanshorn.ch"
+    },
+    {
+      "id": 790,
+      "name": "Genossenschaft für die Stromversorgung Kalpetran GSK",
+      "uid": "CHE-103.665.722",
+      "website": ""
+    },
+    {
+      "id": 634,
+      "name": "Genossenschaft Licht- und Kraftwerke Glattfelden",
+      "uid": "CHE-106.948.866",
+      "website": "www.lkwg.ch"
+    },
+    {
+      "id": 112,
+      "name": "Genossenschaft Werk Bichelsee-Balterswil",
+      "uid": "CHE-115.720.931",
+      "website": "www.w-b-b.ch"
+    },
+    {
+      "id": 607,
+      "name": "Glattwerk AG",
+      "uid": "CHE-102.714.559",
+      "website": "www.glattwerk.ch"
+    },
+    {
+      "id": 609,
+      "name": "Groupe E SA",
+      "uid": "CHE-108.954.582",
+      "website": "www.groupe-e.ch"
+    },
+    {
+      "id": 610,
+      "name": "Gruyère Energie S.A.",
+      "uid": "CHE-104.815.533",
+      "website": "www.gruyere-energie.ch"
+    },
+    {
+      "id": 611,
+      "name": "HEnergie Härkingen HEH",
+      "uid": "CHE-112.279.298",
+      "website": "www.heh.ch"
+    },
+    {
+      "id": 612,
+      "name": "Hydrantenkorporation & Elektraversorgung Schönengrund",
+      "uid": "CHE-103.179.781",
+      "website": ""
+    },
+    {
+      "id": 622,
+      "name": "IB Langenthal AG",
+      "uid": "CHE-108.953.370",
+      "website": "www.ib-langenthal.ch"
+    },
+    {
+      "id": 614,
+      "name": "IB Wohlen AG",
+      "uid": "CHE-109.340.477",
+      "website": "www.ibw.ag"
+    },
+    {
+      "id": 616,
+      "name": "IBB Strom AG",
+      "uid": "CHE-109.261.501",
+      "website": "www.ibbrugg.ch"
+    },
+    {
+      "id": 617,
+      "name": "IBC Energie Wasser Chur (IBC)",
+      "uid": "CHE-108.953.938",
+      "website": "www.ibc-chur.ch"
+    },
+    {
+      "id": 369,
+      "name": "Impianti elettrici Bivio società cooperativa",
+      "uid": "CHE-102.236.873",
+      "website": "https://www.surses.ch/DE/verwaltung/gebuehren.html"
+    },
+    {
+      "id": 619,
+      "name": "Industrielle Betriebe Huttwil AG",
+      "uid": "CHE-109.809.190",
+      "website": "www.ibhag.ch"
+    },
+    {
+      "id": 620,
+      "name": "Industrielle Betriebe Interlaken (IBI) AG",
+      "uid": "CHE-108.954.754",
+      "website": "www.ibi.ch"
+    },
+    {
+      "id": 621,
+      "name": "Industrielle Betriebe Kloten AG",
+      "uid": "CHE-105.005.063",
+      "website": "www.ibkloten.ch"
+    },
+    {
+      "id": 623,
+      "name": "Industrielle Betriebe Murten",
+      "uid": "CHE-108.953.246",
+      "website": "www.ibmurten.ch"
+    },
+    {
+      "id": 514,
+      "name": "Infrastruktur Zürichsee AG",
+      "uid": "CHE-102.141.965",
+      "website": "www.infra-z.ch"
+    },
+    {
+      "id": 625,
+      "name": "InfraWerkeMünsingen (IWM)",
+      "uid": "CHE-109.834.319",
+      "website": "www.inframuensingen.ch"
+    },
+    {
+      "id": 624,
+      "name": "IWB Industrielle Werke Basel",
+      "uid": "CHE-108.955.038",
+      "website": "www.iwb.ch"
+    },
+    {
+      "id": 627,
+      "name": "Jungfraubahn AG",
+      "uid": "CHE-101.404.866",
+      "website": "www.jungfrau.ch"
+    },
+    {
+      "id": 628,
+      "name": "Kantonales Elektrizitätswerk Nidwalden (EWN)",
+      "uid": "CHE-108.953.967",
+      "website": "www.ewn.ch"
+    },
+    {
+      "id": 633,
+      "name": "Licht- und Kraftgenossenschaft Richigen",
+      "uid": "CHE-102.118.392",
+      "website": ""
+    },
+    {
+      "id": 632,
+      "name": "Licht- und Wasserwerk Adelboden AG",
+      "uid": "CHE-108.094.726",
+      "website": "www.lwa.ch"
+    },
+    {
+      "id": 635,
+      "name": "Licht- und Wasserwerk AG Kandersteg",
+      "uid": "CHE-107.189.904",
+      "website": "www.lwk.ch"
+    },
+    {
+      "id": 636,
+      "name": "Localnet AG",
+      "uid": "CHE-105.705.864",
+      "website": "www.localnet.ch"
+    },
+    {
+      "id": 903,
+      "name": "LST Energie AG",
+      "uid": "CHE-228.489.784",
+      "website": ""
+    },
+    {
+      "id": 637,
+      "name": "Martin Zeller AG, Elektrizitätswerk",
+      "uid": "CHE-100.009.444",
+      "website": "www.ewmzag.ch"
+    },
+    {
+      "id": 858,
+      "name": "Media Mesolcina Energia",
+      "uid": "CHE-168.775.600",
+      "website": "www.aemoesano.ch"
+    },
+    {
+      "id": 701,
+      "name": "Monthey Energies SA",
+      "uid": "CHE-264.518.200",
+      "website": "http://www.monthey.ch"
+    },
+    {
+      "id": 702,
+      "name": "Municipalité de La Neuveville",
+      "uid": "CHE-108.962.676",
+      "website": "www.laneuveville.ch"
+    },
+    {
+      "id": 581,
+      "name": "Munizipalgemeinde Eisten, Stromversorgung",
+      "uid": "CHE-113.886.762",
+      "website": "www.eisten.ch"
+    },
+    {
+      "id": 763,
+      "name": "Munizipalgemeinde Wängi, Elektrititätswerk",
+      "uid": "CHE-108.957.066",
+      "website": "www.tbwaengi.ch"
+    },
+    {
+      "id": 421,
+      "name": "Murg Flums Energie",
+      "uid": "CHE-175.404.267",
+      "website": "www.mfenergie.ch"
+    },
+    {
+      "id": 638,
+      "name": "NetZulg AG",
+      "uid": "CHE-108.955.771",
+      "website": "www.netzulg.ch"
+    },
+    {
+      "id": 853,
+      "name": "OIKEN SA",
+      "uid": "CHE-182.207.803",
+      "website": "www.oiken.ch"
+    },
+    {
+      "id": 641,
+      "name": "Ovra Electrica Medel, Elektrizitätswerk",
+      "uid": "CHE-108.960.648",
+      "website": ""
+    },
+    {
+      "id": 654,
+      "name": "Polit. Gemeinde Münsterlingen, Elektra",
+      "uid": "CHE-106.270.739",
+      "website": "www.muensterlingen.ch"
+    },
+    {
+      "id": 642,
+      "name": "Politische Gemeinde Altnau, Elektrizitätsversorgung",
+      "uid": "CHE-112.540.640",
+      "website": "www.altnau.ch"
+    },
+    {
+      "id": 288,
+      "name": "Politische Gemeinde Au SG, Elektrizitätswerk",
+      "uid": "CHE-112.848.954",
+      "website": "http://www.au.ch"
+    },
+    {
+      "id": 376,
+      "name": "Politische Gemeinde Basadingen-Schlattingen , Elektrizität",
+      "uid": "CHE-108.960.246",
+      "website": "www.basadingen-schlattingen.ch"
+    },
+    {
+      "id": 289,
+      "name": "Politische Gemeinde Benken SG, Elektrizitätsversorgung",
+      "uid": "CHE-114.765.517",
+      "website": "www.benken.ch"
+    },
+    {
+      "id": 290,
+      "name": "Politische Gemeinde Benken ZH, Elektrizitätsversorgung",
+      "uid": "CHE-100.587.008",
+      "website": "www.benken-zh.ch"
+    },
+    {
+      "id": 378,
+      "name": "Politische Gemeinde Berlingen, Elektizitätsversorgung",
+      "uid": "CHE-108.961.748",
+      "website": "www.berlingen.ch"
+    },
+    {
+      "id": 645,
+      "name": "Politische Gemeinde Bettwiesen, Elektra",
+      "uid": "CHE-108.961.837",
+      "website": ""
+    },
+    {
+      "id": 765,
+      "name": "Politische Gemeinde Birwinken, Elektrizitätsversorgung",
+      "uid": "CHE-108.957.617",
+      "website": "www.birwinken.ch"
+    },
+    {
+      "id": 124,
+      "name": "Politische Gemeinde Bottighofen, Elektrizitätsversorgung",
+      "uid": "CHE-112.546.186",
+      "website": "www.bottighofen.ch"
+    },
+    {
+      "id": 769,
+      "name": "Politische Gemeinde Braunau, Elektrizitätsversorgung",
+      "uid": "CHE-113.835.569",
+      "website": ""
+    },
+    {
+      "id": 380,
+      "name": "Politische Gemeinde Bussnang, Elektrizitätsversorgung",
+      "uid": "CHE-108.965.309",
+      "website": "www.bussnang.ch"
+    },
+    {
+      "id": 529,
+      "name": "Politische Gemeinde Bürglen TG, Elektrizitätsversorgung",
+      "uid": "CHE-100.615.219",
+      "website": "www.buerglen-tg.ch"
+    },
+    {
+      "id": 569,
+      "name": "Politische Gemeinde Diepoldsau, Elektrizitätsversorgung",
+      "uid": "CHE-112.843.201",
+      "website": "www.diepoldsau.ch"
+    },
+    {
+      "id": 587,
+      "name": "Politische Gemeinde Dietlikon, Gemeindewerke",
+      "uid": "CHE-113.528.647",
+      "website": "www.dietlikon.ch"
+    },
+    {
+      "id": 126,
+      "name": "Politische Gemeinde Eggersriet, Elektra",
+      "uid": "CHE-100.417.033",
+      "website": "www.eggersriet.ch"
+    },
+    {
+      "id": 805,
+      "name": "Politische Gemeinde Eschenz, Elektrizitätswerk",
+      "uid": "CHE-112.538.175",
+      "website": ""
+    },
+    {
+      "id": 308,
+      "name": "Politische Gemeinde Felben-Wellhausen, Elektrizitätsversorgung",
+      "uid": "CHE-108.962.564",
+      "website": ""
+    },
+    {
+      "id": 432,
+      "name": "Politische Gemeinde Fällanden, Wasser, Abwasser, Strom",
+      "uid": "CHE-112.544.112",
+      "website": "www.werke-faellanden.ch"
+    },
+    {
+      "id": 648,
+      "name": "Politische Gemeinde Gachnang, Elektrizitätversorgung",
+      "uid": "CHE-112.511.058",
+      "website": "www.gachnang.ch"
+    },
+    {
+      "id": 649,
+      "name": "Politische Gemeinde Gaiserwald, Elektrizitätsversorgung",
+      "uid": "CHE-108.963.210",
+      "website": "www.gaiserwald.ch"
+    },
+    {
+      "id": 791,
+      "name": "Politische Gemeinde Gottlieben, Elektrizitätsversorgung",
+      "uid": "CHE-108.960.039",
+      "website": ""
+    },
+    {
+      "id": 650,
+      "name": "Politische Gemeinde Herdern Abwasser, Wasser- & Elektragen. Technische Werke",
+      "uid": "CHE-113.850.072",
+      "website": "www.herdern.ch"
+    },
+    {
+      "id": 385,
+      "name": "Politische Gemeinde Hohentannen, Stromversorgung",
+      "uid": "CHE-108.964.439",
+      "website": "www.hohentannen.ch"
+    },
+    {
+      "id": 651,
+      "name": "Politische Gemeinde Hüttlingen, Elektrizitätswerk",
+      "uid": "CHE-112.553.045",
+      "website": "www.huettlingen.ch"
+    },
+    {
+      "id": 386,
+      "name": "Politische Gemeinde Hüttwilen, Elektrizitätswerk",
+      "uid": "CHE-108.964.178",
+      "website": ""
+    },
+    {
+      "id": 442,
+      "name": "Politische Gemeinde Jenins, Energieversorgung",
+      "uid": "CHE-115.985.984",
+      "website": "www.ew-jenins.ch"
+    },
+    {
+      "id": 365,
+      "name": "Politische Gemeinde Kradolf-Schönenberg, Elektrizität",
+      "uid": "CHE-113.524.632",
+      "website": "www.pgks.ch"
+    },
+    {
+      "id": 388,
+      "name": "Politische Gemeinde Lengwil, Elektrizitätswerk",
+      "uid": "CHE-108.957.729",
+      "website": "www.lengwil.ch"
+    },
+    {
+      "id": 393,
+      "name": "Politische Gemeinde Mammern, Elektrizität",
+      "uid": "CHE-113.525.790",
+      "website": "www.mammern.ch"
+    },
+    {
+      "id": 325,
+      "name": "Politische Gemeinde Marbach SG, Elektrizitätsversorgung",
+      "uid": "CHE-108.961.636",
+      "website": "www.marbach.ch"
+    },
+    {
+      "id": 243,
+      "name": "Politische Gemeinde Mels, Elektrizitäts- & Wasserwerk",
+      "uid": "CHE-108.953.766",
+      "website": ""
+    },
+    {
+      "id": 652,
+      "name": "Politische Gemeinde Märstetten, Elektrizitätsversorgung",
+      "uid": "CHE-112.546.559",
+      "website": "www.maerstetten.ch"
+    },
+    {
+      "id": 326,
+      "name": "Politische Gemeinde Mörschwil, Elektrizitätsversorgung",
+      "uid": "CHE-112.539.163",
+      "website": "www.moerschwil.ch"
+    },
+    {
+      "id": 399,
+      "name": "Politische Gemeinde Neunforn, Elektrizitätsversorgung",
+      "uid": "CHE-108.961.990",
+      "website": "www.neunforn.ch"
+    },
+    {
+      "id": 449,
+      "name": "Politische Gemeinde Niederhelfenschwil, Elektra / Stromversorgung",
+      "uid": "CHE-108.961.599",
+      "website": "www.niederhelfenschwil.ch"
+    },
+    {
+      "id": 332,
+      "name": "Politische Gemeinde Oberriet SG, Elektrizitätsversorgung",
+      "uid": "CHE-112.843.477",
+      "website": "www.oberriet.ch"
+    },
+    {
+      "id": 403,
+      "name": "Politische Gemeinde Pfyn",
+      "uid": "CHE-115.084.242",
+      "website": "http://www.pfyn.ch/xml_1/internet/de/application/d10/d65/d55/f56.cfm"
+    },
+    {
+      "id": 335,
+      "name": "Politische Gemeinde Rebstein, Elektrizitätsversorgung",
+      "uid": "CHE-105.597.853",
+      "website": "www.rebstein.ch"
+    },
+    {
+      "id": 304,
+      "name": "Politische Gemeinde Rickenbach TG Elektrizitätsversorgung",
+      "uid": "CHE-108.961.659",
+      "website": ""
+    },
+    {
+      "id": 339,
+      "name": "Politische Gemeinde Rorschacherberg, Elektrizitätsversorgung",
+      "uid": "CHE-114.802.532",
+      "website": "www.rorschacherberg.ch"
+    },
+    {
+      "id": 181,
+      "name": "Politische Gemeinde Rüthi, Elektrizitätsversorgung",
+      "uid": "CHE-114.802.495",
+      "website": "www.ruethi.ch"
+    },
+    {
+      "id": 343,
+      "name": "Politische Gemeinde Schlatt, Elektrizitätversorgung",
+      "uid": "CHE-108.961.079",
+      "website": "www.schlatt.ch"
+    },
+    {
+      "id": 733,
+      "name": "Politische Gemeinde Steckborn",
+      "uid": "CHE-115.084.271",
+      "website": "www.steckborn.ch"
+    },
+    {
+      "id": 350,
+      "name": "Politische Gemeinde Steinach, Elektrizitätsversorgung",
+      "uid": "CHE-114.802.472",
+      "website": "www.steinach.ch"
+    },
+    {
+      "id": 767,
+      "name": "Politische Gemeinde Tobel-Tägerschen, Elektrizitätsversorgung",
+      "uid": "CHE-313.302.682",
+      "website": "www.tobel-taegerschen.ch"
+    },
+    {
+      "id": 470,
+      "name": "Politische Gemeinde Tägerwilen, Elektrizitätswerk",
+      "uid": "CHE-114.799.491",
+      "website": "www.taegerwilen.ch"
+    },
+    {
+      "id": 191,
+      "name": "Politische Gemeinde Tübach, Elektrizitätsversorgung",
+      "uid": "CHE-108.962.854",
+      "website": "www.tuebach.ch"
+    },
+    {
+      "id": 528,
+      "name": "Politische Gemeinde Uesslingen-Buch, Elektrizitätswerk",
+      "uid": "CHE-108.962.104",
+      "website": "www.uesslingen-buch.ch"
+    },
+    {
+      "id": 479,
+      "name": "Politische Gemeinde Vaz/Obervaz, Elektrizitätswerk / -Versorgung",
+      "uid": "CHE-113.560.645",
+      "website": "www.vazobervaz.ch"
+    },
+    {
+      "id": 480,
+      "name": "Politische Gemeinde Vilters-Wangs, Elektrizitätswerk Vilters-Wangs",
+      "uid": "CHE-115.253.817",
+      "website": "www.vilters-wangs.ch"
+    },
+    {
+      "id": 756,
+      "name": "Politische Gemeinde Waldkirch, Abteilung Elektra",
+      "uid": "CHE-115.250.552",
+      "website": "www.tbwaldkirch.ch"
+    },
+    {
+      "id": 294,
+      "name": "Politische Gemeinde Widnau, Elektra / Stromversorgung",
+      "uid": "CHE-112.853.145",
+      "website": "www.widnau.ch"
+    },
+    {
+      "id": 481,
+      "name": "Politische Gemeinde Wigoltingen, Elektrizitätswerk",
+      "uid": "CHE-108.961.926",
+      "website": "www.wigoltingen.ch"
+    },
+    {
+      "id": 657,
+      "name": "Politische Gemeinde Wilen b. Wil, Elektrizitätsversorgung",
+      "uid": "CHE-114.801.248",
+      "website": "www.wilen.ch"
+    },
+    {
+      "id": 360,
+      "name": "Politische Gemeinde Wittenbach, Elektrizitätsversorgung",
+      "uid": "CHE-100.640.855",
+      "website": "www.wittenbach.ch"
+    },
+    {
+      "id": 656,
+      "name": "Politische Gemeinde Wäldi, Werkbetrieb",
+      "uid": "CHE-115.977.022",
+      "website": "www.waeldi.ch"
+    },
+    {
+      "id": 485,
+      "name": "Politische Gemeinde Zuzwil, Elektrizitätswerk",
+      "uid": "CHE-114.914.094",
+      "website": "www.zuzwil.ch"
+    },
+    {
+      "id": 314,
+      "name": "Politische Gemeinde, Häggenschwil, Elektrizitätsversorgung",
+      "uid": "CHE-112.568.845",
+      "website": "http://www.haeggenschwil.ch/"
+    },
+    {
+      "id": 70,
+      "name": "Primeo Netz AG",
+      "uid": "CHE-109.319.939",
+      "website": "www.primeo-energie.ch"
+    },
+    {
+      "id": 659,
+      "name": "Provedimaint electric Val Müstair (PEM)",
+      "uid": "CHE-108.956.204",
+      "website": "www.pemenergia.ch"
+    },
+    {
+      "id": 660,
+      "name": "Rabiosa Energie",
+      "uid": "CHE-113.521.958",
+      "website": "www.rabiosa-energie.ch"
+    },
+    {
+      "id": 744,
+      "name": "Regio Energie Amriswil (REA)",
+      "uid": "CHE-302.980.932",
+      "website": "www.rea.swiss"
+    },
+    {
+      "id": 664,
+      "name": "Regio Energie Solothurn",
+      "uid": "CHE-108.954.760",
+      "website": "www.regioenergie.ch"
+    },
+    {
+      "id": 667,
+      "name": "Regionalwerke AG Baden",
+      "uid": "CHE-106.843.428",
+      "website": "www.regionalwerke.ch"
+    },
+    {
+      "id": 665,
+      "name": "RELL AG",
+      "uid": "CHE-407.914.038",
+      "website": "www.rell.ch"
+    },
+    {
+      "id": 662,
+      "name": "Repower AG",
+      "uid": "CHE-103.176.251",
+      "website": "www.repower.com"
+    },
+    {
+      "id": 471,
+      "name": "Rhiienergie AG (rhiienergie)",
+      "uid": "CHE-101.486.806",
+      "website": "www.rhiienergie.ch"
+    },
+    {
+      "id": 669,
+      "name": "Romande Energie SA",
+      "uid": "CHE-105.952.948",
+      "website": "www.romande-energie.ch"
+    },
+    {
+      "id": 666,
+      "name": "RTB Regionale Technische Betriebe",
+      "uid": "CHE-112.789.719",
+      "website": "www.rtb-wildegg.ch"
+    },
+    {
+      "id": 506,
+      "name": "rwt Regionalwerk Toggenburg AG",
+      "uid": "CHE-108.953.890",
+      "website": "www.rwt.ch"
+    },
+    {
+      "id": 689,
+      "name": "SEDRE SA",
+      "uid": "CHE-115.271.382",
+      "website": "www.altis.swiss"
+    },
+    {
+      "id": 676,
+      "name": "Service de l'Electricité, Municipalité de Moutier",
+      "uid": "CHE-114.770.464",
+      "website": "sim.moutier.ch"
+    },
+    {
+      "id": 631,
+      "name": "Service des Energies, Commune d'Yverdon-les-Bains",
+      "uid": "CHE-108.954.292",
+      "website": "www.yverdon-les-bains.ch"
+    },
+    {
+      "id": 698,
+      "name": "Service Industriel de la Commune, Pully",
+      "uid": "CHE-105.618.946",
+      "website": "www.pully.ch"
+    },
+    {
+      "id": 695,
+      "name": "Services industriels de Delémont",
+      "uid": "CHE-108.956.641",
+      "website": "sid.delemont.ch"
+    },
+    {
+      "id": 692,
+      "name": "Services industriels de Genève",
+      "uid": "CHE-108.955.185",
+      "website": ""
+    },
+    {
+      "id": 703,
+      "name": "Services industriels de la Ville de Nyon",
+      "uid": "CHE-108.954.903",
+      "website": "www.sinyon.ch"
+    },
+    {
+      "id": 675,
+      "name": "Services Industriels de Lausanne",
+      "uid": "CHE-108.956.664",
+      "website": "www.lausanne.ch/sil"
+    },
+    {
+      "id": 709,
+      "name": "SIE SA",
+      "uid": "CHE-106.840.789",
+      "website": "www.sie.ch"
+    },
+    {
+      "id": 798,
+      "name": "Sinergy Infrastructure SA",
+      "uid": "CHE-109.405.438",
+      "website": "www.sinergy.ch"
+    },
+    {
+      "id": 833,
+      "name": "Società Elettrica Sopracenerina SA (Mesolcina)",
+      "uid": "CHE-999.999.833",
+      "website": "www.ses.ch"
+    },
+    {
+      "id": 712,
+      "name": "Società Elettrica Sopracenerina SA (Ticino)",
+      "uid": "CHE-105.893.814",
+      "website": "www.ses.ch"
+    },
+    {
+      "id": 808,
+      "name": "Società Semplice Tra I Comuni, Concedenti Elin, Prestazioni di Servizio",
+      "uid": "CHE-104.317.270",
+      "website": "www.aemoesano.ch"
+    },
+    {
+      "id": 716,
+      "name": "Société des Forces Électriques de La Goule SA",
+      "uid": "CHE-105.935.186",
+      "website": "www.lagoule.ch"
+    },
+    {
+      "id": 718,
+      "name": "Société Electrique de la Vallée de Joux S.A.",
+      "uid": "CHE-106.385.472",
+      "website": "www.sevj.ch"
+    },
+    {
+      "id": 719,
+      "name": "Société Electrique des Forces de l'Aubonne SA (SEFA)",
+      "uid": "CHE-105.733.725",
+      "website": "www.sefa.ch"
+    },
+    {
+      "id": 723,
+      "name": "Société Electrique Intercommunale de la Côte SA",
+      "uid": "CHE-102.056.905",
+      "website": "www.seicgland.ch"
+    },
+    {
+      "id": 727,
+      "name": "St. Gallisch-Appenzellische Kraftwerke AG",
+      "uid": "CHE-114.776.923",
+      "website": "www.sak.ch"
+    },
+    {
+      "id": 468,
+      "name": "St. Moritz Energie",
+      "uid": "CHE-108.953.861",
+      "website": "www.stmoritz-energie.ch"
+    },
+    {
+      "id": 672,
+      "name": "St.Galler Stadtwerke",
+      "uid": "CHE-175.038.369",
+      "website": "www.sgsw.ch"
+    },
+    {
+      "id": 735,
+      "name": "Stadtwerk Winterthur",
+      "uid": "CHE-114.866.242",
+      "website": "www.stadtwerk.winterthur.ch"
+    },
+    {
+      "id": 737,
+      "name": "Stadtwerke Gossau",
+      "uid": "CHE-114.834.012",
+      "website": "www.stadtgossau.ch"
+    },
+    {
+      "id": 595,
+      "name": "Stadtwerke Wetzikon",
+      "uid": "CHE-108.953.341",
+      "website": "www.wetzikon.ch/stadtwerke-wetzikon"
+    },
+    {
+      "id": 738,
+      "name": "Steiner Energie AG",
+      "uid": "CHE-105.942.401",
+      "website": "www.steiner-energie.ch"
+    },
+    {
+      "id": 740,
+      "name": "StWZ Energie AG",
+      "uid": "CHE-109.339.741",
+      "website": "www.stwz.ch"
+    },
+    {
+      "id": 729,
+      "name": "Städtische Betriebe Olten (SBO)",
+      "uid": "CHE-114.663.839",
+      "website": ""
+    },
+    {
+      "id": 731,
+      "name": "SWG",
+      "uid": "CHE-108.954.748",
+      "website": "www.swg.ch"
+    },
+    {
+      "id": 741,
+      "name": "SWL Energie AG",
+      "uid": "CHE-109.698.660",
+      "website": "www.swl.ch"
+    },
+    {
+      "id": 749,
+      "name": "TB Gränichen Energie AG",
+      "uid": "CHE-205.935.844",
+      "website": "www.tbgraenichen.ch"
+    },
+    {
+      "id": 743,
+      "name": "tba energie ag",
+      "uid": "CHE-280.633.868",
+      "website": "www.tba-energie.ch"
+    },
+    {
+      "id": 755,
+      "name": "TBS Strom AG",
+      "uid": "CHE-203.025.931",
+      "website": "www.tbsuhr.ch"
+    },
+    {
+      "id": 728,
+      "name": "Technische Betriebe Altstätten",
+      "uid": "CHE-115.690.626",
+      "website": "www.altstaetten.ch"
+    },
+    {
+      "id": 747,
+      "name": "Technische Betriebe Flawil (TBF)",
+      "uid": "CHE-114.918.790",
+      "website": "www.tbflawil.ch"
+    },
+    {
+      "id": 785,
+      "name": "Technische Betriebe Glarus",
+      "uid": "CHE-116.363.153",
+      "website": "www.tb.glarus.ch"
+    },
+    {
+      "id": 825,
+      "name": "Technische Betriebe Glarus Nord (TBGN)",
+      "uid": "CHE-116.402.439",
+      "website": "www.tbgn.ch"
+    },
+    {
+      "id": 465,
+      "name": "Technische Betriebe Glarus Süd",
+      "uid": "CHE-116.387.219",
+      "website": "www.tbgs.ch"
+    },
+    {
+      "id": 748,
+      "name": "Technische Betriebe Goldach",
+      "uid": "CHE-113.560.243",
+      "website": "www.tbgoldach.ch"
+    },
+    {
+      "id": 435,
+      "name": "Technische Betriebe Grabs, Energie, Strom, Wasser",
+      "uid": "CHE-324.770.573",
+      "website": "www.tbgrabs.ch"
+    },
+    {
+      "id": 570,
+      "name": "Technische Betriebe Kemmental, Stromverkauf",
+      "uid": "CHE-114.147.710",
+      "website": "www.kemmental.ch"
+    },
+    {
+      "id": 83,
+      "name": "Technische Betriebe Seon AG",
+      "uid": "CHE-280.163.354",
+      "website": "www.tbseon.ch"
+    },
+    {
+      "id": 757,
+      "name": "Technische Betriebe Weinfelden AG",
+      "uid": "CHE-109.412.510",
+      "website": "www.tbweinfelden.ch"
+    },
+    {
+      "id": 758,
+      "name": "Technische Betriebe Wil",
+      "uid": "CHE-108.953.789",
+      "website": "www.tb-wil.ch"
+    },
+    {
+      "id": 759,
+      "name": "Technische Betriebe Würenlos",
+      "uid": "CHE-484.802.622",
+      "website": "www.tbwnet.ch"
+    },
+    {
+      "id": 754,
+      "name": "Technische Betriebe, Politische Gemeinde St. Margrethen",
+      "uid": "CHE-113.560.438",
+      "website": "http://www.stmargrethen.ch/xml_1/internet/DE/application/d152/d4/d153/d39/f122.cfm"
+    },
+    {
+      "id": 753,
+      "name": "Technische Betriebe, Stadt Rorschach",
+      "uid": "CHE-108.953.909",
+      "website": "www.rorschach.ch"
+    },
+    {
+      "id": 760,
+      "name": "Technische Gemeindebetriebe Berg, Gas-Strom-Und Wasserverteilung",
+      "uid": "CHE-108.963.173",
+      "website": "www.berg-tg.ch"
+    },
+    {
+      "id": 761,
+      "name": "Technische Gemeindebetriebe Bischofszell",
+      "uid": "CHE-108.955.452",
+      "website": "www.tgb.swiss"
+    },
+    {
+      "id": 762,
+      "name": "Technische Gemeindebetriebe Hauptwil-Gottshaus, Elektrizitätsversorgung",
+      "uid": "CHE-108.960.022",
+      "website": "www.pghg.ch"
+    },
+    {
+      "id": 764,
+      "name": "Technische Werke der Politischen Gemeinde Affeltrangen, Abwasserentsorgung",
+      "uid": "CHE-108.962.512",
+      "website": "www.affeltrangen.ch"
+    },
+    {
+      "id": 784,
+      "name": "Thurplus",
+      "uid": "CHE-108.960.329",
+      "website": "www.thurplus.ch"
+    },
+    {
+      "id": 520,
+      "name": "Thurwerke AG",
+      "uid": "CHE-102.727.800",
+      "website": "www.thurwerke.ch"
+    },
+    {
+      "id": 574,
+      "name": "Trimmiser Industrielle Betriebe (TIB)",
+      "uid": "CHE-114.774.976",
+      "website": "www.trimmis.ch"
+    },
+    {
+      "id": 771,
+      "name": "VED Visp Energie Dienste AG",
+      "uid": "CHE-110.362.333",
+      "website": "www.enalpin.ch"
+    },
+    {
+      "id": 773,
+      "name": "Viteos SA",
+      "uid": "CHE-113.989.623",
+      "website": "www.viteos.ch"
+    },
+    {
+      "id": 721,
+      "name": "VOé distribution SA",
+      "uid": "CHE-346.828.867",
+      "website": "www.voenergies.ch"
+    },
+    {
+      "id": 774,
+      "name": "Wasser- & Elektrizitätswerk Steinhausen",
+      "uid": "CHE-108.953.447",
+      "website": "www.west-steinhausen.ch"
+    },
+    {
+      "id": 775,
+      "name": "Wasser- und Elektrizitätswerk Walenstadt",
+      "uid": "CHE-108.953.134",
+      "website": "www.ew-walenstadt.ch"
+    },
+    {
+      "id": 783,
+      "name": "Werkbetrieb der Dorfgemeinde Matzingen",
+      "uid": "CHE-183.224.856",
+      "website": "www.werke-matzingen.ch"
+    },
+    {
+      "id": 580,
+      "name": "Werkbetriebe Wynau (WBW)",
+      "uid": "CHE-114.571.060",
+      "website": "www.wbwynau.ch"
+    },
+    {
+      "id": 513,
+      "name": "Werke am Zürichsee AG (Erlenbach)",
+      "uid": "CHE-999.999.513",
+      "website": "www.werkezuerichsee.ch"
+    },
+    {
+      "id": 444,
+      "name": "Werke am Zürichsee AG (Küsnacht)",
+      "uid": "CHE-999.999.444",
+      "website": "www.werkezuerichsee.ch"
+    },
+    {
+      "id": 596,
+      "name": "Werke am Zürichsee AG (Zollikon)",
+      "uid": "CHE-999.999.596",
+      "website": "www.werkezuerichsee.ch"
+    },
+    {
+      "id": 589,
+      "name": "Werke Horgen",
+      "uid": "CHE-444.636.464",
+      "website": "www.horgen.ch"
+    },
+    {
+      "id": 786,
+      "name": "Werke Rheineck, Elektrizitätsversorgung",
+      "uid": "CHE-113.521.697",
+      "website": "www.rheineck.ch"
+    },
+    {
+      "id": 586,
+      "name": "Werke Wangen-Brüttisellen, Elektrizitätswerk",
+      "uid": "CHE-113.515.509",
+      "website": "www.werkewb.ch"
+    },
+    {
+      "id": 788,
+      "name": "WWZ Energie AG",
+      "uid": "CHE-109.070.390",
+      "website": "www.wwz.ch"
+    }
+  ]
+}

@@ -82,6 +82,7 @@ ZEV_FIELDS = (
     "start_date",
     "zev_type",
     "grid_operator",
+    "grid_operator_elcom_id",
     "grid_connection_point",
     "billing_interval",
     "invoice_prefix",

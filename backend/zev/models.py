@@ -50,6 +50,14 @@ class Zev(models.Model):
         related_name="owned_zevs",
     )
     grid_operator = models.CharField(max_length=200, blank=True, help_text="Name of the VNB (Verteilnetzbetreiber)")
+    # Set when the name was chosen from the official ElCom list, null when it
+    # was typed. Deliberately not a foreign key: the list is a suggestion
+    # source, and an operator missing from ElCom's tariff cube must still be
+    # enterable (see zev.grid_operators).
+    grid_operator_elcom_id = models.PositiveIntegerField(
+        null=True, blank=True,
+        help_text="ElCom operator id, when the grid operator was picked from the official list",
+    )
     grid_connection_point = models.CharField(max_length=200, blank=True, help_text="Verknüpfungspunkt / EAN")
     billing_interval = models.CharField(
         max_length=20, choices=BillingInterval.choices, default=BillingInterval.MONTHLY

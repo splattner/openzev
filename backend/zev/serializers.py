@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from django.core.exceptions import ValidationError as DjangoValidationError
 from .geocoding import get_cached_building_footprint
+from .grid_operators import grid_operator_ids
 from .models import Zev, Participant, MeteringPoint, MeteringPointAssignment
 from accounts.models import UserRole
 from .services import create_zev_with_owner_setup, ensure_participant_account
@@ -131,7 +132,41 @@ class ParticipantSerializer(serializers.ModelSerializer):
         ]
 
 
+class GridOperatorSerializer(serializers.Serializer):
+    """One entry of the ElCom grid-operator list. Read-only reference data."""
+
+    id = serializers.IntegerField(help_text="ElCom operator id")
+    name = serializers.CharField()
+    uid = serializers.CharField(allow_blank=True, help_text="Swiss company UID (CHE-...)")
+    website = serializers.CharField(allow_blank=True)
+
+
+class GridOperatorListSerializer(serializers.Serializer):
+    """The fixture as served: the operator list plus its provenance."""
+
+    source = serializers.CharField()
+    cube = serializers.CharField()
+    licence = serializers.CharField()
+    period = serializers.CharField()
+    fetched_on = serializers.DateField()
+    operators = GridOperatorSerializer(many=True)
+
+
 class ZevSerializer(serializers.ModelSerializer):
+    def validate_grid_operator_elcom_id(self, value):
+        """Only ids from the shipped ElCom list are accepted.
+
+        The field exists to make ``grid_operator`` resolvable back to a real
+        utility; an arbitrary integer would defeat that while looking like it
+        had worked. ``None`` stays valid — that is the hand-typed case.
+        """
+        if value is not None and value not in grid_operator_ids():
+            raise serializers.ValidationError(
+                "Unknown ElCom operator id. Leave it empty when the grid operator "
+                "was entered by hand."
+            )
+        return value
+
     def validate_owner(self, value):
         request = self.context.get("request")
         if not request or request.user.is_admin:

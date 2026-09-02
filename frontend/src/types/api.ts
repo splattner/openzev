@@ -77,6 +77,7 @@ export interface Zev {
     owner: number
     zev_type: 'zev' | 'vzev'
     grid_operator: string
+    grid_operator_elcom_id?: number | null
     grid_connection_point?: string
     billing_interval: string
     invoice_prefix?: string
@@ -98,6 +99,7 @@ export interface ZevInput {
     owner?: number
     zev_type: 'zev' | 'vzev'
     grid_operator?: string
+    grid_operator_elcom_id?: number | null
     grid_connection_point?: string
     billing_interval: 'monthly' | 'quarterly' | 'semi_annual' | 'annual'
     invoice_prefix?: string
@@ -224,6 +226,7 @@ export interface SelfSetupZevInput {
     zev_type: 'zev' | 'vzev'
     billing_interval: 'monthly' | 'quarterly' | 'semi_annual' | 'annual'
     grid_operator?: string
+    grid_operator_elcom_id?: number | null
 }
 
 export interface ZevWizardResult {
@@ -449,6 +452,22 @@ export interface TariffPeriodInput {
     time_from?: string | null
     time_to?: string | null
     weekdays?: string
+}
+
+export interface GridOperator {
+    id: number
+    name: string
+    uid: string
+    website: string
+}
+
+export interface GridOperatorList {
+    source: string
+    cube: string
+    licence: string
+    period: string
+    fetched_on: string
+    operators: GridOperator[]
 }
 
 export interface Invoice {

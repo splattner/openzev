@@ -11,6 +11,8 @@ from rest_framework.decorators import action
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.views import APIView
+from drf_spectacular.utils import extend_schema
 from accounts.permissions import IsAdmin
 from accounts.throttling import ApiKeyRateThrottle, TransferArchiveThrottle
 from accounts.models import User, UserRole
@@ -19,6 +21,7 @@ from metering.models import MeterReading
 from .models import Zev, Participant, MeteringPoint, MeteringPointAssignment
 from .scoping import ZevScopedQuerySetMixin
 from .serializers import (
+    GridOperatorListSerializer,
     ZevSerializer,
     ZevDetailSerializer,
     ZevCreateWithOwnerSerializer,
@@ -32,6 +35,7 @@ from .permissions import (
     MeteringPointPermission,
     ZevManagementPermission,
 )
+from .grid_operators import load_grid_operators
 from .services import send_participant_invitation, create_zev_for_existing_owner
 from .transfer import (
     SECTION_DEPENDENCIES,
@@ -830,3 +834,20 @@ class MeteringPointAssignmentViewSet(AuditedUpdateMixin, ZevScopedQuerySetMixin,
             summary=f"Deleted metering point assignment for {meter_id}.",
             metadata={"participant_id": participant_id},
         )
+
+
+class GridOperatorListView(APIView):
+    """The official ElCom list of Swiss grid operators, for the ZEV form picker.
+
+    A static reference list served whole rather than paginated: the picker
+    filters client-side, and 553 entries is ~82 KB. Read from a checked-in
+    fixture, so creating a ZEV never depends on an external SPARQL endpoint
+    being reachable — see ``zev.grid_operators`` and
+    ``manage.py fetch_grid_operators``.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(responses=GridOperatorListSerializer)
+    def get(self, request):
+        return Response(load_grid_operators())

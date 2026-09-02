@@ -7,6 +7,7 @@ import { createSelfSetupZev } from '../lib/api/zev'
 import { formatApiError } from '../lib/api/errors'
 import { todayLocalIso } from '../lib/dates'
 import type { SelfSetupZevInput } from '../types/api'
+import { GridOperatorField } from '../features/zev/GridOperatorField'
 
 type Step = 'verifying' | 'error' | 'set-password' | 'create-zev' | 'done'
 
@@ -221,13 +222,12 @@ export function VerifyEmailPage() {
                         </select>
                     </label>
 
-                    <label>
-                        <span>{t('auth.verify.zevGridOperator')}</span>
-                        <input
-                            value={zevForm.grid_operator ?? ''}
-                            onChange={(e) => setZevForm((f) => ({ ...f, grid_operator: e.target.value }))}
-                        />
-                    </label>
+                    <GridOperatorField
+                        label={t('auth.verify.zevGridOperator')}
+                        value={zevForm.grid_operator ?? ''}
+                        elcomId={zevForm.grid_operator_elcom_id ?? null}
+                        onChange={(next) => setZevForm((f) => ({ ...f, ...next }))}
+                    />
 
                     {zevError ? <div className="error-banner">{zevError}</div> : null}
 

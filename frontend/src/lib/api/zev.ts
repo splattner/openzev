@@ -1,4 +1,5 @@
 import type {
+  GridOperatorList,
   MeteringPoint,
   MeteringPointAssignment,
   MeteringPointAssignmentInput,
@@ -90,6 +91,11 @@ export async function createParticipantAccount(participantId: string, payload: {
 export async function downloadParticipantContractPdf(participantId: string, filename: string): Promise<void> {
   const response = await api.post(`/zev/participants/${participantId}/contract-pdf/`, null, { responseType: 'blob' })
   downloadBlob(response.data as Blob, filename)
+}
+
+export async function fetchGridOperators(): Promise<GridOperatorList> {
+  const { data } = await api.get<GridOperatorList>('/zev/grid-operators/')
+  return data
 }
 
 export async function fetchMeteringPoints(): Promise<MeteringPoint[]> {
