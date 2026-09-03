@@ -8,6 +8,7 @@ synthetic ones for the shapes that document happens not to contain, and the
 mapping is asserted through to what the billing engine actually reads back.
 """
 import json
+import urllib.error
 from datetime import date, time
 from decimal import Decimal
 from pathlib import Path
@@ -602,7 +603,7 @@ class RemoteFetchTests(SimpleTestCase):
         with self.assertRaises(TariffFetchError) as caught:
             fetch_tariff_document("http://127.0.0.1:8000/tariffs.json")
 
-        self.assertIn("not a public address", str(caught.exception))
+        self.assertIn("does not resolve to a public address", str(caught.exception))
 
     def test_localhost_is_refused_by_name_too(self):
         """Asserting on the message, not just the exception: without the
@@ -611,7 +612,33 @@ class RemoteFetchTests(SimpleTestCase):
         with self.assertRaises(TariffFetchError) as caught:
             fetch_tariff_document("http://localhost/tariffs.json")
 
-        self.assertIn("not a public address", str(caught.exception))
+        self.assertIn("does not resolve to a public address", str(caught.exception))
+
+    def test_the_refusal_does_not_report_what_the_name_resolved_to(self):
+        """Blocking the request but naming the address turns a failed import
+        into a way of mapping internal DNS: aim it at an internal hostname and
+        read the answer off the error. The address is logged, not returned."""
+        with self.assertRaises(TariffFetchError) as caught:
+            fetch_tariff_document("http://localhost/tariffs.json")
+
+        self.assertNotIn("127.0.0.1", str(caught.exception))
+        self.assertIn("127.0.0.1", caught.exception.log_detail)
+
+    def test_socket_errors_are_logged_rather_than_returned(self):
+        """A raw URLError carries TLS and library detail about the deployment,
+        none of which helps the user fix their URL."""
+        with mock.patch("tariffs.importers.remote.socket.getaddrinfo", fake_public_dns), \
+             mock.patch("urllib.request.build_opener") as opener:
+            opener.return_value.open.side_effect = urllib.error.URLError(
+                "[SSL: CERTIFICATE_VERIFY_FAILED] unable to get local issuer "
+                "certificate (_ssl.c:1006) /etc/ssl/internal-ca.pem"
+            )
+            with self.assertRaises(TariffFetchError) as caught:
+                fetch_tariff_document("https://werke.example.ch/tarife.json")
+
+        self.assertNotIn("_ssl.c", str(caught.exception))
+        self.assertNotIn("internal-ca.pem", str(caught.exception))
+        self.assertIn("internal-ca.pem", caught.exception.log_detail)
 
     def test_only_http_and_https_are_fetched(self):
         with self.assertRaises(TariffFetchError) as caught:
@@ -637,6 +664,21 @@ class RemoteFetchTests(SimpleTestCase):
                 fetch_tariff_document("https://werke.example.ch/tarife.json")
 
         self.assertIn("larger than", str(caught.exception))
+
+    def test_the_operators_own_error_text_is_not_echoed_back(self):
+        """The status code is what the user needs; the reason phrase comes from
+        a server we were merely pointed at."""
+        with mock.patch("tariffs.importers.remote.socket.getaddrinfo", fake_public_dns), \
+             mock.patch("urllib.request.build_opener") as opener:
+            opener.return_value.open.side_effect = urllib.error.HTTPError(
+                "https://werke.example.ch/tarife.json", 403, "Forbidden by WAF rule 42",
+                {}, None,
+            )
+            with self.assertRaises(TariffFetchError) as caught:
+                fetch_tariff_document("https://werke.example.ch/tarife.json")
+
+        self.assertIn("403", str(caught.exception))
+        self.assertNotIn("WAF rule 42", str(caught.exception))
 
     def test_a_web_page_instead_of_json_gives_an_actionable_message(self):
         with mock.patch("tariffs.importers.remote.socket.getaddrinfo", fake_public_dns), \

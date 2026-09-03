@@ -364,6 +364,26 @@ this is noted in the module docstring.
 
 The digest returned is `sha256` of the exact bytes received.
 
+**What a failure is allowed to say.** A blocked request that names the address
+it blocked is still an answer: aim the import at an internal hostname, read the
+resolution off the error, and the guard above has been walked around without
+being defeated. So `TariffFetchError` carries two strings — the message
+returned to the user, which is either a literal or built from what the user
+typed, and `log_detail`, which holds the resolved address, the socket or TLS
+error, and the operator server's own reason phrase. `views_import._fetch_failed`
+logs the second and returns the first. Concretely:
+
+| Situation | Returned | Logged |
+|---|---|---|
+| Resolves into private space | "`<host>` does not resolve to a public address…" | the address it resolved to |
+| DNS failure | "The host `<host>` could not be resolved…" | the `gaierror` |
+| Transport failure | "The document could not be downloaded…" | exception type and message |
+| Operator returned an error | "…answered HTTP 403." | status *and* reason phrase, plus the URL |
+| Not JSON | "…is not valid JSON. Check that the link points at…" | the `JSONDecodeError` |
+
+`TariffDocumentError` needs no such split: every message it carries is a
+literal.
+
 ## 11. Audit
 
 One event per apply, via `audit.services.record_audit_event`:
@@ -517,10 +537,11 @@ result, messages, errors) and `pages.zevSettings.fields.tariffSourceUrl` /
 | Re-import creates duplicates or trips the overlap guard | High | `duplicate` status; planning re-run inside the write transaction |
 | A published document drifts from the OpenAPI shape | Medium | Defensive parsing (§7); per-entry failure |
 | Preview lets an authenticated user make the server fetch arbitrary public URLs | Low | Role- and ownership-gated, public addresses only, 5 MB / 20 s caps. Not rate-limited yet — worth adding if the endpoint is ever exposed more widely |
+| A refused fetch describes the deployment's network back to the user | Medium | Resolved addresses and raw socket errors are logged, never returned (§10) |
 
 ## 14. Test plan
 
-### Backend — `backend/tariffs/test_vse_import.py` (62 tests)
+### Backend — `backend/tariffs/test_vse_import.py` (65 tests)
 
 The suite leans on a **real published document** — InfraWerke Münsingen's 2027
 tariffs, fetched from the operator's own website and checked in unchanged as
@@ -564,11 +585,14 @@ candidate is refused rather than ignored.
 `invoices.engine._get_tariff_price` — daytime at HT, night and evening at NT,
 and the boundaries at 06:59/07:00 and 20:59/21:00.
 
-**`RemoteFetchTests`** (7): a literal private address and `localhost` both
+**`RemoteFetchTests`** (10): a literal private address and `localhost` both
 refused *with the guard's own message* (a connection error would otherwise let
 the test pass with the guard gone); non-http schemes; a redirect into private
 space; an oversized body with no `Content-Length`; an HTML page instead of JSON;
-the digest covering the downloaded bytes.
+the digest covering the downloaded bytes. Three more cover what a failure is
+allowed to say: the refusal does not report what the name resolved to (while
+`log_detail` does), a TLS error's paths do not reach the response, and the
+operator's own reason phrase is not echoed back.
 
 **`ImportEndpointTests`** (13): auth; participants forbidden; an owner refused
 another owner's ZEV; preview writes nothing; the stored URL as fallback; a ZEV
@@ -579,8 +603,8 @@ false` honoured; the preview publishes the billing modes it may offer, and a
 mode picked there reaches the created tariff.
 
 Each of these was checked to fail with the production code reverted (duplicate
-detection, wrap-around splitting, the address checks, and the billing-mode
-allowlist were each disabled in turn).
+detection, wrap-around splitting, the address checks, the billing-mode
+allowlist, and the message/log split were each disabled in turn).
 
 ### Frontend — `frontend/tests/vse-tariff-import.test.ts` (12 tests)
 

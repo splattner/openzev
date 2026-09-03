@@ -33,7 +33,23 @@ ALLOWED_SCHEMES = frozenset({"http", "https"})
 
 
 class TariffFetchError(Exception):
-    """The document could not be retrieved. The message is shown to the user."""
+    """The document could not be retrieved.
+
+    The message is returned to the user, so it must never describe the
+    deployment's own network. Echoing a resolved address back — "that name
+    resolves to 10.0.0.5, which is refused" — leaves the request blocked but
+    hands over the answer anyway: point the import at an internal hostname and
+    read the map off the error. The same goes for raw socket and TLS errors,
+    which carry paths and library detail.
+
+    So anything of that kind goes in ``log_detail``, which is logged where the
+    request is handled and never leaves the server. The user gets a sentence
+    they can act on about the URL *they* supplied.
+    """
+
+    def __init__(self, message: str, *, log_detail: str = ""):
+        super().__init__(message)
+        self.log_detail = log_detail or message
 
 
 def _check_public_host(url: str) -> None:
@@ -58,14 +74,20 @@ def _check_public_host(url: str) -> None:
     try:
         addresses = socket.getaddrinfo(host, parsed.port or (443 if parsed.scheme == "https" else 80))
     except socket.gaierror as exc:
-        raise TariffFetchError(f"The host {host} could not be resolved: {exc}") from exc
+        raise TariffFetchError(
+            f"The host {host} could not be resolved. Check the address for a typo.",
+            log_detail=f"getaddrinfo({host!r}) failed: {exc}",
+        ) from exc
 
     for family, _type, _proto, _canonname, sockaddr in addresses:
         address = ipaddress.ip_address(sockaddr[0])
         if not address.is_global or address.is_multicast:
+            # The resolved address stays out of the message on purpose: see
+            # TariffFetchError. The host is repeated because the user typed it.
             raise TariffFetchError(
-                f"{host} resolves to {address}, which is not a public address. "
-                "Tariff documents must be fetched from the operator's public website."
+                f"{host} does not resolve to a public address. Tariff documents must be "
+                "fetched from the operator's public website.",
+                log_detail=f"{host!r} resolved to {address}, which is not globally routable.",
             )
 
 
@@ -111,9 +133,18 @@ def fetch_tariff_document(url: str) -> tuple[dict, str]:
             # its length is still caught by what actually arrived.
             body = response.read(MAX_DOCUMENT_BYTES + 1)
     except urllib.error.HTTPError as exc:
-        raise TariffFetchError(f"The operator's server answered {exc.code} {exc.reason}.") from exc
+        # The status code is the actionable part; the reason phrase comes from
+        # a server the user pointed us at, so it is logged rather than echoed.
+        raise TariffFetchError(
+            f"The operator's server answered HTTP {exc.code}.",
+            log_detail=f"HTTP {exc.code} {exc.reason} from {url}",
+        ) from exc
     except (urllib.error.URLError, TimeoutError, socket.timeout, OSError) as exc:
-        raise TariffFetchError(f"The document could not be downloaded: {exc}") from exc
+        raise TariffFetchError(
+            "The document could not be downloaded. Check the address, and that the "
+            "operator's site is reachable.",
+            log_detail=f"{type(exc).__name__}: {exc}",
+        ) from exc
 
     if len(body) > MAX_DOCUMENT_BYTES:
         raise TariffFetchError(
@@ -125,8 +156,9 @@ def fetch_tariff_document(url: str) -> tuple[dict, str]:
         payload = json.loads(body.decode("utf-8-sig"))
     except (UnicodeDecodeError, json.JSONDecodeError) as exc:
         raise TariffFetchError(
-            f"The document at this URL is not valid JSON ({exc}). Check that the link points "
-            "at the machine-readable tariff file and not at a web page."
+            "The document at this URL is not valid JSON. Check that the link points at "
+            "the machine-readable tariff file and not at a web page.",
+            log_detail=f"{type(exc).__name__}: {exc}",
         ) from exc
 
     return payload, digest

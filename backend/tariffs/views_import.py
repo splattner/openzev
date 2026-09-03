@@ -16,6 +16,8 @@ changed between the two steps is refused instead of half-applied.
 """
 from __future__ import annotations
 
+import logging
+
 from drf_spectacular.utils import extend_schema
 from rest_framework import status
 from rest_framework.exceptions import NotFound, PermissionDenied
@@ -38,6 +40,25 @@ from .serializers import (
     VseTariffImportPreviewSerializer,
     VseTariffImportResultSerializer,
 )
+
+
+logger = logging.getLogger(__name__)
+
+
+def _fetch_failed(exc, zev) -> Response:
+    """Turn a fetch/parse failure into a 400 the user can act on.
+
+    The full detail — a resolved address, a socket error, whatever the
+    operator's server actually said — is logged here and only here.
+    ``str(exc)`` is safe to return by construction: every message these two
+    exceptions carry is either a literal or built from what the user typed
+    (see ``TariffFetchError``).
+    """
+    logger.warning(
+        "VSE tariff import failed for ZEV %s: %s",
+        zev.pk, getattr(exc, "log_detail", exc), exc_info=True,
+    )
+    return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 
 
 def _resolve_zev(request, zev_id) -> Zev:
@@ -126,7 +147,7 @@ class VseTariffImportPreviewView(APIView):
         try:
             url, document, digest = _load(zev, payload.validated_data.get("url", ""))
         except (TariffFetchError, TariffDocumentError) as exc:
-            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+            return _fetch_failed(exc, zev)
 
         planned = plan_import(zev.id, document)
         return Response(
@@ -159,7 +180,7 @@ class VseTariffImportApplyView(APIView):
         try:
             url, document, digest = _load(zev, data.get("url", ""))
         except (TariffFetchError, TariffDocumentError) as exc:
-            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+            return _fetch_failed(exc, zev)
 
         if digest != data["document_digest"]:
             return Response(
