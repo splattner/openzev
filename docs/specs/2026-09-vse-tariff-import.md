@@ -51,9 +51,10 @@ the same series.
 - **File upload** of the document. Iteration 1 is URL-only; the parser takes a
   decoded payload, so adding upload is a view-layer change.
 - **Seasonal tariffs** (`months[]` covering fewer than 12 months) — rejected
-  per entry with a reason. See §6.
-- **More than two distinct energy prices**, power/demand and reactive-power
-  charges, storage refunds, dynamic tariffs — reported, never imported.
+  per entry with a reason. See §6; tracked in #527.
+- **More than two distinct energy prices** (#528), power/demand charges
+  (#529), dynamic tariffs (#530), reactive-power charges and storage refunds —
+  reported, never imported.
 - Any scheduled or automatic refresh. The import is manual, previewed and
   user-confirmed.
 - Publishing tariffs *as* a VNB. OpenZEV is a consumer of this standard.
@@ -215,18 +216,19 @@ Every one of these produces a candidate with a `blocked_reason`, shown in the
 preview and refused by the apply step even if its key is sent. Nothing is ever
 silently dropped.
 
-| Construct | Reason given |
-|---|---|
-| `months[]` covering fewer than 12 months | Seasonal prices are not supported yet — `TariffPeriod` has no month dimension |
-| ≥ 3 distinct energy prices | Only a high and a low band can be stored |
-| `tariffForm: dynamic` | The price lives in an external time series; the URL is named in the message |
-| Energy price not in `CHF/kWh` | Cannot be billed per kWh |
-| Base price not in `CHF/M` | Does not map to a monthly fee |
-| Negative price | The standard requires prices ≥ 0 |
+| Construct | Reason given | Tracked |
+|---|---|---|
+| `months[]` covering fewer than 12 months | Seasonal prices are not supported yet — `TariffPeriod` has no month dimension | #527 |
+| ≥ 3 distinct energy prices | Only a high and a low band can be stored | #528 |
+| `tariffForm: dynamic` | The price lives in an external time series; the URL is named in the message | #530 |
+| Energy price not in `CHF/kWh` | Cannot be billed per kWh | — |
+| Base price not in `CHF/M` | Does not map to a monthly fee | — |
+| Negative price | The standard requires prices ≥ 0 | — |
 
 Non-blocking, reported as warnings on the candidate: a non-zero
-`prices.power` (CHF/kW — OpenZEV does not bill demand and no demand data is
-metered), a non-zero `prices.reactivePower`, and a non-zero
+`prices.power` (CHF/kW — OpenZEV has no demand billing mode; tracked in #529,
+which also notes that demand *is* derivable from the 15-minute readings already
+stored), a non-zero `prices.reactivePower`, and a non-zero
 `prices.refundStorage`. Components published as `0.00` — of which real
 documents carry many — produce no warning, but a candidate whose only price is
 zero is never pre-selected.
@@ -621,7 +623,9 @@ call shapes — including that apply sends only selections and a digest.
    `Zev.zev_type` already knows which this is. Keying the default off it would
    save a click; it would also make the picker's initial value depend on a
    setting the user is not looking at, which is why it is not done yet.
-3. **Seasonal tariffs** are common in Switzerland and are the largest remaining
-   gap. Supporting them means either a month dimension on `TariffPeriod` or
-   splitting into per-season `Tariff` versions, which collides with the
-   same-name overlap guard.
+3. **The remaining gaps are tracked separately**, each naming the code that
+   blocks it: seasonal prices #527, more than two bands #528, power/demand
+   billing #529, dynamic tariffs #530. #527 and #528 touch the same model and
+   the same consumers and are worth sequencing together; #530 is blocked on
+   something outside this repo, since the standard defines `prices.dynamic` as
+   a bare URL with no response schema.
