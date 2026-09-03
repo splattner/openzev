@@ -108,7 +108,8 @@ only exist while the user is deciding.
 | `valid_from`, `valid_to` | `date` | From the document's `startDate` / `endDate` |
 | `periods` | `list[ProposedPeriod]` | Energy candidates only |
 | `source_tariff_name`, `source_tariff_type`, `source_customer_type`, `source_voltage_level`, `standard_basegroup` | | Provenance, shown in the preview |
-| `warnings` | `list[str]` | Lossy or assumed mappings — importable |
+| `billing_mode_options` | `tuple[str, ...]` | Modes the user may pick instead; empty when there is nothing to choose |
+| `warnings` | `list[str]` | Lossy mappings — importable |
 | `blocked_reason` | `str \| None` | Set when the entry cannot be represented at all |
 
 `recommended` is `standard_basegroup and is_importable and not is_free`.
@@ -133,7 +134,7 @@ and an energy price, because `Tariff` has a single `billing_mode` and
 
 | Standard | OpenZEV | Name |
 |---|---|---|
-| `prices.base` (`CHF/M`) | `billing_mode=shared_monthly_fee`, `fixed_price_chf` | `"<tariffName> (Grundpreis)"` |
+| `prices.base` (`CHF/M`) | `fixed_price_chf` + a monthly fee mode the user picks (below) | `"<tariffName> (Grundpreis)"` |
 | `prices.energy[]` (`CHF/kWh`) | `billing_mode=energy` + `TariffPeriod` rows | `"<tariffName> (Arbeitspreis)"` |
 
 The component suffix is applied **even when only one component is present**. A
@@ -141,12 +142,33 @@ document that grows a base price next year must append to the same series
 rather than fork it under a bare name. These strings become invoice line
 labels, hence the Swiss-German billing vocabulary.
 
-**`shared_monthly_fee`, not `monthly_fee`.** The grid operator bills the
-community once for its connection. A plain `monthly_fee` would collect that
-amount from every participant and so collect it N times over. A vZEV whose
-participants each hold their own DSO contract wants the plain mode instead —
-so the candidate carries a warning saying which assumption was made, and the
-billing mode is editable after import like any other tariff's.
+**The billing mode for a base price is the user's choice, not a guess.** The
+document says the price is CHF per month; it cannot say *who* pays it. So a
+fee candidate carries `billing_mode_options` and the preview renders a picker
+on that row:
+
+| Mode | When it is right |
+|---|---|
+| `shared_monthly_fee` *(default)* | Classic ZEV: the operator bills the community once for its connection, and the fee is split across participants |
+| `monthly_fee` | vZEV whose participants each hold their own DSO contract |
+| `per_metering_point_monthly_fee` | A per-meter charge — the Messtarif is one |
+
+Only the *monthly* modes are offered. The yearly modes read `fixed_price_chf`
+as a per-year amount, so offering one for a `CHF/M` price would bill a twelfth
+of it. The default leads with `shared_monthly_fee` because billing a
+connection fee per participant collects it N times over, which is the more
+damaging of the two mistakes.
+
+`Candidate.billing_mode_options` is the single allowlist: the frontend renders
+exactly that list and `planner._with_chosen_billing_mode` accepts exactly that
+list, so a mode can never appear in the picker that the write path would then
+refuse — nor be reached by a client that never saw the picker. An override on
+an energy candidate (which offers nothing) is **refused, not ignored**:
+silently billing per kWh what somebody asked to be billed monthly is precisely
+what this feature must not do.
+
+`split_key` is left at the model default (`equal`) for the shared modes;
+splitting by weight instead is an edit after import.
 
 ### 5.3 Time bands → `TariffPeriod`
 
@@ -292,20 +314,29 @@ a ZEV with neither gets a 400 saying so.
 **Apply request** — `VseTariffImportApplyRequestSerializer`:
 
 ```json
-{ "zev": "<uuid>", "url": "…", "keys": ["<key>", …],
+{ "zev": "<uuid>", "url": "…",
+  "selections": [{ "key": "<key>", "billing_mode": "monthly_fee" }, …],
   "document_digest": "<sha256 hex>", "remember_url": true }
 ```
 
-Only keys travel back — never tariff data. The server re-fetches and re-parses
-the document, so nothing a client sends can become a price. `document_digest`
-is what ties the confirmation to the version the user reviewed: a mismatch is
-**409 Conflict**, not a partial write.
+Only keys and the billing mode chosen for each travel back — never tariff
+data. The server re-fetches and re-parses the document, so nothing a client
+sends can become a price. `billing_mode` is optional; omitted, the candidate's
+proposed mode is used, and the frontend omits it whenever the user left the
+row alone. `document_digest` is what ties the confirmation to the version the
+user reviewed: a mismatch is **409 Conflict**, not a partial write.
+
+A candidate whose chosen mode changes its `billing_mode` may plan differently
+from the preview — a series that agreed on the proposed mode will `conflict`
+on a different one, because `SERIES_FIELDS` includes `billing_mode`. That is
+caught by the re-plan inside the write path and reported in `skipped`.
 
 `remember_url` (default `true`) stores the URL on the ZEV so next year's
 refresh is one click.
 
 **Apply response** — `VseTariffImportResultSerializer`: `created[]`
-(`{name, category, valid_from, valid_to}`), `skipped[]` (`{name, reason}`),
+(`{name, category, billing_mode, valid_from, valid_to}` — the mode is echoed
+so the result confirms what was chosen), `skipped[]` (`{name, reason}`),
 `errors[]` (`{name, error}`). 201 when anything was created, else 200.
 
 **Errors:** `TariffFetchError` and `TariffDocumentError` become 400 with the
@@ -338,7 +369,7 @@ One event per apply, via `audit.services.record_audit_event`:
 - `action_category`: `import`; `action_type`: `tariff.import_vse`
 - `target_type`: `zev.Zev`, `zev` set, so it appears in the ZEV's scoped stream
 - `metadata_json`: `source_url`, `document_digest`, `dso_name`, `dso_number`,
-  `selected`, `created` (names), `skipped`, `errors`
+  `selected`, `created` (`{name, billing_mode}` each), `skipped`, `errors`
 
 `metering.ImportLog` was **not** reused. Its name and fields (`rows_total`,
 `rows_imported`, `rows_skipped`) lean toward meter readings, it lives in the
@@ -377,9 +408,14 @@ Mutations: `previewVseTariffImport`, `applyVseTariffImport`. Success invalidates
 through `invalidateTariffQueries(queryClient, zevId)`. Neither response is
 cached — a preview is a point-in-time read of an external document.
 
-**File:** `frontend/src/features/tariffs/vseImportSelection.ts` — `isSelectable`,
-`recommendedKeys`, `toggleKey`, `trimPrice`. Extracted from the component so
-the rules that decide what gets written are testable.
+**File:** `frontend/src/features/tariffs/vseImportSelection.ts` —
+`isSelectable`, `recommendedKeys`, `defaultBillingModes`, `selectionFor`,
+`toggleKey`, `trimPrice`. Extracted from the component so the rules that decide
+what gets written are testable.
+
+The chosen modes live in their own `Record<string, string>` beside the tick
+`Set`, so "clear selection" and "select standard tariffs" do not throw away a
+billing decision the user already made.
 
 ### 12.3 ZEV settings
 
@@ -407,6 +443,7 @@ interface VseTariffCandidate {
     name: string
     category: 'energy' | 'grid_fees' | 'levies' | 'metering'
     billing_mode: string
+    billing_mode_options: string[]
     energy_type: string | null
     fixed_price_chf: string | null
     valid_from: string
@@ -434,8 +471,16 @@ interface VseTariffImportPreview {
     errors: Array<{ tariff: string; error: string }>
 }
 
+interface VseTariffImportSelection {
+    key: string
+    billing_mode?: string
+}
+
 interface VseTariffImportResult {
-    created: Array<{ name: string; category: string; valid_from: string; valid_to: string | null }>
+    created: Array<{
+        name: string; category: string; billing_mode: string
+        valid_from: string; valid_to: string | null
+    }>
     skipped: Array<{ name: string; reason: string }>
     errors: Array<{ name: string; error: string }>
 }
@@ -463,7 +508,7 @@ result, messages, errors) and `pages.zevSettings.fields.tariffSourceUrl` /
 | Risk | Impact | Mitigation |
 |---|---|---|
 | A wrong price silently reprices every invoice | High | Nothing is written without a per-candidate preview; the engine mapping is tested end to end against a real document |
-| The base-fee billing mode is wrong for a vZEV | Medium | Warning on every fee candidate naming the assumption; editable after import |
+| The base-fee billing mode is wrong for this ZEV | Medium | Chosen per row in the preview from a three-option picker (§5.2), not assumed |
 | The HT/NT assignment is a heuristic | Medium | Stated as a warning on the candidate rather than applied silently |
 | SSRF through the user-supplied URL | High | Address check on the URL and every redirect hop; scheme allowlist; size and timeout caps (§10) |
 | The document changes between preview and apply | Medium | `document_digest` → 409 |
@@ -473,7 +518,7 @@ result, messages, errors) and `pages.zevSettings.fields.tariffSourceUrl` /
 
 ## 14. Test plan
 
-### Backend — `backend/tariffs/test_vse_import.py` (53 tests)
+### Backend — `backend/tariffs/test_vse_import.py` (62 tests)
 
 The suite leans on a **real published document** — InfraWerke Münsingen's 2027
 tariffs, fetched from the operator's own website and checked in unchanged as
@@ -488,7 +533,7 @@ onto HT + two NT rows; a municipal surcharge becomes its own levy; power and
 reactive charges are reported; zero-priced components are offered but never
 recommended.
 
-**`DefensiveParsingTests`** (7): dotted dates; a bare-number `base`;
+**`DefensiveParsingTests`** (8): dotted dates; a bare-number `base`;
 case-insensitive weekday and month codes; a midnight-wrapping window split in
 two; one bad entry not blocking the rest; a document with no `tariffs` array
 and a bare JSON array both rejected outright; duplicate names reported.
@@ -506,6 +551,13 @@ even when its key is sent; two versions inside one document chained rather than
 collided; a stale key is an error; the source URL is on every imported tariff's
 notes.
 
+**`BillingModeChoiceTests`** (7): a fee offers exactly the three monthly modes
+and defaults to the shared one; no yearly mode is ever offered (it would bill a
+twelfth of a CHF/M price); an energy candidate offers none; a picked mode is
+what gets created, including the per-metering-point case the shared default
+gets wrong; a mode that was never offered is refused; an override on an energy
+candidate is refused rather than ignored.
+
 **`EnginePricingTests`** (3): the imported multilevel tariff is read back by
 `invoices.engine._get_tariff_price` — daytime at HT, night and evening at NT,
 and the boundaries at 06:59/07:00 and 20:59/21:00.
@@ -516,23 +568,25 @@ the test pass with the guard gone); non-http schemes; a redirect into private
 space; an oversized body with no `Content-Length`; an HTML page instead of JSON;
 the digest covering the downloaded bytes.
 
-**`ImportEndpointTests`** (12): auth; participants forbidden; an owner refused
+**`ImportEndpointTests`** (13): auth; participants forbidden; an owner refused
 another owner's ZEV; preview writes nothing; the stored URL as fallback; a ZEV
 with no URL told what is missing; a fetch failure as a 400 not a 500; apply
 creates only what was ticked and remembers the URL; the audit event and its
 metadata; a changed document refused with 409 and no write; `remember_url:
-false` honoured.
+false` honoured; the preview publishes the billing modes it may offer, and a
+mode picked there reaches the created tariff.
 
 Each of these was checked to fail with the production code reverted (duplicate
-detection, wrap-around splitting, and the address checks were each disabled in
-turn).
+detection, wrap-around splitting, the address checks, and the billing-mode
+allowlist were each disabled in turn).
 
-### Frontend — `frontend/tests/vse-tariff-import.test.ts` (9 tests)
+### Frontend — `frontend/tests/vse-tariff-import.test.ts` (12 tests)
 
 Selection rules (`isSelectable` for all five statuses, `recommendedKeys`
-skipping a recommended-but-inapplicable candidate, `toggleKey`), price
-trimming, and the two API call shapes — including that apply sends only keys
-and a digest.
+skipping a recommended-but-inapplicable candidate, `toggleKey`), billing-mode
+state (`defaultBillingModes`; `selectionFor` omitting the mode when the row was
+left alone and sending it when it was changed), price trimming, and the two API
+call shapes — including that apply sends only selections and a digest.
 
 - `npm run test:unit`, `npm run build`, `tsc --noEmit`, `eslint`, `stylelint`
 - Locale parity is enforced by the existing `tests/locale-parity.test.ts`
@@ -546,6 +600,8 @@ and a digest.
       correctly through the existing billing engine
 - [x] Unrepresentable constructs are reported per entry with a reason and never
       silently dropped
+- [x] Where the document cannot say how a fee should be billed, the preview
+      asks instead of assuming
 - [x] Re-importing the same document is idempotent and does not trip the
       same-name overlap guard
 - [x] Next year's document appends a new version, leaving prior versions closed
@@ -559,10 +615,12 @@ and a digest.
    line labels and are German in a four-language product. Renaming a whole
    series after import is one action (`rename-series`), so this is a default
    rather than a commitment — but it is a default that ships.
-2. **The shared-fee assumption** (§5.2) is right for a classic ZEV and wrong
-   for a vZEV whose participants each hold their own DSO contract. A future
-   iteration could pick the default from `Zev.zev_type`, or let the user choose
-   the billing mode per fee candidate in the preview.
+2. **The fee billing-mode default.** Resolved by making it a per-row choice in
+   the preview (§5.2). What remains open is only the *default*:
+   `shared_monthly_fee` is right for a classic ZEV and wrong for a vZEV, and
+   `Zev.zev_type` already knows which this is. Keying the default off it would
+   save a click; it would also make the picker's initial value depend on a
+   setting the user is not looking at, which is why it is not done yet.
 3. **Seasonal tariffs** are common in Switzerland and are the largest remaining
    gap. Supporting them means either a month dimension on `TariffPeriod` or
    splitting into per-season `Tariff` versions, which collides with the

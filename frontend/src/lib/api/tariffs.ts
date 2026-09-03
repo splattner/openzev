@@ -7,6 +7,7 @@ import type {
   TariffVersionInput,
   VseTariffImportPreview,
   VseTariffImportResult,
+  VseTariffImportSelection,
 } from '../../types/api'
 import { api } from './client'
 
@@ -82,14 +83,15 @@ export async function previewVseTariffImport(payload: {
 }
 
 /**
- * Create the selected candidates. Only the keys travel back, not the tariff
- * data: the server re-fetches the document and refuses the write if
- * `document_digest` no longer matches what the preview showed.
+ * Create the selected candidates. Only the keys and the billing mode chosen
+ * for each travel back, never the tariff data: the server re-fetches the
+ * document and refuses the write if `document_digest` no longer matches what
+ * the preview showed.
  */
 export async function applyVseTariffImport(payload: {
   zev: string
   url?: string
-  keys: string[]
+  selections: VseTariffImportSelection[]
   document_digest: string
   remember_url?: boolean
 }): Promise<VseTariffImportResult> {

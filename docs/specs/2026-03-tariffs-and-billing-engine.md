@@ -183,6 +183,11 @@ Two consequences are worth knowing here, because they follow from the shape of
 - One published tariff carrying both a base fee and a per-kWh price becomes
   **two** tariffs, because `Tariff` has a single `billing_mode`, named
   `"… (Grundpreis)"` and `"… (Arbeitspreis)"`.
+- A published base price is an amount per month, but the document cannot say
+  *who* pays it, so the preview asks: a fee row is imported as
+  `shared_monthly_fee`, `monthly_fee` or `per_metering_point_monthly_fee` at
+  the user's choice. The yearly modes are never offered — they read
+  `fixed_price_chf` as a per-year amount.
 - What decides whether a published multi-band tariff fits is the number of
   **distinct prices**, not the number of windows: `PeriodType` has three slots,
   so a three-window/two-price document maps onto one `high` and two `low` rows,

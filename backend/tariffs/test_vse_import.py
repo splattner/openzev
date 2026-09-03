@@ -21,9 +21,10 @@ from rest_framework.test import APIClient
 from accounts.models import UserRole
 from audit.models import AuditEvent
 from invoices.engine import _get_tariff_price
-from tariffs.importers.planner import CandidateStatus, apply_import, plan_import
+from tariffs.importers.planner import CandidateStatus, Selection, apply_import, plan_import
 from tariffs.importers.remote import TariffFetchError, fetch_tariff_document
 from tariffs.importers.vse_json import (
+    FEE_BILLING_MODE_OPTIONS,
     TariffDocumentError,
     parse_document,
 )
@@ -287,12 +288,12 @@ class PlanningTests(TestCase):
         self.owner = make_user("vse_plan_owner", UserRole.ZEV_OWNER)
         self.zev = Zev.objects.create(name="Plan ZEV", owner=self.owner, zev_type="zev")
 
-    def _apply(self, doc, keys=None, url="https://example.ch/tariffs.json"):
+    def _apply(self, doc, selections=None, url="https://example.ch/tariffs.json"):
         parsed = parse_document(doc)
-        if keys is None:
-            keys = [c.key for c in parsed.candidates if c.is_importable]
+        if selections is None:
+            selections = [Selection(c.key) for c in parsed.candidates if c.is_importable]
         return apply_import(
-            zev=self.zev, document=parsed, keys=keys,
+            zev=self.zev, document=parsed, selections=selections,
             source_url=url, imported_on=date(2026, 9, 2),
         )
 
@@ -372,7 +373,7 @@ class PlanningTests(TestCase):
         wanted = [c for c in parsed.candidates if c.recommended]
 
         report, _ = apply_import(
-            zev=self.zev, document=parsed, keys=[c.key for c in wanted],
+            zev=self.zev, document=parsed, selections=[Selection(c.key) for c in wanted],
             source_url="https://example.ch/t.json", imported_on=date(2026, 9, 2),
         )
 
@@ -385,7 +386,7 @@ class PlanningTests(TestCase):
         )))
 
         report, created = apply_import(
-            zev=self.zev, document=parsed, keys=[parsed.candidates[0].key],
+            zev=self.zev, document=parsed, selections=[Selection(parsed.candidates[0].key)],
             source_url="https://example.ch/t.json", imported_on=date(2026, 9, 2),
         )
 
@@ -414,7 +415,7 @@ class PlanningTests(TestCase):
     def test_a_key_that_is_no_longer_in_the_document_is_an_error(self):
         report, _ = apply_import(
             zev=self.zev, document=parse_document(document(entry())),
-            keys=["Something Else@2027-01-01"],
+            selections=[Selection("Something Else@2027-01-01")],
             source_url="https://example.ch/t.json", imported_on=date(2026, 9, 2),
         )
 
@@ -432,6 +433,105 @@ class PlanningTests(TestCase):
         self.assertIn("Haushalte", notes)
 
 
+class BillingModeChoiceTests(TestCase):
+    """A published base price is an amount per month; *who* pays it is the one
+    thing the document cannot say. The preview asks rather than guessing, so
+    the offered set and what the write path accepts must be the same set."""
+
+    def setUp(self):
+        self.owner = make_user("vse_mode_owner", UserRole.ZEV_OWNER)
+        self.zev = Zev.objects.create(name="Mode ZEV", owner=self.owner, zev_type="zev")
+
+    def _fee_and_energy(self):
+        parsed = parse_document(document(entry(prices={
+            "base": {"price": 7, "priceUnit": "CHF/M"},
+            "energy": [{"from": "00:00", "to": "00:00", "price": 0.1, "priceUnit": "CHF/kWh"}],
+        })))
+        return (
+            parsed,
+            by_name(parsed, "Netznutzung Basis (Grundpreis)"),
+            by_name(parsed, "Netznutzung Basis (Arbeitspreis)"),
+        )
+
+    def test_a_fee_offers_the_three_monthly_modes_and_defaults_to_the_shared_one(self):
+        """Shared leads because the operator bills the community once for its
+        connection; billing it per participant would collect it N times over."""
+        _, fee, _ = self._fee_and_energy()
+
+        self.assertEqual(fee.billing_mode, BillingMode.SHARED_MONTHLY_FEE)
+        self.assertEqual(fee.billing_mode_options, FEE_BILLING_MODE_OPTIONS)
+
+    def test_no_yearly_mode_is_ever_offered(self):
+        """The yearly modes read ``fixed_price_chf`` as a per-year amount, so
+        offering one for a CHF/M price would bill a twelfth of it."""
+        self.assertEqual(
+            [mode for mode in FEE_BILLING_MODE_OPTIONS if "yearly" in mode], []
+        )
+
+    def test_an_energy_candidate_offers_no_choice(self):
+        _, _, energy = self._fee_and_energy()
+
+        self.assertEqual(energy.billing_mode_options, ())
+
+    def test_the_chosen_mode_is_what_gets_created(self):
+        """A vZEV whose participants each hold their own contract picks the
+        plain monthly fee."""
+        parsed, fee, _ = self._fee_and_energy()
+
+        report, _ = apply_import(
+            zev=self.zev, document=parsed,
+            selections=[Selection(fee.key, billing_mode=BillingMode.MONTHLY_FEE)],
+            source_url="https://example.ch/t.json", imported_on=date(2026, 9, 3),
+        )
+
+        self.assertEqual(report.created[0]["billing_mode"], BillingMode.MONTHLY_FEE)
+        self.assertEqual(Tariff.objects.get(zev=self.zev).billing_mode, BillingMode.MONTHLY_FEE)
+
+    def test_a_per_meter_charge_can_be_billed_per_metering_point(self):
+        """The Messtarif is charged per meter, which is exactly the case the
+        shared default gets wrong."""
+        parsed, fee, _ = self._fee_and_energy()
+
+        apply_import(
+            zev=self.zev, document=parsed,
+            selections=[Selection(fee.key, billing_mode=BillingMode.PER_METERING_POINT_MONTHLY_FEE)],
+            source_url="https://example.ch/t.json", imported_on=date(2026, 9, 3),
+        )
+
+        self.assertEqual(
+            Tariff.objects.get(zev=self.zev).billing_mode,
+            BillingMode.PER_METERING_POINT_MONTHLY_FEE,
+        )
+
+    def test_a_mode_that_was_never_offered_is_refused(self):
+        """The candidate's own option list is the allowlist, so a client cannot
+        reach a mode the preview did not render."""
+        parsed, fee, _ = self._fee_and_energy()
+
+        report, created = apply_import(
+            zev=self.zev, document=parsed,
+            selections=[Selection(fee.key, billing_mode=BillingMode.SHARED_YEARLY_FEE)],
+            source_url="https://example.ch/t.json", imported_on=date(2026, 9, 3),
+        )
+
+        self.assertEqual(created, [])
+        self.assertIn("not a billing mode this tariff can be imported as", report.errors[0]["error"])
+
+    def test_an_override_on_an_energy_tariff_is_refused_not_ignored(self):
+        """Silently billing per kWh what somebody asked to be billed monthly is
+        exactly what this feature must not do."""
+        parsed, _, energy = self._fee_and_energy()
+
+        report, created = apply_import(
+            zev=self.zev, document=parsed,
+            selections=[Selection(energy.key, billing_mode=BillingMode.MONTHLY_FEE)],
+            source_url="https://example.ch/t.json", imported_on=date(2026, 9, 3),
+        )
+
+        self.assertEqual(created, [])
+        self.assertEqual(len(report.errors), 1)
+
+
 class EnginePricingTests(TestCase):
     """The point of the import is that the engine reads back what the operator
     published — asserting on the stored rows alone would not show that."""
@@ -442,7 +542,7 @@ class EnginePricingTests(TestCase):
         parsed = parse_document(real_document())
         wanted = by_name(parsed, "Netznutzung Leistung (Arbeitspreis)")
         apply_import(
-            zev=self.zev, document=parsed, keys=[wanted.key],
+            zev=self.zev, document=parsed, selections=[Selection(wanted.key)],
             source_url="https://example.ch/t.json", imported_on=date(2026, 9, 2),
         )
         self.tariff = Tariff.objects.get(zev=self.zev)
@@ -581,10 +681,15 @@ class ImportEndpointTests(TestCase):
         with self._patched():
             return self.client.post(PREVIEW_URL, payload, format="json")
 
-    def _apply(self, keys, **overrides):
+    def _apply(self, keys, modes=None, **overrides):
+        modes = modes or {}
         payload = {
             "zev": str(self.zev.id), "url": self.URL,
-            "keys": keys, "document_digest": self.digest,
+            "selections": [
+                {"key": key, **({"billing_mode": modes[key]} if key in modes else {})}
+                for key in keys
+            ],
+            "document_digest": self.digest,
         }
         payload.update(overrides)
         with self._patched():
@@ -665,7 +770,10 @@ class ImportEndpointTests(TestCase):
         event = AuditEvent.objects.get(action_type="tariff.import_vse")
         self.assertEqual(event.zev_id, self.zev.id)
         self.assertEqual(event.metadata_json["source_url"], self.URL)
-        self.assertEqual(event.metadata_json["created"], ["Netznutzung Basis (Arbeitspreis)"])
+        self.assertEqual(
+            event.metadata_json["created"],
+            [{"name": "Netznutzung Basis (Arbeitspreis)", "billing_mode": "energy"}],
+        )
 
     def test_a_document_that_changed_since_the_preview_is_refused(self):
         """Apply re-fetches rather than trusting tariff data from the browser,
@@ -676,6 +784,29 @@ class ImportEndpointTests(TestCase):
 
         self.assertEqual(response.status_code, 409)
         self.assertEqual(Tariff.objects.count(), 0)
+
+    def test_the_preview_tells_the_client_which_billing_modes_it_may_offer(self):
+        """The frontend renders exactly this list, so a mode can never appear in
+        the picker that the apply step would then refuse."""
+        self.document = document(entry(prices={"base": {"price": 7, "priceUnit": "CHF/M"}}))
+
+        candidate = self._preview().json()["candidates"][0]
+
+        self.assertEqual(candidate["billing_mode"], "shared_monthly_fee")
+        self.assertEqual(
+            candidate["billing_mode_options"],
+            ["shared_monthly_fee", "monthly_fee", "per_metering_point_monthly_fee"],
+        )
+
+    def test_a_billing_mode_picked_in_the_preview_reaches_the_created_tariff(self):
+        self.document = document(entry(prices={"base": {"price": 7, "priceUnit": "CHF/M"}}))
+        key = self._preview().json()["candidates"][0]["key"]
+
+        response = self._apply([key], modes={key: "monthly_fee"})
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.json()["created"][0]["billing_mode"], "monthly_fee")
+        self.assertEqual(Tariff.objects.get(zev=self.zev).billing_mode, "monthly_fee")
 
     def test_the_url_is_not_stored_when_the_user_declines(self):
         key = self._preview().json()["candidates"][0]["key"]

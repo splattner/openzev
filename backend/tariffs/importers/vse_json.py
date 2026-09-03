@@ -46,6 +46,23 @@ CATEGORY_BY_TARIFF_TYPE = {
     "regional_fees": TariffCategory.LEVIES,
 }
 
+#: What a ``CHF/M`` base price may be billed as. All three are *monthly*: the
+#: published price is an amount per month, so the yearly modes — which read
+#: ``fixed_price_chf`` as a per-year amount — would be off by a factor of
+#: twelve. The user picks in the import preview; the default is first.
+#:
+#: ``shared_monthly_fee`` leads because the grid operator bills the community
+#: once for its connection, and a plain ``monthly_fee`` would collect that
+#: amount from every participant. But a vZEV whose participants each hold
+#: their own DSO contract wants ``monthly_fee``, and a per-meter charge — the
+#: Messtarif is one — wants ``per_metering_point_monthly_fee``. There is no
+#: way to tell which from the document, so the choice is the user's.
+FEE_BILLING_MODE_OPTIONS = (
+    BillingMode.SHARED_MONTHLY_FEE,
+    BillingMode.MONTHLY_FEE,
+    BillingMode.PER_METERING_POINT_MONTHLY_FEE,
+)
+
 WEEKDAY_NUMBERS = {"mo": 0, "tu": 1, "we": 2, "th": 3, "fr": 4, "sa": 5, "su": 6}
 MONTH_NUMBERS = {
     name: index
@@ -107,6 +124,11 @@ class Candidate:
     source_customer_type: str = ""
     source_voltage_level: int | None = None
     standard_basegroup: bool = False
+
+    #: Billing modes the user may choose instead of ``billing_mode``, empty
+    #: when there is nothing to choose. The frontend renders exactly this list
+    #: and the apply step accepts exactly this list, so the two cannot drift.
+    billing_mode_options: tuple[str, ...] = ()
 
     warnings: list[str] = field(default_factory=list)
     #: Set when the entry cannot be represented at all. A blocked candidate is
@@ -406,6 +428,7 @@ def _candidate(
     header: dict,
     warnings: list[str],
     billing_mode: str,
+    billing_mode_options: tuple[str, ...] = (),
     energy_type: str | None = None,
     fixed_price_chf: Decimal | None = None,
     periods: list[ProposedPeriod] | None = None,
@@ -419,6 +442,7 @@ def _candidate(
         name=name,
         category=category,
         billing_mode=billing_mode,
+        billing_mode_options=billing_mode_options,
         energy_type=energy_type,
         fixed_price_chf=fixed_price_chf,
         valid_from=valid_from,
@@ -448,23 +472,17 @@ def _fee_candidate(raw_price, *, name: str, category: str, header: dict, label: 
     except (ValueError, _Unsupported) as exc:
         return _candidate(
             name=name, category=category, header=header, warnings=warnings,
-            billing_mode=BillingMode.SHARED_MONTHLY_FEE, blocked_reason=str(exc),
+            billing_mode=FEE_BILLING_MODE_OPTIONS[0], blocked_reason=str(exc),
         )
 
-    # The grid operator bills the community once for its connection, so the fee
-    # is imported as a *shared* monthly fee split across participants. Billing
-    # it as a plain monthly fee would collect it once per participant and so
-    # collect it N times over. A vZEV whose participants each hold their own
-    # DSO contract wants the plain mode instead — hence the warning rather than
-    # a silent choice.
-    warnings.append(
-        "Imported as a community fee split equally across participants, because the grid "
-        "operator bills the ZEV once for its connection. Change the billing mode after "
-        "importing if each participant is billed this fee separately."
-    )
+    # Which of FEE_BILLING_MODE_OPTIONS is right cannot be read off the
+    # document — it depends on how this ZEV relates to its operator — so the
+    # candidate offers all three and the preview asks.
     return _candidate(
         name=name, category=category, header=header, warnings=warnings,
-        billing_mode=BillingMode.SHARED_MONTHLY_FEE, fixed_price_chf=fixed,
+        billing_mode=FEE_BILLING_MODE_OPTIONS[0],
+        billing_mode_options=FEE_BILLING_MODE_OPTIONS,
+        fixed_price_chf=fixed,
     )
 
 

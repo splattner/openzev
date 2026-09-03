@@ -15,7 +15,7 @@ transaction against freshly read rows.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import date
 
 from django.db import transaction
@@ -38,6 +38,19 @@ class CandidateStatus:
 #: Statuses the apply step will act on. Everything else is reported and left
 #: alone — re-running an import must not rewrite what is already live.
 APPLICABLE_STATUSES = frozenset({CandidateStatus.NEW, CandidateStatus.NEW_VERSION})
+
+
+@dataclass(frozen=True)
+class Selection:
+    """One ticked row of the preview.
+
+    ``billing_mode`` carries the user's answer to the one question the
+    published document cannot answer — see ``FEE_BILLING_MODE_OPTIONS``.
+    ``None`` means "whatever the candidate proposed".
+    """
+
+    key: str
+    billing_mode: str | None = None
 
 
 @dataclass
@@ -178,7 +191,26 @@ def _create(zev, planned: PlannedCandidate, source_url: str, imported_on: date) 
     return tariff
 
 
-def apply_import(*, zev, document: ParsedDocument, keys: list[str], source_url: str,
+def _with_chosen_billing_mode(candidate: Candidate, chosen: str | None) -> Candidate:
+    """Apply the user's billing-mode answer, refusing anything not offered.
+
+    The candidate's own ``billing_mode_options`` is the allowlist, so what the
+    preview rendered and what the write path accepts are the same list. An
+    energy candidate offers nothing, and an override on one is refused rather
+    than quietly ignored — silently billing per kWh what somebody asked to be
+    billed monthly is exactly the kind of thing this feature must not do.
+    """
+    if chosen is None or chosen == candidate.billing_mode:
+        return candidate
+    if chosen not in candidate.billing_mode_options:
+        raise ValueError(
+            f"{chosen!r} is not a billing mode this tariff can be imported as. "
+            f"Offered: {', '.join(candidate.billing_mode_options) or 'none'}."
+        )
+    return replace(candidate, billing_mode=chosen)
+
+
+def apply_import(*, zev, document: ParsedDocument, selections: list[Selection], source_url: str,
                  imported_on: date) -> tuple[ImportReport, list[Tariff]]:
     """Create the selected candidates, one savepoint each.
 
@@ -190,17 +222,21 @@ def apply_import(*, zev, document: ParsedDocument, keys: list[str], source_url: 
     created: list[Tariff] = []
 
     by_key = {candidate.key: candidate for candidate in document.candidates}
-    unknown = [key for key in keys if key not in by_key]
-    for key in unknown:
-        report.errors.append({
-            "name": key,
-            "error": "This tariff is no longer in the document. Run the preview again.",
-        })
 
-    for key in keys:
-        if key not in by_key:
+    for selection in selections:
+        if selection.key not in by_key:
+            report.errors.append({
+                "name": selection.key,
+                "error": "This tariff is no longer in the document. Run the preview again.",
+            })
             continue
-        candidate = by_key[key]
+
+        try:
+            candidate = _with_chosen_billing_mode(by_key[selection.key], selection.billing_mode)
+        except ValueError as exc:
+            report.errors.append({"name": by_key[selection.key].name, "error": str(exc)})
+            continue
+
         # Re-read the series per candidate rather than planning against a list
         # loaded once up front: the preview the user looked at may be minutes
         # old, another session may have added a version since, and each
@@ -225,6 +261,7 @@ def apply_import(*, zev, document: ParsedDocument, keys: list[str], source_url: 
         report.created.append({
             "name": tariff.name,
             "category": tariff.category,
+            "billing_mode": tariff.billing_mode,
             "valid_from": tariff.valid_from.isoformat(),
             "valid_to": tariff.valid_to.isoformat() if tariff.valid_to else None,
         })

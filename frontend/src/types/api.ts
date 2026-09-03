@@ -915,6 +915,8 @@ export interface VseTariffCandidate {
     name: string
     category: 'energy' | 'grid_fees' | 'levies' | 'metering'
     billing_mode: string
+    /** Modes the user may pick instead; empty when there is nothing to choose. */
+    billing_mode_options: string[]
     energy_type: string | null
     fixed_price_chf: string | null
     valid_from: string
@@ -942,8 +944,20 @@ export interface VseTariffImportPreview {
     errors: Array<{ tariff: string; error: string }>
 }
 
+/** One ticked preview row, with the user's answer to how it should be billed. */
+export interface VseTariffImportSelection {
+    key: string
+    billing_mode?: string
+}
+
 export interface VseTariffImportResult {
-    created: Array<{ name: string; category: string; valid_from: string; valid_to: string | null }>
+    created: Array<{
+        name: string
+        category: string
+        billing_mode: string
+        valid_from: string
+        valid_to: string | null
+    }>
     skipped: Array<{ name: string; reason: string }>
     errors: Array<{ name: string; error: string }>
 }

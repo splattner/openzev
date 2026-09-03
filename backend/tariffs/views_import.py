@@ -29,7 +29,7 @@ from audit.models import AuditActionCategory
 from audit.services import record_audit_event
 from zev.models import Zev
 
-from .importers.planner import PlannedCandidate, apply_import, plan_import
+from .importers.planner import PlannedCandidate, Selection, apply_import, plan_import
 from .importers.remote import TariffFetchError, fetch_tariff_document
 from .importers.vse_json import ParsedDocument, TariffDocumentError, parse_document
 from .serializers import (
@@ -78,6 +78,7 @@ def _candidate_payload(planned: PlannedCandidate) -> dict:
         "name": candidate.name,
         "category": candidate.category,
         "billing_mode": candidate.billing_mode,
+        "billing_mode_options": list(candidate.billing_mode_options),
         "energy_type": candidate.energy_type,
         "fixed_price_chf": candidate.fixed_price_chf,
         "valid_from": candidate.valid_from,
@@ -167,10 +168,14 @@ class VseTariffImportApplyView(APIView):
                 status=status.HTTP_409_CONFLICT,
             )
 
+        selections = [
+            Selection(key=item["key"], billing_mode=item.get("billing_mode") or None)
+            for item in data["selections"]
+        ]
         report, created = apply_import(
             zev=zev,
             document=document,
-            keys=data["keys"],
+            selections=selections,
             source_url=url,
             imported_on=timezone.localdate(),
         )
@@ -197,8 +202,11 @@ class VseTariffImportApplyView(APIView):
                 "document_digest": digest,
                 "dso_name": document.dso_name,
                 "dso_number": document.dso_number,
-                "selected": len(data["keys"]),
-                "created": [tariff.name for tariff in created],
+                "selected": len(selections),
+                "created": [
+                    {"name": tariff.name, "billing_mode": tariff.billing_mode}
+                    for tariff in created
+                ],
                 "skipped": len(report.skipped),
                 "errors": len(report.errors),
             },

@@ -2,8 +2,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { api } from '../src/lib/api/client'
 import { applyVseTariffImport, previewVseTariffImport } from '../src/lib/api/tariffs'
 import {
+    defaultBillingModes,
     isSelectable,
     recommendedKeys,
+    selectionFor,
     toggleKey,
     trimPrice,
 } from '../src/features/tariffs/vseImportSelection'
@@ -20,6 +22,7 @@ function candidate(overrides: Partial<VseTariffCandidate> = {}): VseTariffCandid
         name: 'Netznutzung Basis (Arbeitspreis)',
         category: 'grid_fees',
         billing_mode: 'energy',
+        billing_mode_options: [],
         energy_type: 'grid',
         fixed_price_chf: null,
         valid_from: '2027-01-01',
@@ -83,6 +86,39 @@ describe('what the wizard pre-selects', () => {
     })
 })
 
+describe('the billing mode a fee is imported as', () => {
+    const fee = () =>
+        candidate({
+            key: 'fee',
+            name: 'Netznutzung Basis (Grundpreis)',
+            billing_mode: 'shared_monthly_fee',
+            billing_mode_options: ['shared_monthly_fee', 'monthly_fee', 'per_metering_point_monthly_fee'],
+            fixed_price_chf: '7.00',
+            periods: [],
+        })
+
+    it('starts every candidate on the mode the backend proposed', () => {
+        expect(defaultBillingModes([fee(), candidate({ key: 'energy' })])).toEqual({
+            fee: 'shared_monthly_fee',
+            energy: 'energy',
+        })
+    })
+
+    it('sends no override when the proposed mode was left alone', () => {
+        // An untouched row must not carry a mode the server then has to
+        // re-validate against a list it already chose from.
+        expect(selectionFor(fee(), 'shared_monthly_fee')).toEqual({ key: 'fee' })
+        expect(selectionFor(fee(), undefined)).toEqual({ key: 'fee' })
+    })
+
+    it('sends the picked mode when the user changed it', () => {
+        expect(selectionFor(fee(), 'per_metering_point_monthly_fee')).toEqual({
+            key: 'fee',
+            billing_mode: 'per_metering_point_monthly_fee',
+        })
+    })
+})
+
 describe('price display', () => {
     it('drops the stored precision padding', () => {
         expect(trimPrice('0.10600')).toBe('0.106')
@@ -116,7 +152,10 @@ describe('import API calls', () => {
         await applyVseTariffImport({
             zev: 'zev-1',
             url: 'https://werke.example.ch/t.json',
-            keys: ['Netznutzung Basis (Arbeitspreis)@2027-01-01'],
+            selections: [
+                { key: 'Netznutzung Basis (Arbeitspreis)@2027-01-01' },
+                { key: 'Netznutzung Basis (Grundpreis)@2027-01-01', billing_mode: 'monthly_fee' },
+            ],
             document_digest: 'a'.repeat(64),
             remember_url: true,
         })
@@ -124,7 +163,7 @@ describe('import API calls', () => {
         const [path, body] = postSpy.mock.calls[0]
         expect(path).toBe('/tariffs/imports/vse/apply/')
         expect(Object.keys(body as object).sort()).toEqual([
-            'document_digest', 'keys', 'remember_url', 'url', 'zev',
+            'document_digest', 'remember_url', 'selections', 'url', 'zev',
         ])
     })
 })

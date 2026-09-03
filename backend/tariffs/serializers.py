@@ -92,10 +92,20 @@ class VseTariffImportPreviewRequestSerializer(serializers.Serializer):
     url = serializers.URLField(max_length=500, required=False, allow_blank=True)
 
 
+class VseTariffImportSelectionSerializer(serializers.Serializer):
+    """One ticked row: which candidate, and how the user chose to bill it."""
+
+    key = serializers.CharField(max_length=300)
+    #: Validated against the candidate's own ``billing_mode_options`` rather
+    #: than against ``BillingMode`` at large, so the preview and the write path
+    #: allow exactly the same set. Omitted means the proposed mode.
+    billing_mode = serializers.CharField(max_length=40, required=False, allow_null=True)
+
+
 class VseTariffImportApplyRequestSerializer(serializers.Serializer):
     zev = serializers.UUIDField()
     url = serializers.URLField(max_length=500, required=False, allow_blank=True)
-    keys = serializers.ListField(child=serializers.CharField(max_length=300), allow_empty=False)
+    selections = VseTariffImportSelectionSerializer(many=True, allow_empty=False)
     #: The digest the preview returned. The document is fetched again on apply
     #: rather than trusting tariff data sent by the client, so this is what
     #: proves the user is confirming the document they actually looked at.
@@ -116,6 +126,9 @@ class VseTariffCandidateSerializer(serializers.Serializer):
     name = serializers.CharField()
     category = serializers.CharField()
     billing_mode = serializers.CharField()
+    #: Alternatives the user may pick in the preview; empty when there is
+    #: nothing to choose.
+    billing_mode_options = serializers.ListField(child=serializers.CharField())
     energy_type = serializers.CharField(allow_null=True)
     fixed_price_chf = serializers.DecimalField(max_digits=10, decimal_places=2, allow_null=True)
     valid_from = serializers.DateField()
@@ -154,6 +167,7 @@ class VseTariffImportPreviewSerializer(serializers.Serializer):
 class VseTariffImportCreatedSerializer(serializers.Serializer):
     name = serializers.CharField()
     category = serializers.CharField()
+    billing_mode = serializers.CharField()
     valid_from = serializers.DateField()
     valid_to = serializers.DateField(allow_null=True)
 

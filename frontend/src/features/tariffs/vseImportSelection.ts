@@ -27,6 +27,29 @@ export function recommendedKeys(candidates: VseTariffCandidate[]): Set<string> {
     )
 }
 
+/**
+ * The billing mode each candidate starts on, keyed by candidate.
+ *
+ * Held apart from the tick state so that clearing and re-selecting rows does
+ * not throw away a choice the user already made about how a fee is billed.
+ */
+export function defaultBillingModes(candidates: VseTariffCandidate[]): Record<string, string> {
+    return Object.fromEntries(candidates.map((candidate) => [candidate.key, candidate.billing_mode]))
+}
+
+/**
+ * What to send for one ticked row. The mode is omitted when it is the one the
+ * backend proposed, so an unchanged selection carries no override at all.
+ */
+export function selectionFor(
+    candidate: VseTariffCandidate,
+    chosen: string | undefined,
+): { key: string; billing_mode?: string } {
+    return chosen && chosen !== candidate.billing_mode
+        ? { key: candidate.key, billing_mode: chosen }
+        : { key: candidate.key }
+}
+
 export function toggleKey(selected: Set<string>, key: string): Set<string> {
     const next = new Set(selected)
     if (!next.delete(key)) next.add(key)

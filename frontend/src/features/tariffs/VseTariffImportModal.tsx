@@ -7,7 +7,14 @@ import { FormModal } from '../../components/FormModal'
 import { applyVseTariffImport, previewVseTariffImport } from '../../lib/api/tariffs'
 import { useToast } from '../../lib/toast'
 import { invalidateTariffQueries } from './invalidate'
-import { isSelectable, recommendedKeys, toggleKey, trimPrice } from './vseImportSelection'
+import {
+    defaultBillingModes,
+    isSelectable,
+    recommendedKeys,
+    selectionFor,
+    toggleKey,
+    trimPrice,
+} from './vseImportSelection'
 import type {
     VseTariffCandidate,
     VseTariffCandidateStatus,
@@ -47,6 +54,9 @@ export function VseTariffImportModal({ isOpen, onClose, zevId, initialUrl }: Vse
     const [preview, setPreview] = useState<VseTariffImportPreview | null>(null)
     const [result, setResult] = useState<VseTariffImportResult | null>(null)
     const [selected, setSelected] = useState<Set<string>>(new Set())
+    // Kept apart from `selected` so clearing and re-ticking rows does not throw
+    // away a decision the user already made about how a fee is billed.
+    const [modeByKey, setModeByKey] = useState<Record<string, string>>({})
     const [rememberUrl, setRememberUrl] = useState(true)
 
     const previewMutation = useMutation({
@@ -54,6 +64,7 @@ export function VseTariffImportModal({ isOpen, onClose, zevId, initialUrl }: Vse
         onSuccess: (data) => {
             setPreview(data)
             setSelected(recommendedKeys(data.candidates))
+            setModeByKey(defaultBillingModes(data.candidates))
         },
         onError: (error) =>
             pushToast(errorDetail(error, t('pages.tariffs.import.errors.previewFailed')), 'error'),
@@ -89,6 +100,7 @@ export function VseTariffImportModal({ isOpen, onClose, zevId, initialUrl }: Vse
         setPreview(null)
         setResult(null)
         setSelected(new Set())
+        setModeByKey({})
         previewMutation.reset()
         applyMutation.reset()
     }
@@ -112,7 +124,9 @@ export function VseTariffImportModal({ isOpen, onClose, zevId, initialUrl }: Vse
         applyMutation.mutate({
             zev: zevId,
             url: preview.source_url,
-            keys: [...selected],
+            selections: preview.candidates
+                .filter((candidate) => selected.has(candidate.key))
+                .map((candidate) => selectionFor(candidate, modeByKey[candidate.key])),
             document_digest: preview.document_digest,
             remember_url: rememberUrl,
         })
@@ -201,6 +215,10 @@ export function VseTariffImportModal({ isOpen, onClose, zevId, initialUrl }: Vse
                         </button>
                     </div>
 
+                    <p className="muted" style={{ margin: 0 }}>
+                        {t('pages.tariffs.import.billingModeHint')}
+                    </p>
+
                     {grouped.map((group) => (
                         <section key={group.category} className="card">
                             <h3 style={{ marginTop: 0 }}>{t(`pages.tariffs.categories.${group.category}`)}</h3>
@@ -211,6 +229,7 @@ export function VseTariffImportModal({ isOpen, onClose, zevId, initialUrl }: Vse
                                             <th aria-label={t('pages.tariffs.import.columns.select')} />
                                             <th>{t('pages.tariffs.import.columns.tariff')}</th>
                                             <th>{t('pages.tariffs.import.columns.price')}</th>
+                                            <th>{t('pages.tariffs.import.columns.billingMode')}</th>
                                             <th>{t('pages.tariffs.import.columns.validity')}</th>
                                             <th>{t('pages.tariffs.import.columns.status')}</th>
                                         </tr>
@@ -222,6 +241,10 @@ export function VseTariffImportModal({ isOpen, onClose, zevId, initialUrl }: Vse
                                                 candidate={candidate}
                                                 checked={selected.has(candidate.key)}
                                                 onToggle={() => toggle(candidate.key)}
+                                                billingMode={modeByKey[candidate.key] ?? candidate.billing_mode}
+                                                onBillingModeChange={(mode) =>
+                                                    setModeByKey((current) => ({ ...current, [candidate.key]: mode }))
+                                                }
                                             />
                                         ))}
                                     </tbody>
@@ -263,7 +286,8 @@ export function VseTariffImportModal({ isOpen, onClose, zevId, initialUrl }: Vse
                     <ResultList title={t('pages.tariffs.import.result.created')} empty={t('pages.tariffs.import.result.none')}>
                         {result.created.map((item) => (
                             <li key={`${item.name}-${item.valid_from}`}>
-                                {item.name} — {item.valid_from} … {item.valid_to ?? t('pages.tariffs.openEnded')}
+                                {item.name} — {t(`pages.tariffs.billingModes.${item.billing_mode}`)} —{' '}
+                                {item.valid_from} … {item.valid_to ?? t('pages.tariffs.openEnded')}
                             </li>
                         ))}
                     </ResultList>
@@ -314,10 +338,14 @@ function CandidateRow({
     candidate,
     checked,
     onToggle,
+    billingMode,
+    onBillingModeChange,
 }: {
     candidate: VseTariffCandidate
     checked: boolean
     onToggle: () => void
+    billingMode: string
+    onBillingModeChange: (mode: string) => void
 }) {
     const { t } = useTranslation()
     const selectable = isSelectable(candidate)
@@ -353,6 +381,24 @@ function CandidateRow({
             </td>
             <td>
                 <CandidatePrice candidate={candidate} />
+            </td>
+            <td>
+                {candidate.billing_mode_options.length > 0 ? (
+                    <select
+                        value={billingMode}
+                        disabled={!selectable}
+                        onChange={(event) => onBillingModeChange(event.target.value)}
+                        aria-label={`${t('pages.tariffs.import.columns.billingMode')} — ${candidate.name}`}
+                    >
+                        {candidate.billing_mode_options.map((mode) => (
+                            <option key={mode} value={mode}>
+                                {t(`pages.tariffs.billingModes.${mode}`)}
+                            </option>
+                        ))}
+                    </select>
+                ) : (
+                    <span className="muted">{t(`pages.tariffs.billingModes.${candidate.billing_mode}`)}</span>
+                )}
             </td>
             <td>
                 {candidate.valid_from} … {(candidate.effective_valid_to ?? candidate.valid_to) ?? t('pages.tariffs.openEnded')}
