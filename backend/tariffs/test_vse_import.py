@@ -680,6 +680,11 @@ def fake_public_dns(*args, **kwargs):
     return [(2, 1, 6, "", ("93.184.216.34", 443))]
 
 
+def fake_private_dns(*args, **kwargs):
+    """An internal name resolving into RFC1918 space — what the guard is for."""
+    return [(2, 1, 6, "", ("10.0.0.5", 80))]
+
+
 class RemoteFetchTests(SimpleTestCase):
     """The URL comes from the user — there is no registry of these documents —
     so this is a server-side request to an address a user chose."""
@@ -704,12 +709,19 @@ class RemoteFetchTests(SimpleTestCase):
     def test_the_refusal_does_not_report_what_the_name_resolved_to(self):
         """Blocking the request but naming the address turns a failed import
         into a way of mapping internal DNS: aim it at an internal hostname and
-        read the answer off the error. The address is logged, not returned."""
-        with self.assertRaises(TariffFetchError) as caught:
-            fetch_tariff_document("http://localhost/tariffs.json")
+        read the answer off the error. The address is logged, not returned.
 
-        self.assertNotIn("127.0.0.1", str(caught.exception))
-        self.assertIn("127.0.0.1", caught.exception.log_detail)
+        The resolver is faked rather than pointed at ``localhost``: which of
+        ``127.0.0.1`` and ``::1`` that yields depends on the host, so asserting
+        on a literal made the test pass here and fail on CI.
+        """
+        with mock.patch("tariffs.importers.remote.socket.getaddrinfo", fake_private_dns):
+            with self.assertRaises(TariffFetchError) as caught:
+                fetch_tariff_document("http://internal-db.corp/tariffs.json")
+
+        self.assertNotIn("10.0.0.5", str(caught.exception))
+        self.assertIn("internal-db.corp", str(caught.exception))
+        self.assertIn("10.0.0.5", caught.exception.log_detail)
 
     def test_socket_errors_are_logged_rather_than_returned(self):
         """A raw URLError carries TLS and library detail about the deployment,
