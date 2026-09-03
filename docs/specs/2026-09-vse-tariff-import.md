@@ -6,7 +6,7 @@
 - Type: Feature
 - Owners: Sebastian Plattner
 - Created: 2026-09-02
-- Target Release: next minor
+- Target Release: 1.8.0
 - Related Issues: [#507](https://github.com/splattner/openzev/issues/507)
 - Related ADRs: —
 - Impacted Areas: backend | frontend | docs
