@@ -416,6 +416,32 @@ class ContractPdfSeasonalTariffTests(TestCase):
         self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0]["rate_description"], "Einheitstarif")
 
+    def test_a_three_band_tariff_prints_every_band(self):
+        """The table used to pick HIGH and LOW by name, so a third band was
+        dropped from the contract entirely — a participant would have been
+        billed at a price their contract never mentioned."""
+        for price, start, end, label in (
+            ("0.09", "00:00", "07:00", ""),
+            ("0.24", "07:00", "17:00", "Spitzenlast"),
+            ("0.15", "17:00", "23:59", ""),
+        ):
+            TariffPeriod.objects.create(
+                tariff=self.tariff, period_type="band", price_chf_per_kwh=Decimal(price),
+                time_from=start, time_to=end, label=label,
+            )
+
+        rows = self._rows()
+
+        self.assertEqual(len(rows), 3)
+        self.assertEqual(
+            [(row["rate_rp"], row["rate_description"]) for row in rows],
+            [
+                ("9.00", "00:00\u201307:00"),
+                ("24.00", "Spitzenlast"),
+                ("15.00", "17:00\u201323:59"),
+            ],
+        )
+
     def test_both_bands_of_a_season_are_printed(self):
         """Four rows from four bands: winter HT, winter NT, summer HT, summer NT."""
         for months, ht, nt in (("1,2,3,10,11,12", "0.28", "0.22"), ("4,5,6,7,8,9", "0.18", "0.14")):

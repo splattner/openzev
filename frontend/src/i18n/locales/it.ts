@@ -1237,6 +1237,10 @@ export const it = {
                 weekdaysHint: 'Tutti selezionati significa che la fascia vale ogni giorno.',
                 months: 'Mesi',
                 monthsHint: 'Tutti selezionati significa che la fascia vale tutto l’anno.',
+                periodTypeHint: 'Usa una fascia oraria quando la tariffa ha più di un prezzo alto e uno basso.',
+                bandLabel: 'Nome della fascia',
+                bandLabelPlaceholder: 'Punta',
+                bandLabelHint: 'Facoltativo. Se vuoto, la fascia viene mostrata con la sua finestra oraria.',
                 selectTariff: 'Seleziona tariffa',
             },
             categories: {
@@ -1287,6 +1291,7 @@ export const it = {
                 flat: 'Piatto',
                 high: 'Alta tensione (AT)',
                 low: 'Bassa tensione (BT)',
+                band: 'Fascia oraria',
             },
             allWeekdays: 'tutti',
             chfPerKwh: 'CHF/kWh',

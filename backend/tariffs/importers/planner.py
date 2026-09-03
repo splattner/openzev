@@ -181,6 +181,7 @@ def _create(zev, planned: PlannedCandidate, source_url: str, imported_on: date) 
         TariffPeriod(
             tariff=tariff,
             period_type=period.period_type,
+            label=period.label,
             price_chf_per_kwh=period.price_chf_per_kwh,
             time_from=period.time_from,
             time_to=period.time_to,

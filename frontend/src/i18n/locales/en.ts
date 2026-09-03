@@ -1248,6 +1248,10 @@ export const en = {
                 weekdaysHint: 'All selected means the band applies every day.',
                 months: 'Months',
                 monthsHint: 'All selected means the band applies all year round.',
+                periodTypeHint: 'Use a time band when the tariff has more than a high and a low price.',
+                bandLabel: 'Band name',
+                bandLabelPlaceholder: 'Peak',
+                bandLabelHint: 'Optional. Left empty, the band is shown by its time window.',
                 selectTariff: 'Select tariff',
             },
             categories: {
@@ -1298,6 +1302,7 @@ export const en = {
                 flat: 'Flat',
                 high: 'High (HT)',
                 low: 'Low (NT)',
+                band: 'Time band',
             },
             allWeekdays: 'all',
             chfPerKwh: 'CHF/kWh',

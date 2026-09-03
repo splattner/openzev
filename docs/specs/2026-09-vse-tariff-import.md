@@ -50,9 +50,8 @@ the same series.
 
 - **File upload** of the document. Iteration 1 is URL-only; the parser takes a
   decoded payload, so adding upload is a view-layer change.
-- **More than two distinct energy prices** (#528), power/demand charges
-  (#529), dynamic tariffs (#530), reactive-power charges and storage refunds —
-  reported, never imported.
+- **Power/demand charges** (#529), **dynamic tariffs** (#530), reactive-power
+  charges and storage refunds — reported, never imported.
 - Any scheduled or automatic refresh. The import is manual, previewed and
   user-confirmed.
 - Publishing tariffs *as* a VNB. OpenZEV is a consumer of this standard.
@@ -185,7 +184,10 @@ carrying four distinct prices overall but two per season.
 |---|---|
 | 1 | One `flat` period, `time_from`/`time_to` `NULL`, however many windows it was written across |
 | 2 | Higher price → `high`, lower → `low`; one row per window, so a price split across two windows (evening + night) gets two `low` rows |
-| ≥ 3 | Blocked with a reason |
+| ≥ 3 | One unnamed `band` per window (#528). The HT/NT heuristic below does not apply: there is no pair to guess at, so nothing is assumed and nothing is warned about |
+
+Imported bands never carry a `label`. The standard does not name its bands, so
+inventing one would be worse than showing the window it published.
 
 Each period carries its season in `TariffPeriod.months`; a band covering all
 twelve months stores blank, which is what the engine already reads as "every
@@ -232,7 +234,6 @@ silently dropped.
 | Construct | Reason given | Tracked |
 |---|---|---|
 | Two month groups that overlap | Which group prices the shared months is ambiguous | — |
-| ≥ 3 distinct energy prices | Only a high and a low band can be stored | #528 |
 | `tariffForm: dynamic` | The price lives in an external time series; the URL is named in the message | #530 |
 | Energy price not in `CHF/kWh` | Cannot be billed per kWh | — |
 | Base price not in `CHF/M` | Does not map to a monthly fee | — |
@@ -554,7 +555,7 @@ result, messages, errors) and `pages.zevSettings.fields.tariffSourceUrl` /
 
 ## 14. Test plan
 
-### Backend — `backend/tariffs/test_vse_import.py` (70 tests)
+### Backend — `backend/tariffs/test_vse_import.py` (72 tests)
 
 The suite leans on a **real published document** — InfraWerke Münsingen's 2027
 tariffs, fetched from the operator's own website and checked in unchanged as
@@ -574,16 +575,17 @@ case-insensitive weekday and month codes; a midnight-wrapping window split in
 two; one bad entry not blocking the rest; a document with no `tariffs` array
 and a bare JSON array both rejected outright; duplicate names reported.
 
-**`SeasonalPriceTests`** (6): a two-season flat tariff becomes one band per
+**`SeasonalPriceTests`** (9): a two-season flat tariff becomes one band per
 season; four distinct prices fit when they are two per season; a year-round band
 stores no months at all; overlapping month groups are refused rather than
 guessed; a year only partly priced is imported but flagged; the HT/NT heuristic
-is reported per season, naming each season's own pair.
+is reported per season, naming each season's own pair; three prices become
+unnamed bands rather than being refused, carry no HT/NT guess, while two prices
+still become HT and NT.
 
-**`UnsupportedConstructTests`** (6): ≥ 3 prices in one season, dynamic
-tariffs (with the URL in the message), wrong energy unit, wrong base unit and a
-negative price each blocked with a reason; excess precision rounded with a
-warning.
+**`UnsupportedConstructTests`** (5): dynamic tariffs (with the URL in the
+message), a wrong energy unit, a wrong base unit and a negative price each
+blocked with a reason; excess precision rounded with a warning.
 
 **`PlanningTests`** (10): a new name; re-importing the same document changes
 nothing; next year's document appends a version and closes the previous one; an
@@ -667,8 +669,9 @@ call shapes — including that apply sends only selections and a digest.
    save a click; it would also make the picker's initial value depend on a
    setting the user is not looking at, which is why it is not done yet.
 3. **The remaining gaps are tracked separately**, each naming the code that
-   blocks it: more than two bands per season #528, power/demand billing #529,
-   dynamic tariffs #530. Seasonal prices (#527) are now supported — see
+   blocks it: power/demand billing #529 and dynamic tariffs #530. Seasonal
+   prices (#527) and multi-band tariffs (#528) are now supported — see
+   `2026-03-tariffs-and-billing-engine.md` §3.2b and §3.2c. Seasonal prices (#527) are now supported — see
    `2026-03-tariffs-and-billing-engine.md` §3.2b. #530 is blocked on something
    outside this repo, since the standard defines `prices.dynamic` as a bare URL
    with no response schema.

@@ -4,7 +4,7 @@ from django.core.exceptions import ValidationError
 from django.db import models
 from zev.models import Zev
 
-from .periods import parse_number_list
+from .periods import hhmm, parse_number_list
 from .series import SERIES_FIELDS
 
 
@@ -39,6 +39,12 @@ class PeriodType(models.TextChoices):
     FLAT = "flat", "Flat rate (all hours)"
     HIGH = "high", "High tariff (HT)"
     LOW = "low", "Low tariff (NT)"
+    # HT and NT name the two bands a Swiss tariff traditionally has, and every
+    # consumer that looks a band up by name is written around that pair. A
+    # tariff with three or more prices has no such names — the VSE/AES standard
+    # does not label its bands at all — so those bands are simply BAND, told
+    # apart by their window and their optional label.
+    BAND = "band", "Time band"
 
 
 class SplitKey(models.TextChoices):
@@ -169,7 +175,7 @@ class Tariff(models.Model):
 
 
 class TariffPeriod(models.Model):
-    """A price band within a tariff (flat, HT, or NT).
+    """A price band within a tariff.
 
     A band recurs: it applies in certain months, on certain weekdays, between
     certain hours. All three are stored as "blank means every one of them", so
@@ -180,6 +186,13 @@ class TariffPeriod(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     tariff = models.ForeignKey(Tariff, on_delete=models.CASCADE, related_name="periods")
     period_type = models.CharField(max_length=10, choices=PeriodType.choices, default=PeriodType.FLAT)
+    # What to call a BAND on an invoice or a contract, where "band" alone says
+    # nothing. Blank falls back to the band's time window, which is always
+    # known; HT/NT and flat have names already and leave this empty.
+    label = models.CharField(
+        max_length=60, blank=True,
+        help_text="Name for this band, e.g. 'Peak'. Only used for period type 'band'.",
+    )
     price_chf_per_kwh = models.DecimalField(max_digits=8, decimal_places=5)
     time_from = models.TimeField(null=True, blank=True, help_text="Start of this period (HH:MM)")
     time_to = models.TimeField(null=True, blank=True, help_text="End of this period (HH:MM)")
@@ -197,18 +210,33 @@ class TariffPeriod(models.Model):
     )
 
     class Meta:
-        # Unchanged deliberately. Seasonal siblings share a period_type and so
-        # fall back to id, which is creation order — for an import that is the
-        # order the operator published. Sorting them meaningfully needs
-        # time_from, which is nullable and orders NULLs differently on SQLite
-        # and Postgres; the frontend sorts for display instead.
-        ordering = ["period_type", "id"]
+        # Ordered by start time within a period type, so a tariff with several
+        # bands reads down the day. `time_from` is null for flat bands, and
+        # SQLite and Postgres disagree on where nulls sort, so the expression
+        # says which end explicitly rather than inheriting the backend's
+        # opinion — the engine's fallback reads periods[0] and must not depend
+        # on that. `id` keeps the total order for bands that start together.
+        ordering = ["period_type", models.F("time_from").asc(nulls_first=True), "id"]
 
     def clean(self):
-        # Nothing else may share a name-and-window with this band's months, but
-        # a band that prices no month at all is simply unreachable.
+        # A band that prices no month at all is simply unreachable.
         if self.months and not parse_number_list(self.months):
             raise ValidationError({"months": "Leave months blank to apply in every month."})
+
+    @property
+    def display_name(self) -> str:
+        """What to call this band where a name is needed.
+
+        A BAND has no conventional name, so it falls back to its window — which
+        is what actually distinguishes it from its siblings.
+        """
+        if self.period_type != PeriodType.BAND:
+            return self.get_period_type_display()
+        if self.label:
+            return self.label
+        if self.time_from and self.time_to:
+            return f"{hhmm(self.time_from)}\u2013{hhmm(self.time_to)}"
+        return self.get_period_type_display()
 
     def __str__(self):
         return f"{self.tariff.name} / {self.get_period_type_display()} @ {self.price_chf_per_kwh} CHF/kWh"

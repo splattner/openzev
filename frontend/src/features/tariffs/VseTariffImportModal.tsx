@@ -7,6 +7,7 @@ import { FormModal } from '../../components/FormModal'
 import { applyVseTariffImport, previewVseTariffImport } from '../../lib/api/tariffs'
 import { useToast } from '../../lib/toast'
 import { invalidateTariffQueries } from './invalidate'
+import { bandName } from './bands'
 import { MONTH_KEYS, formatSeason } from './recurrence'
 import {
     defaultBillingModes,
@@ -431,7 +432,7 @@ function CandidatePrice({ candidate }: { candidate: VseTariffCandidate }) {
         <span>
             {candidate.periods.map((period, index) => (
                 <span key={`${period.period_type}-${period.time_from}-${index}`} style={{ display: 'block' }}>
-                    {t(`pages.tariffs.periodTypes.${period.period_type}`)}{' '}
+                    {bandName(period, t(`pages.tariffs.periodTypes.${period.period_type}`))}{' '}
                     {t('pages.tariffs.import.perKwh', { amount: trimPrice(period.price_chf_per_kwh) })}
                     {period.time_from && period.time_to
                         ? ` (${period.time_from.slice(0, 5)}–${period.time_to.slice(0, 5)})`

@@ -58,6 +58,7 @@ export function TariffPeriodFormModal({
 
   // useWatch rather than form.watch(): the latter returns a fresh function on
   // every render, which the React Compiler refuses to memoize around.
+  const periodType = useWatch({ control: form.control, name: 'period_type' })
   const weekdays = useWatch({ control: form.control, name: 'weekdays' })
   const months = useWatch({ control: form.control, name: 'months' })
 
@@ -83,8 +84,17 @@ export function TariffPeriodFormModal({
             <option value="flat">{t('pages.tariffs.periodTypes.flat')}</option>
             <option value="high">{t('pages.tariffs.periodTypes.high')}</option>
             <option value="low">{t('pages.tariffs.periodTypes.low')}</option>
+            <option value="band">{t('pages.tariffs.periodTypes.band')}</option>
           </select>
+          <small className="muted">{t('pages.tariffs.form.periodTypeHint')}</small>
         </label>
+        {periodType === 'band' && (
+          <label>
+            <span>{t('pages.tariffs.form.bandLabel')}</span>
+            <input {...form.register('label')} placeholder={t('pages.tariffs.form.bandLabelPlaceholder')} />
+            <small className="muted">{t('pages.tariffs.form.bandLabelHint')}</small>
+          </label>
+        )}
         <label>
           <span>{t('pages.tariffs.form.pricePerKwh')}</span>
           <input type="number" step="0.00001" {...form.register('price_chf_per_kwh')} required />

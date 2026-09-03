@@ -223,15 +223,6 @@ class UnsupportedConstructTests(SimpleTestCase):
     """Everything the model cannot express has to say so per entry. Silently
     dropping a construct is how a tariff ends up priced at the wrong number."""
 
-    def test_more_than_two_distinct_prices_in_one_season_are_blocked(self):
-        parsed = parse_document(document(entry(tariffForm="multilevel", prices={"energy": [
-            {"from": "00:00", "to": "08:00", "price": 0.1, "priceUnit": "CHF/kWh"},
-            {"from": "08:00", "to": "16:00", "price": 0.2, "priceUnit": "CHF/kWh"},
-            {"from": "16:00", "to": "23:59", "price": 0.3, "priceUnit": "CHF/kWh"},
-        ]})))
-
-        self.assertIn("3 different energy prices", parsed.candidates[0].blocked_reason)
-
     def test_a_dynamic_tariff_is_blocked_and_names_its_url(self):
         parsed = parse_document(document(entry(
             tariffForm="dynamic",
@@ -319,6 +310,51 @@ class SeasonalPriceTests(SimpleTestCase):
                 (PeriodType.LOW, "0.11000", "4,5,6,7,8,9"),
                 (PeriodType.LOW, "0.11000", "4,5,6,7,8,9"),
             ],
+        )
+
+    def test_three_prices_become_plain_bands_rather_than_being_refused(self):
+        """HT and NT are the names of a two-band tariff. A third price has no
+        such name — the standard does not label its bands — so the bands are
+        told apart by their windows instead of being turned away."""
+        parsed = self._parse([
+            {"from": "00:00", "to": "08:00", "price": 0.1, "priceUnit": "CHF/kWh"},
+            {"from": "08:00", "to": "16:00", "price": 0.2, "priceUnit": "CHF/kWh"},
+            {"from": "16:00", "to": "23:59", "price": 0.3, "priceUnit": "CHF/kWh"},
+        ])
+        candidate = parsed.candidates[0]
+
+        self.assertTrue(candidate.is_importable, candidate.blocked_reason)
+        self.assertEqual(
+            [(p.period_type, str(p.price_chf_per_kwh), p.time_from, p.time_to) for p in candidate.periods],
+            [
+                (PeriodType.BAND, "0.10000", time(0, 0), time(8, 0)),
+                (PeriodType.BAND, "0.20000", time(8, 0), time(16, 0)),
+                (PeriodType.BAND, "0.30000", time(16, 0), time(23, 59)),
+            ],
+        )
+
+    def test_three_prices_carry_no_HT_NT_guess(self):
+        """The heuristic only exists to name a pair. With three bands there is
+        no pair, so nothing is assumed and nothing is warned about."""
+        parsed = self._parse([
+            {"from": "00:00", "to": "08:00", "price": 0.1, "priceUnit": "CHF/kWh"},
+            {"from": "08:00", "to": "16:00", "price": 0.2, "priceUnit": "CHF/kWh"},
+            {"from": "16:00", "to": "23:59", "price": 0.3, "priceUnit": "CHF/kWh"},
+        ])
+
+        self.assertEqual([w for w in parsed.candidates[0].warnings if "higher price" in w], [])
+
+    def test_two_prices_still_become_HT_and_NT(self):
+        """The common case has to keep its names: the contract PDF and the
+        price chart both look bands up by them."""
+        parsed = self._parse([
+            {"from": "07:00", "to": "22:00", "price": 0.2, "priceUnit": "CHF/kWh"},
+            {"from": "22:00", "to": "07:00", "price": 0.1, "priceUnit": "CHF/kWh"},
+        ])
+
+        self.assertEqual(
+            {p.period_type for p in parsed.candidates[0].periods},
+            {PeriodType.HIGH, PeriodType.LOW},
         )
 
     def test_a_year_round_band_stores_no_months_at_all(self):

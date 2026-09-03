@@ -82,3 +82,12 @@ def month_ranges(months) -> list[tuple[int, int]]:
         runs[-1].extend(runs.pop(0))
 
     return [(run[0], run[-1]) for run in runs]
+
+
+def hhmm(value) -> str:
+    """``07:00`` from a ``time`` or from the string a form posted.
+
+    Rows read back from the database hold ``time`` objects, but a freshly
+    assigned one holds whatever was given it, and both reach the naming code.
+    """
+    return str(value)[:5]

@@ -100,6 +100,9 @@ class ProposedPeriod:
     weekdays: str
     #: Comma-separated month numbers, blank for a band that applies all year.
     months: str = ""
+    #: Always blank for an import: the standard does not name its bands, so a
+    #: plain band is shown by its window rather than by an invented name.
+    label: str = ""
 
 
 @dataclass
@@ -407,20 +410,18 @@ def _map_one_season(months: frozenset[int], bands: list[_Band], warnings: list[s
                     *, seasonal: bool) -> list[ProposedPeriod]:
     """One month group → its ``TariffPeriod`` rows.
 
-    ``PeriodType`` offers three slots — flat, HT, NT — so the number of
-    *distinct prices* decides whether a season fits, not the number of windows.
-    The document this was built against writes day, evening and night with two
-    prices, and maps onto HT and NT cleanly.
+    What decides the shape is the number of *distinct prices*, not the number
+    of windows: a season written as three windows carrying two prices is an
+    HT/NT tariff with the cheap price split in two.
+
+    One price is flat. Two are HT and NT — the names Swiss tariffs use, and the
+    ones the contract PDF and the price chart look up. Three or more have no
+    such names, because the standard does not label its bands at all, so they
+    are stored as plain bands told apart by their windows.
     """
     where = f" in {format_number_list(sorted(months))}" if seasonal else ""
     months_field = _months_field(months)
     prices = sorted({band.price for band in bands})
-
-    if len(prices) > 2:
-        raise _Unsupported(
-            f"The entry has {len(prices)} different energy prices{where}; OpenZEV tariffs "
-            "carry at most a high (HT) and a low (NT) band per season."
-        )
 
     if _uncovered_hours(bands):
         warnings.append(
@@ -445,15 +446,23 @@ def _map_one_season(months: frozenset[int], bands: list[_Band], warnings: list[s
             )
         ]
 
-    low, high = prices
-    warnings.append(
-        f"The standard does not label its bands, so the higher price ({high} CHF/kWh) was "
-        f"taken as the high tariff (HT) and the lower ({low} CHF/kWh) as the low tariff (NT)"
-        f"{where}."
-    )
+    if len(prices) == 2:
+        low, high = prices
+        # Only the two-price case needs a heuristic: with three or more bands
+        # there is no HT/NT pair to guess at, so nothing is assumed and nothing
+        # is warned about.
+        warnings.append(
+            f"The standard does not label its bands, so the higher price ({high} CHF/kWh) was "
+            f"taken as the high tariff (HT) and the lower ({low} CHF/kWh) as the low tariff (NT)"
+            f"{where}."
+        )
+        band_type = {high: PeriodType.HIGH, low: PeriodType.LOW}
+    else:
+        band_type = {}
+
     return [
         ProposedPeriod(
-            period_type=PeriodType.HIGH if band.price == high else PeriodType.LOW,
+            period_type=band_type.get(band.price, PeriodType.BAND),
             price_chf_per_kwh=_quantize(
                 band.price, ENERGY_PRICE_QUANTUM, "An energy price", warnings
             ),

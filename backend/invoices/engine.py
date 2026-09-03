@@ -301,6 +301,11 @@ def _get_tariff_price(tariff: Tariff, ts: datetime) -> Decimal | None:
     # is every band that predates seasonal support.
     in_season = [period for period in periods if ts.month in months_of(period)]
 
+    # Any number of timed bands is fine here: a band is matched by its window,
+    # not by its name, so three or five of them resolve exactly as two do.
+    # A flat band short-circuits without looking at the window, which is only
+    # safe because a flat band may not share its months with a timed one
+    # (TariffPeriodSerializer._reject_flat_beside_timed_bands).
     t_time = ts.time()
     weekday = ts.weekday()  # 0 = Monday
     for period in in_season:
@@ -310,9 +315,12 @@ def _get_tariff_price(tariff: Tariff, ts: datetime) -> Decimal | None:
             if weekday in weekdays_of(period) and period.time_from <= t_time < period.time_to:
                 return period.price_chf_per_kwh
 
-    # Nothing matched the hour. Fall back to the first band, preferring one
-    # that at least applies this month — falling back to a band priced for the
-    # other half of the year would be the worse of two guesses.
+    # Nothing matched the hour, so the bands leave part of the day unpriced.
+    # The rule is "the day's first band in this season": TariffPeriod.Meta
+    # orders by start time with nulls placed explicitly, so this is the same
+    # band on every database rather than whatever the backend happened to
+    # return first. Preferring an in-season band matters once seasons exist —
+    # billing a January night at the summer rate would be the worse guess.
     return (in_season or periods)[0].price_chf_per_kwh
 
 

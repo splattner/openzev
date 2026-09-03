@@ -1237,6 +1237,10 @@ export const fr = {
                 weekdaysHint: 'Tous sélectionnés signifie que la bande s’applique chaque jour.',
                 months: 'Mois',
                 monthsHint: 'Tous sélectionnés signifie que la bande s’applique toute l’année.',
+                periodTypeHint: 'Utilisez une plage horaire lorsque le tarif a plus d’un prix haut et bas.',
+                bandLabel: 'Nom de la plage',
+                bandLabelPlaceholder: 'Pointe',
+                bandLabelHint: 'Facultatif. Laissée vide, la plage est affichée par sa fenêtre horaire.',
                 selectTariff: 'Sélectionner un tarif',
             },
             categories: {
@@ -1287,6 +1291,7 @@ export const fr = {
                 flat: 'Plat',
                 high: 'Heure de pointe (HP)',
                 low: 'Heure creuse (HC)',
+                band: 'Plage horaire',
             },
             allWeekdays: 'tous',
             chfPerKwh: 'CHF/kWh',

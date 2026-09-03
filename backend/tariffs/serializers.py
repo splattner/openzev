@@ -1,13 +1,50 @@
 from rest_framework import serializers
 from django.core.exceptions import ValidationError as DjangoValidationError
-from .models import BillingMode, Tariff, TariffPeriod
+from .models import BillingMode, PeriodType, Tariff, TariffPeriod
+from .periods import months_of
 
 
 class TariffPeriodSerializer(serializers.ModelSerializer):
+    def _reject_flat_beside_timed_bands(self, tariff, attrs):
+        """A flat band and a timed band may not price the same months.
+
+        The engine returns a flat band's price without looking at any window,
+        so in a month where both apply the flat one always wins and the timed
+        bands are dead weight that still show up on the contract. Checked per
+        season rather than per tariff, because winter-flat with summer-HT/NT is
+        a perfectly ordinary shape.
+        """
+        candidate = TariffPeriod(
+            period_type=attrs.get(
+                "period_type", getattr(self.instance, "period_type", PeriodType.FLAT)
+            ),
+            months=attrs.get("months", getattr(self.instance, "months", "")),
+        )
+        siblings = tariff.periods.all()
+        if self.instance is not None:
+            siblings = siblings.exclude(pk=self.instance.pk)
+
+        candidate_is_flat = candidate.period_type == PeriodType.FLAT
+        for sibling in siblings:
+            if (sibling.period_type == PeriodType.FLAT) == candidate_is_flat:
+                continue
+            shared = months_of(candidate) & months_of(sibling)
+            if shared:
+                raise serializers.ValidationError({
+                    "period_type": (
+                        "A flat band and a timed band cannot both apply in months "
+                        f"{','.join(str(month) for month in sorted(shared))}: the flat "
+                        "price is used for every hour, so the timed bands would never "
+                        "apply. Give them different months, or make them all timed."
+                    )
+                })
+
     def validate(self, attrs):
         tariff = attrs.get("tariff") or getattr(self.instance, "tariff", None)
         if tariff and tariff.billing_mode != BillingMode.ENERGY:
             raise serializers.ValidationError("Tariff periods are only supported for energy-based tariffs.")
+        if tariff:
+            self._reject_flat_beside_timed_bands(tariff, attrs)
         return attrs
 
     class Meta:

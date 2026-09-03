@@ -16,7 +16,7 @@ from .dates import format_date_value
 from .pdf_render import render_pdf
 
 from tariffs.models import BillingMode, EnergyType, PeriodType
-from tariffs.periods import month_ranges, months_of
+from tariffs.periods import hhmm, month_ranges, months_of
 from zev.models import MeteringPointType
 
 CONTRACT_TEMPLATE_NAME = "contracts/participant_contract_pdf.html"
@@ -123,10 +123,12 @@ def _build_local_tariff_display(zev, tr: dict, date_pattern: str, as_of: date) -
         # Every band gets a row, not one per band *type*. A seasonal tariff has
         # two or more bands sharing a period_type, and showing the first of them
         # would print a winter price on a contract with nothing to say it only
-        # applies in winter.
+        # applies in winter. Timed bands are taken by exclusion rather than by
+        # naming HIGH and LOW, so a tariff with three or more of them prints all
+        # of them instead of silently dropping everything past NT.
         flats = [p for p in periods if p.period_type == PeriodType.FLAT]
         shown = flats if flats else [
-            p for p in periods if p.period_type in (PeriodType.HIGH, PeriodType.LOW)
+            p for p in periods if p.period_type != PeriodType.FLAT
         ]
         for period in shown:
             rows.append({
@@ -140,12 +142,20 @@ def _build_local_tariff_display(zev, tr: dict, date_pattern: str, as_of: date) -
 
 
 def _band_description(period, tr: dict) -> str:
-    """The band's name, qualified by its season when it has one."""
+    """The band's name, qualified by its season when it has one.
+
+    HT and NT are named; a plain band is not, because the tariff it came from
+    does not name its bands either. Such a band is called by its own label if
+    one was given, and otherwise by the window that distinguishes it — which a
+    contract has to state in any case.
+    """
     label = {
         PeriodType.FLAT: tr["tariff_flat"],
         PeriodType.HIGH: tr["tariff_ht"],
         PeriodType.LOW: tr["tariff_nt"],
-    }.get(period.period_type, tr["tariff_flat"])
+    }.get(period.period_type)
+    if label is None:
+        label = period.label or _window(period, tr)
 
     ranges = month_ranges(months_of(period))
     if not ranges:
@@ -157,6 +167,13 @@ def _band_description(period, tr: dict) -> str:
         for first, last in ranges
     )
     return tr["tariff_season"].format(label=label, season=season)
+
+
+def _window(period, tr: dict) -> str:
+    """``07:00-21:00``, or the generic band name when the band has no window."""
+    if period.time_from and period.time_to:
+        return f"{hhmm(period.time_from)}\u2013{hhmm(period.time_to)}"
+    return tr["tariff_band"]
 
 
 def _build_contract_context(participant, document_id: str | None = None,

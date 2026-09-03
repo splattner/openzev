@@ -6,11 +6,12 @@ import { useTranslation } from 'react-i18next'
 import { FormModal } from '../../components/FormModal'
 import { CivilDateInput } from '../../components/CivilDateInput'
 import { formatShortDate } from '../../lib/appSettings'
-import type { AppSettings, TariffVersion, TariffVersionInput } from '../../types/api'
+import type { AppSettings, TariffPeriodType, TariffVersion, TariffVersionInput } from '../../types/api'
 import type { VersionDialog } from './useTariffVersions'
 
 type PeriodDraft = {
-  period_type: 'flat' | 'high' | 'low'
+  period_type: TariffPeriodType
+  label: string
   price_chf_per_kwh: string
   time_from: string | null
   time_to: string | null
@@ -31,6 +32,9 @@ type TariffVersionModalProps = {
 function draftsFrom(source: TariffVersion): PeriodDraft[] {
   return source.periods.map((period) => ({
     period_type: period.period_type,
+    // A band is named by its label; dropping it here would leave the copy
+    // showing a bare time window on the contract.
+    label: period.label ?? '',
     price_chf_per_kwh: String(period.price_chf_per_kwh),
     time_from: period.time_from ?? null,
     time_to: period.time_to ?? null,
@@ -96,6 +100,7 @@ export function TariffVersionModal({
     if (usesPeriods) {
       payload.periods = periods.map((period) => ({
         period_type: period.period_type,
+        label: period.label,
         price_chf_per_kwh: period.price_chf_per_kwh,
         time_from: period.time_from || null,
         time_to: period.time_to || null,

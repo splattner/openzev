@@ -15,7 +15,10 @@ which replaces ``Meta.ordering`` outright rather than extending it.
 """
 
 from django.apps import apps
+from django.db.models import F
 from django.test import TestCase
+
+from tariffs.models import TariffPeriod
 
 # Apps whose models we do not own; their ordering is not ours to change.
 THIRD_PARTY_APP_LABELS = {
@@ -29,9 +32,29 @@ THIRD_PARTY_APP_LABELS = {
 }
 
 
+def _ordered_field_names(ordering):
+    """The column each ordering entry sorts on.
+
+    Entries are usually strings, but a model may order by an expression when
+    the placement of NULLs has to be stated rather than inherited from the
+    database — ``TariffPeriod`` does, because the billing engine reads
+    ``periods[0]`` and must get the same row everywhere. Those still sort on a
+    column, so reach through to it rather than skipping the entry and calling
+    the ordering total on the strength of the parts that happen to be strings.
+    """
+    for entry in ordering:
+        if isinstance(entry, str):
+            yield entry.lstrip("-")
+            continue
+        expression = getattr(entry, "expression", None)
+        name = getattr(expression, "name", None)
+        if name:
+            yield name
+
+
 def _is_total_order(model, ordering) -> bool:
     """True when *ordering* can never tie, i.e. it reaches a unique column."""
-    for field_name in (entry.lstrip("-") for entry in ordering):
+    for field_name in _ordered_field_names(ordering):
         if field_name in ("pk", model._meta.pk.name):
             return True
         try:
@@ -41,6 +64,18 @@ def _is_total_order(model, ordering) -> bool:
         if getattr(field, "unique", False):
             return True
     return False
+
+
+class OrderingParsingTests(TestCase):
+    """The check above is only worth anything if it can read every shape of
+    ordering entry. An expression it silently skipped would make a partial
+    ordering look total."""
+
+    def test_an_expression_ordering_is_read_through_to_its_column(self):
+        self.assertFalse(_is_total_order(TariffPeriod, [F("time_from").asc(nulls_first=True)]))
+
+    def test_a_unique_column_still_counts_after_an_expression(self):
+        self.assertTrue(_is_total_order(TariffPeriod, [F("time_from").asc(nulls_first=True), "id"]))
 
 
 class ModelOrderingIsTotalTests(TestCase):

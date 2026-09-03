@@ -1,10 +1,20 @@
 import type { TariffPeriod, TariffSeries, TariffVersion } from '../../types/api'
+import { bandName, bandWindow } from './bands'
 import { parseMonths } from './recurrence'
 
 /** What the y-axis of a series' price history is measured in. */
 export type PriceUnit = 'chf_per_kwh' | 'chf' | 'percent'
 
-export type BandKey = 'flat' | 'high' | 'low' | 'amount' | 'effective'
+/**
+ * A series on the price chart.
+ *
+ * `flat`/`high`/`low` are the named bands, `amount` and `effective` the
+ * single-series shapes for fee and percentage tariffs. `band-N` covers a
+ * tariff with three or more prices: those bands have no names, so they are
+ * keyed by position and labelled from their window (see `bandLabels`). The key
+ * is kept free of `.` because Recharts reads a `dataKey` as a property path.
+ */
+export type BandKey = 'flat' | 'high' | 'low' | 'amount' | 'effective' | `band-${number}`
 
 type PriceHistoryPoint = {
     /** Boundary as an epoch millisecond value, so the x-axis can be proportional. */
@@ -19,6 +29,8 @@ type PriceHistoryPoint = {
 type PriceHistory = {
     unit: PriceUnit
     bands: BandKey[]
+    /** Display name per band key; only `band-N` keys need one. */
+    bandLabels: Partial<Record<BandKey, string>>
     points: PriceHistoryPoint[]
     /** Uncovered stretches, as epoch ms, for shading. */
     gaps: Array<{ from: number, to: number }>
@@ -119,6 +131,7 @@ export function buildPriceHistory(
         return {
             unit: 'chf_per_kwh',
             bands: ['effective'],
+            bandLabels: {},
             derived: true,
             // A percentage tariff with no grid tariff behind it prices at zero —
             // the engine's base sum is zero, so it genuinely bills nothing. That
@@ -133,6 +146,7 @@ export function buildPriceHistory(
         return {
             unit: 'chf',
             bands: ['amount'],
+            bandLabels: {},
             derived: false,
             gaps,
             points: assemble(versions, ['amount'], today,
@@ -147,20 +161,51 @@ export function buildPriceHistory(
     // through untouched.
     const segments = versions.flatMap((version) => seasonalSegments(version, today))
 
-    const bands = BAND_ORDER.filter(
+    const named = BAND_ORDER.filter(
         (band) => segments.some((version) => version.periods.some((period) => period.period_type === band)),
     )
+    // A tariff with three or more prices has no named bands, so each gets a
+    // series of its own keyed by position. Position is meaningful because the
+    // backend orders bands by start time: `band-0` is the same band of the day
+    // in every version, which is what makes a line across versions honest.
+    const bandCount = Math.max(
+        0, ...segments.map((version) => plainBands(version).length),
+    )
+    const positional = Array.from({ length: bandCount }, (_, index) => `band-${index}` as BandKey)
+    const bands: BandKey[] = [...named, ...positional]
+
+    const bandLabels: Partial<Record<BandKey, string>> = {}
+    positional.forEach((key, index) => {
+        const sample = segments.map((version) => plainBands(version)[index]).find(Boolean)
+        if (sample) bandLabels[key] = bandName(sample, bandWindow(sample) ?? key)
+    })
 
     const points = assemble(segments, bands, today, (version) => {
         const values: Partial<Record<BandKey, number | null>> = {}
-        bands.forEach((band) => {
+        named.forEach((band) => {
             const period = version.periods.find((entry) => entry.period_type === band)
             values[band] = period ? num(period.price_chf_per_kwh) : null
+        })
+        positional.forEach((key, index) => {
+            const period = plainBands(version)[index]
+            values[key] = period ? num(period.price_chf_per_kwh) : null
         })
         return values
     })
 
-    return { unit: 'chf_per_kwh', bands: bands.length ? bands : ['flat'], derived: false, gaps, points }
+    return {
+        unit: 'chf_per_kwh',
+        bands: bands.length ? bands : ['flat'],
+        bandLabels,
+        derived: false,
+        gaps,
+        points,
+    }
+}
+
+/** The unnamed bands of a version, in the start-time order the backend stores. */
+function plainBands(version: TariffVersion): TariffPeriod[] {
+    return version.periods.filter((period) => period.period_type === 'band')
 }
 
 /** Bands of `version` that apply in `month` (1-12). Blank months = every month. */

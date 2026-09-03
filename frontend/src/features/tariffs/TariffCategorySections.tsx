@@ -21,6 +21,7 @@ import type {
     TariffSeries,
     TariffVersion,
 } from '../../types/api'
+import { bandName } from './bands'
 import { MONTH_KEYS, formatSeason } from './recurrence'
 import { validityState, type ValidityState } from './validity'
 import { TariffPriceHistoryChart } from './TariffPriceHistoryChart'
@@ -407,7 +408,7 @@ export function TariffCategorySections({
                                                                     <div className="tariff-period-main">
                                                                         <div className="tariff-period-line">
                                                                             <span className="badge badge-neutral">
-                                                                                {t(`pages.tariffs.periodTypes.${period.period_type}` as Parameters<typeof t>[0], { defaultValue: period.period_type })}
+                                                                                {bandName(period, t(`pages.tariffs.periodTypes.${period.period_type}` as Parameters<typeof t>[0], { defaultValue: period.period_type }))}
                                                                             </span>
                                                                             <strong>CHF {period.price_chf_per_kwh}/kWh</strong>
                                                                         </div>

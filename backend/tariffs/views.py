@@ -52,6 +52,7 @@ def _copy_or_replace_periods(source, target, periods_data) -> None:
             TariffPeriod(
                 tariff=target,
                 period_type=period.period_type,
+                label=period.label,
                 price_chf_per_kwh=period.price_chf_per_kwh,
                 time_from=period.time_from,
                 time_to=period.time_to,

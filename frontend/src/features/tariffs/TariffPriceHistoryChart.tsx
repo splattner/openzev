@@ -21,12 +21,17 @@ import { AXIS_COLOR, CHART_GRID, CHART_GRIDLINE, CONS_COLORS, FLOW_LOCAL_CONS, N
 // pair from the shared palette and carry the two bands that actually co-occur
 // (HT and NT). Flat never shares a version with HT/NT in practice, so its blue
 // can be reused without an ambiguous adjacency.
-const BAND_COLOR: Record<BandKey, string> = {
+const NAMED_BAND_COLOR: Partial<Record<BandKey, string>> = {
     flat: CONS_COLORS[0],
     high: CHART_GRID,
     low: FLOW_LOCAL_CONS,
     amount: CONS_COLORS[0],
     effective: CONS_COLORS[0],
+}
+
+/** Unnamed bands cycle the consumer ramp, which is ordered for adjacency. */
+function bandColor(band: BandKey, index: number): string {
+    return NAMED_BAND_COLOR[band] ?? CONS_COLORS[index % CONS_COLORS.length]
 }
 const GAP_FILL = NEGATIVE_COLOR
 
@@ -119,14 +124,15 @@ export function TariffPriceHistoryChart({ series, allSeries, settings }: Props) 
                             value === null || value === undefined
                                 ? t('pages.tariffs.priceHistory.noPrice')
                                 : `${Number(value).toFixed(decimals)} ${unitLabel}`,
-                            t(`pages.tariffs.priceHistory.bands.${name}` as Parameters<typeof t>[0], { defaultValue: String(name) }),
+                            history.bandLabels[name as BandKey]
+                                ?? t(`pages.tariffs.priceHistory.bands.${name}` as Parameters<typeof t>[0], { defaultValue: String(name) }),
                         ]}
                         contentStyle={{ fontSize: '0.82rem', borderRadius: 6 }}
                     />
                     {history.bands.length > 1 && (
                         <Legend wrapperStyle={{ fontSize: '0.72rem' }} />
                     )}
-                    {history.bands.map((band) => (
+                    {history.bands.map((band, index) => (
                         <Line
                             key={band}
                             // Stepped, not interpolated: a price holds for its whole
@@ -134,8 +140,11 @@ export function TariffPriceHistoryChart({ series, allSeries, settings }: Props) 
                             // claim it drifted between two Januaries.
                             type="stepAfter"
                             dataKey={band}
-                            name={t(`pages.tariffs.priceHistory.bands.${band}` as Parameters<typeof t>[0], { defaultValue: band })}
-                            stroke={BAND_COLOR[band]}
+                            // An unnamed band is labelled by its window, which is
+                            // the only thing that distinguishes it in a legend.
+                            name={history.bandLabels[band]
+                                ?? t(`pages.tariffs.priceHistory.bands.${band}` as Parameters<typeof t>[0], { defaultValue: band })}
+                            stroke={bandColor(band, index)}
                             strokeWidth={2}
                             dot={{ r: 3 }}
                             activeDot={{ r: 5 }}

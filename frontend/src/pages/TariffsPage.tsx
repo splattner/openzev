@@ -82,7 +82,10 @@ export function TariffsPage() {
                 const seasonDelta = seasonSortKey(left.months) - seasonSortKey(right.months)
                 if (seasonDelta !== 0) return seasonDelta
 
-                const periodTypeOrder = { flat: 0, high: 1, low: 2 }
+                // Appended rather than inserted, so tariffs that predate
+                // unnamed bands display exactly as they did.
+                const periodTypeOrder: Record<TariffPeriod['period_type'], number> =
+                    { flat: 0, high: 1, low: 2, band: 3 }
                 const typeDelta = periodTypeOrder[left.period_type] - periodTypeOrder[right.period_type]
                 if (typeDelta !== 0) return typeDelta
 

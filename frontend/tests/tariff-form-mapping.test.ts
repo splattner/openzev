@@ -108,18 +108,41 @@ describe('tariff form mapping', () => {
       mapTariffPeriodFormValuesToInput({
         tariff: 't-1',
         period_type: 'low',
+        label: '',
         price_chf_per_kwh: '0.12',
         time_from: '',
         time_to: '',
         weekdays: '',
+        months: '',
       }),
     ).toEqual({
       tariff: 't-1',
       period_type: 'low',
+      label: '',
       price_chf_per_kwh: '0.12',
       time_from: null,
       time_to: null,
       weekdays: '',
+      months: '',
     })
+  })
+
+  it('keeps a band label, and drops one left behind by a type change', () => {
+    const values = {
+      tariff: 't-1',
+      label: 'Spitzenlast',
+      price_chf_per_kwh: '0.24',
+      time_from: '07:00',
+      time_to: '17:00',
+      weekdays: '',
+      months: '',
+    }
+
+    expect(mapTariffPeriodFormValuesToInput({ ...values, period_type: 'band' }).label)
+      .toBe('Spitzenlast')
+    // Only a band is named by hand. A label surviving a switch back to NT
+    // would surface on the contract under a name nothing set.
+    expect(mapTariffPeriodFormValuesToInput({ ...values, period_type: 'low' }).label)
+      .toBe('')
   })
 })

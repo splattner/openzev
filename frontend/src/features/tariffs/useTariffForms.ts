@@ -18,6 +18,7 @@ export type TariffFormValues = {
 export type TariffPeriodFormValues = {
   tariff: string
   period_type: TariffPeriodInput['period_type']
+  label: string
   price_chf_per_kwh: string
   time_from: string
   time_to: string
@@ -95,7 +96,8 @@ export const tariffFormSchema = z
 
 export const tariffPeriodFormSchema = z.object({
   tariff: z.string().trim().min(1),
-  period_type: z.enum(['flat', 'high', 'low']),
+  period_type: z.enum(['flat', 'high', 'low', 'band']),
+  label: z.string(),
   price_chf_per_kwh: z.string().trim().min(1),
   time_from: z.string(),
   time_to: z.string(),
@@ -119,6 +121,7 @@ export const defaultTariffFormValues: TariffFormValues = {
 export const defaultTariffPeriodFormValues: TariffPeriodFormValues = {
   tariff: '',
   period_type: 'flat',
+  label: '',
   price_chf_per_kwh: '',
   time_from: '',
   time_to: '',
@@ -164,6 +167,7 @@ export function mapTariffPeriodToFormValues(period: TariffPeriod): TariffPeriodF
   return {
     tariff: period.tariff,
     period_type: period.period_type,
+    label: period.label ?? '',
     price_chf_per_kwh: String(period.price_chf_per_kwh),
     time_from: period.time_from || '',
     time_to: period.time_to || '',
@@ -176,6 +180,9 @@ export function mapTariffPeriodFormValuesToInput(values: TariffPeriodFormValues)
   return {
     tariff: values.tariff,
     period_type: values.period_type,
+    // Only a `band` is named by hand; the others name themselves, and a label
+    // left behind by a type change would surface on the contract.
+    label: values.period_type === 'band' ? values.label : '',
     price_chf_per_kwh: values.price_chf_per_kwh,
     time_from: values.time_from || null,
     time_to: values.time_to || null,

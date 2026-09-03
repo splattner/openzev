@@ -397,10 +397,19 @@ export interface TariffInput {
     notes?: string
 }
 
+/**
+ * `flat` prices every hour; `high`/`low` are the HT/NT pair a Swiss tariff
+ * traditionally has and that the contract PDF and price chart name; `band` is
+ * a tariff with three or more prices, whose bands the standard does not name.
+ */
+export type TariffPeriodType = 'flat' | 'high' | 'low' | 'band'
+
 export interface TariffPeriod {
     id: string
     tariff: string
-    period_type: 'flat' | 'high' | 'low'
+    period_type: TariffPeriodType
+    /** Name for a `band`; blank falls back to its time window. */
+    label?: string
     price_chf_per_kwh: string
     time_from?: string | null
     time_to?: string | null
@@ -451,7 +460,8 @@ export interface TariffVersionInput {
 
 export interface TariffPeriodInput {
     tariff: string
-    period_type: 'flat' | 'high' | 'low'
+    period_type: TariffPeriodType
+    label?: string
     price_chf_per_kwh: string
     time_from?: string | null
     time_to?: string | null
@@ -904,7 +914,8 @@ export interface FeasibilityPrefill {
  * not be represented, so the user decides before anything is written.
  */
 export interface VseTariffPeriodPreview {
-    period_type: 'flat' | 'high' | 'low'
+    period_type: TariffPeriodType
+    label: string
     price_chf_per_kwh: string
     time_from: string | null
     time_to: string | null

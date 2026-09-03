@@ -1237,6 +1237,10 @@ export const de = {
                 weekdaysHint: 'Alle ausgewählt heisst, das Band gilt an jedem Tag.',
                 months: 'Monate',
                 monthsHint: 'Alle ausgewählt heisst, das Band gilt das ganze Jahr.',
+                periodTypeHint: 'Zeitband verwenden, wenn der Tarif mehr als einen Hoch- und einen Niedertarif hat.',
+                bandLabel: 'Bandname',
+                bandLabelPlaceholder: 'Spitzenlast',
+                bandLabelHint: 'Optional. Leer gelassen, wird das Band mit seinem Zeitfenster angezeigt.',
                 selectTariff: 'Tarif auswählen',
             },
             categories: {
@@ -1287,6 +1291,7 @@ export const de = {
                 flat: 'Einheitstarif',
                 high: 'Hochtarif (HT)',
                 low: 'Niedertarif (NT)',
+                band: 'Zeitband',
             },
             allWeekdays: 'alle',
             chfPerKwh: 'CHF/kWh',
