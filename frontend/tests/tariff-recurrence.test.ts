@@ -1,11 +1,14 @@
 import { describe, it, expect } from 'vitest'
 import {
     MONTH_KEYS,
+    WEEKDAY_KEYS,
     formatSeason,
     monthRanges,
     parseMonths,
+    recurrenceValue,
     seasonSortKey,
-} from '../src/features/tariffs/seasons'
+    selectedRecurrence,
+} from '../src/features/tariffs/recurrence'
 import { buildPriceHistory } from '../src/features/tariffs/priceHistory'
 import type { TariffSeries, TariffVersion } from '../src/types/api'
 
@@ -34,6 +37,44 @@ describe('parsing a month mask', () => {
         expect(MONTH_KEYS).toHaveLength(12)
         expect(MONTH_KEYS[0]).toBe('jan')
         expect(MONTH_KEYS[11]).toBe('dec')
+    })
+})
+
+const WEEKDAY_VALUES = [0, 1, 2, 3, 4, 5, 6]
+const MONTH_VALUES = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+
+describe('the weekday and month toggle groups', () => {
+    it('names all seven weekdays, Monday first', () => {
+        // 0 = Monday, matching Date#getDay() shifted and the backend's mask.
+        expect(WEEKDAY_KEYS).toHaveLength(7)
+        expect(WEEKDAY_KEYS[0]).toBe('mon')
+        expect(WEEKDAY_KEYS[6]).toBe('sun')
+    })
+
+    it('shows every option lit for an unrestricted band', () => {
+        // Blank means "no restriction". Rendering that as nothing selected
+        // would make turning one off read as "now only this one".
+        expect(selectedRecurrence('', WEEKDAY_VALUES)).toEqual(['0', '1', '2', '3', '4', '5', '6'])
+        expect(selectedRecurrence(undefined, MONTH_VALUES)).toHaveLength(12)
+    })
+
+    it('shows exactly what a restricted band stored', () => {
+        expect(selectedRecurrence('0,1,2,3,4', WEEKDAY_VALUES)).toEqual(['0', '1', '2', '3', '4'])
+    })
+
+    it('stores nothing when everything is selected', () => {
+        // So a band that applies always looks the same however it was reached.
+        expect(recurrenceValue(['0', '1', '2', '3', '4', '5', '6'], 7)).toBe('')
+    })
+
+    it('stores a restricted selection in numeric order', () => {
+        expect(recurrenceValue(['10', '1', '2'], 12)).toBe('1,2,10')
+    })
+
+    it('refuses a selection of nothing', () => {
+        // A band applying on no day at all cannot be stored, and would not
+        // mean anything if it could — so the click is a no-op.
+        expect(recurrenceValue([], 7)).toBeNull()
     })
 })
 

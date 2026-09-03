@@ -1234,8 +1234,9 @@ export const it = {
                 timeFrom: 'Orario inizio',
                 timeTo: 'Orario fine',
                 weekdays: 'Giorni della settimana',
+                weekdaysHint: 'Tutti selezionati significa che la fascia vale ogni giorno.',
                 months: 'Mesi',
-                monthsHint: '1 = gennaio. Lasciare vuoto per applicare tutto l’anno.',
+                monthsHint: 'Tutti selezionati significa che la fascia vale tutto l’anno.',
                 selectTariff: 'Seleziona tariffa',
             },
             categories: {
@@ -1258,6 +1259,15 @@ export const it = {
                 local: 'Locale',
                 grid: 'Rete',
                 feed_in: 'Immissione',
+            },
+            weekdaysShort: {
+                mon: 'lun',
+                tue: 'mar',
+                wed: 'mer',
+                thu: 'gio',
+                fri: 'ven',
+                sat: 'sab',
+                sun: 'dom',
             },
             monthsShort: {
                 jan: 'genn.',

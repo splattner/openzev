@@ -10,7 +10,7 @@ import { TariffPeriodFormModal } from '../features/tariffs/TariffPeriodFormModal
 import { TariffToolbar, type TariffValidityFilter } from '../features/tariffs/TariffToolbar'
 import { TariffVersionModal } from '../features/tariffs/TariffVersionModal'
 import { useTariffVersions } from '../features/tariffs/useTariffVersions'
-import { seasonSortKey } from '../features/tariffs/seasons'
+import { seasonSortKey } from '../features/tariffs/recurrence'
 import { isTariffCurrentlyValid } from '../features/tariffs/validity'
 import { fetchTariffSeries } from '../lib/api/tariffs'
 import { queryKeys } from '../lib/api/queryKeys'

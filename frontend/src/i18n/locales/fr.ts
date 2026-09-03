@@ -1234,8 +1234,9 @@ export const fr = {
                 timeFrom: 'Heure de début',
                 timeTo: 'Heure de fin',
                 weekdays: 'Jours de la semaine',
+                weekdaysHint: 'Tous sélectionnés signifie que la bande s’applique chaque jour.',
                 months: 'Mois',
-                monthsHint: '1 = janvier. Laisser vide pour une application toute l’année.',
+                monthsHint: 'Tous sélectionnés signifie que la bande s’applique toute l’année.',
                 selectTariff: 'Sélectionner un tarif',
             },
             categories: {
@@ -1258,6 +1259,15 @@ export const fr = {
                 local: 'Local',
                 grid: 'Réseau',
                 feed_in: 'Injection',
+            },
+            weekdaysShort: {
+                mon: 'lun',
+                tue: 'mar',
+                wed: 'mer',
+                thu: 'jeu',
+                fri: 'ven',
+                sat: 'sam',
+                sun: 'dim',
             },
             monthsShort: {
                 jan: 'janv.',

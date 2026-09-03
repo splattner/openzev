@@ -1234,8 +1234,9 @@ export const de = {
                 timeFrom: 'Zeit von',
                 timeTo: 'Zeit bis',
                 weekdays: 'Wochentage',
+                weekdaysHint: 'Alle ausgewählt heisst, das Band gilt an jedem Tag.',
                 months: 'Monate',
-                monthsHint: '1 = Januar. Leer lassen, damit der Tarif ganzjährig gilt.',
+                monthsHint: 'Alle ausgewählt heisst, das Band gilt das ganze Jahr.',
                 selectTariff: 'Tarif auswählen',
             },
             categories: {
@@ -1258,6 +1259,15 @@ export const de = {
                 local: 'Intern',
                 grid: 'Netz',
                 feed_in: 'Einspeisung',
+            },
+            weekdaysShort: {
+                mon: 'Mo',
+                tue: 'Di',
+                wed: 'Mi',
+                thu: 'Do',
+                fri: 'Fr',
+                sat: 'Sa',
+                sun: 'So',
             },
             monthsShort: {
                 jan: 'Jan.',

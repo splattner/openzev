@@ -2,9 +2,11 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faCheck, faXmark } from '@fortawesome/free-solid-svg-icons'
 import { useEffect } from 'react'
-import { useForm } from 'react-hook-form'
+import { useForm, useWatch } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 import { FormModal } from '../../components/FormModal'
+import { RecurrenceChips } from './RecurrenceChips'
+import { MONTH_KEYS, WEEKDAY_KEYS } from './recurrence'
 import type { Tariff, TariffPeriod, TariffPeriodInput } from '../../types/api'
 import {
   defaultTariffPeriodFormValues,
@@ -54,6 +56,11 @@ export function TariffPeriodFormModal({
     })
   }, [defaultTariffId, form, initialPeriod, isOpen])
 
+  // useWatch rather than form.watch(): the latter returns a fresh function on
+  // every render, which the React Compiler refuses to memoize around.
+  const weekdays = useWatch({ control: form.control, name: 'weekdays' })
+  const months = useWatch({ control: form.control, name: 'months' })
+
   function submit(values: TariffPeriodFormValues) {
     onSubmit(mapTariffPeriodFormValuesToInput(values))
   }
@@ -90,15 +97,28 @@ export function TariffPeriodFormModal({
           <span>{t('pages.tariffs.form.timeTo')}</span>
           <input type="time" {...form.register('time_to')} />
         </label>
-        <label>
-          <span>{t('pages.tariffs.form.weekdays')}</span>
-          <input {...form.register('weekdays')} placeholder="0,1,2,3,4" />
-        </label>
-        <label>
-          <span>{t('pages.tariffs.form.months')}</span>
-          <input {...form.register('months')} placeholder="10,11,12,1,2,3" />
-          <small className="muted">{t('pages.tariffs.form.monthsHint')}</small>
-        </label>
+        <RecurrenceChips
+          label={t('pages.tariffs.form.weekdays')}
+          hint={t('pages.tariffs.form.weekdaysHint')}
+          value={weekdays}
+          onChange={(next) => form.setValue('weekdays', next, { shouldDirty: true })}
+          options={WEEKDAY_KEYS.map((key, index) => ({
+            value: index,
+            label: t(`pages.tariffs.weekdaysShort.${key}` as Parameters<typeof t>[0]),
+          }))}
+          columns={7}
+        />
+        <RecurrenceChips
+          label={t('pages.tariffs.form.months')}
+          hint={t('pages.tariffs.form.monthsHint')}
+          value={months}
+          onChange={(next) => form.setValue('months', next, { shouldDirty: true })}
+          options={MONTH_KEYS.map((key, index) => ({
+            value: index + 1,
+            label: t(`pages.tariffs.monthsShort.${key}` as Parameters<typeof t>[0]),
+          }))}
+          columns={6}
+        />
 
         {Object.keys(form.formState.errors).length > 0 && (
           <div className="error-banner" style={{ gridColumn: '1 / -1' }}>

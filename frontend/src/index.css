@@ -1434,6 +1434,39 @@ h3 {
   grid-column: 1 / -1;
 }
 
+/* Grouped toggles for a tariff band's weekdays and months. Laid out like a
+   plain field so the group's label lines up with the inputs beside it, but
+   marked up as role="group" rather than a fieldset — a legend does not lay out
+   predictably inside a grid. */
+.recurrence-field {
+  display: grid;
+  gap: 0.4rem;
+  min-inline-size: 0;
+}
+
+.recurrence-chips {
+  display: grid;
+  gap: 0.375rem;
+}
+
+/* Each chip fills its grid cell, so selecting one cannot change any width and
+   the rows stay put while the group is being used. Applied through Mantine's
+   `classNames` API rather than by reaching for its internal class names. */
+.recurrence-chip {
+  width: 100%;
+  justify-content: center;
+}
+
+/* Mantine hides a chip's checkbox by zeroing its width, which the
+   `input[type="checkbox"] { width: auto }` reset near the top of this file
+   overrides on specificity — leaving a 13px inline-block that doubled every
+   chip's height. Taken out of flow entirely here; the label's `for` is what
+   makes the chip clickable, so the input never needs to occupy space. */
+input.recurrence-chip-input {
+  position: absolute;
+  width: 0;
+}
+
 .mb-1 {
   margin-bottom: 1rem;
 }

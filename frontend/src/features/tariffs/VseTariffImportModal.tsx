@@ -7,7 +7,7 @@ import { FormModal } from '../../components/FormModal'
 import { applyVseTariffImport, previewVseTariffImport } from '../../lib/api/tariffs'
 import { useToast } from '../../lib/toast'
 import { invalidateTariffQueries } from './invalidate'
-import { MONTH_KEYS, formatSeason } from './seasons'
+import { MONTH_KEYS, formatSeason } from './recurrence'
 import {
     defaultBillingModes,
     isSelectable,

@@ -1,5 +1,5 @@
 import type { TariffPeriod, TariffSeries, TariffVersion } from '../../types/api'
-import { parseMonths } from './seasons'
+import { parseMonths } from './recurrence'
 
 /** What the y-axis of a series' price history is measured in. */
 export type PriceUnit = 'chf_per_kwh' | 'chf' | 'percent'

@@ -171,8 +171,8 @@ value has to be refused at entry rather than discovered at invoice time.
 `period_type` and so fall back to `id`, which is creation order — for an import
 that is the order the operator published. Sorting them meaningfully would need
 `time_from`, which is nullable and orders NULLs differently on SQLite and
-Postgres; the frontend sorts for display instead (`features/tariffs/seasons.ts`,
-`seasonSortKey`).
+Postgres; the frontend sorts for display instead
+(`features/tariffs/recurrence.ts`, `seasonSortKey`).
 
 **Period matching rules** (evaluated per-timestamp, `invoices/engine.py:_get_tariff_price`):
 
@@ -217,6 +217,17 @@ Consequences elsewhere:
   version at its season boundaries and charts the result as steps, which is
   what a seasonal price actually does over time. A tariff with no seasonal band
   is passed through untouched.
+- **The band form** (`features/tariffs/RecurrenceChips.tsx`) sets both axes
+  with toggle groups rather than free-text number lists. Asking the user to
+  know that Monday is `0` while January is `1` was tolerable for one axis and
+  not for two, and a typo was only reported by the server. Blank is rendered as
+  *every* chip lit, so an unrestricted band shows what it does rather than
+  showing nothing, and turning one off reads as "not this one" instead of "now
+  only this one". Selecting everything stores blank again; selecting nothing is
+  refused, since a band applying on no day at all cannot be stored and would
+  not mean anything if it could. The chips sit on a fixed grid — a selected
+  chip is wider than an unselected one, so wrapping made every click reflow the
+  rows below it.
 - The **representative price** used for percentage-of-energy tariffs (contract
   PDF and chart) still takes one band per tariff. For a seasonal grid tariff
   that is one season's price — the same approximation the HT/NT case already
@@ -232,8 +243,9 @@ month; the unpriced-hour fallback staying inside its own season; weekday and mon
 restrictions applying together; and the write-time validation of both masks.
 `backend/tariffs/test_versioning.py` covers a new version keeping each band in its
 own season. `backend/invoices/test_contract_context.py::ContractPdfSeasonalTariffTests`
-(3) covers the contract rows. Frontend: `frontend/tests/tariff-seasons.test.ts` (13)
-covers parsing, naming, display ordering, and the chart stepping between seasons.
+(3) covers the contract rows. Frontend: `frontend/tests/tariff-recurrence.test.ts` (19)
+covers parsing, naming, display ordering, the toggle group's blank-means-all and
+refuse-empty rules, and the chart stepping between seasons.
 
 ### 3.2a Importing bands from a grid operator's publication
 

@@ -21,7 +21,7 @@ import type {
     TariffSeries,
     TariffVersion,
 } from '../../types/api'
-import { MONTH_KEYS, formatSeason } from './seasons'
+import { MONTH_KEYS, formatSeason } from './recurrence'
 import { validityState, type ValidityState } from './validity'
 import { TariffPriceHistoryChart } from './TariffPriceHistoryChart'
 

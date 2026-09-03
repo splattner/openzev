@@ -1245,8 +1245,9 @@ export const en = {
                 timeFrom: 'Time from',
                 timeTo: 'Time to',
                 weekdays: 'Weekdays',
+                weekdaysHint: 'All selected means the band applies every day.',
                 months: 'Months',
-                monthsHint: '1 = January. Leave blank to apply all year round.',
+                monthsHint: 'All selected means the band applies all year round.',
                 selectTariff: 'Select tariff',
             },
             categories: {
@@ -1269,6 +1270,15 @@ export const en = {
                 local: 'Local',
                 grid: 'Grid',
                 feed_in: 'Feed-in',
+            },
+            weekdaysShort: {
+                mon: 'Mon',
+                tue: 'Tue',
+                wed: 'Wed',
+                thu: 'Thu',
+                fri: 'Fri',
+                sat: 'Sat',
+                sun: 'Sun',
             },
             monthsShort: {
                 jan: 'Jan',
