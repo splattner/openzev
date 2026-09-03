@@ -1,7 +1,7 @@
 # Feature Spec: VSE/AES tariff import (Art. 7b StromVV)
 
 - Spec ID: SPEC-2026-vse-tariff-import
-- Status: In Progress
+- Status: Completed
 - Scope: Major
 - Type: Feature
 - Owners: Sebastian Plattner
