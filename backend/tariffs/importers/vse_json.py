@@ -25,6 +25,7 @@ from datetime import date, datetime, time
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 
 from tariffs.models import BillingMode, EnergyType, PeriodType, TariffCategory
+from tariffs.periods import ALL_MONTHS, format_number_list
 
 #: A standard entry carrying both a base fee and a per-kWh price becomes *two*
 #: OpenZEV tariffs, because ``Tariff`` has a single ``billing_mode``. The
@@ -97,6 +98,8 @@ class ProposedPeriod:
     time_from: time | None
     time_to: time | None
     weekdays: str
+    #: Comma-separated month numbers, blank for a band that applies all year.
+    months: str = ""
 
 
 @dataclass
@@ -277,6 +280,7 @@ class _Band:
     start: int  # minutes from midnight, inclusive
     end: int  # minutes from midnight, exclusive
     weekdays: list[int]
+    months: frozenset[int]
 
 
 def _parse_band(entry: dict, label: str) -> list[_Band]:
@@ -292,13 +296,7 @@ def _parse_band(entry: dict, label: str) -> list[_Band]:
             f"{label} is priced in {unit}; only CHF/kWh energy prices can be billed per kWh."
         )
 
-    months = _month_numbers(entry.get("months"), f"{label} months")
-    if len(months) != 12:
-        raise _Unsupported(
-            "Seasonal prices are not supported yet — this entry prices only "
-            f"{len(months)} of 12 months. Enter it by hand, or import it once "
-            "per season as separate tariffs."
-        )
+    months = frozenset(_month_numbers(entry.get("months"), f"{label} months"))
 
     weekdays = _weekday_numbers(entry.get("weekdays"), f"{label} weekdays")
     start = _minutes(entry.get("from"), f"{label} from")
@@ -306,7 +304,7 @@ def _parse_band(entry: dict, label: str) -> list[_Band]:
 
     if start == end:
         # The standard's constant marker: from and to both "00:00".
-        return [_Band(price, 0, END_OF_DAY_MINUTES, weekdays)]
+        return [_Band(price, 0, END_OF_DAY_MINUTES, weekdays, months)]
     if end == 0:
         end = END_OF_DAY_MINUTES
     if end == END_OF_DAY_MINUTES - 1:
@@ -314,29 +312,36 @@ def _parse_band(entry: dict, label: str) -> list[_Band]:
         # would leave the last minute of the day unpriced.
         end = END_OF_DAY_MINUTES
     if start < end:
-        return [_Band(price, start, end, weekdays)]
+        return [_Band(price, start, end, weekdays, months)]
     return [
-        _Band(price, start, END_OF_DAY_MINUTES, weekdays),
-        _Band(price, 0, end, weekdays),
+        _Band(price, start, END_OF_DAY_MINUTES, weekdays, months),
+        _Band(price, 0, end, weekdays, months),
     ]
 
 
 def _uncovered_hours(bands: list[_Band]) -> bool:
     """True when some weekday/hour combination has no band.
 
-    Not fatal — the engine falls back to a tariff's first period — but the
-    fallback prices those hours at a band the document never meant for them,
-    so the preview says so.
+    Not fatal — the engine falls back to a tariff's first in-season period —
+    but the fallback prices those hours at a band the document never meant for
+    them, so the preview says so.
     """
     for weekday in range(7):
-        covered = [False] * END_OF_DAY_MINUTES
-        for band in bands:
-            if weekday in band.weekdays:
-                for minute in range(band.start, band.end):
-                    covered[minute] = True
-        if not all(covered):
+        spans = sorted((band.start, band.end) for band in bands if weekday in band.weekdays)
+        reached = 0
+        for start, end in spans:
+            if start > reached:
+                return True  # a hole before this span
+            reached = max(reached, end)
+        if reached < END_OF_DAY_MINUTES:
             return True
     return False
+
+
+def _months_field(months: frozenset[int]) -> str:
+    """``TariffPeriod.months`` — blank means every month, which is what the
+    engine already assumes, so a year-round band stores nothing."""
+    return "" if months == ALL_MONTHS else format_number_list(months)
 
 
 def _weekday_field(weekdays: list[int]) -> str:
@@ -349,11 +354,12 @@ def _weekday_field(weekdays: list[int]) -> str:
 def _map_energy_bands(entries: list, label: str, warnings: list[str]) -> list[ProposedPeriod]:
     """``prices.energy`` → the ``TariffPeriod`` rows that reproduce it.
 
-    ``PeriodType`` offers exactly three slots — flat, HT, NT — so the number of
-    *distinct prices* decides whether the entry fits, not the number of
-    windows. The example that motivated this maps a three-window document
-    (day / evening / night) onto two prices and therefore onto HT and NT
-    cleanly.
+    Bands are grouped by the months they apply in, and the flat/HT/NT question
+    is answered **per season**. That is not a convenience: ``period_type`` only
+    has to tell apart bands that compete for the same moment, and a winter band
+    never competes with a summer one. A document pricing winter-HT, winter-NT,
+    summer-HT and summer-NT therefore fits in four rows carrying two distinct
+    prices each, even though it carries four distinct prices overall.
     """
     bands: list[_Band] = []
     for index, entry in enumerate(entries, start=1):
@@ -362,37 +368,88 @@ def _map_energy_bands(entries: list, label: str, warnings: list[str]) -> list[Pr
     if not bands:
         raise _Unsupported("The entry has no energy prices to import.")
 
+    seasons: dict[frozenset[int], list[_Band]] = {}
+    for band in bands:
+        seasons.setdefault(band.months, []).append(band)
+
+    # Grouping is by *exact* month set, so seasons that merely overlap — one
+    # band for Jan–Jun and another for Mar–Sep — would be mapped as if they
+    # never competed, and the engine would pick whichever sorted first for the
+    # months they share. Refuse rather than guess.
+    _reject_overlapping_seasons(list(seasons))
+
+    covered = frozenset().union(*seasons) if seasons else frozenset()
+    if covered != ALL_MONTHS:
+        warnings.append(
+            f"The document prices only {len(covered)} of 12 months; the remaining months "
+            "will bill at this tariff's first band."
+        )
+
+    periods: list[ProposedPeriod] = []
+    for months, season_bands in seasons.items():
+        periods.extend(_map_one_season(months, season_bands, warnings, seasonal=len(seasons) > 1))
+    return periods
+
+
+def _reject_overlapping_seasons(month_sets: list[frozenset[int]]) -> None:
+    for index, earlier in enumerate(month_sets):
+        for later in month_sets[index + 1:]:
+            shared = earlier & later
+            if shared:
+                raise _Unsupported(
+                    "Two of the entry's price groups apply in the same months "
+                    f"({format_number_list(sorted(shared))}), so which one prices those "
+                    "months is ambiguous. Enter this tariff by hand."
+                )
+
+
+def _map_one_season(months: frozenset[int], bands: list[_Band], warnings: list[str],
+                    *, seasonal: bool) -> list[ProposedPeriod]:
+    """One month group → its ``TariffPeriod`` rows.
+
+    ``PeriodType`` offers three slots — flat, HT, NT — so the number of
+    *distinct prices* decides whether a season fits, not the number of windows.
+    The document this was built against writes day, evening and night with two
+    prices, and maps onto HT and NT cleanly.
+    """
+    where = f" in {format_number_list(sorted(months))}" if seasonal else ""
+    months_field = _months_field(months)
     prices = sorted({band.price for band in bands})
+
     if len(prices) > 2:
         raise _Unsupported(
-            f"The entry has {len(prices)} different energy prices; OpenZEV tariffs "
-            "carry at most a high (HT) and a low (NT) band."
+            f"The entry has {len(prices)} different energy prices{where}; OpenZEV tariffs "
+            "carry at most a high (HT) and a low (NT) band per season."
         )
 
     if _uncovered_hours(bands):
         warnings.append(
-            "The document leaves part of the day unpriced; those hours will bill "
+            f"The document leaves part of the day unpriced{where}; those hours will bill "
             "at this tariff's first band."
         )
 
     if len(prices) == 1:
-        # One price, however many windows it was written across, is a flat
-        # tariff. Storing it without times also spares the engine the
+        # One price, however many windows it was written across, is flat for
+        # this season. Storing it without times also spares the engine the
         # window match on every reading.
         return [
             ProposedPeriod(
                 period_type=PeriodType.FLAT,
-                price_chf_per_kwh=_quantize(prices[0], ENERGY_PRICE_QUANTUM, "The energy price", warnings),
+                price_chf_per_kwh=_quantize(
+                    prices[0], ENERGY_PRICE_QUANTUM, "The energy price", warnings
+                ),
                 time_from=None,
                 time_to=None,
                 weekdays="",
+                months=months_field,
             )
         ]
 
     low, high = prices
     warnings.append(
         f"The standard does not label its bands, so the higher price ({high} CHF/kWh) was "
-        f"taken as the high tariff (HT) and the lower ({low} CHF/kWh) as the low tariff (NT)."
+        f"taken as the high tariff (HT) and the lower ({low} CHF/kWh) as the low tariff (NT)"
+        f"{where}."
     )
     return [
         ProposedPeriod(
@@ -403,6 +460,7 @@ def _map_energy_bands(entries: list, label: str, warnings: list[str]) -> list[Pr
             time_from=_time_from_minutes(band.start),
             time_to=_time_from_minutes(band.end),
             weekdays=_weekday_field(band.weekdays),
+            months=months_field,
         )
         for band in bands
     ]

@@ -28,6 +28,7 @@ from allocation.split import split_consumption, split_production
 from allocation.windows import AssignmentWindows
 from zev.models import AllocationMode, Zev, Participant, MeteringPoint, MeteringPointAssignment
 from tariffs.models import BillingMode, EnergyType, PeriodType, SplitKey, Tariff, TariffCategory
+from tariffs.periods import months_of, weekdays_of
 from metering.models import MeterReading, ReadingDirection
 from .models import Invoice, InvoiceItem, InvoiceStatus
 
@@ -294,22 +295,25 @@ def _get_tariff_price(tariff: Tariff, ts: datetime) -> Decimal | None:
     if not periods:
         return None
 
-    # Find matching period (HT/NT or flat)
+    # The month is checked before anything else, the flat case included: a
+    # winter-only flat band that short-circuited on period_type would bill its
+    # winter price in July. Bands with no months set match every month, which
+    # is every band that predates seasonal support.
+    in_season = [period for period in periods if ts.month in months_of(period)]
+
     t_time = ts.time()
     weekday = ts.weekday()  # 0 = Monday
-    for period in periods:
+    for period in in_season:
         if period.period_type == PeriodType.FLAT:
             return period.price_chf_per_kwh
         if period.time_from and period.time_to:
-            allowed_weekdays = (
-                [int(d) for d in period.weekdays.split(",") if d.strip()]
-                if period.weekdays else list(range(7))
-            )
-            if weekday in allowed_weekdays and period.time_from <= t_time < period.time_to:
+            if weekday in weekdays_of(period) and period.time_from <= t_time < period.time_to:
                 return period.price_chf_per_kwh
 
-    # Fall back to first period
-    return periods[0].price_chf_per_kwh
+    # Nothing matched the hour. Fall back to the first band, preferring one
+    # that at least applies this month — falling back to a band priced for the
+    # other half of the year would be the worse of two guesses.
+    return (in_season or periods)[0].price_chf_per_kwh
 
 
 def _resolve_vat_rate(zev: Zev, period_end: date) -> Decimal:

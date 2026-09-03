@@ -15,6 +15,7 @@ type PeriodDraft = {
   time_from: string | null
   time_to: string | null
   weekdays: string
+  months: string
 }
 
 type TariffVersionModalProps = {
@@ -34,6 +35,9 @@ function draftsFrom(source: TariffVersion): PeriodDraft[] {
     time_from: period.time_from ?? null,
     time_to: period.time_to ?? null,
     weekdays: period.weekdays ?? '',
+    // Carried through the copy or the new version keeps the price and loses
+    // the season it applied in, which prices the whole year at it.
+    months: period.months ?? '',
   }))
 }
 
@@ -96,6 +100,7 @@ export function TariffVersionModal({
         time_from: period.time_from || null,
         time_to: period.time_to || null,
         weekdays: period.weekdays,
+        months: period.months,
       }))
     }
     return payload

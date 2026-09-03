@@ -405,6 +405,8 @@ export interface TariffPeriod {
     time_from?: string | null
     time_to?: string | null
     weekdays?: string
+    /** Comma-separated month numbers 1-12; blank means every month. */
+    months?: string
 }
 
 /** One version of a tariff, as returned nested inside a series. */
@@ -454,6 +456,7 @@ export interface TariffPeriodInput {
     time_from?: string | null
     time_to?: string | null
     weekdays?: string
+    months?: string
 }
 
 export interface GridOperator {
@@ -906,6 +909,7 @@ export interface VseTariffPeriodPreview {
     time_from: string | null
     time_to: string | null
     weekdays: string
+    months: string
 }
 
 export type VseTariffCandidateStatus = 'new' | 'new_version' | 'duplicate' | 'conflict' | 'unsupported'

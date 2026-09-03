@@ -112,6 +112,7 @@ def _candidate_payload(planned: PlannedCandidate) -> dict:
                 "time_from": period.time_from,
                 "time_to": period.time_to,
                 "weekdays": period.weekdays,
+                "months": period.months,
             }
             for period in candidate.periods
         ],

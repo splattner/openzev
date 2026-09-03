@@ -161,13 +161,79 @@ twice unguarded.
 | `time_from` | `TimeField` (nullable) | Start of HT/NT window (required for `high`/`low`) |
 | `time_to` | `TimeField` (nullable) | End of HT/NT window (exclusive) |
 | `weekdays` | `CharField(20)` | Comma-separated weekday numbers `0`–`6` (Mon–Sun); blank = all days |
+| `months` | `CharField(40)` | Comma-separated month numbers `1`–`12`; blank = all months |
 
-**Period matching rules** (evaluated per-timestamp):
+Both masks are validated on write (`validate_weekday_list`, `validate_month_list`
+in `tariffs/models.py`): the engine parses them with a bare `int()`, so a stray
+value has to be refused at entry rather than discovered at invoice time.
 
-1. If a `flat` period exists → use its price; ignore time/weekday.
-2. For `high` / `low` periods: extract the timestamp's **time** and **weekday**.
+**Ordering** stays `["period_type", "id"]`. Seasonal siblings share a
+`period_type` and so fall back to `id`, which is creation order — for an import
+that is the order the operator published. Sorting them meaningfully would need
+`time_from`, which is nullable and orders NULLs differently on SQLite and
+Postgres; the frontend sorts for display instead (`features/tariffs/seasons.ts`,
+`seasonSortKey`).
+
+**Period matching rules** (evaluated per-timestamp, `invoices/engine.py:_get_tariff_price`):
+
+1. Restrict to periods whose `months` contain the timestamp's month. A blank
+   mask matches every month, so every period predating seasonal support
+   qualifies unchanged.
+2. Among those, if a `flat` period exists → use its price; ignore time/weekday.
+3. For `high` / `low` periods: extract the timestamp's **time** and **weekday**.
    Match periods where `time_from ≤ time < time_to` and weekday ∈ allowed weekdays.
-3. **Fallback:** if no period matches, use the first period's price (ordered by `period_type`).
+4. **Fallback:** if no period matches, use the first period's price — preferring
+   one that applies this month, falling back to the first of all periods only
+   when the month is unpriced entirely.
+
+The month check comes **first, before the flat short-circuit**. A winter-only
+flat band that short-circuited on `period_type` would bill its winter price in
+July, which is the whole hazard seasonal support introduces.
+
+### 3.2b Seasonal bands
+
+Winter/summer pricing is ordinary in Switzerland. A seasonal tariff is several
+bands over one tariff, each restricted to its months — and seasons combine with
+HT/NT, so a tariff can carry four bands and four distinct prices even though
+`PeriodType` offers only three slots. That works because `period_type` only has
+to tell apart bands competing for the same moment, and a winter band never
+competes with a summer one.
+
+`tariffs/periods.py` holds what both the engine and the contract PDF need:
+`months_of` / `weekdays_of` (parsed once and memoised on the instance, since
+the engine reads them per reading), and `month_ranges`, which treats December
+and January as adjacent so a winter season reads as one `Oct–Mar` range rather
+than two the reader has to piece together.
+
+Consequences elsewhere:
+
+- **Contract PDF** (`invoices/contract_pdf.py`) renders one row per *band*, not
+  one per band type, and qualifies a seasonal row with its month range
+  (`_band_description`). Picking the first band of a type would print a winter
+  price with nothing to say it applies for half the year.
+- **New version / duplicate** copy `months` along with the rest of the band. A
+  copy that dropped it would keep the winter price and apply it all year.
+- **Price-history chart** (`features/tariffs/priceHistory.ts`) splits each
+  version at its season boundaries and charts the result as steps, which is
+  what a seasonal price actually does over time. A tariff with no seasonal band
+  is passed through untouched.
+- The **representative price** used for percentage-of-energy tariffs (contract
+  PDF and chart) still takes one band per tariff. For a seasonal grid tariff
+  that is one season's price — the same approximation the HT/NT case already
+  makes by preferring HT.
+
+Remaining gap: more than two distinct prices *within one season* still cannot be
+stored (#528).
+
+**Tests.** `backend/tariffs/test_seasonal_periods.py` (16): month-range wrapping;
+the parsed masks being memoised; a winter flat band not pricing July; seasons and
+time bands combining into four prices; a band with no months still pricing every
+month; the unpriced-hour fallback staying inside its own season; weekday and month
+restrictions applying together; and the write-time validation of both masks.
+`backend/tariffs/test_versioning.py` covers a new version keeping each band in its
+own season. `backend/invoices/test_contract_context.py::ContractPdfSeasonalTariffTests`
+(3) covers the contract rows. Frontend: `frontend/tests/tariff-seasons.test.ts` (13)
+covers parsing, naming, display ordering, and the chart stepping between seasons.
 
 ### 3.2a Importing bands from a grid operator's publication
 
@@ -183,6 +249,10 @@ Two consequences are worth knowing here, because they follow from the shape of
 - One published tariff carrying both a base fee and a per-kWh price becomes
   **two** tariffs, because `Tariff` has a single `billing_mode`, named
   `"… (Grundpreis)"` and `"… (Arbeitspreis)"`.
+- Seasonal bands (`months[]`) are imported: bands are grouped by their month
+  set and the flat/HT/NT question is answered per season. Groups whose months
+  merely *overlap* are refused, because which one prices the shared months
+  would be ambiguous.
 - A published base price is an amount per month, but the document cannot say
   *who* pays it, so the preview asks: a fee row is imported as
   `shared_monthly_fee`, `monthly_fee` or `per_metering_point_monthly_fee` at

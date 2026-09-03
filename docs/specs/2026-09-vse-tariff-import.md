@@ -50,8 +50,6 @@ the same series.
 
 - **File upload** of the document. Iteration 1 is URL-only; the parser takes a
   decoded payload, so adding upload is a view-layer change.
-- **Seasonal tariffs** (`months[]` covering fewer than 12 months) — rejected
-  per entry with a reason. See §6; tracked in #527.
 - **More than two distinct energy prices** (#528), power/demand charges
   (#529), dynamic tariffs (#530), reactive-power charges and storage refunds —
   reported, never imported.
@@ -177,11 +175,26 @@ splitting by weight instead is an edit after import.
 decides whether an entry fits is the number of **distinct prices**, not the
 number of windows.
 
-| Distinct prices | Result |
+Bands are first grouped by the months they apply in, and the question is then
+answered **per season** — `period_type` only has to tell apart bands competing
+for the same moment, and a winter band never competes with a summer one. A
+document pricing winter-HT, winter-NT, summer-HT and summer-NT therefore fits,
+carrying four distinct prices overall but two per season.
+
+| Distinct prices in one season | Result |
 |---|---|
 | 1 | One `flat` period, `time_from`/`time_to` `NULL`, however many windows it was written across |
 | 2 | Higher price → `high`, lower → `low`; one row per window, so a price split across two windows (evening + night) gets two `low` rows |
 | ≥ 3 | Blocked with a reason |
+
+Each period carries its season in `TariffPeriod.months`; a band covering all
+twelve months stores blank, which is what the engine already reads as "every
+month", so a non-seasonal import is byte-for-byte what it was before seasons
+existed. Month groups that *overlap* rather than partition the year are refused:
+grouping is by exact month set, so two groups sharing months would be mapped as
+if they never competed. A year only partly priced is imported with a warning —
+the engine's in-season fallback covers the rest, but at a price the document
+never meant for it.
 
 The document this was built against writes three windows — day, evening,
 night — with two prices, and maps cleanly onto HT/NT. The standard does not
@@ -218,7 +231,7 @@ silently dropped.
 
 | Construct | Reason given | Tracked |
 |---|---|---|
-| `months[]` covering fewer than 12 months | Seasonal prices are not supported yet — `TariffPeriod` has no month dimension | #527 |
+| Two month groups that overlap | Which group prices the shared months is ambiguous | — |
 | ≥ 3 distinct energy prices | Only a high and a low band can be stored | #528 |
 | `tariffForm: dynamic` | The price lives in an external time series; the URL is named in the message | #530 |
 | Energy price not in `CHF/kWh` | Cannot be billed per kWh | — |
@@ -541,7 +554,7 @@ result, messages, errors) and `pages.zevSettings.fields.tariffSourceUrl` /
 
 ## 14. Test plan
 
-### Backend — `backend/tariffs/test_vse_import.py` (65 tests)
+### Backend — `backend/tariffs/test_vse_import.py` (70 tests)
 
 The suite leans on a **real published document** — InfraWerke Münsingen's 2027
 tariffs, fetched from the operator's own website and checked in unchanged as
@@ -561,7 +574,13 @@ case-insensitive weekday and month codes; a midnight-wrapping window split in
 two; one bad entry not blocking the rest; a document with no `tariffs` array
 and a bare JSON array both rejected outright; duplicate names reported.
 
-**`UnsupportedConstructTests`** (7): seasonal months, ≥ 3 prices, dynamic
+**`SeasonalPriceTests`** (6): a two-season flat tariff becomes one band per
+season; four distinct prices fit when they are two per season; a year-round band
+stores no months at all; overlapping month groups are refused rather than
+guessed; a year only partly priced is imported but flagged; the HT/NT heuristic
+is reported per season, naming each season's own pair.
+
+**`UnsupportedConstructTests`** (6): ≥ 3 prices in one season, dynamic
 tariffs (with the URL in the message), wrong energy unit, wrong base unit and a
 negative price each blocked with a reason; excess precision rounded with a
 warning.
@@ -648,8 +667,8 @@ call shapes — including that apply sends only selections and a digest.
    save a click; it would also make the picker's initial value depend on a
    setting the user is not looking at, which is why it is not done yet.
 3. **The remaining gaps are tracked separately**, each naming the code that
-   blocks it: seasonal prices #527, more than two bands #528, power/demand
-   billing #529, dynamic tariffs #530. #527 and #528 touch the same model and
-   the same consumers and are worth sequencing together; #530 is blocked on
-   something outside this repo, since the standard defines `prices.dynamic` as
-   a bare URL with no response schema.
+   blocks it: more than two bands per season #528, power/demand billing #529,
+   dynamic tariffs #530. Seasonal prices (#527) are now supported — see
+   `2026-03-tariffs-and-billing-engine.md` §3.2b. #530 is blocked on something
+   outside this repo, since the standard defines `prices.dynamic` as a bare URL
+   with no response schema.

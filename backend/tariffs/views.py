@@ -56,6 +56,7 @@ def _copy_or_replace_periods(source, target, periods_data) -> None:
                 time_from=period.time_from,
                 time_to=period.time_to,
                 weekdays=period.weekdays,
+                months=period.months,
             )
             for period in source.periods.all()
         ])

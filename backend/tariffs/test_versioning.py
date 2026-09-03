@@ -172,6 +172,33 @@ def test_a_new_version_closes_the_previous_one_the_day_before(owner_client):
     assert response.data["valid_to"] is None
 
 
+def test_a_new_version_keeps_each_band_in_its_own_season(owner_client):
+    """A copy that dropped the months would keep the winter price and apply it
+    to the whole year — a silent doubling of what summer costs."""
+    client, zev = owner_client
+    original = factories.TariffFactory(
+        zev=zev, name="Seasonal Grid", category=TariffCategory.GRID_FEES,
+        billing_mode=BillingMode.ENERGY, energy_type=EnergyType.GRID,
+        valid_from=date(2026, 1, 1),
+    )
+    factories.TariffPeriodFactory(tariff=original, period_type=PeriodType.FLAT,
+                                  price_chf_per_kwh=Decimal("0.25000"),
+                                  months="1,2,3,10,11,12")
+    factories.TariffPeriodFactory(tariff=original, period_type=PeriodType.FLAT,
+                                  price_chf_per_kwh=Decimal("0.15000"),
+                                  months="4,5,6,7,8,9")
+
+    response = client.post(url(original, "new-version"), {"valid_from": "2027-01-01"}, format="json")
+
+    created = Tariff.objects.get(pk=response.data["id"])
+    assert {
+        (period.months, period.price_chf_per_kwh) for period in created.periods.all()
+    } == {
+        ("1,2,3,10,11,12", Decimal("0.25000")),
+        ("4,5,6,7,8,9", Decimal("0.15000")),
+    }
+
+
 def test_a_new_version_leaves_no_gap(owner_client):
     """Auto-closing removes the cause of the silently-unbilled month."""
     client, zev = owner_client

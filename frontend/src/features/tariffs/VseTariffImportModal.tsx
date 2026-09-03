@@ -7,6 +7,7 @@ import { FormModal } from '../../components/FormModal'
 import { applyVseTariffImport, previewVseTariffImport } from '../../lib/api/tariffs'
 import { useToast } from '../../lib/toast'
 import { invalidateTariffQueries } from './invalidate'
+import { MONTH_KEYS, formatSeason } from './seasons'
 import {
     defaultBillingModes,
     isSelectable,
@@ -415,6 +416,9 @@ function CandidateRow({
 
 function CandidatePrice({ candidate }: { candidate: VseTariffCandidate }) {
     const { t } = useTranslation()
+    const monthNames = MONTH_KEYS.map(
+        (key) => t(`pages.tariffs.monthsShort.${key}` as Parameters<typeof t>[0]),
+    )
 
     if (candidate.billing_mode !== 'energy') {
         return (
@@ -432,6 +436,9 @@ function CandidatePrice({ candidate }: { candidate: VseTariffCandidate }) {
                     {period.time_from && period.time_to
                         ? ` (${period.time_from.slice(0, 5)}–${period.time_to.slice(0, 5)})`
                         : ''}
+                    {/* Without it, a winter and a summer price read as two
+                        unexplained rows for the same band. */}
+                    {formatSeason(period.months, monthNames) && ` · ${formatSeason(period.months, monthNames)}`}
                 </span>
             ))}
         </span>

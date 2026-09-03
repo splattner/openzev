@@ -1,4 +1,5 @@
 import type { TariffPeriod, TariffSeries, TariffVersion } from '../../types/api'
+import { parseMonths } from './seasons'
 
 /** What the y-axis of a series' price history is measured in. */
 export type PriceUnit = 'chf_per_kwh' | 'chf' | 'percent'
@@ -139,11 +140,18 @@ export function buildPriceHistory(
         }
     }
 
+    // A seasonal tariff really does charge different prices at different times
+    // of year, so it belongs on a time series as a step. Splitting each version
+    // at its season boundaries lets the existing step-chart assembly draw that
+    // without knowing seasons exist; a tariff with no seasonal band is handed
+    // through untouched.
+    const segments = versions.flatMap((version) => seasonalSegments(version, today))
+
     const bands = BAND_ORDER.filter(
-        (band) => versions.some((version) => version.periods.some((period) => period.period_type === band)),
+        (band) => segments.some((version) => version.periods.some((period) => period.period_type === band)),
     )
 
-    const points = assemble(versions, bands, today, (version) => {
+    const points = assemble(segments, bands, today, (version) => {
         const values: Partial<Record<BandKey, number | null>> = {}
         bands.forEach((band) => {
             const period = version.periods.find((entry) => entry.period_type === band)
@@ -153,6 +161,69 @@ export function buildPriceHistory(
     })
 
     return { unit: 'chf_per_kwh', bands: bands.length ? bands : ['flat'], derived: false, gaps, points }
+}
+
+/** Bands of `version` that apply in `month` (1-12). Blank months = every month. */
+function bandsInMonth(version: TariffVersion, month: number): TariffPeriod[] {
+    return version.periods.filter((period) => {
+        const months = parseMonths(period.months)
+        return months.length === 0 || months.includes(month)
+    })
+}
+
+function bandSignature(version: TariffVersion, month: number): string {
+    return bandsInMonth(version, month).map((period) => period.id).sort().join('|')
+}
+
+function isoDay(year: number, month: number, day: number): string {
+    return new Date(Date.UTC(year, month - 1, day)).toISOString().slice(0, 10)
+}
+
+/**
+ * One version split into the stretches over which its set of bands is constant.
+ *
+ * Boundaries can only fall on the first of a month, so the months where the
+ * active set changes are worked out once and then projected across the years
+ * the version spans. A version with no seasonal band produces itself, which is
+ * both the fast path and the guarantee that nothing predating seasons moved.
+ */
+function seasonalSegments(version: TariffVersion, today: string): TariffVersion[] {
+    if (!version.periods.some((period) => parseMonths(period.months).length > 0)) {
+        return [version]
+    }
+
+    const changeMonths = Array.from({ length: 12 }, (_, index) => index + 1).filter(
+        (month) => bandSignature(version, month) !== bandSignature(version, month === 1 ? 12 : month - 1),
+    )
+    if (changeMonths.length === 0) return [version]
+
+    const end = version.valid_to ?? (today > version.valid_from ? today : version.valid_from)
+    const boundaries: string[] = []
+    for (let year = Number(version.valid_from.slice(0, 4)); year <= Number(end.slice(0, 4)); year += 1) {
+        changeMonths.forEach((month) => {
+            const day = isoDay(year, month, 1)
+            if (day > version.valid_from && day <= end) boundaries.push(day)
+        })
+    }
+    boundaries.sort()
+
+    const segments: TariffVersion[] = []
+    let from = version.valid_from
+    const close = (to: string | null | undefined) => {
+        segments.push({
+            ...version,
+            valid_from: from,
+            valid_to: to ?? null,
+            periods: bandsInMonth(version, Number(from.slice(5, 7))),
+        })
+    }
+    boundaries.forEach((boundary) => {
+        // The day before the boundary: the last day of the preceding month.
+        close(isoDay(Number(boundary.slice(0, 4)), Number(boundary.slice(5, 7)), 0))
+        from = boundary
+    })
+    close(version.valid_to)
+    return segments
 }
 
 /**

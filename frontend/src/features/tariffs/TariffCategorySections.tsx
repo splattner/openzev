@@ -21,6 +21,7 @@ import type {
     TariffSeries,
     TariffVersion,
 } from '../../types/api'
+import { MONTH_KEYS, formatSeason } from './seasons'
 import { validityState, type ValidityState } from './validity'
 import { TariffPriceHistoryChart } from './TariffPriceHistoryChart'
 
@@ -72,6 +73,9 @@ export function TariffCategorySections({
     onRenameSeries,
 }: TariffCategorySectionsProps) {
     const { t } = useTranslation()
+    const monthNames = MONTH_KEYS.map(
+        (key) => t(`pages.tariffs.monthsShort.${key}` as Parameters<typeof t>[0]),
+    )
     const [expandedSeries, setExpandedSeries] = useState<Set<string>>(new Set())
     // Which version a card is showing. Defaults to the active one, so a card
     // reads as "what this tariff costs now" until you deliberately look back.
@@ -411,6 +415,9 @@ export function TariffCategorySections({
                                                                             {period.period_type === 'flat'
                                                                                 ? `${t('pages.tariffs.allDay')} · ${t('pages.tariffs.allWeekdays')}`
                                                                                 : `${period.time_from || '--'} - ${period.time_to || '--'} · ${period.weekdays || t('pages.tariffs.allWeekdays')}`}
+                                                                            {/* Without the season a winter price reads as the
+                                                                                whole year's price. */}
+                                                                            {formatSeason(period.months, monthNames) && ` · ${formatSeason(period.months, monthNames)}`}
                                                                         </div>
                                                                     </div>
 

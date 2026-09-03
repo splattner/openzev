@@ -16,6 +16,7 @@ from .dates import format_date_value
 from .pdf_render import render_pdf
 
 from tariffs.models import BillingMode, EnergyType, PeriodType
+from tariffs.periods import month_ranges, months_of
 from zev.models import MeteringPointType
 
 CONTRACT_TEMPLATE_NAME = "contracts/participant_contract_pdf.html"
@@ -119,36 +120,43 @@ def _build_local_tariff_display(zev, tr: dict, date_pattern: str, as_of: date) -
         if not periods:
             continue
 
-        flat = next((p for p in periods if p.period_type == PeriodType.FLAT), None)
-        if flat:
-            rp = float(flat.price_chf_per_kwh) * 100
+        # Every band gets a row, not one per band *type*. A seasonal tariff has
+        # two or more bands sharing a period_type, and showing the first of them
+        # would print a winter price on a contract with nothing to say it only
+        # applies in winter.
+        flats = [p for p in periods if p.period_type == PeriodType.FLAT]
+        shown = flats if flats else [
+            p for p in periods if p.period_type in (PeriodType.HIGH, PeriodType.LOW)
+        ]
+        for period in shown:
             rows.append({
                 **base_row,
-                "rate_rp": f"{rp:.2f}",
-                "rate_description": tr["tariff_flat"],
+                "rate_rp": f"{float(period.price_chf_per_kwh) * 100:.2f}",
+                "rate_description": _band_description(period, tr),
                 "pct": None,
             })
-        else:
-            ht = next((p for p in periods if p.period_type == PeriodType.HIGH), None)
-            nt = next((p for p in periods if p.period_type == PeriodType.LOW), None)
-            if ht:
-                rp = float(ht.price_chf_per_kwh) * 100
-                rows.append({
-                    **base_row,
-                    "rate_rp": f"{rp:.2f}",
-                    "rate_description": tr["tariff_ht"],
-                    "pct": None,
-                })
-            if nt:
-                rp = float(nt.price_chf_per_kwh) * 100
-                rows.append({
-                    **base_row,
-                    "rate_rp": f"{rp:.2f}",
-                    "rate_description": tr["tariff_nt"],
-                    "pct": None,
-                })
 
     return rows
+
+
+def _band_description(period, tr: dict) -> str:
+    """The band's name, qualified by its season when it has one."""
+    label = {
+        PeriodType.FLAT: tr["tariff_flat"],
+        PeriodType.HIGH: tr["tariff_ht"],
+        PeriodType.LOW: tr["tariff_nt"],
+    }.get(period.period_type, tr["tariff_flat"])
+
+    ranges = month_ranges(months_of(period))
+    if not ranges:
+        return label
+
+    names = tr["tariff_months_short"]
+    season = ", ".join(
+        names[first - 1] if first == last else f"{names[first - 1]}\u2013{names[last - 1]}"
+        for first, last in ranges
+    )
+    return tr["tariff_season"].format(label=label, season=season)
 
 
 def _build_contract_context(participant, document_id: str | None = None,

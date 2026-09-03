@@ -22,6 +22,7 @@ export type TariffPeriodFormValues = {
   time_from: string
   time_to: string
   weekdays: string
+  months: string
 }
 
 export const tariffFormSchema = z
@@ -99,6 +100,7 @@ export const tariffPeriodFormSchema = z.object({
   time_from: z.string(),
   time_to: z.string(),
   weekdays: z.string(),
+  months: z.string(),
 })
 
 export const defaultTariffFormValues: TariffFormValues = {
@@ -121,6 +123,7 @@ export const defaultTariffPeriodFormValues: TariffPeriodFormValues = {
   time_from: '',
   time_to: '',
   weekdays: '',
+  months: '',
 }
 
 export function mapTariffToFormValues(tariff: Tariff): TariffFormValues {
@@ -165,6 +168,7 @@ export function mapTariffPeriodToFormValues(period: TariffPeriod): TariffPeriodF
     time_from: period.time_from || '',
     time_to: period.time_to || '',
     weekdays: period.weekdays || '',
+    months: period.months || '',
   }
 }
 
@@ -176,5 +180,6 @@ export function mapTariffPeriodFormValuesToInput(values: TariffPeriodFormValues)
     time_from: values.time_from || null,
     time_to: values.time_to || null,
     weekdays: values.weekdays,
+    months: values.months,
   }
 }

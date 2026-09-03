@@ -185,6 +185,7 @@ def _create(zev, planned: PlannedCandidate, source_url: str, imported_on: date) 
             time_from=period.time_from,
             time_to=period.time_to,
             weekdays=period.weekdays,
+            months=period.months,
         )
         for period in candidate.periods
     ])

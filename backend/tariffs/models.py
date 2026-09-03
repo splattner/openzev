@@ -4,6 +4,7 @@ from django.core.exceptions import ValidationError
 from django.db import models
 from zev.models import Zev
 
+from .periods import parse_number_list
 from .series import SERIES_FIELDS
 
 
@@ -50,6 +51,33 @@ class SplitKey(models.TextChoices):
 
     EQUAL = "equal", "Equal (headcount)"
     WEIGHT = "weight", "Weight"
+
+
+def _validate_number_list(value: str, *, low: int, high: int, label: str) -> None:
+    """Reject anything the engine could not parse back out.
+
+    ``weekdays`` went unvalidated for a long time and the engine parses it with
+    a bare ``int()``, so a stray value there is a crash at invoice time rather
+    than at entry time. ``months`` arrives with the same shape, so both get the
+    same guard.
+    """
+    if not value:
+        return
+    for part in value.split(","):
+        part = part.strip()
+        if not part.isdigit() or not (low <= int(part) <= high):
+            raise ValidationError(
+                f"{label} must be comma-separated numbers between {low} and {high}, "
+                f"or blank for all of them. Got {value!r}."
+            )
+
+
+def validate_weekday_list(value: str) -> None:
+    _validate_number_list(value, low=0, high=6, label="Weekdays")
+
+
+def validate_month_list(value: str) -> None:
+    _validate_number_list(value, low=1, high=12, label="Months")
 
 
 class Tariff(models.Model):
@@ -141,7 +169,13 @@ class Tariff(models.Model):
 
 
 class TariffPeriod(models.Model):
-    """A price band within a tariff (flat, HT, or NT)."""
+    """A price band within a tariff (flat, HT, or NT).
+
+    A band recurs: it applies in certain months, on certain weekdays, between
+    certain hours. All three are stored as "blank means every one of them", so
+    an unrestricted band is the empty string on every axis and the common case
+    stays cheap to read.
+    """
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     tariff = models.ForeignKey(Tariff, on_delete=models.CASCADE, related_name="periods")
@@ -151,11 +185,30 @@ class TariffPeriod(models.Model):
     time_to = models.TimeField(null=True, blank=True, help_text="End of this period (HH:MM)")
     weekdays = models.CharField(
         max_length=20, blank=True,
+        validators=[validate_weekday_list],
         help_text="Comma-separated weekday numbers 0-6 (Mon-Sun). Leave blank for all days.",
+    )
+    # Swiss grid operators commonly price winter and summer differently, and
+    # the VSE/AES tariff standard publishes that as a months array per band.
+    months = models.CharField(
+        max_length=40, blank=True,
+        validators=[validate_month_list],
+        help_text="Comma-separated month numbers 1-12. Leave blank for all months.",
     )
 
     class Meta:
+        # Unchanged deliberately. Seasonal siblings share a period_type and so
+        # fall back to id, which is creation order — for an import that is the
+        # order the operator published. Sorting them meaningfully needs
+        # time_from, which is nullable and orders NULLs differently on SQLite
+        # and Postgres; the frontend sorts for display instead.
         ordering = ["period_type", "id"]
+
+    def clean(self):
+        # Nothing else may share a name-and-window with this band's months, but
+        # a band that prices no month at all is simply unreachable.
+        if self.months and not parse_number_list(self.months):
+            raise ValidationError({"months": "Leave months blank to apply in every month."})
 
     def __str__(self):
         return f"{self.tariff.name} / {self.get_period_type_display()} @ {self.price_chf_per_kwh} CHF/kWh"

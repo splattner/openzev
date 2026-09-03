@@ -223,20 +223,7 @@ class UnsupportedConstructTests(SimpleTestCase):
     """Everything the model cannot express has to say so per entry. Silently
     dropping a construct is how a tariff ends up priced at the wrong number."""
 
-    def test_seasonal_prices_are_blocked_with_a_reason(self):
-        parsed = parse_document(document(entry(tariffForm="multilevel", prices={"energy": [
-            {"months": ["Oct", "Nov", "Dec", "Jan", "Feb", "Mar"], "from": "00:00", "to": "00:00",
-             "price": 0.2, "priceUnit": "CHF/kWh"},
-            {"months": ["Apr", "May", "Jun", "Jul", "Aug", "Sep"], "from": "00:00", "to": "00:00",
-             "price": 0.1, "priceUnit": "CHF/kWh"},
-        ]})))
-
-        candidate = parsed.candidates[0]
-
-        self.assertFalse(candidate.is_importable)
-        self.assertIn("Seasonal prices", candidate.blocked_reason)
-
-    def test_more_than_two_distinct_prices_are_blocked(self):
+    def test_more_than_two_distinct_prices_in_one_season_are_blocked(self):
         parsed = parse_document(document(entry(tariffForm="multilevel", prices={"energy": [
             {"from": "00:00", "to": "08:00", "price": 0.1, "priceUnit": "CHF/kWh"},
             {"from": "08:00", "to": "16:00", "price": 0.2, "priceUnit": "CHF/kWh"},
@@ -279,6 +266,106 @@ class UnsupportedConstructTests(SimpleTestCase):
 
         self.assertEqual(candidate.periods[0].price_chf_per_kwh, Decimal("0.12346"))
         self.assertTrue(any("rounded" in warning for warning in candidate.warnings))
+
+
+WINTER = ["Oct", "Nov", "Dec", "Jan", "Feb", "Mar"]
+SUMMER = ["Apr", "May", "Jun", "Jul", "Aug", "Sep"]
+
+
+class SeasonalPriceTests(SimpleTestCase):
+    """Winter/summer pricing is ordinary in Switzerland, and it combines with
+    HT/NT — so the flat/HT/NT question has to be answered per season, not once
+    for the whole entry."""
+
+    def _parse(self, energy):
+        return parse_document(document(entry(tariffForm="multilevel", prices={"energy": energy})))
+
+    def test_a_two_season_flat_tariff_becomes_one_band_per_season(self):
+        parsed = self._parse([
+            {"months": WINTER, "from": "00:00", "to": "00:00", "price": 0.2, "priceUnit": "CHF/kWh"},
+            {"months": SUMMER, "from": "00:00", "to": "00:00", "price": 0.1, "priceUnit": "CHF/kWh"},
+        ])
+        candidate = parsed.candidates[0]
+
+        self.assertTrue(candidate.is_importable)
+        self.assertEqual(
+            [(p.period_type, str(p.price_chf_per_kwh), p.months) for p in candidate.periods],
+            [
+                (PeriodType.FLAT, "0.20000", "1,2,3,10,11,12"),
+                (PeriodType.FLAT, "0.10000", "4,5,6,7,8,9"),
+            ],
+        )
+
+    def test_four_distinct_prices_fit_when_they_are_two_per_season(self):
+        """Globally there are four prices, which the old rule refused. But a
+        winter band never competes with a summer one, so each season has its
+        own HT and NT slot."""
+        parsed = self._parse([
+            {"months": WINTER, "from": "07:00", "to": "22:00", "price": 0.24, "priceUnit": "CHF/kWh"},
+            {"months": WINTER, "from": "22:00", "to": "07:00", "price": 0.18, "priceUnit": "CHF/kWh"},
+            {"months": SUMMER, "from": "07:00", "to": "22:00", "price": 0.14, "priceUnit": "CHF/kWh"},
+            {"months": SUMMER, "from": "22:00", "to": "07:00", "price": 0.11, "priceUnit": "CHF/kWh"},
+        ])
+        candidate = parsed.candidates[0]
+
+        self.assertTrue(candidate.is_importable, candidate.blocked_reason)
+        self.assertEqual(
+            [(p.period_type, str(p.price_chf_per_kwh), p.months) for p in candidate.periods],
+            [
+                (PeriodType.HIGH, "0.24000", "1,2,3,10,11,12"),
+                (PeriodType.LOW, "0.18000", "1,2,3,10,11,12"),
+                (PeriodType.LOW, "0.18000", "1,2,3,10,11,12"),
+                (PeriodType.HIGH, "0.14000", "4,5,6,7,8,9"),
+                (PeriodType.LOW, "0.11000", "4,5,6,7,8,9"),
+                (PeriodType.LOW, "0.11000", "4,5,6,7,8,9"),
+            ],
+        )
+
+    def test_a_year_round_band_stores_no_months_at_all(self):
+        """Blank already means "every month" to the engine, so a non-seasonal
+        import is byte-for-byte what it was before seasons existed."""
+        parsed = self._parse([
+            {"months": [], "from": "00:00", "to": "00:00", "price": 0.1, "priceUnit": "CHF/kWh"},
+        ])
+
+        self.assertEqual(parsed.candidates[0].periods[0].months, "")
+
+    def test_seasons_that_overlap_are_refused_rather_than_guessed(self):
+        """Grouping is by exact month set, so two groups sharing months would
+        be mapped as if they never competed — and the engine would price those
+        months from whichever sorted first."""
+        parsed = self._parse([
+            {"months": ["Jan", "Feb", "Mar"], "from": "00:00", "to": "00:00",
+             "price": 0.2, "priceUnit": "CHF/kWh"},
+            {"months": ["Mar", "Apr"], "from": "00:00", "to": "00:00",
+             "price": 0.1, "priceUnit": "CHF/kWh"},
+        ])
+
+        self.assertIn("apply in the same months", parsed.candidates[0].blocked_reason)
+
+    def test_a_year_only_partly_priced_is_imported_but_flagged(self):
+        parsed = self._parse([
+            {"months": WINTER, "from": "00:00", "to": "00:00", "price": 0.2, "priceUnit": "CHF/kWh"},
+        ])
+        candidate = parsed.candidates[0]
+
+        self.assertTrue(candidate.is_importable)
+        self.assertTrue(any("only 6 of 12 months" in w for w in candidate.warnings))
+
+    def test_the_HT_NT_heuristic_is_reported_per_season(self):
+        """The two seasons pick different prices, so one warning naming one
+        pair would be telling the user about half of what happened."""
+        parsed = self._parse([
+            {"months": WINTER, "from": "07:00", "to": "22:00", "price": 0.24, "priceUnit": "CHF/kWh"},
+            {"months": WINTER, "from": "22:00", "to": "07:00", "price": 0.18, "priceUnit": "CHF/kWh"},
+            {"months": SUMMER, "from": "07:00", "to": "22:00", "price": 0.14, "priceUnit": "CHF/kWh"},
+            {"months": SUMMER, "from": "22:00", "to": "07:00", "price": 0.11, "priceUnit": "CHF/kWh"},
+        ])
+        heuristic = [w for w in parsed.candidates[0].warnings if "higher price" in w]
+
+        self.assertEqual(len(heuristic), 2)
+        self.assertTrue(any("0.24" in w for w in heuristic))
+        self.assertTrue(any("0.14" in w for w in heuristic))
 
 
 class PlanningTests(TestCase):

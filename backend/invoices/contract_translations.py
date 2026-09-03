@@ -81,6 +81,10 @@ CONTRACT_TRANSLATIONS: dict[str, dict] = {
         "tariff_ht": "HT (Hochtarif)",
         "tariff_nt": "NT (Niedertarif)",
         "tariff_flat": "Einheitstarif",
+        # Order is significant: index 0 is January. Used to name a
+        # seasonal band's month range on the tariff table.
+        "tariff_months_short": ["Jan.", "Feb.", "März", "Apr.", "Mai", "Juni", "Juli", "Aug.", "Sept.", "Okt.", "Nov.", "Dez."],
+        "tariff_season": "{label} ({season})",
         "tariff_pct_prefix": "% des Netzpreises",
         "tariff_rp_unit": "Rp./kWh",
         "tariff_none": "—",
@@ -431,6 +435,10 @@ CONTRACT_TRANSLATIONS: dict[str, dict] = {
         "tariff_ht": "HT (tarif plein)",
         "tariff_nt": "NT (tarif creux)",
         "tariff_flat": "Tarif unique",
+        # Order is significant: index 0 is January. Used to name a
+        # seasonal band's month range on the tariff table.
+        "tariff_months_short": ["janv.", "févr.", "mars", "avr.", "mai", "juin", "juil.", "août", "sept.", "oct.", "nov.", "déc."],
+        "tariff_season": "{label} ({season})",
         "tariff_pct_prefix": "% du tarif réseau",
         "tariff_rp_unit": "cts/kWh",
         "tariff_none": "—",
@@ -779,6 +787,10 @@ CONTRACT_TRANSLATIONS: dict[str, dict] = {
         "tariff_ht": "HT (tariffa piena)",
         "tariff_nt": "NT (tariffa ridotta)",
         "tariff_flat": "Tariffa unica",
+        # Order is significant: index 0 is January. Used to name a
+        # seasonal band's month range on the tariff table.
+        "tariff_months_short": ["genn.", "febbr.", "mar.", "apr.", "magg.", "giugno", "luglio", "ag.", "sett.", "ott.", "nov.", "dic."],
+        "tariff_season": "{label} ({season})",
         "tariff_pct_prefix": "% della tariffa di rete",
         "tariff_rp_unit": "ct/kWh",
         "tariff_none": "—",
@@ -1126,6 +1138,10 @@ CONTRACT_TRANSLATIONS: dict[str, dict] = {
         "tariff_ht": "HT (peak)",
         "tariff_nt": "NT (off-peak)",
         "tariff_flat": "Flat rate",
+        # Order is significant: index 0 is January. Used to name a
+        # seasonal band's month range on the tariff table.
+        "tariff_months_short": ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
+        "tariff_season": "{label} ({season})",
         "tariff_pct_prefix": "% of grid tariff",
         "tariff_rp_unit": "Rp./kWh",
         "tariff_none": "—",

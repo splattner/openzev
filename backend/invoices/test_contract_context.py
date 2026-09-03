@@ -21,7 +21,7 @@ from invoices.contract_translations import CONTRACT_TRANSLATIONS
 from invoices.models import ContractIssue
 from invoices.test_helpers import make_participant, make_user, make_zev
 from invoices.template_context import build_sample_contract_context
-from tariffs.models import BillingMode, EnergyType
+from tariffs.models import BillingMode, EnergyType, TariffPeriod
 from testing.factories import TariffFactory, assignment_for, flat_tariff
 from zev.models import MeteringPoint, MeteringPointAssignment, MeteringPointType, Zev
 
@@ -359,6 +359,83 @@ class ContractPdfTariffRuleTests(TestCase):
         self.assertIn("freetext-box", markup)
         self.assertNotIn("freetext-placeholder", markup)
         self.assertNotIn("Beispiel: Der Tarif", markup)
+
+
+class ContractPdfSeasonalTariffTests(TestCase):
+    """A seasonal tariff has two or more bands sharing a period_type. The table
+    used to pick the first of them, which printed one price on a contract with
+    nothing to say it only applies for half the year."""
+
+    def setUp(self):
+        self.owner = make_user("seasonal_contract_owner", UserRole.ZEV_OWNER)
+        self.zev = make_zev(self.owner, "Seasonal Contract ZEV")
+        self.participant = make_participant(self.zev, first="Season", last="Participant")
+        self.tariff = TariffFactory(
+            zev=self.zev,
+            billing_mode=BillingMode.ENERGY,
+            energy_type=EnergyType.LOCAL,
+            valid_from=date(2026, 1, 1),
+            valid_to=date(2026, 12, 31),
+        )
+
+    def _rows(self):
+        with patch("invoices.contract_pdf.timezone.localdate") as mocked:
+            mocked.return_value = date(2026, 4, 15)
+            return _build_contract_context(self.participant)["local_tariff_rows"]
+
+    def test_each_season_gets_its_own_row_naming_its_months(self):
+        TariffPeriod.objects.create(
+            tariff=self.tariff, period_type="flat",
+            price_chf_per_kwh=Decimal("0.25"), months="1,2,3,10,11,12",
+        )
+        TariffPeriod.objects.create(
+            tariff=self.tariff, period_type="flat",
+            price_chf_per_kwh=Decimal("0.15"), months="4,5,6,7,8,9",
+        )
+
+        rows = self._rows()
+
+        self.assertEqual(
+            sorted((row["rate_rp"], row["rate_description"]) for row in rows),
+            [
+                ("15.00", "Einheitstarif (Apr.\u2013Sept.)"),
+                ("25.00", "Einheitstarif (Okt.\u2013März)"),
+            ],
+        )
+
+    def test_a_year_round_tariff_reads_exactly_as_it_did_before(self):
+        """No season, no qualifier — the overwhelming majority of contracts."""
+        TariffPeriod.objects.create(
+            tariff=self.tariff, period_type="flat", price_chf_per_kwh=Decimal("0.20"),
+        )
+
+        rows = self._rows()
+
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["rate_description"], "Einheitstarif")
+
+    def test_both_bands_of_a_season_are_printed(self):
+        """Four rows from four bands: winter HT, winter NT, summer HT, summer NT."""
+        for months, ht, nt in (("1,2,3,10,11,12", "0.28", "0.22"), ("4,5,6,7,8,9", "0.18", "0.14")):
+            TariffPeriod.objects.create(
+                tariff=self.tariff, period_type="high", price_chf_per_kwh=Decimal(ht),
+                time_from="07:00", time_to="22:00", months=months,
+            )
+            TariffPeriod.objects.create(
+                tariff=self.tariff, period_type="low", price_chf_per_kwh=Decimal(nt),
+                time_from="22:00", time_to="23:59", months=months,
+            )
+
+        rows = self._rows()
+
+        self.assertEqual(len(rows), 4)
+        self.assertEqual(
+            {row["rate_description"] for row in rows},
+            {
+                "HT (Hochtarif) (Okt.\u2013März)", "NT (Niedertarif) (Okt.\u2013März)",
+                "HT (Hochtarif) (Apr.\u2013Sept.)", "NT (Niedertarif) (Apr.\u2013Sept.)",
+            },
+        )
 
 
 class ContractIssuanceTests(TestCase):

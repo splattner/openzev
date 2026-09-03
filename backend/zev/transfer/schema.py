@@ -149,6 +149,7 @@ TARIFF_PERIOD_FIELDS = (
     "time_from",
     "time_to",
     "weekdays",
+    "months",
 )
 
 INVOICE_FIELDS = (

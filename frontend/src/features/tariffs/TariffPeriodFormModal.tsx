@@ -94,6 +94,11 @@ export function TariffPeriodFormModal({
           <span>{t('pages.tariffs.form.weekdays')}</span>
           <input {...form.register('weekdays')} placeholder="0,1,2,3,4" />
         </label>
+        <label>
+          <span>{t('pages.tariffs.form.months')}</span>
+          <input {...form.register('months')} placeholder="10,11,12,1,2,3" />
+          <small className="muted">{t('pages.tariffs.form.monthsHint')}</small>
+        </label>
 
         {Object.keys(form.formState.errors).length > 0 && (
           <div className="error-banner" style={{ gridColumn: '1 / -1' }}>

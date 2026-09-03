@@ -119,6 +119,7 @@ class VseTariffPeriodPreviewSerializer(serializers.Serializer):
     time_from = serializers.TimeField(allow_null=True)
     time_to = serializers.TimeField(allow_null=True)
     weekdays = serializers.CharField(allow_blank=True)
+    months = serializers.CharField(allow_blank=True)
 
 
 class VseTariffCandidateSerializer(serializers.Serializer):
