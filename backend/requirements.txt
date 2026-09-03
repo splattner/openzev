@@ -28,7 +28,7 @@ fonttools==4.63.0
 gunicorn==26.0.0
 inflection==0.5.1
 iniconfig==2.3.0
-iso3166==2.1.1
+iso3166==3.0.0
 jsonschema==4.26.0
 jsonschema-specifications==2025.9.1
 kombu==5.6.2
