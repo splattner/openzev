@@ -21,7 +21,7 @@ Welcome to the OpenZEV user documentation. This guide covers everything you need
 
 - **[Metering Data Import](05-metering-import.md)** — CSV/Excel and SDAT-CH import workflows
 - **[Metering Analysis](06-metering-analysis.md)** — Charting, filtering, and data quality checks
-- **[Tariff Configuration](07-tariff-configuration.md)** — Set up tariffs, periods, and pricing
+- **[Tariff Configuration](07-tariff-configuration.md)** — Set up tariffs, periods, and pricing, or import them from your grid operator
 
 ## Billing and Invoicing
 

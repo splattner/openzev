@@ -21,7 +21,7 @@ Tariffs are **activity-based**:
 
 **ZEV Owners** create tariffs in **Tariffs**.
 
-1. Click **Add Tariff**
+1. Click **New Tariff**
 2. Enter details:
    - **Name** — Tariff identifier (e.g., "Summer Local 2026-Q2")
    - **Type** — `Local Energy`, `Grid Energy`, `Feed-in`, or `Fixed Fee`
@@ -38,6 +38,110 @@ Tariffs are **activity-based**:
 4. Configure pricing (depends on type; see below)
 
 5. Click **Create**
+
+## Importing Tariffs from Your Grid Operator
+
+Swiss grid operators publish their tariffs in machine-readable form every year
+(Art. 7b StromVV). Rather than transcribing next year's prices by hand, point
+OpenZEV at that file and it will show you exactly what it would create.
+
+### Running an import
+
+1. Go to **Tariffs** and click **Import from grid operator**.
+2. Paste the **Tariff document URL** — usually a `.json` file linked from your
+   operator's tariff page. If you stored it under
+   **Settings → Grid Connection → Tariff document URL**, it is filled in for
+   you.
+3. Click **Read document**. **Nothing is saved at this point.** You get a table
+   of everything the document offers, with a **Status** for each row.
+4. Tick what you want. **Select standard tariffs** ticks only what the operator
+   itself flags as its standard product — a document can carry 35 rows when
+   your community needs four, so nothing is pre-ticked wholesale.
+5. Click **Import N tariffs**.
+
+Leave **Remember this address for next year's tariffs** ticked and the URL is
+stored on the ZEV, so next year's refresh is one click.
+
+### One published tariff can become two
+
+A published tariff often carries both a monthly **base price** (Grundpreis) and
+a per-kWh **energy price** (Arbeitspreis). An OpenZEV tariff is billed one way
+or the other, never both, so such an entry is imported as **two tariffs**:
+
+```
+Netznutzung Basis (Grundpreis)     CHF 7.00/month
+Netznutzung Basis (Arbeitspreis)   CHF 0.284/kWh
+```
+
+Those suffixes are your operator's own words, and they appear on invoice lines,
+so a participant comparing an invoice against the published tariff sheet sees
+matching vocabulary.
+
+### Choosing how a fee is billed
+
+The document says a base price is CHF per month. It cannot say *who* pays it —
+that depends on how your community relates to its operator. So each fee row has
+a **Billed as** picker, and the choice is yours:
+
+| Billed as | When it is right |
+| --- | --- |
+| **Shared monthly fee** *(default)* | The usual ZEV: the operator bills the community once for its connection, and the fee is split across participants |
+| **Monthly fee** | A vZEV whose participants each hold their own contract with the operator |
+| **Per metering point, monthly** | A charge levied per meter — a metering fee is the typical case |
+
+Getting this wrong bills the same connection several times over, so the picker
+never guesses on your behalf beyond the default.
+
+### What the statuses mean
+
+| Status | Meaning | Imported? |
+| --- | --- | --- |
+| **New** | Nothing like it in this community yet | Yes |
+| **New version** | You already have this tariff; the document carries a later price. See [Tariff Versions](#tariff-versions) | Yes |
+| **Already imported** | A version already starts on that date — you have imported this document before | No |
+| **Name conflict** | A tariff of that name exists but means something else (a different category or energy type), which cannot be reconciled automatically | No |
+| **Not supported** | The entry cannot be represented — the row says why | No |
+
+Only **New** and **New version** rows can be ticked.
+
+### Importing next year's document
+
+Re-importing is the normal yearly workflow, and it is safe to run twice:
+
+- Rows you have already imported come back as **Already imported** and are left
+  alone. Nothing is rewritten.
+- A newer price arrives as **New version**. Your existing version is closed the
+  day before the new one starts, so the two never overlap and no period is
+  billed twice.
+- **If you renamed a tariff after importing it**, the new version still lands in
+  it. OpenZEV records which published price each tariff came from, so it
+  recognises your renamed tariff as the same one; the row says *Will be added
+  to "your name"*, and it keeps the name you gave it.
+- **The way you chose to bill a fee is remembered.** Next year's document
+  proposes the default again, but the import matches what you already decided
+  rather than refusing the row.
+
+### What is not imported
+
+These are reported in the preview rather than skipped silently — a row that
+cannot be imported always says why:
+
+- **Power / demand charges** (CHF/kW) — OpenZEV does not bill demand, and no
+  demand data is metered.
+- **Reactive-power charges** (CHF/kVarh).
+- **Storage grid-usage refunds.**
+- **Dynamic tariffs**, whose price lives in an external time series rather than
+  in the document.
+- Prices in a unit that cannot be billed — an energy price not in CHF/kWh, or a
+  base price not in CHF/month — and negative prices.
+
+Where a published price is more precise than OpenZEV stores, it is rounded and
+the row tells you so.
+
+> **Tip:** Import prices exactly as published — they are net of VAT. If your
+> community pays VAT it cannot reclaim, set the VAT treatment in
+> [ZEV settings](02-zev-setup.md#vat-configuration) rather than adjusting
+> tariff prices by hand; a re-import would undo that.
 
 ## Energy Tariff Types
 

@@ -92,6 +92,7 @@ The settings form is organized into sections:
 | Setting | Purpose | Required |
 | --- | --- | --- |
 | **Grid Operator** | VNB name (Verteilnetzbetreiber) | No |
+| **Tariff document URL** | Where this operator publishes its machine-readable tariffs (Art. 7b StromVV). Used by the [tariff import](07-tariff-configuration.md#importing-tariffs-from-your-grid-operator) | No |
 | **Grid Connection Point** | Verknüpfungspunkt / EAN identifier | No |
 
 #### Billing & Payment
@@ -139,7 +140,7 @@ Choose how often invoices are generated:
 - **Not registered — fold VAT into prices** — for the common case of a small
   ZEV that is *not* registered but whose grid operator invoices it **with VAT
   it cannot reclaim**. Enter tariff prices net, exactly as the operator
-  publishes them (this is also what the [tariff import](07-tariff-configuration.md)
+  publishes them (this is also what the [tariff import](07-tariff-configuration.md#importing-tariffs-from-your-grid-operator)
   writes). At invoice time OpenZEV grosses up grid energy, grid fees, levies
   and metering by the active VAT rate. Your own local (solar) energy and the
   feed-in credit are left untouched. No VAT line appears — a non-registered
@@ -170,8 +171,8 @@ Netznutzung – HT (Hochtarif)    412.0000 kWh × 0.28400   117.01
 Netznutzung – NT (Niedertarif)  638.0000 kWh × 0.19100   121.86
 ```
 
-The bands are named the way your [participation contracts](09-contracts.md)
-name them, so the two documents agree.
+The bands are named the way your participation contracts name them, so the two
+documents agree.
 
 The invoice costs exactly the same either way — a tariff's total is worked out
 first and then divided across its band lines, never the other way round. A
