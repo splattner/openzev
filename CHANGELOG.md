@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.9.2](https://github.com/splattner/openzev/compare/v1.9.1...v1.9.2) (2026-09-04)
+
+
+### Bug Fixes
+
+* **tariffs:** re-importing a fee no longer deadlocks on its billing mode ([#556](https://github.com/splattner/openzev/issues/556)) ([a045e16](https://github.com/splattner/openzev/commit/a045e1660b9231585a48f82e2881b51464c51143))
+
 ## [1.9.1](https://github.com/splattner/openzev/compare/v1.9.0...v1.9.1) (2026-09-04)
 
 
