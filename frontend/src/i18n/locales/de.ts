@@ -1690,6 +1690,8 @@ export const de = {
                 billingInterval: 'Abrechnungsintervall',
                 invoiceLanguage: 'Rechnungssprache',
                 paymentTermDays: 'Zahlungsziel (Tage)',
+                itemizeTariffBands: 'Preisbänder auf der Rechnung einzeln ausweisen',
+                itemizeTariffBandsHint: 'Ein Tarif mit mehreren Preisbändern erscheint als eine Position je genutztem Band, jeweils zum tatsächlichen Bandpreis. Ausgeschaltet erscheint er als eine Position zum gewichteten Mittelwert. Gilt nur für neu erzeugte Rechnungen.',
                 gridOperator: 'Netzbetreiber',
                 gridOperatorHint: 'Tippen, um aus der offiziellen ElCom-Liste zu wählen, oder einen beliebigen Namen eingeben.',
                 gridOperatorMatched: 'Mit der offiziellen ElCom-Liste abgeglichen.',

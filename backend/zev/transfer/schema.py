@@ -95,6 +95,7 @@ ZEV_FIELDS = (
     "bank_name",
     "vat_mode",
     "vat_number",
+    "itemize_tariff_bands",
     "notes",
     "email_subject_template",
     "email_body_template",

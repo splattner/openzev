@@ -90,6 +90,17 @@ export function ZevGeneralSettingsFields({ form, onChange }: ZevGeneralSettingsF
                             }}
                         />
                     </label>
+                    <label className="checkbox-row grid-span-full" style={{ alignItems: 'flex-start' }}>
+                        <input
+                            type="checkbox"
+                            checked={form.itemize_tariff_bands ?? false}
+                            onChange={(event) => onChange({ itemize_tariff_bands: event.target.checked })}
+                        />
+                        <span style={{ display: 'grid', gap: '0.15rem' }}>
+                            <span>{t('pages.zevSettings.fields.itemizeTariffBands')}</span>
+                            <small className="muted">{t('pages.zevSettings.fields.itemizeTariffBandsHint')}</small>
+                        </span>
+                    </label>
                 </div>
             </div>
 

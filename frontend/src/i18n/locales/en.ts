@@ -1702,6 +1702,8 @@ export const en = {
                 billingInterval: 'Billing interval',
                 invoiceLanguage: 'Invoice language',
                 paymentTermDays: 'Payment term (days)',
+                itemizeTariffBands: 'Itemise price bands on the invoice',
+                itemizeTariffBandsHint: "A tariff with several price bands appears as one line per band used, each at that band's real rate. Off, it appears as a single line at the weighted average rate. Applies only to invoices generated from now on.",
                 gridOperator: 'Grid operator',
                 gridOperatorHint: 'Start typing to pick from the official ElCom list, or enter any name.',
                 gridOperatorMatched: 'Matched to the official ElCom list.',

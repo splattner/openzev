@@ -31,6 +31,7 @@ from zev.models import AllocationMode, Zev, Participant, MeteringPoint, Metering
 from tariffs.models import BillingMode, EnergyType, PeriodType, SplitKey, Tariff, TariffCategory
 from tariffs.periods import months_of, weekdays_of
 from metering.models import MeterReading, ReadingDirection
+from .band_labels import band_description, translations_for as band_translations_for
 from .models import Invoice, InvoiceItem, InvoiceStatus
 
 logger = logging.getLogger(__name__)
@@ -227,12 +228,19 @@ class ItemAccumulator:
     bidirectional meter is charged for what they drew and credited for what
     they sold under the same tariff, which is what ``bucket`` separates.
 
+    With ``itemize_bands`` the band that priced each reading splits the line
+    further, so a three-band tariff bills as three lines at their real rates
+    instead of one at the blended average (``Zev.itemize_tariff_bands``).
+    Entries still carry ``group_key`` — the tariff-and-bucket they belong to —
+    because the money is rounded per group, not per band.
+
     Iteration yields entries in the order they were first seen, which the
     caller's stable sort relies on to break ties.
     """
 
-    def __init__(self):
+    def __init__(self, *, itemize_bands: bool = False):
         self._entries: dict[str, dict] = {}
+        self._itemize_bands = itemize_bands
 
     def add(
         self,
@@ -243,10 +251,19 @@ class ItemAccumulator:
         unit: str,
         base_total: Decimal | None = None,
         bucket: str = "default",
+        period=None,
     ) -> None:
         if quantity == 0 and total == 0:
             return
-        key = f"{tariff.id}:{bucket}"
+        group_key = f"{tariff.id}:{bucket}"
+        # A tariff with one band has nothing to split: keying it by that band
+        # would only add a redundant name to a line that already reads right.
+        split = (
+            self._itemize_bands
+            and period is not None
+            and len(tariff.periods.all()) > 1
+        )
+        key = f"{group_key}:{period.id}" if split else group_key
         entry = self._entries.get(key)
         if entry is None:
             entry = self._entries[key] = {
@@ -256,6 +273,8 @@ class ItemAccumulator:
                 "unit": unit,
                 "base_total": Decimal("0"),
                 "bucket": bucket,
+                "group_key": group_key,
+                "period": period if split else None,
             }
         entry["quantity"] += quantity
         entry["total"] += total
@@ -289,6 +308,18 @@ def _tariff_is_active(tariff: Tariff, day: date) -> bool:
 
 def _get_tariff_price(tariff: Tariff, ts: datetime) -> Decimal | None:
     """Find the applicable price for a given tariff and timestamp."""
+    period = _resolve_tariff_band(tariff, ts)
+    return period.price_chf_per_kwh if period is not None else None
+
+
+def _resolve_tariff_band(tariff: Tariff, ts: datetime):
+    """The band that prices ``tariff`` at ``ts``, or None when it has none.
+
+    Split out of ``_get_tariff_price`` so a caller that itemises bands can key
+    a line by the band that priced it. The resolution order is the pricing
+    rule itself and must stay in one place: two copies would drift and bill
+    one thing while printing another.
+    """
     periods = list(tariff.periods.all())
     if not periods:
         return None
@@ -308,10 +339,10 @@ def _get_tariff_price(tariff: Tariff, ts: datetime) -> Decimal | None:
     weekday = ts.weekday()  # 0 = Monday
     for period in in_season:
         if period.period_type == PeriodType.FLAT:
-            return period.price_chf_per_kwh
+            return period
         if period.time_from and period.time_to:
             if weekday in weekdays_of(period) and period.time_from <= t_time < period.time_to:
-                return period.price_chf_per_kwh
+                return period
 
     # Nothing matched the hour, so the bands leave part of the day unpriced.
     # The rule is "the day's first band in this season": TariffPeriod.Meta
@@ -319,7 +350,7 @@ def _get_tariff_price(tariff: Tariff, ts: datetime) -> Decimal | None:
     # band on every database rather than whatever the backend happened to
     # return first. Preferring an in-season band matters once seasons exist —
     # billing a January night at the summer rate would be the worse guess.
-    return (in_season or periods)[0].price_chf_per_kwh
+    return (in_season or periods)[0]
 
 
 def _active_vat_rate(period_end: date) -> Decimal:
@@ -786,8 +817,17 @@ def _build_description(
     *,
     base_rate: Decimal | None = None,
     bucket: str = "default",
+    period=None,
 ) -> str:
     t = DESCRIPTION_TRANSLATIONS.get(lang, DESCRIPTION_TRANSLATIONS["de"])
+    # ``period`` is set only on a line the ZEV chose to itemise by band. The
+    # band is named the way the participation contract names it, so the two
+    # documents agree on what "Peak" or "HT" means.
+    band = (
+        band_description(period, band_translations_for(lang))
+        if period is not None
+        else None
+    )
     # Every "shared" bucket ("shared", "shared_producer_credit") is a
     # community-metering-point line (§7.6) — distinct from the pre-existing
     # SHARED_MONTHLY_FEE/SHARED_YEARLY_FEE wording above, which already names
@@ -796,7 +836,12 @@ def _build_description(
     marker = t["community_marker"]
 
     if tariff.billing_mode == BillingMode.ENERGY:
-        return f"{tariff.name} ({marker})" if community else tariff.name
+        # The band is set off with a dash rather than parenthesised: band names
+        # carry their own brackets ("HT (Hochtarif)"), and nesting them inside
+        # another pair reads as a typo. The community marker keeps its
+        # parentheses, so a line can carry both without ambiguity.
+        named = f"{tariff.name} – {band}" if band else tariff.name
+        return f"{named} ({marker})" if community else named
     if tariff.billing_mode == BillingMode.PERCENTAGE_OF_ENERGY:
         pct = tariff.percentage or Decimal("0")
         # Format: remove trailing zeros (50.00 → 50, 33.50 → 33.5)
@@ -983,14 +1028,42 @@ def _price_fixed_fees(participant, tariffs, period_start, period_end, accumulato
         )
 
 
+def _round_to_group_total(raw_totals: list[Decimal], target: Decimal) -> list[Decimal]:
+    """Round each line to the centime so the lines sum exactly to ``target``.
+
+    Rounding each band on its own would let a tariff's lines add up to a
+    centime or two either side of what that tariff actually costs, and the
+    invoice would show a total nobody can reproduce from the lines above it.
+    So the tariff's total is rounded once and the difference is handed to the
+    lines that lost the most in their own rounding — largest first, ties
+    broken by magnitude and then position, so the same invoice always
+    distributes it the same way.
+    """
+    quantized = [total.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP) for total in raw_totals]
+    drift = target - sum(quantized)
+    if drift == 0 or not quantized:
+        return quantized
+
+    step = Decimal("0.01") if drift > 0 else Decimal("-0.01")
+    order = sorted(
+        range(len(raw_totals)),
+        key=lambda i: (-abs(raw_totals[i] - quantized[i]), -abs(raw_totals[i]), i),
+    )
+    centimes = int((abs(drift) / Decimal("0.01")).to_integral_value(rounding=ROUND_HALF_UP))
+    for position in range(centimes):
+        quantized[order[position % len(order)]] += step
+    return quantized
+
+
 def _build_item_payloads(
     accumulator, *, gross_rate: Decimal = Decimal("0")
 ) -> tuple[list, Decimal, Decimal]:
     """Turn accumulated totals into rounded line-item payloads plus the subtotal.
 
-    Each line is rounded to the centime and the subtotal is the sum of those
-    rounded lines, so an invoice adds up to what is printed on it rather than
-    to a more precise figure rounded once at the end.
+    Lines are rounded per tariff-and-bucket group rather than one by one, so a
+    tariff split into band lines still costs what that tariff costs and the
+    subtotal is the sum of what is printed. A group is a single line unless
+    the ZEV itemises bands, in which case the group is that tariff's bands.
 
     ``gross_rate`` is non-zero only for a ZEV on ``VatMode.INCLUSIVE``: each
     VAT-bearing line (grid energy, grid fees, levies, metering) has its raw
@@ -998,41 +1071,62 @@ def _build_item_payloads(
     unit price comes out gross too. The third return value is the
     non-recoverable VAT thus folded in, summed over those lines.
     """
+    groups: dict[str, list[dict]] = {}
+    for entry in accumulator:
+        if Decimal(entry["quantity"]) == 0 and Decimal(entry["total"]) == 0:
+            continue
+        groups.setdefault(entry["group_key"], []).append(entry)
+
     payloads = []
     subtotal = Decimal("0")
     embedded_vat = Decimal("0")
-    for entry in accumulator:
-        quantity = Decimal(entry["quantity"])
-        total = Decimal(entry["total"])
-        if quantity == 0 and total == 0:
-            continue
+    for entries in groups.values():
+        # Grossing is decided per line, as it was when a group was always one
+        # line: the classifier reads the tariff, and a credit (a negative
+        # total) carries no input VAT to fold in.
+        grossed_flags = [
+            bool(gross_rate)
+            and Decimal(entry["total"]) > 0
+            and _tariff_bears_input_vat(entry["tariff"])
+            for entry in entries
+        ]
+        raw_totals = [
+            Decimal(entry["total"]) * (Decimal("1") + gross_rate) if grossed else Decimal(entry["total"])
+            for entry, grossed in zip(entries, grossed_flags)
+        ]
+        group_total = sum(raw_totals).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        line_totals = _round_to_group_total(raw_totals, group_total)
+        subtotal += group_total
 
-        grossed = bool(gross_rate) and total > 0 and _tariff_bears_input_vat(entry["tariff"])
-        if grossed:
-            total = total * (Decimal("1") + gross_rate)
+        for entry, raw_total, line_total, grossed in zip(
+            entries, raw_totals, line_totals, grossed_flags
+        ):
+            if grossed:
+                net = (line_total / (Decimal("1") + gross_rate)).quantize(
+                    Decimal("0.01"), rounding=ROUND_HALF_UP
+                )
+                embedded_vat += line_total - net
 
-        quantized_total = total.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-        subtotal += quantized_total
-        if grossed:
-            net = (quantized_total / (Decimal("1") + gross_rate)).quantize(
-                Decimal("0.01"), rounding=ROUND_HALF_UP
+            quantity = Decimal(entry["quantity"])
+            # The unit price stays the band's real rate, derived from the
+            # unrounded total: the centime a line may have taken from the
+            # group's rounding belongs on the total, not on the rate.
+            unit_price = (
+                (raw_total / quantity).quantize(Decimal("0.00001"), rounding=ROUND_HALF_UP)
+                if quantity != 0
+                else Decimal("0")
             )
-            embedded_vat += quantized_total - net
-        if quantity != 0:
-            unit_price = (total / quantity).quantize(Decimal("0.00001"), rounding=ROUND_HALF_UP)
-        else:
-            unit_price = Decimal("0")
-
-        raw_base_total = entry.get("base_total", Decimal("0"))
-        payloads.append({
-            "tariff": entry["tariff"],
-            "quantity": quantity.quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP),
-            "unit": str(entry["unit"]),
-            "unit_price": unit_price,
-            "total": quantized_total,
-            "base_rate": (raw_base_total / quantity).quantize(Decimal("0.00001"), rounding=ROUND_HALF_UP) if quantity and raw_base_total else None,
-            "bucket": entry["bucket"],
-        })
+            raw_base_total = entry.get("base_total", Decimal("0"))
+            payloads.append({
+                "tariff": entry["tariff"],
+                "quantity": quantity.quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP),
+                "unit": str(entry["unit"]),
+                "unit_price": unit_price,
+                "total": line_total,
+                "base_rate": (raw_base_total / quantity).quantize(Decimal("0.00001"), rounding=ROUND_HALF_UP) if quantity and raw_base_total else None,
+                "bucket": entry["bucket"],
+                "period": entry.get("period"),
+            })
 
     return (
         payloads,
@@ -1061,13 +1155,15 @@ def _is_zero_chf(total: Decimal) -> bool:
 def _price_energy(acc, tariffs, energy_type, quantity, ts, day, *, sign, bucket="default"):
     """Price one (energy_type, quantity) at a timestamp. sign=-1 for credits."""
     for tariff in tariffs.energy(energy_type, day):
-        price = _get_tariff_price(tariff, ts) or Decimal("0")
+        period = _resolve_tariff_band(tariff, ts)
+        price = (period.price_chf_per_kwh if period is not None else None) or Decimal("0")
         acc.add(
             tariff=tariff,
             quantity=quantity,
             total=sign * (quantity * price),
             unit="kWh",
             bucket=bucket,
+            period=period,
         )
     pct_tariffs = tariffs.percentage(energy_type, day)
     if not pct_tariffs:
@@ -1124,7 +1220,7 @@ def generate_invoice(participant: Participant, period_start: date, period_end: d
     # stream everything else with ``.iterator()`` and still deduplicate here.
     personal_gap_reading_ids: set = set()
 
-    items_accumulator = ItemAccumulator()
+    items_accumulator = ItemAccumulator(itemize_bands=zev.itemize_tariff_bands)
 
     for reading in readings.participant_consumption.order_by("timestamp").iterator():
         ts = reading.timestamp
@@ -1195,12 +1291,14 @@ def generate_invoice(participant: Participant, period_start: date, period_end: d
 
         if exported_kwh > 0:
             for tariff in tariffs.energy(EnergyType.FEED_IN, day):
-                price = _get_tariff_price(tariff, ts) or Decimal("0")
+                period = _resolve_tariff_band(tariff, ts)
+                price = (period.price_chf_per_kwh if period is not None else None) or Decimal("0")
                 items_accumulator.add(
                     tariff=tariff,
                     quantity=exported_kwh,
                     total=-(exported_kwh * price),
                     unit="kWh",
+                    period=period,
                 )
 
     # ─── Community-allocated energy (§7.4) ─────────────────────────────────
@@ -1291,13 +1389,15 @@ def generate_invoice(participant: Participant, period_start: date, period_end: d
 
         if shared_exported > 0:
             for tariff in tariffs.energy(EnergyType.FEED_IN, day):
-                price = _get_tariff_price(tariff, ts) or Decimal("0")
+                period = _resolve_tariff_band(tariff, ts)
+                price = (period.price_chf_per_kwh if period is not None else None) or Decimal("0")
                 items_accumulator.add(
                     tariff=tariff,
                     quantity=shared_exported,
                     total=-(shared_exported * price),
                     unit="kWh",
                     bucket="shared",
+                    period=period,
                 )
 
     _price_fixed_fees(participant, tariffs_list, period_start, period_end, items_accumulator)
@@ -1369,6 +1469,7 @@ def generate_invoice(participant: Participant, period_start: date, period_end: d
             description=_build_description(
                 tariff, period_start, period_end, payload["quantity"], lang,
                 base_rate=payload.get("base_rate"), bucket=payload["bucket"],
+                period=payload.get("period"),
             ),
             quantity_kwh=payload["quantity"],
             unit=payload["unit"],

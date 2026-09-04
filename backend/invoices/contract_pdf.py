@@ -11,12 +11,12 @@ from django.template import Template, Context
 from django.utils import timezone
 
 from accounts.models import AppSettings, VatRate
+from .band_labels import band_description
 from .contract_translations import CONTRACT_TRANSLATIONS
 from .dates import format_date_value
 from .pdf_render import render_pdf
 
 from tariffs.models import BillingMode, EnergyType, PeriodType
-from tariffs.periods import hhmm, month_ranges, months_of
 from zev.models import MeteringPointType
 
 CONTRACT_TEMPLATE_NAME = "contracts/participant_contract_pdf.html"
@@ -134,46 +134,11 @@ def _build_local_tariff_display(zev, tr: dict, date_pattern: str, as_of: date) -
             rows.append({
                 **base_row,
                 "rate_rp": f"{float(period.price_chf_per_kwh) * 100:.2f}",
-                "rate_description": _band_description(period, tr),
+                "rate_description": band_description(period, tr),
                 "pct": None,
             })
 
     return rows
-
-
-def _band_description(period, tr: dict) -> str:
-    """The band's name, qualified by its season when it has one.
-
-    HT and NT are named; a plain band is not, because the tariff it came from
-    does not name its bands either. Such a band is called by its own label if
-    one was given, and otherwise by the window that distinguishes it — which a
-    contract has to state in any case.
-    """
-    label = {
-        PeriodType.FLAT: tr["tariff_flat"],
-        PeriodType.HIGH: tr["tariff_ht"],
-        PeriodType.LOW: tr["tariff_nt"],
-    }.get(period.period_type)
-    if label is None:
-        label = period.label or _window(period, tr)
-
-    ranges = month_ranges(months_of(period))
-    if not ranges:
-        return label
-
-    names = tr["tariff_months_short"]
-    season = ", ".join(
-        names[first - 1] if first == last else f"{names[first - 1]}\u2013{names[last - 1]}"
-        for first, last in ranges
-    )
-    return tr["tariff_season"].format(label=label, season=season)
-
-
-def _window(period, tr: dict) -> str:
-    """``07:00-21:00``, or the generic band name when the band has no window."""
-    if period.time_from and period.time_to:
-        return f"{hhmm(period.time_from)}\u2013{hhmm(period.time_to)}"
-    return tr["tariff_band"]
 
 
 def _build_contract_context(participant, document_id: str | None = None,

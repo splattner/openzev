@@ -1691,6 +1691,8 @@ export const fr = {
                 billingInterval: 'Intervalle de facturation',
                 invoiceLanguage: 'Langue de facturation',
                 paymentTermDays: 'Délai de paiement (jours)',
+                itemizeTariffBands: 'Détailler les tranches tarifaires sur la facture',
+                itemizeTariffBandsHint: "Un tarif comportant plusieurs tranches apparaît sur une ligne par tranche utilisée, au prix réel de chaque tranche. Désactivé, il apparaît sur une seule ligne au tarif moyen pondéré. Ne s'applique qu'aux factures générées ensuite.",
                 gridOperator: 'Gestionnaire de réseau',
                 gridOperatorHint: 'Saisissez pour choisir dans la liste officielle ElCom, ou entrez un nom libre.',
                 gridOperatorMatched: 'Correspond à la liste officielle ElCom.',

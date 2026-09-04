@@ -1691,6 +1691,8 @@ export const it = {
                 billingInterval: 'Intervallo di fatturazione',
                 invoiceLanguage: 'Lingua della fattura',
                 paymentTermDays: 'Termine di pagamento (giorni)',
+                itemizeTariffBands: 'Dettagliare le fasce tariffarie sulla fattura',
+                itemizeTariffBandsHint: "Una tariffa con più fasce di prezzo compare con una riga per ogni fascia utilizzata, al prezzo effettivo di quella fascia. Se disattivato, compare in un'unica riga al prezzo medio ponderato. Vale solo per le fatture generate in seguito.",
                 gridOperator: 'Gestore di rete',
                 gridOperatorHint: 'Digita per scegliere dall’elenco ufficiale ElCom, oppure inserisci un nome qualsiasi.',
                 gridOperatorMatched: 'Corrisponde all’elenco ufficiale ElCom.',

@@ -88,6 +88,7 @@ export interface Zev {
     bank_name?: string
     vat_mode?: 'not_registered' | 'registered' | 'inclusive'
     vat_number?: string
+    itemize_tariff_bands?: boolean
     notes?: string
     email_subject_template?: string
     email_body_template?: string
@@ -112,6 +113,7 @@ export interface ZevInput {
     bank_name?: string
     vat_mode?: 'not_registered' | 'registered' | 'inclusive'
     vat_number?: string
+    itemize_tariff_bands?: boolean
     notes?: string
     email_subject_template?: string
     email_body_template?: string

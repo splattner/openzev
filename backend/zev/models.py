@@ -118,6 +118,15 @@ class Zev(models.Model):
         help_text="How VAT is applied when billing participants.",
     )
     vat_number = models.CharField(max_length=50, blank=True)
+    # Off by default: turning it on changes how every subsequent invoice reads,
+    # and an operator who never set it should keep the output they know.
+    itemize_tariff_bands = models.BooleanField(
+        default=False,
+        help_text=(
+            "Show each price band of a multi-band tariff as its own invoice "
+            "line, instead of one line at the blended average rate."
+        ),
+    )
     notes = models.TextField(blank=True)
     email_subject_template = models.CharField(
         max_length=500,

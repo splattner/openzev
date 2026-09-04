@@ -814,7 +814,9 @@ counting, leaving it with no behavioural consumer in the engine.
 
 ### 4.7 Item accumulation
 
-All tariff applications use a shared **accumulator map** keyed by `"{tariff_id}:{bucket}"`.
+All tariff applications use a shared **accumulator map** keyed by `"{tariff_id}:{bucket}"`,
+or by `"{tariff_id}:{bucket}:{period_id}"` when the ZEV sets `itemize_tariff_bands`
+and the tariff has more than one band (§4.7a).
 
 - Default bucket: `"default"` (consumers).
 - Producer-credit bucket: `"producer_credit"` (for local-energy credits on producers).
@@ -825,8 +827,35 @@ Each accumulator entry tracks:
 - `total` (running sum of CHF, before rounding)
 - `unit` (`"kWh"` or `"month"`)
 - `base_total` (for percentage-of-energy tariffs: running sum of `quantity × grid_base_price_sum`)
+- `group_key` (the `"{tariff_id}:{bucket}"` the entry rounds against, §5)
+- `period` (the band that priced it, set only when the entry is band-split)
 
 Zero-quantity + zero-total entries are skipped.
+
+### 4.7a Band itemisation (`Zev.itemize_tariff_bands`)
+
+Off by default. A multi-band tariff otherwise accumulates into one entry, so
+its line is priced at `total / quantity` — the quantity-weighted average of
+whichever bands the participant's consumption fell into. That average matches
+no band's published rate, and differs between two participants on the same
+tariff, so the invoice cannot be checked against the tariff.
+
+With the setting on, the band resolved per timestamp (§3.2b) also keys the
+entry, and each band that was used bills as its own line at its own rate. A
+tariff with a single band is never split: there is nothing to distinguish.
+
+The band is named by `band_labels.band_description`, which the participation
+contract also uses, so both documents call a band the same thing (§7.2). The
+name is written into the line's `description` rather than stored as a foreign
+key, following the rule that an invoice records what was charged rather than
+referencing the pricing structure that produced it.
+
+Percentage-of-energy tariffs are not split: their price derives from the grid
+base rather than from a band of their own. Fixed fees are per-month and have
+no band.
+
+Existing invoices are untouched; the setting applies to invoices generated
+after it is changed.
 
 ### 4.8 VAT resolution
 
@@ -878,6 +907,19 @@ Rationale and alternatives: ADR 0016.
 
 `subtotal_chf` is the sum of already-rounded line-item totals.
 
+**Lines round against their group, not individually.** A group is one
+`"{tariff_id}:{bucket}"` — a single line, or that tariff's band lines when
+§4.7a applies. The group's unrounded total is rounded once, and the difference
+against the individually-rounded lines is handed out a centime at a time to
+the lines that lost the most in their own rounding (ties broken by magnitude,
+then position, so the distribution is deterministic). A tariff therefore costs
+the same whether or not its bands are itemised, and the lines still sum to
+`subtotal_chf`.
+
+The centime a line gains or gives up lands on its `total_chf` only. Its
+`unit_price_chf` stays derived from the unrounded total, so an itemised line
+still shows its band's real rate.
+
 ---
 
 ## 6. Actors, permissions, and ZEV scope
@@ -921,7 +963,7 @@ Descriptions are **localized** using the ZEV's `invoice_language` (de/fr/it/en).
 
 | Billing mode | Description format |
 |---|---|
-| `energy` | `"{tariff.name}"` |
+| `energy` | `"{tariff.name}"`, or `"{tariff.name} – {band}"` when the line is band-itemised (§4.7a) |
 | `percentage_of_energy` | `"{tariff.name} ({pct}%)"` or `"{tariff.name} ({pct}% of CHF {base_rate}/kWh)"` when base rate is known |
 | `monthly_fee` | `"{tariff.name} ({n} Monat/Monate)"` |
 | `yearly_fee` | `"{tariff.name} ({n} monatliche Rate(n) der Jahresgebühr)"` |
@@ -931,6 +973,13 @@ Descriptions are **localized** using the ZEV's `invoice_language` (de/fr/it/en).
 | `shared_yearly_fee` | `"{tariff.name} ({n} monatliche Rate(n) der Jahresgebühr, Gemeinschaftskosten anteilig)"` |
 
 Singular vs. plural forms are selected based on `quantity == 1`.
+
+**Band qualifier.** A band-itemised energy line (§4.7a) names its band with
+`band_labels.band_description` — the same function the participation contract
+uses, so a band the contract calls "HT (Hochtarif)" or "Peak (Okt–März)" is
+called that on the invoice too. The band is set off with a dash rather than parenthesised, because band
+names carry their own brackets. A line carrying both a band and the community
+marker keeps them apart: `"{tariff.name} – {band} ({marker})"`.
 
 The shared modes carry **no participant count** in the description: the
 denominator is per month and can differ between the months covered by a single

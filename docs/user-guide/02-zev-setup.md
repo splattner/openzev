@@ -85,6 +85,7 @@ The settings form is organized into sections:
 | **ZEV Type** | `ZEV` or `vZEV` | Yes |
 | **Billing Interval** | Invoice frequency | Yes |
 | **Invoice Language** | Language for generated PDFs (de/fr/it/en) | Yes |
+| **Itemise price bands on the invoice** | Show each price band of a multi-band tariff as its own line (see below) | No |
 
 #### Grid Information
 
@@ -148,6 +149,41 @@ Choose how often invoices are generated:
 
   An admin still has to configure the VAT rate for this to take effect; with no
   active rate, prices are billed unchanged.
+
+### Price bands on the invoice
+
+A tariff can carry several price bands — peak and off-peak, a weekend rate, a
+different winter price. By default such a tariff appears on the invoice as
+**one line**, priced at the average of the bands your participant actually
+used, weighted by how much they used in each.
+
+That average is nobody's published rate. It also differs from participant to
+participant: someone who runs their washing machine at night gets a lower
+figure than their neighbour, from the same tariff. Neither can check the
+invoice against the tariff sheet they were given.
+
+Tick **Itemise price bands on the invoice** and each band that was used gets
+its own line at its own rate:
+
+```
+Netznutzung – HT (Hochtarif)    412.0000 kWh × 0.28400   117.01
+Netznutzung – NT (Niedertarif)  638.0000 kWh × 0.19100   121.86
+```
+
+The bands are named the way your [participation contracts](09-contracts.md)
+name them, so the two documents agree.
+
+The invoice costs exactly the same either way — a tariff's total is worked out
+first and then divided across its band lines, never the other way round. A
+tariff with only one band is never split.
+
+Fixed monthly and yearly fees are not affected: they have no bands. Neither
+are percentage-of-energy tariffs, whose price comes from the grid rate rather
+than from a band of their own.
+
+This changes invoices **generated from now on**. Invoices you have already
+generated are left exactly as they are; regenerate one (only possible while it
+is still a draft) if you want it in the new shape.
 
 If no VAT rate is active for an invoice period, VAT defaults to **0%** in every mode.
 

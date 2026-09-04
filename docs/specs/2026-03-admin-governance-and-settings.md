@@ -119,6 +119,7 @@ Singleton pattern with `pk=1` enforced by `save()` plus a `singleton_enforcer = 
 | `bank_name` | CharField(200) | blank | |
 | `vat_mode` | CharField(20) | `not_registered` | Choices `not_registered`, `registered`, `inclusive` (from `VatMode` TextChoices). Drives VAT handling in the billing engine — see `2026-03-tariffs-and-billing-engine.md` §4.8. |
 | `vat_number` | CharField(50) | blank | Swiss UID. `Zev.clean()` requires it when `vat_mode = registered` and forbids it otherwise. Shown on invoice/contract PDFs only when set. |
+| `itemize_tariff_bands` | BooleanField | `False` | Bill each price band of a multi-band tariff as its own invoice line at its own rate, instead of one line at the blended average — see `2026-03-tariffs-and-billing-engine.md` §4.7a. Applies to invoices generated after the change. |
 | `email_subject_template` | CharField(500) | `""` (blank) | Python `.format_map()` template. Falls back to `DEFAULT_EMAIL_SUBJECT_TEMPLATE` if blank. |
 | `email_body_template` | TextField | `""` (blank) | Python `.format_map()` template. Falls back to `DEFAULT_EMAIL_BODY_TEMPLATE` if blank. |
 | `local_tariff_notes` | TextField | blank | Free-text shown on contract PDF |
@@ -245,7 +246,7 @@ on-disk default. See `2026-08-contract-pdf-redesign.md` §5.2.
 |---|---|---|---|
 | `/api/v1/zev/zevs/{id}/` | PATCH | `IsAdmin` or `IsZevOwner` | Partial update of any Zev field including billing, email templates, contract notes |
 
-Handled by `ZevViewSet` with `ZevSerializer`. All Zev fields (billing_interval, invoice_prefix, invoice_language, payment_term_days, bank_iban, bank_name, vat_mode, vat_number, email_subject_template, email_body_template, local_tariff_notes, additional_contract_notes, notes) are writable. `ZevSerializer.validate()` enforces the `vat_mode`/`vat_number` pairing (number required for `registered`, forbidden otherwise).
+Handled by `ZevViewSet` with `ZevSerializer`. All Zev fields (billing_interval, invoice_prefix, invoice_language, payment_term_days, bank_iban, bank_name, vat_mode, vat_number, itemize_tariff_bands, email_subject_template, email_body_template, local_tariff_notes, additional_contract_notes, notes) are writable. `ZevSerializer.validate()` enforces the `vat_mode`/`vat_number` pairing (number required for `registered`, forbidden otherwise).
 
 ---
 
@@ -431,6 +432,7 @@ Two form sections sharing the same submit mutation (`updateZev`):
 **Section 1 — General Settings** (via `ZevGeneralSettingsFields` component):
 - Name, start date (DatePicker with app-settings format), ZEV type (ZEV/vZEV), billing interval, invoice language
 - Grid connection: grid operator, grid connection point
+- General: name, start date, ZEV type, billing interval, invoice language, payment term, itemise price bands on the invoice (`itemize_tariff_bands` checkbox)
 - Payment details: invoice prefix, VAT treatment (`vat_mode` selector), VAT number (shown only when treatment is `registered`), bank name, bank IBAN
 - Notes, local tariff notes (contract PDF), additional contract notes (contract PDF)
 
