@@ -1,5 +1,61 @@
 # Changelog
 
+## [1.8.0](https://github.com/splattner/openzev/compare/v1.7.0...v1.8.0) (2026-09-04)
+
+
+### Features
+
+* **accounts:** rate-limit public auth endpoints ([#433](https://github.com/splattner/openzev/issues/433)) ([b9b8a13](https://github.com/splattner/openzev/commit/b9b8a130ce036a980672dfb9a8f1723a92520380))
+* **allocation,invoices,metering:** read-model + consumer migration for shared metering points ([#461](https://github.com/splattner/openzev/issues/461)) ([9fc340e](https://github.com/splattner/openzev/commit/9fc340eaf05bcaed4ca56940e1decd9a32fe7385))
+* **frontend,docs:** shared metering points UI and baseline spec updates ([#464](https://github.com/splattner/openzev/issues/464)) ([2394524](https://github.com/splattner/openzev/commit/2394524da1f480917430f60d962ec102381b4eed)), closes [#387](https://github.com/splattner/openzev/issues/387)
+* **i18n:** migrate hardcoded strings and add locale parity enforcement ([#452](https://github.com/splattner/openzev/issues/452)) ([86fae7c](https://github.com/splattner/openzev/commit/86fae7ce161feb43b5b5573f1914257d570ab4ec))
+* **invoices,frontend:** split_key for SHARED_* fees ([#462](https://github.com/splattner/openzev/issues/462)) ([3dac9f0](https://github.com/splattner/openzev/commit/3dac9f00f9adeb2a29e2474ed1725db74253571b)), closes [#387](https://github.com/splattner/openzev/issues/387)
+* **invoices:** allocation-weight primitive for shared metering points ([#460](https://github.com/splattner/openzev/issues/460)) ([63c804a](https://github.com/splattner/openzev/commit/63c804abb61c3890db89ed86bbef223c3786c5ea))
+* **invoices:** community billing for shared metering points ([#463](https://github.com/splattner/openzev/issues/463)) ([d1e3d7d](https://github.com/splattner/openzev/commit/d1e3d7def488c654e88b178aa743e08dd5a3abf2)), closes [#387](https://github.com/splattner/openzev/issues/387)
+* **invoices:** issue versioned contract snapshots on download ([#443](https://github.com/splattner/openzev/issues/443)) ([348df53](https://github.com/splattner/openzev/commit/348df53f2a5b7ea75ce5b68111feedb9a472af2a))
+* **invoices:** redesign the participation contract PDF and harden template overrides ([#442](https://github.com/splattner/openzev/issues/442)) ([bce8bb1](https://github.com/splattner/openzev/commit/bce8bb13e933c8ae190e612a573f5d7feaec29db))
+* **reports:** move document downloads to /reports and slim dashboard ([#503](https://github.com/splattner/openzev/issues/503)) ([402958c](https://github.com/splattner/openzev/commit/402958cc12d8f2064daab4485d7b0f1e89969d40))
+* **tariffs:** import tariffs from a grid operator's Art. 7b publication ([#533](https://github.com/splattner/openzev/issues/533)) ([f440c8c](https://github.com/splattner/openzev/commit/f440c8c1da5840223df3d44a429a51fca34c2a05)), closes [#507](https://github.com/splattner/openzev/issues/507)
+* **tariffs:** price bands can apply in only some months ([#531](https://github.com/splattner/openzev/issues/531)) ([b731a88](https://github.com/splattner/openzev/commit/b731a88bf767ad81911353457a70d9560ad3cf84))
+* **tariffs:** tariffs can carry more than a high and a low price band ([#534](https://github.com/splattner/openzev/issues/534)) ([f364ae3](https://github.com/splattner/openzev/commit/f364ae358fb46fb05f434d0191af516da5b5f5ab)), closes [#528](https://github.com/splattner/openzev/issues/528)
+* **tokens:** enforce brand-ramp luminance monotonicity ([#522](https://github.com/splattner/openzev/issues/522)) ([c542b2d](https://github.com/splattner/openzev/commit/c542b2d5cd58200060028164ef9efb2b6b8012f3))
+* **ui:** print-parity redesign — single-source tokens, MUI retirement, real PDF previews ([#470](https://github.com/splattner/openzev/issues/470)) ([a26a27a](https://github.com/splattner/openzev/commit/a26a27ac82be3d6fe5afa607c1b94b9547b50e6c))
+* **ui:** shared PageSkeleton variants and EmptyState factory ([#502](https://github.com/splattner/openzev/issues/502)) ([50016d5](https://github.com/splattner/openzev/commit/50016d58732e5863e7458943abe88dd553426383))
+* **zev:** pick the grid operator from the official ElCom list ([#519](https://github.com/splattner/openzev/issues/519)) ([10f8815](https://github.com/splattner/openzev/commit/10f88153a29191c748aac483f8c9fe2f9b380536)), closes [#518](https://github.com/splattner/openzev/issues/518)
+
+
+### Bug Fixes
+
+* **accounts:** make OAuth client secret write-only ([#432](https://github.com/splattner/openzev/issues/432)) ([40caa3f](https://github.com/splattner/openzev/commit/40caa3f23d2ea5d962f4fd88373d1e108b9778fa))
+* **accounts:** restrict /auth/users/ to admins ([#430](https://github.com/splattner/openzev/issues/430)) ([305d262](https://github.com/splattner/openzev/commit/305d262ea33ae7308f96f3ebabde35e112af6da2))
+* **compose:** mount postgres_data at one path and pin PGDATA inside it ([#513](https://github.com/splattner/openzev/issues/513)) ([50b0e77](https://github.com/splattner/openzev/commit/50b0e7706c5cb1bc345a897150e9844f20a678b4)), closes [#492](https://github.com/splattner/openzev/issues/492)
+* **compose:** proxy API same-origin to restore cookie CSRF ([#453](https://github.com/splattner/openzev/issues/453)) ([61a4aa8](https://github.com/splattner/openzev/commit/61a4aa8db37897d94a503fe27c4ac34b494bde70))
+* **contracts:** move contract-PDF issuance from GET to POST ([#508](https://github.com/splattner/openzev/issues/508)) ([dec93e8](https://github.com/splattner/openzev/commit/dec93e8b4b28aad4460f8f9dc533471f987dc7ba)), closes [#448](https://github.com/splattner/openzev/issues/448)
+* **css:** stop the global input width:100% from stretching checkboxes ([#510](https://github.com/splattner/openzev/issues/510)) ([0afc527](https://github.com/splattner/openzev/commit/0afc527e2a4a21ce352fc7164f0ff36d76583a39)), closes [#490](https://github.com/splattner/openzev/issues/490)
+* **engine:** round total_feed_in_kwh with ROUND_HALF_UP like the sibling kWh totals ([#521](https://github.com/splattner/openzev/issues/521)) ([a75fb2d](https://github.com/splattner/openzev/commit/a75fb2d06c91bd190d9d8c3fc31781935c956755))
+* **engine:** shared metering gap logging and CHF 0.00 line gates ([#479](https://github.com/splattner/openzev/issues/479)) ([b890cec](https://github.com/splattner/openzev/commit/b890cec3a29962dfb5505e2552f8a6d9908a11eb))
+* **engine:** stop reading MeteringPoint.is_active when pricing a period ([#514](https://github.com/splattner/openzev/issues/514)) ([b1dcdd9](https://github.com/splattner/openzev/commit/b1dcdd9b8529d28d0bc6e29476c5efade3a79ad6)), closes [#408](https://github.com/splattner/openzev/issues/408)
+* **frontend:** fetch every page of DRF-paginated list endpoints ([#484](https://github.com/splattner/openzev/issues/484)) ([6a26aa3](https://github.com/splattner/openzev/commit/6a26aa3e74ed1f789e9866d14cb5f938150b8a3b))
+* **frontend:** let owners of multiple ZEVs switch between them ([#481](https://github.com/splattner/openzev/issues/481)) ([1c7467d](https://github.com/splattner/openzev/commit/1c7467df2451760b3c9e4da17b4134d942ef5bd3))
+* **i18n:** translate confirm-dialog defaults, participant validation, and chart tooltip ([#525](https://github.com/splattner/openzev/issues/525)) ([0e58f51](https://github.com/splattner/openzev/commit/0e58f51cba1b9c692fa9ccbfc02d7da9c9dc94e8))
+* **invoices:** clamp weight-split denominators to the tariff's own validity ([#466](https://github.com/splattner/openzev/issues/466)) ([d8e0c25](https://github.com/splattner/openzev/commit/d8e0c250e034334e18ed1d3998adc9a962c34770)), closes [#465](https://github.com/splattner/openzev/issues/465) [#387](https://github.com/splattner/openzev/issues/387)
+* **invoices:** server-side status filter for the dashboard open-invoice list ([#485](https://github.com/splattner/openzev/issues/485)) ([bb4b755](https://github.com/splattner/openzev/commit/bb4b75520ba138792e8b4d407171542139af3e4b))
+* **media:** close unauthenticated /media/ PDF path, use authenticated API endpoint URL ([#474](https://github.com/splattner/openzev/issues/474)) ([a81fdd3](https://github.com/splattner/openzev/commit/a81fdd39be3de2516935d9a92e7684baa44bdbc8))
+* **media:** stop proxying unauthenticated /media/ PDFs in compose nginx ([#516](https://github.com/splattner/openzev/issues/516)) ([39c7ed8](https://github.com/splattner/openzev/commit/39c7ed80a526fe8d909d85e6e24c0d76038daefc))
+* **models:** give every paginated list ordering a unique tiebreaker ([#512](https://github.com/splattner/openzev/issues/512)) ([388274c](https://github.com/splattner/openzev/commit/388274c1a1333970470cc531db3166d82fd616c4)), closes [#489](https://github.com/splattner/openzev/issues/489)
+* **security:** enforce CSRF for cookie JWT sessions ([#446](https://github.com/splattner/openzev/issues/446)) ([ea8f91f](https://github.com/splattner/openzev/commit/ea8f91f8d2c3f70101742fdebd0af42a6dd94dd1))
+* **security:** harden upload parsing against zip bombs and parse loops ([#449](https://github.com/splattner/openzev/issues/449)) ([b7a1b75](https://github.com/splattner/openzev/commit/b7a1b75935d18d820ba4952886989cfd7496c714))
+* **security:** restrict render fetches and harden template preview ([#469](https://github.com/splattner/openzev/issues/469)) ([e51057b](https://github.com/splattner/openzev/commit/e51057bcd8ceb507286032bf071ba4420c02a257))
+* **tariffs:** preserve split_key on new-version and duplicate ([#473](https://github.com/splattner/openzev/issues/473)) ([f3e33ee](https://github.com/splattner/openzev/commit/f3e33ee60927e6f8af2c224325aa23018259cd85))
+* **ui:** migrate account page and admin overview to the page contract ([#486](https://github.com/splattner/openzev/issues/486)) ([6ea75b3](https://github.com/splattner/openzev/commit/6ea75b37f384ef41e6f52be1c6b78ba0cd1147bc))
+
+
+### Performance Improvements
+
+* **docker:** add a .dockerignore, shrinking the build context 930 MB -&gt; 8 MB ([#475](https://github.com/splattner/openzev/issues/475)) ([2b49dd7](https://github.com/splattner/openzev/commit/2b49dd75b5975bee6bb109976e43fb829fc6e61d))
+* **invoices:** drop nested items and email logs from the invoice list ([#509](https://github.com/splattner/openzev/issues/509)) ([6258b5a](https://github.com/splattner/openzev/commit/6258b5a1d8a972613b5d275c980810dc939cff27)), closes [#488](https://github.com/splattner/openzev/issues/488)
+* **tests:** parallelize suite with pytest-xdist, tag slow PDF tests ([#523](https://github.com/splattner/openzev/issues/523)) ([71892d8](https://github.com/splattner/openzev/commit/71892d887af74d92a6ad31c1b5fbcc03ccd80094))
+
 ## [1.7.0](https://github.com/splattner/openzev/compare/v1.6.0...v1.7.0) (2026-08-10)
 
 
