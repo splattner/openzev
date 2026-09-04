@@ -10,7 +10,8 @@
     "test:unit": "vitest run",
     "test:unit:watch": "vitest",
     "preview": "vite preview",
-    "screenshots": "playwright test --config screenshots.config.ts",
+    "screenshots": "playwright test --config screenshots.config.ts screenshots/capture.spec.ts",
+    "shot": "playwright test --config screenshots.config.ts screenshots/shot.spec.ts",
     "lint:style": "stylelint \"src/**/*.css\""
   },
   "dependencies": {

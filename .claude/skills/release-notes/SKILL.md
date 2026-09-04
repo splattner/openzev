@@ -134,6 +134,59 @@ Follow the v1.7.0 notes; read them before writing (`gh release view v1.7.0`).
 - A short code block or `curl` example where it saves a paragraph.
 - Numbers where you have them, and only where you have checked them.
 
+### Screenshots
+
+Most sections do not need one. A screenshot earns its place when the reader
+has to *find* something ("tick this box, here"), or when a change is visual
+and a paragraph describing it would be longer and vaguer than the picture. A
+new default, a fixed calculation or an API change gets no screenshot — there
+is nothing to look at.
+
+At most one or two per release. Never in `Also new` (if it needs a picture it
+needs a section) and never in `Fixes worth knowing about`.
+
+**Taking one.** The stack must be running and seeded. From `frontend/`:
+
+```
+SHOT_NAME=1.9.0-band-setting SHOT_URL=/zev-settings \
+  SHOT_SELECTOR='.form-section' npm run shot
+```
+
+`SHOT_SELECTOR` is usually what you want: crop to the card or table that
+changed rather than shipping 1400px of chrome around it. The helper writes to
+`docs/release-notes/screenshots/` and defaults to the English UI. Its header
+comment lists the rest (`SHOT_MODE`, `SHOT_WAIT`, `SHOT_NO_PIN`, and the
+`SCREENSHOT_*` connection variables, which is where to look when login fails).
+
+Name files `<version>-<slug>.png`, or `<version>-<slug>-before.png` /
+`-after.png` for a pair.
+
+**Before/after** is two stacked images with bold captions, not one composed
+picture and not an HTML table — this renders the same in the repo, in the PR
+review and in the release body:
+
+```markdown
+**Before** — one line at the blended average rate
+
+![...](screenshots/1.9.0-bands-before.png)
+
+**After** — one line per band
+
+![...](screenshots/1.9.0-bands-after.png)
+```
+
+Only use before/after where the *before* is genuinely reproducible. If showing
+it means generating throwaway billing data on a real instance, show the
+control the reader has to find instead, and let the prose carry the contrast.
+
+**Always write the path relative to the draft** (`screenshots/x.png`). It is
+correct in the repo and in the PR, and the publish step rewrites it — see §6.
+Do not hand-write a `raw.githubusercontent.com` URL, and never use a `../`
+path: in a release body the `..` eats the tag ref and the image breaks.
+
+**Alt text is not a caption.** It is what a reader gets when the image does not
+load, so say what the picture shows, not "Screenshot".
+
 ### The Upgrading section
 
 Migrations are the part most likely to be wrong by hand. Derive them:
@@ -207,18 +260,30 @@ notes go on `v<version>`.
 
 ```
 gh release view v<version> --json body -q .body > /tmp/generated.md
+node scripts/release-notes-body.mjs <version> --generated /tmp/generated.md > /tmp/body.md
+gh release edit v<version> --notes-file /tmp/body.md
 ```
 
-Build the new body: the prose from `docs/release-notes/<version>.md`, then
-`## Full change list`, then the generated body with its own `## [<version>]`
-heading kept. Then:
+The script assembles the body: the prose from `docs/release-notes/<version>.md`,
+then `## Full change list`, then the generated body with its own
+`## [<version>]` heading kept. It also does the two things that are easy to get
+wrong by hand:
 
-```
-gh release edit v<version> --notes-file <combined>
-```
+- **Strips the `release-notes-state` block.** Bookkeeping for `continue` mode;
+  it must not reach the published release.
+- **Pins every relative image path** to `https://raw.githubusercontent.com/<repo>/v<version>/…`.
+  This is necessary because a release body has no file context: GitHub resolves
+  a relative path against the *repository root* at the tag, while the same
+  markdown in the repo resolves it against `docs/release-notes/`. One path
+  cannot satisfy both, so the draft keeps the repo-correct one and the publish
+  step rewrites it. It refuses to build a body that references an image which
+  does not exist, because a broken image in a published release is not
+  something you can quietly fix afterwards.
 
 Read the result back and check the two halves did not run together — the
-`## Full change list` heading is what separates them.
+`## Full change list` heading is what separates them. If the notes carry an
+image, open the released page and confirm it actually renders: the URL is
+pinned to the tag, so it only resolves once the release is cut.
 
 ## Checks before publishing
 
@@ -231,6 +296,8 @@ Read the result back and check the two halves did not run together — the
   wrong path is worse than no path: it sends the reader looking in the wrong
   place and makes them doubt the rest.
 - Every number checked.
+- **Every screenshot shows the version being released**, not a newer UI. These
+  are frozen artefacts: never regenerate an old release's images.
 - Every migration listed.
 - Removals called out.
 - No change that belongs in a section is sitting in `Also new` because it was

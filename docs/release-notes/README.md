@@ -16,6 +16,22 @@ written by hand.
   how, including the ones deliberately left out, so a draft can be picked up
   later or by someone else.
 
+## Screenshots
+
+`screenshots/` holds the images the notes embed, named `<version>-<slug>.png`.
+They are **frozen artefacts**: a 1.9.0 image documents the 1.9.0 UI, so it is
+never regenerated — re-shooting it against a later UI would illustrate that
+release with a product it never shipped. This is the opposite of
+`docs/user-guide/screenshots/`, which is regenerated as a set whenever the
+interface moves.
+
+Capture one with `npm run shot` from `frontend/` (see the header of
+`frontend/screenshots/shot.spec.ts`). Reference it from the draft with a path
+relative to the draft — `screenshots/x.png` — which is correct in the repo and
+in review; `scripts/release-notes-body.mjs` rewrites it to a tag-pinned
+absolute URL at publish time, because a release body resolves relative paths
+against the repository root rather than against this directory.
+
 Written with the `release-notes` skill (`.claude/skills/release-notes/`), which
 carries the triage rules and the house voice.
 
