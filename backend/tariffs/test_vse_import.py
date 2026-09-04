@@ -582,6 +582,95 @@ class PlanningTests(TestCase):
 
         self.assertEqual(planned[0].status, CandidateStatus.CONFLICT)
 
+    # ── Provenance: a series keeps its identity through a rename ───────────
+
+    def test_a_renamed_series_gets_the_new_version_not_a_second_series(self):
+        """The reported failure mode: the component suffix was the only record
+        of where a tariff came from, so renaming the series made next year's
+        document fork a parallel one and bill both."""
+        first, _ = self._apply(document(entry()))
+        self.assertEqual(len(first.created), 1)
+        tariff = Tariff.objects.get(zev=self.zev)
+        tariff.name = "Netznutzung (unser Name)"
+        tariff.save()
+
+        planned = plan_import(self.zev.id, parse_document(document(entry(
+            startDate="2028-01-01", endDate="2028-12-31"))))
+
+        self.assertEqual(planned[0].status, CandidateStatus.NEW_VERSION)
+        self.assertEqual(planned[0].series_name, "Netznutzung (unser Name)")
+        self.assertIn("Netznutzung (unser Name)", planned[0].detail)
+
+    def test_the_new_version_is_written_under_the_name_the_series_answers_to(self):
+        self._apply(document(entry()))
+        tariff = Tariff.objects.get(zev=self.zev)
+        tariff.name = "Netznutzung (unser Name)"
+        tariff.save()
+
+        report, created = self._apply(document(entry(
+            startDate="2028-01-01", endDate="2028-12-31")))
+
+        self.assertEqual(report.errors, [])
+        self.assertEqual([t.name for t in created], ["Netznutzung (unser Name)"])
+        self.assertEqual(
+            Tariff.objects.filter(zev=self.zev).count(), 2,
+            "a second series would mean both versions bill at once",
+        )
+        # The predecessor is still closed, which is what stops double billing.
+        self.assertEqual(
+            Tariff.objects.get(zev=self.zev, valid_from=date(2027, 1, 1)).valid_to,
+            date(2027, 12, 31),
+        )
+
+    def test_provenance_is_recorded_on_what_the_import_creates(self):
+        _, created = self._apply(document(entry(prices={
+            "base": {"price": 7, "priceUnit": "CHF/M"},
+            "energy": [{"from": "00:00", "to": "00:00", "price": 0.1, "priceUnit": "CHF/kWh"}],
+        })))
+
+        by_component = {t.source_component: t for t in created}
+        self.assertEqual(set(by_component), {"base", "energy"})
+        self.assertEqual(
+            {t.source_series_name for t in created}, {"Netznutzung Basis"},
+            "both components belong to the operator's one tariff",
+        )
+
+    def test_a_tariff_entered_by_hand_still_matches_on_its_name(self):
+        """Nothing imported before provenance existed carries it, and neither
+        does anything typed in, so the name has to keep working."""
+        Tariff.objects.create(
+            zev=self.zev, name="Netznutzung Basis (Arbeitspreis)",
+            category=TariffCategory.GRID_FEES, billing_mode=BillingMode.ENERGY,
+            energy_type=EnergyType.GRID, valid_from=date(2025, 1, 1),
+        )
+
+        planned = plan_import(self.zev.id, parse_document(document(entry())))
+
+        self.assertEqual(planned[0].status, CandidateStatus.NEW_VERSION)
+        self.assertEqual(planned[0].series_name, "Netznutzung Basis (Arbeitspreis)")
+
+    def test_renaming_does_not_capture_an_unrelated_tariff_of_the_same_name(self):
+        """Provenance is more specific than the name, so a hand-made tariff
+        that happens to be called what the document proposes is left alone."""
+        self._apply(document(entry()))
+        imported = Tariff.objects.get(zev=self.zev)
+        imported.name = "Netznutzung (unser Name)"
+        imported.save()
+        unrelated = Tariff.objects.create(
+            zev=self.zev, name="Netznutzung Basis (Arbeitspreis)",
+            category=TariffCategory.GRID_FEES, billing_mode=BillingMode.ENERGY,
+            energy_type=EnergyType.GRID, valid_from=date(2020, 1, 1),
+            valid_to=date(2020, 12, 31),
+        )
+
+        report, created = self._apply(document(entry(
+            startDate="2028-01-01", endDate="2028-12-31")))
+
+        self.assertEqual(report.errors, [])
+        self.assertEqual([t.name for t in created], ["Netznutzung (unser Name)"])
+        unrelated.refresh_from_db()
+        self.assertEqual(unrelated.valid_to, date(2020, 12, 31))
+
     def test_only_the_selected_candidates_are_created(self):
         parsed = parse_document(real_document())
         wanted = [c for c in parsed.candidates if c.recommended]
@@ -1014,6 +1103,26 @@ class ImportEndpointTests(TestCase):
         self.assertEqual(fee["status"], CandidateStatus.NEW_VERSION)
         self.assertEqual(fee["billing_mode"], BillingMode.MONTHLY_FEE)
         self.assertIn(BillingMode.MONTHLY_FEE, fee["billing_mode_options"])
+
+    def test_preview_names_the_series_a_renamed_tariff_would_rejoin(self):
+        """The name column shows what the document proposes, so a row that
+        would land in a renamed series has to say where it is going."""
+        with self._patched():
+            self.client.post(APPLY_URL, {
+                "zev": str(self.zev.id), "url": self.URL,
+                "selections": [{"key": "Netznutzung Basis (Arbeitspreis)@2027-01-01"}],
+                "document_digest": self.digest,
+            }, format="json")
+        tariff = Tariff.objects.get(zev=self.zev)
+        tariff.name = "Netznutzung (unser Name)"
+        tariff.save()
+        self.document = document(entry(startDate="2028-01-01", endDate="2028-12-31"))
+
+        candidate = self._preview().json()["candidates"][0]
+
+        self.assertEqual(candidate["status"], CandidateStatus.NEW_VERSION)
+        self.assertEqual(candidate["name"], "Netznutzung Basis (Arbeitspreis)")
+        self.assertEqual(candidate["series_name"], "Netznutzung (unser Name)")
 
     def test_preview_falls_back_to_the_url_stored_on_the_zev(self):
         self.zev.tariff_source_url = self.URL

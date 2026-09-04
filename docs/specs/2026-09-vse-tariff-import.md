@@ -105,7 +105,9 @@ only exist while the user is deciding.
 | `fixed_price_chf` | `Decimal \| None` | Fee candidates only |
 | `valid_from`, `valid_to` | `date` | From the document's `startDate` / `endDate` |
 | `periods` | `list[ProposedPeriod]` | Energy candidates only |
-| `source_tariff_name`, `source_tariff_type`, `source_customer_type`, `source_voltage_level`, `standard_basegroup` | | Provenance, shown in the preview |
+| `source_component` | `str` | `base` or `energy` — which published price this candidate came from. Persisted on the created `Tariff` |
+| `source_series_name` | `str` | The operator's own name for the component's series, before the suffix. Persisted alongside `source_component` |
+| `source_tariff_name`, `source_tariff_type`, `source_customer_type`, `source_voltage_level`, `standard_basegroup` | | Provenance, shown in the preview only |
 | `billing_mode_options` | `tuple[str, ...]` | Modes the user may pick instead; empty when there is nothing to choose |
 | `warnings` | `list[str]` | Lossy mappings — importable |
 | `blocked_reason` | `str \| None` | Set when the entry cannot be represented at all |
@@ -139,6 +141,14 @@ The component suffix is applied **even when only one component is present**. A
 document that grows a base price next year must append to the same series
 rather than fork it under a bare name. These strings become invoice line
 labels, hence the Swiss-German billing vocabulary.
+
+The suffix is **presentation, not identity**. Which component a tariff came
+from is recorded structurally on `Tariff.source_component`, with the
+operator's own pre-suffix name in `source_series_name`. Both are written by
+the importer and read-only on the API — a client that could set them could
+fake a series match. Together they let §8 match a series through a rename on
+either side, which a derived name cannot: it is the same tariff whatever
+anyone has since called it. Tariffs entered by hand leave both blank.
 
 **The billing mode for a base price is the user's choice, not a guess.** The
 document says the price is CHF per month; it cannot say *who* pays it. So a
@@ -281,10 +291,32 @@ sentence. This is where a careless import doubles somebody's bill, so the same
 planning code runs **again inside the write transaction** against freshly read
 rows.
 
+**Which series a candidate belongs to** is resolved before any of this, by
+`planner._resolve_series`:
+
+1. **Provenance**, when the candidate has one: tariffs whose
+   `(source_series_name, source_component)` match. A tariff imported from the
+   same published component is the same series however it has been renamed
+   since — by us, or by the operator in the new document. The versions of a
+   series share a name, so the one already in use wins, and the created
+   version takes it rather than the name the document derives
+   (`PlannedCandidate.series_name`, echoed to the preview so a row says where
+   it is going).
+2. **Name**, otherwise. Tariffs entered by hand carry no provenance, and
+   neither does anything imported before it was recorded, so the name has to
+   keep working.
+
+Provenance is the more specific of the two, so a hand-made tariff that happens
+to be called what the document proposes is not captured by a renamed series.
+
+Before this, the derived name was the only link back to the published
+component, and renaming a series silently forked a second one from the next
+import — leaving both live and billing at once.
+
 | Status | Meaning | Applied? |
 |---|---|---|
-| `new` | No tariff of that name in this ZEV | yes |
-| `new_version` | Name exists with a different `valid_from`; the predecessor is closed the day before, and the new version's end date is capped by any later version (`series.plan_new_version`) | yes |
+| `new` | No tariff of that series in this ZEV | yes |
+| `new_version` | The series exists with a different `valid_from`; the predecessor is closed the day before, and the new version's end date is capped by any later version (`series.plan_new_version`) | yes |
 | `duplicate` | A version already starts on that date — the document has been imported before | no |
 | `conflict` | The name exists but disagrees on `category` / `energy_type`, or on a `billing_mode` this candidate cannot be imported as — all of which `Tariff.clean` would reject | no |
 | `unsupported` | `blocked_reason` set by the parser | no |
@@ -472,6 +504,10 @@ The chosen modes live in their own `Record<string, string>` beside the tick
 `Set`, so "clear selection" and "select standard tariffs" do not throw away a
 billing decision the user already made.
 
+A row whose `series_name` differs from its `name` shows
+`import.addedToSeries` under the name — the column states what the document
+proposes, so the row has to say which existing series it would actually join.
+
 ### 12.3 ZEV settings
 
 **File:** `frontend/src/components/ZevGeneralSettingsFields.tsx` — a
@@ -510,6 +546,8 @@ interface VseTariffCandidate {
     source_customer_type: string
     source_voltage_level: number | null
     standard_basegroup: boolean
+    /** Where the row lands; differs from `name` for a renamed series (§8). */
+    series_name: string
     status: VseTariffCandidateStatus
     detail: string
     warnings: string[]

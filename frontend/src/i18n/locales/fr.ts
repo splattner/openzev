@@ -1046,6 +1046,7 @@ export const fr = {
                 selectRecommended: 'S\u00e9lectionner les tarifs standard',
                 selectNone: 'Effacer la s\u00e9lection',
                 standardBadge: 'Standard',
+                addedToSeries: 'Sera ajouté à « {{name}} »',
                 billingModeHint: 'Les gestionnaires de r\u00e9seau facturent le raccordement une seule fois \u00e0 la communaut\u00e9 ; les prix de base sont donc import\u00e9s comme un forfait mensuel partag\u00e9. Choisissez un autre mode si chaque participant \u2014 ou chaque point de mesure, comme pour le tarif de mesure \u2014 est factur\u00e9 s\u00e9par\u00e9ment.',
                 monthlyFee: '{{amount}} CHF/mois',
                 perKwh: '{{amount}} CHF/kWh',

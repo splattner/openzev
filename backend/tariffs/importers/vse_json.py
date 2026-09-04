@@ -24,7 +24,7 @@ from dataclasses import dataclass, field
 from datetime import date, datetime, time
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 
-from tariffs.models import BillingMode, EnergyType, PeriodType, TariffCategory
+from tariffs.models import BillingMode, EnergyType, PeriodType, SourceComponent, TariffCategory
 from tariffs.periods import ALL_MONTHS, format_number_list
 
 #: A standard entry carrying both a base fee and a per-kWh price becomes *two*
@@ -125,6 +125,12 @@ class Candidate:
 
     # Provenance, shown in the preview so the user can tell two similarly
     # named customer groups apart.
+    #: Which published price this candidate came from, and the operator's own
+    #: name for the component's series (the name before the suffix). Together
+    #: these survive a rename on either side, which the derived name does not.
+    source_component: str = ""
+    source_series_name: str = ""
+
     source_tariff_name: str = ""
     source_tariff_type: str = ""
     source_customer_type: str = ""
@@ -500,6 +506,8 @@ def _candidate(
     fixed_price_chf: Decimal | None = None,
     periods: list[ProposedPeriod] | None = None,
     blocked_reason: str | None = None,
+    source_component: str = "",
+    source_series_name: str = "",
 ) -> Candidate:
     valid_from = header["start_date"]
     # Deduplicated: per-band rounding notices otherwise repeat once per window.
@@ -516,6 +524,8 @@ def _candidate(
         valid_to=header["end_date"],
         notes=header["notes"],
         periods=periods or [],
+        source_component=source_component,
+        source_series_name=source_series_name[:MAX_TARIFF_NAME_LENGTH],
         source_tariff_name=header["tariff_name"],
         source_tariff_type=header["tariff_type"],
         source_customer_type=header["customer_type"],
@@ -526,9 +536,15 @@ def _candidate(
     )
 
 
-def _fee_candidate(raw_price, *, name: str, category: str, header: dict, label: str) -> Candidate:
+def _fee_candidate(raw_price, *, series_name: str, category: str, header: dict,
+                   label: str) -> Candidate:
     """A ``CHF/M`` base price → a monthly fee tariff."""
     warnings: list[str] = []
+    name = _tariff_name(series_name, BASE_COMPONENT_SUFFIX, [])
+    provenance = {
+        "source_component": SourceComponent.BASE,
+        "source_series_name": series_name,
+    }
     try:
         price, unit = _price_of(raw_price, label)
         if unit and unit.casefold() != "chf/m":
@@ -540,6 +556,7 @@ def _fee_candidate(raw_price, *, name: str, category: str, header: dict, label: 
         return _candidate(
             name=name, category=category, header=header, warnings=warnings,
             billing_mode=FEE_BILLING_MODE_OPTIONS[0], blocked_reason=str(exc),
+            **provenance,
         )
 
     # Which of FEE_BILLING_MODE_OPTIONS is right cannot be read off the
@@ -550,22 +567,30 @@ def _fee_candidate(raw_price, *, name: str, category: str, header: dict, label: 
         billing_mode=FEE_BILLING_MODE_OPTIONS[0],
         billing_mode_options=FEE_BILLING_MODE_OPTIONS,
         fixed_price_chf=fixed,
+        **provenance,
     )
 
 
-def _energy_candidate(entries, *, name: str, category: str, header: dict, label: str) -> Candidate:
+def _energy_candidate(entries, *, series_name: str, category: str, header: dict,
+                      label: str) -> Candidate:
     warnings: list[str] = []
+    name = _tariff_name(series_name, ENERGY_COMPONENT_SUFFIX, [])
+    provenance = {
+        "source_component": SourceComponent.ENERGY,
+        "source_series_name": series_name,
+    }
     try:
         periods = _map_energy_bands(list(entries), label, warnings)
     except (ValueError, _Unsupported) as exc:
         return _candidate(
             name=name, category=category, header=header, warnings=warnings,
             billing_mode=BillingMode.ENERGY, energy_type=EnergyType.GRID,
-            blocked_reason=str(exc),
+            blocked_reason=str(exc), **provenance,
         )
     return _candidate(
         name=name, category=category, header=header, warnings=warnings,
         billing_mode=BillingMode.ENERGY, energy_type=EnergyType.GRID, periods=periods,
+        **provenance,
     )
 
 
@@ -667,6 +692,8 @@ def _candidates_for_entry(entry: dict, dso_name: str, dso_number: int | None) ->
                 name=_tariff_name(header["tariff_name"], ENERGY_COMPONENT_SUFFIX, []),
                 category=category, header=header, warnings=[],
                 billing_mode=BillingMode.ENERGY, energy_type=EnergyType.GRID,
+                source_component=SourceComponent.ENERGY,
+                source_series_name=header["tariff_name"],
                 blocked_reason=(
                     "Dynamic tariffs are not supported: the price is served by an external "
                     "time series" + (f" at {url}" if url else "") + ", not published in this document."
@@ -677,16 +704,14 @@ def _candidates_for_entry(entry: dict, dso_name: str, dso_number: int | None) ->
     if prices.get("base") is not None:
         candidates.append(
             _fee_candidate(
-                prices["base"],
-                name=_tariff_name(header["tariff_name"], BASE_COMPONENT_SUFFIX, []),
+                prices["base"], series_name=header["tariff_name"],
                 category=category, header=header, label="The base price",
             )
         )
     if prices.get("energy"):
         candidates.append(
             _energy_candidate(
-                prices["energy"],
-                name=_tariff_name(header["tariff_name"], ENERGY_COMPONENT_SUFFIX, []),
+                prices["energy"], series_name=header["tariff_name"],
                 category=category, header=header, label="The",
             )
         )
@@ -734,14 +759,14 @@ def _tax_candidates(tax, *, label: str, header: dict, base_key: str, energy_key:
     if tax.get(base_key) is not None:
         candidates.append(
             _fee_candidate(
-                tax[base_key], name=_tariff_name(label, BASE_COMPONENT_SUFFIX, []),
+                tax[base_key], series_name=label,
                 category=TariffCategory.LEVIES, header=scoped, label="The base price",
             )
         )
     if tax.get(energy_key):
         candidates.append(
             _energy_candidate(
-                tax[energy_key], name=_tariff_name(label, ENERGY_COMPONENT_SUFFIX, []),
+                tax[energy_key], series_name=label,
                 category=TariffCategory.LEVIES, header=scoped, label="The",
             )
         )

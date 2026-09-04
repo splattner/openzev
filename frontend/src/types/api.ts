@@ -385,6 +385,9 @@ export interface Tariff {
     valid_from: string
     valid_to?: string | null
     notes?: string
+    /** Written by the Art. 7b importer; blank for tariffs entered by hand. */
+    source_component?: 'base' | 'energy' | ''
+    source_series_name?: string
 }
 
 export interface TariffInput {
@@ -947,6 +950,9 @@ export interface VseTariffCandidate {
     source_customer_type: string
     source_voltage_level: number | null
     standard_basegroup: boolean
+    /** Name the created tariff takes; differs from `name` when the series was
+     *  matched on provenance and has been renamed since. */
+    series_name: string
     status: VseTariffCandidateStatus
     detail: string
     warnings: string[]

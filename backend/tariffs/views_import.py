@@ -123,6 +123,9 @@ def _candidate_payload(planned: PlannedCandidate) -> dict:
         "standard_basegroup": candidate.standard_basegroup,
         "status": planned.status,
         "detail": planned.detail,
+        # Differs from ``name`` when the series was matched on provenance and
+        # has been renamed since; that is the name the tariff would get.
+        "series_name": planned.series_name or candidate.name,
         "warnings": candidate.warnings,
         # Only ever pre-tick something that is both the operator's own default
         # product and actually applicable to this ZEV right now.

@@ -1046,6 +1046,7 @@ export const de = {
                 selectRecommended: 'Standardtarife ausw\u00e4hlen',
                 selectNone: 'Auswahl aufheben',
                 standardBadge: 'Standard',
+                addedToSeries: 'Wird zu «{{name}}» hinzugefügt',
                 billingModeHint: 'Netzbetreiber verrechnen den Anschluss einmal an die Gemeinschaft, deshalb werden Grundpreise als geteilte Monatsgeb\u00fchr importiert. W\u00e4hlen Sie eine andere Verrechnungsart, wenn jede Teilnehmerin \u2014 oder jeder Messpunkt, wie beim Messtarif \u2014 einzeln verrechnet wird.',
                 monthlyFee: '{{amount}} CHF/Monat',
                 perKwh: '{{amount}} CHF/kWh',

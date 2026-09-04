@@ -19,6 +19,7 @@ from dataclasses import dataclass, field, replace
 from datetime import date
 
 from django.db import transaction
+from django.db.models import Q
 from django.core.exceptions import ValidationError as DjangoValidationError
 
 from tariffs.models import Tariff, TariffPeriod
@@ -63,6 +64,10 @@ class PlannedCandidate:
     #: The end date the new tariff would actually get, which is the document's
     #: end date unless a later version already exists and caps it earlier.
     effective_valid_to: date | None = None
+    #: Name the created version takes. Differs from the candidate's own name
+    #: when the series was matched on provenance and has since been renamed —
+    #: versions of a series share a name, so the existing one wins.
+    series_name: str = ""
 
     @property
     def is_applicable(self) -> bool:
@@ -76,31 +81,69 @@ class ImportReport:
     errors: list[dict] = field(default_factory=list)
 
 
-def _existing_series(zev_id, names: set[str]) -> dict[str, list[Tariff]]:
-    series: dict[str, list[Tariff]] = {}
-    for tariff in Tariff.objects.filter(zev_id=zev_id, name__in=names):
-        series.setdefault(tariff.name, []).append(tariff)
-    return series
+def _resolve_series(candidate: Candidate, tariffs: list[Tariff]) -> tuple[list[Tariff], str]:
+    """The versions of the series this candidate belongs to, and their name.
+
+    Provenance first: a tariff imported from the same published component is
+    the same series even if its name has changed since — on either side. The
+    derived name cannot express that, which is how a rename used to fork a
+    second series and start billing both.
+
+    Falls back to the name for tariffs entered by hand, and for anything
+    imported before provenance was recorded.
+    """
+    if candidate.source_component and candidate.source_series_name:
+        matched = [
+            tariff for tariff in tariffs
+            if tariff.source_component == candidate.source_component
+            and tariff.source_series_name == candidate.source_series_name
+        ]
+        if matched:
+            # Versions share a name, so the one already in use wins.
+            return matched, matched[0].name
+    return [tariff for tariff in tariffs if tariff.name == candidate.name], candidate.name
+
+
+def _series_candidates(zev_id, candidates: list[Candidate]):
+    """Every tariff that could be a version of one of these candidates."""
+    lookup = Q(name__in={candidate.name for candidate in candidates})
+    sourced = [c for c in candidates if c.source_component and c.source_series_name]
+    if sourced:
+        lookup |= Q(
+            source_component__in={c.source_component for c in sourced},
+            source_series_name__in={c.source_series_name for c in sourced},
+        )
+    return list(Tariff.objects.filter(zev_id=zev_id).filter(lookup))
 
 
 def _plan_one(
-    candidate: Candidate, versions: list[Tariff], *, billing_mode_was_chosen: bool = False
+    candidate: Candidate, versions: list[Tariff], *, series_name: str = "",
+    billing_mode_was_chosen: bool = False,
 ) -> PlannedCandidate:
     """Status one candidate against the versions of its series that exist.
+
+    ``series_name`` is the name the created version must take — the existing
+    series' name when it was matched on provenance, which may no longer be the
+    one the document derives.
 
     ``billing_mode_was_chosen`` says the user answered the billing-mode
     question for this row, which decides what a mismatch against the existing
     series means: an unanswered one is matched to the series, an answered one
     is a conflict rather than something to quietly overrule.
     """
+    series_name = series_name or candidate.name
     if not candidate.is_importable:
-        return PlannedCandidate(candidate, CandidateStatus.UNSUPPORTED, candidate.blocked_reason or "")
+        return PlannedCandidate(
+            candidate, CandidateStatus.UNSUPPORTED, candidate.blocked_reason or "",
+            series_name=series_name,
+        )
 
     if not versions:
         return PlannedCandidate(
             candidate, CandidateStatus.NEW,
             "Creates a new tariff.",
             effective_valid_to=candidate.valid_to,
+            series_name=series_name,
         )
 
     # Same name and same start date is the same version: re-importing last
@@ -110,6 +153,7 @@ def _plan_one(
             candidate, CandidateStatus.DUPLICATE,
             f"A version of this tariff already starts on {candidate.valid_from.isoformat()}; "
             "it has been imported before and is left untouched.",
+            series_name=series_name,
         )
 
     # Versions of one tariff must agree on what the tariff *is* — the model
@@ -146,6 +190,7 @@ def _plan_one(
                 f'A tariff named "{candidate.name}" already exists in this ZEV billed as '
                 f"{theirs!r}. Versions of one tariff must agree on that, so it cannot be "
                 f"imported as {mine!r}. Choose {theirs!r}, or rename one of them.",
+                series_name=series_name,
             )
 
         return PlannedCandidate(
@@ -153,6 +198,7 @@ def _plan_one(
             f'A tariff named "{candidate.name}" already exists in this ZEV with '
             f"{series_field}={theirs!r}, but the document maps it to {mine!r}. "
             "Rename one of them before importing.",
+            series_name=series_name,
         )
 
     window = plan_new_version(versions, candidate.valid_from)
@@ -160,7 +206,10 @@ def _plan_one(
     if window.valid_to is not None and (valid_to is None or window.valid_to < valid_to):
         valid_to = window.valid_to
 
-    detail = "Adds a new version to the existing tariff."
+    detail = (
+        f'Adds a new version to "{series_name}".' if series_name != candidate.name
+        else "Adds a new version to the existing tariff."
+    )
     if matched_billing_mode is not None:
         # Say so rather than let the dropdown quietly disagree with the
         # document the reader is comparing it against.
@@ -177,13 +226,18 @@ def _plan_one(
         candidate, CandidateStatus.NEW_VERSION, detail,
         closes_predecessor_on=window.predecessor_valid_to,
         effective_valid_to=valid_to,
+        series_name=series_name,
     )
 
 
 def plan_import(zev_id, document: ParsedDocument) -> list[PlannedCandidate]:
     """Status every candidate against the tariffs this ZEV already has."""
-    series = _existing_series(zev_id, {candidate.name for candidate in document.candidates})
-    return [_plan_one(candidate, series.get(candidate.name, [])) for candidate in document.candidates]
+    tariffs = _series_candidates(zev_id, document.candidates)
+    planned = []
+    for candidate in document.candidates:
+        versions, series_name = _resolve_series(candidate, tariffs)
+        planned.append(_plan_one(candidate, versions, series_name=series_name))
+    return planned
 
 
 def _notes_with_provenance(candidate: Candidate, source_url: str, imported_on: date) -> str:
@@ -193,13 +247,16 @@ def _notes_with_provenance(candidate: Candidate, source_url: str, imported_on: d
 
 def _create(zev, planned: PlannedCandidate, source_url: str, imported_on: date) -> Tariff:
     candidate = planned.candidate
+    # Versions of a series share a name, so a series matched on provenance
+    # keeps the name it answers to rather than reverting to the document's.
+    name = planned.series_name or candidate.name
 
     if planned.closes_predecessor_on is not None:
         # Truncate first: saving the new version while the predecessor still
         # covers this date would trip the overlap guard in Tariff.clean.
         predecessor = (
             Tariff.objects.filter(
-                zev=zev, name=candidate.name, valid_from__lt=candidate.valid_from
+                zev=zev, name=name, valid_from__lt=candidate.valid_from
             )
             .order_by("-valid_from")
             .first()
@@ -210,7 +267,7 @@ def _create(zev, planned: PlannedCandidate, source_url: str, imported_on: date) 
 
     tariff = Tariff(
         zev=zev,
-        name=candidate.name,
+        name=name,
         category=candidate.category,
         billing_mode=candidate.billing_mode,
         energy_type=candidate.energy_type,
@@ -218,6 +275,8 @@ def _create(zev, planned: PlannedCandidate, source_url: str, imported_on: date) 
         valid_from=candidate.valid_from,
         valid_to=planned.effective_valid_to,
         notes=_notes_with_provenance(candidate, source_url, imported_on),
+        source_component=candidate.source_component,
+        source_series_name=candidate.source_series_name,
     )
     tariff.save()
 
@@ -288,9 +347,12 @@ def apply_import(*, zev, document: ParsedDocument, selections: list[Selection], 
         # old, another session may have added a version since, and each
         # candidate this loop writes changes the timeline the next one plans
         # against.
-        versions = list(Tariff.objects.filter(zev_id=zev.id, name=candidate.name))
+        versions, series_name = _resolve_series(
+            candidate, _series_candidates(zev.id, [candidate])
+        )
         planned = _plan_one(
-            candidate, versions, billing_mode_was_chosen=selection.billing_mode is not None
+            candidate, versions, series_name=series_name,
+            billing_mode_was_chosen=selection.billing_mode is not None,
         )
         if not planned.is_applicable:
             report.skipped.append({"name": candidate.name, "reason": planned.detail})

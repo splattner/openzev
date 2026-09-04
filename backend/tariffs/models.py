@@ -88,6 +88,20 @@ def validate_month_list(value: str) -> None:
     _validate_number_list(value, low=1, high=12, label="Months")
 
 
+class SourceComponent(models.TextChoices):
+    """Which price of a published tariff entry a tariff was imported from.
+
+    One entry in an Art. 7b document carries several prices, and each becomes
+    its own OpenZEV tariff because ``Tariff`` holds a single ``billing_mode``.
+    Which one a tariff came from was previously recorded only as a suffix on
+    its name — a derived string that a rename, on either side, silently
+    detaches from the component it names.
+    """
+
+    BASE = "base", "Base price (Grundpreis)"
+    ENERGY = "energy", "Energy price (Arbeitspreis)"
+
+
 class Tariff(models.Model):
     """Tariff definition for a ZEV with a validity period."""
 
@@ -107,6 +121,20 @@ class Tariff(models.Model):
     valid_from = models.DateField()
     valid_to = models.DateField(null=True, blank=True)
     notes = models.TextField(blank=True)
+
+    # Provenance, written by the Art. 7b importer and blank for everything
+    # entered by hand. Together these identify the published component a tariff
+    # came from, which is what lets next year's document append a version to a
+    # series that has since been renamed instead of forking a second one.
+    source_component = models.CharField(
+        max_length=20, choices=SourceComponent.choices, blank=True, default="",
+        help_text="Which price of the published entry this was imported from.",
+    )
+    source_series_name = models.CharField(
+        max_length=200, blank=True, default="",
+        help_text="The operator's own name for this component, before the name suffix.",
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

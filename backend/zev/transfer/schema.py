@@ -143,6 +143,8 @@ TARIFF_FIELDS = (
     "valid_from",
     "valid_to",
     "notes",
+    "source_component",
+    "source_series_name",
 )
 
 TARIFF_PERIOD_FIELDS = (

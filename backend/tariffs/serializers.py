@@ -113,7 +113,11 @@ class TariffSerializer(serializers.ModelSerializer):
     class Meta:
         model = Tariff
         fields = "__all__"
-        read_only_fields = ["id", "created_at", "updated_at"]
+        # Provenance is the importer's record of where a tariff came from;
+        # a client that could set it could fake a series match.
+        read_only_fields = [
+            "id", "created_at", "updated_at", "source_component", "source_series_name",
+        ]
 
 
 # ── VSE/AES tariff import ────────────────────────────────────────────────────
@@ -181,6 +185,9 @@ class VseTariffCandidateSerializer(serializers.Serializer):
     standard_basegroup = serializers.BooleanField()
 
     #: ``new`` / ``new_version`` / ``duplicate`` / ``conflict`` / ``unsupported``
+    #: Where the row actually lands: the existing series' name when it was
+    #: matched on provenance and renamed since, otherwise the same as ``name``.
+    series_name = serializers.CharField()
     status = serializers.CharField()
     detail = serializers.CharField(allow_blank=True)
     warnings = serializers.ListField(child=serializers.CharField())

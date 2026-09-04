@@ -372,6 +372,11 @@ function CandidateRow({
                         </span>
                     )}
                 </div>
+                {candidate.series_name !== candidate.name && (
+                    <small className="muted" style={{ display: 'block' }}>
+                        {t('pages.tariffs.import.addedToSeries', { name: candidate.series_name })}
+                    </small>
+                )}
                 {candidate.source_customer_type && (
                     <small className="muted">{candidate.source_customer_type}</small>
                 )}
