@@ -108,23 +108,25 @@ PVshare Cockpit is a closed, subscription-based SaaS (CHF ~30/participant/year) 
 | Timestamp-level energy allocation billing engine (local vs. grid split) | `shipped` | — | [spec](specs/2026-03-tariffs-and-billing-engine.md) |
 | Producer credit allocation (local-consumption credit + feed-in compensation) | `shipped` | — | [spec](specs/2026-03-tariffs-and-billing-engine.md) |
 | Six billing modes (energy, % of grid, monthly fee, yearly fee, per-meter monthly/yearly) | `shipped` | — | [spec](specs/2026-03-tariffs-and-billing-engine.md) |
-| High-tariff / low-tariff pricing with time-of-day and weekday windows | `shipped` | — | [spec](specs/2026-03-tariffs-and-billing-engine.md) |
+| Time-band pricing with time-of-day, weekday, and month windows | `shipped` | — | HT/NT plus seasonal bands (#527) and three-or-more bands per tariff (#528) — [spec](specs/2026-03-tariffs-and-billing-engine.md) |
 | Four tariff categories (energy, grid fees, levies, metering) | `shipped` | — | [spec](specs/2026-03-tariffs-and-billing-engine.md) |
 | Tariff-only JSON export/import (tariff preset) | `removed` | — | Superseded by whole-ZEV transfer — [spec](specs/2026-08-zev-transfer-archive.md), [guide](user-guide/17-zev-transfer.md) |
+| Tariff import from the grid operator's Art. 7b publication (VSE/AES standard, URL fetch, previewed and per-entry selected) | `shipped` | — | [spec](specs/2026-09-vse-tariff-import.md), #507 |
 | VAT application with validity-windowed VAT rate table | `shipped` | — | [spec](specs/2026-03-tariffs-and-billing-engine.md) |
 | Annual financial report for tax purposes | `shipped` | — | — |
 | Period overview with strict daily completeness checking | `shipped` | — | [spec](specs/2026-03-invoice-lifecycle-and-communication.md) |
 | Contract PDF (multi-language, tariff rates, metering points, billing interval) | `shipped` | — | — |
 | vZEV feasibility / profitability calculator (aggregate or per-participant, energy-flow topology, self-consumption & internal-price sensitivity, payback/ROI/NPV, prefill of a real ZEV's participants, measured self-consumption, and all-in tariffs) | `shipped` | — | [guide](user-guide/13-feasibility-calculator.md) |
 | Scheduled invoice auto-generation (cron-triggered, per-ZEV billing interval) | `idea` | `medium` | Would remove the manual "generate all" step each month |
-| Payment reference number / ESR reference on invoice | `idea` | `medium` | Needed for automated bank reconciliation in Swiss setup |
+| Payment reference number (QRR / SCOR) on the invoice QR bill | `idea` | `medium` | Needed for automated bank reconciliation; the QR bill already ships, the structured reference does not — #536 |
+| Dynamic tariffs (`tariffForm: dynamic`) | `idea` | `low` | Price served by an external time series; the standard defines it as a bare URL with no response schema, so it needs a real operator endpoint to build against — #530 |
 | Invoice data export — CSV export of invoice line items | `idea` | `low` | Useful for external accounting software |
 | Mark invoice as disputed / on-hold state | `idea` | `low` | Would require an extra lifecycle state and guard |
 | Credit note / corrective invoice generation | `idea` | `low` | Complex billing edge case; needs dedicated spec |
 | Send invoice email from custom SMTP sender per ZEV | `idea` | `low` | Currently uses system-wide SMTP settings |
 | Invoice run reject + auto-recalculate workflow | `idea` | `medium` | PVshare: reject a run, fix config, confirm → system auto-rebuilds run in 1–2 days; smoother than manual regenerate |
 | Vacant unit auto-billing to ZEV responsible | `idea` | `medium` | When no participant assignment exists for a unit in a period, bill the ZEV owner automatically (PVshare parity) |
-| LEG (Lokale Elektrizitätsgemeinschaft) billing model | `idea` | `high` | New Swiss law since 2026; LEG bills only internally-exchanged energy; grid operator settles remainder directly — fundamentally different from vZEV model — [spec](specs/2026-06-leg-billing-model.md) |
+| LEG (Lokale Elektrizitätsgemeinschaft) billing model | `planned` | `high` | New Swiss law since 2026; LEG bills only internally-exchanged energy; grid operator settles remainder directly — fundamentally different from vZEV model — [spec](specs/2026-06-leg-billing-model.md) |
 
 ---
 
@@ -148,7 +150,7 @@ PVshare Cockpit is a closed, subscription-based SaaS (CHF ~30/participant/year) 
 | Bulk meter reading export (CSV/Excel) for a period and ZEV | `idea` | `medium` | Needed for external analysis and audit |
 | Anomaly / outlier detection on imported readings | `idea` | `low` | Flag unusually high/low values before billing |
 | Real-time or near-real-time metering ingestion (MQTT / push API) | `deferred` | — | Significant infrastructure change; out of scope for current architecture |
-| Demand tariff (Leistungstarif) support | `idea` | `high` | Monthly peak-demand billing (CHF/kW); CKW introduced in 2025; required for some Swiss grids — not computable from energy readings alone, needs peak-power data per period |
+| Demand tariff (Leistungstarif) support | `idea` | `high` | Monthly peak-demand billing (CHF/kW); CKW introduced in 2025; required for some Swiss grids. Peak kW *is* derivable from stored readings (`energy_kwh × 4` at 15-minute resolution); what is missing is a billing mode, an engine pass, and a decision on whose peak is billed — #529 |
 | BFE reference market price auto-fetch | `idea` | `low` | Automatically retrieve Swiss federal BFE quarterly PV feed-in reference price so ZEV owners don't need to look it up manually |
 
 ---
@@ -160,6 +162,7 @@ PVshare Cockpit is a closed, subscription-based SaaS (CHF ~30/participant/year) 
 | ZEV CRUD (admin-scoped and owner-scoped) | `shipped` | — | [spec](specs/2026-03-metering-point-management.md) |
 | Admin ZEV creation wizard (creates ZEV + owner + participant + meters in one transaction) | `shipped` | — | [spec](specs/2026-03-metering-point-management.md) |
 | Self-setup for self-registered ZEV owners | `shipped` | — | — |
+| Grid operator (VNB) picked from the official ElCom list instead of typed | `shipped` | — | PR #519 |
 | Participant CRUD with validity window | `shipped` | — | [spec](specs/2026-03-metering-point-management.md) |
 | Participant invitation (reset password + email with temporary credentials) | `shipped` | — | — |
 | Participant account linking / unlinking | `shipped` | — | [spec](specs/2026-03-metering-point-management.md) |
