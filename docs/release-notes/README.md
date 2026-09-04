@@ -25,8 +25,11 @@ release with a product it never shipped. This is the opposite of
 `docs/user-guide/screenshots/`, which is regenerated as a set whenever the
 interface moves.
 
-Capture one with `npm run shot` from `frontend/` (see the header of
-`frontend/screenshots/shot.spec.ts`). Reference it from the draft with a path
+Capture a UI shot with `npm run shot` from `frontend/` (see the header of
+`frontend/screenshots/shot.spec.ts`). For a figure from a generated document,
+render the PDF from a throwaway test and crop it with
+`scripts/crop-pdf-figure.py`, which finds the line-item table by its header
+bar so a before/after pair lines up exactly. Reference it from the draft with a path
 relative to the draft — `screenshots/x.png` — which is correct in the repo and
 in review; `scripts/release-notes-body.mjs` rewrites it to a tag-pinned
 absolute URL at publish time, because a release body resolves relative paths
