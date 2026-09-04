@@ -135,6 +135,14 @@ export function ZevGeneralSettingsFields({ form, onChange }: ZevGeneralSettingsF
                         />
                     </label>
                     <label>
+                        <span>{t('pages.zevSettings.fields.bankName')}</span>
+                        <input
+                            name="bank_name"
+                            value={form.bank_name ?? ''}
+                            onChange={(event) => onChange({ bank_name: event.target.value })}
+                        />
+                    </label>
+                    <label className="grid-span-full">
                         <span>{t('pages.zevSettings.fields.vatMode')}</span>
                         <select
                             value={form.vat_mode ?? 'not_registered'}
@@ -154,7 +162,7 @@ export function ZevGeneralSettingsFields({ form, onChange }: ZevGeneralSettingsF
                         <small className="muted">{t('pages.zevSettings.fields.vatModeHint')}</small>
                     </label>
                     {form.vat_mode === 'registered' && (
-                        <label>
+                        <label className="grid-span-full">
                             <span>{t('pages.zevSettings.fields.vatNumber')}</span>
                             <input
                                 value={form.vat_number ?? ''}
@@ -162,14 +170,6 @@ export function ZevGeneralSettingsFields({ form, onChange }: ZevGeneralSettingsF
                             />
                         </label>
                     )}
-                    <label>
-                        <span>{t('pages.zevSettings.fields.bankName')}</span>
-                        <input
-                            name="bank_name"
-                            value={form.bank_name ?? ''}
-                            onChange={(event) => onChange({ bank_name: event.target.value })}
-                        />
-                    </label>
                     <label className="grid-span-full">
                         <span>{t('pages.zevSettings.fields.bankIban')}</span>
                         <input
