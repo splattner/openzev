@@ -492,6 +492,96 @@ class PlanningTests(TestCase):
         self.assertEqual(created, [])
         self.assertIn("already exists in this ZEV", report.skipped[0]["reason"])
 
+    # ── Re-importing a fee whose billing mode the user already chose ───────
+    #
+    # The document does not record which of the three monthly modes a fee was
+    # imported as — that answer is the user's. So next year's document
+    # proposes the default again, and the plan has to reconcile it with the
+    # choice already made rather than refuse.
+
+    FEE_DOC = {
+        "base": {"price": 7, "priceUnit": "CHF/M"},
+        "energy": [{"from": "00:00", "to": "00:00", "price": 0.1, "priceUnit": "CHF/kWh"}],
+    }
+
+    def _existing_fee(self, billing_mode, valid_from=date(2025, 1, 1)):
+        return Tariff.objects.create(
+            zev=self.zev, name="Netznutzung Basis (Grundpreis)",
+            category=TariffCategory.GRID_FEES, billing_mode=billing_mode,
+            energy_type=None, fixed_price_chf=Decimal("6.00"), valid_from=valid_from,
+        )
+
+    def _fee_plan(self, **kwargs):
+        planned = plan_import(self.zev.id, parse_document(document(entry(prices=self.FEE_DOC))))
+        return next(p for p in planned if p.candidate.name == "Netznutzung Basis (Grundpreis)")
+
+    def test_a_fee_billed_differently_is_matched_to_the_series_not_refused(self):
+        """The reported bug: the preview called this a conflict, and a
+        conflicting row is unselectable — which disables the billing-mode
+        dropdown that was the only way to resolve it."""
+        self._existing_fee(BillingMode.MONTHLY_FEE)
+
+        fee = self._fee_plan()
+
+        self.assertEqual(fee.status, CandidateStatus.NEW_VERSION)
+        self.assertEqual(fee.candidate.billing_mode, BillingMode.MONTHLY_FEE)
+        self.assertIn("to match the versions already here", fee.detail)
+
+    def test_matching_the_series_survives_through_to_what_is_created(self):
+        self._existing_fee(BillingMode.PER_METERING_POINT_MONTHLY_FEE)
+
+        report, created = self._apply(document(entry(prices=self.FEE_DOC)))
+
+        self.assertEqual(report.errors, [])
+        fee = next(t for t in created if t.name == "Netznutzung Basis (Grundpreis)")
+        self.assertEqual(fee.billing_mode, BillingMode.PER_METERING_POINT_MONTHLY_FEE)
+
+    def test_an_explicit_choice_is_never_silently_overruled(self):
+        """Matching the series is for an unanswered question. Someone who
+        picked a mode outright gets told it cannot be, rather than having the
+        import quietly bill it another way."""
+        self._existing_fee(BillingMode.MONTHLY_FEE)
+        parsed = parse_document(document(entry(prices=self.FEE_DOC)))
+        fee = by_name(parsed, "Netznutzung Basis (Grundpreis)")
+
+        report, created = apply_import(
+            zev=self.zev, document=parsed,
+            selections=[Selection(fee.key, billing_mode=BillingMode.SHARED_MONTHLY_FEE)],
+            source_url="https://example.ch/t.json", imported_on=date(2026, 9, 2),
+        )
+
+        self.assertEqual(created, [])
+        self.assertIn("must agree", report.skipped[0]["reason"])
+        self.assertEqual(Tariff.objects.filter(name="Netznutzung Basis (Grundpreis)").count(), 1)
+
+    def test_choosing_the_mode_the_series_already_uses_is_accepted(self):
+        self._existing_fee(BillingMode.MONTHLY_FEE)
+        parsed = parse_document(document(entry(prices=self.FEE_DOC)))
+        fee = by_name(parsed, "Netznutzung Basis (Grundpreis)")
+
+        report, created = apply_import(
+            zev=self.zev, document=parsed,
+            selections=[Selection(fee.key, billing_mode=BillingMode.MONTHLY_FEE)],
+            source_url="https://example.ch/t.json", imported_on=date(2026, 9, 2),
+        )
+
+        self.assertEqual(report.errors, [])
+        self.assertEqual(len(created), 1)
+        self.assertEqual(created[0].billing_mode, BillingMode.MONTHLY_FEE)
+
+    def test_a_mode_the_candidate_cannot_be_imported_as_is_still_a_conflict(self):
+        """An energy tariff offers no modes at all, so there is nothing to
+        match it to — that mismatch stays a dead end."""
+        Tariff.objects.create(
+            zev=self.zev, name="Netznutzung Basis (Arbeitspreis)",
+            category=TariffCategory.GRID_FEES, billing_mode=BillingMode.MONTHLY_FEE,
+            energy_type=EnergyType.GRID, valid_from=date(2025, 1, 1),
+        )
+
+        planned = plan_import(self.zev.id, parse_document(document(entry())))
+
+        self.assertEqual(planned[0].status, CandidateStatus.CONFLICT)
+
     def test_only_the_selected_candidates_are_created(self):
         parsed = parse_document(real_document())
         wanted = [c for c in parsed.candidates if c.recommended]
@@ -902,6 +992,28 @@ class ImportEndpointTests(TestCase):
         self.assertEqual(body["document_digest"], self.digest)
         self.assertEqual(body["candidates"][0]["status"], CandidateStatus.NEW)
         self.assertEqual(Tariff.objects.count(), 0)
+
+    def test_preview_offers_a_refreshed_fee_as_a_new_version_with_its_mode_intact(self):
+        """What the wizard keys off: a conflicting row is rendered
+        unselectable, which disables the billing-mode dropdown too — so a fee
+        whose mode was chosen last year has to come back selectable, already
+        showing the mode the series uses."""
+        self.document = document(entry(prices={
+            "base": {"price": 7, "priceUnit": "CHF/M"},
+            "energy": [{"from": "00:00", "to": "00:00", "price": 0.1, "priceUnit": "CHF/kWh"}],
+        }))
+        Tariff.objects.create(
+            zev=self.zev, name="Netznutzung Basis (Grundpreis)",
+            category=TariffCategory.GRID_FEES, billing_mode=BillingMode.MONTHLY_FEE,
+            energy_type=None, fixed_price_chf=Decimal("6.00"), valid_from=date(2025, 1, 1),
+        )
+
+        body = self._preview().json()
+        fee = next(c for c in body["candidates"] if c["name"] == "Netznutzung Basis (Grundpreis)")
+
+        self.assertEqual(fee["status"], CandidateStatus.NEW_VERSION)
+        self.assertEqual(fee["billing_mode"], BillingMode.MONTHLY_FEE)
+        self.assertIn(BillingMode.MONTHLY_FEE, fee["billing_mode_options"])
 
     def test_preview_falls_back_to_the_url_stored_on_the_zev(self):
         self.zev.tariff_source_url = self.URL

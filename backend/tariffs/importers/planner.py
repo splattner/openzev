@@ -83,7 +83,16 @@ def _existing_series(zev_id, names: set[str]) -> dict[str, list[Tariff]]:
     return series
 
 
-def _plan_one(candidate: Candidate, versions: list[Tariff]) -> PlannedCandidate:
+def _plan_one(
+    candidate: Candidate, versions: list[Tariff], *, billing_mode_was_chosen: bool = False
+) -> PlannedCandidate:
+    """Status one candidate against the versions of its series that exist.
+
+    ``billing_mode_was_chosen`` says the user answered the billing-mode
+    question for this row, which decides what a mismatch against the existing
+    series means: an unanswered one is matched to the series, an answered one
+    is a conflict rather than something to quietly overrule.
+    """
     if not candidate.is_importable:
         return PlannedCandidate(candidate, CandidateStatus.UNSUPPORTED, candidate.blocked_reason or "")
 
@@ -107,16 +116,44 @@ def _plan_one(candidate: Candidate, versions: list[Tariff]) -> PlannedCandidate:
     # enforces it, so catching it here turns a 500-shaped validation error into
     # a sentence the user can act on.
     reference = versions[0]
+    matched_billing_mode: str | None = None
     for series_field in SERIES_FIELDS:
         mine = getattr(candidate, series_field)
         theirs = getattr(reference, series_field)
-        if mine != theirs:
+        if mine == theirs:
+            continue
+
+        # ``billing_mode`` is the one series field the document does not
+        # decide: for a fee the user picks it on first import, and the document
+        # carries no record of what they picked. So the same document
+        # re-imported a year later proposes the default again and would
+        # deadlock against the choice already made — the row went to CONFLICT,
+        # which the preview renders as unselectable, disabling the very
+        # dropdown that could have resolved it. Match the series instead, as
+        # long as this candidate can be imported that way at all.
+        if (
+            series_field == "billing_mode"
+            and not billing_mode_was_chosen
+            and theirs in candidate.billing_mode_options
+        ):
+            candidate = replace(candidate, billing_mode=theirs)
+            matched_billing_mode = theirs
+            continue
+
+        if series_field == "billing_mode" and billing_mode_was_chosen:
             return PlannedCandidate(
                 candidate, CandidateStatus.CONFLICT,
-                f'A tariff named "{candidate.name}" already exists in this ZEV with '
-                f"{series_field}={theirs!r}, but the document maps it to {mine!r}. "
-                "Rename one of them before importing.",
+                f'A tariff named "{candidate.name}" already exists in this ZEV billed as '
+                f"{theirs!r}. Versions of one tariff must agree on that, so it cannot be "
+                f"imported as {mine!r}. Choose {theirs!r}, or rename one of them.",
             )
+
+        return PlannedCandidate(
+            candidate, CandidateStatus.CONFLICT,
+            f'A tariff named "{candidate.name}" already exists in this ZEV with '
+            f"{series_field}={theirs!r}, but the document maps it to {mine!r}. "
+            "Rename one of them before importing.",
+        )
 
     window = plan_new_version(versions, candidate.valid_from)
     valid_to = candidate.valid_to
@@ -124,6 +161,13 @@ def _plan_one(candidate: Candidate, versions: list[Tariff]) -> PlannedCandidate:
         valid_to = window.valid_to
 
     detail = "Adds a new version to the existing tariff."
+    if matched_billing_mode is not None:
+        # Say so rather than let the dropdown quietly disagree with the
+        # document the reader is comparing it against.
+        detail += (
+            f" Billed as {matched_billing_mode!r} to match the versions already here,"
+            " not as the document proposes."
+        )
     if window.predecessor_valid_to is not None:
         detail += f" The previous version is closed on {window.predecessor_valid_to.isoformat()}."
     if valid_to != candidate.valid_to:
@@ -245,7 +289,9 @@ def apply_import(*, zev, document: ParsedDocument, selections: list[Selection], 
         # candidate this loop writes changes the timeline the next one plans
         # against.
         versions = list(Tariff.objects.filter(zev_id=zev.id, name=candidate.name))
-        planned = _plan_one(candidate, versions)
+        planned = _plan_one(
+            candidate, versions, billing_mode_was_chosen=selection.billing_mode is not None
+        )
         if not planned.is_applicable:
             report.skipped.append({"name": candidate.name, "reason": planned.detail})
             continue

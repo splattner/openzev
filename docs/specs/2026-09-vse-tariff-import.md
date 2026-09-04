@@ -286,8 +286,26 @@ rows.
 | `new` | No tariff of that name in this ZEV | yes |
 | `new_version` | Name exists with a different `valid_from`; the predecessor is closed the day before, and the new version's end date is capped by any later version (`series.plan_new_version`) | yes |
 | `duplicate` | A version already starts on that date — the document has been imported before | no |
-| `conflict` | The name exists but disagrees on `category` / `billing_mode` / `energy_type`, which `Tariff.clean` would reject | no |
+| `conflict` | The name exists but disagrees on `category` / `energy_type`, or on a `billing_mode` this candidate cannot be imported as — all of which `Tariff.clean` would reject | no |
 | `unsupported` | `blocked_reason` set by the parser | no |
+
+**A `billing_mode` mismatch is matched to the series, not refused.** The
+document does not record which of `FEE_BILLING_MODE_OPTIONS` a fee was
+imported as — that answer is the user's (§5.2) — so next year's document
+proposes the default again and disagrees with the choice already made. Since
+`SERIES_FIELDS` includes `billing_mode`, that used to plan as `conflict`,
+which the preview renders unselectable; and because the wizard disables a
+row's billing-mode picker along with its checkbox, the one control that could
+have resolved it was disabled too. The plan therefore takes the mode the
+series already uses, provided it is in this candidate's
+`billing_mode_options`, and says so in `detail`. A mode the candidate cannot
+be imported as — an energy candidate offers none — stays a `conflict`.
+
+This applies only where the user has *not* answered: an explicit
+`selections[].billing_mode` that disagrees with the series is reported rather
+than overruled (`_plan_one(..., billing_mode_was_chosen=True)`). Matching a
+question nobody answered is a convenience; overruling an answer would be the
+silent mis-billing §5.2 exists to prevent.
 
 **Idempotency** falls out of `duplicate`: re-importing the same document
 creates nothing, changes nothing, and does not trip the same-name overlap
@@ -343,8 +361,9 @@ row alone. `document_digest` is what ties the confirmation to the version the
 user reviewed: a mismatch is **409 Conflict**, not a partial write.
 
 A candidate whose chosen mode changes its `billing_mode` may plan differently
-from the preview — a series that agreed on the proposed mode will `conflict`
-on a different one, because `SERIES_FIELDS` includes `billing_mode`. That is
+from the preview — a series will `conflict` on a mode other than its own,
+because `SERIES_FIELDS` includes `billing_mode` and an explicit choice is not
+silently matched to the series the way an omitted one is (§8). That is
 caught by the re-plan inside the write path and reported in `skipped`.
 
 `remember_url` (default `true`) stores the URL on the ZEV so next year's
