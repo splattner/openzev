@@ -167,6 +167,19 @@ of it. The default leads with `shared_monthly_fee` because billing a
 connection fee per participant collects it N times over, which is the more
 damaging of the two mistakes.
 
+**The question is asked once, on the first import.** `SERIES_FIELDS` includes
+`billing_mode`, so every later version of a tariff inherits the answer — a
+different one is not a new version but a `conflict` the write path refuses
+(§8). The wizard therefore renders the picker only on a `new` row
+(`canChooseBillingMode`) and shows the settled mode as text on a
+`new_version`, with a line saying where it was decided. Offering a live
+control whose only non-default outcome is a skipped row is worse than showing
+none.
+
+The backend does not rely on that: an explicit `selections[].billing_mode`
+that disagrees with the series is still reported rather than applied, because
+the API is reachable without the wizard.
+
 `Candidate.billing_mode_options` is the single allowlist: the frontend renders
 exactly that list and `planner._with_chosen_billing_mode` accepts exactly that
 list, so a mode can never appear in the picker that the write path would then
@@ -496,8 +509,8 @@ through `invalidateTariffQueries(queryClient, zevId)`. Neither response is
 cached — a preview is a point-in-time read of an external document.
 
 **File:** `frontend/src/features/tariffs/vseImportSelection.ts` —
-`isSelectable`, `recommendedKeys`, `defaultBillingModes`, `selectionFor`,
-`toggleKey`, `trimPrice`. Extracted from the component so the rules that decide
+`isSelectable`, `canChooseBillingMode`, `recommendedKeys`,
+`defaultBillingModes`, `selectionFor`, `toggleKey`, `trimPrice`. Extracted from the component so the rules that decide
 what gets written are testable.
 
 The chosen modes live in their own `Record<string, string>` beside the tick

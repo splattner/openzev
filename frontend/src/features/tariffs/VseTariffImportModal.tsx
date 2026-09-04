@@ -11,6 +11,7 @@ import { bandName } from './bands'
 import { MONTH_KEYS, formatSeason } from './recurrence'
 import {
     defaultBillingModes,
+    canChooseBillingMode,
     isSelectable,
     recommendedKeys,
     selectionFor,
@@ -390,10 +391,9 @@ function CandidateRow({
                 <CandidatePrice candidate={candidate} />
             </td>
             <td>
-                {candidate.billing_mode_options.length > 0 ? (
+                {canChooseBillingMode(candidate) ? (
                     <select
                         value={billingMode}
-                        disabled={!selectable}
                         onChange={(event) => onBillingModeChange(event.target.value)}
                         aria-label={`${t('pages.tariffs.import.columns.billingMode')} — ${candidate.name}`}
                     >
@@ -404,7 +404,17 @@ function CandidateRow({
                         ))}
                     </select>
                 ) : (
-                    <span className="muted">{t(`pages.tariffs.billingModes.${candidate.billing_mode}`)}</span>
+                    <>
+                        <span className="muted">{t(`pages.tariffs.billingModes.${candidate.billing_mode}`)}</span>
+                        {/* Rendered as text rather than a disabled control: the
+                            mode is settled, and a greyed-out picker reads as
+                            something broken rather than something decided. */}
+                        {candidate.billing_mode_options.length > 0 && candidate.status === 'new_version' && (
+                            <small className="muted" style={{ display: 'block' }}>
+                                {t('pages.tariffs.import.billingModeFixed')}
+                            </small>
+                        )}
+                    </>
                 )}
             </td>
             <td>

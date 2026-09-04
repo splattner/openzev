@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { api } from '../src/lib/api/client'
 import { applyVseTariffImport, previewVseTariffImport } from '../src/lib/api/tariffs'
 import {
+    canChooseBillingMode,
     defaultBillingModes,
     isSelectable,
     recommendedKeys,
@@ -36,6 +37,7 @@ function candidate(overrides: Partial<VseTariffCandidate> = {}): VseTariffCandid
         source_customer_type: 'Haushalte',
         source_voltage_level: 7,
         standard_basegroup: true,
+        series_name: 'Netznutzung Basis (Arbeitspreis)',
         status: 'new',
         detail: 'Creates a new tariff.',
         warnings: [],
@@ -56,6 +58,35 @@ describe('which candidates can be imported', () => {
         expect(isSelectable(candidate({ status: 'duplicate' }))).toBe(false)
         expect(isSelectable(candidate({ status: 'conflict' }))).toBe(false)
         expect(isSelectable(candidate({ status: 'unsupported' }))).toBe(false)
+    })
+})
+
+describe('when the billing mode is still an open question', () => {
+    const fee = (overrides = {}) => candidate({
+        billing_mode: 'shared_monthly_fee',
+        billing_mode_options: ['shared_monthly_fee', 'monthly_fee', 'per_metering_point_monthly_fee'],
+        ...overrides,
+    })
+
+    it('asks on the first import of a fee', () => {
+        expect(canChooseBillingMode(fee({ status: 'new' }))).toBe(true)
+    })
+
+    it('does not ask again for a new version of a fee already imported', () => {
+        // Versions of one tariff must agree on how it is billed, so the only
+        // thing a second answer could produce is a row the import refuses.
+        expect(canChooseBillingMode(fee({ status: 'new_version' }))).toBe(false)
+    })
+
+    it('does not ask on a row that cannot be imported at all', () => {
+        for (const status of ['duplicate', 'conflict', 'unsupported'] as const) {
+            expect(canChooseBillingMode(fee({ status }))).toBe(false)
+        }
+    })
+
+    it('never asks where the document leaves no choice', () => {
+        // An energy candidate is billed per kWh and nothing else.
+        expect(canChooseBillingMode(candidate({ status: 'new' }))).toBe(false)
     })
 })
 

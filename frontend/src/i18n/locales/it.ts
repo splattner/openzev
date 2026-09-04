@@ -1047,6 +1047,7 @@ export const it = {
                 selectNone: 'Annulla la selezione',
                 standardBadge: 'Standard',
                 addedToSeries: 'Verrà aggiunto a «{{name}}»',
+                billingModeFixed: 'Definito al primo import: tutte le versioni di una tariffa devono concordare.',
                 billingModeHint: 'I gestori di rete fatturano l\u2019allacciamento una sola volta alla comunit\u00e0, quindi i prezzi base vengono importati come tariffa mensile condivisa. Scegli un\u2019altra modalit\u00e0 se ogni partecipante \u2014 o ogni punto di misura, come per la tariffa di misura \u2014 viene fatturato separatamente.',
                 monthlyFee: '{{amount}} CHF/mese',
                 perKwh: '{{amount}} CHF/kWh',

@@ -1058,6 +1058,7 @@ export const en = {
                 selectNone: 'Clear selection',
                 standardBadge: 'Standard',
                 addedToSeries: 'Will be added to “{{name}}”',
+                billingModeFixed: 'Set at the first import — every version of a tariff must agree on it.',
                 billingModeHint: 'Grid operators bill the community once for its connection, so fees are imported as a shared monthly fee. Choose a different mode where each participant \u2014 or each metering point, as with a metering charge \u2014 is billed separately.',
                 monthlyFee: '{{amount}} CHF/month',
                 perKwh: '{{amount}} CHF/kWh',

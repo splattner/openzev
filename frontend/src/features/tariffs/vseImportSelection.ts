@@ -28,6 +28,19 @@ export function recommendedKeys(candidates: VseTariffCandidate[]): Set<string> {
 }
 
 /**
+ * Whether this row's billing mode is still an open question.
+ *
+ * It is asked once, when the tariff is first imported. Every later version
+ * inherits it, because versions of one tariff must agree on how it is billed —
+ * so offering the picker again on a `new_version` row would offer a choice
+ * whose only outcome is a row the import then refuses. The answer is changed
+ * by editing the tariff, not by re-importing it.
+ */
+export function canChooseBillingMode(candidate: VseTariffCandidate): boolean {
+    return candidate.billing_mode_options.length > 0 && candidate.status === 'new'
+}
+
+/**
  * The billing mode each candidate starts on, keyed by candidate.
  *
  * Held apart from the tick state so that clearing and re-selecting rows does
