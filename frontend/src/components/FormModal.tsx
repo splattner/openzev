@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { Z_MODAL } from '../lib/zLayers'
 
 interface FormModalProps {
     isOpen: boolean
@@ -20,7 +21,7 @@ export function FormModal({ isOpen, title, children, onClose, maxWidth = '600px'
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                zIndex: 1000,
+                zIndex: Z_MODAL,
             }}
             onClick={onClose}
         >

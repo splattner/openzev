@@ -6,7 +6,6 @@ import '@fontsource-variable/inter/index.css'
 import '@mantine/core/styles.css'
 import '@mantine/dates/styles.css'
 import './styles/tokens.css'
-import { generatedTheme } from './styles/generatedTheme'
 import './index.css'
 import App from './App.tsx'
 import './i18n'
@@ -14,13 +13,9 @@ import { DateLocaleProvider } from './components/DateLocaleProvider'
 import { AuthProvider } from './lib/auth'
 import { AppSettingsProvider } from './lib/appSettings'
 import { ToastProvider } from './lib/toast'
+import { mantineTheme } from './lib/mantineTheme'
 
 const queryClient = new QueryClient()
-
-// Colors live in styles/generatedTheme.ts (generated from design/tokens.json),
-// never here. `fontFamily` must stay in the generated theme: Mantine's stylesheet
-// sets `body { font-family }` and would otherwise override index.css.
-const mantineTheme = { ...generatedTheme, defaultRadius: 'md' } as const
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

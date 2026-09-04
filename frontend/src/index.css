@@ -2126,7 +2126,9 @@ input.recurrence-chip-input {
   right: 1rem;
   display: grid;
   gap: 0.5rem;
-  z-index: 1000;
+  /* Above the modal (1000) and the dropdowns that open over it (1100) —
+     see src/lib/zLayers.ts, which owns this scale. */
+  z-index: 1200;
 }
 
 .toast {
