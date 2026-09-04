@@ -175,9 +175,33 @@ review and in the release body:
 ![...](screenshots/1.9.0-bands-after.png)
 ```
 
-Only use before/after where the *before* is genuinely reproducible. If showing
-it means generating throwaway billing data on a real instance, show the
-control the reader has to find instead, and let the prose carry the contrast.
+**Showing a generated document** (an invoice, a contract, a statement) is
+often the strongest figure available, because it is what the participant
+actually receives. Do not screenshot a PDF viewer, and do not generate
+billing data on a real instance to get one. Build the case in a throwaway
+pytest against the test database, render it, and crop:
+
+```python
+# invoices/test_zz_figure.py — delete it once the PNG is committed
+zev.itemize_tariff_bands = True          # the setting the figure is about
+inv = generate_invoice(participant, date(2026, 1, 1), date(2026, 1, 31))
+pathlib.Path("/tmp/after.pdf").write_bytes(generate_pdf(inv))
+```
+
+```
+python3 scripts/crop-pdf-figure.py /tmp/after.pdf \
+  --out docs/release-notes/screenshots/1.9.0-bands-after.png
+```
+
+The cropper finds the line-item table by its header bar rather than by
+hand-measured coordinates, so a before/after pair lines up exactly; `--box`
+overrides it when that fails. Build the two cases as two participants with
+identical readings rather than regenerating one invoice, so the only
+difference between the images is the thing being shown.
+
+Pick figures whose numbers agree with the prose around them, and make the
+prose lean on what is visible — "both tables come to 238.87" is checkable by
+the reader; "the total is unaffected" is a claim they have to take on trust.
 
 **Always write the path relative to the draft** (`screenshots/x.png`). It is
 correct in the repo and in the PR, and the publish step rewrites it — see §6.
