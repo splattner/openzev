@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.9.1](https://github.com/splattner/openzev/compare/v1.9.0...v1.9.1) (2026-09-04)
+
+
+### Bug Fixes
+
+* **ui:** open dropdowns above the modal that contains them ([#552](https://github.com/splattner/openzev/issues/552)) ([a6a0caa](https://github.com/splattner/openzev/commit/a6a0caae922894212fd65ffcd6ac3bde014e9e5d))
+
 ## [1.9.0](https://github.com/splattner/openzev/compare/v1.8.1...v1.9.0) (2026-09-04)
 
 
