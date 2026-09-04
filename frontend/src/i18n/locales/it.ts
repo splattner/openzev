@@ -1025,6 +1025,7 @@ export const it = {
             deleteConfirm: 'Elimina partecipante',
         },
         tariffs: {
+            vatInclusiveNotice: 'Questo CEL include nei prezzi l’IVA non recuperabile. I prezzi mostrati qui sono netti; le fatture aggiungono l’aliquota IVA vigente a energia di rete, utilizzo della rete, tributi e misurazione.',
             import: {
                 action: 'Importa dal gestore di rete',
                 title: 'Importa le tariffe dal tuo gestore di rete',

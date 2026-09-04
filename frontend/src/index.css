@@ -2200,6 +2200,15 @@ input.recurrence-chip-input {
   color: var(--warning-800);
 }
 
+.info-banner {
+  padding: 0.9rem 1rem;
+  border-radius: 0.85rem;
+  background: var(--info-100);
+  border: 1px solid var(--info-200);
+  color: var(--text-body);
+  font-size: 0.85rem;
+}
+
 .warning-banner a {
   color: var(--warning-800);
   font-weight: 600;

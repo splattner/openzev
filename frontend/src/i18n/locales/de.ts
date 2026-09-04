@@ -1025,6 +1025,7 @@ export const de = {
             deleteConfirm: 'Teilnehmer löschen',
         },
         tariffs: {
+            vatInclusiveNotice: 'Dieser ZEV rechnet nicht rückforderbare MWST in die Preise ein. Die hier angezeigten Preise sind netto; Rechnungen schlagen den aktiven MWST-Satz auf Netzstrom, Netznutzung, Abgaben und Messwesen auf.',
             import: {
                 action: 'Vom Netzbetreiber importieren',
                 title: 'Tarife vom Netzbetreiber importieren',

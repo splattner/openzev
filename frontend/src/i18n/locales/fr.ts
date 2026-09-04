@@ -1025,6 +1025,7 @@ export const fr = {
             deleteConfirm: 'Supprimer le participant',
         },
         tariffs: {
+            vatInclusiveNotice: 'Ce RCP int\u00e8gre la TVA non r\u00e9cup\u00e9rable dans ses prix. Les prix affich\u00e9s ici sont nets ; les factures ajoutent le taux de TVA en vigueur \u00e0 l\u2019\u00e9nergie du r\u00e9seau, \u00e0 l\u2019utilisation du r\u00e9seau, aux redevances et \u00e0 la m\u00e9trologie.',
             import: {
                 action: 'Importer depuis le gestionnaire de r\u00e9seau',
                 title: 'Importer les tarifs de votre gestionnaire de r\u00e9seau',

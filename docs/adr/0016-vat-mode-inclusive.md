@@ -71,6 +71,11 @@ Trade-offs:
 - A ZEV on `inclusive` still shows "not VAT-liable" on the participation
   contract, with no note that prices are VAT-inclusive. Acceptable for now;
   can be revisited.
+- The tariff page (history list and price chart) shows the stored **net**
+  prices, not the gross amounts invoices bill. A page-level notice is shown
+  when `vat_mode = inclusive` to name the gap; the numbers themselves are not
+  grossed there, because the net figure is the one that reconciles against
+  the operator's published sheet.
 - The financial summary does not yet surface `embedded_vat_chf`; the value is
   on the API and can be added to that operator-facing report later.
 

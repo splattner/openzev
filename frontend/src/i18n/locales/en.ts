@@ -1036,6 +1036,7 @@ export const en = {
             deleteConfirm: 'Delete Participant',
         },
         tariffs: {
+            vatInclusiveNotice: 'This ZEV folds non-recoverable VAT into its prices. The prices shown here are net; invoices add the active VAT rate to grid energy, grid fees, levies and metering.',
             import: {
                 action: 'Import from grid operator',
                 title: 'Import tariffs from your grid operator',

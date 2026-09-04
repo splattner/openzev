@@ -240,6 +240,10 @@ export function TariffsPage() {
                 onOpenImportModal={selectedZevId ? () => setShowImportModal(true) : undefined}
             />
 
+            {selectedZev?.vat_mode === 'inclusive' && (
+                <div className="info-banner">{t('pages.tariffs.vatInclusiveNotice')}</div>
+            )}
+
             {selectedZevId && (
                 <VseTariffImportModal
                     isOpen={showImportModal}
