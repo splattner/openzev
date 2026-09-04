@@ -81,7 +81,7 @@ matching vocabulary.
 
 The document says a base price is CHF per month. It cannot say *who* pays it —
 that depends on how your community relates to its operator. So each fee row has
-a **Billed as** picker, and the choice is yours:
+a **Billed as** picker on its first import, and the choice is yours:
 
 | Billed as | When it is right |
 | --- | --- |
@@ -91,6 +91,11 @@ a **Billed as** picker, and the choice is yours:
 
 Getting this wrong bills the same connection several times over, so the picker
 never guesses on your behalf beyond the default.
+
+**You are asked once.** Every later version of that tariff is billed the way
+you chose, so on a re-import the mode is shown as text rather than as a picker
+— all versions of one tariff have to agree on it. To change it afterwards,
+edit the tariff itself rather than re-importing.
 
 ### What the statuses mean
 
@@ -117,9 +122,9 @@ Re-importing is the normal yearly workflow, and it is safe to run twice:
   it. OpenZEV records which published price each tariff came from, so it
   recognises your renamed tariff as the same one; the row says *Will be added
   to "your name"*, and it keeps the name you gave it.
-- **The way you chose to bill a fee is remembered.** Next year's document
-  proposes the default again, but the import matches what you already decided
-  rather than refusing the row.
+- **The way you chose to bill a fee is kept.** Next year's document proposes
+  the default again, but the import bills it the way you decided the first
+  time, and the row shows that mode as text rather than asking again.
 
 ### What is not imported
 
