@@ -33,7 +33,14 @@ backend:
   # Comma-separated list for Django ALLOWED_HOSTS.
   # Example: "openzev.example.com,openzev.local"
   allowedHosts: ""
+  # Comma-separated origins (scheme + host) allowed to make browser API calls.
+  # Example: "https://openzev.example.com"
   corsAllowedOrigins: ""
+  # Comma-separated origins (scheme + host) Django trusts for CSRF on unsafe
+  # methods. Cookie-authenticated writes (e.g. imports) fail without this.
+  # Defaults to corsAllowedOrigins when left empty.
+  # Example: "https://openzev.example.com"
+  csrfTrustedOrigins: ""
 
 worker:
   replicaCount: 1

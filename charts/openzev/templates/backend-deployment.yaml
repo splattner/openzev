@@ -87,6 +87,11 @@ spec:
             - name: CORS_ALLOWED_ORIGINS
               value: {{ .Values.backend.corsAllowedOrigins | quote }}
             {{- end }}
+            {{- $csrfTrustedOrigins := .Values.backend.csrfTrustedOrigins | default .Values.backend.corsAllowedOrigins }}
+            {{- if $csrfTrustedOrigins }}
+            - name: CSRF_TRUSTED_ORIGINS
+              value: {{ $csrfTrustedOrigins | quote }}
+            {{- end }}
             {{- range $key, $value := .Values.backend.extraEnv }}
             - name: {{ $key }}
               value: {{ $value | quote }}

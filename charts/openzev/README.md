@@ -103,6 +103,21 @@ backend:
 
 If this is missing, Django may reject requests with `400 Bad Request`.
 
+### Trusted origins
+
+Since 1.8.0 the backend enforces CSRF on cookie-authenticated writes. A domain
+deployment must tell Django which origin the browser sends, or write requests
+(imports, edits) fail with `CSRF Failed: Origin checking failed`:
+
+```yaml
+backend:
+  csrfTrustedOrigins: "https://openzev.example.com"
+```
+
+The value is the full origin — scheme and host, no path. When left empty it
+falls back to `backend.corsAllowedOrigins`, so setting that alone is enough if
+the frontend calls the API from the same origin.
+
 ## Email configuration
 
 Set email-related values under `email` in `values.yaml`:
