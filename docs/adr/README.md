@@ -19,6 +19,7 @@ This directory captures key architectural decisions for OpenZEV.
 - [0013: Extract shared local-pool allocation service](0013-shared-allocation-service.md)
 - [0014: Print parity via shared tokens and real-PDF previews](0014-print-parity-and-ui-tokens.md)
 - [0015: Retire MUI — TanStack Table and full Mantine consolidation](0015-retire-mui-tanstack-table.md)
+- [0016: Explicit VAT mode, with an "inclusive" treatment for non-registered ZEVs](0016-vat-mode-inclusive.md)
 
 ## Conventions
 

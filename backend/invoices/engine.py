@@ -27,7 +27,7 @@ from allocation.read_model import (
 from allocation.validity import active_during, period_window
 from allocation.split import split_consumption, split_production
 from allocation.windows import AssignmentWindows
-from zev.models import AllocationMode, Zev, Participant, MeteringPoint, MeteringPointAssignment
+from zev.models import AllocationMode, Zev, Participant, MeteringPoint, MeteringPointAssignment, VatMode
 from tariffs.models import BillingMode, EnergyType, PeriodType, SplitKey, Tariff, TariffCategory
 from tariffs.periods import months_of, weekdays_of
 from metering.models import MeterReading, ReadingDirection
@@ -322,11 +322,41 @@ def _get_tariff_price(tariff: Tariff, ts: datetime) -> Decimal | None:
     return (in_season or periods)[0].price_chf_per_kwh
 
 
-def _resolve_vat_rate(zev: Zev, period_end: date) -> Decimal:
-    if not zev.vat_number:
-        return Decimal("0")
+def _active_vat_rate(period_end: date) -> Decimal:
     active_rate = VatRate.active_for_day(period_end)
     return Decimal(active_rate.rate) if active_rate else Decimal("0")
+
+
+def _resolve_vat_rate(zev: Zev, period_end: date) -> Decimal:
+    """The rate charged *on top of* the subtotal — REGISTERED only.
+
+    NOT_REGISTERED bills prices as entered; INCLUSIVE folds VAT into the line
+    totals instead of adding a line, so both return 0 here.
+    """
+    if zev.vat_mode != VatMode.REGISTERED:
+        return Decimal("0")
+    return _active_vat_rate(period_end)
+
+
+# Categories a non-registered ZEV pays non-recoverable VAT on: the grid
+# operator bills Netznutzung, SDL, the Netzzuschlag, the cantonal/communal
+# levies and the metering charge with VAT, and grid energy is bought from a
+# supplier with VAT. The ZEV's own local (solar) energy and the feed-in
+# credit it pays participants carry no input VAT.
+_VAT_BEARING_CATEGORIES = frozenset({
+    TariffCategory.GRID_FEES,
+    TariffCategory.LEVIES,
+    TariffCategory.METERING,
+})
+
+
+def _tariff_bears_input_vat(tariff: Tariff) -> bool:
+    """Whether this tariff's cost reaches an unregistered ZEV carrying VAT."""
+    if tariff.category in _VAT_BEARING_CATEGORIES:
+        return True
+    if tariff.category == TariffCategory.ENERGY:
+        return tariff.energy_type == EnergyType.GRID
+    return False
 
 
 def _month_start(day: date) -> date:
@@ -953,23 +983,41 @@ def _price_fixed_fees(participant, tariffs, period_start, period_end, accumulato
         )
 
 
-def _build_item_payloads(accumulator) -> tuple[list, Decimal]:
+def _build_item_payloads(
+    accumulator, *, gross_rate: Decimal = Decimal("0")
+) -> tuple[list, Decimal, Decimal]:
     """Turn accumulated totals into rounded line-item payloads plus the subtotal.
 
     Each line is rounded to the centime and the subtotal is the sum of those
     rounded lines, so an invoice adds up to what is printed on it rather than
     to a more precise figure rounded once at the end.
+
+    ``gross_rate`` is non-zero only for a ZEV on ``VatMode.INCLUSIVE``: each
+    VAT-bearing line (grid energy, grid fees, levies, metering) has its raw
+    total multiplied by ``1 + gross_rate`` before rounding, so the derived
+    unit price comes out gross too. The third return value is the
+    non-recoverable VAT thus folded in, summed over those lines.
     """
     payloads = []
     subtotal = Decimal("0")
+    embedded_vat = Decimal("0")
     for entry in accumulator:
         quantity = Decimal(entry["quantity"])
         total = Decimal(entry["total"])
         if quantity == 0 and total == 0:
             continue
 
+        grossed = bool(gross_rate) and total > 0 and _tariff_bears_input_vat(entry["tariff"])
+        if grossed:
+            total = total * (Decimal("1") + gross_rate)
+
         quantized_total = total.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
         subtotal += quantized_total
+        if grossed:
+            net = (quantized_total / (Decimal("1") + gross_rate)).quantize(
+                Decimal("0.01"), rounding=ROUND_HALF_UP
+            )
+            embedded_vat += quantized_total - net
         if quantity != 0:
             unit_price = (total / quantity).quantize(Decimal("0.00001"), rounding=ROUND_HALF_UP)
         else:
@@ -986,7 +1034,11 @@ def _build_item_payloads(accumulator) -> tuple[list, Decimal]:
             "bucket": entry["bucket"],
         })
 
-    return payloads, subtotal.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    return (
+        payloads,
+        subtotal.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP),
+        embedded_vat.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP),
+    )
 
 
 def _utc_date(ts: datetime) -> date:
@@ -1274,7 +1326,12 @@ def generate_invoice(participant: Participant, period_start: date, period_end: d
     local_kwh = local_kwh_acc.quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP)
     grid_kwh = grid_kwh_acc.quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP)
 
-    item_payloads, subtotal = _build_item_payloads(items_accumulator)
+    # INCLUSIVE folds non-recoverable VAT into the line totals; the other
+    # modes leave prices untouched here (REGISTERED adds a line below).
+    gross_rate = _active_vat_rate(period_end) if zev.vat_mode == VatMode.INCLUSIVE else Decimal("0")
+    item_payloads, subtotal, embedded_vat_chf = _build_item_payloads(
+        items_accumulator, gross_rate=gross_rate
+    )
 
     vat_rate = _resolve_vat_rate(zev, period_end)
     vat_chf = (subtotal * vat_rate).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
@@ -1295,6 +1352,7 @@ def generate_invoice(participant: Participant, period_start: date, period_end: d
         subtotal_chf=subtotal,
         vat_rate=vat_rate,
         vat_chf=vat_chf,
+        embedded_vat_chf=embedded_vat_chf if zev.vat_mode == VatMode.INCLUSIVE else None,
         total_chf=total_chf,
         due_date=timezone.localdate() + timedelta(days=zev.payment_term_days),
     )

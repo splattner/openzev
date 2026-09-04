@@ -33,6 +33,14 @@ class Invoice(models.Model):
     subtotal_chf = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     vat_rate = models.DecimalField(max_digits=5, decimal_places=4, default=0)
     vat_chf = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    # Non-recoverable VAT already contained in the line totals, for a ZEV on
+    # VatMode.INCLUSIVE. Not charged and not shown on the participant invoice
+    # (a non-registered issuer must not show a VAT figure); recorded for the
+    # operator's own bookkeeping and the annual statement. Null for the other
+    # VAT modes and for invoices issued before the feature existed.
+    embedded_vat_chf = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True
+    )
     total_chf = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     # Document
     pdf_file = models.FileField(upload_to="invoices/pdf/", blank=True, null=True)

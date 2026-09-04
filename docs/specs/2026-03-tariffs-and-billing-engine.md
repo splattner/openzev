@@ -396,8 +396,9 @@ produced by the engine:
 | `total_grid_kwh` | Sum of grid energy allocated to this participant |
 | `total_feed_in_kwh` | Sum of exported energy allocated to this producer |
 | `subtotal_chf` | Sum of all line-item totals |
-| `vat_rate` | Resolved VAT rate (decimal fraction, e.g. `0.0810`) |
+| `vat_rate` | Resolved VAT rate (decimal fraction, e.g. `0.0810`); 0 unless `vat_mode = registered` |
 | `vat_chf` | `subtotal_chf × vat_rate`, rounded to 0.01 |
+| `embedded_vat_chf` | Non-recoverable VAT folded into the line totals under `vat_mode = inclusive`; null otherwise (§4.8) |
 | `total_chf` | `subtotal_chf + vat_chf` |
 
 **InvoiceItem** (one per tariff per bucket):
@@ -829,14 +830,36 @@ Zero-quantity + zero-total entries are skipped.
 
 ### 4.8 VAT resolution
 
-```
-IF zev.vat_number is blank or empty:
-    vat_rate = 0
-ELSE:
-    vat_rate = VatRate.active_for_day(period_end).rate   # or 0 if no active rate
-```
+`zev.vat_mode` selects one of three treatments. In all three, the rate — where
+one is needed — is `VatRate.active_for_day(period_end).rate` (or 0 if no rate is
+active). `VatRate` records have non-overlapping `[valid_from, valid_to]`
+windows, and the rate active on `period_end` applies to the whole invoice.
 
-`VatRate` records have non-overlapping `[valid_from, valid_to]` windows.  The rate active on `period_end` is used for the entire invoice.
+| `vat_mode` | `vat_rate` on invoice | `vat_chf` | line totals | `embedded_vat_chf` |
+|---|---|---|---|---|
+| `not_registered` | 0 | 0 | as entered | null |
+| `registered` | active rate | `subtotal × rate` | net (as entered) | null |
+| `inclusive` | 0 | 0 | VAT-bearing lines grossed by `1 + rate` | non-recoverable VAT folded in |
+
+**`registered`** is the old behaviour, and the data migration moves every ZEV
+that had a non-empty `vat_number` into it (the number is now required in this
+mode and forbidden in the other two).
+
+**`inclusive`** is for a ZEV that is not VAT-registered but buys in costs that
+carry VAT it cannot reclaim. Tariff prices stay net in storage. At invoice
+time, each line whose tariff *bears input VAT* has its raw total multiplied by
+`1 + rate` before rounding, so the derived unit price is gross too. No VAT line
+appears — a non-registered issuer must not show one — but the amounts billed
+are gross. The VAT thus folded in is summed into `Invoice.embedded_vat_chf`
+for the operator's own records (annual statement, bookkeeping); it is never
+shown on the participant invoice.
+
+A tariff **bears input VAT** when its category is `grid_fees`, `levies` or
+`metering`, or its category is `energy` and its `energy_type` is `grid`. Local
+(solar) energy and the feed-in credit do not: the ZEV pays no input VAT on its
+own production, and the feed-in credit is money paid out, not a purchased cost.
+
+Rationale and alternatives: ADR 0016.
 
 ---
 
@@ -1265,6 +1288,20 @@ community energy to a single participant.
 | `test_allows_overlapping_tariffs_with_different_names` | §3.1: distinct simultaneous components are permitted |
 | `test_allows_the_same_name_in_consecutive_windows` | §3.1: seasonal versioning with the old window closed |
 | `test_rejects_overlapping_fixed_fees_with_the_same_name` | §3.1: the check covers fixed-fee modes, not only energy modes |
+
+### Backend (`invoices/test_engine_edge_cases.py`) — VAT modes (§4.8)
+
+| Test case | Validates |
+|---|---|
+| `InvoiceVatRateSelectionTests` | `registered`: rate resolved at `period_end`, VAT line added; missing rate → 0% |
+| `TariffBearsInputVatTests` | classifier: grid energy / grid fees / levies / metering bear VAT; local energy and feed-in do not |
+| `InvoiceVatInclusiveModeTests` | `inclusive`: VAT-bearing lines grossed by `1 + rate`, `embedded_vat_chf` recorded, no VAT line; no active rate → prices unchanged; `not_registered` bills verbatim |
+
+### Backend (`zev/tests.py`) — VAT-mode validation
+
+| Test case | Validates |
+|---|---|
+| `ZevVatModeTests` | default `not_registered`; `clean()` requires a number for `registered` and forbids one otherwise; PATCH to `inclusive` accepted, PATCH to `registered` without a number rejected |
 
 ### Frontend
 

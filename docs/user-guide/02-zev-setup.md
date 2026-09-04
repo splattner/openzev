@@ -98,7 +98,8 @@ The settings form is organized into sections:
 | Setting | Purpose | Required |
 | --- | --- | --- |
 | **Invoice Prefix** | Prefix for invoice numbers (default: `INV`) | No |
-| **VAT Number** | Swiss UID — enables VAT on invoices | No |
+| **VAT treatment** | How VAT is applied when billing participants (see below) | No |
+| **VAT Number** | Swiss UID — shown only when VAT treatment is *VAT-registered* | If registered |
 | **Bank Name** | Bank name for QR-Rechnung | No |
 | **Bank IBAN** | IBAN for QR-Rechnung | No |
 
@@ -123,12 +124,32 @@ Choose how often invoices are generated:
 
 ### VAT Configuration
 
-If your ZEV is VAT-registered:
+**VAT treatment** has three options:
 
-1. Enter your **VAT Number** (UID format) in ZEV Settings
-2. Ask an admin to configure VAT rates — see [Admin Console → VAT Settings](14-admin-console.md#vat-settings)
+- **Not VAT-registered** (default) — tariff prices are billed exactly as you
+  entered them. No VAT line appears. Use this when the prices you entered are
+  already the final amounts your participants should pay.
 
-If no VAT number is set on the ZEV, or no VAT rate is active for an invoice period, VAT defaults to **0%**.
+- **VAT-registered** — enter your **VAT Number** (UID format), and ask an admin
+  to configure VAT rates ([Admin Console → VAT Settings](14-admin-console.md#vat-settings)).
+  Tariff prices are treated as net; the invoice adds the active rate on top and
+  shows a VAT line. You reclaim the VAT you pay upstream in your own VAT return.
+
+- **Not registered — fold VAT into prices** — for the common case of a small
+  ZEV that is *not* registered but whose grid operator invoices it **with VAT
+  it cannot reclaim**. Enter tariff prices net, exactly as the operator
+  publishes them (this is also what the [tariff import](07-tariff-configuration.md)
+  writes). At invoice time OpenZEV grosses up grid energy, grid fees, levies
+  and metering by the active VAT rate. Your own local (solar) energy and the
+  feed-in credit are left untouched. No VAT line appears — a non-registered
+  issuer must not show one — but the amounts billed are gross, so you recover
+  what the operator charged you. The folded-in VAT is recorded per invoice for
+  your bookkeeping.
+
+  An admin still has to configure the VAT rate for this to take effect; with no
+  active rate, prices are billed unchanged.
+
+If no VAT rate is active for an invoice period, VAT defaults to **0%** in every mode.
 
 ### Email Templates
 

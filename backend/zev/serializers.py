@@ -2,7 +2,7 @@ from rest_framework import serializers
 from django.core.exceptions import ValidationError as DjangoValidationError
 from .geocoding import get_cached_building_footprint
 from .grid_operators import grid_operator_ids
-from .models import Zev, Participant, MeteringPoint, MeteringPointAssignment
+from .models import Zev, Participant, MeteringPoint, MeteringPointAssignment, VatMode
 from accounts.models import UserRole
 from .services import create_zev_with_owner_setup, ensure_participant_account
 from .tasks import trigger_geocode_if_address_present
@@ -175,6 +175,27 @@ class ZevSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Only admins can assign a different owner.")
         return value
 
+    def validate(self, attrs):
+        def resolved(field):
+            if field in attrs:
+                return attrs[field]
+            if self.instance is not None:
+                return getattr(self.instance, field)
+            return Zev._meta.get_field(field).get_default()
+
+        vat_mode = resolved("vat_mode")
+        vat_number = resolved("vat_number")
+        if vat_mode == VatMode.REGISTERED and not vat_number:
+            raise serializers.ValidationError(
+                {"vat_number": "A VAT-registered ZEV must have a VAT number (UID)."}
+            )
+        if vat_mode != VatMode.REGISTERED and vat_number:
+            raise serializers.ValidationError(
+                {"vat_number": "Only a VAT-registered ZEV carries a VAT number. "
+                 "Clear it, or set the VAT mode to registered."}
+            )
+        return attrs
+
     def create(self, validated_data):
         request = self.context.get("request")
         if request and "owner" not in validated_data:
@@ -254,10 +275,25 @@ class ZevCreateWithOwnerSerializer(serializers.Serializer):
     invoice_prefix = serializers.CharField(required=False, allow_blank=True, max_length=10)
     bank_iban = serializers.CharField(required=False, allow_blank=True, max_length=34)
     bank_name = serializers.CharField(required=False, allow_blank=True, max_length=200)
+    vat_mode = serializers.ChoiceField(
+        choices=Zev._meta.get_field('vat_mode').choices, required=False
+    )
     vat_number = serializers.CharField(required=False, allow_blank=True, max_length=50)
     notes = serializers.CharField(required=False, allow_blank=True)
     owner = ZevOwnerAccountSerializer()
     metering_points = OwnerMeteringPointInputSerializer(many=True, min_length=1)
+
+    def validate(self, attrs):
+        vat_mode = attrs.get("vat_mode", VatMode.NOT_REGISTERED)
+        if vat_mode == VatMode.REGISTERED and not attrs.get("vat_number"):
+            raise serializers.ValidationError(
+                {"vat_number": "A VAT-registered ZEV must have a VAT number (UID)."}
+            )
+        if vat_mode != VatMode.REGISTERED and attrs.get("vat_number"):
+            raise serializers.ValidationError(
+                {"vat_number": "Only a VAT-registered ZEV carries a VAT number."}
+            )
+        return attrs
 
     def create(self, validated_data):
         owner_data = validated_data.pop('owner')

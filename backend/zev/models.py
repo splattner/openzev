@@ -39,6 +39,28 @@ class InvoiceLanguage(models.TextChoices):
     EN = "en", "English"
 
 
+class VatMode(models.TextChoices):
+    """How VAT is treated when billing participants.
+
+    - ``NOT_REGISTERED``: the ZEV is not VAT-registered. Tariff prices are
+      billed exactly as entered — whatever they are is the final amount, and
+      no VAT line appears.
+    - ``REGISTERED``: the ZEV is VAT-registered. Tariff prices are net; the
+      engine adds the active ``VatRate`` on top of the subtotal and the
+      invoice shows a VAT line. The ZEV reclaims its input VAT upstream.
+    - ``INCLUSIVE``: the ZEV is not registered but the costs it buys in (grid
+      energy, grid fees, levies, metering) reach it with VAT it cannot
+      reclaim. Tariff prices stay net (as published / imported); the engine
+      grosses the VAT-bearing lines by the active rate at invoice time. No
+      VAT line appears — a non-registered issuer must not show one — but the
+      amounts billed are gross. See ``Invoice.embedded_vat_chf``.
+    """
+
+    NOT_REGISTERED = "not_registered", "Not VAT-registered (prices are final as entered)"
+    REGISTERED = "registered", "VAT-registered (VAT added on top of net prices)"
+    INCLUSIVE = "inclusive", "Not registered — upstream VAT folded into prices"
+
+
 class Zev(models.Model):
     """Represents a ZEV or vZEV community."""
 
@@ -89,6 +111,12 @@ class Zev(models.Model):
     )
     bank_iban = models.CharField(max_length=34, blank=True, help_text="IBAN for QR-Rechnung")
     bank_name = models.CharField(max_length=200, blank=True)
+    vat_mode = models.CharField(
+        max_length=20,
+        choices=VatMode.choices,
+        default=VatMode.NOT_REGISTERED,
+        help_text="How VAT is applied when billing participants.",
+    )
     vat_number = models.CharField(max_length=50, blank=True)
     notes = models.TextField(blank=True)
     email_subject_template = models.CharField(
@@ -131,6 +159,21 @@ class Zev(models.Model):
 
     def __str__(self):
         return f"{self.name} ({self.get_zev_type_display()})"
+
+    def clean(self):
+        # A VAT-registered ZEV shows its UID on every invoice and contract, so
+        # the number is not optional in that mode. The other two modes are for
+        # entities that have no UID, so a number stored against them is almost
+        # certainly a leftover — flag it rather than silently print it.
+        if self.vat_mode == VatMode.REGISTERED and not self.vat_number:
+            raise ValidationError(
+                {"vat_number": "A VAT-registered ZEV must have a VAT number (UID)."}
+            )
+        if self.vat_mode != VatMode.REGISTERED and self.vat_number:
+            raise ValidationError(
+                {"vat_number": "Only a VAT-registered ZEV carries a VAT number. "
+                 "Clear it, or set the VAT mode to registered."}
+            )
 
     def next_invoice_number(self):
         num = f"{self.invoice_prefix}-{self.invoice_counter:05d}"

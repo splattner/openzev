@@ -135,12 +135,33 @@ export function ZevGeneralSettingsFields({ form, onChange }: ZevGeneralSettingsF
                         />
                     </label>
                     <label>
-                        <span>{t('pages.zevSettings.fields.vatNumber')}</span>
-                        <input
-                            value={form.vat_number ?? ''}
-                            onChange={(event) => onChange({ vat_number: event.target.value })}
-                        />
+                        <span>{t('pages.zevSettings.fields.vatMode')}</span>
+                        <select
+                            value={form.vat_mode ?? 'not_registered'}
+                            onChange={(event) => {
+                                const vat_mode = event.target.value as ZevInput['vat_mode']
+                                onChange(
+                                    vat_mode === 'registered'
+                                        ? { vat_mode }
+                                        : { vat_mode, vat_number: '' },
+                                )
+                            }}
+                        >
+                            <option value="not_registered">{t('pages.zevSettings.fields.vatModeNotRegistered')}</option>
+                            <option value="registered">{t('pages.zevSettings.fields.vatModeRegistered')}</option>
+                            <option value="inclusive">{t('pages.zevSettings.fields.vatModeInclusive')}</option>
+                        </select>
+                        <small className="muted">{t('pages.zevSettings.fields.vatModeHint')}</small>
                     </label>
+                    {form.vat_mode === 'registered' && (
+                        <label>
+                            <span>{t('pages.zevSettings.fields.vatNumber')}</span>
+                            <input
+                                value={form.vat_number ?? ''}
+                                onChange={(event) => onChange({ vat_number: event.target.value })}
+                            />
+                        </label>
+                    )}
                     <label>
                         <span>{t('pages.zevSettings.fields.bankName')}</span>
                         <input

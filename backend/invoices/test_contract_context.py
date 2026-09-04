@@ -25,7 +25,7 @@ from invoices.test_helpers import make_participant, make_user, make_zev
 from invoices.template_context import build_sample_contract_context
 from tariffs.models import BillingMode, EnergyType, TariffPeriod
 from testing.factories import TariffFactory, assignment_for, flat_tariff
-from zev.models import MeteringPoint, MeteringPointAssignment, MeteringPointType, Zev
+from zev.models import MeteringPoint, MeteringPointAssignment, MeteringPointType, VatMode, Zev
 
 
 _STYLE_BLOCK_RE = re.compile(r"<style>.*?</style>", re.DOTALL)
@@ -219,16 +219,18 @@ class ContractPdfContextFieldsTests(TestCase):
 
     def test_vat_rate_display_shows_active_rate_when_liable(self):
         VatRate.objects.create(rate=Decimal("0.0810"), valid_from=date(2026, 1, 1))
+        self.zev.vat_mode = VatMode.REGISTERED
         self.zev.vat_number = "CHE-123.456.789"
-        self.zev.save(update_fields=["vat_number"])
+        self.zev.save(update_fields=["vat_mode", "vat_number"])
         self.assertEqual(self._context()["vat_rate_display"], "8.10 %")
 
     def test_vat_rate_display_empty_when_not_liable(self):
         self.assertEqual(self._context()["vat_rate_display"], "")
 
     def test_vat_rate_display_empty_when_liable_without_active_rate(self):
+        self.zev.vat_mode = VatMode.REGISTERED
         self.zev.vat_number = "CHE-123.456.789"
-        self.zev.save(update_fields=["vat_number"])
+        self.zev.save(update_fields=["vat_mode", "vat_number"])
         self.assertEqual(self._context()["vat_rate_display"], "")
 
     def test_document_id_is_short_and_stable(self):
@@ -889,10 +891,11 @@ class ContractPdfRenderingTests(TestCase):
     def setUp(self):
         self.owner = make_user("render_contract_owner", UserRole.ZEV_OWNER)
         self.zev = make_zev(self.owner, "Render Contract ZEV")
+        self.zev.vat_mode = VatMode.REGISTERED
         self.zev.vat_number = "CHE-123.456.789"
         self.zev.invoice_language = "de"
         self.zev.payment_term_days = 30
-        self.zev.save(update_fields=["vat_number", "invoice_language", "payment_term_days"])
+        self.zev.save(update_fields=["vat_mode", "vat_number", "invoice_language", "payment_term_days"])
         VatRate.objects.create(rate=Decimal("0.0810"), valid_from=date(2026, 1, 1))
 
         self.owner_participant = make_participant(self.zev, user=self.owner, first="Maria", last="Muster")

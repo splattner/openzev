@@ -40,7 +40,7 @@ from metering.importers.limits import (
 )
 from metering.models import ImportLog, ImportSource, MeterReading, ReadingDirection, ReadingResolution
 from tariffs.models import Tariff, TariffPeriod
-from zev.models import MeteringPoint, MeteringPointAssignment, Participant, Zev
+from zev.models import MeteringPoint, MeteringPointAssignment, Participant, VatMode, Zev
 
 logger = logging.getLogger(__name__)
 
@@ -723,6 +723,12 @@ def _run_import(archive, manifest, sections, *, owner, name_override, collector,
     source_name = (manifest.get("source_zev") or {}).get("name") or "Imported ZEV"
     zev_fields["name"] = name_override.strip() or zev_fields.get("name") or source_name
     zev_fields.pop("invoice_counter", None)  # set from the imported invoices below
+
+    # Archives written before vat_mode existed carry only vat_number. Apply the
+    # same rule the data migration uses: a number means the source was
+    # VAT-registered. Without this the model's clean() rejects the pairing.
+    if zev_fields.get("vat_number") and not zev_fields.get("vat_mode"):
+        zev_fields["vat_mode"] = VatMode.REGISTERED
 
     zev = Zev(owner=owner, **zev_fields)
     try:

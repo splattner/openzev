@@ -13,7 +13,7 @@ from zev.management.commands.seed_demo import Command as SeedDemoCommand, previo
 from metering.models import MeterReading
 from tariffs.models import BillingMode, PeriodType, Tariff
 from tariffs.series import active_version, find_gaps
-from zev.models import AllocationMode, MeteringPoint, MeteringPointAssignment, MeteringPointType, Participant, Zev
+from zev.models import AllocationMode, MeteringPoint, MeteringPointAssignment, MeteringPointType, Participant, VatMode, Zev
 
 
 from testing.helpers import authenticate as auth, make_user
@@ -59,6 +59,52 @@ class ZevPaymentTermTests(TestCase):
 			self.assertEqual(resp.status_code, 400)
 		self.zev.refresh_from_db()
 		self.assertEqual(self.zev.payment_term_days, 30)
+
+
+class ZevVatModeTests(TestCase):
+	def setUp(self):
+		self.client = APIClient()
+		self.admin = make_user("vatmode_admin", UserRole.ADMIN)
+		self.owner = make_user("vatmode_owner", UserRole.ZEV_OWNER)
+		self.zev = Zev.objects.create(name="VAT Mode ZEV", owner=self.owner)
+
+	def test_defaults_to_not_registered(self):
+		self.assertEqual(self.zev.vat_mode, VatMode.NOT_REGISTERED)
+
+	def test_clean_requires_number_for_registered(self):
+		self.zev.vat_mode = VatMode.REGISTERED
+		with self.assertRaises(ValidationError):
+			self.zev.full_clean()
+		self.zev.vat_number = "CHE-123.456.789"
+		self.zev.full_clean()  # ok
+
+	def test_clean_rejects_number_without_registered_mode(self):
+		self.zev.vat_mode = VatMode.INCLUSIVE
+		self.zev.vat_number = "CHE-123.456.789"
+		with self.assertRaises(ValidationError):
+			self.zev.full_clean()
+
+	def test_api_patch_to_inclusive_is_accepted(self):
+		auth(self.client, self.admin)
+		resp = self.client.patch(
+			f"/api/v1/zev/zevs/{self.zev.id}/",
+			{"vat_mode": VatMode.INCLUSIVE},
+			format="json",
+		)
+		self.assertEqual(resp.status_code, 200, resp.content)
+		self.zev.refresh_from_db()
+		self.assertEqual(self.zev.vat_mode, VatMode.INCLUSIVE)
+
+	def test_api_patch_to_registered_without_number_is_rejected(self):
+		auth(self.client, self.admin)
+		resp = self.client.patch(
+			f"/api/v1/zev/zevs/{self.zev.id}/",
+			{"vat_mode": VatMode.REGISTERED},
+			format="json",
+		)
+		self.assertEqual(resp.status_code, 400)
+		self.zev.refresh_from_db()
+		self.assertEqual(self.zev.vat_mode, VatMode.NOT_REGISTERED)
 
 
 class ParticipantEndpointRestrictionTests(TestCase):

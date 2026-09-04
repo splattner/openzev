@@ -60,6 +60,7 @@ class InvoiceListSerializer(serializers.ModelSerializer):
             "subtotal_chf",
             "vat_rate",
             "vat_chf",
+            "embedded_vat_chf",
             "total_chf",
             "period_start",
             "period_end",

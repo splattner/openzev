@@ -34,6 +34,7 @@ from zev.models import (
     MeteringPointAssignment,
     MeteringPointType,
     Participant,
+    VatMode,
     Zev,
     ZevType,
 )
@@ -156,6 +157,7 @@ class Command(BaseCommand):
                 "invoice_language": InvoiceLanguage.EN,
                 "bank_iban": "CH9300762011623852957",
                 "bank_name": "Demo Energy Bank",
+                "vat_mode": VatMode.REGISTERED,
                 "vat_number": "CHE-123.456.789",
             },
         )
@@ -169,6 +171,7 @@ class Command(BaseCommand):
         zev.invoice_language = InvoiceLanguage.EN
         zev.bank_iban = "CH9300762011623852957"
         zev.bank_name = "Demo Energy Bank"
+        zev.vat_mode = VatMode.REGISTERED
         zev.vat_number = "CHE-123.456.789"
         zev.save()
 

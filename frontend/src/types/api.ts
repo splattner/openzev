@@ -86,6 +86,7 @@ export interface Zev {
     payment_term_days?: number
     bank_iban?: string
     bank_name?: string
+    vat_mode?: 'not_registered' | 'registered' | 'inclusive'
     vat_number?: string
     notes?: string
     email_subject_template?: string
@@ -109,6 +110,7 @@ export interface ZevInput {
     payment_term_days?: number
     bank_iban?: string
     bank_name?: string
+    vat_mode?: 'not_registered' | 'registered' | 'inclusive'
     vat_number?: string
     notes?: string
     email_subject_template?: string
