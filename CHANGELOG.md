@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.9.0](https://github.com/splattner/openzev/compare/v1.8.1...v1.9.0) (2026-09-04)
+
+
+### Features
+
+* **docs:** crop a generated PDF down to a release-note figure ([#550](https://github.com/splattner/openzev/issues/550)) ([00ffb58](https://github.com/splattner/openzev/commit/00ffb585d20dfb919098ad14f535326c04a6988f))
+* **docs:** screenshots in release notes ([#549](https://github.com/splattner/openzev/issues/549)) ([cced026](https://github.com/splattner/openzev/commit/cced026c046435e036f1749ef39f4c1de02ecbc5))
+* **invoices:** itemise a multi-band tariff's bands on the invoice ([#547](https://github.com/splattner/openzev/issues/547)) ([6dc9edf](https://github.com/splattner/openzev/commit/6dc9edfd63ba16d2cecec695caa13e20db1fbebe)), closes [#546](https://github.com/splattner/openzev/issues/546)
+* **invoices:** VAT mode with an "inclusive" treatment for non-registered ZEVs ([#543](https://github.com/splattner/openzev/issues/543)) ([6f55aa3](https://github.com/splattner/openzev/commit/6f55aa3296663777e74edb2c2cd8a927afeb2984))
+
 ## [1.8.1](https://github.com/splattner/openzev/compare/v1.8.0...v1.8.1) (2026-09-04)
 
 
