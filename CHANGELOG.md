@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.9.3](https://github.com/splattner/openzev/compare/v1.9.2...v1.9.3) (2026-09-04)
+
+
+### Bug Fixes
+
+* **tariffs:** stop offering a billing mode that a re-import cannot accept ([#561](https://github.com/splattner/openzev/issues/561)) ([4f528fd](https://github.com/splattner/openzev/commit/4f528fd0528b7a83e031b0a56d03c4b4bc8d66b7))
+
 ## [1.9.2](https://github.com/splattner/openzev/compare/v1.9.1...v1.9.2) (2026-09-04)
 
 
