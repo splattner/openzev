@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.8.1](https://github.com/splattner/openzev/compare/v1.8.0...v1.8.1) (2026-09-04)
+
+
+### Bug Fixes
+
+* **chart:** expose CSRF_TRUSTED_ORIGINS for domain deployments ([#540](https://github.com/splattner/openzev/issues/540)) ([d54226d](https://github.com/splattner/openzev/commit/d54226dbc44e0254bb9ca18c3f1bc506eafcb365))
+
 ## [1.8.0](https://github.com/splattner/openzev/compare/v1.7.0...v1.8.0) (2026-09-04)
 
 
