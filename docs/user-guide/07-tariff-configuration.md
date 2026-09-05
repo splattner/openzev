@@ -541,6 +541,37 @@ When OpenZEV generates an invoice:
 
 > **See also:** [How Energy Allocation Works](08-billing-allocation-explained.md) for detailed billing logic.
 
+## Printing a Tariff Overview
+
+Click **Tariff overview (PDF)** on the Tariffs page toolbar to download every
+tariff in force today, grouped by category (Energy, Grid Fees, Levies,
+Metering) — the same grouping and order as an invoice's line items.
+
+- Each price band is listed and named on its own line, using the exact same
+  wording as the participation contract (HT/NT, a seasonal band's month
+  range, or a plain band's time window) — the two documents describe a
+  tariff the same way.
+- A **percentage-of-energy tariff** prints its formula (e.g. `18.00 % ×
+  29.50 Rp./kWh`), computed from the same grid tariffs the participation
+  contract uses. If the grid tariff it is based on has more than one price
+  band, a footnote explains that the figure shown is the tariff's base rate,
+  not what any single reading is actually billed at.
+- A **shared fee** states how it is split (equally, or by weight) — the
+  figure printed is what the whole community pays, not one participant's
+  share.
+- The document states the ZEV's VAT treatment. Under **VAT inclusive**, an
+  explicit note says the prices shown are net and that VAT is added on the
+  invoice — the number on this document is deliberately not the number a
+  participant is billed.
+- Switch the page's own **Valid now / All versions** filter before
+  downloading to include superseded and future tariff versions, shown
+  greyed out with their full validity span instead of "from …".
+
+There is no date picker (yet) — the overview always reflects today. Only ZEV
+owners and admins can download it; there is nothing on this document a
+participant does not already see broken out on their own participation
+contract or invoice.
+
 ## Tariff Tips
 
 **Use consistent naming:** Helps operators find right tariff.

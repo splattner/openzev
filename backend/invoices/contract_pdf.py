@@ -15,6 +15,7 @@ from .band_labels import band_description
 from .contract_translations import CONTRACT_TRANSLATIONS
 from .dates import format_date_value
 from .pdf_render import render_pdf
+from .tariff_pricing import display_grid_base_chf_per_kwh
 
 from tariffs.models import BillingMode, EnergyType, PeriodType
 from zev.models import MeteringPointType
@@ -59,18 +60,9 @@ def _build_local_tariff_display(zev, tr: dict, date_pattern: str, as_of: date) -
 
     # Sum the flat / HT prices of active GRID tariffs once: this is the base
     # price every percentage-of-grid-tariff local tariff is computed from.
-    grid_sum_chf = Decimal("0")
-    for gt in grid_tariffs:
-        periods = list(gt.periods.all())
-        flat = next((p for p in periods if p.period_type == PeriodType.FLAT), None)
-        if flat:
-            grid_sum_chf += Decimal(str(flat.price_chf_per_kwh))
-        else:
-            ht = next((p for p in periods if p.period_type == PeriodType.HIGH), None)
-            if ht:
-                grid_sum_chf += Decimal(str(ht.price_chf_per_kwh))
-            elif periods:
-                grid_sum_chf += Decimal(str(periods[0].price_chf_per_kwh))
+    # Shared with the tariff overview PDF via tariff_pricing, so the two
+    # documents cannot print two different answers for the same tariff.
+    grid_sum_chf = display_grid_base_chf_per_kwh(grid_tariffs)
 
     rp_unit = tr.get("tariff_rp_unit", "Rp./kWh")
 

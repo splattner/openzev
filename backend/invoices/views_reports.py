@@ -21,6 +21,7 @@ from allocation.read_model import community_totals_by_timestamp, eligible_partic
 from allocation.validity import active_during, period_window
 from django.core.exceptions import ValidationError
 from django.http import HttpResponse
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -32,6 +33,7 @@ from zev.models import Participant, Zev
 
 from .annual_statement import generate_annual_statement_pdf
 from .financial_summary import generate_financial_summary_pdf
+from .tariff_overview import generate_tariff_overview_pdf
 
 
 logger = logging.getLogger(__name__)
@@ -58,6 +60,22 @@ def _parse_year(year_raw: str | None) -> tuple[int | None, Response | None]:
             status=status.HTTP_400_BAD_REQUEST,
         )
     return year, None
+
+
+def _parse_as_of(as_of_raw: str | None) -> tuple[date | None, Response | None]:
+    """Return ``(date, None)`` or ``(None, error response)``.
+
+    ``None`` for ``as_of_raw`` is a valid result (the caller then defaults to
+    today) — only an unparseable value is an error.
+    """
+    if not as_of_raw:
+        return None, None
+    try:
+        return date.fromisoformat(as_of_raw), None
+    except ValueError:
+        return None, Response(
+            {"error": "as_of must be YYYY-MM-DD."}, status=status.HTTP_400_BAD_REQUEST
+        )
 
 
 def _get_authorised_zev(request, zev_id) -> tuple[Zev | None, Response | None]:
@@ -282,5 +300,43 @@ class FinancialSummaryView(APIView):
         return _pdf_response(
             generate_financial_summary_pdf(zev, participant, year),
             f"financial-summary-{year}-{participant.last_name}.pdf",
+            disposition="attachment",
+        )
+
+
+class TariffOverviewView(APIView):
+    """Every tariff of a ZEV, as of a date, as a printable PDF.
+
+    Owner/admin only — see docs/specs/2026-09-tariff-overview-pdf.md §3. There
+    is no self-service branch: unlike an invoice or a financial summary, this
+    document is not addressed to one participant, and the Tariffs page it is
+    downloaded from is itself owner/admin only.
+    """
+
+    permission_classes = [IsAuthenticated, IsZevOwnerOrAdmin]
+
+    def get(self, request, *args, **kwargs):
+        zev_id = request.query_params.get("zev_id")
+        if not zev_id:
+            return Response({"error": "zev_id is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        zev, error = _get_authorised_zev(request, zev_id)
+        if error:
+            return error
+
+        as_of, error = _parse_as_of(request.query_params.get("as_of"))
+        if error:
+            return error
+        as_of = as_of or timezone.localdate()
+
+        scope = request.query_params.get("scope", "valid")
+        if scope not in ("valid", "all"):
+            return Response(
+                {"error": "scope must be 'valid' or 'all'."}, status=status.HTTP_400_BAD_REQUEST
+            )
+
+        return _pdf_response(
+            generate_tariff_overview_pdf(zev, as_of, scope),
+            f"tariff-overview-{as_of.isoformat()}.pdf",
             disposition="attachment",
         )

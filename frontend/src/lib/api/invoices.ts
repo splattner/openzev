@@ -121,6 +121,18 @@ export async function downloadFinancialSummary(params: {
   return data as Blob
 }
 
+export async function downloadTariffOverview(params: {
+  zev_id: string
+  scope?: 'valid' | 'all'
+  as_of?: string
+}): Promise<Blob> {
+  const { data } = await api.get('/invoices/invoices/tariff-overview/', {
+    params,
+    responseType: 'blob',
+  })
+  return data as Blob
+}
+
 export async function fetchInvoicePeriodOverview(params: {
   zev_id: string
   period_start: string

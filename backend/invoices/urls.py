@@ -11,6 +11,7 @@ from .views_reports import (
     AnnualStatementsZipView,
     AnnualStatementView,
     FinancialSummaryView,
+    TariffOverviewView,
 )
 from .views_templates import (
     EmailTemplateListView,
@@ -31,6 +32,7 @@ extracted_urlpatterns = [
     path("invoices/annual-statement/", AnnualStatementView.as_view(), name="invoice-annual-statement"),
     path("invoices/annual-statements-zip/", AnnualStatementsZipView.as_view(), name="invoice-annual-statements-zip"),
     path("invoices/financial-summary/", FinancialSummaryView.as_view(), name="invoice-financial-summary"),
+    path("invoices/tariff-overview/", TariffOverviewView.as_view(), name="invoice-tariff-overview"),
     path(
         "invoices/pdf-template/",
         PdfTemplateView.as_view(

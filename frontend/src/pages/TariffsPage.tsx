@@ -1,4 +1,4 @@
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useMemo, useState } from 'react'
 import { ConfirmDialog, useConfirmDialog } from '../components/ConfirmDialog'
 import { TariffCategorySections } from '../features/tariffs/TariffCategorySections'
@@ -12,9 +12,13 @@ import { TariffVersionModal } from '../features/tariffs/TariffVersionModal'
 import { useTariffVersions } from '../features/tariffs/useTariffVersions'
 import { seasonSortKey } from '../features/tariffs/recurrence'
 import { isTariffCurrentlyValid } from '../features/tariffs/validity'
+import { tariffOverviewFilename, tariffOverviewParams } from '../features/tariffs/tariffOverview'
 import { fetchTariffSeries } from '../lib/api/tariffs'
+import { downloadTariffOverview } from '../lib/api/invoices'
+import { formatApiError } from '../lib/api/errors'
 import { queryKeys } from '../lib/api/queryKeys'
 import { todayLocalIso } from '../lib/dates'
+import { downloadBlob } from '../lib/downloadBlob'
 import { useAppSettings } from '../lib/appSettings'
 import { useAuth } from '../lib/auth'
 import { useManagedZev } from '../lib/managedZev'
@@ -206,6 +210,15 @@ export function TariffsPage() {
 
     const versions = useTariffVersions({ selectedZevId, queryClient, pushToast, t })
 
+    // Scope follows the page's own validity filter, so the PDF matches what
+    // the operator is currently looking at — "current tariffs" or "every
+    // version" — without a second control to keep in sync.
+    const overviewMutation = useMutation({
+        mutationFn: () => downloadTariffOverview(tariffOverviewParams(selectedZevId ?? '', validityFilter)),
+        onSuccess: (blob) => downloadBlob(blob, tariffOverviewFilename(today)),
+        onError: (error) => pushToast(formatApiError(error, t('pages.tariffs.overviewPdf.error')), 'error'),
+    })
+
     if (seriesQuery.isLoading) {
         return (
             <div className="page-stack">
@@ -238,6 +251,8 @@ export function TariffsPage() {
                 onValidityFilterChange={setValidityFilter}
                 onOpenCreateTariffModal={openCreateTariffModal}
                 onOpenImportModal={selectedZevId ? () => setShowImportModal(true) : undefined}
+                onDownloadOverview={selectedZevId ? () => overviewMutation.mutate() : undefined}
+                overviewBusy={overviewMutation.isPending}
             />
 
             {selectedZev?.vat_mode === 'inclusive' && (
