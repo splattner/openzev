@@ -1,7 +1,7 @@
 # Feature Spec: Tariff overview PDF
 
 - Spec ID: SPEC-2026-tariff-overview-pdf
-- Status: Draft
+- Status: Completed
 - Scope: Minor
 - Type: Feature
 - Owners: Sebastian Plattner
