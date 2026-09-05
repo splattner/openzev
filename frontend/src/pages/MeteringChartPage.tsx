@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { Tabs } from '@mantine/core'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { DataTable, type ColumnDef } from '../components/DataTable'
 import { EmptyState } from '../components/EmptyState'
@@ -26,11 +26,13 @@ import { RawMeteringTable } from '../components/RawMeteringTable'
 import { useAuth } from '../lib/auth'
 import { useManagedZev } from '../lib/managedZev'
 import {
+    billingRangeFromParams,
+    firstAlignedBillingPeriod,
     type BillingInterval,
     getCurrentBillingPeriod,
 } from '../lib/billingPeriod'
 import { formatShortDate, useAppSettings } from '../lib/appSettings'
-import { daysInPeriod, formatUtcIsoDate, isValidIsoDate } from '../lib/dates'
+import { daysInPeriod, formatUtcIsoDate } from '../lib/dates'
 import { formatMeteringBucketLabel, meteringPointOptionLabel, outReadingLabelKey } from '../lib/meteringLabels'
 import type { AppSettings, ChartDataPoint, DataQualitySeverity, MeteringPoint, MeteringPointDataQuality } from '../types/api'
 import { CHART_GRID, CONS_COLORS, NEGATIVE_COLOR, PROD_COLORS } from '../lib/chartTokens'
@@ -115,18 +117,19 @@ export function filterAndRankQualityRows(
 }
 
 /**
- * The period from `?from=`/`?to=`, or `null` if either is missing/invalid
- * or the range is reversed. A URL is never trusted input (#647): a
- * hand-edited or stale pair falls back to the current billing period
- * instead of feeding a broken range to the chart/quality queries.
+ * The period encoded in the URL, or `null` if either date is missing/invalid
+ * or the range is reversed. `period_start`/`period_end` is the canonical
+ * shared billing form; `from`/`to` remains a read-only compatibility alias
+ * for metering links created before the navigation regroup. If either
+ * canonical key is present, that pair wins rather than mixing formats.
  */
 export function readPeriodFromSearchParams(searchParams: URLSearchParams): { from: string; to: string } | null {
-    const from = searchParams.get('from')
-    const to = searchParams.get('to')
-    if (!isValidIsoDate(from) || !isValidIsoDate(to) || from > to) {
-        return null
+    const canonicalFrom = searchParams.get('period_start')
+    const canonicalTo = searchParams.get('period_end')
+    if (canonicalFrom !== null || canonicalTo !== null) {
+        return billingRangeFromParams(canonicalFrom, canonicalTo)
     }
-    return { from, to }
+    return billingRangeFromParams(searchParams.get('from'), searchParams.get('to'))
 }
 
 /**
@@ -187,45 +190,17 @@ export function MeteringChartPage({ tab }: { tab: 'chart' | 'quality' }) {
     const isManagedScope = user?.role === 'admin' || user?.role === 'zev_owner'
     const interval: BillingInterval = (selectedZev?.billing_interval as BillingInterval) ?? 'monthly'
 
-    // Controlled state
+    // The aligned floor only guards whole-period prev/next nav; custom ranges
+    // stay free-form (pre-first-billing windows are legitimate on metering).
+    const minPeriod = useMemo(
+        () => firstAlignedBillingPeriod(selectedZev?.start_date ?? null, interval),
+        [selectedZev?.start_date, interval],
+    )
     const [selectedMpId, setSelectedMpId] = useState<string>(searchParams.get('metering_point') ?? '')
-    const [period, setPeriodState] = useState<{ from: string; to: string }>(
-        () => readPeriodFromSearchParams(searchParams) ?? getCurrentBillingPeriod(interval),
+    const [period, setPeriod] = useState<{ from: string; to: string }>(() =>
+        readPeriodFromSearchParams(searchParams) ?? getCurrentBillingPeriod(interval),
     )
     const [bucket, setBucket] = useState<'day' | 'hour' | 'month'>('day')
-
-    // Sync the selected period to the URL, so a shared link reproduces it
-    // (#647). The router's setSearchParams is not a stable identity, so it
-    // goes through a ref: the callback below must keep a stable identity or
-    // the auto-reset effect underneath refires on every render and snaps the
-    // period back (breaking prev/next navigation).
-    const setSearchParamsRef = useRef(setSearchParams)
-    useEffect(() => {
-        setSearchParamsRef.current = setSearchParams
-    })
-    const handlePeriodChange = useCallback((next: { from: string; to: string }) => {
-        setPeriodState(next)
-        setSearchParamsRef.current((previous) => {
-            const nextParams = new URLSearchParams(previous)
-            nextParams.set('from', next.from)
-            nextParams.set('to', next.to)
-            return nextParams
-        }, { replace: true })
-    }, [])
-
-    // Skip exactly the first auto-reset below when the URL already named an
-    // explicit period (a restored/shared link) — otherwise the ZEV query
-    // settling from its placeholder interval to the real one on first load
-    // would immediately overwrite the restored period.
-    const skipInitialAutoResetRef = useRef(readPeriodFromSearchParams(searchParams) !== null)
-
-    useEffect(() => {
-        if (skipInitialAutoResetRef.current) {
-            skipInitialAutoResetRef.current = false
-            return
-        }
-        handlePeriodChange(getCurrentBillingPeriod(interval))
-    }, [selectedZevId, interval, handlePeriodChange])
 
     const periodDays = daysInPeriod(period.from, period.to)
     const hourlyResolutionAvailable = periodDays <= MAX_HOURLY_RESOLUTION_DAYS
@@ -238,6 +213,25 @@ export function MeteringChartPage({ tab }: { tab: 'chart' | 'quality' }) {
             setBucket('day')
         }
     }, [bucket, hourlyResolutionAvailable])
+
+    // The URL is the period truth (shared with the invoice pages): re-derive
+    // the state from period_start/period_end whenever the scope or the URL
+    // changes, so ZEV/interval switches and shared links land correctly.
+    useEffect(() => {
+        setPeriod(
+            readPeriodFromSearchParams(searchParams) ?? getCurrentBillingPeriod(interval),
+        )
+    }, [selectedZevId, interval, searchParams])
+
+    const handlePeriodChange = useCallback((next: { from: string; to: string }) => {
+        setPeriod(next)
+        const nextParams = new URLSearchParams(searchParams)
+        nextParams.set('period_start', next.from)
+        nextParams.set('period_end', next.to)
+        nextParams.delete('from')
+        nextParams.delete('to')
+        setSearchParams(nextParams, { replace: true })
+    }, [searchParams, setSearchParams])
 
     // Data queries
     // Operator-only lookup; /zevs/ is 403 for participants.
@@ -528,6 +522,7 @@ export function MeteringChartPage({ tab }: { tab: 'chart' | 'quality' }) {
                         interval={interval}
                         from={period.from}
                         to={period.to}
+                        minFrom={minPeriod?.from}
                         onChange={handlePeriodChange}
                     />
 

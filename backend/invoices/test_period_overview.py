@@ -149,7 +149,9 @@ class InvoicePeriodOverviewTests(TestCase):
         self.assertTrue(with_data_row["metering_data_complete"])
 
     def test_no_assignment_means_participant_excluded_from_overview(self):
-        """A participant with no assignment in the period is excluded from the overview entirely."""
+        """A participant with no assignment in the period is excluded from the
+        overview unless they hold an invoice for it — an invoice keeps its row
+        so attention links (retry / mark paid) never land on an empty table."""
         # Remove the assignment for p_with_data so they have no assignment this period.
         MeteringPointAssignment.objects.filter(metering_point=self.mp_with_data).delete()
 
@@ -159,8 +161,158 @@ class InvoicePeriodOverviewTests(TestCase):
             {"zev_id": str(self.zev.id), "period_start": "2026-01-01", "period_end": "2026-01-31"},
         )
         self.assertEqual(resp.status_code, 200)
-        participant_names = [row["participant_name"] for row in resp.data["rows"]]
-        # p_with_data has no assignment → excluded
-        self.assertNotIn(self.p_with_data.full_name, participant_names)
+        rows_by_participant = {row["participant_name"]: row for row in resp.data["rows"]}
+        # p_with_data still holds an invoice for the period → the row stays,
+        # but with no metering data behind it.
+        row = rows_by_participant[self.p_with_data.full_name]
+        self.assertIsNotNone(row["invoice"])
+        self.assertFalse(row["metering_data_complete"])
         # p_missing_data still has an assignment → included
-        self.assertIn(self.p_missing_data.full_name, participant_names)
+        self.assertIn(self.p_missing_data.full_name, rows_by_participant)
+        # Drop the invoice too: with neither assignment nor invoice the
+        # participant is excluded from the overview entirely.
+        self.invoice.delete()
+        resp = self.client.get(
+            "/api/v1/invoices/invoices/period-overview/",
+            {"zev_id": str(self.zev.id), "period_start": "2026-01-01", "period_end": "2026-01-31"},
+        )
+        participant_names = [row["participant_name"] for row in resp.data["rows"]]
+        self.assertNotIn(self.p_with_data.full_name, participant_names)
+
+
+class GenerationEligibilityTests(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.owner = make_user("eligibility_owner", UserRole.ZEV_OWNER)
+        self.zev = make_zev(self.owner, "Eligibility ZEV")
+        self.zev.billing_interval = "quarterly"
+        self.zev.save()
+        self.participant = make_participant(self.zev, first="Eligible")
+        self.mp = MeteringPoint.objects.create(
+            zev=self.zev, meter_id="CH-ELIG", meter_type=MeteringPointType.CONSUMPTION
+        )
+        MeteringPointAssignment.objects.create(
+            metering_point=self.mp, participant=self.participant,
+            valid_from=date(2026, 1, 1),
+        )
+
+    def _rows(self, start="2026-01-01", end="2026-03-31"):
+        auth(self.client, self.owner)
+        resp = self.client.get(
+            "/api/v1/invoices/invoices/period-overview/",
+            {"zev_id": str(self.zev.id), "period_start": start, "period_end": end},
+        )
+        self.assertEqual(resp.status_code, 200)
+        return {row["participant_name"]: row for row in resp.data["rows"]}
+
+    def test_row_without_invoice_is_eligible(self):
+        row = self._rows()[self.participant.full_name]
+        self.assertIsNone(row["invoice"])
+        self.assertEqual(
+            row["generation_eligibility"],
+            {"state": "eligible", "invoice_id": None, "invoice_number": None},
+        )
+
+    def test_live_invoice_row_has_no_eligibility(self):
+        make_invoice(
+            self.zev, self.participant, InvoiceStatus.DRAFT,
+            period=(date(2026, 1, 1), date(2026, 3, 31)),
+        )
+        row = self._rows()[self.participant.full_name]
+        self.assertIsNotNone(row["invoice"])
+        self.assertIsNone(row["generation_eligibility"])
+
+    def test_partially_locked_row_is_blocked_with_destination(self):
+        paid = make_invoice(
+            self.zev, self.participant, InvoiceStatus.PAID,
+            period=(date(2026, 1, 1), date(2026, 1, 31)),
+        )
+        row = self._rows()[self.participant.full_name]
+        self.assertEqual(
+            row["generation_eligibility"],
+            {
+                "state": "blocked",
+                "invoice_id": str(paid.id),
+                "invoice_number": paid.invoice_number,
+            },
+        )
+
+    def test_fully_settled_row_is_covered_with_first_covering_invoice(self):
+        first = make_invoice(
+            self.zev, self.participant, InvoiceStatus.PAID,
+            period=(date(2026, 1, 1), date(2026, 1, 31)),
+        )
+        make_invoice(
+            self.zev, self.participant, InvoiceStatus.PAID,
+            period=(date(2026, 2, 1), date(2026, 2, 28)),
+        )
+        make_invoice(
+            self.zev, self.participant, InvoiceStatus.PAID,
+            period=(date(2026, 3, 1), date(2026, 3, 31)),
+        )
+        row = self._rows()[self.participant.full_name]
+        self.assertEqual(
+            row["generation_eligibility"],
+            {
+                "state": "covered",
+                "invoice_id": str(first.id),
+                "invoice_number": first.invoice_number,
+            },
+        )
+
+    def test_draft_overlap_stays_eligible_and_cancelled_exact_is_blocked(self):
+        make_invoice(
+            self.zev, self.participant, InvoiceStatus.DRAFT,
+            period=(date(2026, 1, 1), date(2026, 1, 31)),
+        )
+        row = self._rows()[self.participant.full_name]
+        self.assertEqual(row["generation_eligibility"]["state"], "eligible")
+        paid = make_invoice(
+            self.zev, self.participant, InvoiceStatus.PAID,
+            period=(date(2026, 2, 1), date(2026, 2, 28)),
+        )
+        cancelled = make_invoice(
+            self.zev, self.participant, InvoiceStatus.CANCELLED,
+            period=(date(2026, 1, 1), date(2026, 3, 31)),
+        )
+        row = self._rows()[self.participant.full_name]
+        self.assertIsNotNone(row["invoice"])
+        self.assertEqual(row["invoice"]["id"], str(cancelled.id))
+        self.assertEqual(row["generation_eligibility"]["state"], "blocked")
+        self.assertEqual(
+            row["generation_eligibility"]["invoice_id"], str(paid.id)
+        )
+
+    def test_every_blocked_row_is_protected_past_the_cockpit_truncation(self):
+        """Row eligibility is complete per row: with four locked participants
+        every row is blocked with a destination, even though the cockpit's
+        display summary carries only three."""
+        from zev.models import Participant
+
+        participants = [self.participant]
+        for index in range(3):
+            other = Participant.objects.create(
+                zev=self.zev, first_name=f"Extra{index}", last_name="Blocked",
+                email=f"extra{index}@example.com", valid_from=date(2026, 1, 1),
+            )
+            MeteringPoint.objects.create(
+                zev=self.zev, meter_id=f"CH-ELIG-{index}",
+                meter_type=MeteringPointType.CONSUMPTION,
+            )
+            MeteringPointAssignment.objects.create(
+                metering_point=MeteringPoint.objects.get(
+                    zev=self.zev, meter_id=f"CH-ELIG-{index}"
+                ),
+                participant=other, valid_from=date(2026, 1, 1),
+            )
+            participants.append(other)
+        for participant in participants:
+            make_invoice(
+                self.zev, participant, InvoiceStatus.PAID,
+                period=(date(2026, 1, 1), date(2026, 1, 31)),
+            )
+        rows = self._rows()
+        self.assertEqual(len(rows), 4)
+        for row in rows.values():
+            self.assertEqual(row["generation_eligibility"]["state"], "blocked")
+            self.assertIsNotNone(row["generation_eligibility"]["invoice_id"])

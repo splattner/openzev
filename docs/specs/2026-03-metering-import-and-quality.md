@@ -582,6 +582,21 @@ to the guarded quality route with `tab` stripped. The quality query only
 fires on the quality tab (`enabled: tab === 'quality'`) with
 `zev_id` for managed roles.
 
+**URL period state:** `MeteringChartPage` initialises its selected period
+from canonical `?period_start` + `?period_end` parameters. Legacy metering
+links using `?from` + `?to` remain readable when neither canonical key is
+present; if either canonical key is present, that pair takes precedence and
+the two formats are never mixed. Every selector change writes the canonical
+pair back into the URL (`replace`) and removes the legacy keys. The URL is
+authoritative for any calendar-valid, ordered range — cockpit/attention links
+arrive as whole aligned periods, while user-picked custom ranges (including
+dates not aligned to the billing interval) survive navigation and
+metering-point changes verbatim. Only malformed input falls back: missing,
+non-ISO, impossible dates (e.g. `2026-02-30`) or a reversed range reset to the
+current period. The community's earliest billable period (see the
+navigation-regroup spec §7 floor rule) disables the previous-period button at
+the boundary, so a selection can never flash a pre-start period and jump away.
+
 ### 5.6 Import endpoints
 
 | Method | URL | Permission | Description |

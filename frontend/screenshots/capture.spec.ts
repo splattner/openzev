@@ -268,6 +268,21 @@ test.describe('User Guide Screenshots', () => {
     await screenshotFull(page, '08b-invoice-detail')
   })
 
+  // 08c — Participant My Invoices (via impersonation)
+  test('08c-my-invoices', async ({ page }) => {
+    const ok = await impersonateDemoParticipant(page)
+    if (!ok) {
+      test.skip()
+      return
+    }
+    await navigateTo(page, '/me/invoices')
+    await page.waitForSelector('table, .card', { timeout: 10_000 })
+    // Rows appear even without a PDF — the state the guide's list section shows.
+    await page.waitForSelector('tbody tr, .invoice-row', { timeout: 10_000 })
+    await page.waitForTimeout(400)
+    await screenshotFull(page, '08c-my-invoices')
+  })
+
   // 09 — Imports
   test('09-imports', async ({ page }) => {
     await navigateTo(page, '/metering/imports')

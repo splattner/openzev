@@ -27,6 +27,77 @@ export function getCurrentBillingPeriod(interval: BillingInterval): { from: stri
 }
 
 /**
+ * The aligned billing period encoded in a range, or null.
+ *
+ * Destination contract for readiness/attention links: pages open on the exact
+ * `period_start`/`period_end` the item carried instead of their own default.
+ * Only an exact whole period of the ZEV's interval counts; `floorIso` rejects
+ * periods before the community existed.
+ */
+export function billingPeriodFromRange(
+    fromIso: string | null | undefined,
+    toIso: string | null | undefined,
+    interval: BillingInterval,
+    floorIso?: string | null,
+): { from: string; to: string } | null {
+    if (!fromIso || !toIso) return null
+    if (!isBillingAlignedPeriod(fromIso, toIso, interval)) return null
+    if (floorIso && fromIso < floorIso) return null
+    return { from: fromIso, to: toIso }
+}
+
+const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/
+
+function isValidIsoDay(iso: string): boolean {
+    if (!ISO_DAY.test(iso)) return false
+    const [year, month, day] = iso.split('-').map(Number)
+    const check = new Date(Date.UTC(year, month - 1, day))
+    return check.getUTCFullYear() === year && check.getUTCMonth() === month - 1 && check.getUTCDate() === day
+}
+
+/**
+ * Any real range from the URL ({from} ≤ {to}, calendar-valid dates), or null.
+ * Accepts custom (unaligned) windows; malformed dates (e.g. 2026-02-30) fall back.
+ */
+export function billingRangeFromParams(
+    fromIso: string | null | undefined,
+    toIso: string | null | undefined,
+): { from: string; to: string } | null {
+    if (!fromIso || !toIso || !isValidIsoDay(fromIso) || !isValidIsoDay(toIso)) return null
+    if (fromIso > toIso) return null
+    return { from: fromIso, to: toIso }
+}
+
+/**
+ * Invoice-page URL ranges: like `billingRangeFromParams`, but rejected before
+ * the community start. Historical invoice periods from an earlier interval
+ * may predate today's aligned floor, so the bound is the start, not the floor.
+ */
+export function invoiceRangeFromParams(
+    fromIso: string | null | undefined,
+    toIso: string | null | undefined,
+    communityStartIso: string | null | undefined,
+): { from: string; to: string } | null {
+    const range = billingRangeFromParams(fromIso, toIso)
+    if (!range || (communityStartIso && range.from < communityStartIso)) return null
+    return range
+}
+
+/** Whole billing periods for the preset menu, newest first, capped at
+ * `count`, never predating `minFrom` (the community's first period). */
+export function recentBillingPeriods(
+    interval: BillingInterval,
+    count = 5,
+    minFrom?: string | null,
+): Array<{ from: string; to: string }> {
+    const periods = [getCurrentBillingPeriod(interval)]
+    for (let i = 0; i < count; i += 1) {
+        periods.push(shiftBillingPeriod(periods[periods.length - 1].from, interval, -1))
+    }
+    return periods.filter((range) => !minFrom || range.from >= minFrom)
+}
+
+/**
  * True when {from, to} exactly spans one whole billing period.
  *
  * Prev/next navigation only makes sense on an aligned period, so the selector
@@ -52,6 +123,25 @@ export function shiftBillingPeriod(
         from: formatIsoDate(shiftedStart),
         to: formatIsoDate(endOfBillingPeriod(shiftedStart, interval)),
     }
+}
+
+/**
+ * The earliest billable aligned period for a community: the first aligned
+ * boundary on/after its start date (a mid-period start skips its partial
+ * containing period). Mirrors the backend's period_starts rule.
+ */
+export function firstAlignedBillingPeriod(
+    startIso: string | null | undefined,
+    interval: BillingInterval,
+): { from: string; to: string } | null {
+    if (!startIso || !isValidIsoDay(startIso)) return null
+    const start = new Date(`${startIso}T00:00:00`)
+    const step = interval === 'monthly' ? 1 : interval === 'quarterly' ? 3 : interval === 'semi_annual' ? 6 : 12
+    const monthIndex = start.getFullYear() * 12 + start.getMonth() - ((start.getMonth()) % step)
+    const containing = new Date(Math.floor(monthIndex / 12), monthIndex % 12, 1)
+    const aligned = start.getDate() === 1 && start.getMonth() % step === 0
+    const firstStart = aligned ? containing : new Date(containing.getFullYear(), containing.getMonth() + step, 1)
+    return { from: formatIsoDate(firstStart), to: formatIsoDate(endOfBillingPeriod(firstStart, interval)) }
 }
 
 /**

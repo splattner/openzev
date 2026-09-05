@@ -317,6 +317,40 @@ always agree, including for multi-membership users.
 |---|---|---|---|
 | `GET` | `/invoices/dashboard/` | `admin` only | Aggregated stats: ZEV count, participant count, invoice counts by status, total revenue, recent invoices, email stats |
 
+### 5.6a Readiness and attention (nav-regroup phase 2)
+
+Pure computation lives in `invoices/readiness.py`; the endpoints in
+`views_readiness.py` mirror the period-overview RBAC pattern (`zev_id`
+required → 400, unknown ZEV → 404, non-owner → 403 via `IsZevOwnerOrAdmin`).
+
+| Method | URL | Permission | Query params | Description |
+|---|---|---|---|---|
+| `GET` | `/invoices/invoices/readiness/` | `IsZevOwnerOrAdmin` | `zev_id`; or `zev_id` + `period_start` + `period_end`; or `zev_id` + `periods=all` | Period readiness for the billing cockpit. Parameterless form resolves the **cockpit period** server-side: the most recent ENDED period with open work — a draft/approved invoice, or a billable participant (active with an assignment) who has no invoice (partial batch generation); sent/paid/cancelled are trailing/withdrawn states; an invoice covers only its exact `(start, end)`, and aligned periods begin on/after the community start (a mid-period start has no partial first period; a period whose every day is covered by sent/paid invoices from an earlier interval counts as settled — paid monthly periods do not reopen as regeneration work, while partly locked-covered periods are an explicit `generation_conflicts` warn step (`next_action: review_generation_conflicts`) instead of ordinary generation). No work at all → one of three flagged states: `setup` (readiness-state block — `complete`/`reason`/`assignment_link` plus advisory `billing_settings_complete`/`billing_settings_link`; `period: null` only when master data is empty), `awaiting_first_period` (nothing has ended yet; `period: null`, but the
+`setup` block is still present), or `caught_up` (the most recent ended period is returned with `caught_up: true` plus a completed `setup` block — only setup/awaiting are `period: null`, and the caught-up steps may still show trailing items such as unpaid invoices; parameterless cockpit responses always carry `setup`, explicit-period ones never do). A pending invoice from an earlier billing interval stays visible even when its period no longer aligns with the current interval; duplicate invoices for one participant/period resolve to the newest one everywhere, and attention/readiness links land on the period overview, whose rows persist for participants holding an invoice even after their assignment ends (so retry/mark-paid actions stay reachable). `periods=all` returns the union of current-calendar and exact invoice periods (deduplicated by both dates, newest-first by end/start, with `source` ∈ calendar | invoice and a configured `interval` only when the exact dates align) with `history_from`/`total_periods`/`truncated` metadata, computed from one shared dataset (constant query count, not a per-period walk); explicit ranges are bounded to five years. |
+| `GET` | `/invoices/invoices/attention/` | `IsZevOwnerOrAdmin` | `zev_id` | Cross-period attention items only (the types the readiness cockpit cannot show as steps): `email_failed`, `invoice_overdue`, `participant_validity` — tariff coverage, cockpit data gaps and setup state are readiness-step concerns and are not repeated here. Each item carries a `link`, its own period ref where item-scoped, structured fields for frontend localization, and a stable type-prefixed `id` (record identity, never list position). Failed-email items appear only while the **newest** attempt failed (a later success clears them); one per invoice. Rendered as a cross-period alert list inside the cockpit card. |
+
+`Readiness` payload: `{period: {start, end, interval} | null, steps: [{key,
+status, count, [total], [failed], [detail], [link], [detail_data]}],
+next_action, [setup], [awaiting_first_period], [caught_up]}`; step keys ∈
+metering | assignments | tariffs | generated | generation_conflicts |
+approved | sent | paid;
+statuses ∈ ok | warn | todo | done (never `blocked` — data quality is
+soft-gated). `count`/`total` are real: `generated` compares invoices present
+against billable participants; approve/send/paid run over the period's active
+(non-cancelled) invoices. `detail` is an English API fallback never rendered;
+the UI localizes from `detail_data`. Both single-period and bulk readiness
+ignore failed email attempts for paid/cancelled invoices, and count the newest
+attempt for every other invoice in the exact period. Cross-period alerts remain
+visible when readiness is loading, unavailable, or has no period; attention
+loading and failure states are shown independently. Full contract: `2026-09-navigation-regroup.md` §7.
+
+Since phase 2 the invoice serializers expose `last_email_status` (newest
+`EmailLog` status per invoice). On list pages it arrives as a `Subquery`
+annotation inside the one SELECT (no per-row N+1); the detail-shaped
+serializer inherits the field too, so detail/overview/echo responses are no
+longer shape-identical to pre-phase-2 — on those (non-annotated) objects the
+value comes from a bounded per-object lookup (see §9.1).
+
 ### 5.7 PDF template management
 
 The invoice, contract, and annual-statement PDF templates are editable via the admin API. Templates are stored in the database (`PdfTemplate` model) when customized; on-disk files serve as immutable defaults and are never modified. All three template endpoints are served by `PdfTemplateView` (`views_templates.py`), a subclass of the shared `_AdminTemplateView` base (`permission_classes = [IsAdmin]`); mutations are audit-logged (`template.invoice_pdf.*`, `template.contract_pdf.*`, `template.annual_statement_pdf.*`), and non-admin mutation attempts are audit-logged as `DENIED`.
@@ -696,6 +730,11 @@ Two shapes, split by cost. `InvoiceListSerializer` returns all invoice fields pl
 - `participant_name`: derived from `participant.full_name`.
 - `zev_name`: derived from `zev.name`.
 - `pdf_url`: absolute URL to PDF file (or `null`).
+- `last_email_status`: status of the newest `EmailLog` for the invoice (`null`
+  when none) — on list pages served by a `Subquery` annotation inside the one
+  SELECT (no per-row N+1); on detail-shaped objects (detail read, workflow
+  echoes, period overview) by a bounded per-object lookup, since
+  `InvoiceSerializer` already embeds full `email_logs`.
 
 `InvoiceSerializer` subclasses it and adds the nested read-only relations:
 - `items`: nested `InvoiceItemSerializer` (read-only).
@@ -802,6 +841,14 @@ Strips legacy period suffixes from `description` on serialization.
   renders only when at least one non-recommended batch item is enabled. In
   periods with nothing to act on (e.g. future periods) both are hidden, not
   disabled; disabled state is reserved for transient `anyBatchPending`.
+- Generation eligibility follows the readiness conflict contract and is
+  authoritative per period-overview row (`generation_eligibility`:
+  `eligible` | `covered` | `blocked` with the first covering/locking
+  invoice id+number): participants blocked by locked overlapping invoices
+  are not generation candidates (batch counts exclude them) and their row
+  action links to the locked invoice (`pages.invoices.reviewConflict`)
+  instead of offering Generate; fully settled rows link to the covering
+  invoice (`pages.invoices.viewCoveringInvoice`).
 - Email field reference is shared: `frontend/src/lib/emailTemplateFields.ts` defines `EMAIL_TEMPLATE_FIELDS`; `frontend/src/components/EmailFieldReference.tsx` (`email-field-reference`) is used by `ZevEmailTemplateFields` and `AdminEmailTemplatesPage`.
 - Annual-statement export card (admin/owner): prepare → poll → download with partial, failed and expired states. Polling stops on ZEV/year switch, and a create response that resolves after the user switched ZEV/year is discarded (the old selection's job is never shown under the new one); a failed job shows the backend's safe `error_message` when there is one; a single transient poll error is tolerated (only consecutive errors or a long wall-clock backstop end the poll); a failed download surfaces an error instead of crashing; an in-flight or completed export is restored after a reload (`AnnualStatementsExportCard`)
 - Build and type checks (`npm run build`)

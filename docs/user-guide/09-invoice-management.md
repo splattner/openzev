@@ -2,6 +2,65 @@
 
 This guide covers generating, reviewing, and managing invoices for participants.
 
+## Billing Cockpit (Dashboard)
+
+The operator dashboard opens with the **Billing cockpit**: the most recent
+ended billing period that still needs you, with one step per workflow stage —
+Metering data, meter assignments, tariffs, generate, approve, send, track
+payments. Each step shows its state (OK, needs attention, pending, done);
+steps that open an actionable page link to it (a step that merely waits on an
+upstream one — e.g. payments before anything was sent — has no link), and the
+**next action** badge links to the step that needs you first. Data problems
+never block generation — they soft-gate as warnings.
+
+The cockpit resolves the most recent ended period that still has open work,
+then shows all seven steps for that period. Step completion and period
+resolution are separate: a period counts as open when it holds a draft or
+approved invoice, or a billable participant (active with a meter assignment)
+with no invoice — a partial batch generation therefore keeps the period open
+even after those invoices are sent. The later steps are trailing states, not
+gates: approve/send/pay track the period's active invoices, so an older
+period can be fully sent yet still show an unpaid payments step or an
+unresolved failed delivery on its step list without pinning the cockpit to
+it. Cancelled invoices are withdrawn and count neither for nor against any
+step — but one still counts as an existing invoice, so it suppresses the
+missing-invoice prompt for its participant until the operator regenerates it.
+
+A community created mid-period has no partial first period: billing periods
+align to the calendar, so the first billable one starts at the next aligned
+boundary after the community's start date.
+
+Three "nothing to do right now" states look similar but behave differently:
+
+- **First run** — a brand-new ZEV with no participants **or** no metering
+  points yet replaces the cockpit with a setup checklist.
+- **Awaiting first period** — participants and meters exist, but the first
+  billing period has not ended yet. Missing meter assignments and a blank
+  IBAN still show as warnings above the waiting message.
+- **Caught up** — no ended period needs you right now (nothing waiting at
+  draft/approved, every eligible participant invoiced); the cockpit shows the
+  most recent ended period. Trailing steps such as unpaid invoices can still
+  appear there.
+
+Inside the cockpit card, below the step list, cross-period alerts appear when
+they exist: unresolved failed invoice emails (a later successful retry clears
+the item), overdue sent invoices, and participant validity endings that still
+hold meter assignments. Tariff coverage, metering gaps, unassigned readings
+and setup state are already covered by the cockpit steps above.
+
+## Participant View: My Invoices
+
+Participants open **My invoices** (`/me/invoices`) in the sidebar to see the
+invoices issued to them — invoice number, period, total, status, and a link to
+the details. Every issued invoice is listed, whether or not its PDF has been
+generated yet; the PDF button appears only on rows that have a document.
+Participants with several communities see which community issued each invoice.
+The list is read-only; the deep link `/billing/invoices/{id}` shows a
+participant only their own invoice (enforced by the backend), and its return
+link leads back to **My invoices**.
+
+![Participant My Invoices](screenshots/08c-my-invoices.png)
+
 ## Invoice Lifecycle
 
 Invoices progress through a controlled workflow:
@@ -14,7 +73,7 @@ Draft → Approved → Sent → Paid
 - **Approved** — locked for review; can be emailed, marked paid, or deleted.
 - **Sent** — email was sent to the participant; can be resent or marked paid.
 - **Paid** — fully settled; no further actions.
-- **Cancelled** — removed from the active workflow; can be deleted. The backend supports cancellation, but there is currently no cancel button in the UI.
+- **Cancelled** — removed from the active workflow; can be deleted or regenerated. A cancelled invoice does not count as generated for its period: the cockpit still asks you to generate a replacement. The backend supports cancellation, but there is currently no cancel button in the UI.
 
 ## Period-Based Invoice View
 
@@ -30,11 +89,29 @@ The toolbar at the top of the page displays:
 
 The period is automatically set based on the selected ZEV's billing interval.
 
+**How the period is chosen and kept consistent:**
+
+- **Default:** the most recent **completed** billing period (nothing older is
+  silently implied — you can move further back with **Prev**).
+- **New community:** with no completed period yet, the page opens on the
+  community's **first aligned period** instead of an empty one.
+- **Deep links:** opening a link that carries a period (`?period_start=…&
+  period_end=…` — from the dashboard cockpit, an attention item, or your own
+  bookmark) shows that **exact period**, including historical periods from an
+  earlier billing interval after a switch. Ranges that would start before the
+  community existed are ignored and fall back to the default.
+- **Boundary:** **Prev** stops at the community's earliest billable period;
+  the preset menu offers nothing older. After switching billing intervals,
+  already settled periods (fully paid under the previous interval) stay
+  closed and link to the invoice that already settles them instead of
+  offering Generate, while partly overlapping locked invoices surface as a
+  generation conflict with a link to the blocking invoices.
+
 ![Invoice period overview](screenshots/08-invoices.png)
 
 ### Period Overview Table
 
-Each row in the table represents one **participant** who had active metering-point assignments during the period. Columns:
+Each row in the table represents one **participant** who had active metering-point assignments during the period. A participant whose assignment has since ended keeps their row while they still hold an invoice for the period, so email/payment actions on that invoice stay reachable. Columns:
 
 | Column | Description |
 |---|---|
@@ -94,7 +171,9 @@ The detail page shows:
 | Grid kWh | Energy drawn from the external grid. |
 | Feed-in kWh | Energy fed back into the grid. |
 
-**The invoice document** — the stored PDF itself is embedded below the summary cards in a full document viewer (the same file the participant receives by email). It contains the line items, grouped by **tariff category** (e.g. Energy, Fee), with each line's type, description, quantity (kWh), unit price (CHF), and total, plus a subtotal per group. If no PDF has been generated yet, the page shows a **Generate PDF** button instead; the viewer appears once the document exists.
+**The invoice document** — the stored PDF itself is embedded below the summary cards in a full document viewer (the same file the participant receives by email). It contains the line items, grouped by **tariff category** (e.g. Energy, Fee),
+with each line's type, description, quantity (kWh), unit price (CHF), and
+total, plus a subtotal per group. If no PDF has been generated yet, the page shows a **Generate PDF** button instead (owners/admins only — a participant sees a plain document-unavailable message, since the API rejects their generation attempt); the viewer appears once the document exists.
 
 > **Note:** Invoices cannot be edited directly. If a correction is needed, fix the underlying data (metering readings or tariff prices) and use **Generate Again** to recreate the invoice.
 

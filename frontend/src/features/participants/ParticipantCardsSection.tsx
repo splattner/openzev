@@ -36,6 +36,8 @@ type ParticipantCardsSectionProps = {
     onConfirmDelete: (participant: Participant, displayName: string) => void
     invitationPending: boolean
     deletePendingOrDialogLoading: boolean
+    /** Participant id to highlight (deep link `?focus=`), if still visible. */
+    focusParticipantId?: string | null
 }
 
 function participantValidityBadgeClass(state: ParticipantValidityState): string {
@@ -56,6 +58,7 @@ export function ParticipantCardsSection({
     onConfirmDelete,
     invitationPending,
     deletePendingOrDialogLoading,
+    focusParticipantId,
 }: ParticipantCardsSectionProps) {
     const { t } = useTranslation()
 
@@ -122,7 +125,11 @@ export function ParticipantCardsSection({
                 }
 
                 return (
-                    <article key={participant.id} className="participant-card">
+                    <article
+                        key={participant.id}
+                        id={`participant-card-${participant.id}`}
+                        className={`participant-card${focusParticipantId === participant.id ? ' participant-card-focus' : ''}`}
+                    >
                         <div className="participant-card-header">
                             <div className="participant-card-title">
                                 <div className="participant-card-badges">

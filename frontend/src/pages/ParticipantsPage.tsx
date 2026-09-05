@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { ConfirmDialog, useConfirmDialog } from '../components/ConfirmDialog'
 import { ParticipantCardsSection } from '../features/participants/ParticipantCardsSection'
 import type { ParticipantValidityState } from '../features/participants/types'
@@ -46,6 +47,10 @@ export function ParticipantsPage() {
     const { settings } = useAppSettings()
     const { selectedZevId, selectedZev } = useManagedZev()
     const { t } = useTranslation()
+    const [searchParams, setSearchParams] = useSearchParams()
+    const focusId = searchParams.get('focus')
+    const focusField = searchParams.get('field')
+    const [highlightedId, setHighlightedId] = useState<string | null>(null)
     const isManagedScope = user?.role === 'admin' || user?.role === 'zev_owner'
     const { data, isLoading, isError } = useQuery({
         queryKey: queryKeys.zev.participants(selectedZevId || undefined),
@@ -57,6 +62,7 @@ export function ParticipantsPage() {
     const [searchTerm, setSearchTerm] = useState('')
     const [readinessFilter, setReadinessFilter] = useState<ParticipantReadinessFilter>('all')
     const [credentialsNotice, setCredentialsNotice] = useState<ParticipantCredentialsNoticeData | null>(null)
+    const [modalFocusField, setModalFocusField] = useState<'valid_to' | null>(null)
 
     const titleLabelByValue = useMemo(() => getTitleLabelMap(t), [t])
 
@@ -124,6 +130,7 @@ export function ParticipantsPage() {
 
     function startEdit(participant: Participant) {
         setEditingId(participant.id)
+        setModalFocusField(null)
         setShowModal(true)
     }
 
@@ -133,13 +140,61 @@ export function ParticipantsPage() {
             return
         }
         setEditingId(null)
+        setModalFocusField(null)
         setShowModal(true)
     }
 
     function closeModal() {
         setShowModal(false)
         setEditingId(null)
+        setModalFocusField(null)
     }
+
+    // Destination contract (spec §7) for participant-validity links
+    // (`?focus=<id>&field=valid_to`). Consuming the URL params (below) must
+    // not tear down the highlight timers, so consumption and the scroll/
+    // flash lifecycle are separate effects.
+    useEffect(() => {
+        if (!focusId || isLoading) return
+        const inScope = (data ?? []).some(
+            (participant) =>
+                participant.id === focusId
+                && (!isManagedScope || !selectedZevId || participant.zev === selectedZevId),
+        )
+        if (!inScope) return
+        // A stale search/readiness filter may keep the card off the page.
+        setSearchTerm('')
+        setReadinessFilter('all')
+        setHighlightedId(focusId)
+        if (focusField === 'valid_to') {
+            const target = (data ?? []).find((participant) => participant.id === focusId)
+            if (target) {
+                setEditingId(target.id)
+                setModalFocusField('valid_to')
+                setShowModal(true)
+            }
+        }
+        // Drop the params so the deep link is consumed (and re-linking works):
+        // the focusId dependency goes null and this effect stops re-running.
+        const params = new URLSearchParams(searchParams)
+        params.delete('focus')
+        params.delete('field')
+        setSearchParams(params, { replace: true })
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [focusId, focusField, isLoading, data, isManagedScope, selectedZevId])
+
+    useEffect(() => {
+        if (!highlightedId) return
+        const timers = [
+            window.setTimeout(() => {
+                document
+                    .getElementById(`participant-card-${highlightedId}`)
+                    ?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+            }, 0),
+            window.setTimeout(() => setHighlightedId(null), 4000),
+        ]
+        return () => timers.forEach((timer) => window.clearTimeout(timer))
+    }, [highlightedId])
 
     function submit(payload: ParticipantInput) {
         if (!selectedZevId) {
@@ -278,6 +333,7 @@ export function ParticipantsPage() {
                 initialParticipant={editingParticipant}
                 selectedZevId={selectedZevId || ''}
                 isPending={createMutation.isPending || updateMutation.isPending}
+                focusField={modalFocusField}
             />
 
             <section className="card">
@@ -304,6 +360,7 @@ export function ParticipantsPage() {
                 onConfirmDelete={confirmDeleteParticipant}
                 invitationPending={invitationMutation.isPending}
                 deletePendingOrDialogLoading={deleteMutation.isPending || dialogLoading}
+                focusParticipantId={highlightedId}
             />
 
             {dialog && (

@@ -110,7 +110,7 @@ If logged in as a ZEV owner:
 
 Login as a participant (Anna or Ben):
 - **Dashboard** shows your energy consumption/production overview
-- **My consumption** shows your consumption charts
+- **My invoices** lists the invoices issued to you (details + PDF)
 - **Annual statement** shows your yearly statement and financial summary
 
 ![Participant Dashboard](screenshots/02b-participant-dashboard.png)

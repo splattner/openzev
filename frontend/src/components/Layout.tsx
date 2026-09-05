@@ -7,6 +7,7 @@ import { useManagedZev } from '../lib/managedZev'
 import { fetchUsers } from '../lib/api/auth'
 import { queryKeys } from '../lib/api/queryKeys'
 import { LanguageSelector } from './LanguageSelector'
+import { useToast } from '../lib/toast'
 import pkg from '../../package.json'
 
 function SidebarLink({ to, label, icon, active, end, className }: {
@@ -45,6 +46,7 @@ export function Layout() {
     })
     const location = useLocation()
     const navigate = useNavigate()
+    const { pushToast } = useToast()
     const [isUserMenuOpen, setIsUserMenuOpen] = useState(false)
     const [isZevMenuOpen, setIsZevMenuOpen] = useState(false)
     const [isStoppingImpersonation, setIsStoppingImpersonation] = useState(false)
@@ -62,19 +64,16 @@ export function Layout() {
         window.localStorage.setItem('openzev.sidebarCollapsed', String(isSidebarCollapsed))
     }, [isSidebarCollapsed])
 
-    // Close mobile menu on navigation
     useEffect(() => {
         setIsMobileMenuOpen(false)
     }, [location.pathname])
 
     // Prevent body scroll when mobile menu is open
     useEffect(() => {
-        if (isMobileMenuOpen) {
-            document.body.style.overflow = 'hidden'
-        } else {
-            document.body.style.overflow = ''
-        }
-        return () => { document.body.style.overflow = '' }
+        if (!isMobileMenuOpen) return
+        const previous = document.body.style.overflow
+        document.body.style.overflow = 'hidden'
+        return () => { document.body.style.overflow = previous }
     }, [isMobileMenuOpen])
 
     useEffect(() => {
@@ -87,8 +86,20 @@ export function Layout() {
             }
         }
 
+        function handleEscape(event: KeyboardEvent) {
+            if (event.key === 'Escape') {
+                setIsUserMenuOpen(false)
+                setIsZevMenuOpen(false)
+                setIsMobileMenuOpen(false)
+            }
+        }
+
         document.addEventListener('mousedown', handleOutsideClick)
-        return () => document.removeEventListener('mousedown', handleOutsideClick)
+        document.addEventListener('keydown', handleEscape)
+        return () => {
+            document.removeEventListener('mousedown', handleOutsideClick)
+            document.removeEventListener('keydown', handleEscape)
+        }
     }, [])
 
     const displayName = `${user?.first_name ?? ''} ${user?.last_name ?? ''}`.trim() || user?.username || ''
@@ -120,12 +131,11 @@ export function Layout() {
 
     return (
         <div className={`shell${isSidebarCollapsed ? ' shell-collapsed' : ''}${isPlatformScope ? ' shell-scope-platform' : ''}`}>
-            {/* Mobile overlay */}
             <div
                 className={`sidebar-overlay${isMobileMenuOpen ? ' visible' : ''}`}
                 onClick={() => setIsMobileMenuOpen(false)}
             />
-            <aside className={`sidebar${isSidebarCollapsed ? ' collapsed' : ''}${isMobileMenuOpen ? ' mobile-open' : ''}`}>
+            <aside id="app-sidebar" className={`sidebar${isSidebarCollapsed ? ' collapsed' : ''}${isMobileMenuOpen ? ' mobile-open' : ''}`}>
                 {/* Persistent scope context (replaces switcher on platform routes). */}
                 <div className="sidebar-fixed">
                     <div className="sidebar-brand-row">
@@ -239,7 +249,7 @@ export function Layout() {
 
                         {isParticipant && (
                             <>
-                                <SidebarLink to="/metering/chart" label={t('nav.myConsumption')} icon={<ChartIcon />} />
+                                <SidebarLink to="/me/invoices" label={t('nav.myInvoices')} icon={<InvoiceIcon />} />
 
                                 <SidebarLink to="/me/statement" label={t('nav.annualStatement')} icon={<ReportsIcon />} />
                             </>
@@ -299,6 +309,8 @@ export function Layout() {
                         className="mobile-menu-button"
                         onClick={() => setIsMobileMenuOpen((prev) => !prev)}
                         aria-label={t('nav.menu')}
+                        aria-expanded={isMobileMenuOpen}
+                        aria-controls="app-sidebar"
                     >
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                             <path d="M3 12h18M3 6h18M3 18h18" />
@@ -306,7 +318,7 @@ export function Layout() {
                     </button>
 
                     {isImpersonating && impersonator && (
-                        <div className="impersonation-banner" role="status" aria-live="polite">
+                        <div className="impersonation-banner" role="status">
                             <span>
                                 {t('nav.impersonatingAs', { name: displayName || user?.username })}
                             </span>
@@ -319,6 +331,8 @@ export function Layout() {
                                         setIsStoppingImpersonation(true)
                                         await stopImpersonation()
                                         navigate('/admin/accounts')
+                                    } catch {
+                                        pushToast(t('common.error'), 'error')
                                     } finally {
                                         setIsStoppingImpersonation(false)
                                     }
@@ -333,6 +347,8 @@ export function Layout() {
                         <button
                             type="button"
                             className="user-menu-trigger"
+                            aria-expanded={isUserMenuOpen}
+                            aria-controls="user-menu-list"
                             onClick={() => setIsUserMenuOpen((prev) => !prev)}
                         >
                             <span className="user-avatar" aria-hidden="true">👤</span>
@@ -343,7 +359,7 @@ export function Layout() {
                         </button>
 
                         {isUserMenuOpen && (
-                            <div className="user-menu-dropdown">
+                            <div className="user-menu-dropdown" id="user-menu-list">
                                 <NavLink
                                     to="/account"
                                     className="user-menu-item"

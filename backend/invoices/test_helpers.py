@@ -30,15 +30,15 @@ def make_participant(zev, user=None, first="Jane", last="Doe"):
     )
 
 
-def make_invoice(zev, participant, inv_status=InvoiceStatus.DRAFT):
+def make_invoice(zev, participant, inv_status=InvoiceStatus.DRAFT, period=None):
     global _counter
     _counter += 1
     return Invoice.objects.create(
         invoice_number=f"T-{_counter:05d}",
         zev=zev,
         participant=participant,
-        period_start=date(2026, 1, 1),
-        period_end=date(2026, 1, 31),
+        period_start=period[0] if period else date(2026, 1, 1),
+        period_end=period[1] if period else date(2026, 1, 31),
         status=inv_status,
         total_chf=Decimal("42.00"),
     )

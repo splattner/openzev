@@ -205,6 +205,21 @@ def _gather_period_readings(
     )
 
 
+def locked_overlapping_invoices(participant, period_start, period_end):
+    """Invoices blocking generation for the period: overlapping invoices past
+    draft/cancelled, which have been sent to somebody and must not be silently
+    rewritten. Shared with the readiness conflict detection."""
+    return (
+        Invoice.objects.filter(
+            participant=participant,
+            period_start__lte=period_end,
+            period_end__gte=period_start,
+        )
+        .exclude(status__in=[InvoiceStatus.DRAFT, InvoiceStatus.CANCELLED])
+        .order_by("period_start", "period_end", "id")
+    )
+
+
 def _discard_replaceable_invoices(participant, period_start, period_end) -> None:
     """Clear the way for a regeneration, or refuse to.
 
@@ -217,9 +232,7 @@ def _discard_replaceable_invoices(participant, period_start, period_end) -> None
         period_start__lte=period_end,
         period_end__gte=period_start,
     )
-    locked = overlapping.exclude(
-        status__in=[InvoiceStatus.DRAFT, InvoiceStatus.CANCELLED]
-    ).first()
+    locked = locked_overlapping_invoices(participant, period_start, period_end).first()
     if locked:
         raise ValueError(
             f"Invoice {locked.invoice_number} already has status '{locked.status}' and cannot be regenerated."

@@ -66,11 +66,34 @@ class InvoiceListPayloadTests(TestCase):
             subject="Invoice",
             status=EmailLog.Status.SENT,
         )
+        # A second invoice with **no** email logs: an annotated null must not
+        # be mistaken for a missing annotation (that would send each such
+        # invoice back to the database — the per-row N+1 this shape exists to
+        # avoid).
+        self.no_log_participant = make_participant(self.zev, first="No", last="Logs")
+        self.no_log_invoice = make_invoice(
+            self.zev, self.no_log_participant, InvoiceStatus.SENT
+        )
 
     def _client(self):
         client = APIClient()
         client.force_authenticate(self.owner)
         return client
+
+    @staticmethod
+    def _standalone_email_log_queries(captured) -> list[str]:
+        """Queries reading ``invoices_emaillog`` outside the list annotation.
+
+        The annotation is part of the invoice SELECT (… AS
+        "last_email_status"); any other query touching the email-log table is
+        the per-row fallback firing. Matching is case- and quote-insensitive
+        so a renamed/uppercased SQL dialect cannot silently pass."""
+        return [
+            q["sql"]
+            for q in captured
+            if "INVOICES_EMAILLOG" in q["sql"].upper()
+            and "LAST_EMAIL_STATUS" not in q["sql"].upper()
+        ]
 
     def test_list_omits_the_nested_items_and_email_logs(self):
         resp = self._client().get("/api/v1/invoices/invoices/")
@@ -126,22 +149,76 @@ class InvoiceListPayloadTests(TestCase):
 
         self.assertEqual(resp.status_code, 200)
         rows = [r for r in resp.json()["rows"] if r["invoice"]]
-        self.assertTrue(rows, "expected the period overview to carry an invoice")
-        self.assertEqual(len(rows[0]["invoice"]["email_logs"]), 1)
-        self.assertEqual(len(rows[0]["invoice"]["items"]), 1)
+        by_participant = {r["participant_name"]: r["invoice"] for r in rows}
+        # The no-log invoice row exists too: an invoice stays reachable even
+        # without its own assignment (attention links land on a non-empty
+        # table), so the row with the log is found by participant, not order.
+        self.assertEqual(by_participant[self.participant.full_name]["email_logs"][0]["status"], "sent")
+        self.assertEqual(len(by_participant[self.participant.full_name]["items"]), 1)
+        self.assertIsNone(by_participant[self.no_log_participant.full_name]["last_email_status"])
 
     def test_list_does_not_query_the_tables_it_no_longer_serializes(self):
         """The prefetch is dropped along with the fields it fed. Asserting on
         the tables touched rather than a query count: the count alone would
         also pass with the prefetch in place, since prefetching is a fixed two
-        extra queries regardless of how many invoices come back."""
+        extra queries regardless of how many invoices come back.
+
+        Since the nav-regroup readiness work the list does carry
+        ``last_email_status``, but via a subquery annotation inside the one
+        SELECT — never a separate per-row query. The captured SQL must not
+        contain a standalone FROM invoices_emaillog outside the subselect,
+        and the page must stay at a constant query count when rows grow."""
         with CaptureQueriesContext(connection) as ctx:
             resp = self._client().get("/api/v1/invoices/invoices/")
 
         self.assertEqual(resp.status_code, 200)
         touched = " ".join(q["sql"] for q in ctx.captured_queries)
         self.assertNotIn("invoices_invoiceitem", touched)
-        self.assertNotIn("invoices_emaillog", touched)
+        # The annotation rides inside the invoice SELECT (… AS "last_email_status");
+        # a prefetch would instead show as its own query with FROM invoices_emaillog.
+        subquery = "LAST_EMAIL_STATUS" in touched.upper()
+        standalone = self._standalone_email_log_queries(ctx.captured_queries)
+        self.assertTrue(
+            subquery,
+            "list must annotate last_email_status instead of reading email logs separately",
+        )
+        self.assertEqual(
+            standalone,
+            [],
+            "list must not query invoices_emaillog outside the annotation subquery",
+        )
+
+    def test_annotated_null_row_stays_constant_query_count(self):
+        """Invoices without email logs must not trigger a per-row fallback
+        query: the annotated null is a value, not a missing annotation. The
+        page costs the same number of queries whether it carries one invoice
+        without logs or many (regression: the fallback fired per no-log
+        invoice, an N+1 that only shows on mixed lists)."""
+        def capture():
+            with CaptureQueriesContext(connection) as ctx:
+                resp = self._client().get("/api/v1/invoices/invoices/")
+            self.assertEqual(resp.status_code, 200)
+            rows = resp.json()["results"]
+            self.assertEqual(
+                self._standalone_email_log_queries(ctx.captured_queries),
+                [],
+                "no-log invoices must not trigger standalone email-log queries",
+            )
+            return len(ctx.captured_queries), rows
+
+        base_queries, rows = capture()
+        by_id = {row["id"]: row for row in rows}
+        self.assertEqual(
+            by_id[str(self.no_log_invoice.id)]["last_email_status"], None
+        )
+        self.assertEqual(by_id[str(self.invoice.id)]["last_email_status"], "sent")
+
+        # Grow the number of no-log invoices — the query count must not move.
+        for i in range(3):
+            participant = make_participant(self.zev, first=f"Grow{i}", last="Logs")
+            make_invoice(self.zev, participant, InvoiceStatus.SENT)
+        grown_queries, _ = capture()
+        self.assertEqual(grown_queries, base_queries)
 
     def test_retrieve_still_prefetches_the_nested_relations(self):
         """The detail read renders them, so it must still fetch them — the

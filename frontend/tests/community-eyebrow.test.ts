@@ -309,4 +309,22 @@ describe('community eyebrow', { timeout: 30000 }, () => {
         expect(eyebrow?.textContent).toBe('nav.platformScope')
         unmount()
     })
+
+    it('statement keeps the membership label with several memberships', async () => {
+        // Recorded exception (spec §6): both statement downloads serve the
+        // backend-resolved membership, so the label stays.
+        mockParticipant(2)
+        const { container, unmount } = await renderAt('/me/statement')
+        const eyebrow = container.querySelector('.page-stack .eyebrow')
+        expect(eyebrow?.textContent).toBe('Member ZEV')
+        unmount()
+    })
+
+    it('my invoices shows the community with a single membership', async () => {
+        mockParticipant()
+        const { container, unmount } = await renderAt('/me/invoices')
+        const eyebrow = container.querySelector('.page-stack .eyebrow')
+        expect(eyebrow?.textContent).toBe('Member ZEV')
+        unmount()
+    })
 })

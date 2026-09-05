@@ -355,7 +355,6 @@ invoices.  Use hard deletion only for meters created in error with no data.
 ---
 
 ## 8. Downstream integration
-
 ### 8.1 Billing engine
 
 The billing engine resolves participant metering points via assignments:
@@ -405,6 +404,18 @@ user's accessible ZEV scope.  The `meter_type` determines default reading
 direction when no explicit direction column is present.
 
 ---
+
+### 8.5 Participants page deep links (`?focus=`)
+
+Readiness/attention links for participant-validity warnings open the
+participants page with `?focus=<participant id>&field=valid_to`. The page
+consumes the parameters once: it clears any search/readiness filter that
+would hide the card, opens the edit modal with the validity focused, scrolls
+the participant card into view and flashes it (`.participant-card-focus`, a
+CSS-only highlight), then drops the parameters from the URL so a later
+refresh or another deep link re-triggers cleanly. URL consumption and the
+scroll/flash lifecycle are separate effects, so removing the parameters
+never cancels the highlight timers.
 
 ## 9. Observability, auditability, and security
 

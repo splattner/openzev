@@ -19,6 +19,7 @@ import {
     fetchMeteringDashboardSummary,
 } from '../lib/api/metering'
 import { fetchInvoices, openInvoicePdf } from '../lib/api/invoices'
+import { fetchAttention, fetchReadiness } from '../lib/api/readiness'
 import { queryKeys } from '../lib/api/queryKeys'
 import { formatIsoDate } from '../lib/dates'
 import { isInvoiceOverdue, selectOpenInvoices, sumTotalChf } from '../features/invoices/openInvoices'
@@ -31,6 +32,7 @@ import { PageSkeleton } from '../components/PageSkeleton'
 import { StatCard } from '../components/StatCard'
 import { PeriodSelector } from '../components/PeriodSelector'
 import { EnergyFlowChart } from '../components/EnergyFlowChart'
+import { BillingCockpit } from '../components/BillingCockpit'
 import {
     type BillingInterval,
     getCurrentBillingPeriod,
@@ -49,6 +51,20 @@ export function DashboardPage() {
     const [selectedParticipantId, setSelectedParticipantId] = useState('')
 
     const isZevScopedRole = user?.role === 'admin' || user?.role === 'zev_owner'
+
+    // Phase-2 cockpit: one readiness query (server-resolved cockpit period,
+    // no date picker) and one cross-period attention query, rendered together
+    // inside the cockpit card.
+    const readinessQuery = useQuery({
+        queryKey: queryKeys.invoices.readiness(selectedZevId || undefined),
+        queryFn: () => fetchReadiness(selectedZevId!),
+        enabled: isZevScopedRole && !!selectedZevId,
+    })
+    const attentionQuery = useQuery({
+        queryKey: queryKeys.invoices.attention(selectedZevId || undefined),
+        queryFn: () => fetchAttention(selectedZevId!),
+        enabled: isZevScopedRole && !!selectedZevId,
+    })
 
     const formatBucketLabel = (value: string) => formatMeteringBucketLabel(value, bucket, settings)
     const formatBucketTooltipLabel = (label: unknown) => formatBucketLabel(String(label ?? ''))
@@ -162,6 +178,14 @@ export function DashboardPage() {
                 <h2>{t('dashboard.title')}</h2>
                 <p className="muted">{t('dashboard.description')}</p>
             </header>
+
+            {/* Phase-2 action area: the cockpit period is resolved server-side
+                and never follows the date selector, so it sits above the
+                selector — the selector then stays adjacent to the analytics
+                it actually controls. */}
+            {isZevScopedRole && selectedZevId && (
+                <BillingCockpit readinessQuery={readinessQuery} attentionQuery={attentionQuery} />
+            )}
 
             {(user?.role === 'admin' || user?.role === 'zev_owner') && (
                 <section className="card">
@@ -523,6 +547,7 @@ export function DashboardPage() {
                                                         className="button button-primary"
                                                         style={{ textDecoration: 'none' }}
                                                         to={`/billing/invoices/${invoice.id}`}
+                                                        state={{ from: '/' }}
                                                     >
                                                         {t('pages.dashboard.viewDetails')}
                                                     </Link>

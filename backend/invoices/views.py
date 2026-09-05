@@ -3,6 +3,7 @@ import logging
 import zipfile
 from datetime import date as date_type
 
+from django.db.models import OuterRef, Subquery
 from rest_framework import mixins, viewsets, status
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
@@ -99,6 +100,17 @@ class InvoiceViewSet(
         # generation instantiates the view without an action.
         if getattr(self, "action", None) != "list":
             queryset = queryset.prefetch_related("items", "email_logs")
+        else:
+            # last_email_status rides a subquery annotation: one extra query
+            # per list page, no per-row N+1 (EmailLog.Meta ordering is newest
+            # first, so [0] of the subquery is the latest attempt).
+            queryset = queryset.annotate(
+                last_email_status=Subquery(
+                    EmailLog.objects.filter(invoice=OuterRef("pk"))
+                    .order_by("-created_at", "-id")
+                    .values("status")[:1]
+                )
+            )
         return self.scope_queryset(queryset)
 
     def filter_queryset(self, queryset):

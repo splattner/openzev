@@ -1321,6 +1321,142 @@ label {
   text-decoration: underline;
 }
 
+/* ── Billing cockpit + attention card (nav-regroup phase 2, spec §7) ── */
+
+.cockpit-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.cockpit-period {
+  font-size: 0.9rem;
+  white-space: nowrap;
+}
+
+.cockpit-steps {
+  list-style: none;
+  margin: 0.9rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.cockpit-step {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  padding: 0.45rem 0;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.cockpit-step:last-child {
+  border-bottom: 0;
+}
+
+.cockpit-step-badge {
+  min-width: 6.2rem;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.cockpit-step-label {
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.cockpit-step-detail {
+  font-size: 0.85rem;
+}
+
+.cockpit-step-link {
+  margin-left: auto;
+  color: var(--interactive);
+  font-weight: 600;
+  font-size: 0.85rem;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.cockpit-step-link:hover {
+  text-decoration: underline;
+}
+
+.cockpit-foot {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border-default);
+}
+
+.cockpit-setup-list {
+  list-style: none;
+  margin: 0.5rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.cockpit-setup-list a {
+  color: var(--interactive);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.cockpit-setup-list a:hover {
+  text-decoration: underline;
+}
+
+.cockpit-alerts {
+  list-style: none;
+  margin: 0;
+  padding: 0.5rem 0 0;
+}
+
+.cockpit-alert {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.cockpit-alert:last-child {
+  border-bottom: 0;
+}
+
+.cockpit-alert .badge {
+  flex-shrink: 0;
+}
+
+.cockpit-alert-text {
+  flex: 1;
+  min-width: 12rem;
+  font-size: 0.88rem;
+  color: var(--ink);
+}
+
+.cockpit-alert-link {
+  margin-left: auto;
+  color: var(--interactive);
+  font-weight: 600;
+  font-size: 0.85rem;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.cockpit-alert-link:hover {
+  text-decoration: underline;
+}
+
 /* ── PDF viewer frame + bar (spec §7.7) ── */
 
 .pdf-frame {
@@ -1365,7 +1501,8 @@ h3 {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .skeleton-block::after {
+  .skeleton-block::after,
+  .participant-card-focus {
     animation: none !important;
   }
 }
@@ -2174,6 +2311,21 @@ input.recurrence-chip-input {
   border-radius: 1rem;
   overflow: hidden;
   background: rgba(255, 255, 255, 0.96);
+}
+
+/* Deep-link target (`?focus=` from attention links): briefly flash the card. */
+.participant-card-focus {
+  animation: participant-card-flash 2.4s ease-out 1;
+  border-color: var(--accent, var(--focus-ring));
+}
+
+@keyframes participant-card-flash {
+  0% {
+    box-shadow: 0 0 0 3px var(--focus-ring);
+  }
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
 }
 
 .participant-card-header {

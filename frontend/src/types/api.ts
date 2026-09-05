@@ -532,6 +532,8 @@ export interface Invoice {
      * queued render and a failed one both leave `pdf_url` null.
      */
     pdf_status?: InvoicePdfStatus
+    /** Status of the newest email attempt; present on list and detail. */
+    last_email_status?: 'pending' | 'sent' | 'failed' | null
     items?: InvoiceItem[]
     email_logs?: EmailLog[]
     /** Detail reads only; never carries the secret (see InvoiceAccessLink). */
@@ -551,11 +553,22 @@ export interface InvoiceAccessLink {
     last_used_at: string | null
 }
 
-export interface InvoicePeriodParticipantRow {
-    participant_id: string
+/** Per-row generation eligibility for a viewed billing period: `eligible`
+ * offers Generate, `blocked` links to the locking invoice, `covered` links
+ * to the first invoice that already settles the period. */
+export interface GenerationEligibility {
+    state: 'eligible' | 'covered' | 'blocked'
+    invoice_id: string | null
+    invoice_number: string | null
+}
+
+export interface InvoicePeriodParticipantRow {    participant_id: string
     participant_name: string
     participant_email?: string
     invoice: Invoice | null
+    /** Generation eligibility for rows without a live exact-period invoice
+     * (null when the row's own invoice governs the actions). */
+    generation_eligibility: GenerationEligibility | null
     metering_data_complete: boolean
     metering_points_total: number
     metering_points_with_data: number
@@ -596,6 +609,183 @@ export interface EmailLog {
     error_message?: string
     sent_at?: string | null
     created_at: string
+}
+
+// ---------------------------------------------------------------------------
+// Readiness / attention (nav-regroup phase 2)
+// ---------------------------------------------------------------------------
+
+export type ReadinessStepKey =
+    | 'metering'
+    | 'assignments'
+    | 'tariffs'
+    | 'generated'
+    | 'generation_conflicts'
+    | 'approved'
+    | 'sent'
+    | 'paid'
+
+export type ReadinessStepStatus = 'ok' | 'warn' | 'todo' | 'done'
+
+export type ReadinessNextAction =
+    | 'fix_metering'
+    | 'fix_assignments'
+    | 'fix_tariffs'
+    | 'generate'
+    | 'review_generation_conflicts'
+    | 'approve'
+    | 'send'
+    | 'track_payments'
+    | 'none'
+
+export interface ReadinessStepMeterGap {
+    meter_id: string
+    missing_days: number
+    from: string
+    to: string
+}
+
+export interface ReadinessStepDetailData {
+    /** metering warn: days missing across the affected points. */
+    missing_days?: number
+    /** metering warn: affected meters (first three). */
+    meters?: ReadinessStepMeterGap[]
+    /** metering warn: how many further meters were cut off. */
+    more_meters?: number
+    /** assignments warn. */
+    unassigned_readings?: number
+    unassigned_days?: number
+    /** tariffs warn: uncovered stretches (first four). */
+    ranges?: Array<{ from: string; to: string }>
+    more_ranges?: number
+    /** generated todo. */
+    missing?: number
+    missing_participants?: string[]
+    more_missing?: number
+    /** generation_conflicts warn: participants blocked by locked overlap. */
+    conflict_count?: number
+    conflicts?: ReadinessConflict[]
+    more_conflicts?: number
+    /** paid todo: active invoices not yet paid. */
+    unpaid?: number
+}
+
+/** One participant blocked by locked overlapping invoices. */
+export interface ReadinessConflict {
+    participant_id: string
+    participant_name: string
+    invoices: ReadinessConflictInvoice[]
+}
+
+export interface ReadinessConflictInvoice {
+    id: string
+    number: string
+    status: string
+    start: string
+    end: string
+}
+
+export interface ReadinessStep {
+    key: ReadinessStepKey
+    status: ReadinessStepStatus
+    /** Invoices / readings / days affected. Data steps count affected points
+     * (metering) or readings (assignments); generated counts participants
+     * that have an invoice against `total` eligible ones; workflow steps
+     * count invoices waiting at that step against `total` active ones. */
+    count: number
+    /** Denominator: eligible participants (generated) or active invoices. */
+    total?: number
+    /** Unresolved (not retried-to-success) email failures for the period. */
+    failed?: number | null
+    /** English API fallback — never rendered by the UI. */
+    detail?: string | null
+    /** Structured fields the UI localizes from (spec §7). */
+    detail_data?: ReadinessStepDetailData
+    /** Route to the page holding the step's action; absent while a
+     * downstream step merely waits on an upstream one. */
+    link?: string | null
+}
+
+export interface ReadinessSetupBlock {
+    participants: number
+    metering_points: number
+    tariffs: number
+    settings_complete: boolean
+    /** False when participants/meters exist but no active participant holds a
+     * current-or-future assignment (or when master data is empty). */
+    complete: boolean
+    reason: 'no_master_data' | 'no_billable_assignment' | null
+    /** Assignment management destination, present when `complete` is false. */
+    assignment_link: string | null
+    /** Blank IBAN is advisory: reported here without failing `complete`. */
+    billing_settings_complete: boolean
+    billing_settings_link: string | null
+}
+
+export interface ReadinessResponse {
+    zev_id: string
+    period: {
+        start: string
+        end: string
+        interval: 'monthly' | 'quarterly' | 'semi_annual' | 'annual'
+    } | null
+    steps: ReadinessStep[]
+    next_action: ReadinessNextAction
+    /** Present only in first-run mode (period null, master data empty). */
+    setup?: ReadinessSetupBlock | null
+    /** Master data exists but no billing period has ended yet. */
+    awaiting_first_period?: boolean
+    /** No ended period has open work; `period` is the most recent ended one
+     * (its steps may still show trailing items like unpaid invoices). */
+    caught_up?: boolean
+}
+
+/** One entry of the `periods=all` readiness list: like ReadinessResponse
+ * without the top-level `zev_id` (it lives on the envelope), but the period
+ * carries calendar-versus-invoice provenance — historical entries only keep
+ * the configured interval when their exact dates align to it. */
+export interface ReadinessPeriod {
+    period: {
+        start: string
+        end: string
+        interval: string | null
+        source: 'calendar' | 'invoice'
+    }
+    steps: ReadinessStep[]
+    next_action: ReadinessNextAction
+    caught_up?: boolean
+    setup?: ReadinessSetupBlock | null
+}
+
+/**
+ * Cross-period attention items only (nav-regroup phase 2, spec §7): the types
+ * the readiness cockpit cannot show as steps. They render inside the cockpit
+ * card; tariff/metering/assignment gaps and setup state are cockpit-step
+ * concerns and are not emitted here.
+ */
+export type AttentionItemType = 'email_failed' | 'invoice_overdue' | 'participant_validity'
+
+export interface AttentionItem {
+    /** UUID for concrete records; type-prefixed for aggregate items. */
+    id: string
+    type: AttentionItemType
+    /** English fallback for API-only consumers; the UI localizes from the
+     * structured fields below and never renders this. */
+    label: string
+    /** Period the item refers to, when item-scoped (interval echoes the ZEV's). */
+    period?: { start: string; end: string; interval?: string } | null
+    /** Invoice reference for invoice-scoped items. */
+    invoice_id?: string | null
+    /** In-app route to the page that resolves the item. */
+    link: string
+    // Structured fields the frontend localizes from:
+    invoice_number?: string
+    recipient?: string
+    due_date?: string | null
+    participant_id?: string
+    participant_name?: string
+    valid_to?: string
+    expired?: boolean
 }
 
 export type AuditActionCategory =

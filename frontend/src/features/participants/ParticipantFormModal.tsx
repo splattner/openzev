@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { useForm } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 import { FormModal } from '../../components/FormModal'
@@ -22,6 +22,8 @@ type ParticipantFormModalProps = {
   initialParticipant?: Participant
   selectedZevId: string
   isPending?: boolean
+  /** Deep-link contract (`?focus=<id>&field=valid_to`): focus this field after the modal opens. */
+  focusField?: 'valid_to' | null
 }
 
 export function ParticipantFormModal({
@@ -32,16 +34,25 @@ export function ParticipantFormModal({
   initialParticipant,
   selectedZevId,
   isPending = false,
+  focusField = null,
 }: ParticipantFormModalProps) {
   const { t } = useTranslation()
   const form = useForm<ParticipantFormValues>({
     resolver: zodResolver(participantFormSchema),
     defaultValues: defaultParticipantFormValues,
   })
+  const validToField = form.register('valid_to')
+  const validToRef = useRef<HTMLInputElement | null>(null)
 
   useEffect(() => {
     form.reset(initialParticipant ? mapParticipantToFormValues(initialParticipant) : defaultParticipantFormValues)
   }, [initialParticipant, form, isOpen])
+
+  useEffect(() => {
+    if (!isOpen || focusField !== 'valid_to') return
+    const timer = window.setTimeout(() => validToRef.current?.focus(), 60)
+    return () => window.clearTimeout(timer)
+  }, [isOpen, focusField])
 
   function submit(values: ParticipantFormValues) {
     onSubmit(mapParticipantFormValuesToInput(values, selectedZevId))
@@ -101,7 +112,14 @@ export function ParticipantFormModal({
         </label>
         <label>
           <span>{t('pages.participants.form.validTo')}</span>
-          <input type="date" {...form.register('valid_to')} />
+          <input
+            type="date"
+            {...validToField}
+            ref={(element) => {
+              validToRef.current = element
+              validToField.ref(element)
+            }}
+          />
         </label>
         <label>
           <span>{t('pages.participants.form.allocationWeight')}</span>

@@ -687,7 +687,8 @@ On update:
 | `/invoices/:invoiceId` | any authenticated | alias → `/billing/invoices/:invoiceId` (param + query preserved) |
 | `/billing/invoices/:invoiceId` | any authenticated | `InvoiceDetailPage` |
 | `/imports` | `admin`, `zev_owner` | alias → `/metering/imports` (query preserved) |
-| `/me/statement` | `participant` | `ReportsPage` (participant branch; impersonating admins carry the participant role) — recorded exception 2 of the permission contract (see `2026-09-navigation-regroup.md` §4) |
+| `/me/statement` | `participant` | `ReportsPage` (participant branch; impersonating admins carry the participant role) |
+| `/me/invoices` | `participant` | `MyInvoicesPage` (own invoices, read-only; reuses the role-scoped invoice list — no new grant, recorded exception 2) |
 | `/login` | public | `LoginPage` |
 | `/verify-email` | public | `VerifyEmailPage` |
 
@@ -702,11 +703,8 @@ The sidebar (`Layout.tsx`) shows sections conditionally:
 | Section | Condition |
 |---|---|
 | Dashboard | always |
-| Metering (`/metering/chart`, active on `/metering/chart` + `/metering/quality`) | `canManage` (visible to admins and owners only) |
-| Billing (`/billing/invoices`, active on `/billing/*`) | `canManage` (visible to admins and owners only) |
-| Imports | `canManage` (visible to admins and owners only) |
-| Reports | `canManage` (visible to admins and owners only in nav; the `/reports` route itself still allows participants) |
-| My consumption (`/metering/chart`), Annual statement (`/me/statement`) | `role == 'participant'` |
+| Metering (`/metering/chart`, active on `/metering/chart` + `/metering/quality`), Billing (`/billing/invoices`, active on `/billing/*`), Imports (transitional, phase-3 hub tab), Reports | `canManage` = `role == 'admin' \|\| role == 'zev_owner'` ("owner-only in nav" = owner AND admin; the `/reports` route itself still allows participants) |
+| My invoices (`/me/invoices`), Annual statement (`/me/statement`) | `role == 'participant'` (the transitional "My consumption" entry folded into the participant dashboard in phase 2) |
 | Setup group (participants, metering points, tariffs, ZEV settings, audit logs) | `canManage` |
 | Feasibility | `canManage` |
 | Platform group (all nine `/admin/*` pages, flat) | `role == 'admin'` |
@@ -743,8 +741,12 @@ entry carries `aria-current` alongside its visual class — `"page"` on the
 exact route, `"true"` on hub entries visually active on sub-routes (Metering
 on `/metering/chart` + `/metering/quality`, Billing on `/billing/*`).
 
-Scope: this rework ships the flat nav, canonical routes + aliases, and
-the Manage entry point. Route/permission decisions and the
+Phase scope: phase 1 shipped the flat nav, canonical routes + aliases, and
+the Manage entry point. Phase 2 shipped `/me/invoices`, the participant nav  fold of "My consumption" into the Dashboard, and the readiness/attention
+  cockpit on the dashboard (`BillingCockpit`, fed by
+`/api/v1/invoices/invoices/readiness/` + `…/attention/`). Deferred to phase 3:
+the metering-points rename, `/billing/periods|emails|statements`, and the
+audit-logs move. The phase plan, route/permission decisions and the
 readiness/attention contract are recorded in
 [2026-09-navigation-regroup.md](2026-09-navigation-regroup.md) (the WIP
 tag `ux-audit-handoff-v1` is archival context only).

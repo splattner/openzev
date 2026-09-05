@@ -29,6 +29,10 @@ vi.mock('../src/lib/api/auth', () => ({
     fetchUsers: vi.fn(() => Promise.resolve([])),
 }))
 
+vi.mock('../src/lib/toast', () => ({
+    useToast: () => ({ pushToast: vi.fn() }),
+}))
+
 const ZEV = { id: 1, name: 'Muster ZEV', owner: 9 }
 const SECOND_ZEV = { id: 2, name: 'Second ZEV', owner: 9 }
 
@@ -168,15 +172,18 @@ describe('flat nav (see docs/specs/2026-09-navigation-regroup.md §5)', () => {
         page.unmount()
     })
 
-    it('participant sees Dashboard, My consumption and Annual statement only', async () => {
+    it('participant sees Dashboard, My invoices and Annual statement only', async () => {
         mockSession('participant')
         const page = await renderLayout()
         expect(page.hasHref('/')).toBe(true)
-        expect(page.hasHref('/metering/chart')).toBe(true)
+        expect(page.hasHref('/me/invoices')).toBe(true)
         expect(page.hasHref('/me/statement')).toBe(true)
         for (const href of ['/reports', '/metering/imports', '/participants', '/tariffs', '/zev-settings', '/audit-logs', '/admin']) {
             expect(page.hasHref(href)).toBe(false)
         }
+        // "My consumption" folded into the participant dashboard (phase 2):
+        // no separate nav entry, deep link still works.
+        expect(page.html()).not.toContain('nav.myConsumption')
         // No switcher for participants.
         expect(page.html()).not.toContain('sidebar-zev-menu')
         page.unmount()
@@ -213,6 +220,21 @@ describe('flat nav (see docs/specs/2026-09-navigation-regroup.md §5)', () => {
         const page = await renderLayout()
         expect(page.html()).toContain('impersonation-banner')
         expect(page.html()).toContain('nav.stopImpersonation')
+        page.unmount()
+    })
+
+    it('closes the user menu on Escape', async () => {
+        mockSession('admin')
+        const page = await renderLayout()
+        const trigger = page.container.querySelector('.top-nav .user-menu-trigger') as HTMLElement
+        await act(async () => {
+            trigger.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+        })
+        expect(page.container.querySelector('#user-menu-list')).not.toBe(null)
+        await act(async () => {
+            document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+        })
+        expect(page.container.querySelector('#user-menu-list')).toBe(null)
         page.unmount()
     })
 })

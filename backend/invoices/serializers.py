@@ -42,6 +42,7 @@ class InvoiceListSerializer(serializers.ModelSerializer):
     participant_name = serializers.CharField(source="participant.full_name", read_only=True)
     zev_name = serializers.CharField(source="zev.name", read_only=True)
     pdf_url = serializers.SerializerMethodField()
+    last_email_status = serializers.SerializerMethodField()
 
     class Meta:
         model = Invoice
@@ -81,6 +82,23 @@ class InvoiceListSerializer(serializers.ModelSerializer):
                     f"/api/v1/invoices/invoices/{obj.pk}/pdf/"
                 )
         return None
+
+    def get_last_email_status(self, obj) -> str | None:
+        """Newest email attempt status; falls back to a per-object lookup.
+
+        ``None`` is a real value (no email logs), so presence of the list
+        subquery annotation is checked by attribute, never by value — an
+        annotated null must not send every log-less invoice back to the DB.
+        """
+        if "last_email_status" in obj.__dict__:
+            return obj.last_email_status
+        log = (
+            EmailLog.objects.filter(invoice_id=obj.pk)
+            .order_by("-created_at", "-id")
+            .only("status")
+            .first()
+        )
+        return log.status if log else None
 
 
 class InvoiceSerializer(InvoiceListSerializer):

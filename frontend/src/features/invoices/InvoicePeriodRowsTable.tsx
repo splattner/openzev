@@ -16,6 +16,7 @@ function emailStatusBadgeClass(status: string): string {
 
 type InvoicePeriodRowsTableProps = {
   rows: InvoicePeriodParticipantRow[]
+  period: { period_start: string; period_end: string }
   onOpenEmailLogs: (invoiceId: string, invoiceNumber: string) => void
   getPrimaryRowAction: (row: InvoicePeriodParticipantRow) => ActionMenuItem | null
   getRowMenuItems: (row: InvoicePeriodParticipantRow) => ActionMenuItem[]
@@ -25,6 +26,7 @@ type InvoicePeriodRowsTableProps = {
 
 export function InvoicePeriodRowsTable({
   rows,
+  period,
   onOpenEmailLogs,
   getPrimaryRowAction,
   getRowMenuItems,
@@ -91,6 +93,11 @@ export function InvoicePeriodRowsTable({
                     <div className="invoice-cell-stack">
                       <span>{invoice.invoice_number}</span>
                       <span className={invoiceStatusBadgeClass(invoice.status)}>{t(`invoice.status.${invoice.status}`)}</span>
+                    </div>
+                  ) : row.generation_eligibility?.state === 'covered' ? (
+                    <div className="invoice-cell-stack">
+                      <span className="muted">{t('pages.invoices.settledCovered')}</span>
+                      <span className="badge badge-success">{t('pages.invoices.settledCovered')}</span>
                     </div>
                   ) : (
                     <div className="invoice-cell-stack">
@@ -178,6 +185,7 @@ export function InvoicePeriodRowsTable({
                         className="button button-secondary button-compact"
                         style={{ textDecoration: 'none' }}
                         to={`/billing/invoices/${invoice.id}`}
+                        state={{ from: '/billing/invoices', period_start: period.period_start, period_end: period.period_end }}
                       >
                         <FontAwesomeIcon icon={faFileInvoice} fixedWidth />
                         {t('pages.invoices.openDetails')}

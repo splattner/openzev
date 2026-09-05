@@ -50,6 +50,7 @@ vi.mock('../src/pages/MeteringPointsPage', () => ({ MeteringPointsPage: marker('
 vi.mock('../src/pages/MeteringChartPage', () => ({ MeteringChartPage: marker('metering-chart') }))
 vi.mock('../src/pages/TariffsPage', () => ({ TariffsPage: marker('tariffs') }))
 vi.mock('../src/pages/InvoicesPage', () => ({ InvoicesPage: marker('invoices') }))
+vi.mock('../src/pages/MyInvoicesPage', () => ({ MyInvoicesPage: marker('my-invoices') }))
 vi.mock('../src/pages/InvoiceDetailPage', () => ({ InvoiceDetailPage: marker('invoice-detail') }))
 vi.mock('../src/pages/ReportsPage', () => ({ ReportsPage: marker('reports') }))
 vi.mock('../src/pages/FeasibilityCalculatorPage', () => ({ FeasibilityCalculatorPage: marker('feasibility') }))
@@ -111,6 +112,7 @@ const MATRIX: Array<{ path: string; marker: string; allow: Record<UserRole, bool
     { path: '/billing/invoices', marker: 'invoices', allow: { admin: true, zev_owner: true, participant: false } },
     { path: '/billing/invoices/42', marker: 'invoice-detail', allow: { admin: true, zev_owner: true, participant: true } },
     { path: '/me/statement', marker: 'reports', allow: { admin: false, zev_owner: false, participant: true } },
+    { path: '/me/invoices', marker: 'my-invoices', allow: { admin: false, zev_owner: false, participant: true } },
     { path: '/reports', marker: 'reports', allow: { admin: true, zev_owner: true, participant: true } },
     { path: '/participants', marker: 'participants', allow: { admin: true, zev_owner: true, participant: false } },
     { path: '/tariffs', marker: 'tariffs', allow: { admin: true, zev_owner: true, participant: false } },

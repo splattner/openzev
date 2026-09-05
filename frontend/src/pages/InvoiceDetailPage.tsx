@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useLocation, useParams } from 'react-router-dom'
 import { PageSkeleton } from '../components/PageSkeleton'
 import { useTranslation } from 'react-i18next'
 import {
@@ -60,9 +60,10 @@ function useInvoicePdfUrl(invoiceId: string | undefined, hasPdf: boolean): {
 
 export function InvoiceDetailPage() {
     const { t } = useTranslation()
+    const { user } = useAuth()
+    const location = useLocation()
     const { invoiceId } = useParams<{ invoiceId: string }>()
     const { settings } = useAppSettings()
-    const { user } = useAuth()
     // Participants reach this page for their own invoices; revoking is a
     // management control and must not be offered to the person holding the QR.
     const canManageAccessLink = user?.role === 'admin' || user?.role === 'zev_owner'
@@ -90,6 +91,29 @@ export function InvoiceDetailPage() {
 
     const inv = invoiceQuery.data
 
+    // Return link follows its origin (dashboard open-invoice list, the
+    // invoices period it came from, or My invoices); participants without
+    // one fall back to /me/invoices.
+    const isParticipant = user?.role === 'participant'
+    const origin = (location.state as { from?: string; period_start?: string; period_end?: string } | null)
+    const isoDay = /^\d{4}-\d{2}-\d{2}$/
+    const originPeriod =
+        origin?.from === '/billing/invoices'
+        && origin.period_start && isoDay.test(origin.period_start)
+        && origin.period_end && isoDay.test(origin.period_end)
+            ? `/billing/invoices?period_start=${origin.period_start}&period_end=${origin.period_end}`
+            : null
+    const backHref = isParticipant
+        ? origin?.from === '/' || origin?.from === '/me/invoices' || origin?.from === '/me/statement'
+            ? origin.from
+            : '/me/invoices'
+        : origin?.from === '/'
+            ? '/'
+            : originPeriod ?? '/billing/invoices'
+    const backLabel = isParticipant
+        ? t('common.back')
+        : t('pages.invoiceDetail.backToInvoices')
+
     const handleGeneratePdf = async () => {
         if (!invoiceId) return
         setGenerating(true)
@@ -115,8 +139,8 @@ export function InvoiceDetailPage() {
                         {inv.participant_name} · {formatShortDate(inv.period_start, settings)} → {formatShortDate(inv.period_end, settings)}
                     </p>
                 </div>
-                <Link to={user?.role === 'participant' ? '/' : '/billing/invoices'} className="button button-primary" style={{ textDecoration: 'none' }}>
-                    {user?.role === 'participant' ? t('common.back') : t('pages.invoiceDetail.backToInvoices')}
+                <Link to={backHref} className="button button-primary" style={{ textDecoration: 'none' }}>
+                    {backLabel}
                 </Link>
             </header>
 
@@ -171,9 +195,12 @@ export function InvoiceDetailPage() {
                         <p className="muted" style={{ margin: 0 }}>
                             {generateError ? <span className="text-error">{t('pdf.generateError')}</span> : t('pdf.noDocument')}
                         </p>
-                        <button className="button" type="button" disabled={generating || pdfLoading} onClick={handleGeneratePdf}>
-                            {t('pages.invoiceDetail.generatePdf')}
-                        </button>
+                        {/* PDF generation is owner/admin-only (403 for participants). */}
+                        {isParticipant ? null : (
+                            <button className="button" type="button" disabled={generating || pdfLoading} onClick={handleGeneratePdf}>
+                                {generating ? t('common.loading') : t('pages.invoiceDetail.generatePdf')}
+                            </button>
+                        )}
                     </div>
                 )}
             </section>

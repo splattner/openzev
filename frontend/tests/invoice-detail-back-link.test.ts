@@ -48,7 +48,7 @@ function mockRole(role: UserRole) {
     mockAuth.mockReturnValue({ user: { id: 7, username: `${role}@x.ch`, role } })
 }
 
-async function renderDetail() {
+async function renderDetail(initialEntries: unknown[] = ['/billing/invoices/1']) {
     const container = document.createElement('div')
     document.body.appendChild(container)
     const client = new QueryClient()
@@ -57,7 +57,7 @@ async function renderDetail() {
         root.render(
             createElement(
                 MemoryRouter,
-                { initialEntries: ['/billing/invoices/1'] },
+                { initialEntries: initialEntries as string[] },
                 createElement(
                     QueryClientProvider,
                     { client },
@@ -82,13 +82,23 @@ async function renderDetail() {
 }
 
 describe('InvoiceDetailPage return link', () => {
-    it('sends participants to the dashboard, not the guarded invoices list', async () => {
+    it('sends participants back to their own invoices list', async () => {
         mockRole('participant')
         const container = await renderDetail()
         const link = container.querySelector('header a.button') as HTMLAnchorElement
-        expect(link.getAttribute('href')).toBe('/')
+        expect(link.getAttribute('href')).toBe('/me/invoices')
         expect(link.textContent).toBe('common.back')
         container.remove()
+    })
+
+    it('honours a participant origin of My invoices or the statement page', async () => {
+        mockRole('participant')
+        for (const from of ['/me/invoices', '/me/statement', '/']) {
+            const container = await renderDetail([{ pathname: '/billing/invoices/1', state: { from } }])
+            const link = container.querySelector('header a.button') as HTMLAnchorElement
+            expect(link.getAttribute('href')).toBe(from)
+            container.remove()
+        }
     })
 
     it('keeps the invoices return for owners', async () => {
@@ -97,6 +107,54 @@ describe('InvoiceDetailPage return link', () => {
         const link = container.querySelector('header a.button') as HTMLAnchorElement
         expect(link.getAttribute('href')).toBe('/billing/invoices')
         expect(link.textContent).toBe('pages.invoiceDetail.backToInvoices')
+        container.remove()
+    })
+
+    it('returns owners to the dashboard origin', async () => {
+        mockRole('zev_owner')
+        const container = await renderDetail([{ pathname: '/billing/invoices/1', state: { from: '/' } }])
+        const link = container.querySelector('header a.button') as HTMLAnchorElement
+        expect(link.getAttribute('href')).toBe('/')
+        container.remove()
+    })
+
+    it('returns owners to the invoice period they came from', async () => {
+        mockRole('zev_owner')
+        const container = await renderDetail([{
+            pathname: '/billing/invoices/1',
+            state: { from: '/billing/invoices', period_start: '2026-08-01', period_end: '2026-08-31' },
+        }])
+        const link = container.querySelector('header a.button') as HTMLAnchorElement
+        expect(link.getAttribute('href')).toBe('/billing/invoices?period_start=2026-08-01&period_end=2026-08-31')
+        container.remove()
+    })
+
+    it('returns owners to a historical period that no longer aligns', async () => {
+        mockRole('zev_owner')
+        const container = await renderDetail([{
+            pathname: '/billing/invoices/1',
+            state: { from: '/billing/invoices', period_start: '2026-02-01', period_end: '2026-02-28' },
+        }])
+        const link = container.querySelector('header a.button') as HTMLAnchorElement
+        expect(link.getAttribute('href')).toBe('/billing/invoices?period_start=2026-02-01&period_end=2026-02-28')
+        container.remove()
+    })
+
+    it('hides the generate-PDF control from participants', async () => {
+        mockRole('participant')
+        const container = await renderDetail()
+        // Document-unavailable state renders, but no owner-only action.
+        expect(container.textContent).toContain('pdf.noDocument')
+        const buttons = Array.from(container.querySelectorAll('button'))
+        expect(buttons.some((b) => b.textContent === 'pages.invoiceDetail.generatePdf')).toBe(false)
+        container.remove()
+    })
+
+    it('keeps the generate-PDF control for owners', async () => {
+        mockRole('zev_owner')
+        const container = await renderDetail()
+        const buttons = Array.from(container.querySelectorAll('button'))
+        expect(buttons.some((b) => b.textContent === 'pages.invoiceDetail.generatePdf')).toBe(true)
         container.remove()
     })
 })

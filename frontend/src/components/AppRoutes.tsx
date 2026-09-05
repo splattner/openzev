@@ -22,6 +22,7 @@ const ImportsPage = lazy(async () => ({ default: (await import('../pages/Imports
 const ReportsPage = lazy(async () => ({ default: (await import('../pages/ReportsPage')).ReportsPage }))
 const InvoiceDetailPage = lazy(async () => ({ default: (await import('../pages/InvoiceDetailPage')).InvoiceDetailPage }))
 const InvoicesPage = lazy(async () => ({ default: (await import('../pages/InvoicesPage')).InvoicesPage }))
+const MyInvoicesPage = lazy(async () => ({ default: (await import('../pages/MyInvoicesPage')).MyInvoicesPage }))
 const LoginPage = lazy(async () => ({ default: (await import('../pages/LoginPage')).LoginPage }))
 const MeteringChartPage = lazy(async () => ({ default: (await import('../pages/MeteringChartPage')).MeteringChartPage }))
 const MeteringPointsPage = lazy(async () => ({ default: (await import('../pages/MeteringPointsPage')).MeteringPointsPage }))
@@ -209,6 +210,16 @@ export function AppRoutes() {
             element={
               <ProtectedRoute allowedRoles={['participant']}>
                 <ReportsPage />
+              </ProtectedRoute>
+            }
+          />
+          {/* Recorded exception 2 (spec §4): participant's own invoices — reuses
+              the existing role-scoped backend list, no new grant. */}
+          <Route
+            path="me/invoices"
+            element={
+              <ProtectedRoute allowedRoles={['participant']}>
+                <MyInvoicesPage />
               </ProtectedRoute>
             }
           />

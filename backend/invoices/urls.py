@@ -18,6 +18,7 @@ from .views_templates import (
     PdfTemplatePreviewView,
     PdfTemplateView,
 )
+from .views_readiness import AttentionView, ReadinessView
 
 router = DefaultRouter()
 router.register("invoices", InvoiceViewSet, basename="invoice")
@@ -27,6 +28,8 @@ router.register("invoices", InvoiceViewSet, basename="invoice")
 # `invoices/<pk>/` detail route — which keeps their URLs byte-identical to what
 # the router generated for them.
 extracted_urlpatterns = [
+    path("invoices/readiness/", ReadinessView.as_view(), name="invoice-readiness"),
+    path("invoices/attention/", AttentionView.as_view(), name="invoice-attention"),
     path("invoices/dashboard/", InvoiceDashboardView.as_view(), name="invoice-dashboard"),
     path("invoices/annual-statement/", AnnualStatementView.as_view(), name="invoice-annual-statement"),
     path("invoices/financial-summary/", FinancialSummaryView.as_view(), name="invoice-financial-summary"),

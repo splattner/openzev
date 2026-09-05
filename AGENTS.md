@@ -75,6 +75,7 @@ For larger or risky changes, consult or create specs and ADRs:
   - `2026-08-zev-transfer-archive.md` — whole-ZEV export/import archive
   - `2026-08-contract-pdf-redesign.md` — contract PDF design, context, shared PDF design base
   - `2026-08-ui-redesign-pdf-style.md` — UI design system, print parity, shared tokens, PDF previews
+  - `2026-09-navigation-regroup.md` — navigation regroup, canonical routes + aliases, scope-aware shell, readiness/attention cockpit + `/me/invoices` (phases 1–2 shipped), phase plan for phase 3 (hubs, admin consolidation)
 
 - **Reference specs** document reusable cross-cutting patterns that should guide future work even when no baseline feature spec changes directly:
   - `2026-04-frontend-management-page-design.md` — reference spec for frontend CRUD / management-page cleanup, action hierarchy, page grouping, icons, i18n discipline, and responsive layouts

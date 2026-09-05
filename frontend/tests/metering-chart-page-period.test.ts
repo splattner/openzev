@@ -25,9 +25,33 @@ afterAll(() => {
 })
 
 describe('readPeriodFromSearchParams', () => {
-  it('reads a valid from/to pair (#647)', () => {
+  it('reads the canonical period_start/period_end pair', () => {
+    const params = new URLSearchParams({ period_start: '2026-01-01', period_end: '2026-03-31' })
+    expect(readPeriodFromSearchParams(params)).toEqual({ from: '2026-01-01', to: '2026-03-31' })
+  })
+
+  it('reads a legacy from/to pair (#647)', () => {
     const params = new URLSearchParams({ from: '2026-01-01', to: '2026-03-31' })
     expect(readPeriodFromSearchParams(params)).toEqual({ from: '2026-01-01', to: '2026-03-31' })
+  })
+
+  it('prefers the canonical pair when both formats are present', () => {
+    const params = new URLSearchParams({
+      period_start: '2026-04-01',
+      period_end: '2026-04-30',
+      from: '2026-01-01',
+      to: '2026-01-31',
+    })
+    expect(readPeriodFromSearchParams(params)).toEqual({ from: '2026-04-01', to: '2026-04-30' })
+  })
+
+  it('does not combine an incomplete canonical pair with legacy values', () => {
+    const params = new URLSearchParams({
+      period_start: '2026-04-01',
+      from: '2026-01-01',
+      to: '2026-01-31',
+    })
+    expect(readPeriodFromSearchParams(params)).toBeNull()
   })
 
   it('returns null when to is missing', () => {

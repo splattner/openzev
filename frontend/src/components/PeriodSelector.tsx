@@ -9,6 +9,7 @@ import {
     type BillingInterval,
     getCurrentBillingPeriod,
     isBillingAlignedPeriod,
+    recentBillingPeriods,
     shiftBillingPeriod,
 } from '../lib/billingPeriod'
 import { quickRangeToDates, type QuickRangePreset } from '../lib/dateRangePresets'
@@ -24,6 +25,8 @@ type PeriodSelectorProps = {
     title?: string
     /** When false, only whole billing periods are offered — no calendar. */
     allowCustomRange?: boolean
+    /** Community start (aligned floor): the previous button stops here. */
+    minFrom?: string
 }
 
 const QUICK_PRESETS: Array<{ preset: Exclude<QuickRangePreset, 'custom'>; labelKey: string }> = [
@@ -45,6 +48,7 @@ export function PeriodSelector({
     onChange,
     title,
     allowCustomRange = true,
+    minFrom,
 }: PeriodSelectorProps) {
     const { t } = useTranslation()
     const { settings } = useAppSettings()
@@ -54,20 +58,20 @@ export function PeriodSelector({
 
     const formatDate = (iso: string) => formatShortDate(iso, settings)
 
-    // Prev/next only mean something when the range spans exactly one billing period.
+    // Prev stops at the community's earliest billable period — never a pre-start range.
     const aligned = isBillingAlignedPeriod(from, to, interval)
-    const canNavigate = !!from && aligned
+    const previous = from ? shiftBillingPeriod(from, interval, -1) : null
+    const canGoPrevious = !!previous && aligned && (!minFrom || previous.from >= minFrom)
+    const canGoNext = !!from && aligned
+    const canNavigate = canGoNext
 
     const presets = useMemo<Array<{ id: string; label: string; hint?: string; range: PeriodRange }>>(() => {
         const current = getCurrentBillingPeriod(interval)
 
         if (!allowCustomRange) {
-            // Invoices bill whole periods, so offer recent ones instead of a calendar.
-            const periods = [current]
-            for (let i = 0; i < PAST_BILLING_PERIODS; i += 1) {
-                periods.push(shiftBillingPeriod(periods[periods.length - 1].from, interval, -1))
-            }
-            return periods.map((range, index) => ({
+            // Invoices bill whole periods, so offer recent ones instead of a
+            // calendar — none predating the community's first period.
+            return recentBillingPeriods(interval, PAST_BILLING_PERIODS, minFrom).map((range, index) => ({
                 id: range.from,
                 label: `${formatShortDate(range.from, settings)} → ${formatShortDate(range.to, settings)}`,
                 hint: index === 0 ? t('common.periodSelector.currentPeriod') : undefined,
@@ -83,7 +87,7 @@ export function PeriodSelector({
                 range: quickRangeToDates(preset),
             })),
         ]
-    }, [interval, allowCustomRange, t, settings])
+    }, [interval, allowCustomRange, minFrom, t, settings])
 
     function apply(next: PeriodRange) {
         onChange(next)
@@ -100,8 +104,8 @@ export function PeriodSelector({
             <button
                 className="button button-secondary"
                 type="button"
-                onClick={() => onChange(shiftBillingPeriod(from, interval, -1))}
-                disabled={!canNavigate}
+                onClick={() => previous && onChange(previous)}
+                disabled={!canGoPrevious}
             >
                 <FontAwesomeIcon icon={faArrowLeft} fixedWidth />
                 {t('pages.invoices.prevPeriod')}

@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useSearchParams } from 'react-router-dom'
 import { InvoicePeriodRowsTable } from '../features/invoices/InvoicePeriodRowsTable'
 import { InvoiceBatchToolbar } from '../features/invoices/InvoiceBatchToolbar'
 import { InvoiceDeleteModal } from '../features/invoices/InvoiceDeleteModal'
@@ -13,7 +14,12 @@ import {
     usePdfWatch,
 } from '../features/invoices/pdfWatch'
 import { PeriodSelector } from '../components/PeriodSelector'
-import { getPreviousBillingPeriod, type BillingInterval } from '../lib/billingPeriod'
+import {
+    firstAlignedBillingPeriod,
+    getPreviousBillingPeriod,
+    invoiceRangeFromParams,
+    type BillingInterval,
+} from '../lib/billingPeriod'
 import {
     fetchEmailLogs,
     fetchInvoicePeriodOverview,
@@ -28,8 +34,14 @@ export function InvoicesPage() {
     const { t } = useTranslation()
     const { selectedZevId, selectedZev } = useManagedZev()
     const { user } = useAuth()
+    const [searchParams, setSearchParams] = useSearchParams()
 
     const interval: BillingInterval = (selectedZev?.billing_interval as BillingInterval) ?? 'monthly'
+    const communityStart = selectedZev?.start_date ?? null
+    const minPeriod = useMemo(
+        () => firstAlignedBillingPeriod(communityStart, interval),
+        [communityStart, interval],
+    )
 
     const [period, setPeriod] = useState<{ period_start: string; period_end: string }>({
         period_start: '',
@@ -45,17 +57,37 @@ export function InvoicesPage() {
     const [showEmailModal, setShowEmailModal] = useState(false)
     const [selectedInvoiceNumber, setSelectedInvoiceNumber] = useState('')
 
+    // Destination contract: the URL's exact period wins (cockpit + historical
+    // attention links); otherwise the latest completed period.
     useEffect(() => {
         if (!selectedZevId) {
             setPeriod({ period_start: '', period_end: '' })
             return
         }
-        // The last *complete* period, not the current one: invoices can only be
-        // generated once a period has ended, so opening on the running period
-        // shows an empty table and makes every billing run start by stepping back.
-        const billable = getPreviousBillingPeriod(interval)
-        setPeriod({ period_start: billable.from, period_end: billable.to })
-    }, [selectedZevId, interval])
+        const fromParams = invoiceRangeFromParams(
+            searchParams.get('period_start'),
+            searchParams.get('period_end'),
+            communityStart,
+        )
+        if (fromParams) {
+            setPeriod({ period_start: fromParams.from, period_end: fromParams.to })
+            return
+        }
+        const previous = getPreviousBillingPeriod(interval)
+        const useFirst = !!minPeriod && previous.from < minPeriod.from
+        const fallback = useFirst && minPeriod
+            ? { period_start: minPeriod.from, period_end: minPeriod.to }
+            : { period_start: previous.from, period_end: previous.to }
+        setPeriod(fallback)
+    }, [selectedZevId, interval, searchParams, minPeriod, communityStart])
+
+    function handlePeriodChange(next: { period_start: string; period_end: string }) {
+        setPeriod(next)
+        const params = new URLSearchParams(searchParams)
+        params.set('period_start', next.period_start)
+        params.set('period_end', next.period_end)
+        setSearchParams(params, { replace: true })
+    }
 
     const periodOverviewQuery = useQuery({
         queryKey: queryKeys.invoices.periodOverview(selectedZevId, period.period_start, period.period_end),
@@ -77,6 +109,11 @@ export function InvoicesPage() {
     const rows = periodOverviewQuery.data?.rows ?? []
     const pendingPdfCount = countPendingPdfs(rows)
     const isWaitingForPdfs = pdfWatch !== null && pendingPdfCount > 0
+
+    // Generation eligibility rides on the rows themselves, so no second
+    // request gates the actions: while the overview loads the table shows
+    // its skeleton, and on failure the error banner — never a Generate
+    // button that a missing readiness payload cannot qualify.
 
     // End the watch when every invoice has its document, or the deadline passes.
     useEffect(() => {
@@ -167,7 +204,8 @@ export function InvoicesPage() {
                     to={period.period_end}
                     title={selectedZev?.name}
                     allowCustomRange={false}
-                    onChange={({ from, to }) => setPeriod({ period_start: from, period_end: to })}
+                    minFrom={minPeriod?.from}
+                    onChange={({ from, to }) => handlePeriodChange({ period_start: from, period_end: to })}
                 />
             </section>
 
@@ -201,6 +239,7 @@ export function InvoicesPage() {
 
                     <InvoicePeriodRowsTable
                         rows={rows}
+                        period={period}
                         onOpenEmailLogs={handleOpenEmailLogs}
                         getPrimaryRowAction={getPrimaryRowAction}
                         getRowMenuItems={getRowMenuItems}

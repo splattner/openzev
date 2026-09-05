@@ -25,6 +25,14 @@ vi.mock('../src/lib/toast', () => ({
   useToast: () => ({ pushToast }),
 }))
 
+const mockNavigate = vi.fn()
+
+vi.mock('react-router-dom', () => ({
+  useNavigate: () => mockNavigate,
+}))
+
+const ELIGIBLE = { state: 'eligible', invoice_id: null, invoice_number: null }
+
 vi.mock('@tanstack/react-query', () => ({
   useQueryClient: () => ({ invalidateQueries }),
   useMutation: (options: Record<string, unknown>) => {
@@ -56,13 +64,13 @@ vi.mock('../src/lib/api/invoices', () => ({
   sendInvoiceEmail: vi.fn(),
 }))
 
-function createHarness(rowsOverride?: unknown[]) {
+function createHarness(rowsOverride?: unknown[], periodOverride?: { period_start: string; period_end: string }) {
   const latestResult = { current: null as ReturnType<typeof useInvoiceActions> | null }
 
   function Harness() {
     const hookResult = useInvoiceActions({
       selectedZevId: 'zev-1',
-      period: {
+      period: periodOverride ?? {
         period_start: '2026-05-01',
         period_end: '2026-05-31',
       },
@@ -70,6 +78,7 @@ function createHarness(rowsOverride?: unknown[]) {
         {
           participant_id: 'participant-1',
           invoice: null,
+          generation_eligibility: ELIGIBLE,
         },
         {
           participant_id: 'participant-2',
@@ -80,6 +89,7 @@ function createHarness(rowsOverride?: unknown[]) {
             email_logs: [],
             invoice_number: 'INV-001',
           },
+          generation_eligibility: null,
         },
         {
           participant_id: 'participant-3',
@@ -90,6 +100,7 @@ function createHarness(rowsOverride?: unknown[]) {
             email_logs: [],
             invoice_number: 'INV-002',
           },
+          generation_eligibility: null,
         },
         {
           participant_id: 'participant-4',
@@ -107,6 +118,7 @@ function createHarness(rowsOverride?: unknown[]) {
             ],
             invoice_number: 'INV-003',
           },
+          generation_eligibility: null,
         },
       ] as any,
       userRole: 'participant',
@@ -235,10 +247,28 @@ describe('recommendedBatchAction ordering', () => {
     return getResult()!.recommendedBatchAction
   }
 
-  const noInvoice = (id: string) => ({ participant_id: id, invoice: null })
+  function mountRows(rows: unknown[]) {
+    const { Harness, getResult } = createHarness(rows)
+    act(() => {
+      root.render(createElement(Harness))
+    })
+    return getResult()!
+  }
+
+  const noInvoice = (id: string, eligibility: unknown = ELIGIBLE) => ({
+    participant_id: id, invoice: null, generation_eligibility: eligibility,
+  })
+  const blocked = (id: string, invoiceId: string) => noInvoice(id, {
+    state: 'blocked', invoice_id: invoiceId, invoice_number: 'T-1',
+  })
+  const covered = (id: string, invoiceId: string) => noInvoice(id, {
+    state: 'covered', invoice_id: invoiceId, invoice_number: 'T-1',
+  })
+
   const withStatus = (id: string, status: string) => ({
     participant_id: id,
     invoice: { id: `invoice-${id}`, status, pdf_url: null, email_logs: [], invoice_number: id },
+    generation_eligibility: status === 'cancelled' ? ELIGIBLE : null,
   })
 
   it('recommends generation before approval when a participant has no invoice', () => {
@@ -271,5 +301,52 @@ describe('recommendedBatchAction ordering', () => {
 
   it('no longer recommends a PDF pass — PDFs arrive with the invoice', () => {
     expect(recommend([withStatus('p1', 'sent'), withStatus('p2', 'sent')])).toBeNull()
+  })
+
+  it('excludes blocked and covered rows from generation candidates', () => {
+    const result = mountRows([noInvoice('p1'), blocked('p2', 'inv-locked'), covered('p3', 'inv-cover')])
+    expect(result.stats.generationCandidateCount).toBe(1)
+    expect(result.recommendedBatchAction?.label).toBe(
+      'pages.invoices.batch.generateAllCount:1',
+    )
+  })
+
+  it('links a blocked row to its locked invoice instead of generating', () => {
+    const result = mountRows([blocked('p1', 'inv-locked')])
+    const action = result.getPrimaryRowAction({ participant_id: 'p1', invoice: null, generation_eligibility: { state: 'blocked', invoice_id: 'inv-locked', invoice_number: 'T-1' } } as any)
+    expect(action?.key).toBe('review-conflict')
+    expect(action?.label).toBe('pages.invoices.reviewConflict')
+    action?.onClick()
+    expect(mockNavigate).toHaveBeenCalledWith('/billing/invoices/inv-locked', {
+      state: { from: '/billing/invoices', period_start: '2026-05-01', period_end: '2026-05-31' },
+    })
+  })
+
+  it('links a covered row to its covering invoice instead of generating', () => {
+    const result = mountRows([covered('p1', 'inv-cover')])
+    const action = result.getPrimaryRowAction({ participant_id: 'p1', invoice: null, generation_eligibility: { state: 'covered', invoice_id: 'inv-cover', invoice_number: 'T-1' } } as any)
+    expect(action?.key).toBe('view-covering-invoice')
+    action?.onClick()
+    expect(mockNavigate).toHaveBeenCalledWith('/billing/invoices/inv-cover', {
+      state: { from: '/billing/invoices', period_start: '2026-05-01', period_end: '2026-05-31' },
+    })
+  })
+
+  it('keeps a historical viewed period on conflict navigation for the return link', () => {
+    const { Harness, getResult } = createHarness(
+      [blocked('p1', 'inv-locked')],
+      { period_start: '2026-02-01', period_end: '2026-02-28' },
+    )
+    act(() => {
+      root.render(createElement(Harness))
+    })
+    const action = getResult()!.getPrimaryRowAction({
+      participant_id: 'p1', invoice: null,
+      generation_eligibility: { state: 'blocked', invoice_id: 'inv-locked', invoice_number: 'T-1' },
+    } as any)
+    action?.onClick()
+    expect(mockNavigate).toHaveBeenCalledWith('/billing/invoices/inv-locked', {
+      state: { from: '/billing/invoices', period_start: '2026-02-01', period_end: '2026-02-28' },
+    })
   })
 })

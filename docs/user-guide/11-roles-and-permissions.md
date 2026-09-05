@@ -96,9 +96,12 @@ A ZEV Owner is **scoped** to one or more ZEVs:
 
 ### Participant Capabilities
 
+The participant sidebar shows **Dashboard**, **My invoices**, and **Annual statement**; own consumption charts and trends stay reachable through the direct `/metering/chart` route.
+
 - **Dashboard:** View own energy consumption/production overview
-- **Metering Data:** View own consumption charts and trends
-- **Invoices:** Download own invoices (read-only)
+- **My invoices:** View and download own invoices (read-only; shows invoices even before a PDF exists)
+- **Annual statement:** View the community's annual statement
+- **Metering Data:** Direct route to own consumption charts and trends
 - **Account Profile:** Update personal information
 
 ### Participant Restrictions
@@ -260,7 +263,7 @@ If operating multiple communities:
 - Can monitor cross-ZEV metrics and KPIs
 
 **ZEV Owner perspective:**
-- Use **ZEV Selector** (top nav bar) to switch between assigned ZEVs
+- Use the ZEV switcher (sidebar top) to switch between assigned ZEVs
 - Each ZEV has isolated data
 - Can be assigned to manage 1 or many ZEVs
 

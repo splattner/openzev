@@ -2073,6 +2073,25 @@ class SeedDemoLegacyNameCollisionTests(TestCase):
 		self.assertEqual(rows[0].pk, newer.pk)
 		self.assertFalse(Zev.objects.filter(name=DEMO_ZEV_LEGACY_NAME).exists())
 
+	def test_duplicate_legacy_row_with_invoices_is_cleared(self):
+		# A legacy duplicate can carry invoices from an older seed run, and
+		# Invoice.zev is PROTECT — the cleanup must clear them before deleting
+		# the superseded community instead of raising ProtectedError.
+		from invoices.models import Invoice, InvoiceStatus
+		from invoices.test_helpers import make_invoice, make_participant
+
+		self._create(DEMO_ZEV_NAME)
+		legacy = self._create(DEMO_ZEV_LEGACY_NAME)
+		participant = make_participant(legacy)
+		make_invoice(legacy, participant, inv_status=InvoiceStatus.SENT)
+		self.command._migrate_legacy_demo_zev_names(owner=self.owner)
+		self._flagship_upsert()
+		self.assertFalse(Zev.objects.filter(name=DEMO_ZEV_LEGACY_NAME).exists())
+		self.assertEqual(Invoice.objects.filter(zev=legacy).count(), 0)
+		self.assertEqual(
+			Zev.objects.filter(name=DEMO_ZEV_NAME, owner=self.owner).count(), 1
+		)
+
 	def test_current_name_upsert_does_not_take_over_another_owners_community(self):
 		tenant = self._create(DEMO_ZEV_NAME, owner=self.stranger)
 		self._flagship_upsert()

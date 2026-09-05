@@ -85,6 +85,10 @@ vi.mock('../src/lib/api/metering', () => ({
     }),
 }))
 
+vi.mock('../src/lib/toast', () => ({
+    useToast: () => ({ pushToast: vi.fn() }),
+}))
+
 vi.mock('../src/lib/api/auth', () => ({
     fetchUsers: () => Promise.resolve([]),
 }))
@@ -157,6 +161,11 @@ describe('metering tab state', () => {
         })
         const historical = range()
         expect(historical).not.toBe(initial)
+        const historicalLocation = container.querySelector('[data-testid="location"]')?.textContent ?? ''
+        expect(historicalLocation).toContain('period_start=')
+        expect(historicalLocation).toContain('period_end=')
+        expect(historicalLocation).not.toContain('from=')
+        expect(historicalLocation).not.toContain('to=')
 
         // Switch resolution away from the default (React doesn't reflect value
         // to the attribute — identify the select by its options).
@@ -190,6 +199,10 @@ describe('metering tab state', () => {
         const { container, unmount } = await renderChart(
             '/metering/quality?from=2026-01-01&to=2026-01-31&quality_severity=red',
         )
+
+        const range = container.querySelector('.period-selector-range')?.textContent ?? ''
+        expect(range).toContain('2026-01-01')
+        expect(range).toContain('2026-01-31')
 
         for (let i = 0; i < 100 && !Array.from(container.querySelectorAll('button')).some((button) => button.textContent === 'CH-TEST-1'); i += 1) {
             await act(async () => {

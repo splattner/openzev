@@ -63,6 +63,7 @@ Baseline specs describe the current implementation. They must be kept in sync:
 | Whole-ZEV export/import archive | `2026-08-zev-transfer-archive.md` |
 | Contract PDF design, shared PDF design base | `2026-08-contract-pdf-redesign.md` |
 | UI design system, shared tokens, print parity, PDF previews | `2026-08-ui-redesign-pdf-style.md` |
+| Navigation regroup, canonical routes, scope-aware shell, readiness/attention cockpit, phase plan | `2026-09-navigation-regroup.md` |
 
 ## Reference specs
 

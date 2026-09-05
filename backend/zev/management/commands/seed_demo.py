@@ -767,14 +767,25 @@ class Command(BaseCommand):
         if Zev.objects.filter(owner=owner, name=DEMO_ZEV_NAME).exists():
             # The current name is already taken by the owner; any legacy rows
             # left over are superseded duplicates of it.
-            legacy_rows.delete()
+            self._delete_demo_zev_rows(legacy_rows)
             return
         # Keep the newest legacy row, drop older duplicates of it, then
         # rename the survivor.
         survivor = legacy_rows.last()
-        legacy_rows.exclude(pk=survivor.pk).delete()
+        self._delete_demo_zev_rows(legacy_rows.exclude(pk=survivor.pk))
         survivor.name = DEMO_ZEV_NAME
         survivor.save(update_fields=["name"])
+
+    def _delete_demo_zev_rows(self, rows) -> None:
+        """Delete superseded demo ZEV rows that may carry invoices.
+
+        ``Invoice.zev`` is PROTECT, so the ZEV cannot go first when an older
+        seed run left invoices behind — clear those (cascading to items and
+        email logs) before deleting the row itself.
+        """
+        for zev in rows:
+            zev.invoices.all().delete()
+            zev.delete()
 
     def _scaled_kwh(self, profile: Profile, factor: float) -> Profile:
         """A main-community profile at another amplitude (one shape per meter kind)."""

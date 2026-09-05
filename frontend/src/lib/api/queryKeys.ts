@@ -25,10 +25,14 @@ export const queryKeys = {
   invoices: {
     lists: () => ['invoices', 'list'] as const,
     list: (zevId?: string, status?: string) => ['invoices', 'list', zevId ?? 'all', status ?? 'all'] as const,
+    mine: () => ['invoices', 'mine'] as const,
     detail: (invoiceId: string) => ['invoices', 'detail', invoiceId] as const,
     dashboard: () => ['invoices', 'dashboard'] as const,
     periodOverview: (zevId: string, periodStart: string, periodEnd: string) =>
       ['invoices', 'period-overview', zevId, periodStart, periodEnd] as const,
+    readiness: (zevId?: string) => ['invoices', 'readiness', zevId ?? 'all'] as const,
+    readinessList: (zevId?: string) => ['invoices', 'readiness-list', zevId ?? 'all'] as const,
+    attention: (zevId?: string) => ['invoices', 'attention', zevId ?? 'all'] as const,
   },
   admin: {
     emailTemplate: (templateKey: string) => ['admin', 'email-template', templateKey] as const,

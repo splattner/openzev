@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useNavigate } from 'react-router-dom'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import {
     faCheck,
@@ -12,6 +13,7 @@ import {
     faPaperPlane,
     faRotate,
     faTrash,
+    faTriangleExclamation,
 } from '@fortawesome/free-solid-svg-icons'
 import {
     approveAllInvoices,
@@ -70,6 +72,7 @@ export function useInvoiceActions({
     onPdfQueued: () => void
 }) {
     const { t } = useTranslation()
+    const navigate = useNavigate()
     const queryClient = useQueryClient()
     const { pushToast } = useToast()
 
@@ -98,6 +101,13 @@ export function useInvoiceActions({
         void queryClient.invalidateQueries({ queryKey: queryKeys.invoices.lists() })
     }, [queryClient])
 
+    // Billing mutations also move the dashboard cockpit: readiness steps and
+    // cross-period attention derive from the same invoice states.
+    const invalidateCockpit = useCallback(() => {
+        void queryClient.invalidateQueries({ queryKey: queryKeys.invoices.readiness(selectedZevId) })
+        void queryClient.invalidateQueries({ queryKey: queryKeys.invoices.attention(selectedZevId) })
+    }, [queryClient, selectedZevId])
+
     // ── Single invoice mutations ──────────────────────────────────────────────
 
     const generateMutation = useMutation({
@@ -108,6 +118,7 @@ export function useInvoiceActions({
             invalidateInvoicesList()
             // The invoice is saved; its PDF is queued and arrives later.
             onPdfQueued()
+            invalidateCockpit()
         },
         onError: (error) => pushToast(formatApiError(error, t('pages.invoices.messages.generateFailed')), 'error'),
     })
@@ -127,6 +138,7 @@ export function useInvoiceActions({
             pushToast(t('pages.invoices.messages.approved'), 'success')
             invalidatePeriodOverview()
             invalidateInvoicesList()
+            invalidateCockpit()
         },
         onError: (error) => pushToast(formatApiError(error, t('pages.invoices.messages.approveFailed')), 'error'),
     })
@@ -137,6 +149,7 @@ export function useInvoiceActions({
             pushToast(t('pages.invoices.messages.deleted'), 'success')
             invalidatePeriodOverview()
             invalidateInvoicesList()
+            invalidateCockpit()
         },
         onError: (error) => pushToast(formatApiError(error, t('pages.invoices.messages.deleteFailed')), 'error'),
     })
@@ -149,6 +162,7 @@ export function useInvoiceActions({
             setEmailPollingStartedAt(Date.now())
             invalidatePeriodOverview()
             invalidateInvoicesList()
+            invalidateCockpit()
         },
         onError: (error) => pushToast(formatApiError(error, t('pages.invoices.messages.sendEmailFailed')), 'error'),
     })
@@ -159,6 +173,7 @@ export function useInvoiceActions({
             pushToast(t('pages.invoices.markedSent'), 'success')
             invalidatePeriodOverview()
             invalidateInvoicesList()
+            invalidateCockpit()
         },
         onError: (error) => pushToast(formatApiError(error, t('pages.invoices.messages.markSentFailed')), 'error'),
     })
@@ -169,6 +184,7 @@ export function useInvoiceActions({
             pushToast(t('pages.invoices.messages.markedPaid'), 'success')
             invalidatePeriodOverview()
             invalidateInvoicesList()
+            invalidateCockpit()
         },
         onError: (error) => pushToast(formatApiError(error, t('pages.invoices.messages.markPaidFailed')), 'error'),
     })
@@ -182,6 +198,7 @@ export function useInvoiceActions({
             setEmailPollingStartedAt(Date.now())
             invalidatePeriodOverview()
             invalidateInvoicesList()
+            invalidateCockpit()
         },
         onError: (error) => pushToast(formatApiError(error, t('pages.invoices.messages.retryEmailFailed')), 'error'),
     })
@@ -198,6 +215,7 @@ export function useInvoiceActions({
             invalidatePeriodOverview()
             invalidateInvoicesList()
             onPdfQueued()
+            invalidateCockpit()
         },
         onError: (error) => pushToast(formatApiError(error, t('pages.invoices.batch.generateAllFailed')), 'error'),
     })
@@ -208,6 +226,7 @@ export function useInvoiceActions({
             pushToast(t('pages.invoices.batch.approvedAll', { n: result.approved }), 'success')
             invalidatePeriodOverview()
             invalidateInvoicesList()
+            invalidateCockpit()
         },
         onError: (error) => pushToast(formatApiError(error, t('pages.invoices.batch.approveAllFailed')), 'error'),
     })
@@ -221,6 +240,7 @@ export function useInvoiceActions({
             pushToast(msg, 'success')
             invalidatePeriodOverview()
             invalidateInvoicesList()
+            invalidateCockpit()
         },
         onError: (error) => pushToast(formatApiError(error, t('pages.invoices.batch.sendAllFailed')), 'error'),
     })
@@ -268,6 +288,7 @@ export function useInvoiceActions({
                     setEmailPollingStartedAt(null)
                     invalidatePeriodOverview()
                     invalidateInvoicesList()
+                    invalidateCockpit()
                     if (lastEmailLog.status === 'sent') {
                         pushToast(t('pages.invoices.messages.emailSentSuccess'), 'success')
                     }
@@ -287,13 +308,14 @@ export function useInvoiceActions({
                 // Update the query cache with the latest invoice data
                 invalidatePeriodOverview()
                 invalidateInvoicesList()
+                invalidateCockpit()
             } catch (error) {
                 console.error('Error polling invoice status:', error)
             }
         }, 2000) // Poll every 2 seconds
 
         return () => clearInterval(pollInterval)
-    }, [pollingInvoiceId, emailPollingStartedAt, periodOverviewInvalidationKey, invalidatePeriodOverview, invalidateInvoicesList, pushToast, t])
+    }, [pollingInvoiceId, emailPollingStartedAt, periodOverviewInvalidationKey, invalidatePeriodOverview, invalidateInvoicesList, invalidateCockpit, pushToast, t])
 
     useEffect(() => {
         if (!pollingInvoiceId || !emailPollingStartedAt) return
@@ -327,7 +349,7 @@ export function useInvoiceActions({
     const invoiceCount = useMemo(() => rows.filter((r) => r.invoice).length, [rows])
     const pdfCount = useMemo(() => rows.filter((r) => r.invoice?.pdf_url).length, [rows])
     const generationCandidateCount = useMemo(
-        () => rows.filter((row) => !row.invoice || row.invoice.status === 'cancelled').length,
+        () => rows.filter((row) => row.generation_eligibility?.state === 'eligible').length,
         [rows],
     )
     const stats: InvoiceActionStats = {
@@ -420,10 +442,45 @@ export function useInvoiceActions({
 
     // ── Row action helpers ──────────────────────────────────────────────
 
+    // Detail destinations keep the return period: the detail page's Back
+    // button restores the exact viewed period from this state.
+    function detailDestination(invoiceId: string) {
+        return {
+            pathname: `/billing/invoices/${invoiceId}`,
+            state: {
+                from: '/billing/invoices',
+                period_start: period.period_start,
+                period_end: period.period_end,
+            },
+        }
+    }
+
     function getPrimaryRowAction(row: InvoicePeriodParticipantRow): ActionMenuItem | null {
         const invoice = row.invoice
 
         if (!invoice || invoice.status === 'cancelled') {
+            const eligibility = row.generation_eligibility
+            if (eligibility?.state === 'blocked' && eligibility.invoice_id) {
+                const destination = detailDestination(eligibility.invoice_id)
+                return {
+                    key: 'review-conflict',
+                    label: t('pages.invoices.reviewConflict'),
+                    icon: <FontAwesomeIcon icon={faTriangleExclamation} fixedWidth />,
+                    onClick: () => navigate(destination.pathname, { state: destination.state }),
+                }
+            }
+            if (eligibility?.state === 'covered' && eligibility.invoice_id) {
+                const destination = detailDestination(eligibility.invoice_id)
+                return {
+                    key: 'view-covering-invoice',
+                    label: t('pages.invoices.viewCoveringInvoice'),
+                    icon: <FontAwesomeIcon icon={faFileInvoice} fixedWidth />,
+                    onClick: () => navigate(destination.pathname, { state: destination.state }),
+                }
+            }
+            if (eligibility && eligibility.state !== 'eligible') {
+                return null
+            }
             return {
                 key: 'generate',
                 label: invoice ? t('pages.invoices.generateAgain') : t('pages.invoices.generateInvoice'),
@@ -480,19 +537,37 @@ export function useInvoiceActions({
         const items: ActionMenuItem[] = []
 
         if (invoice.status === 'draft' || invoice.status === 'cancelled') {
-            items.push({
-                key: 'generate-again',
-                label: t('pages.invoices.regenerateInvoice'),
-                icon: <FontAwesomeIcon icon={faRotate} fixedWidth />,
-                section: t('pages.invoices.menuSections.invoice'),
-                onClick: () =>
-                    generateMutation.mutate({
-                        participant_id: row.participant_id,
-                        period_start: period.period_start,
-                        period_end: period.period_end,
-                    }),
-                disabled: generateMutation.isPending,
-            })
+            const eligibility = row.generation_eligibility
+            const destination =
+                eligibility && eligibility.state !== 'eligible' ? eligibility.invoice_id : null
+            if (destination && (eligibility?.state === 'blocked' || eligibility?.state === 'covered')) {
+                const detail = detailDestination(destination)
+                items.push({
+                    key: 'review-conflict',
+                    label: t(
+                        eligibility?.state === 'blocked'
+                            ? 'pages.invoices.reviewConflict'
+                            : 'pages.invoices.viewCoveringInvoice',
+                    ),
+                    icon: <FontAwesomeIcon icon={faTriangleExclamation} fixedWidth />,
+                    section: t('pages.invoices.menuSections.invoice'),
+                    onClick: () => navigate(detail.pathname, { state: detail.state }),
+                })
+            } else {
+                items.push({
+                    key: 'generate-again',
+                    label: t('pages.invoices.regenerateInvoice'),
+                    icon: <FontAwesomeIcon icon={faRotate} fixedWidth />,
+                    section: t('pages.invoices.menuSections.invoice'),
+                    onClick: () =>
+                        generateMutation.mutate({
+                            participant_id: row.participant_id,
+                            period_start: period.period_start,
+                            period_end: period.period_end,
+                        }),
+                    disabled: generateMutation.isPending,
+                })
+            }
         }
 
         items.push({
