@@ -1,5 +1,5 @@
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faDownload, faPlus } from '@fortawesome/free-solid-svg-icons'
+import { faDownload, faFilePdf, faPlus } from '@fortawesome/free-solid-svg-icons'
 import { useTranslation } from 'react-i18next'
 
 export type TariffValidityFilter = 'valid' | 'all'
@@ -14,6 +14,9 @@ type TariffToolbarProps = {
   onOpenCreateTariffModal: () => void
   /** Absent when no single ZEV is selected — an import needs one target. */
   onOpenImportModal?: () => void
+  /** Absent when no single ZEV is selected — same reason as the import button. */
+  onDownloadOverview?: () => void
+  overviewBusy?: boolean
 }
 
 export function TariffToolbar({
@@ -25,6 +28,8 @@ export function TariffToolbar({
   onValidityFilterChange,
   onOpenCreateTariffModal,
   onOpenImportModal,
+  onDownloadOverview,
+  overviewBusy,
 }: TariffToolbarProps) {
   const { t } = useTranslation()
 
@@ -55,6 +60,16 @@ export function TariffToolbar({
             <button className="button button-secondary" onClick={onOpenImportModal}>
               <FontAwesomeIcon icon={faDownload} fixedWidth />
               {t('pages.tariffs.import.action')}
+            </button>
+          )}
+          {onDownloadOverview && (
+            <button
+              className="button button-secondary"
+              onClick={onDownloadOverview}
+              disabled={overviewBusy}
+            >
+              <FontAwesomeIcon icon={faFilePdf} fixedWidth />
+              {overviewBusy ? t('pages.tariffs.overviewPdf.busy') : t('pages.tariffs.overviewPdf.action')}
             </button>
           )}
           <button className="button button-primary" onClick={onOpenCreateTariffModal}>

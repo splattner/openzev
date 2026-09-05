@@ -1081,6 +1081,11 @@ export const de = {
                     applyFailed: 'Die Tarife konnten nicht importiert werden.',
                 },
             },
+            overviewPdf: {
+                action: 'Tarifübersicht (PDF)',
+                busy: 'Wird erstellt…',
+                error: 'Die Tarifübersicht konnte nicht erstellt werden.',
+            },
             title: 'Tarife',
             description: 'Tarife und Zeitbänder für die Abrechnung konfigurieren.',
             newTariff: 'Neuer Tarif',

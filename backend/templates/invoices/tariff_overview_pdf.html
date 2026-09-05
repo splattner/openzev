@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="{{ zev.invoice_language|default:'de' }}">
+
+<head>
+    <meta charset="UTF-8">
+    <title>{{ tr.document_label }} {{ zev.name }}</title>
+    {% comment %}The shared tokens, base, utilities, document-header anatomy
+    and page-meta furniture live in pdf/shared_pdf_base.html so this document
+    stays visually consistent with the invoice and contract PDFs.{% endcomment %}
+    {% include "pdf/shared_pdf_base.html" %}
+
+    <style>
+        /* ══ 2. Page layout ═════════════════════════════════════ */
+        .overview-page {
+            padding: 12mm 16mm;
+        }
+
+        /* ══ 3. Meta band ════════════════════════════════════════ */
+        .overview-meta {
+            display: flex;
+            gap: 10mm;
+            margin: 6mm 0 5mm;
+        }
+
+        .overview-meta .meta-item { flex: 1 1 auto; }
+
+        .overview-meta dt {
+            color: var(--muted);
+            font-size: 6.8pt;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+
+        .overview-meta dd {
+            font-size: 9.5pt;
+            font-weight: 600;
+            margin-top: 0.6mm;
+            color: var(--ink);
+        }
+
+        /* ══ 4. Category groups ══════════════════════════════════ */
+        .category-group {
+            break-inside: avoid;
+            margin-top: 5mm;
+        }
+
+        .category-title {
+            font-size: 8.4pt;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            color: var(--white);
+            background: var(--brand-deep);
+            padding: 1.8mm 3mm;
+            border-radius: 1.5mm 1.5mm 0 0;
+        }
+
+        /* ══ 5. Tariff table ═════════════════════════════════════ */
+        .tariff-table {
+            border-collapse: separate;
+            border-spacing: 0;
+            table-layout: fixed;
+            width: 100%;
+        }
+
+        .tariff-table col.description { width: 53%; }
+        .tariff-table col.recurrence { width: 21%; }
+        .tariff-table col.amount { width: 12%; }
+        .tariff-table col.unit { width: 14%; }
+
+        .tariff-table td {
+            border-bottom: 0.5pt solid var(--line);
+            font-size: 8.2pt;
+            padding: 1.2mm 3mm;
+            vertical-align: top;
+            color: var(--ink-soft);
+            font-variant-numeric: tabular-nums;
+        }
+
+        .tariff-table .numeric {
+            text-align: right;
+            font-variant-numeric: tabular-nums;
+            white-space: nowrap;
+        }
+
+        .tariff-table tbody tr.tariff-header-row.even td,
+        .tariff-table tbody tr.price-row.even td {
+            background: var(--zebra);
+        }
+
+        .tariff-header-row td { padding-top: 2.2mm; }
+
+        .tariff-header-row .tariff-name {
+            font-weight: 700;
+            font-size: 8.6pt;
+            color: var(--ink);
+        }
+
+        .tariff-header-row .tariff-subtitle {
+            display: block;
+            font-weight: 400;
+            font-size: 7.5pt;
+            color: var(--muted);
+            margin-top: 0.3mm;
+        }
+
+        .tariff-header-row .tariff-notes {
+            display: block;
+            font-weight: 400;
+            font-size: 7.3pt;
+            color: var(--muted);
+            font-style: italic;
+            margin-top: 0.5mm;
+        }
+
+        .price-row td { padding-left: 6mm; }
+
+        .price-row .price-recurrence {
+            color: var(--muted);
+            font-size: 7.5pt;
+        }
+
+        .price-row .footnote-marker {
+            color: var(--brand-mid);
+            font-weight: 700;
+            vertical-align: super;
+            font-size: 6.5pt;
+        }
+
+        .price-row .price-amount {
+            font-weight: 700;
+            color: var(--subtotal-color);
+        }
+
+        .superseded .tariff-name,
+        .superseded .price-amount,
+        .superseded td {
+            color: var(--muted) !important;
+        }
+
+        .tariff-table tr { break-inside: avoid; }
+
+        .category-group table tbody tr:last-child td {
+            border-bottom: none;
+        }
+
+        .category-group table {
+            border: 0.5pt solid var(--line);
+            border-top: none;
+            border-radius: 0 0 1.5mm 1.5mm;
+        }
+
+        /* ══ 6. VAT note, footnotes & empty state ════════════════ */
+        .vat-note {
+            margin-top: 5mm;
+            font-size: 7.8pt;
+            color: var(--ink-soft);
+            background: var(--brand-pale);
+            border: 0.5pt solid var(--brand-mid);
+            border-radius: 2mm;
+            padding: 2.5mm 3.5mm;
+        }
+
+        .footnotes {
+            margin-top: 4mm;
+            font-size: 7.3pt;
+            color: var(--muted);
+            line-height: 1.5;
+        }
+
+        .empty-state {
+            margin-top: 8mm;
+            font-size: 9.5pt;
+            color: var(--muted);
+            text-align: center;
+            padding: 12mm 0;
+            border: 0.5pt dashed var(--line);
+            border-radius: 2mm;
+        }
+
+        /* ══ 7. Page furniture ═══════════════════════════════════ */
+        .page-meta .meta-center::after { content: counter(page) " / " counter(pages); }
+
+        @page {
+            size: A4;
+            margin: 0 0 12mm 0;
+            @top-center { content: none; }
+            @bottom-center {
+                content: element(footer-meta);
+                width: 210mm;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div style="position: running(footer-meta)" class="page-meta page-meta--footer">
+        <div class="page-meta-inner">
+            <span class="meta-left">{{ zev.name }} · {{ tr.document_label }}</span>
+            <span class="meta-center"></span>
+            <span class="meta-right">{{ as_of_display }}</span>
+        </div>
+    </div>
+
+    <main class="overview-page">
+        <header class="document-header">
+            <div>
+                <div class="brand-row">
+                    <div class="brand-mark" aria-hidden="true"></div>
+                    <div class="company-name">{{ zev.name }}</div>
+                </div>
+            </div>
+            <div>
+                <div class="document-label">{{ tr.document_label }}</div>
+                <div class="document-number">{{ as_of_display }}</div>
+                <div class="document-status">
+                    {% if scope == 'all' %}{{ tr.all_versions }}{% else %}{{ valid_at_display }}{% endif %}
+                </div>
+            </div>
+        </header>
+
+        <dl class="overview-meta">
+            <div class="meta-item">
+                <dt>{{ tr.generated_on }}</dt>
+                <dd>{{ generated_on_display }}</dd>
+            </div>
+            <div class="meta-item">
+                <dt>{{ tr.tariff_count }}</dt>
+                <dd>{{ tariff_count }}</dd>
+            </div>
+            <div class="meta-item">
+                <dt>{{ tr.vat_label }}</dt>
+                <dd>{{ vat_display }}</dd>
+            </div>
+        </dl>
+
+        {% if groups %}
+        {% for group in groups %}
+        <section class="category-group">
+            <div class="category-title">{{ group.label }}</div>
+            <table class="tariff-table">
+                <colgroup>
+                    <col class="description">
+                    <col class="recurrence">
+                    <col class="amount">
+                    <col class="unit">
+                </colgroup>
+                <tbody>
+                    {% for tariff in group.tariffs %}
+                    <tr class="tariff-header-row{% if forloop.counter0|divisibleby:2 %} even{% endif %}{% if not tariff.is_current %} superseded{% endif %}">
+                        <td colspan="2" class="tariff-name">
+                            {{ tariff.name }}
+                            <span class="tariff-subtitle">{{ tariff.billing_mode_label }} · {{ tariff.validity }}</span>
+                            {% if tariff.notes %}<span class="tariff-notes">{{ tariff.notes }}</span>{% endif %}
+                        </td>
+                        <td colspan="2"></td>
+                    </tr>
+                    {% for price in tariff.price_rows %}
+                    <tr class="price-row{% if forloop.parentloop.counter0|divisibleby:2 %} even{% endif %}{% if not tariff.is_current %} superseded{% endif %}">
+                        <td>{{ price.label }}{% if price.footnote_index %}<span class="footnote-marker">{{ price.footnote_index }}</span>{% endif %}</td>
+                        <td class="price-recurrence">{{ price.recurrence }}</td>
+                        <td class="numeric price-amount">{{ price.amount }}</td>
+                        <td class="numeric">{{ price.unit }}</td>
+                    </tr>
+                    {% endfor %}
+                    {% endfor %}
+                </tbody>
+            </table>
+        </section>
+        {% endfor %}
+        {% else %}
+        <div class="empty-state">{{ tr.no_tariffs }}</div>
+        {% endif %}
+
+        {% if vat_note %}
+        <div class="vat-note">{{ vat_note }}</div>
+        {% endif %}
+
+        {% if footnotes %}
+        <div class="footnotes">
+            {% for index, text in footnotes %}
+            <div>{{ index }}. {{ text }}</div>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </main>
+</body>
+
+</html>

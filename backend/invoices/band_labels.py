@@ -11,7 +11,7 @@ does not have to reach into that module itself.
 """
 
 from tariffs.models import PeriodType
-from tariffs.periods import hhmm, month_ranges, months_of
+from tariffs.periods import ALL_WEEKDAYS, hhmm, month_ranges, months_of, weekdays_of
 
 from .contract_translations import CONTRACT_TRANSLATIONS
 
@@ -54,3 +54,38 @@ def band_description(period, tr: dict) -> str:
         for first, last in ranges
     )
     return tr["tariff_season"].format(label=label, season=season)
+
+
+def band_recurrence(period, tr: dict) -> str:
+    """``Mo–Fr, 07:00–20:00``. Empty when the band applies unrestricted.
+
+    Independent of :func:`band_description`: a band's *name* (HT, a label, or
+    its window) is one thing, and *when it recurs* is another. An invoice line
+    already carries a quantity that implicitly reflects the restriction, and
+    the contract states the band inline in prose — this is for the tariff
+    overview, which lists a band with nothing else to say when it applies.
+    """
+    weekdays = weekdays_of(period)
+    if weekdays == ALL_WEEKDAYS:
+        days = ""
+    else:
+        ordered = sorted(weekdays)
+        names = tr["tariff_weekdays_short"]
+        runs: list[list[int]] = []
+        for day in ordered:
+            if runs and day == runs[-1][-1] + 1:
+                runs[-1].append(day)
+            else:
+                runs.append([day])
+        parts = [
+            names[run[0]] if len(run) == 1
+            else tr["tariff_weekday_range"].format(first=names[run[0]], last=names[run[-1]])
+            for run in runs
+        ]
+        days = ", ".join(parts)
+
+    hours = f"{hhmm(period.time_from)}–{hhmm(period.time_to)}" if period.time_from and period.time_to else ""
+
+    if days and hours:
+        return tr["tariff_recurrence_join"].format(days=days, hours=hours)
+    return days or hours

@@ -1081,6 +1081,11 @@ export const it = {
                     applyFailed: 'Non \u00e8 stato possibile importare le tariffe.',
                 },
             },
+            overviewPdf: {
+                action: 'Panoramica tariffe (PDF)',
+                busy: 'Generazione\u2026',
+                error: 'Non \u00e8 stato possibile creare la panoramica delle tariffe.',
+            },
             title: 'Tariffe',
             description: 'Configura tariffe e fasce orarie per i calcoli di fatturazione.',
             newTariff: 'Nuova tariffa',

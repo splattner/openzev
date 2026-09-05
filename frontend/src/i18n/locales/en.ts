@@ -1092,6 +1092,11 @@ export const en = {
                     applyFailed: 'The tariffs could not be imported.',
                 },
             },
+            overviewPdf: {
+                action: 'Tariff overview (PDF)',
+                busy: 'Generating…',
+                error: 'The tariff overview could not be created.',
+            },
             title: 'Tariffs',
             description: 'Configure rates and time bands for billing calculations.',
             newTariff: 'New Tariff',

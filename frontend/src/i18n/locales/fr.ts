@@ -1081,6 +1081,11 @@ export const fr = {
                     applyFailed: 'Les tarifs n\u2019ont pas pu \u00eatre import\u00e9s.',
                 },
             },
+            overviewPdf: {
+                action: 'Aper\u00e7u des tarifs (PDF)',
+                busy: 'G\u00e9n\u00e9ration\u2026',
+                error: 'L\u2019aper\u00e7u des tarifs n\u2019a pas pu \u00eatre cr\u00e9\u00e9.',
+            },
             title: 'Tarifs',
             description: 'Configurer les tarifs et les plages horaires pour les calculs de facturation.',
             newTariff: 'Nouveau tarif',
