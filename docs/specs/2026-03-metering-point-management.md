@@ -186,6 +186,26 @@ Routed under `/api/v1/zev/metering-points/` via DRF `ModelViewSet`.
 | `GET` | `/metering-points/{id}/` | Authenticated (scoped) | Retrieve single metering point |
 | `PUT/PATCH` | `/metering-points/{id}/` | `MeteringPointPermission` | Update metering point |
 | `DELETE` | `/metering-points/{id}/` | `MeteringPointPermission` | Delete metering point |
+| `POST` | `/metering-points/{id}/delete-readings/` | `IsAdmin` | Delete every reading or an inclusive UTC date range after request validation |
+
+#### Delete readings request
+
+`MeteringPointReadingsDeleteSerializer` validates the complete request before
+any reading is counted or deleted:
+
+| Field | Type | Required | Semantics |
+|---|---|---|---|
+| `delete_all` | `BooleanField` | No (default `false`) | Only a value accepted by DRF as true enables whole-meter deletion; accepted false strings such as `"false"`, `"0"`, and `"off"` use bounded deletion |
+| `date_from` | `DateField` | When `delete_all=false` | Inclusive UTC civil-date lower bound |
+| `date_to` | `DateField` | When `delete_all=false` | Inclusive UTC civil-date upper bound; must be on or after `date_from` |
+
+An omitted `delete_all` value defaults to false. Missing, malformed, or
+reversed date ranges and invalid boolean values return HTTP 400 with field-keyed
+serializer errors and perform no writes. When `delete_all=true`, dates are
+optional and all readings belonging to the selected meter are deleted. A
+successful response is `{ "deleted_count": integer }`; the audit event stores
+the normalized boolean and ISO date strings (or null dates for an all-reading
+deletion).
 
 ### 4.2 Metering point assignments
 
@@ -436,6 +456,7 @@ Tests are distributed across `metering/tests.py` and the invoice test suite.
 | Queryset scoping | Admin sees all; owner sees own ZEV; participant sees assigned meters (read-only) |
 | Assignment validation | Overlap rejection, ZEV-scope enforcement, participant-validity containment, date integrity |
 | CRUD operations | Create/update/delete for metering points and assignments with permission checks |
+| Reading deletion | `MeteringPointReadingsDeletionTests` (8 methods): admin whole-meter and inclusive-range deletion; false JSON/form values and omission remain bounded; invalid booleans and invalid/incomplete/reversed ranges return 400 without writes; owners are denied |
 | Soft deactivation | `is_active = False` preserves history; meter remains queryable |
 | Billing integration | Engine resolves assignments for period; only overlapping assignments contribute readings |
 | Period overview | Assignment-aware gap detection, no-assignment exclusion |

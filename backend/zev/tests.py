@@ -953,6 +953,75 @@ class MeteringPointReadingsDeletionTests(TestCase):
 		)
 
 		self.assertEqual(resp.status_code, 400)
+		self.assertEqual(MeterReading.objects.filter(metering_point=self.metering_point).count(), 3)
+
+	def test_string_false_uses_bounded_deletion(self):
+		resp = self.admin_client.post(
+			f"/api/v1/zev/metering-points/{self.metering_point.id}/delete-readings/",
+			{
+				"delete_all": "false",
+				"date_from": "2026-01-15",
+				"date_to": "2026-01-31",
+			},
+			format="json",
+		)
+
+		self.assertEqual(resp.status_code, 200)
+		self.assertEqual(resp.data["deleted_count"], 1)
+		self.assertEqual(
+			list(
+				MeterReading.objects.filter(metering_point=self.metering_point)
+				.order_by("timestamp")
+				.values_list("energy_kwh", flat=True)
+			),
+			[Decimal("1.0000"), Decimal("3.0000")],
+		)
+
+	def test_other_false_inputs_and_omission_never_delete_all(self):
+		url = f"/api/v1/zev/metering-points/{self.metering_point.id}/delete-readings/"
+		for delete_all in ("0", "off", None):
+			with self.subTest(delete_all=delete_all):
+				payload = {"date_from": "2026-03-01", "date_to": "2026-03-01"}
+				if delete_all is not None:
+					payload["delete_all"] = delete_all
+				resp = self.admin_client.post(url, payload)
+				self.assertEqual(resp.status_code, 200)
+				self.assertEqual(resp.data["deleted_count"], 0)
+				self.assertEqual(
+					MeterReading.objects.filter(metering_point=self.metering_point).count(), 3
+				)
+
+	def test_invalid_delete_all_values_are_rejected_without_writes(self):
+		url = f"/api/v1/zev/metering-points/{self.metering_point.id}/delete-readings/"
+		for invalid in ("definitely", 2, [], {}):
+			with self.subTest(invalid=invalid):
+				resp = self.admin_client.post(
+					url,
+					{"delete_all": invalid, "date_from": "2026-01-01", "date_to": "2026-01-31"},
+					format="json",
+				)
+				self.assertEqual(resp.status_code, 400)
+				self.assertIn("delete_all", resp.data)
+				self.assertEqual(
+					MeterReading.objects.filter(metering_point=self.metering_point).count(), 3
+				)
+
+	def test_invalid_or_incomplete_ranges_are_rejected_without_writes(self):
+		url = f"/api/v1/zev/metering-points/{self.metering_point.id}/delete-readings/"
+		for payload, error_field in (
+			({"delete_all": False, "date_from": "invalid", "date_to": "2026-01-31"}, "date_from"),
+			({"delete_all": False, "date_from": "2026-01-01", "date_to": "invalid"}, "date_to"),
+			({"delete_all": False, "date_from": "2026-02-01", "date_to": "2026-01-01"}, "date_to"),
+			({"delete_all": False, "date_from": "2026-01-01"}, "date_to"),
+			({"delete_all": False, "date_to": "2026-01-31"}, "date_from"),
+		):
+			with self.subTest(payload=payload):
+				resp = self.admin_client.post(url, payload, format="json")
+				self.assertEqual(resp.status_code, 400)
+				self.assertIn(error_field, resp.data)
+				self.assertEqual(
+					MeterReading.objects.filter(metering_point=self.metering_point).count(), 3
+				)
 
 	def test_non_admin_cannot_delete_readings(self):
 		resp = self.owner_client.post(
