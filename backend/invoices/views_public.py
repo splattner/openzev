@@ -287,9 +287,18 @@ def _empty_charts() -> dict:
     return {"title": "", "intro": "", "charts": []}
 
 
+# Bumped whenever the payload *shape* changes, which is a different thing from
+# the invoice changing. Keying only on the invoice meant a deploy that
+# restructured this response kept serving the previous shape for an hour, to a
+# frontend that had just been taught to expect the new one — the page crashed
+# on a key that was no longer there. Data freshness and schema compatibility
+# need separate parts of the key because they change for separate reasons.
+_CHART_PAYLOAD_VERSION = 2
+
+
 def _chart_cache_key(invoice) -> str:
     stamp = invoice.updated_at.isoformat() if invoice.updated_at else "new"
-    return f"public-invoice-charts:{invoice.pk}:{stamp}"
+    return f"public-invoice-charts:v{_CHART_PAYLOAD_VERSION}:{invoice.pk}:{stamp}"
 
 
 @api_view(["GET"])

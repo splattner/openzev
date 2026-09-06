@@ -46,6 +46,8 @@ export function PublicInvoicePage() {
         retry: false,
     })
 
+    const chartList = charts?.charts ?? []
+
     const [linkRequested, setLinkRequested] = useState(false)
     const magicLink = useMutation({
         mutationFn: () => requestMagicLink(prefix, secret),
@@ -155,16 +157,20 @@ export function PublicInvoicePage() {
                     ))}
                 </section>
 
-                {charts && charts.charts.length > 0 && (
+                {/* Optional chaining is not defensive habit here: this page is
+                    served to someone with no session, no navigation and no
+                    support channel, so an unexpected payload must degrade to a
+                    missing figure rather than a white screen. */}
+                {chartList.length > 0 && (
                     <section className="public-invoice-charts">
                         {/* Laid out like the invoice's insights page: a section
                             heading and intro, then each figure under its own
                             title and description. The SVGs and all of this copy
                             come from the server, so the screen and the paper say
                             the same things in the same language. */}
-                        <h2>{charts.title}</h2>
-                        <p className="muted">{charts.intro}</p>
-                        {charts.charts.map((chart) => (
+                        {charts?.title && <h2>{charts.title}</h2>}
+                        {charts?.intro && <p className="muted">{charts.intro}</p>}
+                        {chartList.map((chart) => (
                             <figure key={chart.key} className="public-invoice-chart">
                                 <figcaption>
                                     <h3>{chart.title}</h3>

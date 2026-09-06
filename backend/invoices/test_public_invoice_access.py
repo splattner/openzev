@@ -543,3 +543,29 @@ class PublicInvoiceChartsTests(PublicInvoiceTestCase):
 
         self.assertNotIn("<script>", body)
         self.assertNotIn("</script>", body)
+
+    def test_the_cache_key_is_versioned_by_payload_shape(self):
+        """A deploy that restructures this response must not serve the old one.
+
+        Keying only on the invoice meant a shape change kept the previous
+        payload alive for an hour, to a frontend already expecting the new one.
+        The page crashed on a key that was no longer there.
+        """
+        from invoices.views_public import _CHART_PAYLOAD_VERSION, _chart_cache_key
+
+        self.assertIn(f":v{_CHART_PAYLOAD_VERSION}:", _chart_cache_key(self.invoice))
+
+    def test_every_response_carries_the_charts_key(self):
+        """Including the failure path, which the page renders without checking."""
+        from unittest.mock import patch
+
+        ok = self._charts().json()
+        with patch(
+            "invoices.views_public.build_invoice_pdf_period_context",
+            side_effect=RuntimeError("boom"),
+        ):
+            failed = self._charts().json()
+
+        for payload in (ok, failed):
+            self.assertIn("charts", payload)
+            self.assertIsInstance(payload["charts"], list)
