@@ -1,5 +1,26 @@
 # Changelog
 
+## [1.10.0](https://github.com/splattner/openzev/compare/v1.9.3...v1.10.0) (2026-09-06)
+
+
+### Features
+
+* **tariffs:** print a tariff overview PDF ([#568](https://github.com/splattner/openzev/issues/568)) ([6d93137](https://github.com/splattner/openzev/commit/6d9313781675c833be338cd61a4cb104ef09353c))
+
+
+### Bug Fixes
+
+* **metering-points:** capture form values before async state updaters ([#563](https://github.com/splattner/openzev/issues/563)) ([fa1c5d1](https://github.com/splattner/openzev/commit/fa1c5d115e11efcc2ea3b9562ec53a62a00d3b57))
+* **metering:** aggregate chart buckets in UTC ([#581](https://github.com/splattner/openzev/issues/581)) ([0a703ac](https://github.com/splattner/openzev/commit/0a703ac21cdf447b3d266ee1305469cc1f71fd14))
+* **metering:** scope participant readings by assignment date ([#579](https://github.com/splattner/openzev/issues/579)) ([2ac749f](https://github.com/splattner/openzev/commit/2ac749f1bdd72bc9468839dbfb5d939415c3542c))
+* **zev:** preserve privileged roles during participant sync ([#577](https://github.com/splattner/openzev/issues/577)) ([5dfe234](https://github.com/splattner/openzev/commit/5dfe234dc9360a1f2288cff0a9e7b606925d8de7))
+* **zev:** validate meter-reading deletion requests ([#580](https://github.com/splattner/openzev/issues/580)) ([7e2814f](https://github.com/splattner/openzev/commit/7e2814f3b57805fd313a987c23761e801b377e76))
+
+
+### Performance Improvements
+
+* **invoices:** reuse allocation work across batch documents ([#555](https://github.com/splattner/openzev/issues/555)) ([e6b66c0](https://github.com/splattner/openzev/commit/e6b66c0f264edb13c850c271d7741cabe998bc5a))
+
 ## [1.9.3](https://github.com/splattner/openzev/compare/v1.9.2...v1.9.3) (2026-09-04)
 
 
