@@ -12,6 +12,7 @@
  */
 import { expect, type Page } from '@playwright/test'
 import path from 'path'
+import { fileURLToPath } from 'url'
 
 export const BASE = process.env.SCREENSHOT_BASE_URL ?? 'http://localhost:8080'
 // The docker compose stack publishes the API on 8001 (see seed_demo's summary
@@ -19,6 +20,15 @@ export const BASE = process.env.SCREENSHOT_BASE_URL ?? 'http://localhost:8080'
 export const API_BASE = process.env.SCREENSHOT_API_URL ?? 'http://localhost:8001/api/v1'
 export const USER = process.env.SCREENSHOT_USER ?? 'admin'
 export const PASS = process.env.SCREENSHOT_PASSWORD ?? 'admin1234'
+
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
+
+/**
+ * Where the setup project persists the admin's authenticated storage state
+ * (see auth.setup.ts). Gitignored: it holds a live session cookie.
+ */
+export const AUTH_STATE_PATH = path.join(__dirname, '.auth', 'admin.json')
 
 /**
  * Pin Sonnenhof so screenshots consistently show the same community: both
@@ -32,22 +42,6 @@ export const DEMO_ZEV_NAME = 'ZEV STWEG Sonnenhof'
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-/** Authenticate via the API. The server sets httpOnly cookies; the browser context carries them automatically. */
-export async function loginViaAPI(page: Page) {
-  const resp = await page.request.post(`${API_BASE}/auth/token/`, {
-    data: { username: USER, password: PASS },
-  })
-  expect(resp.ok(), `Login failed (${resp.status()})`).toBeTruthy()
-
-  // The server sets openzev_access / openzev_refresh httpOnly cookies on the response.
-  // page.request shares the browser context's cookie jar, so subsequent navigations
-  // will include those cookies automatically — no localStorage injection needed.
-  await page.addInitScript(() => {
-    // Ensure sidebar is expanded for screenshots
-    localStorage.setItem('openzev.sidebarCollapsed', 'false')
-  })
-}
 
 /** Navigate and wait until the page is fully loaded and idle. */
 export async function navigateTo(page: Page, urlPath: string) {
@@ -70,13 +64,31 @@ export async function goToPreviousPeriod(page: Page) {
   await page.waitForTimeout(2000)
 }
 
-/** Log in as admin and return the access cookie for direct API requests. */
+/**
+ * Return a bearer access token for direct API calls from Playwright helpers.
+ *
+ * The token is the `openzev_access` cookie set by the login endpoint, and the
+ * suite authenticates each context via the setup project's storage state — so
+ * in the common case this only reads the cookie jar. Only when the cookie is
+ * missing (a context that skipped the shared auth state) do we log in here.
+ * Every avoidable POST counts: the backend throttles `auth/token/` per IP at
+ * 40/hour, and all captures share one IP.
+ */
 export async function getAdminToken(page: Page): Promise<string> {
-  await loginViaAPI(page)
-  const cookies = await page.context().cookies()
-  const accessCookie = cookies.find(c => c.name === 'openzev_access')
-  expect(accessCookie, 'openzev_access cookie missing after login').toBeTruthy()
-  return accessCookie!.value
+  // CookieJWTAuthentication also accepts the value as an Authorization bearer
+  // header, so the cookie value doubles as the token for direct API calls.
+  const readCookie = async () =>
+    (await page.context().cookies(API_BASE)).find(c => c.name === 'openzev_access')?.value
+  const existing = await readCookie()
+  if (existing) return existing
+
+  const resp = await page.request.post(`${API_BASE}/auth/token/`, {
+    data: { username: USER, password: PASS },
+  })
+  expect(resp.ok(), `Admin login failed (${resp.status()})`).toBeTruthy()
+  const token = await readCookie()
+  expect(token, 'openzev_access cookie missing after login').toBeTruthy()
+  return token!
 }
 
 /** Resolve the id of the data-bearing demo ZEV via the admin API. */

@@ -3,7 +3,7 @@
  *
  * Run:
  *   cd frontend
- *   npx playwright test --config screenshots.config.ts
+ *   npm run screenshots
  *
  * Screenshots are saved to: docs/user-guide/screenshots/
  *
@@ -39,19 +39,29 @@ const screenshotViewport = (page: Page, name: string) => captureViewport(page, S
 
 // ---------------------------------------------------------------------------
 // Screenshot tests — one test per page / state
+//
+// Every test starts from the authenticated storage state the `setup` project
+// saved (see screenshots.config.ts), so tests must not log in themselves.
 // ---------------------------------------------------------------------------
+
+// Keep this outside the authenticated suite: its beforeEach pins the demo ZEV.
+test.describe('Unauthenticated Screenshots', () => {
+  test.use({ storageState: { cookies: [], origins: [] } })
+
+  test('01-login', async ({ page }) => {
+    await navigateTo(page, '/login')
+    const cookies = await page.context().cookies(API_BASE)
+    expect(cookies.some(cookie => cookie.name === 'openzev_access'),
+      'Login capture must stay signed out').toBe(false)
+    await page.waitForSelector('form')
+    await screenshotFull(page, '01-login')
+  })
+})
 
 test.describe('User Guide Screenshots', () => {
   test.beforeEach(async ({ page }) => {
     const pinned = await pinDemoZev(page)
     expect(pinned, 'Demo ZEV not found — run seed_demo before capturing screenshots').toBe(true)
-  })
-
-  // 01 — Login page (unauthenticated)
-  test('01-login', async ({ page }) => {
-    await navigateTo(page, '/login')
-    await page.waitForSelector('form')
-    await screenshotFull(page, '01-login')
   })
 
   // 02 — Dashboard

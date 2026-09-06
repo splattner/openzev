@@ -35,7 +35,6 @@ import { test, expect, type Page } from '@playwright/test'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import {
-  loginViaAPI,
   navigateTo,
   pinDemoZev,
   resetHover,
@@ -68,7 +67,6 @@ test('shot', async ({ page }) => {
   expect(NAME, 'SHOT_NAME is required').toBeTruthy()
   expect(URL_PATH, 'SHOT_URL is required').toBeTruthy()
 
-  await loginViaAPI(page)
   await page.addInitScript((lang: string) => {
     localStorage.setItem('openzev.language', lang)
   }, LANG)

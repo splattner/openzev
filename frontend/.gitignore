@@ -24,3 +24,6 @@ dist-ssr
 *.sw?
 
 test-results
+
+# Saved login session for the screenshot suite (written by auth.setup.ts)
+screenshots/.auth
