@@ -73,10 +73,15 @@ one section, written around the capability. Group first, then triage the group
 description of what someone can now do.
 
 **Its own `###` section** — yes, and they need to be told how. Something
-previously impossible is now possible, or a workflow changes shape. These get a
-few paragraphs: what it does, where it is in the UI, what it costs, and what it
-deliberately does *not* do. Two to five per release; more than five means the
-triage is too generous.
+previously impossible is now possible, or a workflow changes shape. Three or
+four paragraphs at most: what it does, where it is in the UI, what it costs,
+and what it deliberately does *not* do. Two to five per release; more than five
+means the triage is too generous.
+
+Resist the urge to give each aspect of a feature its own bullet. A bulleted
+list of six things the document prints is a specification, not a release note —
+fold them into prose, or show them in a figure and let the prose name only the
+two or three that need a reason attached.
 
 **`### Also new`** — yes, but it needs no explanation. One line each. A better
 default, a new filter, a term corrected in a translation.
@@ -85,6 +90,10 @@ default, a new filter, a term corrected in a translation.
 data, blocked a workflow, or crossed a tenant boundary. The test is whether
 someone might need to go and check their own data. Name the symptom first, then
 the cause: the reader is trying to work out whether it affected them.
+
+Three to five lines each. Enough cause to recognise whether it hit them, and
+the check to run if it did — not the mechanism in full. If a fix genuinely
+needs more than that it is a section, not a bullet.
 
 **`### Under the hood`** — refactors, new internal structure, test and CI work.
 One short paragraph for the whole release, or leave the section out. Include it
@@ -120,6 +129,28 @@ Structure, in order. Leave out any section with nothing in it.
 5. `### Under the hood`
 6. `### Upgrading` — see below.
 
+### Length
+
+**Aim for 600–900 words of prose, and treat 1,000 as the point where something
+is wrong.** A release note is read once, in a tab someone opened on their way
+to somewhere else. What survives that reading is short.
+
+Length comes from over-explaining, not from covering too much. The usual causes,
+in the order they show up:
+
+- Explaining *why* the implementation is the way it is. Interesting to the
+  person who wrote it, irrelevant to the person deciding whether to upgrade.
+  One clause, if the reason changes what the reader should do; otherwise cut it.
+- Restating the problem the feature solves after already naming it. One sentence
+  of "here is what you couldn't do before" is framing; three is a preamble.
+- A bullet per aspect where a sentence per idea would do.
+- Naming a mechanism (`event.currentTarget`, `bool()`, `TruncDay`) *and*
+  narrating what it does. Name it once, in passing, for the reader who will
+  search for it, then move on.
+
+Write the section, then cut it by a third. The version that survives is the one
+to publish.
+
 ### Voice
 
 Follow the v1.7.0 notes; read them before writing (`gh release view v1.7.0`).
@@ -127,9 +158,9 @@ Follow the v1.7.0 notes; read them before writing (`gh release view v1.7.0`).
 - Address the reader as *you*. Name the UI path in bold: **Account → API keys**.
 - Be concrete. "A typical invoice now fits on one page instead of three", not
   "improved invoice layout".
-- **Say what a feature cannot do.** The API-keys section is the model: it spends
-  a paragraph on what a key deliberately cannot reach. That is what makes the
-  notes trustworthy rather than promotional.
+- **Say what a feature cannot do**, in a sentence or two — the limits are what
+  make the notes trustworthy rather than promotional. Prefer one closing
+  sentence that names several limits over a paragraph on each.
 - No marketing register: no "seamless", "powerful", "revolutionise". No emoji.
 - A short code block or `curl` example where it saves a paragraph.
 - Numbers where you have them, and only where you have checked them.
@@ -144,6 +175,12 @@ is nothing to look at.
 
 At most one or two per release. Never in `Also new` (if it needs a picture it
 needs a section) and never in `Fixes worth knowing about`.
+
+**A figure is a budget cut, not an addition.** Anything visible in the picture
+should leave the prose: rows, labels, units, ordering, layout. Keep the
+sentences the picture cannot make — what the reader has to decide, what the
+feature refuses to do, what is true but off-frame. A section that gains a
+screenshot should get shorter.
 
 **Taking one.** The stack must be running and seeded. From `frontend/`:
 
@@ -262,6 +299,17 @@ Every PR from the change list must appear here exactly once, including the
 omitted ones — an untriaged PR is the only thing `continue` needs to look at,
 and "omit" is a decision worth being able to see in a diff.
 
+An open PR that would change the notes if it merged goes under `not-final:`,
+with what it would need. The state block is stripped at publish, so this is the
+one place a warning can sit without reaching the release:
+
+```markdown
+not-final:
+  578: open       # annual statements in subprocess workers. If it lands before
+                  # the cut it needs a section, an Upgrading entry for
+                  # PDF_POOL_MAX_WORKERS, and the ZIP entry-name change.
+```
+
 Commit it on a branch and open a PR like any other change. It is reviewable
 prose about the release, and it stays as the archive: v1.7.0's notes exist only
 on GitHub, which is why this directory exists.
@@ -326,3 +374,6 @@ pinned to the tag, so it only resolves once the release is cut.
 - Removals called out.
 - No change that belongs in a section is sitting in `Also new` because it was
   easier to summarise in one line.
+- **Under 1,000 words of prose** (`sed '/release-notes-state/,$d' <file> | wc -w`).
+  Over that, the cut is almost always mechanism and rationale, not coverage —
+  find the sentences explaining *why the code is like that* and delete them.
