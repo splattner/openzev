@@ -257,20 +257,47 @@ class TariffOverviewContentTests(TariffOverviewTestCase):
         self.assertEqual(row["amount"], "500.00")
         self.assertEqual(row["unit"], "CHF/Mt.")
 
-    def test_percentage_row_matches_the_contract_figure(self):
-        grid = self._energy_tariff(name="Grid", energy_type=EnergyType.GRID)
-        _flat_period(grid, "0.29500")
-        Tariff.objects.create(
+    def _grid_sheet(self):
+        """A grid tariff as an operator actually files one: the Arbeitspreis in
+        ENERGY, network usage in GRID_FEES, levies in LEVIES. Only the first is
+        category ENERGY, which is what makes this the case that catches a base
+        selected by category. Sums to 0.28890 CHF/kWh.
+        """
+        for name, category, price in (
+            ("Arbeitspreis", TariffCategory.ENERGY, "0.13600"),
+            ("Netznutzung", TariffCategory.GRID_FEES, "0.10400"),
+            ("KEV", TariffCategory.LEVIES, "0.02380"),
+            ("SDL", TariffCategory.LEVIES, "0.00290"),
+            ("Gemeinwesen", TariffCategory.LEVIES, "0.01620"),
+            ("WiRes", TariffCategory.LEVIES, "0.00440"),
+            ("SGF", TariffCategory.LEVIES, "0.00110"),
+            ("Solidarisierte Kosten", TariffCategory.LEVIES, "0.00050"),
+        ):
+            _flat_period(
+                self._energy_tariff(name=name, category=category, energy_type=EnergyType.GRID),
+                price,
+            )
+
+    def _local_pct(self, percentage="65.00"):
+        return Tariff.objects.create(
             zev=self.zev, name="Local pct", category=TariffCategory.ENERGY,
             billing_mode=BillingMode.PERCENTAGE_OF_ENERGY, energy_type=EnergyType.LOCAL,
-            percentage=Decimal("18.00"), valid_from=date(2026, 1, 1),
+            percentage=Decimal(percentage), valid_from=date(2026, 1, 1),
         )
 
-        ctx = _build_template_context(self.zev, date(2026, 6, 1), "valid")
-        overview_row = next(
+    def _pct_row(self, as_of=date(2026, 6, 1)):
+        ctx = _build_template_context(self.zev, as_of, "valid")
+        return next(
             row for group in ctx["groups"] for tariff in group["tariffs"]
             for row in tariff["price_rows"] if tariff["name"] == "Local pct"
         )
+
+    def test_percentage_row_matches_the_contract_figure(self):
+        grid = self._energy_tariff(name="Grid", energy_type=EnergyType.GRID)
+        _flat_period(grid, "0.29500")
+        self._local_pct("18.00")
+
+        overview_row = self._pct_row()
 
         contract_rows = _build_local_tariff_display(
             self.zev, CONTRACT_TRANSLATIONS["de"], "dd.MM.yyyy", date(2026, 6, 1)
@@ -279,6 +306,36 @@ class TariffOverviewContentTests(TariffOverviewTestCase):
 
         self.assertEqual(overview_row["amount"], contract_row["rate_rp"])
         self.assertIsNone(overview_row["footnote"])
+
+    def test_percentage_base_spans_every_grid_category(self):
+        """The base is the whole grid price, not just its ENERGY component.
+
+        Selecting by category kept only the 13.60 Arbeitspreis and printed
+        8.84 instead of 18.78 — less than half the rate actually billed.
+        """
+        self._grid_sheet()
+        self._local_pct("65.00")
+
+        row = self._pct_row()
+
+        self.assertEqual(row["amount"], "18.78")
+        self.assertIn("28.89", row["label"])
+
+    def test_percentage_row_matches_the_contract_across_grid_categories(self):
+        """The parity the spec asks for, on a grid sheet that spans categories.
+
+        The single-tariff case above agrees whichever way the base is selected,
+        so it cannot see a divergence between the two documents.
+        """
+        self._grid_sheet()
+        self._local_pct("65.00")
+
+        contract_rows = _build_local_tariff_display(
+            self.zev, CONTRACT_TRANSLATIONS["de"], "dd.MM.yyyy", date(2026, 6, 1)
+        )
+        contract_row = next(r for r in contract_rows if r["name"] == "Local pct")
+
+        self.assertEqual(self._pct_row()["amount"], contract_row["rate_rp"])
 
     def test_multiband_grid_base_adds_the_footnote(self):
         from datetime import time

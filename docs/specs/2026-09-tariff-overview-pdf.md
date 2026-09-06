@@ -174,7 +174,23 @@ The overview must not add a third answer:
 2. `contract_pdf._build_local_tariff_display` calls it instead of computing
    inline. Behaviour unchanged — this is a move, and the existing contract
    tests are the regression net.
-3. The overview calls the same function.
+3. The overview calls the same function, **on the same set of tariffs**.
+
+**Which tariffs make up the base:** `energy_type == GRID` and
+`billing_mode == ENERGY`, active on the reference date. **Category is not part
+of the predicate.** A percentage-of-grid tariff is a percentage of the whole
+grid price a participant would otherwise pay, and a Swiss operator files that
+across three categories — Arbeitspreis under `ENERGY`, Netznutzung under
+`GRID_FEES`, and each levy under `LEVIES`. Filtering to `ENERGY` keeps only the
+Arbeitspreis; on a real ZEV that is roughly 47% of the base, so the document
+prints less than half the rate the engine bills.
+
+Sharing the helper is therefore necessary but not sufficient: the *input* to it
+has to be selected the same way too. Both `contract_pdf` and
+`engine.TariffResolver` select without a category filter, and the overview must
+match. This was shipped wrong in 1.10.0 (#568) and fixed in #583; the test that
+was supposed to catch it used a single grid tariff, which agrees under either
+predicate — see §14.
 
 The engine is *not* refactored onto it. It resolves a price per timestamp
 because it has to; a static display figure is a different question with a
@@ -452,6 +468,8 @@ enforces them across all four locales.
 | `test_prices_are_printed_in_rappen` | `22.50`, not `0.22500` |
 | `test_shared_fee_names_its_split` | Split wording and `split_key` present |
 | `test_percentage_row_matches_the_contract_figure` | Identical effective price in both documents |
+| `test_percentage_base_spans_every_grid_category` | A grid sheet split across `ENERGY`/`GRID_FEES`/`LEVIES` gives 18.78, not the 8.84 an `ENERGY`-only base yields |
+| `test_percentage_row_matches_the_contract_across_grid_categories` | The parity above, on that same multi-category sheet — the single-tariff case agrees under either predicate and cannot see the divergence |
 | `test_multiband_grid_base_adds_the_footnote` | Footnote text present; absent for a single-band base |
 
 **`TariffOverviewVatTests`** (3 tests):
