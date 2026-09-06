@@ -173,9 +173,16 @@ The prefix selects the row; the secret is compared against `hashed_secret` with
   "participant_name": "Anna Muster",
   "period_start": "2026-01-01",
   "period_end": "2026-03-31",
-  "status": "sent",
+  "status": "paid",
+  "is_paid": true,
   "total_chf": "238.87",
   "currency": "CHF",
+  "energy_summary": {
+    "local_kwh": "320.5",
+    "grid_kwh": "180.0",
+    "total_kwh": "500.5",
+    "local_share_pct": "64"
+  },
   "items": [
     {"category": "energy", "description": "Solarstrom ZEV",
      "quantity": "412.500", "unit": "kWh", "unit_price": "0.22500",
@@ -195,8 +202,18 @@ The prefix selects the row; the secret is compared against `hashed_secret` with
 **404 for every failure, including a wrong secret.** Distinguishing "no such
 invoice" from "wrong secret" tells a scanner which prefixes exist.
 
+`energy_summary` is `pdf_stats._build_energy_summary(invoice)` verbatim — the
+same four figures the insights page prints, read off `Invoice.total_local_kwh`
+and `total_grid_kwh` rather than recomputed, so the page and the paper cannot
+disagree. It is `null` when the invoice has no consumption, which is the same
+condition that suppresses the insights page and the QR (§6).
+
+`is_paid` is derived from `status`, not stored twice. It is the one field that
+can change after the paper was printed, and showing it is the point: "have I
+paid this?" is the second question a reader has, after "what is it for?".
+
 The response deliberately carries **no participant email, address, or bank
-detail** — only what is already printed on the page the reader is holding, plus
+detail** — only what is already printed on the pages the reader is holding, plus
 the line items behind the total. It does not include other invoices, other
 participants, or ZEV-wide totals.
 
@@ -257,10 +274,26 @@ overridable through the existing `EmailTemplate` admin like
 
 **QR rendering.** `qrcode==8.2` is already a dependency, distinct from
 `qrbill==1.2.0`. The Swiss QR-Rechnung payload is regulated and cannot carry a
-portal URL, so this is a **second, separate** QR — smaller, in the invoice
-footer, captioned so it cannot be mistaken for the payment code. The invoice
-already reserves QR space (`invoice_pdf.html`, `.qr-section`) and 1.7.0 brought
-a typical invoice to one page; the addition must not cost that page.
+portal URL, so this is a **second, separate** QR.
+
+**It goes on the insights page** (`.insights-page`, `invoice_pdf.html:850`),
+never on the payment page and never on a page carrying the QR-Rechnung. Three
+reasons, in order of weight:
+
+1. **It cannot be confused with the payment code.** `.payment-page` and
+   `.insights-page` both carry `break-before: page`, so the two QRs are never
+   on the same sheet — including under `inline_qr_payment`, where the slip
+   sits on page 1 and the insights page is still its own.
+2. **It is already the consumption page.** The link leads to the same figures
+   the page prints, so the QR is an invitation to see more of what the reader
+   is looking at rather than an unrelated marketing square.
+3. **It costs no page.** 1.7.0 brought a typical invoice to one page plus
+   insights; this adds nothing to that count.
+
+**No insights page means no QR.** The section renders only when there is energy
+data, and `_build_energy_summary()` returns `None` for the same invoices
+(`pdf_stats.py:206`). A fee-only invoice with no consumption has nothing to show
+online, so it gets no QR — one condition, not two that can drift.
 
 ## 7. Frontend
 
@@ -437,18 +470,22 @@ Pure mapping only: the URL builder produces `/i/<prefix>?s=<secret>`, and the
 - [ ] A ZEV that has not opted in prints no QR and serves no public route
 - [ ] No migration opts an existing ZEV in
 
-## 13. Open questions
+## 13. Resolved in review
 
-- **Where exactly does the second QR go?** The invoice is one page after the
-  1.7.0 redesign and the payment slip owns the bottom. A footer QR risks
-  proximity to the QR-Rechnung; a header QR competes with the document number.
-  Wants a rendered comparison before it is settled.
-- **Should tier 1 show the consumption figures, or only the invoice lines?**
-  The line items explain the charge; the readings explain the consumption. The
-  second is the more interesting answer and the larger disclosure.
-- **Does `status` belong in the tier-1 payload?** "Paid" is useful to a reader
-  and is a fact about their own bill; it is also the one field that changes
-  after the paper was printed.
-- **Should an operator be able to see which invoices have been viewed?** The
-  audit events make it possible. Whether it should be surfaced is a different
-  question from whether it should be recorded.
+| Question | Decision |
+|---|---|
+| Where the second QR goes | The **insights page** — never a sheet carrying the QR-Rechnung. §6 |
+| Consumption figures on tier 1 | **Yes**, `energy_summary` verbatim from the insights page. §5.1 |
+| `status` in the payload | **Yes** — whether it is paid is the second question a reader has. §5.1 |
+| Audit event on a QR open | **Yes** — `invoice_link.viewed`, throttled to one per token per hour. §8 |
+
+## 14. Open questions
+
+- **Should the operator *see* the view events?** They are recorded either way
+  (§8). Surfacing "this participant opened their bill" in the audit log is a
+  different question from recording it, and worth deciding before the log UI
+  gains a filter for it.
+- **Does the savings callout belong on the public page?** `savings_data` is
+  computed for the invoice already and is the most persuasive number a ZEV
+  produces. It is also a claim rather than a measurement, and wants its own
+  wording review.
