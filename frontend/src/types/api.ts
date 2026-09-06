@@ -986,3 +986,41 @@ export interface VseTariffImportResult {
     skipped: Array<{ name: string; reason: string }>
     errors: Array<{ name: string; error: string }>
 }
+
+/** One line on a publicly-viewable invoice (see `PublicInvoice`). */
+export interface PublicInvoiceItem {
+    category: 'energy' | 'grid_fees' | 'levies' | 'metering'
+    description: string
+    quantity: string
+    unit: string
+    total_chf: string
+}
+
+/**
+ * One invoice, as served to the bearer of the link printed on it.
+ *
+ * Deliberately narrow: no contact detail, no other invoice, no other
+ * participant, no ZEV-wide figure. That narrowness is the reason the endpoint
+ * needs no login at all — see the backend's `views_public` docstring before
+ * widening this type to match a wider payload.
+ */
+export interface PublicInvoice {
+    invoice_number: string
+    zev_name: string
+    participant_name: string
+    period_start: string
+    period_end: string
+    status: string
+    is_paid: boolean
+    total_chf: string
+    currency: string
+    /** Null when the invoice has no consumption — then no QR was printed either. */
+    energy_summary: {
+        local_kwh: string
+        grid_kwh: string
+        total_kwh: string
+        local_share_pct: string
+    } | null
+    items: PublicInvoiceItem[]
+    has_pdf: boolean
+}

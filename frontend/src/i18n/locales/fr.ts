@@ -1024,6 +1024,25 @@ export const fr = {
             deleteMessage: 'Êtes-vous sûr de vouloir supprimer "{{name}}" ? Cette action est irréversible.',
             deleteConfirm: 'Supprimer le participant',
         },
+        publicInvoice: {
+            title: 'Facture {{number}}',
+            loading: 'Chargement de la facture …',
+            invalidTitle: 'Ce lien n\u2019est pas valable',
+            invalidBody: 'Le lien a expiré, a été révoqué ou est incomplet. Veuillez utiliser le code QR de votre facture actuelle.',
+            paid: 'Payée',
+            notPaid: 'Ouverte',
+            localEnergy: 'Énergie locale',
+            gridEnergy: 'Import réseau',
+            localShare: 'Part locale',
+            downloadPdf: 'Facture en PDF',
+            recipientNote: 'Cette facture a été établie pour {{name}}.',
+            categories: {
+                energy: 'Énergie',
+                grid_fees: 'Frais de réseau',
+                levies: 'Taxes',
+                metering: 'Tarif de comptage',
+            },
+        },
         tariffs: {
             vatInclusiveNotice: 'Ce RCP int\u00e8gre la TVA non r\u00e9cup\u00e9rable dans ses prix. Les prix affich\u00e9s ici sont nets ; les factures ajoutent le taux de TVA en vigueur \u00e0 l\u2019\u00e9nergie du r\u00e9seau, \u00e0 l\u2019utilisation du r\u00e9seau, aux redevances et \u00e0 la m\u00e9trologie.',
             import: {

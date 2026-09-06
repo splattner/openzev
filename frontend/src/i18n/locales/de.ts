@@ -1024,6 +1024,25 @@ export const de = {
             deleteMessage: 'Sind Sie sicher, dass Sie "{{name}}" löschen möchten? Diese Aktion kann nicht rückgängig gemacht werden.',
             deleteConfirm: 'Teilnehmer löschen',
         },
+        publicInvoice: {
+            title: 'Rechnung {{number}}',
+            loading: 'Rechnung wird geladen …',
+            invalidTitle: 'Dieser Link ist nicht gültig',
+            invalidBody: 'Der Link ist abgelaufen, wurde zurückgezogen oder ist unvollständig. Bitte verwenden Sie den QR-Code auf Ihrer aktuellen Rechnung.',
+            paid: 'Bezahlt',
+            notPaid: 'Offen',
+            localEnergy: 'Lokale Energie',
+            gridEnergy: 'Netzbezug',
+            localShare: 'Lokalanteil',
+            downloadPdf: 'Rechnung als PDF',
+            recipientNote: 'Diese Rechnung wurde für {{name}} ausgestellt.',
+            categories: {
+                energy: 'Energie',
+                grid_fees: 'Netzgebühren',
+                levies: 'Abgaben',
+                metering: 'Messtarif',
+            },
+        },
         tariffs: {
             vatInclusiveNotice: 'Dieser ZEV rechnet nicht rückforderbare MWST in die Preise ein. Die hier angezeigten Preise sind netto; Rechnungen schlagen den aktiven MWST-Satz auf Netzstrom, Netznutzung, Abgaben und Messwesen auf.',
             import: {
