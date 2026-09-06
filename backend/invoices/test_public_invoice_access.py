@@ -422,3 +422,91 @@ class MagicLinkTests(PublicInvoiceTestCase):
 
         self.participant.user.refresh_from_db()
         self.assertFalse(self.participant.user.has_usable_password())
+
+
+class PublicInvoiceChartsTests(PublicInvoiceTestCase):
+    """The three figures from the invoice's insights page (spec §9)."""
+
+    CHARTS_URL = "/api/v1/public/invoices/{prefix}/charts/"
+
+    def setUp(self):
+        super().setUp()
+        from django.core.cache import cache
+
+        cache.clear()
+
+    def _charts(self, secret=None):
+        return self.client.get(
+            self.CHARTS_URL.format(prefix=self.token.prefix),
+            {"s": self.secret if secret is None else secret},
+        )
+
+    def test_returns_the_three_chart_keys(self):
+        resp = self._charts()
+
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(
+            set(resp.json()),
+            {"energy_chart_svg", "hourly_profile_chart_svg", "energy_flow_svg"},
+        )
+
+    def test_a_bad_link_gets_nothing(self):
+        self.assertEqual(self._charts(secret="wrong").status_code, 404)
+
+    def test_zev_not_opted_in_gets_nothing(self):
+        self.zev.participant_invoice_access = False
+        self.zev.save()
+
+        self.assertEqual(self._charts().status_code, 404)
+
+    def test_the_second_request_is_served_from_cache(self):
+        """An unauthenticated caller must not be able to make the server redo
+        a full period's allocation work per request."""
+        from unittest.mock import patch
+
+        self._charts()
+        with patch(
+            "invoices.views_public.build_invoice_pdf_period_context"
+        ) as build:
+            self._charts()
+
+        build.assert_not_called()
+
+    def test_regenerating_the_invoice_invalidates_the_cache(self):
+        """The cache key carries updated_at, so a re-rendered invoice cannot
+        keep serving the previous period's picture."""
+        from invoices.views_public import _chart_cache_key
+
+        before = _chart_cache_key(self.invoice)
+        self.invoice.save()
+        self.invoice.refresh_from_db()
+
+        self.assertNotEqual(before, _chart_cache_key(self.invoice))
+
+    def test_a_chart_failure_does_not_fail_the_page(self):
+        from unittest.mock import patch
+
+        with patch(
+            "invoices.views_public.build_invoice_pdf_period_context",
+            side_effect=RuntimeError("boom"),
+        ):
+            resp = self._charts()
+
+        self.assertEqual(resp.status_code, 200)
+        self.assertIsNone(resp.json()["energy_flow_svg"])
+
+    def test_a_hostile_participant_name_cannot_inject_markup(self):
+        """The page injects this SVG with dangerouslySetInnerHTML.
+
+        Producer and consumer nodes are labelled with ``participant_name``,
+        which an operator types. Everything reaching the SVG goes through
+        ``pdf_charts._esc``; this asserts it, because the cost of being wrong
+        is script execution on a page served without a session.
+        """
+        self.participant.first_name = '<script>alert("x")</script>'
+        self.participant.save()
+
+        body = self._charts().content.decode()
+
+        self.assertNotIn("<script>", body)
+        self.assertNotIn("</script>", body)

@@ -4,7 +4,12 @@ import { useMutation, useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 
 import { groupItemsByCategory } from '../features/publicInvoice/grouping'
-import { fetchPublicInvoice, publicInvoicePdfUrl, requestMagicLink } from '../lib/api/public'
+import {
+    fetchPublicInvoice,
+    fetchPublicInvoiceCharts,
+    publicInvoicePdfUrl,
+    requestMagicLink,
+} from '../lib/api/public'
 
 /**
  * One invoice, opened from the QR printed on it. No account, no session.
@@ -30,6 +35,16 @@ export function PublicInvoicePage() {
     })
 
     const grouped = useMemo(() => (data ? groupItemsByCategory(data.items) : []), [data])
+
+    // Its own query, and not blocking the invoice: the server needs a full
+    // period of allocation work to draw these, so the figures should render
+    // while the pictures are still coming.
+    const { data: charts } = useQuery({
+        queryKey: ['public-invoice-charts', prefix, secret],
+        queryFn: () => fetchPublicInvoiceCharts(prefix, secret),
+        enabled: Boolean(data),
+        retry: false,
+    })
 
     const [linkRequested, setLinkRequested] = useState(false)
     const magicLink = useMutation({
@@ -139,6 +154,35 @@ export function PublicInvoicePage() {
                         </div>
                     ))}
                 </section>
+
+                {charts && (
+                    <section className="public-invoice-charts">
+                        {/* The same SVGs the PDF prints, served verbatim — the
+                            reader is holding the page these came from, and a
+                            second rendering path is where screen and paper
+                            would start to disagree. */}
+                        {charts.energy_chart_svg && (
+                            <div
+                                className="public-invoice-chart"
+                                dangerouslySetInnerHTML={{ __html: charts.energy_chart_svg }}
+                            />
+                        )}
+                        {charts.hourly_profile_chart_svg && (
+                            <div
+                                className="public-invoice-chart"
+                                dangerouslySetInnerHTML={{
+                                    __html: charts.hourly_profile_chart_svg,
+                                }}
+                            />
+                        )}
+                        {charts.energy_flow_svg && (
+                            <div
+                                className="public-invoice-chart"
+                                dangerouslySetInnerHTML={{ __html: charts.energy_flow_svg }}
+                            />
+                        )}
+                    </section>
+                )}
 
                 <section className="public-invoice-more">
                     {linkRequested ? (

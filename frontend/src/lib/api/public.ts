@@ -38,3 +38,27 @@ export async function requestMagicLink(prefix: string, secret: string): Promise<
 export async function consumeMagicLink(token: string): Promise<void> {
     await api.post('/public/magic-link/consume/', { token })
 }
+
+/** The three SVG figures the invoice's insights page prints. */
+export interface PublicInvoiceCharts {
+    energy_chart_svg: string | null
+    hourly_profile_chart_svg: string | null
+    energy_flow_svg: string | null
+}
+
+/**
+ * Fetch the charts, separately from the invoice.
+ *
+ * Their own request because building them costs a full period of allocation
+ * work on the server: the invoice figures should not wait behind a picture.
+ */
+export async function fetchPublicInvoiceCharts(
+    prefix: string,
+    secret: string,
+): Promise<PublicInvoiceCharts> {
+    const { data } = await api.get<PublicInvoiceCharts>(
+        `/public/invoices/${prefix}/charts/`,
+        { params: { s: secret } },
+    )
+    return data
+}

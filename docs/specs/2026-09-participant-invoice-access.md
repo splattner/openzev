@@ -57,8 +57,10 @@ Nobody invents a password at any point.
 - **Replacing the password invitation.** It stays for participants who want a
   conventional account, and for owners and admins, who are unaffected by all of
   this. This spec adds a door; it does not close one.
-- **A consumption chart on the public page.** The figures behind the invoice are
-  in scope; a rendered chart is a second iteration — see §10.
+- ~~A consumption chart on the public page.~~ **Delivered.** All three figures
+  from the insights page — energy comparison, average daily profile and the
+  energy-flow diagram — are served verbatim from `pdf_charts`, on their own
+  cached route (§5.5).
 - **A QR on the annual statement or contract.** Same mechanism would apply, but
   each document carries its own disclosure question. See §10.
 - **Passwordless login for owners and admins.** A management account is not a
@@ -173,6 +175,7 @@ return 404 for that ZEV's invoices.
 | Endpoint | Method | Permission | Behaviour |
 |---|---|---|---|
 | `/api/v1/public/invoices/<prefix>/` | GET | `AllowAny` | Tier 1: one invoice |
+| `/api/v1/public/invoices/<prefix>/charts/` | GET | `AllowAny` | Tier 1: its three figures |
 | `/api/v1/public/magic-link/request/` | POST | `AllowAny` | Tier 2: email a link |
 | `/api/v1/public/magic-link/consume/` | POST | `AllowAny` | Tier 2: mint a session |
 
@@ -295,6 +298,35 @@ ordinary participant session with ordinary participant scoping.
 | 400 | Unknown, consumed, or expired |
 | 429 | Throttled |
 
+### 5.5 Tier 1 — the charts
+
+`GET /api/v1/public/invoices/<prefix>/charts/` returns
+`{energy_chart_svg, hourly_profile_chart_svg, energy_flow_svg}`, each a string
+or `null`.
+
+**Its own route, not part of the invoice payload.** Building these runs
+`build_invoice_pdf_period_context`, which reads every meter reading in the
+period via `community_totals_by_timestamp`. The invoice figures are a few
+indexed reads; the pictures are a full period of allocation work, and the
+former must not wait behind the latter.
+
+**Cached for an hour**, keyed on the invoice id *and* its `updated_at`. The
+cache is what stops an unauthenticated caller making the server redo that work
+per request; the `updated_at` component is what stops a regenerated invoice
+serving the previous period's picture.
+
+**Built by `pdf_charts`, verbatim.** The same functions the PDF calls, so the
+screen and the paper cannot drift. A failure logs and returns three nulls: the
+invoice already rendered without them, and failing the page for a missing
+picture would be the wrong trade.
+
+**Escaping is load-bearing here.** The flow diagram labels nodes with
+`participant_name`, which an operator types, and the page injects the SVG with
+`dangerouslySetInnerHTML`. Everything reaching the SVG goes through
+`pdf_charts._esc`, and `test_a_hostile_participant_name_cannot_inject_markup`
+asserts it — the cost of being wrong is script execution on a page served
+without a session.
+
 ## 6. Async and integration behavior
 
 **Email.** A new `EMAIL_TEMPLATE_DEFAULTS` entry `participant_magic_link`,
@@ -415,9 +447,22 @@ destination.
 
 Two consequences that constrain the design and are not negotiable within it:
 
-1. **Tier 1 must never widen.** The moment the public page shows a second
-   invoice, a neighbour's figure, or a ZEV-wide total, the argument above stops
-   holding and the whole design needs re-justifying.
+1. **Tier 1 must never show anything the printed document does not.** That is
+   the limit, and it is deliberately stated as a principle rather than a list
+   of forbidden fields — an earlier draft banned "a neighbour's figure or a
+   ZEV-wide total", which turned out to forbid something the paper itself
+   prints.
+
+   The energy-flow diagram is the case that settled it. It names other
+   producers and shows community totals, and it is on the **same sheet as the
+   QR that leads here** — a reader is looking at it while they scan. Serving it
+   therefore discloses nothing to that bearer, and refusing to serve it would
+   have protected nobody while making the page disagree with the paper.
+
+   The test is not "is this figure about the reader" but "is this figure on the
+   document in their hands". A second invoice, a different participant's
+   invoice, or any ZEV-wide report that is not printed on this one all still
+   fail it.
 2. **Tier 1 resolves to one row.** Participant-wide scoping is the thing that
    has already been wrong here: #579 leaked the previous and next holder's
    readings because assignment dates were missing from the predicate. A bearer
@@ -428,7 +473,7 @@ Two consequences that constrain the design and are not negotiable within it:
 
 | Decision | Taken | Revisit when |
 |---|---|---|
-| Consumption chart on the public page | No — figures only in v1 | After the first release; it is the most-asked-for follow-on |
+| ~~Consumption chart on the public page~~ | Delivered — all three, verbatim (§5.5) | — |
 | QR on annual statement and contract | No | Each document needs its own disclosure argument |
 | Token expiry | No — revocation instead | If a leaked-invoice incident ever happens |
 | Second factor on tier 1 | No | If tier 1 ever widens beyond one invoice |

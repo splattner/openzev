@@ -3140,3 +3140,24 @@ input.recurrence-chip-input {
   margin: 0 0 0.75rem;
   font-size: 0.9rem;
 }
+
+.public-invoice-charts {
+  margin-top: 1.5rem;
+  display: grid;
+  gap: 1rem;
+}
+
+.public-invoice-chart {
+  padding: 0.75rem;
+  border: 1px solid var(--border-default);
+  border-radius: 0.5rem;
+  overflow-x: auto;
+}
+
+/* The SVGs carry print dimensions and a viewBox; this is what makes them
+   scale to a phone instead of overflowing it. */
+.public-invoice-chart svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
