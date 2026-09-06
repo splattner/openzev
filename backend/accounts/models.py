@@ -113,6 +113,36 @@ class EmailVerificationToken(models.Model):
         return timezone.now() < self.created_at + timedelta(hours=24)
 
 
+MAGIC_LINK_LIFETIME = timedelta(minutes=15)
+
+
+class MagicLinkToken(models.Model):
+    """A one-time, short-lived token that mints a session.
+
+    Shaped after :class:`EmailVerificationToken`, which already does one-time
+    email-borne authentication. It differs in lifetime: 15 minutes rather than
+    24 hours, because this one *is* the login rather than a confirmation of an
+    address, and because the holder asked for it seconds before it arrived.
+    """
+
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="magic_link_tokens",
+    )
+    token = models.CharField(max_length=64, unique=True, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    consumed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-created_at", "id"]
+
+    def is_valid(self) -> bool:
+        if self.consumed_at:
+            return False
+        return timezone.now() < self.created_at + MAGIC_LINK_LIFETIME
+
+
 class AppSettings(models.Model):
     SHORT_DATE_DD_MM_YYYY = "dd.MM.yyyy"
     SHORT_DATE_DD_SLASH_MM_SLASH_YYYY = "dd/MM/yyyy"

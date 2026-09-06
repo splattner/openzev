@@ -168,6 +168,9 @@ REST_FRAMEWORK = {
         # household refreshing its own bill costs a handful; a scanner walking
         # prefixes runs out long before entropy would have saved it anyway.
         "invoice_link": env("INVOICE_LINK_THROTTLE_RATE", default="60/hour"),
+        # Per invoice link, so one leaked invoice cannot be used to bombard a
+        # participant's mailbox regardless of where the requests originate.
+        "magic_link_request": env("MAGIC_LINK_THROTTLE_RATE", default="5/hour"),
         # Per-user budgets bounding bulk uploads (worker-exhaustion guard).
         "import": env("IMPORT_THROTTLE_RATE", default="60/hour"),
         "transfer_import": env("TRANSFER_IMPORT_THROTTLE_RATE", default="20/hour"),

@@ -88,3 +88,23 @@ class InvoiceLinkThrottle(SimpleRateThrottle):
             "scope": self.scope,
             "ident": self.get_ident(request),
         }
+
+
+class MagicLinkRequestThrottle(SimpleRateThrottle):
+    """Bound magic-link requests **per invoice link**, not per IP.
+
+    A leaked invoice is the realistic abuse here: whoever holds it can ask for
+    a link to the participant's mailbox over and over. Keying on the invoice
+    prefix caps that at a handful an hour no matter where the requests come
+    from, which keying on IP would not.
+
+    ``InvoiceLinkThrottle`` still applies the per-IP ceiling on the same view.
+    """
+
+    scope = "magic_link_request"
+
+    def get_cache_key(self, request, view):
+        prefix = (request.data or {}).get("prefix") or ""
+        if not prefix:
+            return None
+        return self.cache_format % {"scope": self.scope, "ident": prefix}

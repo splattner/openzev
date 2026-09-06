@@ -1024,6 +1024,11 @@ export const de = {
             deleteMessage: 'Sind Sie sicher, dass Sie "{{name}}" löschen möchten? Diese Aktion kann nicht rückgängig gemacht werden.',
             deleteConfirm: 'Teilnehmer löschen',
         },
+        magicSignIn: {
+            signingIn: 'Sie werden angemeldet …',
+            errorTitle: 'Dieser Anmeldelink ist nicht mehr gültig',
+            errorBody: 'Der Link wurde bereits verwendet oder ist abgelaufen. Fordern Sie über den QR-Code auf Ihrer Rechnung einen neuen an.',
+        },
         publicInvoice: {
             title: 'Rechnung {{number}}',
             loading: 'Rechnung wird geladen …',
@@ -1034,6 +1039,9 @@ export const de = {
             localEnergy: 'Lokale Energie',
             gridEnergy: 'Netzbezug',
             localShare: 'Lokalanteil',
+            moreBody: 'Alle Ihre Rechnungen und Ihren Verbrauch sehen? Wir senden Ihnen einen Anmeldelink an die hinterlegte E-Mail-Adresse.',
+            requestLink: 'Anmeldelink senden',
+            linkSent: 'Falls für Sie eine E-Mail-Adresse hinterlegt ist, haben wir einen Anmeldelink gesendet. Er ist 15 Minuten gültig.',
             downloadPdf: 'Rechnung als PDF',
             recipientNote: 'Diese Rechnung wurde für {{name}} ausgestellt.',
             categories: {
@@ -1718,6 +1726,8 @@ export const de = {
                 paymentTermDays: 'Zahlungsziel (Tage)',
                 itemizeTariffBands: 'Preisbänder auf der Rechnung einzeln ausweisen',
                 itemizeTariffBandsHint: 'Ein Tarif mit mehreren Preisbändern erscheint als eine Position je genutztem Band, jeweils zum tatsächlichen Bandpreis. Ausgeschaltet erscheint er als eine Position zum gewichteten Mittelwert. Gilt nur für neu erzeugte Rechnungen.',
+                participantInvoiceAccess: 'QR-Code für Teilnehmende auf der Rechnung',
+                participantInvoiceAccessHint: 'Druckt einen QR-Code auf jede Rechnung. Wer die Rechnung in Händen hält, kann sie und den zugehörigen Verbrauch online ansehen — ohne Konto und ohne Passwort.',
                 gridOperator: 'Netzbetreiber',
                 gridOperatorHint: 'Tippen, um aus der offiziellen ElCom-Liste zu wählen, oder einen beliebigen Namen eingeben.',
                 gridOperatorMatched: 'Mit der offiziellen ElCom-Liste abgeglichen.',

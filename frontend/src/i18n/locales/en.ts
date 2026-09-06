@@ -1035,6 +1035,11 @@ export const en = {
             deleteMessage: 'Are you sure you want to delete "{{name}}"? This action cannot be undone.',
             deleteConfirm: 'Delete Participant',
         },
+        magicSignIn: {
+            signingIn: 'Signing you in …',
+            errorTitle: 'This sign-in link is no longer valid',
+            errorBody: 'The link was already used or has expired. Request a new one from the QR code on your invoice.',
+        },
         publicInvoice: {
             title: 'Invoice {{number}}',
             loading: 'Loading invoice …',
@@ -1045,6 +1050,9 @@ export const en = {
             localEnergy: 'Local energy',
             gridEnergy: 'Grid energy',
             localShare: 'Local share',
+            moreBody: 'Want to see all your invoices and your consumption? We will email a sign-in link to the address on file.',
+            requestLink: 'Send me a sign-in link',
+            linkSent: 'If an email address is on file for you, we have sent a sign-in link. It is valid for 15 minutes.',
             downloadPdf: 'Invoice as PDF',
             recipientNote: 'This invoice was issued to {{name}}.',
             categories: {
@@ -1730,6 +1738,8 @@ export const en = {
                 paymentTermDays: 'Payment term (days)',
                 itemizeTariffBands: 'Itemise price bands on the invoice',
                 itemizeTariffBandsHint: "A tariff with several price bands appears as one line per band used, each at that band's real rate. Off, it appears as a single line at the weighted average rate. Applies only to invoices generated from now on.",
+                participantInvoiceAccess: 'Participant QR code on the invoice',
+                participantInvoiceAccessHint: 'Prints a QR code on every invoice. Anyone holding the invoice can view it and its consumption online — no account, no password.',
                 gridOperator: 'Grid operator',
                 gridOperatorHint: 'Start typing to pick from the official ElCom list, or enter any name.',
                 gridOperatorMatched: 'Matched to the official ElCom list.',

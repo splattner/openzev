@@ -3128,3 +3128,15 @@ input.recurrence-chip-input {
   font-size: 0.8rem;
   margin: 0;
 }
+
+.public-invoice-more {
+  margin-top: 1.75rem;
+  padding: 1.25rem;
+  background: var(--brand-pale);
+  border-radius: 0.5rem;
+}
+
+.public-invoice-more p {
+  margin: 0 0 0.75rem;
+  font-size: 0.9rem;
+}

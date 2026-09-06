@@ -216,6 +216,18 @@ DEFAULT_VERIFICATION_EMAIL_BODY = (
     "Best regards,\nOpenZEV"
 )
 
+DEFAULT_MAGIC_LINK_EMAIL_SUBJECT = "Your OpenZEV sign-in link"
+DEFAULT_MAGIC_LINK_EMAIL_BODY = (
+    "Hello {participant_name},\n\n"
+    "Here is your sign-in link for {zev_name}. It opens your statements and "
+    "consumption without a password:\n\n"
+    "{link_url}\n\n"
+    "The link is valid for {valid_minutes} minutes and can be used once.\n\n"
+    "If you did not ask for it, you can ignore this email — nothing has "
+    "changed on your account.\n\n"
+    "Best regards,\nOpenZEV"
+)
+
 EMAIL_TEMPLATE_DEFAULTS = {
     "invoice_email": {
         "subject": DEFAULT_INVOICE_EMAIL_SUBJECT,
@@ -228,6 +240,10 @@ EMAIL_TEMPLATE_DEFAULTS = {
     "email_verification": {
         "subject": DEFAULT_VERIFICATION_EMAIL_SUBJECT,
         "body": DEFAULT_VERIFICATION_EMAIL_BODY,
+    },
+    "participant_magic_link": {
+        "subject": DEFAULT_MAGIC_LINK_EMAIL_SUBJECT,
+        "body": DEFAULT_MAGIC_LINK_EMAIL_BODY,
     },
 }
 

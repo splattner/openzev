@@ -101,6 +101,21 @@ export function ZevGeneralSettingsFields({ form, onChange }: ZevGeneralSettingsF
                             <small className="muted">{t('pages.zevSettings.fields.itemizeTariffBandsHint')}</small>
                         </span>
                     </label>
+                    <label className="checkbox-row grid-span-full" style={{ alignItems: 'flex-start' }}>
+                        <input
+                            type="checkbox"
+                            checked={form.participant_invoice_access ?? false}
+                            onChange={(event) =>
+                                onChange({ participant_invoice_access: event.target.checked })
+                            }
+                        />
+                        <span style={{ display: 'grid', gap: '0.15rem' }}>
+                            <span>{t('pages.zevSettings.fields.participantInvoiceAccess')}</span>
+                            <small className="muted">
+                                {t('pages.zevSettings.fields.participantInvoiceAccessHint')}
+                            </small>
+                        </span>
+                    </label>
                 </div>
             </div>
 
