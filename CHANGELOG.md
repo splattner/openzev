@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.11.0](https://github.com/splattner/openzev/compare/v1.10.3...v1.11.0) (2026-09-06)
+
+
+### Features
+
+* **invoices:** opt-in setting and the passwordless sign-in link ([#595](https://github.com/splattner/openzev/issues/595)) ([82d83bb](https://github.com/splattner/openzev/commit/82d83bb5894c990cf4297920f6668dfa67068823))
+* **invoices:** print the access QR on the insights page ([#593](https://github.com/splattner/openzev/issues/593)) ([bd353a0](https://github.com/splattner/openzev/commit/bd353a06123ca51272f21de73cb9177ec6318d9c))
+* **invoices:** serve one invoice from the link printed on it ([#591](https://github.com/splattner/openzev/issues/591)) ([1d705ef](https://github.com/splattner/openzev/commit/1d705efdc15d8eb40ac564b6f59d920515a87fdb))
+* **invoices:** show the invoice's charts on the public page ([#596](https://github.com/splattner/openzev/issues/596)) ([60d628d](https://github.com/splattner/openzev/commit/60d628d6f056647ac062369617a29d504736eaa3))
+* **invoices:** the page the invoice QR opens ([#594](https://github.com/splattner/openzev/issues/594)) ([59b9111](https://github.com/splattner/openzev/commit/59b911191fd43cdbfddcdaa1c290326cf27d486e))
+
 ## [1.10.3](https://github.com/splattner/openzev/compare/v1.10.2...v1.10.3) (2026-09-06)
 
 
