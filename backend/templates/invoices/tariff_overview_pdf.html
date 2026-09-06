@@ -22,7 +22,9 @@
             margin: 4mm 0 3mm;
         }
 
-        .overview-meta .meta-item { flex: 1 1 auto; }
+        /* The mode is the label; the note is the explanation next to it, so
+           it takes the width the mode does not need. */
+        .overview-meta .meta-item { flex: 0 0 auto; }
 
         .overview-meta dt {
             color: var(--muted);
@@ -160,14 +162,15 @@
         }
 
         /* ══ 6. VAT note, footnotes & empty state ════════════════ */
-        .vat-note {
-            margin-top: 5mm;
-            font-size: 7.8pt;
+        .overview-meta .vat-note {
+            flex: 1 1 auto;
+            margin: 0;
+            align-self: center;
+            font-size: 7.2pt;
+            line-height: 1.45;
             color: var(--ink-soft);
-            background: var(--brand-pale);
-            border: 0.5pt solid var(--brand-mid);
-            border-radius: 2mm;
-            padding: 2.5mm 3.5mm;
+            border-left: 1.2pt solid var(--brand-mid);
+            padding-left: 3mm;
         }
 
         .footnotes {
@@ -239,6 +242,13 @@
                 <dt>{{ tr.vat_label }}</dt>
                 <dd>{{ vat_display }}</dd>
             </div>
+            {% if vat_note %}
+            {% comment %}Beside the mode it qualifies, not in a callout below
+            the table: under vat_mode=inclusive the printed prices are net, and
+            a reader who meets that caveat only after the prices has already
+            read them as the billed figure.{% endcomment %}
+            <p class="vat-note">{{ vat_note }}</p>
+            {% endif %}
         </dl>
 
         {% if groups %}
@@ -295,10 +305,6 @@
         {% endfor %}
         {% else %}
         <div class="empty-state">{{ tr.no_tariffs }}</div>
-        {% endif %}
-
-        {% if vat_note %}
-        <div class="vat-note">{{ vat_note }}</div>
         {% endif %}
 
         {% if footnotes %}

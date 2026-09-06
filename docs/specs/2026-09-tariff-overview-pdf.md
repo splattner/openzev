@@ -216,11 +216,18 @@ what the printed prices mean, and the document must say so. Under `inclusive`
 the stored prices are **net** and the invoice grosses them per line at render
 time, so the tariff table's number is deliberately not the number on the bill.
 
-| `vat_mode` | Meta band | Footnote |
+| `vat_mode` | Meta band | Note beside it |
 |---|---|---|
 | `not_registered` | "Nicht MWST-pflichtig" | none |
 | `registered` | "MWST-pflichtig" + `vat_number` | "Alle Preise exkl. MWST." |
 | `inclusive` | "MWST inklusive" | "Preise netto. Auf der Rechnung wird die MWST aufgeschlagen." |
+
+The note sits **beside the mode in the meta band**, not in a callout below the
+table. It qualifies what every price on the page means, and a reader who meets
+that caveat only after the prices has already read them as the billed figure.
+It is also the one line on this document whose absence does harm, so it goes
+where the eye lands before the table, separated from the mode by a
+`--brand-mid` rule.
 
 The footnote is unconditional for the two registered modes. A tariff document
 handed to participants that silently omits it is the one way this feature does
@@ -265,7 +272,7 @@ ERSTELLT AM        TARIFE        MWST
 | Document label | `tr["document_label"]` — "TARIFÜBERSICHT" |
 | Document number | The `as_of` date in `.document-number` style: light 22 pt with the year in `<strong>`, matching the invoice number's prefix/suffix split |
 | Status chip | `.document-status` — "Alle Versionen", **only** under `scope="all"`. Under `scope="valid"` the document number already says what date the prices are true on, and a chip restating it made the document look like it was about dates |
-| Meta band | One `.eyebrow`-labelled cell: VAT mode. Generated-on and the tariff count were dropped — the first repeated a date the reader does not act on, the second is a fact they can see |
+| Meta band | One `.eyebrow`-labelled cell — VAT mode — with the VAT note beside it (§7). Generated-on and the tariff count were dropped: the first repeated a date the reader does not act on, the second is a fact they can see |
 | Category column | `rowspan` label cell, the same construction as the invoice's `.category-label-cell` (`backend/templates/invoices/invoice_pdf.html:786`) |
 | Tariff row | Name in `600` weight; second line, muted 7.5 pt: billing mode · validity. **A tariff with exactly one price puts it on this row** and emits no band row — see §8.1 |
 | Band rows | Indented under the tariff; label left, recurrence in muted text right of it, amount right-aligned `tabular-nums` |
@@ -448,7 +455,7 @@ enforces them across all four locales.
 
 | Risk | Impact | Mitigation |
 |---|---|---|
-| Net prices printed without a VAT note under `inclusive` mode | High — participants compare against a bill and conclude they were overcharged | Footnote is unconditional; a test asserts the string is present in the rendered text |
+| Net prices printed without a VAT note under `inclusive` mode | High — participants compare against a bill and conclude they were overcharged | The note is unconditional, and `test_inclusive_net_note_reaches_the_rendered_page` extracts the text of a rendered PDF and asserts both that the string is present and that it precedes the first price. The other VAT tests read the context, which cannot see the note dropped from or moved within the template |
 | Overview, contract and invoice name the same band differently | Medium — three documents describing one tariff in three vocabularies | All three go through `band_description()`; a test renders a contract and an overview for the same tariff and compares the labels |
 | Percentage base disagrees with the contract | Medium | One extracted helper, called by both; the engine's per-timestamp resolution is documented as deliberate and footnoted |
 | A ZEV with many tariffs produces an unreadably long table | Low | `break-inside: avoid` per tariff group and a repeating `thead`; no page cap |
