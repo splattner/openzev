@@ -302,7 +302,24 @@ class InvoiceAccessToken(models.Model):
     # In clear and indexed: one lookup by prefix, then one constant-time
     # comparison of the secret, rather than hashing every row.
     prefix = models.CharField(max_length=32, unique=True, db_index=True)
-    hashed_secret = models.CharField(max_length=64)
+    # Stored in clear, unlike ApiKey.hashed_key, and that is deliberate.
+    #
+    # An API key is hashed because its blast radius exceeds the database it
+    # lives in: it authenticates actions across the whole API, so a leaked key
+    # table would hand an attacker capabilities they could not otherwise reach.
+    # This token grants read access to exactly one invoice — a row in the same
+    # database as the token. Anyone who can read this table can already read
+    # what it protects, so hashing defends nothing that is not already open.
+    #
+    # What hashing would cost is the property the printed link depends on: a
+    # secret that cannot be recovered cannot be reprinted, and a regenerated
+    # PDF must carry the same QR as the copy already in the post.
+    #
+    # The alternative — deriving the secret from SECRET_KEY by HMAC, storing
+    # nothing — was rejected because rotating SECRET_KEY is ordinary practice
+    # and would silently kill every QR ever printed, with no signal that it
+    # had happened.
+    secret = models.CharField(max_length=64)
     created_at = models.DateTimeField(auto_now_add=True)
     revoked_at = models.DateTimeField(null=True, blank=True)
     last_used_at = models.DateTimeField(null=True, blank=True)

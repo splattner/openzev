@@ -83,6 +83,10 @@ def build_sample_invoice_context() -> dict:
             email="hans@example.com",
         ),
         "qr_svg": None,
+        # Both QRs are None in the sample for the same reason: rendering one
+        # needs real data (a payable IBAN, a minted token), and a preview must
+        # not mint anything.
+        "access_qr_svg": None,
         "energy_chart_svg": None,
         "hourly_profile_chart_svg": None,
         "energy_flow_svg": None,

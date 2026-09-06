@@ -44,7 +44,8 @@ class PublicInvoiceTestCase(TestCase):
             unit="kWh", total_chf=Decimal("72.11"),
         )
 
-        self.token, self.secret = access_tokens.get_or_create_for_invoice(self.invoice)
+        self.token = access_tokens.get_or_create_for_invoice(self.invoice)
+        self.secret = self.token.secret
 
     def _get(self, prefix=None, secret=None, url=PUBLIC_URL):
         return self.client.get(
@@ -172,25 +173,30 @@ class PublicInvoicePdfTests(PublicInvoiceTestCase):
 class InvoiceAccessTokenTests(PublicInvoiceTestCase):
     def test_token_is_stable_across_regeneration(self):
         """A regenerated PDF must carry the same QR as the copy in the post."""
-        again, secret = access_tokens.get_or_create_for_invoice(self.invoice)
+        again = access_tokens.get_or_create_for_invoice(self.invoice)
 
         self.assertEqual(again.pk, self.token.pk)
-        self.assertIsNone(secret, "an existing secret is not recoverable")
+        self.assertEqual(again.secret, self.secret, "the link must be reprintable")
 
     def test_revoke_then_mint_produces_a_new_token(self):
         access_tokens.revoke(self.token)
 
-        fresh, secret = access_tokens.get_or_create_for_invoice(self.invoice)
+        fresh = access_tokens.get_or_create_for_invoice(self.invoice)
 
         self.assertNotEqual(fresh.prefix, self.token.prefix)
-        self.assertIsNotNone(secret)
+        self.assertNotEqual(fresh.secret, self.secret)
         self.assertEqual(self._get().status_code, 404, "the printed link is dead")
 
-    def test_only_the_hash_is_stored(self):
-        self.token.refresh_from_db()
+    def test_public_url_carries_prefix_and_secret(self):
+        url = access_tokens.public_url(self.token)
 
-        self.assertNotIn(self.secret, self.token.hashed_secret)
-        self.assertEqual(len(self.token.hashed_secret), 64)
+        self.assertIn(f"/i/{self.token.prefix}", url)
+        self.assertIn("s=", url)
+        # Round-trips: what is printed is what resolves.
+        from urllib.parse import parse_qs, urlparse
+
+        presented = parse_qs(urlparse(url).query)["s"][0]
+        self.assertIsNotNone(access_tokens.resolve(self.token.prefix, presented))
 
 
 class PublicInvoiceAuditTests(PublicInvoiceTestCase):
@@ -225,3 +231,61 @@ class PublicInvoiceAuditTests(PublicInvoiceTestCase):
         self._get(secret="wrong")
 
         self.assertEqual(self._events().count(), 0)
+
+
+class InvoiceAccessQrTests(PublicInvoiceTestCase):
+    """The QR on the insights page (spec §6)."""
+
+    def _context(self):
+        from .pdf import _build_template_context
+
+        return _build_template_context(self.invoice)
+
+    def test_opted_in_invoice_with_consumption_gets_a_qr(self):
+        ctx = self._context()
+
+        self.assertIsNotNone(ctx["access_qr_svg"])
+        self.assertIn("<svg", ctx["access_qr_svg"])
+
+    def test_no_qr_when_the_zev_has_not_opted_in(self):
+        self.zev.participant_invoice_access = False
+        self.zev.save()
+        self.invoice.refresh_from_db()
+
+        self.assertIsNone(self._context()["access_qr_svg"])
+
+    def test_no_qr_without_an_insights_page(self):
+        """Same condition, not a second one that could drift.
+
+        A fee-only invoice renders no insights page, and the link leads to
+        consumption detail it does not have.
+        """
+        self.invoice.total_local_kwh = Decimal("0")
+        self.invoice.total_grid_kwh = Decimal("0")
+        self.invoice.save()
+
+        ctx = self._context()
+
+        self.assertIsNone(ctx["energy_summary"])
+        self.assertIsNone(ctx["access_qr_svg"])
+
+    def test_rendering_twice_reuses_one_token(self):
+        """The printed QR must survive a re-render, so no second token."""
+        from .models import InvoiceAccessToken
+
+        self._context()
+        self._context()
+
+        self.assertEqual(
+            InvoiceAccessToken.objects.filter(invoice=self.invoice).count(), 1
+        )
+
+    def test_a_qr_failure_does_not_lose_the_invoice(self):
+        """A missing QR costs a convenience; raising would cost the document."""
+        from unittest.mock import patch
+
+        with patch("invoices.access_tokens.qr_svg", side_effect=RuntimeError("boom")):
+            ctx = self._context()
+
+        self.assertIsNone(ctx["access_qr_svg"])
+        self.assertEqual(ctx["invoice"], self.invoice)

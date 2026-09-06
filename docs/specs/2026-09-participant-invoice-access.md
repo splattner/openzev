@@ -86,19 +86,37 @@ login route.
 
 **Model:** `invoices.models.InvoiceAccessToken`
 
-Shaped after `accounts.ApiKey` (`backend/accounts/models.py:52`): the prefix is
-stored in clear and indexed so a lookup costs one indexed query, and only the
-hash of the secret is retained.
+Shaped after `accounts.ApiKey` (`backend/accounts/models.py:52`) for the prefix,
+which is stored in clear and indexed so a lookup costs one indexed query. It
+departs from `ApiKey` on the secret, which is **not** hashed.
 
 | Field | Type | Default | Constraints / Notes |
 |---|---|---|---|
 | `id` | `UUIDField` | `uuid4` | PK |
 | `invoice` | `FK(Invoice, CASCADE)` | — | `related_name="access_tokens"` |
 | `prefix` | `CharField(16)` | — | `unique`, `db_index`. Appears in the URL |
-| `hashed_secret` | `CharField(64)` | — | SHA-256 of the secret |
+| `secret` | `CharField(64)` | — | Stored in clear — see below |
 | `created_at` | `DateTimeField` | `auto_now_add` | |
 | `revoked_at` | `DateTimeField` | `null=True` | Set by owner or admin |
 | `last_used_at` | `DateTimeField` | `null=True` | Written at most once per hour |
+
+**The secret is stored in clear**, and the `ApiKey` precedent deliberately does
+not carry over. An API key is hashed because its blast radius exceeds the
+database it lives in: it authenticates actions across the whole API, so a leaked
+key table hands an attacker capabilities they could not otherwise reach. This
+token grants read access to exactly one invoice — a row in the same database as
+the token. Anyone who can read this table can already read what it protects, so
+hashing defends nothing that is not already open.
+
+What hashing *would* cost is the property §4.1 requires below: a secret that
+cannot be recovered cannot be reprinted, and a regenerated PDF must carry the
+same QR as the copy already in the post.
+
+The alternative — deriving the secret from `SECRET_KEY` by HMAC and storing
+nothing — was rejected because rotating `SECRET_KEY` is ordinary practice and
+would silently invalidate every QR ever printed, with no signal that it had
+happened. A stored secret has a bounded, visible downside; a derived one has an
+unbounded, silent one.
 
 **No `expires_at`.** The token's lifetime is the invoice's: it is printed on a
 document that stays meaningful for years, and a link that dies while the paper
@@ -112,6 +130,11 @@ as the copy already in the post — so the token is created on first render and
 reused on every subsequent one. Revoking mints nothing; the next render creates
 a fresh token and the old printed link is dead, which is the intended and only
 way a printed link stops working.
+
+**The printed URL** is `{FRONTEND_URL}/i/<prefix>?s=<secret>`, built by
+`access_tokens.public_url()`. It points at the SPA rather than the API because
+it is a page a person opens; the route resolves the token through the API
+itself.
 
 ### 4.2 `MagicLinkToken`
 
@@ -290,10 +313,19 @@ reasons, in order of weight:
 3. **It costs no page.** 1.7.0 brought a typical invoice to one page plus
    insights; this adds nothing to that count.
 
-**No insights page means no QR.** The section renders only when there is energy
-data, and `_build_energy_summary()` returns `None` for the same invoices
-(`pdf_stats.py:206`). A fee-only invoice with no consumption has nothing to show
-online, so it gets no QR — one condition, not two that can drift.
+**No insights page means no QR.** `pdf._build_access_qr()` takes
+`energy_summary` as an argument rather than re-deriving the condition, so the
+page and the code are decided by the same value. A fee-only invoice with no
+consumption has nothing to show online and gets no QR.
+
+**A QR failure must not cost the invoice.** `_build_access_qr` catches and logs,
+returning `None`. A document that fails to render because a convenience link
+could not be built would be a bad trade.
+
+**Rendered size 24 mm**, against the QR-Rechnung's standard-fixed 46 mm, and
+captioned "This is not a payment code" in all four locales. A second QR on an
+invoice that did not say so would be read as the one people already expect, and
+paying the wrong thing is the only failure here that costs money.
 
 ## 7. Frontend
 
