@@ -9,8 +9,11 @@ the context dict than off WeasyPrint's text layout, and a handful of
 end-to-end renders (empty state, PDF/A) cover the template itself.
 """
 
+import io
 from datetime import date
 from decimal import Decimal
+
+from pypdf import PdfReader
 
 from django.test import TestCase
 from rest_framework.test import APIClient
@@ -33,6 +36,16 @@ TARIFF_OVERVIEW_URL = "/api/v1/invoices/invoices/tariff-overview/"
 
 def _flat_period(tariff, price="0.20000"):
     return TariffPeriod.objects.create(tariff=tariff, price_chf_per_kwh=Decimal(price))
+
+
+def _pdf_text(pdf_bytes: bytes) -> str:
+    """All pages' extracted text, joined."""
+    return "\n".join((page.extract_text() or "") for page in PdfReader(io.BytesIO(pdf_bytes)).pages)
+
+
+def _squash(text: str) -> str:
+    """Collapse whitespace: WeasyPrint line-wraps, the translation string does not."""
+    return " ".join(text.split())
 
 
 class TariffOverviewTestCase(TestCase):
@@ -461,16 +474,38 @@ class TariffOverviewVatTests(TariffOverviewTestCase):
         self.assertEqual(ctx["vat_display"], tr["vat_not_registered"])
         self.assertIsNone(ctx["vat_note"])
 
+    def test_inclusive_net_note_reaches_the_rendered_page(self):
+        """§13's top risk, asserted where it actually matters.
+
+        Under ``inclusive`` the printed prices are net and the invoice grosses
+        them per line, so a participant comparing this document against a bill
+        concludes they were overcharged unless the note is on the page. The
+        other VAT tests read the context, which cannot see the note being
+        dropped from — or moved within — the template.
+        """
+        self.zev.vat_mode = VatMode.INCLUSIVE
+        self.zev.save()
+        self._energy_tariff(name="Solarstrom")
+        _flat_period(Tariff.objects.get(name="Solarstrom"), "0.22500")
+
+        text = _pdf_text(generate_tariff_overview_pdf(self.zev, date(2026, 6, 1)))
+
+        tr = TARIFF_OVERVIEW_TRANSLATIONS["de"]
+        self.assertIn(_squash(tr["vat_note_inclusive"]), _squash(text))
+        # Beside the VAT mode at the top, ahead of the prices it qualifies —
+        # a caveat met after the prices has already been read past.
+        self.assertLess(
+            _squash(text).index(_squash(tr["vat_note_inclusive"])),
+            _squash(text).index("22.50"),
+        )
+
 
 class TariffOverviewEdgeTests(TariffOverviewTestCase):
     def test_zev_without_tariffs_renders_an_empty_state(self):
         ctx = _build_template_context(self.zev, date(2026, 6, 1), "valid")
         self.assertEqual(ctx["groups"], [])
 
-        pdf_bytes = generate_tariff_overview_pdf(self.zev, date(2026, 6, 1))
-        from pypdf import PdfReader
-        import io
-        text = PdfReader(io.BytesIO(pdf_bytes)).pages[0].extract_text() or ""
+        text = _pdf_text(generate_tariff_overview_pdf(self.zev, date(2026, 6, 1)))
         self.assertIn("keine Tarife", text)
 
     def test_energy_tariff_without_periods_is_skipped(self):
