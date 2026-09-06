@@ -21,20 +21,14 @@ import {
   getAdminToken,
   goToPreviousPeriod,
   impersonateDemoParticipant,
-  loginViaAPI,
   navigateTo,
   pinDemoZev,
+  resolveDemoZevId,
   screenshotFull as captureFull,
   screenshotViewport as captureViewport,
   API_BASE,
 } from './helpers'
 
-
-/**
- * The only ZEV the seed fills with readings and tariffs. The app's fallback
- * picks an arbitrary managed ZEV when nothing is pinned, and this database
- * carries dozens of empty tenants — so data-dependent captures must pin it.
- */
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -49,7 +43,8 @@ const screenshotViewport = (page: Page, name: string) => captureViewport(page, S
 
 test.describe('User Guide Screenshots', () => {
   test.beforeEach(async ({ page }) => {
-    await loginViaAPI(page)
+    const pinned = await pinDemoZev(page)
+    expect(pinned, 'Demo ZEV not found — run seed_demo before capturing screenshots').toBe(true)
   })
 
   // 01 — Login page (unauthenticated)
@@ -61,14 +56,13 @@ test.describe('User Guide Screenshots', () => {
 
   // 02 — Dashboard
   test('02-dashboard', async ({ page }) => {
-    if (!(await pinDemoZev(page))) {
-      test.skip()
-      return
-    }
     await navigateTo(page, '/')
     // Wait for dashboard content (stat cards or similar)
     await page.waitForSelector('.card', { timeout: 10_000 })
-    await goToPreviousPeriod(page)
+    await Promise.all([
+      page.waitForResponse(response => response.url().includes('/dashboard-summary/') && response.ok()),
+      goToPreviousPeriod(page),
+    ])
     // The energy-flow Sankey only renders once the period has readings.
     await page.waitForSelector('.sankey-participant-label', { timeout: 15_000 })
     await screenshotFull(page, '02-dashboard')
@@ -83,7 +77,10 @@ test.describe('User Guide Screenshots', () => {
     }
     await navigateTo(page, '/')
     await page.waitForSelector('.card, .stat-card', { timeout: 10_000 })
-    await goToPreviousPeriod(page)
+    await Promise.all([
+      page.waitForResponse(response => response.url().includes('/dashboard-summary/') && response.ok()),
+      goToPreviousPeriod(page),
+    ])
     await page.waitForSelector('.sankey-participant-label', { timeout: 15_000 })
     await screenshotFull(page, '02b-participant-dashboard')
   })
@@ -93,6 +90,35 @@ test.describe('User Guide Screenshots', () => {
     await navigateTo(page, '/participants')
     await page.waitForSelector('table, .card', { timeout: 10_000 })
     await screenshotFull(page, '03-participants')
+  })
+
+  // 03b — Participant create form with the allocation weight filled in, so
+  // the guide can show how a weighted cost split is entered. Weight 2 reads
+  // against the seeded 1 / 1 / 2 split instead of an arbitrary number.
+  test('03b-participant-allocation-weight', async ({ page }) => {
+    await navigateTo(page, '/participants')
+    await page.waitForSelector('table, .card', { timeout: 10_000 })
+
+    await page
+      .getByRole('button', {
+        name: /new participant|neuer teilnehmer|nouveau participant|nuovo partecipante/i,
+      })
+      .click()
+    // The modal is up once its footer button is reachable; waiting on the
+    // overlay's inline z-index would tie the test to the modal's styling.
+    const createButton = page.getByRole('button', { name: /create|erstellen|créer|creare/i })
+    await createButton.waitFor({ timeout: 5_000 })
+
+    // The weight input sits inside its label, so it is reachable by the
+    // translated label text instead of being "the only numeric input".
+    await page
+      .getByLabel(/allocation weight|zuteilungsgewicht|attribution|allocazione/i)
+      .fill('2')
+    // Scroll to the modal's footer so the weight field, its hint text and the
+    // action buttons share the frame instead of the field hugging the edge.
+    await createButton.scrollIntoViewIfNeeded()
+    await page.waitForTimeout(300)
+    await screenshotViewport(page, '03b-participant-allocation-weight')
   })
 
   // 04 — Metering Points
@@ -105,11 +131,6 @@ test.describe('User Guide Screenshots', () => {
   // 04b — Metering Points with Assign Participant modal, captured against the
   // seeded unassigned metering point (CH-DEMO-CONS-0003) — no fixture needed.
   test('04b-metering-points-assign', async ({ page }) => {
-    if (!(await pinDemoZev(page))) {
-      test.skip()
-      return
-    }
-
     await navigateTo(page, '/metering-points')
     await page.waitForSelector('.metering-point-card, table, .card', { timeout: 10_000 })
 
@@ -129,10 +150,6 @@ test.describe('User Guide Screenshots', () => {
 
   // 05 — Metering Data / Charts (with a metering point selected)
   test('05-metering-data', async ({ page }) => {
-    if (!(await pinDemoZev(page))) {
-      test.skip()
-      return
-    }
     await navigateTo(page, '/metering-data')
     await page.waitForSelector('.card', { timeout: 10_000 })
     // Select the first metering point that can carry readings.
@@ -183,10 +200,6 @@ test.describe('User Guide Screenshots', () => {
 
   // 07b — A tariff's version history and price chart, both behind the expander
   test('07b-tariff-versions', async ({ page }) => {
-    if (!(await pinDemoZev(page))) {
-      test.skip()
-      return
-    }
     await navigateTo(page, '/tariffs')
     const card = page.locator('article.tariff-card').filter({ hasText: 'Grid Energy HT/NT' }).first()
     await card.waitFor({ timeout: 10_000 })
@@ -211,7 +224,9 @@ test.describe('User Guide Screenshots', () => {
   // 08b — Invoice Detail page
   test('08b-invoice-detail', async ({ page }) => {
     const headers = { Authorization: `Bearer ${await getAdminToken(page)}` }
-    const resp = await page.request.get(`${API_BASE}/invoices/invoices/`, { headers })
+    const demoZevId = await resolveDemoZevId(page)
+    expect(demoZevId, 'Demo ZEV not found — run seed_demo before capturing screenshots').toBeTruthy()
+    const resp = await page.request.get(`${API_BASE}/invoices/invoices/?zev_id=${demoZevId}`, { headers })
     expect(resp.ok(), `Invoice list request failed (${resp.status()})`).toBeTruthy()
 
     const body = await resp.json() as { results?: Array<{ id: string; pdf_url: string | null }> }
@@ -316,10 +331,6 @@ test.describe('User Guide Screenshots', () => {
 
   // 23 — Reports (owner view on the demo ZEV)
   test('23-reports', async ({ page }) => {
-    if (!(await pinDemoZev(page))) {
-      test.skip()
-      return
-    }
     await navigateTo(page, '/reports')
     await page.waitForSelector('.card', { timeout: 10_000 })
     await screenshotFull(page, '23-reports')

@@ -14,16 +14,20 @@ import { expect, type Page } from '@playwright/test'
 import path from 'path'
 
 export const BASE = process.env.SCREENSHOT_BASE_URL ?? 'http://localhost:8080'
-export const API_BASE = process.env.SCREENSHOT_API_URL ?? 'http://localhost:8000/api/v1'
+// The docker compose stack publishes the API on 8001 (see seed_demo's summary
+// output); 8000 is only reachable in a bare `python manage.py runserver` setup.
+export const API_BASE = process.env.SCREENSHOT_API_URL ?? 'http://localhost:8001/api/v1'
 export const USER = process.env.SCREENSHOT_USER ?? 'admin'
 export const PASS = process.env.SCREENSHOT_PASSWORD ?? 'admin1234'
 
 /**
- * The only ZEV the seed fills with readings and tariffs. The app's fallback
- * picks an arbitrary managed ZEV when nothing is pinned, and this database
- * carries dozens of empty tenants — so data-dependent captures must pin it.
+ * Pin Sonnenhof so screenshots consistently show the same community: both
+ * demo ZEVs carry data, and a capture that drifted onto the second community
+ * would silently change frame. The flagship id is resolved by name and stored
+ * as the browser's selection before any navigation, so database collation
+ * cannot move the capture either.
  */
-export const DEMO_ZEV_NAME = 'OpenZEV Demo Community'
+export const DEMO_ZEV_NAME = 'ZEV STWEG Sonnenhof'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -66,30 +70,13 @@ export async function goToPreviousPeriod(page: Page) {
   await page.waitForTimeout(2000)
 }
 
-/** Log in as admin and return the bearer access token (used for subsequent direct API calls). */
+/** Log in as admin and return the access cookie for direct API requests. */
 export async function getAdminToken(page: Page): Promise<string> {
-  // We use a separate direct axios-style POST via page.request. simplejwt still
-  // returns the token in the body for the obtain-pair view; the CookieJWTAuthentication
-  // layer also falls back to the Authorization header, so this is valid for
-  // server-to-server calls within the Playwright helper.
-  const resp = await page.request.post(`${API_BASE}/auth/token/`, {
-    data: { username: USER, password: PASS },
-  })
-  expect(resp.ok(), `Admin login failed (${resp.status()})`).toBeTruthy()
-  // The body contains no tokens (cookie-based login), so read the cookie instead.
-  // For direct API calls from Playwright helpers we need a bearer token; re-use
-  // the page context's cookie jar which was populated by loginViaAPI.
-  // The access cookie value can be read via the context's storage state.
+  await loginViaAPI(page)
   const cookies = await page.context().cookies()
   const accessCookie = cookies.find(c => c.name === 'openzev_access')
-  // If the cookie is missing (first call before loginViaAPI), perform a login now.
-  if (accessCookie) return accessCookie.value
-  // Fallback: perform login to populate the cookie jar and return the token.
-  await loginViaAPI(page)
-  const cookies2 = await page.context().cookies()
-  const ac = cookies2.find(c => c.name === 'openzev_access')
-  expect(ac, 'openzev_access cookie missing after login').toBeTruthy()
-  return ac!.value
+  expect(accessCookie, 'openzev_access cookie missing after login').toBeTruthy()
+  return accessCookie!.value
 }
 
 /** Resolve the id of the data-bearing demo ZEV via the admin API. */
@@ -177,6 +164,7 @@ export async function resetHover(page: Page) {
  * its fixed point c(h) = h instead of creeping toward it.
  */
 export async function screenshotFull(page: Page, dir: string, name: string) {
+  await expect(page.locator('.skeleton-block')).toHaveCount(0, { timeout: 30_000 })
   await resetHover(page)
   const measure = () => page.evaluate(() => document.documentElement.scrollHeight)
   const resize = async (height: number) => {
@@ -212,6 +200,7 @@ export async function screenshotFull(page: Page, dir: string, name: string) {
 
 /** Take a viewport-only screenshot (no scroll) — for viewport-scoped UI like modals. */
 export async function screenshotViewport(page: Page, dir: string, name: string) {
+  await expect(page.locator('.skeleton-block')).toHaveCount(0, { timeout: 30_000 })
   await resetHover(page)
   await page.screenshot({
     path: path.join(dir, `${name}.png`),

@@ -296,14 +296,27 @@ source ../.venv/bin/activate
 python manage.py seed_demo
 ```
 
+By default, `--end-date` is today and `--start-date` is the start of the
+complete quarter before that end date. Both dates accept `YYYY-MM-DD`; use
+`--end-date` to reproduce a historical window and `--start-date` to override
+its default start.
+
 Seeded demo users:
 
 - Admin: `admin@openzev.local` / `admin1234`
 - ZEV Owner: `owner@openzev.local` / `owner1234`
-- Participant: `anna.consumer@openzev.local` / `participant1234`
-- Participant: `ben.consumer@openzev.local` / `participant1234`
+- Participant (ZEV 1): `anna@openzev.local` / `anna1234`
+- Participant (ZEV 1): `ben@openzev.local` / `ben1234`
+- Participant (ZEV 2): `clara@openzev.local` / `clara1234`
 
-The seed command also creates a sample ZEV, metering points, tariffs, and 15-minute interval readings from the previous quarter up to today.
+The seed command creates two communities owned by the same demo owner, so the community switcher can be exercised:
+
+- **ZEV STWEG Sonnenhof** — the flagship, a single-building condominium (`zev`) with quarterly billing, German invoices and VAT folded into its prices. Carries participants, metering points, tariffs and hourly readings from 1 January of the previous year through the seed window, with 15-minute readings only for its latest 14 days. The previous year is billed quarter by quarter as paid invoices, except when its final quarter overlaps the open prior quarter; that prior quarter has draft, approved and sent invoices.
+- **ZEV Sonnenfirma AG** — a smaller property-company (`vzev`) with monthly billing, English invoices, VAT-registered with a UID, shared grid-connection and per-metering-point fees, and itemized tariff bands. Carries its own participants, metering points, tariffs and readings, plus two invoice periods: the prior complete month in draft/approved/sent and the month before it closed (paid/cancelled).
+
+The standard Swiss VAT ranges (7.7 % from 2018 and 8.1 % from 2024) are added only when no existing rate overlaps each range; existing VAT timelines are preserved. The operational/log pages are seeded too — metering import logs (CSV + SDAT-CH, with CSV provenance on a real meter month), invoice email logs, two issued contract snapshots (Anna and Clara), and audit events (including one denied) — and one meter on the flagship carries an intentional ~12-day reading gap in the current quarter so the data-quality page has a real issue to show.
+
+Re-running `seed_demo` refreshes the demo readings, invoices, import/email logs and audit events, while retaining contract snapshots. Screenshot captures explicitly select ZEV STWEG Sonnenhof so they consistently show the same community.
 
 ## API & Developer Docs
 
