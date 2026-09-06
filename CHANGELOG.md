@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.10.2](https://github.com/splattner/openzev/compare/v1.10.1...v1.10.2) (2026-09-06)
+
+
+### Bug Fixes
+
+* **ui:** fit the tariff overview on one page ([#585](https://github.com/splattner/openzev/issues/585)) ([b2dc163](https://github.com/splattner/openzev/commit/b2dc163a504ac8f17fd2c69977bc11fefdb0f309))
+
 ## [1.10.1](https://github.com/splattner/openzev/compare/v1.10.0...v1.10.1) (2026-09-06)
 
 
