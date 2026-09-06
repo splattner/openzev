@@ -21,3 +21,20 @@ export async function fetchPublicInvoice(prefix: string, secret: string): Promis
 export function publicInvoicePdfUrl(prefix: string, secret: string): string {
     return `${API_BASE_URL}/public/invoices/${prefix}/pdf/?s=${encodeURIComponent(secret)}`
 }
+
+/**
+ * Ask for a sign-in link, identified by the invoice link itself.
+ *
+ * There is deliberately no email parameter: the destination comes from the
+ * participant record, never from the caller. That is what makes account
+ * enumeration impossible here rather than merely hard — and it is why the
+ * response is always 202, whatever the outcome.
+ */
+export async function requestMagicLink(prefix: string, secret: string): Promise<void> {
+    await api.post('/public/magic-link/request/', { prefix, s: secret })
+}
+
+/** Trade a one-time link for a session. Throws on an expired or used link. */
+export async function consumeMagicLink(token: string): Promise<void> {
+    await api.post('/public/magic-link/consume/', { token })
+}

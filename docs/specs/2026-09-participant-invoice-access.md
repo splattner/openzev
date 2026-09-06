@@ -1,7 +1,7 @@
 # Feature Spec: Participant access from the invoice
 
 - Spec ID: SPEC-2026-participant-invoice-access
-- Status: Draft
+- Status: Completed
 - Scope: Major
 - Type: Feature
 - Owners: Sebastian Plattner
@@ -265,14 +265,21 @@ is no address field to probe.
 **Response is always 202** with `{"detail": "If the account can be reached, a
 link has been sent."}` — including when the participant has no email on file.
 
-Creates the user via `ensure_participant_account()` if absent, with
-`set_unusable_password()`. `must_change_password` is **not** set: there is no
-password to change, and setting it would trap a magic-link user in a password
-form.
+Creates the user via `ensure_participant_account()` if absent, then clears what
+that helper sets for the invitation flow: the temporary password becomes
+unusable and `must_change_password` goes to `False`. Nothing here transmits that
+password, so leaving it usable would keep alive a credential nobody holds and
+nobody can rotate — and leaving the flag set would strand a magic-link user in a
+form asking them to change a password they were never given.
 
-**Throttle:** `MagicLinkRequestThrottle`, 5/hour per prefix *and* 20/hour per
-IP. The per-prefix limit is what stops a leaked invoice being used to bombard
-one participant's mailbox.
+**Consuming a link also disarms an outstanding invitation.** A participant who
+was invited, never activated, and then used a magic link instead would otherwise
+leave the emailed temporary password valid indefinitely.
+
+**Throttle:** `MagicLinkRequestThrottle` at 5/hour keyed on the **invoice
+prefix**, with `InvoiceLinkThrottle`'s per-IP ceiling applying to the same view.
+Keying the tighter limit on the prefix is what stops a leaked invoice being used
+to bombard one mailbox, which an IP-keyed limit would not.
 
 ### 5.4 Tier 2 — consume
 

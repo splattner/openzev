@@ -1024,6 +1024,11 @@ export const it = {
             deleteMessage: 'Sei sicuro di voler eliminare "{{name}}"? Questa azione non può essere annullata.',
             deleteConfirm: 'Elimina partecipante',
         },
+        magicSignIn: {
+            signingIn: 'Accesso in corso …',
+            errorTitle: 'Questo link di accesso non è più valido',
+            errorBody: 'Il link è già stato usato o è scaduto. Richiedetene uno nuovo tramite il codice QR sulla vostra fattura.',
+        },
         publicInvoice: {
             title: 'Fattura {{number}}',
             loading: 'Caricamento della fattura …',
@@ -1034,6 +1039,9 @@ export const it = {
             localEnergy: 'Energia locale',
             gridEnergy: 'Prelievo dalla rete',
             localShare: 'Quota locale',
+            moreBody: 'Volete vedere tutte le vostre fatture e i consumi? Vi inviamo un link di accesso all\u2019indirizzo registrato.',
+            requestLink: 'Invia il link di accesso',
+            linkSent: 'Se per voi è registrato un indirizzo e-mail, abbiamo inviato un link di accesso. È valido 15 minuti.',
             downloadPdf: 'Fattura in PDF',
             recipientNote: 'Questa fattura è stata emessa per {{name}}.',
             categories: {
@@ -1719,6 +1727,8 @@ export const it = {
                 paymentTermDays: 'Termine di pagamento (giorni)',
                 itemizeTariffBands: 'Dettagliare le fasce tariffarie sulla fattura',
                 itemizeTariffBandsHint: "Una tariffa con più fasce di prezzo compare con una riga per ogni fascia utilizzata, al prezzo effettivo di quella fascia. Se disattivato, compare in un'unica riga al prezzo medio ponderato. Vale solo per le fatture generate in seguito.",
+                participantInvoiceAccess: 'Codice QR per i partecipanti sulla fattura',
+                participantInvoiceAccessHint: 'Stampa un codice QR su ogni fattura. Chi ha la fattura in mano può consultarla online con i relativi consumi — senza account né password.',
                 gridOperator: 'Gestore di rete',
                 gridOperatorHint: 'Digita per scegliere dall’elenco ufficiale ElCom, oppure inserisci un nome qualsiasi.',
                 gridOperatorMatched: 'Corrisponde all’elenco ufficiale ElCom.',

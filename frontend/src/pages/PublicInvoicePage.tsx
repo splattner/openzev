@@ -1,10 +1,10 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 
 import { groupItemsByCategory } from '../features/publicInvoice/grouping'
-import { fetchPublicInvoice, publicInvoicePdfUrl } from '../lib/api/public'
+import { fetchPublicInvoice, publicInvoicePdfUrl, requestMagicLink } from '../lib/api/public'
 
 /**
  * One invoice, opened from the QR printed on it. No account, no session.
@@ -30,6 +30,15 @@ export function PublicInvoicePage() {
     })
 
     const grouped = useMemo(() => (data ? groupItemsByCategory(data.items) : []), [data])
+
+    const [linkRequested, setLinkRequested] = useState(false)
+    const magicLink = useMutation({
+        mutationFn: () => requestMagicLink(prefix, secret),
+        // The backend answers 202 whatever happens, so there is no failure to
+        // distinguish and nothing to report differently. Showing one outcome
+        // is not a simplification here — it is the design.
+        onSettled: () => setLinkRequested(true),
+    })
 
     const formatMoney = (value: string) =>
         new Intl.NumberFormat(i18n.language, { minimumFractionDigits: 2 }).format(Number(value))
@@ -129,6 +138,24 @@ export function PublicInvoicePage() {
                             </table>
                         </div>
                     ))}
+                </section>
+
+                <section className="public-invoice-more">
+                    {linkRequested ? (
+                        <p className="muted">{t('pages.publicInvoice.linkSent')}</p>
+                    ) : (
+                        <>
+                            <p className="muted">{t('pages.publicInvoice.moreBody')}</p>
+                            <button
+                                type="button"
+                                className="button button-primary"
+                                disabled={magicLink.isPending}
+                                onClick={() => magicLink.mutate()}
+                            >
+                                {t('pages.publicInvoice.requestLink')}
+                            </button>
+                        </>
+                    )}
                 </section>
 
                 <footer className="public-invoice-footer">

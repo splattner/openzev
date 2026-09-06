@@ -289,3 +289,136 @@ class InvoiceAccessQrTests(PublicInvoiceTestCase):
 
         self.assertIsNone(ctx["access_qr_svg"])
         self.assertEqual(ctx["invoice"], self.invoice)
+
+
+class MagicLinkTests(PublicInvoiceTestCase):
+    """Tier 2: the escalation from one invoice to the whole account."""
+
+    REQUEST_URL = "/api/v1/public/magic-link/request/"
+    CONSUME_URL = "/api/v1/public/magic-link/consume/"
+
+    def setUp(self):
+        super().setUp()
+        self.participant.email = "anna@example.com"
+        self.participant.save()
+
+    def _request(self, prefix=None, secret=None):
+        return self.client.post(
+            self.REQUEST_URL,
+            {"prefix": prefix or self.token.prefix, "s": self.secret if secret is None else secret},
+            format="json",
+        )
+
+    def _link_token(self):
+        from accounts.models import MagicLinkToken
+
+        return MagicLinkToken.objects.filter(user__isnull=False).latest("created_at")
+
+    def test_sends_to_the_address_on_file(self):
+        from django.core import mail
+
+        resp = self._request()
+
+        self.assertEqual(resp.status_code, 202)
+        self.assertEqual(mail.outbox[-1].to, ["anna@example.com"])
+
+    def test_the_caller_cannot_choose_the_destination(self):
+        """The trust anchor: the requester never names the address."""
+        from django.core import mail
+
+        self.client.post(
+            self.REQUEST_URL,
+            {"prefix": self.token.prefix, "s": self.secret, "email": "attacker@example.com"},
+            format="json",
+        )
+
+        self.assertEqual(mail.outbox[-1].to, ["anna@example.com"])
+
+    def test_a_bad_link_is_still_202(self):
+        """Never a signal about which invoices or accounts exist."""
+        from django.core import mail
+
+        ok = self._request()
+        bad = self._request(secret="wrong")
+
+        self.assertEqual(bad.status_code, 202)
+        self.assertEqual(bad.json(), ok.json())
+        self.assertEqual(len(mail.outbox), 1, "nothing sent for the bad link")
+
+    def test_a_participant_without_an_address_is_still_202(self):
+        from django.core import mail
+
+        self.participant.email = ""
+        self.participant.save()
+
+        self.assertEqual(self._request().status_code, 202)
+        self.assertEqual(mail.outbox, [])
+
+    def test_consume_issues_a_session(self):
+        self._request()
+
+        resp = self.client.post(
+            self.CONSUME_URL, {"token": self._link_token().token}, format="json"
+        )
+
+        from accounts.cookies import ACCESS_COOKIE, REFRESH_COOKIE
+
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn(ACCESS_COOKIE, resp.cookies)
+        self.assertIn(REFRESH_COOKIE, resp.cookies)
+
+    def test_consume_is_one_time(self):
+        self._request()
+        token = self._link_token().token
+
+        self.client.post(self.CONSUME_URL, {"token": token}, format="json")
+        second = self.client.post(self.CONSUME_URL, {"token": token}, format="json")
+
+        self.assertEqual(second.status_code, 400)
+
+    def test_expired_link_is_rejected(self):
+        from accounts.models import MAGIC_LINK_LIFETIME, MagicLinkToken
+
+        self._request()
+        link = self._link_token()
+        MagicLinkToken.objects.filter(pk=link.pk).update(
+            created_at=timezone.now() - MAGIC_LINK_LIFETIME * 2
+        )
+
+        resp = self.client.post(self.CONSUME_URL, {"token": link.token}, format="json")
+
+        self.assertEqual(resp.status_code, 400)
+
+    def test_a_new_request_supersedes_the_previous_link(self):
+        """Two taps must not leave a spare key in the inbox."""
+        self._request()
+        first = self._link_token().token
+        self._request()
+
+        resp = self.client.post(self.CONSUME_URL, {"token": first}, format="json")
+
+        self.assertEqual(resp.status_code, 400)
+
+    def test_the_user_is_not_trapped_in_a_password_form(self):
+        """Nobody invents a password anywhere in this flow."""
+        self._request()
+        self.client.post(self.CONSUME_URL, {"token": self._link_token().token}, format="json")
+
+        self.participant.refresh_from_db()
+        self.participant.user.refresh_from_db()
+        self.assertFalse(self.participant.user.must_change_password)
+        self.assertFalse(self.participant.user.has_usable_password())
+
+    def test_consuming_kills_an_outstanding_invitation_password(self):
+        """An emailed temporary password must not outlive its purpose."""
+        from zev.services import send_participant_invitation
+
+        send_participant_invitation(self.participant, self.owner)
+        self.participant.refresh_from_db()
+        self.assertTrue(self.participant.user.must_change_password)
+
+        self._request()
+        self.client.post(self.CONSUME_URL, {"token": self._link_token().token}, format="json")
+
+        self.participant.user.refresh_from_db()
+        self.assertFalse(self.participant.user.has_usable_password())

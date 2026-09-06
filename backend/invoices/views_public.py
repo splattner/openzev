@@ -23,11 +23,15 @@ from rest_framework.decorators import (
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
-from accounts.throttling import InvoiceLinkThrottle
+from accounts import magic_links
+from accounts.cookies import set_auth_cookies
+from accounts.jwt_utils import make_jwt_for_user
+from accounts.throttling import InvoiceLinkThrottle, MagicLinkRequestThrottle
 from audit.models import AuditActionCategory, AuditEventSource, AuditEventStatus
 from audit.services import record_audit_event
 
 from . import access_tokens
+from .emails import send_magic_link_email
 from .models import InvoiceStatus
 from .pdf_stats import _build_energy_summary
 
@@ -152,4 +156,96 @@ def public_invoice_pdf(request, prefix):
 
     response = FileResponse(invoice.pdf_file.open("rb"), content_type="application/pdf")
     response["Content-Disposition"] = f'inline; filename="{invoice.invoice_number}.pdf"'
+    return response
+
+
+@api_view(["POST"])
+@permission_classes([AllowAny])
+@authentication_classes([])
+@throttle_classes([MagicLinkRequestThrottle, InvoiceLinkThrottle])
+def magic_link_request(request):
+    """Email a sign-in link to the address already on file.
+
+    The invoice token identifies the participant, so **the caller never
+    supplies an email address.** That is what removes account enumeration from
+    this design rather than mitigating it: there is no address field to probe,
+    and no answer that could confirm one.
+
+    Always 202, including when the participant has no address on file. Saying
+    "there is no account here" would answer a question the requester is not
+    entitled to ask.
+    """
+    prefix = (request.data or {}).get("prefix", "")
+    secret = (request.data or {}).get("s", "")
+    accepted = Response(
+        {"detail": "If the account can be reached, a link has been sent."},
+        status=status.HTTP_202_ACCEPTED,
+    )
+
+    token = access_tokens.resolve(prefix, secret)
+    if token is None:
+        return accepted
+
+    invoice = token.invoice
+    user = magic_links.account_for_participant(invoice.participant)
+    if user is None:
+        return accepted
+
+    try:
+        link = magic_links.issue(user)
+        send_magic_link_email(invoice.participant, invoice.zev, link)
+    except Exception:
+        # The requester is told the same thing either way; the operator gets
+        # the traceback. Leaking a send failure would distinguish a reachable
+        # participant from an unreachable one.
+        logger.exception("Magic-link delivery failed for invoice %s", invoice.pk)
+        return accepted
+
+    record_audit_event(
+        action_type="invoice_link.magic_link_requested",
+        action_category=AuditActionCategory.AUTH,
+        status=AuditEventStatus.SUCCESS,
+        source=AuditEventSource.INVOICE_LINK,
+        request=request,
+        zev=invoice.zev,
+        target_type="accounts.User",
+        target_id=str(user.pk),
+        target_display=user.username,
+        # Records the invoice it came from, not the address it went to.
+        summary=f"Sign-in link requested from invoice {invoice.invoice_number}.",
+        metadata={"token_prefix": token.prefix},
+    )
+    return accepted
+
+
+@api_view(["POST"])
+@permission_classes([AllowAny])
+@authentication_classes([])
+@throttle_classes([InvoiceLinkThrottle])
+def magic_link_consume(request):
+    """Trade a one-time link for an ordinary participant session."""
+    user = magic_links.consume((request.data or {}).get("token", ""))
+    if user is None:
+        return Response(
+            {"detail": "This sign-in link has expired or already been used."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    record_audit_event(
+        action_type="invoice_link.magic_link_consumed",
+        action_category=AuditActionCategory.AUTH,
+        status=AuditEventStatus.SUCCESS,
+        source=AuditEventSource.INVOICE_LINK,
+        request=request,
+        user=user,
+        target_type="accounts.User",
+        target=user,
+        target_id=str(user.pk),
+        target_display=user.username,
+        summary=f"Signed in with a link from an invoice: {user.username}.",
+    )
+
+    tokens = make_jwt_for_user(user)
+    response = Response({"detail": "Signed in."})
+    set_auth_cookies(request, response, access=tokens["access"], refresh=tokens["refresh"])
     return response

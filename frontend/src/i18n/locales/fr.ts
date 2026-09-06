@@ -1024,6 +1024,11 @@ export const fr = {
             deleteMessage: 'Êtes-vous sûr de vouloir supprimer "{{name}}" ? Cette action est irréversible.',
             deleteConfirm: 'Supprimer le participant',
         },
+        magicSignIn: {
+            signingIn: 'Connexion en cours …',
+            errorTitle: 'Ce lien de connexion n\u2019est plus valable',
+            errorBody: 'Le lien a déjà été utilisé ou a expiré. Demandez-en un nouveau via le code QR de votre facture.',
+        },
         publicInvoice: {
             title: 'Facture {{number}}',
             loading: 'Chargement de la facture …',
@@ -1034,6 +1039,9 @@ export const fr = {
             localEnergy: 'Énergie locale',
             gridEnergy: 'Import réseau',
             localShare: 'Part locale',
+            moreBody: 'Vous souhaitez voir toutes vos factures et votre consommation ? Nous vous envoyons un lien de connexion à l\u2019adresse enregistrée.',
+            requestLink: 'Envoyer le lien de connexion',
+            linkSent: 'Si une adresse e-mail est enregistrée pour vous, nous avons envoyé un lien de connexion. Il est valable 15 minutes.',
             downloadPdf: 'Facture en PDF',
             recipientNote: 'Cette facture a été établie pour {{name}}.',
             categories: {
@@ -1719,6 +1727,8 @@ export const fr = {
                 paymentTermDays: 'Délai de paiement (jours)',
                 itemizeTariffBands: 'Détailler les tranches tarifaires sur la facture',
                 itemizeTariffBandsHint: "Un tarif comportant plusieurs tranches apparaît sur une ligne par tranche utilisée, au prix réel de chaque tranche. Désactivé, il apparaît sur une seule ligne au tarif moyen pondéré. Ne s'applique qu'aux factures générées ensuite.",
+                participantInvoiceAccess: 'Code QR pour les participants sur la facture',
+                participantInvoiceAccessHint: 'Imprime un code QR sur chaque facture. Toute personne en possession de la facture peut la consulter en ligne, avec la consommation correspondante — sans compte ni mot de passe.',
                 gridOperator: 'Gestionnaire de réseau',
                 gridOperatorHint: 'Saisissez pour choisir dans la liste officielle ElCom, ou entrez un nom libre.',
                 gridOperatorMatched: 'Correspond à la liste officielle ElCom.',
