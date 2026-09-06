@@ -792,8 +792,15 @@ class SchemaParityTests(TestCase):
     # surrogate ids (top-level "id" and nested "participant_id"), ownership and
     # audit plumbing (FKs to the ZEV, user, or parent row, created/updated
     # stamps), and pdf_file (deliberately not archived — PDFs are regenerated).
+    #
+    # participant_invoice_access is excluded for the reason stated above
+    # ZEV_FIELDS: an import must never grant anybody access to anything, and
+    # that flag serves invoice data without a login. An operator turns it on
+    # deliberately, per instance.
     FIELDS_EXCLUDED_FROM_ARCHIVE = {
-        "ZEV_FIELDS": {"id", "owner", "created_at", "updated_at"},
+        "ZEV_FIELDS": {
+            "id", "owner", "created_at", "updated_at", "participant_invoice_access",
+        },
         "PARTICIPANT_FIELDS": {"id", "zev", "user", "created_at", "updated_at"},
         "METERING_POINT_FIELDS": {"id", "zev", "created_at", "updated_at"},
         "ASSIGNMENT_FIELDS": {"id", "metering_point", "participant", "created_at", "updated_at"},

@@ -1,0 +1,227 @@
+"""Coverage for unauthenticated invoice access (spec §5.1, §9, §12).
+
+The tests that matter most here are the negative ones. This endpoint is served
+without a session on the strength of a single claim — that a response describes
+only the invoice the reader is holding — so the suite spends most of its effort
+asserting the response stays that narrow and that every failure is
+indistinguishable from every other.
+"""
+from decimal import Decimal
+
+from django.test import TestCase
+from django.utils import timezone
+from rest_framework.test import APIClient
+
+from accounts.models import UserRole
+from audit.models import AuditEvent, AuditEventSource
+from testing.helpers import make_user
+
+from . import access_tokens
+from .models import InvoiceItem, InvoiceStatus
+from .test_helpers import make_invoice, make_participant, make_zev
+
+PUBLIC_URL = "/api/v1/public/invoices/{prefix}/"
+PUBLIC_PDF_URL = "/api/v1/public/invoices/{prefix}/pdf/"
+
+
+class PublicInvoiceTestCase(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.owner = make_user("pia_owner", UserRole.ZEV_OWNER)
+        self.zev = make_zev(self.owner, "Access ZEV")
+        self.zev.participant_invoice_access = True
+        self.zev.save()
+
+        self.participant = make_participant(self.zev, first="Anna", last="Muster")
+        self.invoice = make_invoice(self.zev, self.participant, InvoiceStatus.SENT)
+        self.invoice.total_local_kwh = Decimal("320.5000")
+        self.invoice.total_grid_kwh = Decimal("180.0000")
+        self.invoice.total_chf = Decimal("238.87")
+        self.invoice.save()
+        InvoiceItem.objects.create(
+            invoice=self.invoice, item_type=InvoiceItem.ItemType.LOCAL_ENERGY,
+            description="Solarstrom ZEV", quantity_kwh=Decimal("320.5000"),
+            unit="kWh", total_chf=Decimal("72.11"),
+        )
+
+        self.token, self.secret = access_tokens.get_or_create_for_invoice(self.invoice)
+
+    def _get(self, prefix=None, secret=None, url=PUBLIC_URL):
+        return self.client.get(
+            url.format(prefix=prefix or self.token.prefix),
+            {"s": self.secret if secret is None else secret},
+        )
+
+
+class PublicInvoiceAccessTests(PublicInvoiceTestCase):
+    def test_valid_token_returns_the_invoice(self):
+        resp = self._get()
+
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.json()["invoice_number"], self.invoice.invoice_number)
+        self.assertEqual(resp.json()["total_chf"], "238.87")
+
+    def test_wrong_secret_is_indistinguishable_from_unknown_prefix(self):
+        """The one leak that would make walking the keyspace worth starting."""
+        wrong_secret = self._get(secret="not-the-secret")
+        unknown_prefix = self._get(prefix="ffffffffffffffff")
+
+        self.assertEqual(wrong_secret.status_code, 404)
+        self.assertEqual(unknown_prefix.status_code, 404)
+        self.assertEqual(wrong_secret.json(), unknown_prefix.json())
+
+    def test_missing_secret_is_404(self):
+        resp = self.client.get(PUBLIC_URL.format(prefix=self.token.prefix))
+        self.assertEqual(resp.status_code, 404)
+
+    def test_revoked_token_is_404(self):
+        access_tokens.revoke(self.token)
+        self.assertEqual(self._get().status_code, 404)
+
+    def test_zev_not_opted_in_is_404(self):
+        self.zev.participant_invoice_access = False
+        self.zev.save()
+        self.assertEqual(self._get().status_code, 404)
+
+    def test_no_session_is_created(self):
+        """The endpoint authenticates nobody; it resolves a bearer to one row."""
+        self._get()
+        self.assertNotIn("sessionid", self.client.cookies)
+
+
+class PublicInvoicePayloadTests(PublicInvoiceTestCase):
+    """§9: the response must stay narrow, or the reason it needs no login dies."""
+
+    def test_carries_no_other_invoice(self):
+        other = make_invoice(self.zev, self.participant, InvoiceStatus.SENT)
+        other.invoice_number = "OTHER-999"
+        other.save()
+
+        body = self._get().content.decode()
+
+        self.assertNotIn("OTHER-999", body)
+
+    def test_carries_no_other_participant(self):
+        neighbour = make_participant(self.zev, first="Beat", last="Nachbar")
+        make_invoice(self.zev, neighbour, InvoiceStatus.SENT)
+
+        body = self._get().content.decode()
+
+        self.assertNotIn("Nachbar", body)
+        self.assertNotIn("Beat", body)
+
+    def test_omits_contact_detail(self):
+        self.participant.email = "anna@example.com"
+        self.participant.save()
+
+        body = self._get().content.decode()
+
+        self.assertNotIn("anna@example.com", body)
+
+    def test_reports_whether_the_invoice_is_paid(self):
+        """The one field that can change after the paper was printed."""
+        self.assertFalse(self._get().json()["is_paid"])
+
+        self.invoice.status = InvoiceStatus.PAID
+        self.invoice.save()
+
+        self.assertTrue(self._get().json()["is_paid"])
+
+    def test_carries_the_consumption_figures(self):
+        summary = self._get().json()["energy_summary"]
+
+        self.assertEqual(summary["local_kwh"], "320.5")
+        self.assertEqual(summary["grid_kwh"], "180.0")
+        self.assertEqual(summary["local_share_pct"], "64")
+
+    def test_energy_summary_is_null_without_consumption(self):
+        """The same condition that prints no QR in the first place."""
+        self.invoice.total_local_kwh = Decimal("0")
+        self.invoice.total_grid_kwh = Decimal("0")
+        self.invoice.save()
+
+        self.assertIsNone(self._get().json()["energy_summary"])
+
+    def test_carries_the_line_items(self):
+        items = self._get().json()["items"]
+
+        self.assertEqual(len(items), 1)
+        self.assertEqual(items[0]["description"], "Solarstrom ZEV")
+
+
+class PublicInvoicePdfTests(PublicInvoiceTestCase):
+    def test_404_when_no_stored_pdf(self):
+        """An unauthenticated caller must not be able to trigger a render."""
+        resp = self._get(url=PUBLIC_PDF_URL)
+        self.assertEqual(resp.status_code, 404)
+
+    def test_streams_the_stored_pdf(self):
+        from django.core.files.base import ContentFile
+
+        self.invoice.pdf_file.save("x.pdf", ContentFile(b"%PDF-1.7\n"), save=True)
+
+        resp = self._get(url=PUBLIC_PDF_URL)
+
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp["Content-Type"], "application/pdf")
+
+    def test_wrong_secret_is_404(self):
+        self.assertEqual(self._get(secret="wrong", url=PUBLIC_PDF_URL).status_code, 404)
+
+
+class InvoiceAccessTokenTests(PublicInvoiceTestCase):
+    def test_token_is_stable_across_regeneration(self):
+        """A regenerated PDF must carry the same QR as the copy in the post."""
+        again, secret = access_tokens.get_or_create_for_invoice(self.invoice)
+
+        self.assertEqual(again.pk, self.token.pk)
+        self.assertIsNone(secret, "an existing secret is not recoverable")
+
+    def test_revoke_then_mint_produces_a_new_token(self):
+        access_tokens.revoke(self.token)
+
+        fresh, secret = access_tokens.get_or_create_for_invoice(self.invoice)
+
+        self.assertNotEqual(fresh.prefix, self.token.prefix)
+        self.assertIsNotNone(secret)
+        self.assertEqual(self._get().status_code, 404, "the printed link is dead")
+
+    def test_only_the_hash_is_stored(self):
+        self.token.refresh_from_db()
+
+        self.assertNotIn(self.secret, self.token.hashed_secret)
+        self.assertEqual(len(self.token.hashed_secret), 64)
+
+
+class PublicInvoiceAuditTests(PublicInvoiceTestCase):
+    def _events(self):
+        return AuditEvent.objects.filter(action_type="invoice_link.viewed")
+
+    def test_opening_records_an_event(self):
+        self._get()
+
+        event = self._events().get()
+        self.assertEqual(event.source, AuditEventSource.INVOICE_LINK)
+        self.assertEqual(event.target_display, self.invoice.invoice_number)
+
+    def test_refreshing_does_not_flood_the_log(self):
+        """One entry per reading session, not one per refresh."""
+        for _ in range(4):
+            self._get()
+
+        self.assertEqual(self._events().count(), 1)
+
+    def test_a_later_visit_records_again(self):
+        self._get()
+        self.token.refresh_from_db()
+        self.token.last_used_at = timezone.now() - access_tokens.USE_RECORD_INTERVAL * 2
+        self.token.save(update_fields=["last_used_at"])
+
+        self._get()
+
+        self.assertEqual(self._events().count(), 2)
+
+    def test_a_refused_link_records_nothing(self):
+        self._get(secret="wrong")
+
+        self.assertEqual(self._events().count(), 0)

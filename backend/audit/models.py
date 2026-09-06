@@ -30,6 +30,10 @@ class AuditEventSource(models.TextChoices):
     # action taken by a script is traceable to the credential that took it,
     # not only to the person who owns it.
     API_KEY = "api_key", "API key"
+    # A request carrying an invoice access token. Distinct from ``API`` for the
+    # same reason ``API_KEY`` is: the actor is a printed credential, not a
+    # session, and the log has to say so.
+    INVOICE_LINK = "invoice_link", "Invoice link"
     CELERY = "celery", "Celery"
     SYSTEM = "system", "System"
     MANAGEMENT_COMMAND = "management_command", "Management command"

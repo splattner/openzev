@@ -71,3 +71,20 @@ class TransferArchiveThrottle(UserRateThrottle):
     """Per-user budget for whole-ZEV transfer archive import/inspect."""
 
     scope = "transfer_import"
+
+
+class InvoiceLinkThrottle(SimpleRateThrottle):
+    """Rate-limit the unauthenticated invoice-link endpoints, by IP.
+
+    The prefix is 16 hex characters guarding a 256-bit secret, so enumeration
+    is already hopeless on entropy alone. This exists so it is also cheap to
+    refuse, and so one leaked link cannot be used to hammer the endpoint.
+    """
+
+    scope = "invoice_link"
+
+    def get_cache_key(self, request, view):
+        return self.cache_format % {
+            "scope": self.scope,
+            "ident": self.get_ident(request),
+        }

@@ -118,6 +118,14 @@ class Zev(models.Model):
         help_text="How VAT is applied when billing participants.",
     )
     vat_number = models.CharField(max_length=50, blank=True)
+    # Prints a QR on the invoice that opens that invoice without a login. Off
+    # by default and no migration opts anyone in: it changes a document
+    # participants receive and exposes figures without authentication, which is
+    # an operator's decision to take rather than one to inherit on upgrade.
+    participant_invoice_access = models.BooleanField(
+        default=False,
+        help_text="Print a QR on invoices letting participants view them without an account.",
+    )
     # Off by default: turning it on changes how every subsequent invoice reads,
     # and an operator who never set it should keep the output they know.
     itemize_tariff_bands = models.BooleanField(

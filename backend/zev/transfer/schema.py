@@ -76,6 +76,11 @@ SECTION_FILES = {
 # design: an export never carries an account reference, so importing an archive
 # can never grant anybody access to anything. The importing user becomes the
 # owner and participants arrive unlinked, to be connected by hand.
+#
+# ``participant_invoice_access`` is absent for the same reason. It serves
+# invoice data to anyone holding a link, so letting it ride in on an archive
+# would be an import granting access — the one thing the rule above forbids.
+# It arrives off, and an operator turns it on for the instance they run.
 
 ZEV_FIELDS = (
     "name",

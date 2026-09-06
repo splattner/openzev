@@ -274,3 +274,45 @@ class EmailLog(models.Model):
 
     class Meta:
         ordering = ["-created_at", "id"]
+
+
+class InvoiceAccessToken(models.Model):
+    """A bearer credential printed on one invoice, granting that invoice only.
+
+    Shaped after ``accounts.ApiKey``: the prefix is stored in clear because it
+    identifies the row rather than authorising it, and only the hash of the
+    secret is kept.
+
+    Two properties matter and are easy to lose:
+
+    **It is per-invoice, not per-participant.** The security argument for
+    serving this without a login is that a link showing only the invoice it is
+    printed on tells the bearer nothing the paper in their hand does not — see
+    the spec's §9. That argument dies the moment this resolves to anything
+    wider, so the token deliberately has no route to the participant's other
+    invoices.
+
+    **It has no expiry.** It is printed on a document that stays in a folder
+    for years, and a link that dies underneath it is a support ticket rather
+    than a security control. Revocation is the control.
+    """
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    invoice = models.ForeignKey(Invoice, on_delete=models.CASCADE, related_name="access_tokens")
+    # In clear and indexed: one lookup by prefix, then one constant-time
+    # comparison of the secret, rather than hashing every row.
+    prefix = models.CharField(max_length=32, unique=True, db_index=True)
+    hashed_secret = models.CharField(max_length=64)
+    created_at = models.DateTimeField(auto_now_add=True)
+    revoked_at = models.DateTimeField(null=True, blank=True)
+    last_used_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-created_at", "id"]
+
+    def __str__(self):
+        return f"{self.prefix} ({self.invoice.invoice_number})"
+
+    @property
+    def is_active(self) -> bool:
+        return self.revoked_at is None
