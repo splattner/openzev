@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.10.3](https://github.com/splattner/openzev/compare/v1.10.2...v1.10.3) (2026-09-06)
+
+
+### Bug Fixes
+
+* **ui:** put the VAT note beside the VAT mode ([#587](https://github.com/splattner/openzev/issues/587)) ([50fea95](https://github.com/splattner/openzev/commit/50fea95f7b37fac2ec32ed6d5c591f3d8eef9601))
+
 ## [1.10.2](https://github.com/splattner/openzev/compare/v1.10.1...v1.10.2) (2026-09-06)
 
 
