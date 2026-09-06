@@ -1,6 +1,5 @@
 import logging
 import tempfile
-from datetime import date as date_type
 
 from django.conf import settings as django_settings
 from django.http import FileResponse, HttpResponse
@@ -28,6 +27,7 @@ from .serializers import (
     ZevCreateWithOwnerSerializer,
     ParticipantSerializer,
     MeteringPointSerializer,
+    MeteringPointReadingsDeleteSerializer,
     MeteringPointAssignmentSerializer,
 )
 from .permissions import (
@@ -684,34 +684,16 @@ class MeteringPointViewSet(AuditedCreateDestroyMixin, AuditedUpdateMixin, ZevSco
     )
     def delete_readings(self, request, pk=None):
         metering_point = self.get_object()
-        delete_all = bool(request.data.get("delete_all", False))
-        date_from = request.data.get("date_from")
-        date_to = request.data.get("date_to")
+        serializer = MeteringPointReadingsDeleteSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        delete_all = serializer.validated_data["delete_all"]
+        date_from = serializer.validated_data.get("date_from")
+        date_to = serializer.validated_data.get("date_to")
 
         readings_qs = MeterReading.objects.filter(metering_point=metering_point)
 
         if not delete_all:
-            if not date_from or not date_to:
-                return Response(
-                    {"error": "date_from and date_to are required when delete_all is false."},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-            try:
-                parsed_from = date_type.fromisoformat(date_from)
-                parsed_to = date_type.fromisoformat(date_to)
-            except ValueError:
-                return Response(
-                    {"error": "Invalid date format. Use YYYY-MM-DD."},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-
-            if parsed_to < parsed_from:
-                return Response(
-                    {"error": "date_to must be on or after date_from."},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-
-            start_dt, end_dt_exclusive = period_window(parsed_from, parsed_to)
+            start_dt, end_dt_exclusive = period_window(date_from, date_to)
             readings_qs = readings_qs.filter(timestamp__gte=start_dt, timestamp__lt=end_dt_exclusive)
 
         deleted_count = readings_qs.count()
@@ -726,7 +708,11 @@ class MeteringPointViewSet(AuditedCreateDestroyMixin, AuditedUpdateMixin, ZevSco
             target_id=str(metering_point.pk),
             target_display=metering_point.meter_id,
             summary=f"Deleted {deleted_count} meter readings for {metering_point.meter_id}.",
-            metadata={"delete_all": delete_all, "date_from": date_from, "date_to": date_to},
+            metadata={
+                "delete_all": delete_all,
+                "date_from": date_from.isoformat() if date_from else None,
+                "date_to": date_to.isoformat() if date_to else None,
+            },
         )
 
         return Response({"deleted_count": deleted_count}, status=status.HTTP_200_OK)

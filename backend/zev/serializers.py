@@ -15,6 +15,29 @@ class MeteringPointSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "created_at", "updated_at"]
 
 
+class MeteringPointReadingsDeleteSerializer(serializers.Serializer):
+    delete_all = serializers.BooleanField(required=False, default=False)
+    date_from = serializers.DateField(required=False)
+    date_to = serializers.DateField(required=False)
+
+    def validate(self, attrs):
+        if attrs["delete_all"]:
+            return attrs
+
+        errors = {}
+        date_from = attrs.get("date_from")
+        date_to = attrs.get("date_to")
+        if date_from is None:
+            errors["date_from"] = "This field is required when delete_all is false."
+        if date_to is None:
+            errors["date_to"] = "This field is required when delete_all is false."
+        if date_from is not None and date_to is not None and date_to < date_from:
+            errors["date_to"] = "Must be on or after date_from."
+        if errors:
+            raise serializers.ValidationError(errors)
+        return attrs
+
+
 class MeteringPointAssignmentSerializer(serializers.ModelSerializer):
     class Meta:
         model = MeteringPointAssignment

@@ -982,7 +982,7 @@ lists the test classes per module (test counts are the `test_*` methods).
 | `MeteringPointAssignmentValidationTests` | 9 | Unique assignment, no overlaps, historical OK, open-end blocks future, dates within participant window, self-update OK |
 | `AssignmentSaveOverlapGuardTests` | 5 | Overlap guard on save path |
 | `SeedDemoAssignmentReseedTests` | 1 | Demo seed re-creates assignments |
-| `MeteringPointReadingsDeletionTests` | 4 | Delete-readings action variants |
+| `MeteringPointReadingsDeletionTests` | 8 | Admin whole-meter and inclusive-range deletion; string/omitted false values stay bounded; invalid booleans and invalid/incomplete/reversed ranges return 400 without writes; non-admin denied |
 | `NextInvoiceNumberTests` | 3 | Invoice number allocation |
 | `SeedDemoPeriodHelpersTests` | 6 | Demo seed period helpers |
 | `SeedDemoTariffVersionTests` | 10 | Demo seed tariff versioning |
