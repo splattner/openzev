@@ -569,3 +569,22 @@ class PublicInvoiceChartsTests(PublicInvoiceTestCase):
         for payload in (ok, failed):
             self.assertIn("charts", payload)
             self.assertIsInstance(payload["charts"], list)
+
+
+class ParticipantInvoiceAccessDefaultTests(TestCase):
+    """Nobody is opted in by an upgrade (spec acceptance criterion 8).
+
+    The flag changes a document participants receive and exposes figures
+    without a login. An operator turns that on deliberately; inheriting it from
+    a migration would be the one way this feature does harm on its own.
+    """
+
+    def test_a_new_zev_is_not_opted_in(self):
+        owner = make_user("default_owner", UserRole.ZEV_OWNER)
+
+        self.assertFalse(make_zev(owner, "Fresh ZEV").participant_invoice_access)
+
+    def test_the_field_default_is_off(self):
+        from zev.models import Zev
+
+        self.assertIs(Zev._meta.get_field("participant_invoice_access").default, False)

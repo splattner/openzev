@@ -554,15 +554,31 @@ Pure mapping only: the URL builder produces `/i/<prefix>?s=<secret>`, and the
 
 ### Acceptance criteria
 
-- [ ] A participant scans the QR on their invoice and sees that invoice, with no login
-- [ ] The same link shows nothing about any other invoice or participant
-- [ ] Regenerating the invoice PDF does not break a QR already in the post
-- [ ] Revoking a token breaks the printed link, and nothing else
-- [ ] "See all my statements" delivers a link to the address on file, and the
+- [x] A participant opens the link printed on their invoice and sees that
+      invoice, with no login
+- [x] The link shows nothing that is not printed on the document it came from
+- [x] Regenerating the invoice PDF does not break a QR already in the post
+- [x] Revoking a token breaks the printed link, and nothing else
+- [x] "See all my statements" delivers a link to the address on file, and the
       requester never names that address
-- [ ] A magic-link user reaches the participant portal without ever setting a password
-- [ ] A ZEV that has not opted in prints no QR and serves no public route
-- [ ] No migration opts an existing ZEV in
+- [x] A magic-link user reaches the participant portal without ever setting a password
+- [x] A ZEV that has not opted in prints no QR and serves no public route
+- [x] No migration opts an existing ZEV in
+- [ ] **Verified end to end against a running instance**: a phone camera opens
+      a printed QR, the page renders on that screen, the sign-in mail arrives,
+      and the link lands in the portal
+
+The second criterion originally read "shows nothing about any other invoice or
+**participant**". Increment 2 made that false: the energy-flow diagram names
+other producers, and §9 was rewritten to permit exactly that, on the grounds
+that the diagram is printed on the same sheet as the QR. The criterion now
+states the rule §9 actually enforces, so the two cannot be read against each
+other.
+
+The last criterion is deliberately unticked. Every step has tests and the parts
+have been exercised in isolation, but the chain has not been walked on real
+hardware — and the one time this code met a browser it crashed on a stale cache
+payload that no test had reason to construct.
 
 ## 13. Resolved in review
 
