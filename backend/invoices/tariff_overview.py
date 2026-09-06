@@ -181,11 +181,20 @@ def _grid_base(tariffs: list, as_of: date) -> tuple[Decimal, bool]:
     percentage-of-energy version shown under ``scope=all`` reads against the
     same reference the current version does, matching how the participation
     contract has always treated it (one document, one reference date).
+
+    Selected by energy type and billing mode only, deliberately *not* by
+    category. What a percentage-of-grid tariff is a percentage *of* is the
+    whole grid price a participant would otherwise pay — the Arbeitspreis plus
+    Netznutzung plus every levy — and a Swiss grid tariff sheet spreads those
+    across the GRID_FEES and LEVIES categories. Filtering to ENERGY keeps only
+    the Arbeitspreis and understates the base by whatever the network charges
+    and levies come to, which on a real ZEV is more than half of it. The engine
+    (``TariffResolver``) and the participation contract both select this way;
+    see docs/specs/2026-09-tariff-overview-pdf.md §6.1.
     """
     grid_tariffs = [
         t for t in tariffs
-        if t.category == TariffCategory.ENERGY
-        and t.energy_type == EnergyType.GRID
+        if t.energy_type == EnergyType.GRID
         and t.billing_mode == BillingMode.ENERGY
         and _is_active(t, as_of)
     ]
