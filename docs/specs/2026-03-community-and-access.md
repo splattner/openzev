@@ -609,8 +609,14 @@ On create:
 4. Return participant data including `account_username` and `initial_password`.
 
 On update:
-1. Sync linked user's `email`, `first_name`, `last_name`, `role` via
-   `sync_participant_user_fields()`.
+1. Sync the linked user's `email`, `first_name`, and `last_name` via
+   `sync_participant_user_fields()`. Preserve existing `zev_owner` and `admin`
+   roles; otherwise set the role to `participant` (including linked guests).
+   Profile synchronization must not remove management access from an owner
+   or admin who also has a participant record.
+2. The existing edit guard remains: only admins may edit participant records
+   linked to a non-participant-role account. Ordinary owners cannot edit their
+   own owner-linked participant record through this endpoint.
 
 ### 8.3 Participant actions
 
@@ -626,7 +632,10 @@ On update:
 ### 8.4 Invitation email flow
 
 `send_participant_invitation()` (atomic):
-1. Ensure account exists via `ensure_participant_account()`.
+1. Ensure account exists via `ensure_participant_account()`. For linked
+   accounts, synchronize profile fields and preserve `zev_owner`/`admin` roles
+   using the same rule as participant updates; linked guests become
+   participants. Newly created accounts have the `participant` role.
 2. Generate new temporary password (12 chars).
 3. Set `must_change_password = True`.
 4. Send email with username + temporary password to participant email.
@@ -958,7 +967,7 @@ lists the test classes per module (test counts are the `test_*` methods).
 | `ParticipantEndpointRestrictionTests` | 7 | Participant cannot access ZEV/participant lists; can list own metering points; cannot create/update/delete metering points; cannot access assignments |
 | `ZevCreationWizardTests` | 2 | Non-admin cannot create ZEV; admin wizard creates ZEV + owner + participant + assignments |
 | `ParticipantAccountLifecycleTests` | 3 | Create participant auto-creates account with initial password; update saves contact details; invitation resets password and sends email |
-| `AdminCanEditOwnerParticipantTests` | 2 | Admin can edit the owner participant; owner cannot edit own record |
+| `AdminCanEditOwnerParticipantTests` | 4 | `test_admin_can_edit_the_owner_participant_address` preserves the owner role and ZEV API access; `test_profile_sync_preserves_privileged_roles` synchronizes name/email while preserving owner/admin roles and ZEV API access; `test_invitation_preserves_privileged_roles_and_promotes_guests` preserves owner/admin/participant roles, promotes linked guests, and verifies password reset/email delivery; `test_zev_owner_cannot_edit_their_own_owner_participant_record` retains the existing edit restriction |
 | `ParticipantAccountLinkingTests` | 5 | Admin can link/unlink accounts; rejects double-linking; admin can create-and-link; non-admin cannot link/create |
 | `ZevOwnerRoleSyncTests` | 1 | Owner transfer promotes new owner, demotes previous |
 | `MeteringPointAssignmentValidationTests` | 9 | Unique assignment, no overlaps, historical OK, open-end blocks future, dates within participant window, self-update OK |

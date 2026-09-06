@@ -50,7 +50,10 @@ def build_unique_username(*, first_name: str, last_name: str, email: str | None 
 
 
 def sync_participant_user_fields(participant, user) -> None:
-    user.role = UserRole.PARTICIPANT
+    # Owners and admins can also have participant records. Updating their
+    # profile or sending an invitation must not remove management access.
+    if user.role not in (UserRole.ZEV_OWNER, UserRole.ADMIN):
+        user.role = UserRole.PARTICIPANT
     user.email = participant.email
     user.first_name = participant.first_name
     user.last_name = participant.last_name
