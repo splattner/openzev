@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.10.1](https://github.com/splattner/openzev/compare/v1.10.0...v1.10.1) (2026-09-06)
+
+
+### Bug Fixes
+
+* **tariffs:** base percentage tariffs on the whole grid price ([#583](https://github.com/splattner/openzev/issues/583)) ([5d2f727](https://github.com/splattner/openzev/commit/5d2f727870121d80b5379485523c0c3daac923ee))
+
 ## [1.10.0](https://github.com/splattner/openzev/compare/v1.9.3...v1.10.0) (2026-09-06)
 
 
