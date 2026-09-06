@@ -249,7 +249,7 @@ The three download endpoints below are consumed from the **/reports** route (`fr
 | Method | URL | Permission | Frontend usage |
 |---|---|---|---|
 | `GET` | `/invoices/invoices/annual-statement/` | Authenticated (participant sees own, admin/owner ZEV-scoped) | Participant "My annual statement" card: `downloadAnnualStatement({year})` (no `zev_id`, backend scopes by participant) |
-| `GET` | `/invoices/invoices/annual-statements-zip/` | `IsZevOwnerOrAdmin` | Admin/owner "Annual statements" card: `downloadAllAnnualStatements({year, zev_id})` — ZIP of all eligible participants for the selected ZEV; shared-data setup failure returns a generic `500` |
+| `GET` | `/invoices/invoices/annual-statements-zip/` | `IsZevOwnerOrAdmin` | Admin/owner "Annual statements" card: `downloadAllAnnualStatements({year, zev_id})` — ZIP of all eligible participants for the selected ZEV; large ZEVs render through the statement worker pool (§8.1), small ones serially; worker crashes, deadline expiry and shared-data setup failure return a generic `500` (no in-process serial retry after a pool abort), every-statement failure returns a generic `500`, individual failures are omitted and listed in an `omitted.txt` manifest (ID plus name) |
 | `GET` | `/invoices/invoices/financial-summary/` | Authenticated (optional `zev_id` / `participant_id`) | Both roles: `downloadFinancialSummary({year, zev_id?})` — `zev_id` supplied for admin/owner, omitted for participant |
 
 Role branches mirror the former dashboard behavior.
@@ -462,21 +462,104 @@ Admin-only endpoints manage the global `EmailTemplate` overrides (§3.5) for the
    - Otherwise: render from the on-disk default using `render_to_string(template_name, context)`.
 3. Convert HTML → PDF via WeasyPrint through `render_pdf()` in `invoices/pdf_render.py`, which emits **PDF/A-3b** (`PDF_VARIANT = "pdf/a-3b"`) — a long-term archival format suitable for Swiss GeBüV retention, with WeasyPrint adding the XMP identification, sRGB OutputIntent, and font subsets. The same helper renders contract, annual statement, and financial summary PDFs. Because template content is admin-editable, the WeasyPrint fetcher is restricted to `data:` URIs (`ALLOWED_URL_PROTOCOLS` in `pdf_render.py`) — templates embed images as data URIs and cannot make the renderer read local files or request remote URLs.
 4. Save PDF to `invoice.pdf_file` (`invoices/pdf/invoice_{number}.pdf`).
+   `save_invoice_pdf()` writes the file without saving the (possibly stale)
+   invoice instance, then updates only `pdf_file`/`updated_at` via a
+   conditional `UPDATE` on the primary key — a concurrent approval or other
+   workflow change survives the save. If the row was deleted mid-render the
+   just-written file is removed and `Invoice.DoesNotExist` is raised instead
+   of recreating the record (the render counts as failed).
 
 `_render_pdfs()` groups invoices by `(zev_id, period_start, period_end)` and
-builds one `InvoicePdfPeriodContext` per group. The context holds the daily
-participant-share map, ZEV-wide participant statistics, timestamp totals and
-assignment windows used by the hourly-profile and energy-flow charts, so a
-batch derives them once rather than once per invoice. A single PDF render
-builds a fresh context on demand. The context records its ZEV and period and
-is rejected if used for another invoice scope. If a shared context cannot be
-built, every invoice in that ZEV-period is counted as failed and the same
-failing computation is not retried for each participant; failures while
-rendering an individual invoice remain isolated to that invoice.
+builds one `InvoicePdfPeriodContext` per group. The context explicitly
+carries the daily participant-share map, participant statistics, per-timestamp
+community totals, and assignment windows. The totals and windows are passed
+directly to `_compute_period_participant_stats()`. The context records its
+ZEV and period and is rejected if used for another invoice scope. A shared
+context failure marks every invoice in that ZEV-period failed, while
+individual render failures stay isolated. Invoice batches always render
+serially in the serving process: subprocess fan-out measured no faster than
+serial for invoices (ADR 0017), so the pool is not used here.
 
-The annual-statement ZIP similarly builds its yearly participant shares and
-ZEV timestamp totals once before rendering. Shared setup failure returns a
-generic `500`; failure in one participant's render omits only that statement.
+**Annual-statement subprocess rendering.** Annual statements are the one
+workload where bounded subprocesses measured substantially faster, so
+`invoices/pdf_pool.py` serves only the `annual-statements-zip` endpoint, for
+batches of at least `_MIN_BATCH_FOR_POOL` (4) participants:
+
+- Up to `PDF_POOL_MAX_WORKERS` workers are created for that batch (default 4,
+  clamped to CPU count and document count) and split the participants into
+  that many contiguous chunks, sizes differing by at most one. Each child
+  re-fetches its chunk and renders it serially, so there is no nested
+  fan-out. Each statement chunk builds its ZEV-wide share map and timestamp
+  totals once.
+- `_batch_gate` serializes batches within a serving process. `_run_chunks()`
+  starts the `PDF_POOL_TIMEOUT_S` (default 600 s) deadline before acquiring
+  it, so time queued behind another batch counts against the budget; a gate
+  held past the budget fails fast with the same deadline error. The gate is
+  process-local: it does not stop two web workers from serving the same
+  export simultaneously. Timeouts layer pool (600 s) < Gunicorn (610 s) <
+  nginx (620 s); the deadline cannot interrupt a native render in the
+  serial path.
+- Each child runs `python -m invoices.pdf_worker` with the parent's PID as
+  an argument; stdin carries one trusted pickle of `(worker_callable,
+  chunk_args)` and stdout carries `(status, result)`, with fd 1 duplicated
+  for the protocol pipe before stdout is redirected to stderr, so neither
+  Python-level nor native output corrupts it. Threads feed and drain all child pipes concurrently.
+  Statement workers return `(participant_id, pdf_bytes, error)` rows; an
+  error is reduced to a string but the child logs the full traceback first.
+  Children close their database connections, exit, and are reaped before the
+  batch returns. Results are restored to participant input order before
+  zipping.
+- Failure policy: spawn failures propagate without serial retry; crashes,
+  worker errors, and deadline expiry kill and reap all children and propagate
+  as the generic `500` — never retried serially in-process. Smaller batches
+  and one-CPU processes use the serial path without ever spawning.
+- A watchdog thread in each child polls `os.getppid()` every 0.5 s and exits
+  when its parent dies, so a SIGKILL'd serving process (Gunicorn hard
+  timeout, `kill -9`) does not keep workers running; polling was chosen over
+  `PR_SET_PDEATHSIG` for portability, and it is best-effort while native
+  rendering holds the GIL.
+- ZIP entry names include the participant's pk and have Windows-invalid
+  punctuation and control characters replaced, so two participants with identical names cannot collide; only
+  the readable `last_first` portion is truncated to keep the whole entry
+  within a conservative UTF-8 byte budget (`_ZIP_ENTRY_BYTE_BUDGET`, 180
+  bytes). A shared yearly-data failure aborts the archive with the generic
+  `500`, while an individual statement failure omits only that statement. A
+  partially failed export includes an `omitted.txt` manifest naming the
+  omitted participants (ID plus last/first name, one per line); if every
+  statement fails the endpoint returns the generic `500` instead of an empty
+  ZIP with HTTP 200.
+- `generate_zev_invoices_task` and `generate_zev_pdfs_task` record a `FAILED`
+  audit event with `"aborted": true` metadata before re-raising the original exception when the batch dies from a catchable
+  interruption: the `except BaseException` handlers cover timeouts, worker
+  crashes, Celery soft time limits and `SystemExit`; the audit write itself
+  is best-effort (its failure is logged, never substituted); a SIGKILL cannot be
+  caught and leaves nothing to record an audit event. `generate_zev_invoices_task`
+  audits both phases — invoice creation (`"phase": "creation"`, no counts:
+  creation never returned) and PDF rendering (`"phase": "rendering"`, with
+  `invoice_count`/`failures`). Invoices or PDFs may already be saved at that
+  point, so the outcome must reach the audit trail.
+
+The peak child count on a host is the number of web workers serving exports
+concurrently multiplied by `PDF_POOL_MAX_WORKERS`, in addition to the
+serving processes and data services themselves. Tune the setting against
+measured CPU and peak child memory for the deployment; throughput is workload
+and host dependent.
+
+**Performance results.** Batch-rendering performance numbers, their
+measurement caveats, and host-sizing guidance are kept in one place: ADR 0017
+(`docs/adr/0017-pdf-render-pool-sizing.md`, "Measured behavior").
+`scripts/benchmark-pdf-batches.py` reproduces them.
+
+`render_pdf()` in `invoices/pdf_render.py` keeps one lazily-created
+`FontConfiguration` per process and serializes access with a process-local
+lock because Pango's font map is not thread-safe. A custom template that
+installs `@font-face` rules invalidates that configuration after the render,
+preventing document fonts and caches from leaking into later renders.
+The font-isolation regression test runs with both the default subsetter and
+forced FontTools fallback. It pins `SOURCE_DATE_EPOCH` so FontTools' embedded
+subset timestamps stay constant during byte-for-byte comparisons;
+otherwise crossing a wall-clock second changes font checksums and PDF offsets
+without changing the document layout.
 
 ### 8.2 Template context
 
@@ -672,8 +755,9 @@ Strips legacy period suffixes from `description` on serialization.
 | `test_engine_edge_cases.py` | `InvoiceVatRateSelectionTests` | VAT rate active at period_end, zero VAT when no vat_number |
 | `test_email_formatting.py` | `InvoiceEmailFormattingTests` | §7.1–7.2: date format in email body, custom ZEV templates, auto-transition to sent |
 | `test_email_task.py` | 5 function-based tests | §7.2: missing invoice no-ops, no recipient skips with failed log, success records sent log and transitions status, failure marks log failed and retries, draft stays draft after send |
-| `test_batch_actions.py` | `TestInvoiceBatchActions`, `TestBulkGenerationTasks`, `TestBulkGenerationIsolatesPerParticipantFailures`, `TestInvoiceRetryEmailAction` | §5.4: approve-all approves only period drafts, send-all queues only approved invoices with recipient, cross-owner ZEV rejection, download-pdfs 404/ZIP; §5.2: generate-all / generate-pdfs-all queue background tasks, one locked invoice does not abort the batch, a failure after number issuance reuses the rolled-back invoice number (gapless and collision-free), the audit event reports the partial outcome, one PDF context is built per ZEV-period batch, a failed shared context is not retried per invoice, and a failed shared invoice-build is reported once per participant with a FAILED audit event; §7.3: retry-email rejects sent logs and other invoices' logs, queues failed recipient |
-| `test_reports.py` | `AnnualStatementTests`, `AnnualStatementsZipTests`, `FinancialSummaryTests` | §5.4: report permissions and scoping, annual-statement ZIP contents and participant validity filtering, one yearly participant-share and timestamp-total computation per ZIP, and a generic `500` when that shared computation fails |
+| `test_batch_actions.py` | `TestInvoiceBatchActions`, `TestBulkGenerationTasks`, `TestPdfsAreProducedWithTheInvoice`, `TestBulkGenerationIsolatesPerParticipantFailures`, `TestInvoiceRetryEmailAction` | §5.4: approve-all approves only period drafts, send-all queues only approved invoices with recipient, cross-owner ZEV rejection, download-pdfs 404/ZIP; §5.2: background task dispatch, invoice-number rollback, partial-outcome audits, aborted-batch audit events (`"aborted": true`, `"phase"` creation/rendering), serial soft-time-limit propagation, shared invoice-build failure reporting, and PDF-context reuse/failure; §7.3: retry-email validation and dispatch |
+| `test_pdf_pool.py` | Function-based tests | §8.1: readiness-handshaked worker concurrency, partial-startup/timeout/soft-time-limit-to-parent cleanup, abrupt worker-exit propagation with sibling reaping, workers exiting after a SIGKILL'd parent, concurrent-batch budget sharing, CPU-affinity sizing and setting floor, balanced chunking table, statement input ordering, statement shared-setup reuse/failure propagation, fd-level stdout isolation, per-statement failure isolation with in-child traceback logging, DB connection cleanup, and the worker's traceback-preserving error protocol |
+| `test_reports.py` | `AnnualStatementTests`, `AnnualStatementsZipTests`, `FinancialSummaryTests` | §5.4: report permissions and scoping, participant validity filtering, shared yearly-data reuse and generic `500` failures, serial + parallel statement rendering in input order with per-statement failure isolation plus the `omitted.txt` manifest (ID plus name), fail-fast `500` without serial generation on worker crash/timeout, complete-failure `500` for both paths, ZIP entry byte-budget truncation (max-length and multibyte names), one unmocked end-to-end ZIP through the real parallel worker pipeline (slow; pins `PYTHON_CPU_COUNT=2` and asserts two spawned workers), fd-level stdout isolation (print plus native write), and financial-summary behavior |
 | `test_invoice_numbering.py` | `TestNumberingIsScopedToTheZev`, `TestDuplicatesWithinOneZevAreStillRejected` | §4.1: two ZEVs on the default `INV` prefix both bill and each counts from 1; a duplicate number within one ZEV is refused at the database level (`bulk_create` bypasses `save()`) |
 | `test_serializers.py` | `InvoiceDescriptionSerializationTests` | §8.9: period suffix stripping in serializer |
 | `test_template_context.py` | `BuildSampleInvoiceContextTests`, `BuildSampleContractContextTests`, `BuildSampleAnnualStatementContextTests` | §5.7 preview: sample context required keys, invoice number/totals, `grouped_items` structure, formatted dates, annual-statement monthly data and chart |
@@ -685,6 +769,7 @@ Strips legacy period suffixes from `description` on serialization.
 |---|---|
 | `InvoicePdfQrTests` | §8.4: QR skip on missing debtor data, success path, text/binary writer compatibility, skip on `qrbill` rejection, QR built in all four languages. §8.2: context uses AppSettings date formats, invoice-number prefix/suffix split (hyphen, long prefix, no hyphen), translation dict is not mutated by context building, period-suffix stripping from item descriptions (§8.9), `status_display` translation, empty `due_date` formatting, `inline_qr_payment` enabled for small invoices and disabled for long invoices / invoices with notes / missing IBAN, sample invoice context exposes every key the default template uses. §8.5: energy comparison rendered with and without a prior period. §8.6: energy-flow SVG returns `None` without readings and renders with valid data; energy summary local-share computation and `None` case. §8.7: hourly profile buckets by local time (not UTC), returns `None` for daily-only resolution, and skips readings outside the participant's assignment window (ADR 0013). §8.8: savings `None` cases (no local energy, local rate ≥ grid rate) and bar-percentage computation. Default template structural layout checks (dedicated invoice/payment layouts) |
 | `PeriodParticipantStatsTests` | §8.6: per-timestamp participant stats — mid-period transfer splits readings between both holders, gap readings appear on no participant, stats reconcile with engine invoice totals |
+| `SaveInvoicePdfConcurrencyTests` | §8.1: concurrent approval survives the PDF save (only `pdf_file`/`updated_at` written back); concurrent delete raises instead of resurrecting the row, without orphaning items or files |
 | `AnnualStatementMonthlyDataTests` | Annual-statement monthly data: per-timestamp attribution across assignment changes, gap readings excluded |
 | `InvoicePdfRenderingTests` | Full WeasyPrint rendering: short invoice → 2 pages, long invoice → 3 pages, savings + many items → 3 pages, all four languages render without error; inline QR and separate payment slip geometry (106 mm height, bottom-aligned with page bottom) via PDF content-stream inspection; no QR clip rect on the insights page. Regression coverage for the render-time guard: wrapping multi-line descriptions that overflow the inline height estimate still produce exactly one slip (`_count_qr_slips`), and a long dedicated-payment invoice keeps a single bottom-aligned slip on its final page; a realistic EVU-style invoice with ~5 Abgaben across all four cost categories (energy, grid fees, levies, metering) paginates to ≥3 pages with exactly one slip |
 | `TranslationParityTests` | §8.3: all four locales have identical, non-empty translation keys and identical `status_values` keys |

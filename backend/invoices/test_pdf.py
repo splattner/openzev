@@ -1441,3 +1441,136 @@ class PeriodParticipantStatsTests(TestCase):
 
         assert float(invoice.total_local_kwh) == row["from_zev_kwh"]
         assert float(invoice.total_grid_kwh) == row["from_grid_kwh"]
+
+
+class SaveInvoicePdfConcurrencyTests(TestCase):
+    """PDF rendering outlives the ORM instance that started it.
+
+    ``save_invoice_pdf`` must only write back ``pdf_file``: a concurrent
+    workflow transition must survive the save, and a concurrent delete must
+    not resurrect the row. ``generate_pdf`` is stubbed with a side effect
+    that performs the concurrent change, reproducing the interleaving
+    without threads.
+    """
+
+    def setUp(self):
+        self.owner = User.objects.create_user(
+            username="pdf_race_owner",
+            password="pass1234",
+            role=UserRole.ZEV_OWNER,
+        )
+        self.zev = Zev.objects.create(
+            name="Race ZEV",
+            owner=self.owner,
+            zev_type="vzev",
+            start_date=date(2026, 1, 1),
+            billing_interval="monthly",
+            invoice_prefix="R",
+        )
+        self.participant = Participant.objects.create(
+            zev=self.zev,
+            first_name="Alice",
+            last_name="Muster",
+            email="alice@example.com",
+            valid_from=date(2026, 1, 1),
+        )
+
+    def _invoice(self, number="R-00001"):
+        invoice = Invoice.objects.create(
+            invoice_number=number,
+            zev=self.zev,
+            participant=self.participant,
+            period_start=date(2026, 1, 1),
+            period_end=date(2026, 1, 31),
+            total_chf=Decimal("42.00"),
+        )
+        InvoiceItem.objects.create(
+            invoice=invoice,
+            item_type=InvoiceItem.ItemType.FEE,
+            description="Base fee",
+            total_chf=Decimal("42.00"),
+        )
+        return invoice
+
+    def test_concurrent_approval_survives_pdf_save(self):
+        from django.utils import timezone as djtimezone
+
+        from .models import InvoiceStatus
+        from .pdf import save_invoice_pdf
+
+        invoice = self._invoice()
+        stale = Invoice.objects.get(pk=invoice.pk)
+
+        def _approve_mid_render(inv, period_context=None):
+            Invoice.objects.filter(pk=invoice.pk).update(
+                status=InvoiceStatus.APPROVED, updated_at=djtimezone.now(),
+            )
+            return b"%PDF-1.4 concurrent-approval"
+
+        with patch("invoices.pdf.generate_pdf", side_effect=_approve_mid_render):
+            save_invoice_pdf(stale)
+
+        fresh = Invoice.objects.get(pk=invoice.pk)
+        self.assertEqual(fresh.status, InvoiceStatus.APPROVED)
+        self.assertTrue(bool(fresh.pdf_file))
+        self.assertEqual(fresh.items.count(), 1)
+
+    def test_concurrent_delete_does_not_resurrect_invoice(self):
+        from .pdf import save_invoice_pdf
+
+        invoice = self._invoice()
+        invoice_id = invoice.pk
+        stale = Invoice.objects.get(pk=invoice_id)
+
+        def _delete_mid_render(inv, period_context=None):
+            Invoice.objects.get(pk=invoice_id).delete()
+            return b"%PDF-1.4 concurrent-delete"
+
+        with patch("invoices.pdf.generate_pdf", side_effect=_delete_mid_render):
+            with self.assertRaises(Invoice.DoesNotExist):
+                save_invoice_pdf(stale)
+
+        self.assertFalse(Invoice.objects.filter(pk=invoice_id).exists())
+        self.assertEqual(InvoiceItem.objects.filter(invoice_id=invoice_id).count(), 0)
+
+    def test_failed_database_update_removes_just_written_file(self):
+        from django.db import DatabaseError
+
+        from .pdf import save_invoice_pdf
+
+        invoice = self._invoice()
+        stale = Invoice.objects.get(pk=invoice.pk)
+
+        with (
+            patch("invoices.pdf.generate_pdf", return_value=b"%PDF-1.4 update-failure"),
+            patch(
+                "django.db.models.query.QuerySet.update",
+                side_effect=DatabaseError("store unavailable"),
+            ),
+        ):
+            with self.assertRaises(DatabaseError):
+                save_invoice_pdf(stale)
+
+        self.assertFalse(stale.pdf_file.storage.exists(stale.pdf_file.name))
+
+    def test_cleanup_failure_preserves_original_delete_error(self):
+        from .pdf import save_invoice_pdf
+
+        invoice = self._invoice()
+        invoice_id = invoice.pk
+        stale = Invoice.objects.get(pk=invoice_id)
+
+        def _delete_mid_render(inv, period_context=None):
+            Invoice.objects.get(pk=invoice_id).delete()
+            return b"%PDF-1.4 concurrent-delete"
+
+        with (
+            patch("invoices.pdf.generate_pdf", side_effect=_delete_mid_render),
+            patch.object(
+                stale.pdf_file.storage, "delete", side_effect=OSError("disk gone"),
+            ),
+        ):
+            with self.assertRaises(Invoice.DoesNotExist):
+                save_invoice_pdf(stale)
+
+        self.assertFalse(Invoice.objects.filter(pk=invoice_id).exists())

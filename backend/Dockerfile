@@ -22,8 +22,14 @@ LABEL org.opencontainers.image.title="$OCI_TITLE" \
     org.opencontainers.image.revision="$OCI_REVISION" \
     org.opencontainers.image.created="$OCI_CREATED"
 
+# Gunicorn timeout (610) exceeds the annual-statement pool's 600s batch
+# deadline (PDF_POOL_TIMEOUT_S in config/settings.py) so the endpoint's own
+# error path usually wins the race — not guaranteed: the pool deadline
+# excludes ZIP/response work (queries/ZIP/response), though it does include
+# gate-queue time. Sync workers render annual-statement ZIPs in-request.
 ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1
+    PYTHONUNBUFFERED=1 \
+    GUNICORN_TIMEOUT=610
 
 WORKDIR /app
 
@@ -49,4 +55,4 @@ COPY backend /app
 
 EXPOSE 8000
 
-CMD ["sh", "-c", "python manage.py migrate && gunicorn config.wsgi:application --bind 0.0.0.0:8000"]
+CMD ["sh", "-c", "python manage.py migrate && gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers \"${GUNICORN_WORKERS:-${WEB_CONCURRENCY:-1}}\" --timeout ${GUNICORN_TIMEOUT}"]

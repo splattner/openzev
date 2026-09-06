@@ -8,13 +8,19 @@ boundary: cross-tenant reads, self-service, and malformed input.
 """
 
 import io
+import os
+import subprocess
+import sys
 import zipfile
+from contextlib import ExitStack
 from datetime import date, datetime
 from datetime import timezone as dt_timezone
 from decimal import Decimal
+from pathlib import Path
 from unittest import mock
 
-from django.test import TestCase
+import pytest
+from django.test import TestCase, override_settings
 from rest_framework.test import APIClient
 
 from accounts.models import UserRole
@@ -128,7 +134,7 @@ class AnnualStatementTests(ReportTestCase):
 
 class AnnualStatementsZipTests(ReportTestCase):
     def test_owner_downloads_a_zip_of_every_participant(self):
-        make_participant(self.zev, first="Bea", last="Zweit")
+        bea = make_participant(self.zev, first="Bea", last="Zweit")
 
         resp = self._get(STATEMENTS_ZIP, self.owner, year=2026, zev_id=str(self.zev.pk))
 
@@ -138,7 +144,10 @@ class AnnualStatementsZipTests(ReportTestCase):
         names = zipfile.ZipFile(io.BytesIO(resp.content)).namelist()
         self.assertEqual(
             sorted(names),
-            ["annual-statement-2026-Muster_Pia.pdf", "annual-statement-2026-Zweit_Bea.pdf"],
+            [
+                f"annual-statement-2026-Muster_Pia-{self.participant.pk}.pdf",
+                f"annual-statement-2026-Zweit_Bea-{bea.pk}.pdf",
+            ],
         )
 
     def test_zip_builds_participant_shares_once_for_every_statement(self):
@@ -206,6 +215,162 @@ class AnnualStatementsZipTests(ReportTestCase):
         build_shares.assert_called_once()
         generate_statement.assert_not_called()
 
+    def test_zip_omits_only_failed_statement(self):
+        """Both render paths omit exactly the failed statement and name it in
+        ``omitted.txt`` (ID plus human-readable name)."""
+        for index in range(3):
+            make_participant(self.zev, first="Extra", last=f"Zed{index}")
+        participants = list(self.zev.participants.order_by("last_name", "first_name"))
+        failed_pk = participants[1].pk
+        expected_names = [
+            f"annual-statement-2026-Muster_Pia-{participants[0].pk}.pdf",
+            f"annual-statement-2026-Zed1_Extra-{participants[2].pk}.pdf",
+            f"annual-statement-2026-Zed2_Extra-{participants[3].pk}.pdf",
+            "omitted.txt",
+        ]
+
+        def _generate(participant, zev, year, **kwargs):
+            if participant.pk == failed_pk:
+                raise ValueError("render failed")
+            return str(participants.index(participant)).encode()
+
+        results = [
+            (participant.pk, None, "render failed") if participant.pk == failed_pk
+            else (participant.pk, str(index).encode(), None)
+            for index, participant in enumerate(participants)
+        ]
+        for path in ("serial", "parallel"):
+            with self.subTest(path=path):
+                with ExitStack() as stack:
+                    if path == "serial":
+                        # One worker forces the serial path through the real gate.
+                        stack.enter_context(override_settings(PDF_POOL_MAX_WORKERS=1))
+                        stack.enter_context(
+                            mock.patch(
+                                "invoices.views_reports.generate_annual_statement_pdf",
+                                side_effect=_generate,
+                            )
+                        )
+                        serial = None
+                    else:
+                        stack.enter_context(
+                            mock.patch(
+                                "invoices.pdf_pool.render_statements_parallel",
+                                return_value=results,
+                            )
+                        )
+                        serial = stack.enter_context(
+                            mock.patch("invoices.views_reports.generate_annual_statement_pdf")
+                        )
+                    response = self._get(STATEMENTS_ZIP, self.owner, year=2026, zev_id=str(self.zev.pk))
+                if path == "parallel":
+                    serial.assert_not_called()
+                self.assertEqual(response.status_code, 200)
+                with zipfile.ZipFile(io.BytesIO(response.content)) as archive:
+                    self.assertEqual(archive.namelist(), expected_names)
+                    self.assertEqual(
+                        [archive.read(name) for name in archive.namelist()[:3]], [b"0", b"2", b"3"],
+                    )
+                    # The manifest must name exactly the omitted participant, with a
+                    # human-readable name alongside the machine-readable ID.
+                    manifest = archive.read("omitted.txt").decode()
+                    self.assertIn(str(participants[1].pk), manifest)
+                    self.assertIn(f"{participants[1].last_name}, {participants[1].first_name}", manifest)
+                    self.assertNotIn(str(participants[0].pk), manifest)
+
+    def test_parallel_zip_returns_500_when_every_statement_fails(self):
+        """A fully failed export must be distinguishable from a successful
+        (even partial) one, so it cannot return an empty ZIP with status 200."""
+        make_participant(self.zev, first="Bea", last="Zweit")
+        participants = list(self.zev.participants.order_by("last_name", "first_name"))
+        results = [
+            (participant.pk, None, "render failed")
+            for participant in participants
+        ]
+        with (
+            mock.patch("invoices.pdf_pool.render_statements_parallel", return_value=results),
+            mock.patch("invoices.views_reports.generate_annual_statement_pdf") as serial,
+        ):
+            response = self._get(STATEMENTS_ZIP, self.owner, year=2026, zev_id=str(self.zev.pk))
+        self.assertEqual(response.status_code, 500)
+        self.assertEqual(response.json(), {"error": "Could not generate annual statements."})
+        serial.assert_not_called()
+
+    def test_serial_zip_returns_500_when_every_statement_fails(self):
+        """The serial path shares the complete-failure rule."""
+        make_participant(self.zev, first="Bea", last="Zweit")
+        with (
+            mock.patch("invoices.pdf_pool.render_statements_parallel", return_value=None),
+            mock.patch(
+                "invoices.views_reports.generate_annual_statement_pdf",
+                side_effect=ValueError("template rejected"),
+            ),
+        ):
+            response = self._get(STATEMENTS_ZIP, self.owner, year=2026, zev_id=str(self.zev.pk))
+        self.assertEqual(response.status_code, 500)
+        self.assertEqual(response.json(), {"error": "Could not generate annual statements."})
+
+    def test_parallel_crash_returns_500_without_serial_generation(self):
+        """A crashed worker (or a deterministic calculation error) fails fast
+        instead of rerunning the batch inside the API process: retrying a
+        document that crashed a child could take down this process, and a
+        late failure leaves no budget for a second full batch."""
+        from invoices import pdf_pool
+
+        for i in range(5):
+            make_participant(self.zev, first=f"Extra{i}", last=f"Viel{i}")
+
+        for exc in (
+            RuntimeError("PDF worker exited with status 3"),
+            OSError("PDF worker spawn failed"),
+            RuntimeError("deterministic calculation error"),
+        ):
+            with (
+                self.subTest(exc=exc),
+                mock.patch.object(
+                    pdf_pool,
+                    "render_statements_parallel",
+                    side_effect=exc,
+                ),
+                mock.patch(
+                    "invoices.views_reports.generate_annual_statement_pdf",
+                ) as generate_statement,
+            ):
+                resp = self._get(
+                    STATEMENTS_ZIP,
+                    self.owner,
+                    year=2026,
+                    zev_id=str(self.zev.pk),
+                )
+
+            self.assertEqual(resp.status_code, 500)
+            self.assertEqual(resp.json(), {"error": "Could not generate annual statements."})
+            generate_statement.assert_not_called()
+
+    def test_parallel_timeout_returns_500_without_serial_generation(self):
+        from invoices import pdf_pool
+
+        for i in range(5):
+            make_participant(self.zev, first=f"Extra{i}", last=f"Viel{i}")
+
+        with mock.patch.object(
+            pdf_pool,
+            "render_statements_parallel",
+            side_effect=TimeoutError("statement batch deadline exceeded"),
+        ), mock.patch(
+            "invoices.views_reports.generate_annual_statement_pdf",
+        ) as generate_statement:
+            resp = self._get(
+                STATEMENTS_ZIP,
+                self.owner,
+                year=2026,
+                zev_id=str(self.zev.pk),
+            )
+
+        self.assertEqual(resp.status_code, 500)
+        self.assertEqual(resp.json(), {"error": "Could not generate annual statements."})
+        generate_statement.assert_not_called()
+
     def test_participant_is_refused(self):
         resp = self._get(STATEMENTS_ZIP, self.puser, year=2026, zev_id=str(self.zev.pk))
 
@@ -236,6 +401,145 @@ class AnnualStatementsZipTests(ReportTestCase):
         resp = self._get(STATEMENTS_ZIP, self.owner, year=2026, zev_id=str(self.zev.pk))
 
         self.assertEqual(resp.status_code, 404)
+
+    def test_zip_names_fit_filesystem_limits_for_maximum_length_names(self):
+        """Two 100-char names plus the UUID previously produced a 264-byte
+        entry that failed to extract; only the readable portion is truncated
+        and the pk is always kept."""
+        from .views_reports import _ZIP_ENTRY_BYTE_BUDGET, _annual_statement_zip_name
+
+        long_last = "L" * 100
+        long_first = "F" * 100
+        participant = make_participant(self.zev, first=long_first, last=long_last)
+
+        name = _annual_statement_zip_name(participant, 2026)
+
+        self.assertLessEqual(len(name.encode("utf-8")), _ZIP_ENTRY_BYTE_BUDGET)
+        self.assertIn(str(participant.pk), name)
+        self.assertTrue(name.startswith("annual-statement-2026-"))
+        self.assertTrue(name.endswith(f"-{participant.pk}.pdf"))
+
+    def test_zip_names_replace_windows_invalid_and_control_characters(self):
+        from .views_reports import _ZIP_ENTRY_BYTE_BUDGET, _annual_statement_zip_name
+
+        participant = make_participant(self.zev, first='A"B', last="C<>D\x01E|F?G*H")
+
+        name = _annual_statement_zip_name(participant, 2026)
+
+        for character in '<>:"/\\|?*\x01':
+            self.assertNotIn(character, name)
+        self.assertIn(str(participant.pk), name)
+        self.assertLessEqual(len(name.encode("utf-8")), _ZIP_ENTRY_BYTE_BUDGET)
+
+    def test_zip_names_truncate_multibyte_names_on_character_boundaries(self):
+        from .views_reports import _ZIP_ENTRY_BYTE_BUDGET, _annual_statement_zip_name
+
+        participant = make_participant(self.zev, first="ü" * 100, last="ö" * 100)
+
+        name = _annual_statement_zip_name(participant, 2026)
+
+        self.assertLessEqual(len(name.encode("utf-8")), _ZIP_ENTRY_BYTE_BUDGET)
+        self.assertIn(str(participant.pk), name)
+        # Re-encoding must round-trip: no split multibyte sequence.
+        name.encode("utf-8").decode("utf-8")
+
+    def test_zip_with_maximum_length_names_extracts(self):
+        participant = make_participant(self.zev, first="F" * 100, last="L" * 100)
+
+        with mock.patch(
+            "invoices.views_reports.generate_annual_statement_pdf",
+            return_value=b"PDF",
+        ):
+            resp = self._get(STATEMENTS_ZIP, self.owner, year=2026, zev_id=str(self.zev.pk))
+
+        self.assertEqual(resp.status_code, 200)
+        with zipfile.ZipFile(io.BytesIO(resp.content)) as archive:
+            names = archive.namelist()
+            self.assertEqual(len(names), 2)
+            for entry in names:
+                self.assertLessEqual(len(entry.encode("utf-8")), 255)
+                archive.read(entry)
+            self.assertTrue(any(str(participant.pk) in entry for entry in names))
+
+    @pytest.mark.slow
+    @pytest.mark.integration
+    def test_zip_renders_end_to_end_in_worker_subprocesses(self):
+        """No render mocks and a file-backed database, so the four-participant
+        batch exercises the real statement pipeline through the parallel path:
+        with two CPUs and two pinned workers, two PDF workers must spawn. A
+        serial fallback fails instead of passing silently. Subprocesses cannot
+        share the TestCase database, hence the self-contained child run."""
+        import json as jsonlib
+        import tempfile
+        import textwrap
+
+        script = textwrap.dedent("""
+            import io, json, subprocess, zipfile
+            import django
+            django.setup()
+            from django.core.management import call_command
+            call_command("migrate", verbosity=0, interactive=False)
+            from rest_framework.test import APIClient
+            from accounts.models import UserRole
+            from testing.helpers import make_user
+            from invoices.test_helpers import make_participant, make_zev
+
+            owner = make_user("zip_e2e_owner", UserRole.ZEV_OWNER)
+            zev = make_zev(owner, "ZIP E2E ZEV")
+            for index in range(4):
+                make_participant(zev, first="Extra", last=f"Zed{index}")
+            client = APIClient()
+            from testing.helpers import authenticate as auth
+            auth(client, owner)
+
+            spawned = []
+            real_popen = subprocess.Popen
+
+            def observed_popen(*args, **kwargs):
+                process = real_popen(*args, **kwargs)
+                command = args[0] if args else kwargs.get("args")
+                if (isinstance(command, (list, tuple))
+                        and "invoices.pdf_worker" in command):
+                    spawned.append(process.pid)
+                return process
+
+            subprocess.Popen = observed_popen
+            try:
+                resp = client.get(
+                    "/api/v1/invoices/invoices/annual-statements-zip/",
+                    {"year": 2026, "zev_id": str(zev.pk)},
+                )
+                assert resp.status_code == 200, resp.content[:500]
+                with zipfile.ZipFile(io.BytesIO(resp.content)) as archive:
+                    names = archive.namelist()
+                    assert len(names) == 4, names
+                    assert "omitted.txt" not in names
+                    assert all(archive.read(n).startswith(b"%PDF-") for n in names)
+            finally:
+                subprocess.Popen = real_popen
+            print(json.dumps({"documents": len(names), "workers_spawned": len(spawned)}))
+        """)
+        with tempfile.TemporaryDirectory(prefix="zip-e2e-") as tmp:
+            environment = {
+                **os.environ,
+                "DJANGO_SETTINGS_MODULE": "config.settings_test",
+                "DATABASE_URL": f"sqlite:///{tmp}/e2e.sqlite3",
+                "MEDIA_ROOT": f"{tmp}/media",
+                "SECRET_KEY": "isolated-zip-e2e-test-key",
+                "ALLOWED_HOSTS": "testserver,localhost",
+                # Pin the child to two CPUs and two workers so the assertion
+                # holds on any host, from one CPU upward.
+                "PYTHON_CPU_COUNT": "2",
+                "PDF_POOL_MAX_WORKERS": "2",
+            }
+            child = subprocess.run(
+                [sys.executable, "-c", script],
+                cwd=Path(__file__).resolve().parents[1],
+                env=environment, capture_output=True, text=True, timeout=300,
+            )
+        assert child.returncode == 0, child.stderr[-2000:]
+        payload = jsonlib.loads(child.stdout.strip().splitlines()[-1])
+        assert payload == {"documents": 4, "workers_spawned": 2}
 
 
 class FinancialSummaryTests(ReportTestCase):

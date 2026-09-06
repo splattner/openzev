@@ -123,6 +123,9 @@ ingress:
   # fullstack setup live in docker/fullstack-nginx.conf.
   annotations:
     nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    # Annual-statement ZIPs render synchronously: ingress (660s) stays above
+    # Gunicorn (610s), which stays above the pool batch deadline (600s).
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "660"
   tls: []
   hosts:
     - host: openzev.local

@@ -246,3 +246,12 @@ CELERY_BEAT_SCHEDULE = {
         "schedule": 300.0,
     },
 }
+
+# Annual-statement subprocess limit per web serving process; account for the
+# web worker count when sizing the host.
+PDF_POOL_MAX_WORKERS = env.int("PDF_POOL_MAX_WORKERS", default=4)
+
+# Annual-statement batch deadline in seconds. The web server's request timeout
+# (GUNICORN_TIMEOUT in the Dockerfile) must exceed this so a slow export is
+# reported by the endpoint as a 500 instead of losing the serving process.
+PDF_POOL_TIMEOUT_S = env.int("PDF_POOL_TIMEOUT_S", default=600)
