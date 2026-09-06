@@ -5,10 +5,12 @@ emits PDF/A-3b. WeasyPrint writes the PDF/A identification (XMP ``pdfaid``), the
 sRGB ``OutputIntent`` and embedded font subsets automatically — these tests make
 sure nobody silently drops the ``pdf_variant`` argument.
 """
+import base64
 import re
 import zlib
 from datetime import date
 from decimal import Decimal
+from pathlib import Path
 
 from django.test import TestCase
 
@@ -115,3 +117,63 @@ class InvoicePdfaTests(TestCase):
         )
 
         assert_is_pdfa(self, generate_pdf(invoice))
+
+
+@pytest.mark.slow
+def _test_font_data_url():
+    """A real TTF embedded as a data: URL for the font-isolation test."""
+    candidates = (
+        "/usr/share/fonts/TTF/DejaVuSans.ttf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+        "/usr/share/fonts/liberation/LiberationSans-Regular.ttf",
+        "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+        "/usr/share/fonts/noto/NotoSans-Regular.ttf",
+        "/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf",
+    )
+    for candidate in candidates:
+        if Path(candidate).is_file():
+            encoded = base64.b64encode(Path(candidate).read_bytes()).decode("ascii")
+            return f"data:font/ttf;base64,{encoded}"
+    pytest.skip("no system TTF font available for the font-isolation test")
+
+
+@pytest.mark.slow
+@pytest.mark.parametrize("fonttools_subset", [False, True], ids=["default", "fonttools"])
+def test_custom_font_does_not_change_other_documents(monkeypatch, fonttools_subset):
+    """Installing an @font-face must invalidate cached strut metrics.
+
+    Strut layouts are cached per font style, so a key stored while the
+    family was unknown would keep serving fallback metrics after the font
+    arrives — shifting line positions in the font document itself. Plain
+    documents before and after must render identically, and the warmed-cache
+    font document must match a fresh-cache one.
+    """
+    from weasyprint.pdf import fonts
+
+    from . import pdf_render
+
+    if fonttools_subset:
+        monkeypatch.setattr(fonts, "harfbuzz_subset", None)
+
+    # FontTools timestamps embedded subsets at save time. Pin that metadata
+    # so renders crossing a wall-clock second still compare byte-for-byte.
+    monkeypatch.setenv("SOURCE_DATE_EPOCH", "1704067200")
+    data_url = _test_font_data_url()
+    plain = (
+        "<style>p {font-family: ReviewFont, monospace}</style>"
+        "<p>Invoice 123<br>second line<br>third line</p>"
+    )
+    font_doc = (
+        "<style>@font-face {font-family: ReviewFont; "
+        f'src: url("{data_url}")}}</style>' + plain
+    )
+
+    monkeypatch.setattr(pdf_render, "_process_font_config", None)
+    first_plain = render_pdf(plain)
+    warmed_font_doc = render_pdf(font_doc)
+    assert pdf_render._process_font_config is None
+    assert render_pdf(plain) == first_plain
+
+    monkeypatch.setattr(pdf_render, "_process_font_config", None)
+    assert render_pdf(font_doc) == warmed_font_doc
+    assert render_pdf(plain) == first_plain

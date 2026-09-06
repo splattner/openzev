@@ -249,6 +249,8 @@ To inspect the attested predicate after verification, add `| jq '.payload | @bas
 
 ### 1) Backend
 
+Requires Python 3.14 (matches the Docker images and CI).
+
 ```bash
 cd backend
 cp .env.example .env

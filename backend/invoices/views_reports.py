@@ -38,6 +38,43 @@ from .tariff_overview import generate_tariff_overview_pdf
 
 logger = logging.getLogger(__name__)
 
+# ZIP entry names must stay well under the 255-byte filesystem limit: both
+# name fields allow 100 chars, so two maximal names plus the UUID would
+# otherwise produce a >260-byte entry that fails to extract.
+_ZIP_ENTRY_BYTE_BUDGET = 180
+
+
+def _truncate_utf8(value: str, max_bytes: int) -> str:
+    """Truncate ``value`` to at most ``max_bytes`` UTF-8 bytes, keeping whole characters."""
+    return value.encode("utf-8")[:max(0, max_bytes)].decode("utf-8", "ignore")
+
+
+# Characters Windows forbids in file names; the fixed prefix plus UUID/".pdf"
+# suffix already rule out reserved device names and trailing dots/spaces.
+_WINDOWS_INVALID_FILENAME_CHARS = '<>:"/\\|?*'
+
+
+def _annual_statement_zip_name(participant, year: int) -> str:
+    """One ZIP entry name for a participant's annual statement.
+
+    The pk is always kept in full (it disambiguates duplicate names); only
+    the readable ``last_first`` portion is truncated to fit the byte budget.
+    Unicode names pass through; Windows-invalid punctuation and control
+    characters become underscores.
+    """
+    prefix = f"annual-statement-{year}-"
+    suffix = f"-{participant.pk}.pdf"
+    safe_name = f"{participant.last_name}_{participant.first_name}".replace(" ", "_")
+    safe_name = "".join(
+        "_"
+        if character in _WINDOWS_INVALID_FILENAME_CHARS or ord(character) < 32
+        else character
+        for character in safe_name
+    )
+    readable_budget = _ZIP_ENTRY_BYTE_BUDGET - len(prefix.encode("utf-8")) - len(suffix.encode("utf-8"))
+    safe_name = _truncate_utf8(safe_name, readable_budget)
+    return f"{prefix}{safe_name}{suffix}"
+
 
 def _parse_year(year_raw: str | None) -> tuple[int | None, Response | None]:
     """Return ``(year, None)`` or ``(None, error response)``.
@@ -208,20 +245,22 @@ class AnnualStatementsZipView(APIView):
             (p.id, p.valid_from, p.valid_to, p.allocation_weight)
             for p in participants
         ]
+        # Annual-statement ZIPs are the pool's only caller (see ADR 0017).
+        from .pdf_pool import render_statements_parallel
+
+        shares_by_date = None
+        zev_totals_by_ts = None
+        parallel_results = None
         try:
-            shares_by_date = eligible_participant_shares(
-                zev,
-                year_start,
-                year_end,
-                windows=share_windows,
+            parallel_results = render_statements_parallel(
+                participants, zev, year, share_windows=share_windows,
             )
-            year_start_dt, year_end_dt = period_window(year_start, year_end)
-            zev_totals_by_ts = community_totals_by_timestamp(
-                zev, year_start_dt, year_end_dt,
-            )
-        except Exception:
+        except TimeoutError:
+            # The time budget — including time queued behind another batch —
+            # is exhausted and serial rendering is slower, so a deadline
+            # expiry fails fast instead of retrying.
             logger.exception(
-                "Annual-statement shared-data calculation failed for ZEV %s and year %s",
+                "Annual-statement batch deadline exceeded for ZEV %s and year %s",
                 zev.id,
                 year,
             )
@@ -229,24 +268,96 @@ class AnnualStatementsZipView(APIView):
                 {"error": "Could not generate annual statements."},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
-        with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        except Exception:
+            # Fail fast without a serial retry (see ADR 0017).
+            logger.exception(
+                "Annual-statement batch failed for ZEV %s and year %s",
+                zev.id,
+                year,
+            )
+            return Response(
+                {"error": "Could not generate annual statements."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+        if parallel_results is None:
+            try:
+                shares_by_date = eligible_participant_shares(
+                    zev,
+                    year_start,
+                    year_end,
+                    windows=share_windows,
+                )
+                year_start_dt, year_end_dt = period_window(year_start, year_end)
+                zev_totals_by_ts = community_totals_by_timestamp(
+                    zev, year_start_dt, year_end_dt,
+                )
+            except Exception:
+                logger.exception(
+                    "Annual-statement shared-data calculation failed for ZEV %s and year %s",
+                    zev.id,
+                    year,
+                )
+                return Response(
+                    {"error": "Could not generate annual statements."},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                )
+
+        # One iterator covers both paths; parallel rows arrive in participant
+        # input order, so zip() pairs each row with its participant.
+        def _statement_documents():
+            if parallel_results is not None:
+                for participant, (_pid, pdf_bytes, error) in zip(participants, parallel_results, strict=True):
+                    if pdf_bytes is None:
+                        logger.warning(
+                            "Annual statement omitted for participant %s: %s",
+                            participant.pk, error,
+                        )
+                    else:
+                        yield participant, pdf_bytes
+                return
             for participant in participants:
                 try:
-                    pdf_bytes = generate_annual_statement_pdf(
+                    yield participant, generate_annual_statement_pdf(
                         participant,
                         zev,
                         year,
                         shares_by_date=shares_by_date,
                         zev_totals_by_ts=zev_totals_by_ts,
                     )
-                    safe_name = f"{participant.last_name}_{participant.first_name}".replace(" ", "_")
-                    zf.writestr(f"annual-statement-{year}-{safe_name}.pdf", pdf_bytes)
                 except Exception:
-                    # Best effort: one participant's missing data must not sink
-                    # the whole archive.
-                    continue
+                    logger.exception(
+                        "Annual statement omitted for participant %s", participant.pk,
+                    )
 
-        buf.seek(0)
+        generated = set()
+        with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+            for participant, pdf_bytes in _statement_documents():
+                generated.add(participant.pk)
+                zf.writestr(_annual_statement_zip_name(participant, year), pdf_bytes)
+            omitted = [p for p in participants if p.pk not in generated]
+            if omitted:
+                # A partial archive must be distinguishable from a complete one
+                # even after the ZIP has left the server. IDs stay first and
+                # machine-readable; names let an admin map them without a lookup.
+                entries = "\n".join(
+                    f"- {p.pk} ({p.last_name}, {p.first_name})"
+                    for p in sorted(omitted, key=lambda p: str(p.pk))
+                )
+                zf.writestr(
+                    "omitted.txt",
+                    "The following participants were omitted because their annual "
+                    f"statement could not be generated:\n{entries}\n",
+                )
+
+        if not generated:
+            logger.error(
+                "Every annual statement failed for ZEV %s and year %s", zev.id, year,
+            )
+            return Response(
+                {"error": "Could not generate annual statements."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
         response = HttpResponse(buf.getvalue(), content_type="application/zip")
         response["Content-Disposition"] = f'attachment; filename="annual-statements-{year}.zip"'
         return response

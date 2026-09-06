@@ -407,13 +407,51 @@ def generate_pdf(
     return pdf_bytes
 
 
+def _delete_stored_pdf(invoice, stored_name) -> None:
+    """Best-effort removal of a just-written PDF; failures are logged, never raised."""
+    try:
+        invoice.pdf_file.storage.delete(stored_name)
+    except Exception:
+        logger.exception("Orphaned invoice PDF could not be removed: %s", stored_name)
+
+
 def save_invoice_pdf(
     invoice,
     *,
     period_context: InvoicePdfPeriodContext | None = None,
 ) -> None:
-    """Generate PDF and attach it to the Invoice model."""
+    """Generate PDF and attach it to the Invoice model.
+
+    Only ``pdf_file`` (and ``updated_at``) are written back, via a
+    conditional ``UPDATE`` on the primary key. Rendering takes long enough
+    that the passed ``invoice`` may be stale: saving the whole instance
+    would overwrite a concurrent workflow change (e.g. revert an approval)
+    or resurrect a concurrently deleted row. A deleted row is treated as a
+    failed render: the just-written file is removed and
+    ``Invoice.DoesNotExist`` is raised instead of recreating the record.
+    """
+    from django.utils import timezone
+
+    from .models import Invoice
+
     pdf_bytes = generate_pdf(invoice, period_context=period_context)
     filename = f"invoice_{invoice.invoice_number}.pdf"
-    invoice.pdf_file.save(filename, ContentFile(pdf_bytes), save=True)
+    # Write the file without saving the (possibly stale) model instance.
+    invoice.pdf_file.save(filename, ContentFile(pdf_bytes), save=False)
+    stored_name = invoice.pdf_file.name
+    try:
+        updated = Invoice.objects.filter(pk=invoice.pk).update(
+            pdf_file=stored_name, updated_at=timezone.now(),
+        )
+    except Exception:
+        logger.exception(
+            "Invoice PDF database update failed for invoice %s", invoice.invoice_number,
+        )
+        _delete_stored_pdf(invoice, stored_name)
+        raise
+    if not updated:
+        _delete_stored_pdf(invoice, stored_name)
+        raise Invoice.DoesNotExist(
+            f"Invoice {invoice.pk} was deleted while its PDF was rendering."
+        )
     logger.info("Saved PDF for invoice %s", invoice.invoice_number)

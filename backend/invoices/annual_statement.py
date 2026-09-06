@@ -382,19 +382,10 @@ def _compute_monthly_data(
     return months_data, totals
 
 
-def _compute_savings(participant, zev, year: int) -> dict | None:
-    """Compute annual savings from local energy vs grid rates using actual invoice data."""
+def _compute_savings(invoices) -> dict | None:
+    """Compute annual savings from local energy vs grid rates for the
+    selected participant/year's non-cancelled invoices."""
     from .models import InvoiceItem
-
-    year_start = date(year, 1, 1)
-    year_end = date(year, 12, 31)
-
-    invoices = Invoice.objects.filter(
-        participant=participant,
-        zev=zev,
-        period_start__gte=year_start,
-        period_end__lte=year_end,
-    ).exclude(status=InvoiceStatus.CANCELLED)
 
     total_local_kwh = float(sum(inv.total_local_kwh for inv in invoices))
     total_grid_kwh = float(sum(inv.total_grid_kwh for inv in invoices))
@@ -546,7 +537,7 @@ def generate_annual_statement_pdf(
             zev=zev,
             period_start__gte=year_start,
             period_end__lte=year_end,
-        ).exclude(status=InvoiceStatus.CANCELLED).order_by("period_start")
+        ).exclude(status=InvoiceStatus.CANCELLED).prefetch_related("items").order_by("period_start")
     )
 
     date_pattern = app_settings.date_format_short
@@ -574,7 +565,7 @@ def generate_annual_statement_pdf(
         "total_chf": f"{sum_total:.2f}",
     }
 
-    savings = _compute_savings(participant, zev, year)
+    savings = _compute_savings(year_invoices)
 
     owner_participant = zev.participants.filter(user=zev.owner).first()
 

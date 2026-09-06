@@ -1,5 +1,6 @@
 """Celery tasks for async invoice operations."""
 import logging
+from billiard.exceptions import SoftTimeLimitExceeded
 from celery import shared_task
 from django.core.mail import EmailMessage
 from django.utils import timezone as djtimezone
@@ -150,15 +151,22 @@ def send_invoice_email_task(self, invoice_id: str, recipient_email: str = None):
 
 
 def _render_pdfs(invoices) -> int:
-    """Render each invoice's PDF, returning how many failed.
+    """Render each invoice's PDF serially, returning how many failed.
 
-    Per-invoice render failures are isolated: one participant with an address
-    the QR library rejects must not cost the rest of the period its documents.
-    A shared period-context failure prevents every invoice in that period from
-    rendering and is not retried once per participant.
+    Prefetches line items once for the whole batch: callers pass either the
+    engine's freshly built list or a period queryset, and neither is required
+    to have items loaded. Per-invoice render failures are isolated: one
+    participant with an address the QR library rejects must not cost the rest
+    of the period its documents. A shared period-context failure prevents
+    every invoice in that period from rendering and is not retried once per
+    participant.
     """
+    from django.db.models import prefetch_related_objects
+
     from .pdf import build_invoice_pdf_period_context, save_invoice_pdf
 
+    invoices = list(invoices)
+    prefetch_related_objects(invoices, "items")
     failed = 0
     period_contexts = {}
     failed_periods = set()
@@ -171,6 +179,8 @@ def _render_pdfs(invoices) -> int:
         if key not in period_contexts:
             try:
                 period_contexts[key] = build_invoice_pdf_period_context(invoice)
+            except SoftTimeLimitExceeded:
+                raise
             except Exception:
                 failed += 1
                 failed_periods.add(key)
@@ -184,10 +194,49 @@ def _render_pdfs(invoices) -> int:
 
         try:
             save_invoice_pdf(invoice, period_context=period_contexts[key])
+        except SoftTimeLimitExceeded:
+            raise
         except Exception as exc:
             failed += 1
             logger.error("PDF generation failed for invoice %s: %s", invoice.invoice_number, exc)
     return failed
+
+
+def _record_aborted_batch_event(
+    *,
+    action_type: str,
+    zev,
+    period_start: str,
+    period_end: str,
+    summary: str,
+    extra_metadata: dict | None = None,
+) -> None:
+    """Record the FAILED audit event for a bulk ZEV task aborted mid-batch.
+
+    Best-effort: an audit-write failure must not replace the original
+    exception reaching Celery, so it is logged and swallowed here while the
+    outer handler re-raises.
+    """
+    try:
+        record_audit_event(
+            action_category=AuditActionCategory.INVOICE,
+            action_type=action_type,
+            target_type="zev.Zev",
+            target=zev,
+            target_id=str(zev.id),
+            target_display=zev.name,
+            summary=summary,
+            status=AuditEventStatus.FAILED,
+            source=AuditEventSource.CELERY,
+            metadata={
+                "period_start": period_start,
+                "period_end": period_end,
+                "aborted": True,
+                **(extra_metadata or {}),
+            },
+        )
+    except Exception:
+        logger.exception("Aborted-batch audit event could not be recorded")
 
 
 @shared_task(bind=True, max_retries=1)
@@ -245,15 +294,44 @@ def generate_zev_invoices_task(self, zev_id: str, period_start: str, period_end:
 
     start = date.fromisoformat(period_start)
     end = date.fromisoformat(period_end)
-    # generate_invoices_for_zev isolates per-participant failures itself, so
-    # nothing here needs to catch them (see engine.generate_invoices_for_zev).
-    invoices, failures = generate_invoices_for_zev(zev, start, end)
+    try:
+        # generate_invoices_for_zev isolates per-participant failures itself, so
+        # nothing here needs to catch them (see engine.generate_invoices_for_zev).
+        invoices, failures = generate_invoices_for_zev(zev, start, end)
+    except BaseException as exc:
+        # Creation never returned — record the abort (see
+        # _record_aborted_batch_event for the policy), then re-raise.
+        logger.exception("Invoice creation aborted for ZEV %s", zev.name)
+        _record_aborted_batch_event(
+            action_type="invoice.generate_all",
+            zev=zev,
+            period_start=period_start,
+            period_end=period_end,
+            summary=f"Invoice creation for ZEV {zev.name} aborted: {exc}.",
+            extra_metadata={"phase": "creation"},
+        )
+        raise
 
-    # The PDF is part of producing an invoice, not a later step the operator has
-    # to remember: an invoice without one cannot be reviewed, downloaded or
-    # emailed. Rendering here costs the batch a few seconds per invoice but is
-    # strictly less work than the separate pass it replaces.
-    pdf_failed = _render_pdfs(invoices)
+    # Rows are already committed before rendering; review, download, approval
+    # and email do not require a PDF (see workflow.approve_invoice).
+    try:
+        pdf_failed = _render_pdfs(invoices)
+    except BaseException as exc:
+        # Invoices (and some PDFs) may already be saved — record the abort,
+        # then re-raise.
+        logger.exception("Invoice generation aborted after saving %d invoices", len(invoices))
+        _record_aborted_batch_event(
+            action_type="invoice.generate_all",
+            zev=zev,
+            period_start=period_start,
+            period_end=period_end,
+            summary=(
+                f"Invoice generation for ZEV {zev.name} aborted after "
+                f"{len(invoices)} invoices were saved: {exc}."
+            ),
+            extra_metadata={"phase": "rendering", "invoice_count": len(invoices), "failures": failures},
+        )
+        raise
 
     logger.info(
         "Generated %d invoices for ZEV %s (%d participant(s) failed, %d PDFs failed)",
@@ -288,8 +366,9 @@ def generate_zev_invoices_task(self, zev_id: str, period_start: str, period_end:
 def generate_zev_pdfs_task(self, zev_id: str, period_start: str, period_end: str):
     """Re-render PDFs for every invoice of a ZEV period.
 
-    Invoices already carry a PDF from generation; this exists to pick up a
-    changed PDF template across a whole period, not to fill gaps.
+    Invoices normally carry a PDF from generation; this re-renders the whole
+    period to pick up a changed PDF template, and also fills the gap for any
+    invoice whose PDF is missing.
     """
     from zev.models import Zev
     from .models import Invoice
@@ -316,7 +395,20 @@ def generate_zev_pdfs_task(self, zev_id: str, period_start: str, period_end: str
         period_end=period_end,
     ).select_related("participant", "zev")
 
-    failed = _render_pdfs(invoices)
+    try:
+        failed = _render_pdfs(invoices)
+    except BaseException as exc:
+        # Some PDFs may already be saved — record the abort, then re-raise.
+        logger.exception("Bulk PDF generation aborted for ZEV %s", zev.name)
+        _record_aborted_batch_event(
+            action_type="invoice.generate_pdfs_all",
+            zev=zev,
+            period_start=period_start,
+            period_end=period_end,
+            summary=f"Bulk PDF generation for ZEV {zev.name} aborted: {exc}.",
+        )
+        raise
+
     count = len(invoices) - failed
 
     logger.info("Generated %d invoice PDFs for ZEV %s (%d failed)", count, zev.name, failed)
