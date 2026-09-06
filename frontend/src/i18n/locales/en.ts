@@ -1035,6 +1035,25 @@ export const en = {
             deleteMessage: 'Are you sure you want to delete "{{name}}"? This action cannot be undone.',
             deleteConfirm: 'Delete Participant',
         },
+        publicInvoice: {
+            title: 'Invoice {{number}}',
+            loading: 'Loading invoice …',
+            invalidTitle: 'This link is not valid',
+            invalidBody: 'The link has expired, was revoked, or is incomplete. Please use the QR code on your current invoice.',
+            paid: 'Paid',
+            notPaid: 'Open',
+            localEnergy: 'Local energy',
+            gridEnergy: 'Grid energy',
+            localShare: 'Local share',
+            downloadPdf: 'Invoice as PDF',
+            recipientNote: 'This invoice was issued to {{name}}.',
+            categories: {
+                energy: 'Energy',
+                grid_fees: 'Grid fees',
+                levies: 'Levies',
+                metering: 'Metering',
+            },
+        },
         tariffs: {
             vatInclusiveNotice: 'This ZEV folds non-recoverable VAT into its prices. The prices shown here are net; invoices add the active VAT rate to grid energy, grid fees, levies and metering.',
             import: {

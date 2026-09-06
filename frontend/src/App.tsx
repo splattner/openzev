@@ -25,6 +25,7 @@ const LoginPage = lazy(async () => ({ default: (await import('./pages/LoginPage'
 const MeteringChartPage = lazy(async () => ({ default: (await import('./pages/MeteringChartPage')).MeteringChartPage }))
 const MeteringPointsPage = lazy(async () => ({ default: (await import('./pages/MeteringPointsPage')).MeteringPointsPage }))
 const NotFoundPage = lazy(async () => ({ default: (await import('./pages/NotFoundPage')).NotFoundPage }))
+const PublicInvoicePage = lazy(async () => ({ default: (await import('./pages/PublicInvoicePage')).PublicInvoicePage }))
 const ParticipantsPage = lazy(async () => ({ default: (await import('./pages/ParticipantsPage')).ParticipantsPage }))
 const TariffsPage = lazy(async () => ({ default: (await import('./pages/TariffsPage')).TariffsPage }))
 const VerifyEmailPage = lazy(async () => ({ default: (await import('./pages/VerifyEmailPage')).VerifyEmailPage }))
@@ -50,6 +51,10 @@ function App() {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/verify-email" element={<VerifyEmailPage />} />
           <Route path="/oauth/callback" element={<OAuthCallbackPage />} />
+          {/* Reached from the QR on an invoice. Outside ProtectedRoute and
+              outside Layout: the reader has no session and nothing to log
+              into, so app chrome would only offer doors that do not open. */}
+          <Route path="/i/:prefix" element={<PublicInvoicePage />} />
           <Route
             path="/"
             element={

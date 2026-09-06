@@ -1024,6 +1024,25 @@ export const it = {
             deleteMessage: 'Sei sicuro di voler eliminare "{{name}}"? Questa azione non può essere annullata.',
             deleteConfirm: 'Elimina partecipante',
         },
+        publicInvoice: {
+            title: 'Fattura {{number}}',
+            loading: 'Caricamento della fattura …',
+            invalidTitle: 'Questo link non è valido',
+            invalidBody: 'Il link è scaduto, è stato revocato o è incompleto. Utilizzate il codice QR della vostra fattura attuale.',
+            paid: 'Pagata',
+            notPaid: 'Aperta',
+            localEnergy: 'Energia locale',
+            gridEnergy: 'Prelievo dalla rete',
+            localShare: 'Quota locale',
+            downloadPdf: 'Fattura in PDF',
+            recipientNote: 'Questa fattura è stata emessa per {{name}}.',
+            categories: {
+                energy: 'Energia',
+                grid_fees: 'Costi di rete',
+                levies: 'Tributi',
+                metering: 'Tariffa di misurazione',
+            },
+        },
         tariffs: {
             vatInclusiveNotice: 'Questo CEL include nei prezzi l’IVA non recuperabile. I prezzi mostrati qui sono netti; le fatture aggiungono l’aliquota IVA vigente a energia di rete, utilizzo della rete, tributi e misurazione.',
             import: {
