@@ -269,6 +269,23 @@ def magic_link_consume(request):
 # invoice must not keep serving the previous period's picture.
 _CHART_CACHE_SECONDS = 60 * 60
 
+# (key, title, description), in the order the insights page prints them.
+#
+# The headings travel with the pictures rather than being looked up in the
+# frontend's own locale, because a chart's *embedded* labels are written in the
+# ZEV's ``invoice_language``. A reader whose browser is English opening an
+# invoice a ZEV issues in German must not get an English heading over a German
+# diagram — the document has one language, and this is it.
+_CHART_COPY = (
+    ("energy", "chart_title", "chart_description"),
+    ("hourly", "hourly_chart_title", "hourly_chart_description"),
+    ("flow", "flow_title", "flow_description"),
+)
+
+
+def _empty_charts() -> dict:
+    return {"title": "", "intro": "", "charts": []}
+
 
 def _chart_cache_key(invoice) -> str:
     stamp = invoice.updated_at.isoformat() if invoice.updated_at else "new"
@@ -311,12 +328,12 @@ def public_invoice_charts(request, prefix):
     tr = dict(INVOICE_TRANSLATIONS.get(lang, INVOICE_TRANSLATIONS["de"]))
     try:
         period_context = build_invoice_pdf_period_context(invoice)
-        charts = {
-            "energy_chart_svg": _build_energy_chart_svg(invoice, tr),
-            "hourly_profile_chart_svg": _build_hourly_profile_chart_svg(
+        svgs = {
+            "energy": _build_energy_chart_svg(invoice, tr),
+            "hourly": _build_hourly_profile_chart_svg(
                 invoice, tr, shares_by_date=period_context.shares_by_date,
             ),
-            "energy_flow_svg": _build_energy_flow_svg(
+            "flow": _build_energy_flow_svg(
                 invoice, tr, period_stats=period_context.participant_stats,
             ),
         }
@@ -324,8 +341,16 @@ def public_invoice_charts(request, prefix):
         # The invoice already rendered without these. Failing the whole page
         # for a missing picture would be the wrong trade.
         logger.exception("Public charts failed for invoice %s", invoice.pk)
-        return Response({"energy_chart_svg": None, "hourly_profile_chart_svg": None,
-                         "energy_flow_svg": None})
+        return Response(_empty_charts())
 
-    cache.set(cache_key, charts, _CHART_CACHE_SECONDS)
-    return Response(charts)
+    payload = {
+        "title": tr["insights_page_title"],
+        "intro": tr["insights_page_intro"],
+        "charts": [
+            {"key": key, "title": tr[title_key], "description": tr[desc_key], "svg": svgs[key]}
+            for key, title_key, desc_key in _CHART_COPY
+            if svgs[key]
+        ],
+    }
+    cache.set(cache_key, payload, _CHART_CACHE_SECONDS)
+    return Response(payload)

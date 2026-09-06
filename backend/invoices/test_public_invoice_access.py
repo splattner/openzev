@@ -435,19 +435,52 @@ class PublicInvoiceChartsTests(PublicInvoiceTestCase):
 
         cache.clear()
 
-    def _charts(self, secret=None):
+    def _charts(self, secret=None, headers=None):
         return self.client.get(
             self.CHARTS_URL.format(prefix=self.token.prefix),
             {"s": self.secret if secret is None else secret},
+            **(headers or {}),
         )
 
-    def test_returns_the_three_chart_keys(self):
-        resp = self._charts()
+    def test_returns_the_charts_in_the_invoice_order(self):
+        """Whatever renders, renders in the order the insights page prints.
 
-        self.assertEqual(resp.status_code, 200)
+        This ZEV has no meter readings, so only the energy chart is buildable —
+        the profile and the flow diagram need consumption to describe. A chart
+        that cannot be drawn is omitted rather than sent as a null the page
+        would have to filter.
+        """
+        keys = [c["key"] for c in self._charts().json()["charts"]]
+
+        self.assertEqual(keys, [k for k in ("energy", "hourly", "flow") if k in keys])
+        self.assertIn("energy", keys)
+
+    def test_each_chart_carries_its_heading_and_description(self):
+        charts = self._charts().json()["charts"]
+
+        self.assertTrue(charts, "expected at least one chart to build")
+        for chart in charts:
+            self.assertTrue(chart["title"], chart["key"])
+            self.assertTrue(chart["description"], chart["key"])
+            self.assertIn("<svg", chart["svg"])
+
+    def test_headings_use_the_invoice_language_not_the_viewer_s(self):
+        """A German diagram under an English heading would read as a bug.
+
+        The chart's own labels are rendered in ``zev.invoice_language``, so the
+        text around it has to come from the same place rather than from the
+        browser's locale.
+        """
+        from .pdf_translations import INVOICE_TRANSLATIONS
+
+        self.zev.invoice_language = "fr"
+        self.zev.save()
+
+        body = self._charts(headers={"HTTP_ACCEPT_LANGUAGE": "en"}).json()
+
+        self.assertEqual(body["title"], INVOICE_TRANSLATIONS["fr"]["insights_page_title"])
         self.assertEqual(
-            set(resp.json()),
-            {"energy_chart_svg", "hourly_profile_chart_svg", "energy_flow_svg"},
+            body["charts"][0]["title"], INVOICE_TRANSLATIONS["fr"]["chart_title"]
         )
 
     def test_a_bad_link_gets_nothing(self):
@@ -493,7 +526,7 @@ class PublicInvoiceChartsTests(PublicInvoiceTestCase):
             resp = self._charts()
 
         self.assertEqual(resp.status_code, 200)
-        self.assertIsNone(resp.json()["energy_flow_svg"])
+        self.assertEqual(resp.json()["charts"], [])
 
     def test_a_hostile_participant_name_cannot_inject_markup(self):
         """The page injects this SVG with dangerouslySetInnerHTML.

@@ -3147,11 +3147,32 @@ input.recurrence-chip-input {
   gap: 1rem;
 }
 
+.public-invoice-charts > h2 {
+  margin: 0 0 0.25rem;
+  font-size: 1.1rem;
+}
+
+.public-invoice-charts > p {
+  margin: 0;
+  font-size: 0.9rem;
+}
+
 .public-invoice-chart {
-  padding: 0.75rem;
+  margin: 0;
+  padding: 0.9rem 1rem;
   border: 1px solid var(--border-default);
   border-radius: 0.5rem;
   overflow-x: auto;
+}
+
+.public-invoice-chart figcaption h3 {
+  margin: 0 0 0.15rem;
+  font-size: 0.95rem;
+}
+
+.public-invoice-chart figcaption p {
+  margin: 0 0 0.75rem;
+  font-size: 0.8rem;
 }
 
 /* The SVGs carry print dimensions and a viewBox; this is what makes them

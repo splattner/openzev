@@ -300,9 +300,19 @@ ordinary participant session with ordinary participant scoping.
 
 ### 5.5 Tier 1 — the charts
 
-`GET /api/v1/public/invoices/<prefix>/charts/` returns
-`{energy_chart_svg, hourly_profile_chart_svg, energy_flow_svg}`, each a string
-or `null`.
+`GET /api/v1/public/invoices/<prefix>/charts/` returns the insights page as
+data: `{title, intro, charts: [{key, title, description, svg}]}`, laid out on
+the page the way the PDF lays it out — a section heading and intro, then each
+figure under its own title and description.
+
+**The copy travels with the pictures**, rather than being looked up in the
+frontend's locale. A chart's embedded labels are rendered in the ZEV's
+`invoice_language`, so a reader whose browser is English opening an invoice a
+ZEV issues in German must not get an English heading over a German diagram. The
+document has one language and the server knows which.
+
+A chart that cannot be drawn is **absent**, not null: a fee-only invoice has no
+consumption to profile, and the page should not have to filter holes.
 
 **Its own route, not part of the invoice payload.** Building these runs
 `build_invoice_pdf_period_context`, which reads every meter reading in the

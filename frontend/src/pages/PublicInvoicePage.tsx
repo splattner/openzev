@@ -155,32 +155,24 @@ export function PublicInvoicePage() {
                     ))}
                 </section>
 
-                {charts && (
+                {charts && charts.charts.length > 0 && (
                     <section className="public-invoice-charts">
-                        {/* The same SVGs the PDF prints, served verbatim — the
-                            reader is holding the page these came from, and a
-                            second rendering path is where screen and paper
-                            would start to disagree. */}
-                        {charts.energy_chart_svg && (
-                            <div
-                                className="public-invoice-chart"
-                                dangerouslySetInnerHTML={{ __html: charts.energy_chart_svg }}
-                            />
-                        )}
-                        {charts.hourly_profile_chart_svg && (
-                            <div
-                                className="public-invoice-chart"
-                                dangerouslySetInnerHTML={{
-                                    __html: charts.hourly_profile_chart_svg,
-                                }}
-                            />
-                        )}
-                        {charts.energy_flow_svg && (
-                            <div
-                                className="public-invoice-chart"
-                                dangerouslySetInnerHTML={{ __html: charts.energy_flow_svg }}
-                            />
-                        )}
+                        {/* Laid out like the invoice's insights page: a section
+                            heading and intro, then each figure under its own
+                            title and description. The SVGs and all of this copy
+                            come from the server, so the screen and the paper say
+                            the same things in the same language. */}
+                        <h2>{charts.title}</h2>
+                        <p className="muted">{charts.intro}</p>
+                        {charts.charts.map((chart) => (
+                            <figure key={chart.key} className="public-invoice-chart">
+                                <figcaption>
+                                    <h3>{chart.title}</h3>
+                                    <p className="muted">{chart.description}</p>
+                                </figcaption>
+                                <div dangerouslySetInnerHTML={{ __html: chart.svg }} />
+                            </figure>
+                        ))}
                     </section>
                 )}
 

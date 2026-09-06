@@ -39,11 +39,27 @@ export async function consumeMagicLink(token: string): Promise<void> {
     await api.post('/public/magic-link/consume/', { token })
 }
 
-/** The three SVG figures the invoice's insights page prints. */
+export interface PublicInvoiceChart {
+    key: 'energy' | 'hourly' | 'flow'
+    title: string
+    description: string
+    svg: string
+}
+
+/**
+ * The invoice's insights page, as data.
+ *
+ * Headings come from the server rather than the SPA's own locale: the SVGs
+ * embed their labels in the ZEV's invoice language, and a German diagram under
+ * an English heading reads as a bug. The document has one language.
+ *
+ * Charts that cannot be drawn are absent rather than null — a fee-only invoice
+ * has no consumption to profile.
+ */
 export interface PublicInvoiceCharts {
-    energy_chart_svg: string | null
-    hourly_profile_chart_svg: string | null
-    energy_flow_svg: string | null
+    title: string
+    intro: string
+    charts: PublicInvoiceChart[]
 }
 
 /**
