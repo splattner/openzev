@@ -9,10 +9,7 @@ same category with two different words.
 TARIFF_OVERVIEW_TRANSLATIONS: dict[str, dict] = {
     "de": {
         "document_label": "Tarifübersicht",
-        "valid_at": "Gültig am {date}",
         "all_versions": "Alle Versionen",
-        "generated_on": "Erstellt am",
-        "tariff_count": "Tarife",
         "vat_label": "MWST",
         "vat_not_registered": "Nicht MWST-pflichtig",
         "vat_registered": "MWST-pflichtig",
@@ -50,10 +47,7 @@ TARIFF_OVERVIEW_TRANSLATIONS: dict[str, dict] = {
     },
     "fr": {
         "document_label": "Aperçu des tarifs",
-        "valid_at": "Valable au {date}",
         "all_versions": "Toutes les versions",
-        "generated_on": "Généré le",
-        "tariff_count": "Tarifs",
         "vat_label": "TVA",
         "vat_not_registered": "Non assujetti à la TVA",
         "vat_registered": "Assujetti à la TVA",
@@ -90,10 +84,7 @@ TARIFF_OVERVIEW_TRANSLATIONS: dict[str, dict] = {
     },
     "it": {
         "document_label": "Panoramica tariffe",
-        "valid_at": "Valido al {date}",
         "all_versions": "Tutte le versioni",
-        "generated_on": "Generato il",
-        "tariff_count": "Tariffe",
         "vat_label": "IVA",
         "vat_not_registered": "Non soggetto a IVA",
         "vat_registered": "Soggetto a IVA",
@@ -131,10 +122,7 @@ TARIFF_OVERVIEW_TRANSLATIONS: dict[str, dict] = {
     },
     "en": {
         "document_label": "Tariff overview",
-        "valid_at": "Valid as of {date}",
         "all_versions": "All versions",
-        "generated_on": "Generated on",
-        "tariff_count": "Tariffs",
         "vat_label": "VAT",
         "vat_not_registered": "Not VAT-registered",
         "vat_registered": "VAT-registered",
