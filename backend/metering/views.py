@@ -83,7 +83,7 @@ class MeterReadingViewSet(ZevScopedQuerySetMixin, viewsets.ModelViewSet):
             qs = qs.filter(timestamp__lt=period_end_exclusive_dt(date_type.fromisoformat(date_to)))
 
         rows = (
-            qs.annotate(bucket=trunc_fn("timestamp"))
+            qs.annotate(bucket=trunc_fn("timestamp", tzinfo=dt_timezone.utc))
             .values("bucket", "direction")
             .annotate(total_kwh=Sum("energy_kwh"))
             .order_by("bucket")
