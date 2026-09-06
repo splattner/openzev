@@ -354,6 +354,13 @@ holder's readings, even when no date bounds are supplied.
 `allocation.validity.period_window`) to avoid Django timezone conversion
 artifacts (ADR 0007).
 
+**Bucket boundaries:** `TruncHour`, `TruncDay`, and `TruncMonth` receive UTC
+explicitly. Response bucket timestamps therefore use `+00:00`; daily and
+monthly buckets cannot move across the filtered UTC date range, and the two
+distinct UTC hours during a local DST fallback remain separate. Presentation
+code may format those timestamps for the user's locale, but it must not change
+the aggregation boundary (ADR 0007).
+
 ### 5.3 Raw data
 
 | Method | URL | Permission | Query params |
@@ -838,6 +845,7 @@ type MeteringDashboardSummary =
 | `ParticipantImportRestrictionTests` | §6.2: participant cannot list import logs, preview CSV, or upload CSV (all 403) |
 | `ImportParserRobustnessTests` | §4.1: malformed CSV reported without crash; malformed SDAT-CH reported without crash; timezone offset normalized to UTC; duplicate rows skipped; idempotent re-import; overwrite mode updates value without creating new row |
 | `MeteringRawDataEndpointTests` | §5.3: owner gets daily-grouped raw rows with correct direction sums; participant can read own metering point's raw data |
+| `ChartDataEndpointTests` | §5.2: direction aggregates; UTC day/month boundaries agree with raw data; hourly buckets stay distinct across both DST transitions |
 | `DataQualityStatusTests` | §5.5: owner sees gaps and severity; participant sees own meters; default 30-day range; fully assigned readings report no unassigned; holder-less meter flags every reading; assignment-gap readings flagged unassigned; overlapping windows flag only the corrupt meter (others still report) |
 
 ### Backend (`metering/test_reading_visibility.py`)

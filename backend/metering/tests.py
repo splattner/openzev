@@ -719,9 +719,8 @@ class DataQualityStatusTests(TestCase):
 class ChartDataEndpointTests(TestCase):
 	"""Regression cover for /metering/readings/chart-data/.
 
-	The endpoint 500'd for a month because ``Sum`` was dropped from the
-	django.db.models import while still being used to aggregate buckets.
-	No test exercised it, so nothing caught the NameError.
+	Guards both aggregation availability and UTC bucket semantics at civil-date,
+	month, and DST boundaries.
 	"""
 
 	def setUp(self):
@@ -755,6 +754,95 @@ class ChartDataEndpointTests(TestCase):
 		# Both readings fall in the same day bucket and must be summed.
 		self.assertAlmostEqual(resp.data[0]["in_kwh"], 4.0)
 		self.assertAlmostEqual(resp.data[0]["out_kwh"], 0.0)
+
+	def test_daily_bucket_uses_the_same_utc_day_as_raw_data(self):
+		MeterReading.objects.create(
+			metering_point=self.mp,
+			timestamp=datetime(2026, 1, 1, 23, 30, tzinfo=timezone.utc),
+			energy_kwh=Decimal("1.0000"),
+			direction=ReadingDirection.IN,
+		)
+		auth(self.client, self.owner)
+
+		params = {
+			"metering_point": str(self.mp.id),
+			"date_from": "2026-01-01",
+			"date_to": "2026-01-01",
+		}
+		chart_resp = self.client.get("/api/v1/metering/readings/chart-data/", params)
+		raw_resp = self.client.get("/api/v1/metering/readings/raw-data/", params)
+
+		self.assertEqual(chart_resp.status_code, 200)
+		self.assertEqual(raw_resp.status_code, 200)
+		self.assertEqual(chart_resp.data, [{
+			"bucket": "2026-01-01T00:00:00+00:00",
+			"in_kwh": 1.0,
+			"out_kwh": 0.0,
+		}])
+		self.assertEqual(raw_resp.data[0]["date"], "2026-01-01")
+		self.assertEqual(chart_resp.data[0]["in_kwh"], raw_resp.data[0]["in_kwh"])
+
+	def test_month_bucket_does_not_cross_the_utc_month_boundary(self):
+		MeterReading.objects.create(
+			metering_point=self.mp,
+			timestamp=datetime(2026, 1, 31, 23, 30, tzinfo=timezone.utc),
+			energy_kwh=Decimal("1.0000"),
+			direction=ReadingDirection.IN,
+		)
+		auth(self.client, self.owner)
+
+		resp = self.client.get(
+			"/api/v1/metering/readings/chart-data/",
+			{
+				"metering_point": str(self.mp.id),
+				"date_from": "2026-01-01",
+				"date_to": "2026-01-31",
+				"bucket": "month",
+			},
+		)
+
+		self.assertEqual(resp.status_code, 200)
+		self.assertEqual(resp.data, [{
+			"bucket": "2026-01-01T00:00:00+00:00",
+			"in_kwh": 1.0,
+			"out_kwh": 0.0,
+		}])
+
+	def test_hour_buckets_remain_distinct_across_dst_transitions(self):
+		auth(self.client, self.owner)
+		for day, timestamps in (
+			("2026-03-29", ((0, 30), (1, 30))),
+			("2026-10-25", ((0, 30), (1, 30))),
+		):
+			with self.subTest(day=day):
+				month, day_of_month = map(int, day[5:].split("-"))
+				for hour, minute in timestamps:
+					MeterReading.objects.create(
+						metering_point=self.mp,
+						timestamp=datetime(2026, month, day_of_month, hour, minute, tzinfo=timezone.utc),
+						energy_kwh=Decimal("1.0000"),
+						direction=ReadingDirection.IN,
+					)
+
+				resp = self.client.get(
+					"/api/v1/metering/readings/chart-data/",
+					{
+						"metering_point": str(self.mp.id),
+						"date_from": day,
+						"date_to": day,
+						"bucket": "hour",
+					},
+				)
+
+				self.assertEqual(resp.status_code, 200)
+				self.assertEqual(
+					[row["bucket"] for row in resp.data],
+					[
+						f"{day}T00:00:00+00:00",
+						f"{day}T01:00:00+00:00",
+					],
+				)
+				self.assertEqual([row["in_kwh"] for row in resp.data], [1.0, 1.0])
 
 	def test_chart_data_requires_metering_point(self):
 		auth(self.client, self.owner)
