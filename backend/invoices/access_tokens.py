@@ -5,17 +5,20 @@ The security argument for serving an invoice without a login is in
 on the token resolving to **one invoice**. Everything here is written to keep
 that true: there is no lookup that returns a participant, a ZEV, or a set.
 
-Hashing reuses ``accounts.api_keys`` rather than repeating the reasoning for a
-single SHA-256 pass over a high-entropy secret — that module's docstring is the
-argument, and having two copies of it invites one of them to be "improved".
+The secret is stored in clear rather than hashed. The reasoning is on
+``InvoiceAccessToken.secret``; the short version is that hashing would defend
+nothing (the token and the invoice it protects live in the same database) and
+would cost the property the whole feature depends on — that a regenerated PDF
+carries the same QR as the copy already in the post.
 """
+import hmac
 import secrets
 from datetime import timedelta
+from urllib.parse import quote
 
+from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
-
-from accounts.api_keys import hash_secret, verify_secret
 
 from .models import InvoiceAccessToken
 
@@ -27,40 +30,41 @@ SECRET_BYTES = 32
 USE_RECORD_INTERVAL = timedelta(hours=1)
 
 
-def generate() -> tuple[str, str, str]:
-    """Return ``(prefix, secret, hashed_secret)``.
-
-    ``secret`` is the only time it exists in plain text: it goes into the
-    printed URL and is never stored.
-    """
-    secret = secrets.token_urlsafe(SECRET_BYTES)
-    return secrets.token_hex(PREFIX_BYTES), secret, hash_secret(secret)
+def generate() -> tuple[str, str]:
+    """Return ``(prefix, secret)``."""
+    return secrets.token_hex(PREFIX_BYTES), secrets.token_urlsafe(SECRET_BYTES)
 
 
-def get_or_create_for_invoice(invoice) -> tuple[InvoiceAccessToken, str | None]:
-    """Return ``(token, secret)`` for ``invoice``, minting one if needed.
+def get_or_create_for_invoice(invoice) -> InvoiceAccessToken:
+    """The active token for ``invoice``, minting one if there is none.
 
-    ``secret`` is ``None`` when an existing token is returned — it was shown
-    once at creation and is not recoverable, exactly like an API key.
+    Get-or-create rather than create, because the printed QR must survive a
+    re-render: an invoice regenerated after a template change has to carry the
+    link that is already in someone's folder. Minting per render would kill
+    every link ever printed, silently and in bulk.
 
-    **The token is stable across PDF regeneration**, which is the whole reason
-    this is get-or-create rather than create. A regenerated invoice must carry
-    the same QR as the copy already in the post; minting a fresh token on every
-    render would silently kill every link ever printed.
-
-    Consequently the secret cannot be recovered for an existing token, so the
-    URL must be built at mint time and stored in the rendered PDF. Revoking is
-    the only way to force a new one.
+    Revoking is therefore the only way a printed link stops working, which is
+    the intended design and not a limitation.
     """
     existing = invoice.access_tokens.filter(revoked_at__isnull=True).first()
     if existing is not None:
-        return existing, None
+        return existing
 
-    prefix, secret, hashed = generate()
-    token = InvoiceAccessToken.objects.create(
-        invoice=invoice, prefix=prefix, hashed_secret=hashed,
+    prefix, secret = generate()
+    return InvoiceAccessToken.objects.create(
+        invoice=invoice, prefix=prefix, secret=secret,
     )
-    return token, secret
+
+
+def public_url(token: InvoiceAccessToken) -> str:
+    """The URL printed as a QR on the invoice.
+
+    Built from ``FRONTEND_URL`` because it is a page a person opens, not an
+    endpoint a script calls — the SPA route resolves the token through the API
+    itself.
+    """
+    base = settings.FRONTEND_URL.rstrip("/")
+    return f"{base}/i/{token.prefix}?s={quote(token.secret, safe='')}"
 
 
 def resolve(prefix: str, secret: str) -> InvoiceAccessToken | None:
@@ -82,7 +86,9 @@ def resolve(prefix: str, secret: str) -> InvoiceAccessToken | None:
     )
     if token is None:
         return None
-    if not verify_secret(secret, token.hashed_secret):
+    # Constant time: the comparison is against a stored secret either way, and
+    # a timing signal would leak it a byte at a time.
+    if not hmac.compare_digest(token.secret, secret):
         return None
     if not token.invoice.zev.participant_invoice_access:
         return None
@@ -119,3 +125,29 @@ def revoke(token: InvoiceAccessToken) -> None:
     """Kill a printed link. The next render mints a fresh one."""
     token.revoked_at = timezone.now()
     token.save(update_fields=["revoked_at"])
+
+
+def qr_svg(token: InvoiceAccessToken) -> str:
+    """An inline SVG QR for :func:`public_url`, sized for the insights page.
+
+    Inline rather than a data: URI so it scales crisply in print and carries no
+    raster weight, matching how the QR-Rechnung reaches the same document.
+    """
+    import io
+
+    import qrcode
+    import qrcode.image.svg
+
+    img = qrcode.make(
+        public_url(token),
+        image_factory=qrcode.image.svg.SvgPathImage,
+        # M tolerates ~15% damage, which is what a folded and posted invoice
+        # actually suffers. H would cost density for a link that is reprinted
+        # rather than irreplaceable.
+        error_correction=qrcode.constants.ERROR_CORRECT_M,
+        box_size=10,
+        border=2,
+    )
+    buf = io.BytesIO()
+    img.save(buf)
+    return buf.getvalue().decode("utf-8")

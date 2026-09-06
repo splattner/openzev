@@ -597,6 +597,34 @@
            renders "Seite N von M". */
         .page-meta .meta-center::after { content: counter(page) " / " counter(pages); }
 
+        /* ══ 9b. Participant access QR ═══════════════════════════ */
+        .access-section {
+            display: flex;
+            gap: 6mm;
+            align-items: center;
+            margin-top: 8mm;
+            padding: 4mm 5mm;
+            background: var(--brand-pale);
+            border: 0.5pt solid var(--brand-mid);
+            border-radius: 2mm;
+            break-inside: avoid;
+        }
+
+        /* Deliberately smaller than the QR-Rechnung, which is fixed at 46mm by
+           the standard. A reader comparing the two should see at a glance that
+           this is not that. */
+        .access-qr { flex: 0 0 24mm; }
+        .access-qr svg { width: 24mm; height: 24mm; display: block; }
+
+        .access-copy { flex: 1 1 auto; }
+        .access-copy h3 { margin: 0 0 1.5mm; font-size: 9.5pt; }
+        .access-copy p { margin: 0; font-size: 8pt; color: var(--ink-soft); }
+
+        .access-note {
+            margin-top: 1.5mm !important;
+            font-weight: 700;
+        }
+
         /* ══ 10. @page rules ═════════════════════════════════════ */
         /* How this prints: the running header/footer and the QR slip are
            normal <div>s in the body, repositioned into page margin boxes
@@ -899,6 +927,23 @@
             <h3>{{ tr.flow_title }}</h3>
             <p class="chart-description">{{ tr.flow_description }}</p>
             <div class="chart">{{ energy_flow_svg|safe }}</div>
+        </section>
+        {% endif %}
+
+        {% comment %}Participant access. On the insights page and never on a
+        sheet carrying the QR-Rechnung: both sections set break-before: page,
+        so the two codes cannot meet. The caption names what it does, because a
+        second QR on an invoice that did not say would be read as the one
+        people already expect — and paying the wrong thing is the only failure
+        here that costs money.{% endcomment %}
+        {% if access_qr_svg %}
+        <section class="access-section">
+            <div class="access-qr">{{ access_qr_svg|safe }}</div>
+            <div class="access-copy">
+                <h3>{{ tr.access_title }}</h3>
+                <p>{{ tr.access_description }}</p>
+                <p class="access-note">{{ tr.access_not_payment }}</p>
+            </div>
         </section>
         {% endif %}
     </section>

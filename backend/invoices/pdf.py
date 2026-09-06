@@ -214,6 +214,37 @@ def _build_qr_svg(invoice) -> str | None:
         return None
 
 
+def _build_access_qr(invoice, energy_summary) -> str | None:
+    """The participant-access QR, or ``None``.
+
+    Drawn only when the ZEV opted in *and* there is an insights page to put it
+    on. ``energy_summary`` is exactly the condition that renders that page
+    (``pdf_stats._build_energy_summary``), so passing it in rather than
+    re-deriving keeps the two from drifting into a QR with no page, or a page
+    with no QR.
+
+    The case this excludes is a fee-only invoice with no consumption, and it is
+    the right one to exclude: the link leads to consumption detail that such an
+    invoice does not have.
+
+    The QR never shares a sheet with the QR-Rechnung. ``.payment-page`` and
+    ``.insights-page`` both carry ``break-before: page``, so that separation is
+    structural rather than a placement someone has to remember not to break.
+    """
+    if not invoice.zev.participant_invoice_access or not energy_summary:
+        return None
+    try:
+        from . import access_tokens
+
+        return access_tokens.qr_svg(access_tokens.get_or_create_for_invoice(invoice))
+    except Exception as exc:
+        # A missing QR costs a convenience. Raising here would cost the invoice.
+        logger.warning(
+            "Skipping participant-access QR for %s: %s", invoice.invoice_number, exc
+        )
+        return None
+
+
 def _build_template_context(
     invoice,
     *,
@@ -241,6 +272,7 @@ def _build_template_context(
         pass  # keep the raw string if a translator removed the placeholder
     savings_data = _build_savings_data(invoice, tr)
     energy_summary = _build_energy_summary(invoice)
+    access_qr_svg = _build_access_qr(invoice, energy_summary)
 
     # Split at the last hyphen so the numeric counter portion renders bold.
     # The hyphen stays with the prefix (e.g. "Q-00001" → prefix "Q-", suffix "00001").
@@ -313,6 +345,7 @@ def _build_template_context(
         ),
         "savings_data": savings_data,
         "energy_summary": energy_summary,
+        "access_qr_svg": access_qr_svg,
         "tr": tr,
         "status_display": tr.get("status_values", {}).get(invoice.status, invoice.status),
         "formatted_dates": {
