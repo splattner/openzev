@@ -1,7 +1,7 @@
 # Feature Spec: Participant access from the invoice
 
 - Spec ID: SPEC-2026-participant-invoice-access
-- Status: Completed
+- Status: Completed (extended — see Increments)
 - Scope: Major
 - Type: Feature
 - Owners: Sebastian Plattner
@@ -10,6 +10,16 @@
 - Related Issues: [#589](https://github.com/splattner/openzev/issues/589)
 - Related ADRs: —
 - Impacted Areas: backend | frontend | docs
+
+### Increments
+
+| # | Delivered | PRs |
+|---|---|---|
+| 1 | Tier 1 endpoint, QR, public page, tier 2 magic link, opt-in setting | #591, #593, #594, #595 |
+| 2 | The insights-page charts on the public page. **Reopened §9**: its limit moved from a list of forbidden fields to a principle, because the flow diagram is both a "neighbour's figure" and a "ZEV-wide total" and is printed on the same sheet as the QR | #596 |
+
+A spec marked Completed and then extended should say so in one place, rather
+than leaving a reader to infer it from a section that postdates the status.
 
 ---
 
