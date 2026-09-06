@@ -1,22 +1,75 @@
-from datetime import date, datetime, time, timezone
+from datetime import date, datetime, time, timedelta, timezone
 from decimal import Decimal
+from io import StringIO
 from unittest import mock
 
+from django.core.management import call_command
 from django.test import TestCase
 from django.core import mail
 from django.core.exceptions import ValidationError
 from django.test import override_settings
 from rest_framework.test import APIClient
 
-from accounts.models import UserRole
-from zev.management.commands.seed_demo import Command as SeedDemoCommand, previous_quarter, quarter_start, years_before
-from metering.models import MeterReading
+from accounts.models import UserRole, VatRate
+from audit.models import AuditActionCategory, AuditEvent
+from audit.services import record_audit_event
+from zev.management.commands.seed_demo import (
+	Command as SeedDemoCommand,
+	DEMO_ZEV_LEGACY_NAME,
+	DEMO_ZEV_NAME,
+	SECOND_DEMO_ZEV_NAME,
+	previous_month,
+	previous_quarter,
+	quarter_start,
+	years_before,
+)
+from invoices.models import ContractIssue, EmailLog, Invoice, InvoiceStatus
+from metering.models import ImportLog, MeterReading, ReadingDirection, ReadingResolution
 from tariffs.models import BillingMode, PeriodType, Tariff
 from tariffs.series import active_version, find_gaps
-from zev.models import AllocationMode, MeteringPoint, MeteringPointAssignment, MeteringPointType, Participant, VatMode, Zev
+from zev.models import (
+	AllocationMode,
+	BillingInterval,
+	InvoiceLanguage,
+	MeteringPoint,
+	MeteringPointAssignment,
+	MeteringPointType,
+	Participant,
+	VatMode,
+	Zev,
+	ZevType,
+)
 
 
 from testing.helpers import authenticate as auth, make_user
+
+
+def _seed_sparse_window_readings(*, start_date, end_date, meters, sample_days=(1, 15)):
+	"""Insert a few hourly rows per sample day per meter.
+
+	Helper-level tests that assert statuses, period sets or window hygiene —
+	never consumption volume — use this in place of the seeder's dense window
+	readings, which would dwarf the actual assertions with tens of thousands
+	of rows.
+	"""
+	rows = []
+	day = start_date
+	while day <= end_date:
+		if day.day in sample_days:
+			for hour in range(24):
+				timestamp = datetime.combine(day, time(hour), tzinfo=timezone.utc)
+				for meter, direction, _profile in meters:
+					rows.append(
+						MeterReading(
+							metering_point=meter,
+							timestamp=timestamp,
+							energy_kwh="0.5000",
+							direction=direction,
+							resolution=ReadingResolution.HOURLY,
+						)
+					)
+		day += timedelta(days=1)
+	MeterReading.objects.bulk_create(rows, batch_size=5000)
 
 
 class ZevPaymentTermTests(TestCase):
@@ -874,6 +927,586 @@ class SeedDemoAssignmentReseedTests(TestCase):
 		self.assertIsNone(windows[0].valid_to)
 
 
+class SeedDemoSecondCommunityTests(TestCase):
+	"""The second demo community exists so one owner can exercise the community
+	switcher. Seeding it must be idempotent and migrate databases that still
+	carry a legacy name: the two demo communities must never duplicate or
+	collide on re-runs."""
+
+	def setUp(self):
+		self.command = SeedDemoCommand()
+		self.owner = make_user("seed_second_zev_owner", UserRole.ZEV_OWNER)
+
+	def _upsert_demo_zevs(self):
+		self.command._upsert_zev(
+			owner=self.owner,
+			name=DEMO_ZEV_NAME,
+			zev_type=ZevType.ZEV,
+			start_date=date(2026, 1, 1),
+			grid_operator="Stadtwerk Demo AG",
+			grid_connection_point="CH-DEMO-GRID-0001",
+			billing_interval=BillingInterval.QUARTERLY,
+			invoice_prefix="OZV",
+			invoice_language=InvoiceLanguage.DE,
+			bank_iban="CH9300762011623852957",
+			bank_name="Demo Energy Bank",
+			vat_mode=VatMode.INCLUSIVE,
+			vat_number="",
+		)
+		self.command._upsert_zev(
+			owner=self.owner,
+			name=SECOND_DEMO_ZEV_NAME,
+			zev_type=ZevType.VZEV,
+			start_date=date(2026, 1, 1),
+			grid_operator="Stadtwerk Demo AG",
+			grid_connection_point="CH-DEMO-GRID-0002",
+			billing_interval=BillingInterval.MONTHLY,
+			invoice_prefix="OZ2",
+			invoice_language=InvoiceLanguage.EN,
+			bank_iban="CH4431999123000889012",
+			bank_name="Demo Energy Bank",
+			vat_mode=VatMode.REGISTERED,
+			vat_number="CHE-987.654.321",
+		)
+
+	def test_upsert_zev_is_idempotent_and_refreshes_config_drift(self):
+		self._upsert_demo_zevs()
+		# A second run must not duplicate the ZEV, and must pull a row back
+		# onto the canonical config (here: a start date that moved on).
+		self.command._upsert_zev(
+			owner=self.owner,
+			name=SECOND_DEMO_ZEV_NAME,
+			zev_type=ZevType.VZEV,
+			start_date=date(2026, 4, 1),
+			grid_operator="Stadtwerk Demo AG",
+			grid_connection_point="CH-DEMO-GRID-0002",
+			billing_interval="monthly",
+			invoice_prefix="OZ2",
+			invoice_language="en",
+			bank_iban="CH4431999123000889012",
+			bank_name="Demo Energy Bank",
+			vat_mode=VatMode.REGISTERED,
+			vat_number="CHE-987.654.321",
+		)
+		self.assertEqual(Zev.objects.filter(name=SECOND_DEMO_ZEV_NAME).count(), 1)
+		second = Zev.objects.get(name=SECOND_DEMO_ZEV_NAME)
+		self.assertEqual(second.owner, self.owner)
+		self.assertEqual(second.start_date, date(2026, 4, 1))
+		self.assertEqual(second.billing_interval, "monthly")
+		self.assertEqual(second.invoice_language, "en")
+		self.assertEqual(second.invoice_prefix, "OZ2")
+		self.assertEqual(second.vat_mode, VatMode.REGISTERED)
+		self.assertEqual(second.vat_number, "CHE-987.654.321")
+
+	def test_legacy_flagship_name_is_renamed_not_duplicated(self):
+		# A database seeded under the name the base branch shipped.
+		Zev.objects.create(
+			name=DEMO_ZEV_LEGACY_NAME,
+			owner=self.owner,
+			start_date=date(2026, 1, 1),
+			zev_type="vzev",
+			invoice_prefix="OZV",
+		)
+		self.command._migrate_legacy_demo_zev_names(owner=self.owner)
+		self._upsert_demo_zevs()
+		self.assertFalse(Zev.objects.filter(name=DEMO_ZEV_LEGACY_NAME).exists())
+		# The legacy row was refreshed in place, not shadowed by a new one.
+		self.assertEqual(Zev.objects.filter(name=DEMO_ZEV_NAME).count(), 1)
+		self.assertEqual(Zev.objects.filter(owner=self.owner).count(), 2)
+
+	def test_legacy_name_of_another_owner_is_untouched(self):
+		# Identification is scoped to the demo owner: a tenant community that
+		# happens to share the display name must never be renamed or deleted.
+		stranger = make_user("seed_legacy_stranger", UserRole.ZEV_OWNER)
+		tenant = Zev.objects.create(
+			name=DEMO_ZEV_LEGACY_NAME,
+			owner=stranger,
+			start_date=date(2026, 1, 1),
+			zev_type="vzev",
+			invoice_prefix="TEN",
+		)
+		self.command._migrate_legacy_demo_zev_names(owner=self.owner)
+		self._upsert_demo_zevs()
+		self.assertTrue(Zev.objects.filter(pk=tenant.pk).exists())
+		self.assertEqual(Zev.objects.get(pk=tenant.pk).name, DEMO_ZEV_LEGACY_NAME)
+
+	def test_each_community_carries_the_config_its_name_implies(self):
+		self._upsert_demo_zevs()
+		stweg = Zev.objects.get(name=DEMO_ZEV_NAME)
+		self.assertEqual(stweg.zev_type, ZevType.ZEV)
+		self.assertEqual(stweg.billing_interval, "quarterly")
+		self.assertEqual(stweg.invoice_language, InvoiceLanguage.DE)
+		self.assertEqual(stweg.vat_mode, VatMode.INCLUSIVE)
+		self.assertEqual(stweg.vat_number, "")
+		company = Zev.objects.get(name=SECOND_DEMO_ZEV_NAME)
+		self.assertEqual(company.zev_type, ZevType.VZEV)
+		self.assertEqual(company.billing_interval, "monthly")
+		self.assertEqual(company.invoice_language, InvoiceLanguage.EN)
+		self.assertEqual(company.vat_mode, VatMode.REGISTERED)
+		self.assertEqual(company.vat_number, "CHE-987.654.321")
+
+	def test_previous_month_returns_the_complete_prior_month(self):
+		self.assertEqual(previous_month(date(2026, 9, 6)), (date(2026, 8, 1), date(2026, 8, 31)))
+		self.assertEqual(previous_month(date(2026, 3, 1)), (date(2026, 2, 1), date(2026, 2, 28)))
+
+
+class SeedDemoSecondCommunitySeedTests(TestCase):
+	"""``_seed_second_community`` must produce a closed (paid/cancelled) month
+	and an open draft/approved/sent month, and re-seeding must reproduce that
+	exactly instead of piling invoices up."""
+
+	def setUp(self):
+		self.command = SeedDemoCommand()
+		self.owner = make_user("seed_second_seed_owner", UserRole.ZEV_OWNER)
+		self.clara_user = make_user("seed_second_clara", UserRole.PARTICIPANT)
+		self.zev = self.command._upsert_zev(
+			owner=self.owner,
+			name="Seeded Second ZEV",
+			zev_type=ZevType.VZEV,
+			start_date=date(2026, 7, 1),
+			grid_operator="Stadtwerk Demo AG",
+			grid_connection_point="CH-DEMO-GRID-0002",
+			billing_interval=BillingInterval.MONTHLY,
+			invoice_prefix="OZ2",
+			invoice_language=InvoiceLanguage.EN,
+			bank_iban="CH4431999123000889012",
+			bank_name="Demo Energy Bank",
+			vat_mode=VatMode.REGISTERED,
+			vat_number="CHE-987.654.321",
+		)
+		self.command._upsert_vat_rates()
+
+	def _seed(self):
+		# Only statuses and counts are under test, never consumption volume:
+		# swap the dense window readings for a few hourly days per month so
+		# the fixture stays small (see ``_seed_sparse_window_readings``).
+		with mock.patch.object(
+			self.command,
+			"_seed_meter_readings",
+			side_effect=_seed_sparse_window_readings,
+		):
+			return self.command._seed_second_community(
+				owner=self.owner,
+				clara_user=self.clara_user,
+				zev=self.zev,
+				start_date=date(2026, 7, 1),
+				end_date=date(2026, 9, 6),
+			)
+
+	def test_seeds_a_closed_and_an_open_month(self):
+		invoices, open_start, open_end, closed_invoices, closed_start, closed_end = self._seed()
+		self.assertEqual((closed_start, closed_end), (date(2026, 7, 1), date(2026, 7, 31)))
+		self.assertEqual((open_start, open_end), (date(2026, 8, 1), date(2026, 8, 31)))
+		self.assertTrue(invoices)
+		self.assertTrue(closed_invoices)
+		# Open month: the normal draft/approved/sent progression only.
+		self.assertFalse(
+			Invoice.objects.filter(
+				zev=self.zev,
+				period_start=open_start,
+				status__in=[InvoiceStatus.PAID, InvoiceStatus.CANCELLED],
+			).exists()
+		)
+		# Closed month: everything settled, at most one invoice cancelled.
+		closed_statuses = set(
+			Invoice.objects.filter(zev=self.zev, period_start=closed_start).values_list("status", flat=True)
+		)
+		self.assertTrue(closed_statuses.issubset({InvoiceStatus.PAID, InvoiceStatus.CANCELLED}))
+		self.assertLessEqual(
+			Invoice.objects.filter(zev=self.zev, period_start=closed_start, status=InvoiceStatus.CANCELLED).count(),
+			1,
+		)
+
+	def test_re_seeding_the_second_community_is_idempotent(self):
+		first = self._seed()
+		second = self._seed()
+		self.assertEqual(len(first[0]), len(second[0]))
+		self.assertEqual(len(first[3]), len(second[3]))
+		self.assertEqual(
+			set(Invoice.objects.filter(zev=self.zev).values_list("period_start", flat=True)),
+			{date(2026, 7, 1), date(2026, 8, 1)},
+		)
+
+
+class SeedDemoQualityGapTests(TestCase):
+	"""The intentional reading gap must delete exactly its window — and must be
+	skipped while the current period is still too young to hold one."""
+
+	def setUp(self):
+		self.command = SeedDemoCommand()
+		self.owner = make_user("seed_gap_owner", UserRole.ZEV_OWNER)
+		self.zev = Zev.objects.create(name="Gap ZEV", owner=self.owner)
+		self.meter = MeteringPoint.objects.create(
+			zev=self.zev,
+			meter_id="GAP-CONS-1",
+			meter_type=MeteringPointType.CONSUMPTION,
+		)
+		first_day = date(2026, 8, 1)
+		for offset in range(36):  # 2026-08-01 .. 2026-09-05
+			MeterReading.objects.create(
+				metering_point=self.meter,
+				timestamp=datetime.combine(
+					first_day + timedelta(days=offset), time(12, 0), tzinfo=timezone.utc
+				),
+				energy_kwh="0.5000",
+				direction=ReadingDirection.IN,
+			)
+
+	def test_punch_quality_gap_deletes_only_the_recent_window(self):
+		gap_start, gap_end = self.command._punch_quality_gap(
+			meter=self.meter,
+			after=date(2026, 8, 24),
+			end_date=date(2026, 9, 6),
+		)
+		self.assertEqual((gap_start, gap_end), (date(2026, 8, 25), date(2026, 9, 5)))
+		remaining = MeterReading.objects.filter(metering_point=self.meter).count()
+		self.assertEqual(remaining, 24)
+		# The hole never reaches back past the billed period end.
+		self.assertTrue(
+			MeterReading.objects.filter(
+				metering_point=self.meter,
+				timestamp__lt=datetime.combine(gap_start, time.min, tzinfo=timezone.utc),
+			).exists()
+		)
+
+	def test_punch_quality_gap_is_skipped_when_the_period_is_too_young(self):
+		gap_start, gap_end = self.command._punch_quality_gap(
+			meter=self.meter,
+			after=date(2026, 8, 31),
+			end_date=date(2026, 9, 6),
+		)
+		self.assertEqual((gap_start, gap_end), (None, None))
+		self.assertEqual(MeterReading.objects.filter(metering_point=self.meter).count(), 36)
+
+
+class SeedDemoVatRateTests(TestCase):
+	"""The demo bills real VAT figures only when VatRate rows exist; the seed
+	must install the standard Swiss history. Its contract is "install missing
+	defaults": rates an admin added or edited in a shared development database
+	are left alone, because deleting and recreating the canonical rows on top
+	of a preserved custom open-ended rate could collide with it."""
+
+	def setUp(self):
+		self.command = SeedDemoCommand()
+
+	def test_upsert_vat_rates_installs_the_swiss_history(self):
+		self.command._upsert_vat_rates()
+		rates = list(VatRate.objects.order_by("valid_from"))
+		self.assertEqual([str(rate.rate) for rate in rates], ["0.0770", "0.0810"])
+		self.assertEqual(rates[0].valid_to, date(2023, 12, 31))
+		self.assertIsNone(rates[1].valid_to)
+
+	def test_upsert_vat_rates_is_idempotent(self):
+		self.command._upsert_vat_rates()
+		self.command._upsert_vat_rates()
+		self.assertEqual(VatRate.objects.count(), 2)
+
+	def test_upsert_vat_rates_leaves_foreign_rates_alone(self):
+		# A dev database may carry VAT rates an admin added on top of the
+		# standard Swiss history; the seed installs only the missing defaults.
+		self.command._upsert_vat_rates()
+		foreign = VatRate.objects.create(
+			rate="0.0260",
+			valid_from=date(2017, 1, 1),
+			valid_to=date(2017, 12, 31),
+		)
+		self.command._upsert_vat_rates()
+		self.assertTrue(VatRate.objects.filter(pk=foreign.pk).exists())
+		self.assertEqual(VatRate.objects.filter(valid_from=date(2018, 1, 1)).count(), 1)
+		self.assertEqual(VatRate.objects.filter(valid_from=date(2024, 1, 1)).count(), 1)
+
+	def test_upsert_vat_rates_keeps_an_admin_edited_canonical_row(self):
+		# An admin who corrected the canonical 2024 rate in place keeps their
+		# edit; the seed adds only what is missing (no canonical row exists
+		# yet here, so it installs the other one and leaves the edit alone).
+		VatRate.objects.create(
+			rate="0.0850",
+			valid_from=date(2024, 1, 1),
+			valid_to=None,
+		)
+		self.command._upsert_vat_rates()
+		self.assertEqual(
+			str(VatRate.objects.get(valid_from=date(2024, 1, 1)).rate),
+			"0.0850",
+		)
+		self.assertEqual(VatRate.objects.filter(valid_from=date(2018, 1, 1)).count(), 1)
+
+	def test_upsert_vat_rates_preserves_overlapping_custom_dates(self):
+		custom = VatRate.objects.create(rate="0.0850", valid_from=date(2025, 1, 1))
+		self.command._upsert_vat_rates()
+		self.command._upsert_vat_rates()
+		custom.refresh_from_db()
+		self.assertEqual(custom.rate, Decimal("0.0850"))
+		self.assertEqual(VatRate.objects.count(), 2)
+		self.assertFalse(VatRate.objects.filter(valid_from=date(2024, 1, 1)).exists())
+
+
+class SeedDemoCounterRefreshTests(TestCase):
+	"""Re-seeding must pull leftover rows back onto the canonical config —
+	including the invoice counter, which would otherwise climb (and skip
+	numbers) across re-seeds because the seed deletes the invoices it
+	generated last time. The contract counter is the exception: issued
+	contract snapshots survive a re-seed, so resetting it could mint
+	duplicate CTR-YYYY-NNNN document numbers."""
+
+	def setUp(self):
+		self.command = SeedDemoCommand()
+		self.owner = make_user("seed_counter_owner", UserRole.ZEV_OWNER)
+
+	def _upsert(self):
+		return self.command._upsert_zev(
+			owner=self.owner,
+			name=DEMO_ZEV_NAME,
+			zev_type=ZevType.ZEV,
+			start_date=date(2026, 1, 1),
+			grid_operator="Stadtwerk Demo AG",
+			grid_connection_point="CH-DEMO-GRID-0001",
+			billing_interval=BillingInterval.QUARTERLY,
+			invoice_prefix="OZV",
+			invoice_language=InvoiceLanguage.DE,
+			bank_iban="CH9300762011623852957",
+			bank_name="Demo Energy Bank",
+			vat_mode=VatMode.INCLUSIVE,
+			vat_number="",
+		)
+
+	def test_reseed_resets_the_invoice_counter(self):
+		zev = self._upsert()
+		Zev.objects.filter(pk=zev.pk).update(invoice_counter=9)
+		self._upsert()
+		zev.refresh_from_db()
+		self.assertEqual(zev.invoice_counter, 1)
+
+	def test_reseed_keeps_the_contract_counter(self):
+		zev = self._upsert()
+		Zev.objects.filter(pk=zev.pk).update(contract_counter=3)
+		self._upsert()
+		zev.refresh_from_db()
+		self.assertEqual(zev.contract_counter, 3)
+
+
+class SeedDemoHourlyHistoryTests(TestCase):
+	"""The hourly history year gives the reports pages a complete year. It
+	must be hourly, stop exactly where the 15-minute window takes over, and
+	keep volumes consistent with the profile: one row sums the four
+	quarter-hour samples it replaces."""
+
+	def setUp(self):
+		self.command = SeedDemoCommand()
+		self.owner = make_user("seed_history_owner", UserRole.ZEV_OWNER)
+		self.zev = Zev.objects.create(
+			name="History ZEV",
+			owner=self.owner,
+			zev_type="vzev",
+			start_date=date(2026, 1, 1),
+			invoice_prefix="HIS",
+		)
+		self.meter = MeteringPoint.objects.create(
+			zev=self.zev,
+			meter_id="HIST-METER-1",
+			meter_type=MeteringPointType.CONSUMPTION,
+		)
+
+	def _seed(self, history_start, stop_date):
+		self.command._seed_history_readings(
+			history_start=history_start,
+			stop_date=stop_date,
+			meters=[(self.meter, ReadingDirection.IN, self.command._consumer_one_kwh)],
+		)
+
+	def test_history_fills_the_range_hourly_and_stops_before_the_window(self):
+		self._seed(date(2025, 1, 1), date(2025, 1, 3))
+		readings = MeterReading.objects.filter(metering_point=self.meter).order_by("timestamp")
+		self.assertEqual(readings.count(), 2 * 24)
+		self.assertEqual(
+			readings.filter(resolution=ReadingResolution.HOURLY).count(),
+			readings.count(),
+		)
+		self.assertEqual(readings.first().timestamp, datetime(2025, 1, 1, 0, 0, tzinfo=timezone.utc))
+		self.assertEqual(readings.last().timestamp, datetime(2025, 1, 2, 23, 0, tzinfo=timezone.utc))
+
+	def test_an_hourly_row_sums_the_four_quarter_samples_it_replaces(self):
+		self._seed(date(2025, 1, 1), date(2025, 1, 2))
+		row = MeterReading.objects.get(
+			metering_point=self.meter,
+			timestamp=datetime(2025, 1, 1, 13, 0, tzinfo=timezone.utc),
+		)
+		total = sum(
+			float(self.command._consumer_one_kwh(datetime(2025, 1, 1, 13, minute, tzinfo=timezone.utc), 0))
+			for minute in (0, 15, 30, 45)
+		)
+		self.assertEqual(row.energy_kwh, Decimal(str(round(total, 4))))
+
+	def test_history_is_skipped_when_the_window_precedes_it(self):
+		self._seed(date(2025, 6, 1), date(2025, 1, 1))
+		self.assertEqual(MeterReading.objects.filter(metering_point=self.meter).count(), 0)
+
+
+class SeedDemoReadingResolutionTests(TestCase):
+	"""The seed window keeps 15-minute rows only for the recent tail; everything
+	older is hourly, each hour summing the four quarter samples it replaces, so
+	volumes stay consistent across the boundary and the dataset stays small
+	enough to re-seed quickly. The boundary is derived from the end date once
+	and shared by every meter."""
+
+	def setUp(self):
+		self.command = SeedDemoCommand()
+		self.owner = make_user("seed_resolution_owner", UserRole.ZEV_OWNER)
+		self.zev = Zev.objects.create(
+			name="Resolution ZEV",
+			owner=self.owner,
+			zev_type="vzev",
+			start_date=date(2026, 1, 1),
+			invoice_prefix="RES",
+		)
+		self.meter = MeteringPoint.objects.create(
+			zev=self.zev,
+			meter_id="RES-METER-1",
+			meter_type=MeteringPointType.CONSUMPTION,
+		)
+
+	def _seed_window(self, start_date, end_date):
+		return self.command._seed_meter_readings(
+			start_date=start_date,
+			end_date=end_date,
+			meters=[(self.meter, ReadingDirection.IN, self.command._consumer_one_kwh)],
+		)
+
+	def test_window_is_hourly_until_the_fine_tail_then_15_minute(self):
+		fine_from = self._seed_window(date(2026, 1, 1), date(2026, 1, 20))
+		self.assertEqual(fine_from, date(2026, 1, 7))
+		readings = MeterReading.objects.filter(metering_point=self.meter)
+		# Jan 1-6 hourly (6 days x 24h), Jan 7-20 at 15-minute resolution (14 days x 96).
+		self.assertEqual(readings.filter(resolution=ReadingResolution.HOURLY).count(), 6 * 24)
+		self.assertEqual(readings.filter(resolution=ReadingResolution.FIFTEEN_MIN).count(), 14 * 96)
+		self.assertTrue(
+			readings.filter(
+				timestamp=datetime(2026, 1, 6, 23, 0, tzinfo=timezone.utc),
+				resolution=ReadingResolution.HOURLY,
+			).exists()
+		)
+		self.assertTrue(
+			readings.filter(
+				timestamp=datetime(2026, 1, 7, 0, 0, tzinfo=timezone.utc),
+				resolution=ReadingResolution.FIFTEEN_MIN,
+			).exists()
+		)
+
+	def test_the_last_hourly_row_sums_its_four_quarter_samples(self):
+		self._seed_window(date(2026, 1, 1), date(2026, 1, 20))
+		row = MeterReading.objects.get(
+			metering_point=self.meter,
+			timestamp=datetime(2026, 1, 6, 23, 0, tzinfo=timezone.utc),
+		)
+		total = sum(
+			float(
+				self.command._consumer_one_kwh(
+					datetime(2026, 1, 6, 23, minute, tzinfo=timezone.utc), 5
+				)
+			)
+			for minute in (0, 15, 30, 45)
+		)
+		self.assertEqual(row.energy_kwh, Decimal(str(round(total, 4))))
+
+	def test_short_windows_stay_entirely_15_minute(self):
+		fine_from = self._seed_window(date(2026, 2, 1), date(2026, 2, 10))
+		self.assertEqual(fine_from, date(2026, 2, 1))
+		self.assertEqual(MeterReading.objects.filter(metering_point=self.meter).count(), 10 * 96)
+		self.assertFalse(
+			MeterReading.objects.filter(
+				metering_point=self.meter, resolution=ReadingResolution.HOURLY
+			).exists()
+		)
+
+
+class SeedDemoInvoiceSettlementTests(TestCase):
+	"""The closed-period run settles every invoice (paid, the last one
+	cancelled as if issued in error) — the counterpart for the UI's
+	paid/cancelled badges, filters and period totals. Re-seeding must
+	reproduce it exactly instead of piling invoices up."""
+
+	PERIOD_START = date(2026, 7, 1)
+	PERIOD_END = date(2026, 7, 31)
+
+	def setUp(self):
+		self.command = SeedDemoCommand()
+		self.owner = make_user("seed_settle_owner", UserRole.ZEV_OWNER)
+		self.zev = Zev.objects.create(
+			name="Settlement ZEV",
+			owner=self.owner,
+			zev_type="vzev",
+			start_date=self.PERIOD_START,
+			invoice_prefix="SET",
+		)
+		for name, meter_id in (("Alice", "SET-CONS-1"), ("Bob", "SET-CONS-2")):
+			participant = self.command._upsert_participant(
+				zev=self.zev,
+				user=None,
+				title=Participant.Title.MS,
+				first_name=name,
+				last_name="Household",
+				email=f"{name.lower()}@settlement.local",
+				phone="+41 31 555 00 00",
+				address_line1="Testgasse 1",
+				postal_code="3000",
+				city="Bern",
+				valid_from=self.PERIOD_START,
+			)
+			meter = self.command._upsert_metering_point(
+				zev=self.zev,
+				meter_id=meter_id,
+				meter_type=MeteringPointType.CONSUMPTION,
+				location_description=f"{name}'s consumption meter",
+			)
+			self.command._ensure_assignment(meter, participant, self.PERIOD_START)
+		self.command._seed_tariffs(self.zev, self.PERIOD_START)
+		# The status transitions are what these tests assert, never the billed
+		# consumption volume, so a couple of hourly days of readings suffice.
+		_seed_sparse_window_readings(
+			start_date=self.PERIOD_START,
+			end_date=self.PERIOD_END,
+			meters=[
+				(
+					MeteringPoint.objects.get(zev=self.zev, meter_id="SET-CONS-1"),
+					ReadingDirection.IN,
+					self.command._consumer_one_kwh,
+				),
+				(
+					MeteringPoint.objects.get(zev=self.zev, meter_id="SET-CONS-2"),
+					ReadingDirection.IN,
+					self.command._consumer_two_kwh,
+				),
+			],
+		)
+
+	def test_closed_run_marks_every_invoice_paid_and_the_last_cancelled(self):
+		invoices = self.command._seed_invoices(
+			self.zev, self.PERIOD_START, self.PERIOD_END, closed=True,
+		)
+		self.assertEqual(len(invoices), 2)
+		cancelled = [invoice for invoice in invoices if invoice.status == InvoiceStatus.CANCELLED]
+		paid = [invoice for invoice in invoices if invoice.status == InvoiceStatus.PAID]
+		self.assertEqual(len(cancelled), 1)
+		self.assertEqual(len(paid), 1)
+		# The cancelled one is the highest invoice number — the one issued last.
+		self.assertEqual(cancelled[0].invoice_number, max(invoice.invoice_number for invoice in invoices))
+		# Settled invoices carry a sent date, like really-sent mail would.
+		for invoice in invoices:
+			self.assertIsNotNone(invoice.sent_at)
+
+	def test_closed_run_survives_a_reseed(self):
+		self.command._seed_invoices(self.zev, self.PERIOD_START, self.PERIOD_END, closed=True)
+		# ``_seed_invoices`` never deletes: its callers wipe the ZEV's earlier
+		# invoices first (the engine refuses to regenerate past draft).
+		Invoice.objects.filter(zev=self.zev).delete()
+		self.command._seed_invoices(self.zev, self.PERIOD_START, self.PERIOD_END, closed=True)
+		self.assertEqual(Invoice.objects.filter(zev=self.zev).count(), 2)
+		self.assertEqual(
+			set(Invoice.objects.filter(zev=self.zev).values_list("status", flat=True)),
+			{InvoiceStatus.PAID, InvoiceStatus.CANCELLED},
+		)
+
+
 class MeteringPointReadingsDeletionTests(TestCase):
 	def setUp(self):
 		self.admin_client = APIClient()
@@ -1126,6 +1759,14 @@ class SeedDemoTariffVersionTests(TestCase):
 		self.assertEqual(len(self._versions("Feed-in Credit")), 1)
 		self.assertEqual(len(self._versions("Metering Service Fee")), 1)
 
+	def test_all_tariffs_cover_the_paid_history_year(self):
+		history_start = date(2025, 1, 1)
+		SeedDemoCommand()._seed_tariffs(self.zev, self.valid_from, history_start=history_start)
+		for name in Tariff.objects.filter(zev=self.zev).values_list("name", flat=True).distinct():
+			with self.subTest(name=name):
+				self.assertIsNotNone(active_version(self._versions(name), history_start))
+				self.assertIsNotNone(active_version(self._versions(name), date(2025, 12, 31)))
+
 	def test_the_version_timeline_is_continuous(self):
 		"""A gap bills the energy inside it at nothing, so demo data must not
 		ship one — the point of the versioning UI is to prevent them."""
@@ -1274,3 +1915,261 @@ class AllocationModelAndApiTests(TestCase):
 		self.assertEqual(patch_resp.status_code, 200, patch_resp.content)
 		self.participant.refresh_from_db()
 		self.assertEqual(self.participant.allocation_weight, Decimal("2.5000"))
+
+
+class SeedDemoLegacyNameCollisionTests(TestCase):
+	"""Legacy-name migration must deduplicate the demo owner's rows that would
+	collide on the current flagship name: ``Zev.name`` carries no unique
+	constraint, so two rows renamed onto one name would make the later upsert
+	raise ``MultipleObjectsReturned`` and roll the whole seed back. Only the
+	demo owner's rows are ever candidates — identification by display name
+	alone must never touch another tenant's community."""
+
+	def setUp(self):
+		self.command = SeedDemoCommand()
+		self.owner = make_user("seed_legacy_collision_owner", UserRole.ZEV_OWNER)
+		self.stranger = make_user("seed_legacy_collision_stranger", UserRole.ZEV_OWNER)
+
+	def _create(self, name, owner=None):
+		return Zev.objects.create(
+			name=name, owner=owner or self.owner, start_date=date(2026, 1, 1),
+			zev_type="vzev", invoice_prefix="OZV",
+		)
+
+	def _flagship_upsert(self):
+		return self.command._upsert_zev(
+			owner=self.owner,
+			name=DEMO_ZEV_NAME,
+			zev_type=ZevType.ZEV,
+			start_date=date(2026, 1, 1),
+			grid_operator="Stadtwerk Demo AG",
+			grid_connection_point="CH-DEMO-GRID-0001",
+			billing_interval="quarterly",
+			invoice_prefix="OZV",
+			invoice_language="de",
+			bank_iban="CH9300762011623852957",
+			bank_name="Demo Energy Bank",
+			vat_mode="inclusive",
+			vat_number="",
+		)
+
+	def test_legacy_row_next_to_an_already_migrated_row_is_dropped(self):
+		self._create(DEMO_ZEV_NAME)
+		self._create(DEMO_ZEV_LEGACY_NAME)
+		self.command._migrate_legacy_demo_zev_names(owner=self.owner)
+		self._flagship_upsert()
+		self.assertEqual(Zev.objects.filter(name=DEMO_ZEV_NAME, owner=self.owner).count(), 1)
+		self.assertFalse(Zev.objects.filter(name=DEMO_ZEV_LEGACY_NAME).exists())
+
+	def test_duplicate_legacy_rows_keep_the_newest_one(self):
+		self._create(DEMO_ZEV_LEGACY_NAME)
+		newer = self._create(DEMO_ZEV_LEGACY_NAME)
+		self.command._migrate_legacy_demo_zev_names(owner=self.owner)
+		self._flagship_upsert()
+		rows = list(Zev.objects.filter(name=DEMO_ZEV_NAME, owner=self.owner))
+		self.assertEqual(len(rows), 1)
+		self.assertEqual(rows[0].pk, newer.pk)
+		self.assertFalse(Zev.objects.filter(name=DEMO_ZEV_LEGACY_NAME).exists())
+
+	def test_current_name_upsert_does_not_take_over_another_owners_community(self):
+		tenant = self._create(DEMO_ZEV_NAME, owner=self.stranger)
+		self._flagship_upsert()
+		self._flagship_upsert()
+		tenant.refresh_from_db()
+		self.assertEqual(tenant.owner_id, self.stranger.pk)
+		self.assertEqual(Zev.objects.filter(name=DEMO_ZEV_NAME).count(), 2)
+
+	def test_only_the_demo_owner_is_affected(self):
+		# A tenant sharing the legacy display name keeps their row untouched
+		# even when the demo owner's own rows collide on the current name.
+		tenant = self._create(DEMO_ZEV_LEGACY_NAME, owner=self.stranger)
+		self._create(DEMO_ZEV_LEGACY_NAME)
+		self._create(DEMO_ZEV_NAME)
+		self.command._migrate_legacy_demo_zev_names(owner=self.owner)
+		self.assertFalse(Zev.objects.filter(name=DEMO_ZEV_LEGACY_NAME, owner=self.owner).exists())
+		self.assertTrue(Zev.objects.filter(pk=tenant.pk, name=DEMO_ZEV_LEGACY_NAME).exists())
+
+
+class SeedDemoWindowShiftTests(TestCase):
+	"""A re-seed with a moved window must not leave stale readings behind: the
+	flagship wipes all of its meters' readings each run, and the second
+	community has to do the same — wiping only the window used to leave the
+	previous run's rows on disk once the window moved on."""
+
+	def setUp(self):
+		self.command = SeedDemoCommand()
+		self.owner = make_user("seed_window_owner", UserRole.ZEV_OWNER)
+		self.clara_user = make_user("seed_window_clara", UserRole.PARTICIPANT)
+		self.zev = self.command._upsert_zev(
+			owner=self.owner,
+			name="Seeded Second ZEV",
+			zev_type=ZevType.VZEV,
+			start_date=date(2026, 7, 1),
+			grid_operator="Stadtwerk Demo AG",
+			grid_connection_point="CH-DEMO-GRID-0002",
+			billing_interval="monthly",
+			invoice_prefix="OZ2",
+			invoice_language="en",
+			bank_iban="CH4431999123000889012",
+			bank_name="Demo Energy Bank",
+			vat_mode="registered",
+			vat_number="CHE-987.654.321",
+		)
+		self.command._upsert_vat_rates()
+
+	def _seed(self, start_date, end_date):
+		# Window hygiene, not consumption volume, is under test here: keep the
+		# fixture small with a few hourly days per month.
+		with mock.patch.object(
+			self.command,
+			"_seed_meter_readings",
+			side_effect=_seed_sparse_window_readings,
+		):
+			return self.command._seed_second_community(
+				owner=self.owner,
+				clara_user=self.clara_user,
+				zev=self.zev,
+				start_date=start_date,
+				end_date=end_date,
+			)
+
+	def test_shifted_window_leaves_no_readings_outside_it(self):
+		self._seed(date(2026, 7, 1), date(2026, 9, 6))
+		self._seed(date(2026, 8, 1), date(2026, 10, 6))
+
+		all_readings = MeterReading.objects.filter(metering_point__zev=self.zev)
+		self.assertTrue(all_readings.exists())
+		# July rows from the first window fall outside the second window and
+		# must be gone, not just the rows inside the new window replaced.
+		self.assertFalse(
+			all_readings.filter(
+				timestamp__lt=datetime.combine(date(2026, 8, 1), time.min, tzinfo=timezone.utc)
+			).exists()
+		)
+
+
+class SeedDemoAuditResetTests(TestCase):
+	"""The demo audit reset is scoped: it clears the two demo ZEVs' events and
+	the demo actors' events without a ZEV, but must not delete those actors'
+	events on *other* communities in a shared dev database."""
+
+	def setUp(self):
+		self.command = SeedDemoCommand()
+		self.owner = make_user("seed_audit_owner", UserRole.ZEV_OWNER)
+		self.admin = make_user("seed_audit_admin", UserRole.ADMIN)
+		self.anna_user = make_user("seed_audit_anna", UserRole.PARTICIPANT)
+		self.stranger = make_user("seed_audit_stranger", UserRole.PARTICIPANT)
+		self.demo_one = Zev.objects.create(name="Demo One", owner=self.owner)
+		self.demo_two = Zev.objects.create(name="Demo Two", owner=self.owner)
+		self.other_zev = Zev.objects.create(name="Other Community", owner=self.owner)
+
+	def _event(self, user, zev=None):
+		return record_audit_event(
+			user=user,
+			zev=zev,
+			action_category=AuditActionCategory.GOVERNANCE,
+			action_type="demo.seed.test",
+			target_type="zev.Zev",
+			summary="Demo audit test event.",
+		)
+
+	def _reset(self):
+		self.command._reset_demo_audit_trail(
+			owner=self.owner,
+			admin=self.admin,
+			anna_user=self.anna_user,
+			zev=self.demo_one,
+			second_zev=self.demo_two,
+		)
+
+	def test_reset_clears_demo_trails_but_keeps_other_communities(self):
+		removed = [
+			self._event(self.owner, zev=self.demo_one),
+			self._event(self.anna_user, zev=self.demo_two),
+			self._event(self.stranger, zev=self.demo_one),  # actor irrelevant on a demo ZEV
+			self._event(self.owner),  # demo actor without a ZEV (e.g. vat_rate.create)
+			self._event(self.admin),
+			self._event(self.anna_user),
+		]
+		survivors = [
+			self._event(self.owner, zev=self.other_zev),
+			self._event(self.stranger, zev=self.other_zev),
+			self._event(self.stranger),  # non-demo actor, no ZEV
+		]
+
+		self._reset()
+
+		for event in removed:
+			with self.subTest(pk=event.pk):
+				self.assertFalse(AuditEvent.objects.filter(pk=event.pk).exists())
+		for event in survivors:
+			with self.subTest(pk=event.pk):
+				self.assertTrue(AuditEvent.objects.filter(pk=event.pk).exists())
+
+
+class SeedDemoEndToEndTests(TestCase):
+	"""The whole ``seed_demo`` command must run on a small deterministic window
+	and re-run identically — the integration check none of the helper-level
+	tests cover: every wipe/replace step and the operational-history seeding
+	working together."""
+
+	WINDOW = ["--start-date=2025-11-01", "--end-date=2026-01-15"]
+
+	def _run(self):
+		buf = StringIO()
+		with mock.patch(
+			"zev.management.commands.seed_demo.issue_contract_pdf",
+			return_value=(None, False),
+		):
+			call_command("seed_demo", *self.WINDOW, stdout=buf, stderr=buf)
+
+	def _snapshot(self):
+		return {
+			"readings": MeterReading.objects.count(),
+			"invoices": Invoice.objects.count(),
+			"invoice_numbers": set(Invoice.objects.values_list("invoice_number", flat=True)),
+			"email_logs": EmailLog.objects.count(),
+			"import_logs": ImportLog.objects.count(),
+			"audit_events": AuditEvent.objects.count(),
+			"contracts": ContractIssue.objects.count(),
+			"zevs": Zev.objects.count(),
+		}
+
+	def test_seed_runs_end_to_end_and_re_seeding_is_identical(self):
+		self._run()
+		flagship = Zev.objects.get(name=DEMO_ZEV_NAME)
+		self.assertEqual(Zev.objects.count(), 2)
+		# The settled previous year feeds the reports page, which defaults to
+		# the prior calendar year and reads paid invoices only.
+		self.assertTrue(
+			Invoice.objects.filter(
+				zev=flagship,
+				status=InvoiceStatus.PAID,
+				period_end__year=2025,
+			).exists()
+		)
+
+		first = self._snapshot()
+		self.assertEqual(first["zevs"], 2)
+		self.assertGreater(first["readings"], 0)
+		self.assertGreater(first["invoices"], 0)
+		self.assertGreater(first["email_logs"], 0)
+		self.assertEqual(first["import_logs"], 2)
+		self.assertGreater(first["audit_events"], 0)
+		self.assertEqual(first["contracts"], 0)  # PDF issuance is mocked
+
+		# Every invoice status the UI renders badges for is present.
+		have_statuses = set(Invoice.objects.values_list("status", flat=True))
+		self.assertTrue({"draft", "approved", "sent", "paid", "cancelled"} <= have_statuses)
+
+		self._run()
+		second = self._snapshot()
+
+		self.assertEqual(second["readings"], first["readings"])
+		self.assertEqual(second["invoices"], first["invoices"])
+		self.assertEqual(second["invoice_numbers"], first["invoice_numbers"])
+		self.assertEqual(second["email_logs"], first["email_logs"])
+		self.assertEqual(second["import_logs"], first["import_logs"])
+		self.assertEqual(second["audit_events"], first["audit_events"])
+		self.assertEqual(second["contracts"], first["contracts"])
+		self.assertEqual(second["zevs"], 2)

@@ -55,9 +55,13 @@ In fullstack mode:
 
 ## Demo Accounts
 
-A demo dataset is pre-loaded with sample data for testing. The demo account credentials are listed in the root [`README.md`](../../README.md#seed-data--demo-accounts).
-
-The demo dataset includes a sample ZEV community, participants, tariffs, and 15-minute interval metering data for the previous quarter up to today.
+A demo dataset is available for testing. It is loaded by starting the stack
+with `scripts/start-demo-environment.sh`, or by running `seed_demo` on an
+already-running stack (see below). It contains two communities owned by the
+same owner — the flagship **ZEV STWEG Sonnenhof** and the smaller
+**ZEV Sonnenfirma AG** — so both sides of the community switcher have real
+data to show. Credentials and the full list of what the seed creates are in
+the root [`README.md`](../../README.md#seed-data--demo-accounts).
 
 ### Resetting Demo Data
 
@@ -66,6 +70,9 @@ To reload the demo dataset:
 ```bash
 docker compose exec backend python manage.py seed_demo
 ```
+
+This refreshes demo readings, invoices, import/email logs and audit events for
+both communities. Issued contract snapshots are retained.
 
 ## First-Time Setup
 
