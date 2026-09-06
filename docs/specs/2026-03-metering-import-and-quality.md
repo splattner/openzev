@@ -345,6 +345,11 @@ All metering endpoints are routed under `/api/v1/metering/` via DRF routers.
 **Response:** array of `{bucket, in_kwh, out_kwh}` objects, pivoted by
 direction within each time bucket.
 
+**Participant visibility:** filter each reading by an assignment belonging to
+the caller that covers the reading's UTC civil date, before aggregation
+(§6.1). Selecting a meter does not grant access to its previous or next
+holder's readings, even when no date bounds are supplied.
+
 **Date bounds:** explicit UTC start/end construction (via
 `allocation.validity.period_window`) to avoid Django timezone conversion
 artifacts (ADR 0007).
@@ -354,6 +359,10 @@ artifacts (ADR 0007).
 | Method | URL | Permission | Query params |
 |---|---|---|---|
 | `GET` | `/readings/raw-data/` | `IsAuthenticated` | `metering_point` (required), `date_from`, `date_to` |
+
+Both the daily summary and single-day detail (`date=YYYY-MM-DD`) apply the
+assignment-date visibility rule in §6.1. Unauthorized readings are omitted;
+a day with no visible readings returns an empty array with HTTP 200.
 
 **Response:** array of daily-grouped objects:
 
@@ -625,15 +634,33 @@ All import endpoints use `MultiPartParser` and `FormParser`.
 |---|---|
 | `admin` | All readings |
 | `zev_owner` | Readings for meters in `zev__owner = user` |
-| `participant` | Readings for meters assigned to them via `assignments__participant__user = user` |
+| `participant` | Readings with an assignment for the same meter whose `participant.user = user` and whose validity window contains the reading's UTC civil date |
+
+`MeterReadingViewSet._scope_by_role()` delegates admin/owner scoping to
+`ZevScopedQuerySetMixin`. For non-manager callers, it aliases `reading_day`
+with `TruncDate("timestamp", tzinfo=UTC)` and filters using a correlated
+`Exists` over `MeteringPointAssignment`: `metering_point_id` equals the outer
+reading's meter, `participant__user` equals the caller, `valid_from <=
+reading_day`, and `valid_to IS NULL OR valid_to >= reading_day`. All conditions
+must match the same assignment. This avoids implicit Zurich date conversion
+and avoids multiplying aggregate sums or reading counts when a holder has
+multiple assignments to one meter.
+
+Both assignment bounds are inclusive; a null end is open-ended. Readings
+before/after the caller's windows and in assignment gaps are excluded.
+Multiple noncontiguous windows authorize only their union, without granting
+access to intervening holders. Assignment allocation mode does not change
+holder access. The shared `scope_queryset()` still applies `?zev_id=` after
+role scoping, so that filter can only narrow visibility. Readings CRUD remains
+owner/admin-only; raw-data and chart-data retain their response shapes.
 
 ### 6.2 Permission summary
 
 | Action | `admin` | `zev_owner` | `participant` |
 |---|---|---|---|
-| List/read readings | All | Own ZEV | Own assigned meters |
+| List/read readings (CRUD routes) | All | Own ZEV | No (403) |
 | CRUD readings | Yes | Yes | No (403) |
-| Chart data, raw data | Yes | Yes | Yes (read-only from own) |
+| Chart data, raw data | Yes | Yes | Only readings within own assignment windows |
 | Dashboard summary | Yes (with `zev_id`) | Yes (own ZEV) | Yes (own data, different response shape) |
 | Data quality status | Yes | Yes | Yes (own meters) |
 | CSV/SDAT-CH import | Yes | Yes | No (403) |
@@ -812,6 +839,22 @@ type MeteringDashboardSummary =
 | `ImportParserRobustnessTests` | §4.1: malformed CSV reported without crash; malformed SDAT-CH reported without crash; timezone offset normalized to UTC; duplicate rows skipped; idempotent re-import; overwrite mode updates value without creating new row |
 | `MeteringRawDataEndpointTests` | §5.3: owner gets daily-grouped raw rows with correct direction sums; participant can read own metering point's raw data |
 | `DataQualityStatusTests` | §5.5: owner sees gaps and severity; participant sees own meters; default 30-day range; fully assigned readings report no unassigned; holder-less meter flags every reading; assignment-gap readings flagged unassigned; overlapping windows flag only the corrupt meter (others still report) |
+
+### Backend (`metering/test_reading_visibility.py`)
+
+72 parametrized API cases cover raw summaries, raw single-day details, and
+day/hour/month chart buckets:
+
+| Test function | Cases | Validates |
+|---|---|---|
+| `test_only_assignment_days_are_visible_without_duplicate_totals` | 35 | Before/after-transfer exclusion, inclusive UTC boundaries, gaps, returning-holder windows, open-ended assignments through DST, and unduplicated IN/OUT totals |
+| `test_next_holder_can_read_their_own_readings` | 5 | The next holder retains access during their own window |
+| `test_unbounded_requests_only_aggregate_owned_readings` | 2 | Requests without date bounds aggregate only owned readings, including exact raw reading counts |
+| `test_assignment_to_one_meter_does_not_grant_access_to_another` | 5 | Assignment correlation includes the meter, not only caller/date |
+| `test_zev_filter_cannot_widen_participant_visibility` | 5 | Foreign meter access is denied and a mismatched ZEV filter excludes an otherwise authorized meter |
+| `test_participant_without_assignments_sees_no_readings` | 5 | ZEV membership alone grants no raw/chart access |
+| `test_managers_can_read_assignment_gaps` | 10 | Admin/owner access does not depend on assignments |
+| `test_owner_cannot_read_another_zevs_meter` | 5 | Owner tenant isolation remains enforced |
 
 ### Backend (`metering/test_import_limits.py`, `metering/test_import_sdatch.py`)
 

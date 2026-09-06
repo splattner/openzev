@@ -2,8 +2,8 @@ from datetime import date as date_type, timedelta, timezone as dt_timezone
 
 from allocation.validity import period_end_exclusive_dt, period_start_dt, period_window
 from django.db import transaction
-from django.db.models import Count, Q, Sum
-from django.db.models.functions import TruncDay, TruncHour, TruncMonth
+from django.db.models import Count, Exists, OuterRef, Q, Sum
+from django.db.models.functions import TruncDate, TruncDay, TruncHour, TruncMonth
 from django.utils.dateparse import parse_date
 from rest_framework import mixins, viewsets, status
 from rest_framework.decorators import action
@@ -12,7 +12,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from accounts.permissions import IsZevOwnerOrAdmin
 from accounts.throttling import ApiKeyRateThrottle, ImportThrottle
-from zev.models import Zev, Participant, MeteringPoint
+from zev.models import Zev, Participant, MeteringPoint, MeteringPointAssignment
 from .models import MeterReading, ImportLog
 from zev.scoping import ZevScopedQuerySetMixin
 from .serializers import MeterReadingSerializer, ImportLogSerializer
@@ -32,9 +32,23 @@ class MeterReadingViewSet(ZevScopedQuerySetMixin, viewsets.ModelViewSet):
     serializer_class = MeterReadingSerializer
     permission_classes = [IsAuthenticated, IsZevOwnerOrAdmin]
     zev_owner_filter = "metering_point__zev__owner"
-    participant_filter = "metering_point__assignments__participant__user"
-    participant_distinct = True
     scope_parent_path = ("metering_point", "zev")
+
+    def _scope_by_role(self, qs):
+        user = self.request.user
+        if user.is_admin or user.is_zev_owner:
+            return super()._scope_by_role(qs)
+
+        # Match ownership and both bounds on the same assignment. EXISTS
+        # avoids multiplying aggregate sums when a holder returns to a meter.
+        qs = qs.alias(reading_day=TruncDate("timestamp", tzinfo=dt_timezone.utc))
+        reading_day = OuterRef("reading_day")
+        assignments = MeteringPointAssignment.objects.filter(
+            metering_point_id=OuterRef("metering_point_id"),
+            participant__user=user,
+            valid_from__lte=reading_day,
+        ).filter(Q(valid_to__isnull=True) | Q(valid_to__gte=reading_day))
+        return qs.filter(Exists(assignments))
 
     def get_queryset(self):
         return self.scope_queryset(MeterReading.objects.select_related("metering_point__zev"))

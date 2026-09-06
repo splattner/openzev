@@ -769,8 +769,17 @@ backend's primary access control mechanism.
 | MeteringPointAssignment | all | `metering_point.zev.owner == user` | `participant.user == user` | — |
 | User (list) | all (`IsAdmin`) | PermissionDenied | PermissionDenied | PermissionDenied |
 | ImportLog | all | `zev.owner == user` OR `imported_by == user` | PermissionDenied | PermissionDenied |
-| MeterReading | all | ZEV-scoped meters | assigned meters | PermissionDenied |
+| MeterReading | all | ZEV-scoped meters | raw/chart readings only within own assignment dates (UTC); CRUD routes denied | PermissionDenied |
 | Invoice | all | `zev.owner == user` | `participant.user == user` | — |
+
+For participant raw/chart metering access, the assignment's meter and linked
+user must match the reading and caller, and its inclusive validity window
+must contain the reading's UTC civil date. A null assignment end is
+open-ended; gaps and other holders' periods remain hidden even when the caller
+held the same meter before or after them. The query uses a correlated
+assignment `Exists` check so returning holders' readings are not duplicated
+in aggregates. See the [metering spec §6.1](2026-03-metering-import-and-quality.md#61-readings-queryset-scoping)
+and its `metering/test_reading_visibility.py` regression coverage.
 
 ---
 
