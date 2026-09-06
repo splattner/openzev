@@ -328,6 +328,7 @@ class ParticipantAccountLifecycleTests(TestCase):
 		self.assertEqual(participant.phone, "+41 79 111 11 11")
 		self.assertEqual(participant.address_line1, "Updated 2")
 		self.assertEqual(participant.city, "Bern")
+		self.assertEqual(participant.user.role, UserRole.PARTICIPANT)
 
 	def test_send_invitation_mail_resets_temporary_password(self):
 		resp_create = self.client.post(
@@ -398,6 +399,52 @@ class AdminCanEditOwnerParticipantTests(TestCase):
 		self.owner_participant.refresh_from_db()
 		self.assertEqual(self.owner_participant.address_line1, "New Street 5")
 		self.assertEqual(self.owner_participant.city, "Bern")
+		self.owner.refresh_from_db()
+		self.assertEqual(self.owner.role, UserRole.ZEV_OWNER)
+		auth(self.client, self.owner)
+		self.assertEqual(self.client.get(f"/api/v1/zev/zevs/{self.zev.id}/").status_code, 200)
+
+	@mock.patch("zev.tasks.warm_participant_geocode_cache_task.delay")
+	def test_profile_sync_preserves_privileged_roles(self, mock_geocode_delay):
+		admin = make_user("admin_edit_privileged", UserRole.ADMIN)
+		for role in (UserRole.ZEV_OWNER, UserRole.ADMIN):
+			with self.subTest(role=role):
+				self.owner.role = role
+				self.owner.save(update_fields=["role"])
+				auth(self.client, admin)
+				resp = self.client.patch(
+					f"/api/v1/zev/participants/{self.owner_participant.id}/",
+					{"first_name": "Updated", "last_name": "Owner", "email": "updated.owner@example.com"},
+					format="json",
+				)
+				self.assertEqual(resp.status_code, 200)
+				self.owner.refresh_from_db()
+				self.assertEqual(self.owner.role, role)
+				self.assertEqual(self.owner.first_name, "Updated")
+				self.assertEqual(self.owner.last_name, "Owner")
+				self.assertEqual(self.owner.email, "updated.owner@example.com")
+				auth(self.client, self.owner)
+				self.assertEqual(self.client.get(f"/api/v1/zev/zevs/{self.zev.id}/").status_code, 200)
+
+	def test_invitation_preserves_privileged_roles_and_promotes_guests(self):
+		admin = make_user("admin_invite_privileged", UserRole.ADMIN)
+		auth(self.client, admin)
+		for role in (UserRole.ZEV_OWNER, UserRole.ADMIN, UserRole.PARTICIPANT, UserRole.GUEST):
+			with self.subTest(role=role):
+				account = make_user(f"invite_{role}", role)
+				participant = Participant.objects.create(
+					zev=self.zev, user=account, first_name="Invited", last_name="Person",
+					email=account.email, valid_from=date(2026, 1, 1),
+				)
+				resp = self.client.post(f"/api/v1/zev/participants/{participant.id}/send-invitation/")
+				self.assertEqual(resp.status_code, 200)
+				account.refresh_from_db()
+				expected_role = UserRole.PARTICIPANT if role == UserRole.GUEST else role
+				self.assertEqual(account.role, expected_role)
+				self.assertTrue(account.check_password(resp.data["temporary_password"]))
+				self.assertTrue(account.must_change_password)
+				self.assertEqual(mail.outbox[-1].to, [participant.email])
+				self.assertIn(resp.data["temporary_password"], mail.outbox[-1].body)
 
 	def test_zev_owner_cannot_edit_their_own_owner_participant_record(self):
 		auth(self.client, self.owner)
