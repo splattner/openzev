@@ -24,18 +24,14 @@ CACHES = {
 # that reuses one API key would start failing once it crossed the hourly limit —
 # in whichever test happened to be the 601st. Tests that exercise throttling
 # override the rate themselves.
+# Derived from the real scopes rather than restated, so a throttle added to
+# settings.py cannot be missed here — the failure that produces is a wall of
+# ImproperlyConfigured in unrelated tests, which says nothing about the cause.
 REST_FRAMEWORK = {
     **REST_FRAMEWORK,  # noqa: F405
     "DEFAULT_THROTTLE_RATES": {
-        "api_key": None,
-        "auth_login": None,
-        "auth_refresh": None,
-        "auth_register": None,
-        "auth_verify": None,
-        "auth_oauth_initiate": None,
-        "auth_oauth_exchange": None,
-        "import": None,
-        "transfer_import": None,
+        scope: None
+        for scope in REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"]  # noqa: F405
     },
 }
 
