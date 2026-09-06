@@ -148,6 +148,21 @@ def _price_row_for_fee_tariff(tariff, tr: dict) -> dict:
     }
 
 
+def _label_is_redundant(tariff, price_row: dict, band_tr: dict) -> bool:
+    """Whether a lone price row's label repeats what the tariff row says.
+
+    Only the flat band qualifies: ``band_description`` calls it "Einheitstarif"
+    to distinguish it from HT/NT, and a tariff with no other band has nothing
+    to distinguish it from. A fee's label names its split key and a percentage
+    row's label carries the formula, so both are kept.
+    """
+    return (
+        tariff.billing_mode == BillingMode.ENERGY
+        and price_row["label"] == band_tr["tariff_flat"]
+        and not price_row["recurrence"]
+    )
+
+
 def _build_tariff_row(
     tariff, tr: dict, band_tr: dict, date_pattern: str, as_of: date,
     grid_sum_chf: Decimal, multiband_base: bool,
@@ -163,6 +178,16 @@ def _build_tariff_row(
     else:
         price_rows = [_price_row_for_fee_tariff(tariff, tr)]
 
+    # A tariff with one price needs no second line to put it on: the price
+    # goes on the tariff's own row and the table halves in height. Most
+    # tariffs are this shape — a levy or a fee has exactly one number — so
+    # the two-row form is the exception, not the default.
+    inline_price = price_rows[0] if len(price_rows) == 1 else None
+    if inline_price is not None and _label_is_redundant(tariff, inline_price, band_tr):
+        # "Flat rate" under a tariff that has no other band says nothing the
+        # single row does not already say.
+        inline_price = {**inline_price, "label": ""}
+
     return {
         "name": tariff.name,
         "validity": _validity_display(tariff, tr, date_pattern),
@@ -170,6 +195,7 @@ def _build_tariff_row(
         "is_current": _is_active(tariff, as_of),
         "notes": tariff.notes,
         "price_rows": price_rows,
+        "inline_price": inline_price,
     }
 
 
@@ -273,15 +299,16 @@ def _build_template_context(zev, as_of: date, scope: str) -> dict:
     vat_display, vat_note = _vat_display(zev, tr)
     as_of_display = format_date_value(as_of, date_pattern)
 
+    # One date, and it is ``as_of``: that is the date the prices are true on,
+    # which is the only one a reader of a tariff sheet needs. The generation
+    # date, the "valid as of" restatement and the footer copy all said the
+    # same thing three more times.
     return {
         "zev": zev,
         "tr": tr,
         "as_of_display": as_of_display,
-        "valid_at_display": tr["valid_at"].format(date=as_of_display),
-        "generated_on_display": format_date_value(timezone.localdate(), date_pattern),
         "scope": scope,
         "groups": groups,
-        "tariff_count": sum(len(group["tariffs"]) for group in groups),
         "vat_display": vat_display,
         "vat_note": vat_note,
         "footnotes": footnotes,

@@ -12,14 +12,14 @@
     <style>
         /* ══ 2. Page layout ═════════════════════════════════════ */
         .overview-page {
-            padding: 12mm 16mm;
+            padding: 10mm 16mm;
         }
 
         /* ══ 3. Meta band ════════════════════════════════════════ */
         .overview-meta {
             display: flex;
             gap: 10mm;
-            margin: 6mm 0 5mm;
+            margin: 4mm 0 3mm;
         }
 
         .overview-meta .meta-item { flex: 1 1 auto; }
@@ -40,12 +40,17 @@
         }
 
         /* ══ 4. Category groups ══════════════════════════════════ */
+        /* A category may split across pages — forcing a six-levy block to
+           move as one unit left a third of a page blank. What must stay
+           together is a tariff and its bands, which .tariff-table tr and the
+           inline form below already guarantee. */
         .category-group {
-            break-inside: avoid;
-            margin-top: 5mm;
+            break-inside: auto;
+            margin-top: 3.5mm;
         }
 
         .category-title {
+            break-after: avoid;
             font-size: 8.4pt;
             font-weight: 700;
             letter-spacing: 0.04em;
@@ -72,7 +77,7 @@
         .tariff-table td {
             border-bottom: 0.5pt solid var(--line);
             font-size: 8.2pt;
-            padding: 1.2mm 3mm;
+            padding: 1mm 3mm;
             vertical-align: top;
             color: var(--ink-soft);
             font-variant-numeric: tabular-nums;
@@ -89,7 +94,7 @@
             background: var(--zebra);
         }
 
-        .tariff-header-row td { padding-top: 2.2mm; }
+        .tariff-header-row td { padding-top: 1.6mm; }
 
         .tariff-header-row .tariff-name {
             font-weight: 700;
@@ -105,30 +110,33 @@
             margin-top: 0.3mm;
         }
 
-        .tariff-header-row .tariff-notes {
-            display: block;
+        .notes-row .tariff-notes {
             font-weight: 400;
-            font-size: 7.3pt;
+            font-size: 7pt;
             color: var(--muted);
             font-style: italic;
-            margin-top: 0.5mm;
+            padding-top: 0;
         }
 
         .price-row td { padding-left: 6mm; }
 
-        .price-row .price-recurrence {
+        /* Inline form: the tariff row is also the price row. */
+        .tariff-header-row.inline .price-recurrence { vertical-align: middle; }
+        .tariff-header-row.inline .numeric { vertical-align: middle; }
+
+        .price-recurrence {
             color: var(--muted);
             font-size: 7.5pt;
         }
 
-        .price-row .footnote-marker {
+        .footnote-marker {
             color: var(--brand-mid);
             font-weight: 700;
             vertical-align: super;
             font-size: 6.5pt;
         }
 
-        .price-row .price-amount {
+        .price-amount {
             font-weight: 700;
             color: var(--subtotal-color);
         }
@@ -199,7 +207,7 @@
         <div class="page-meta-inner">
             <span class="meta-left">{{ zev.name }} · {{ tr.document_label }}</span>
             <span class="meta-center"></span>
-            <span class="meta-right">{{ as_of_display }}</span>
+            <span class="meta-right"></span>
         </div>
     </div>
 
@@ -213,22 +221,20 @@
             </div>
             <div>
                 <div class="document-label">{{ tr.document_label }}</div>
+                {% comment %}The one date this document carries. It is the
+                as-of date, which is what the tariffs are true on — the
+                generation date told the reader nothing they needed, and
+                repeating either in the status chip and the footer made a
+                document about prices look like a document about dates.
+                {% endcomment %}
                 <div class="document-number">{{ as_of_display }}</div>
-                <div class="document-status">
-                    {% if scope == 'all' %}{{ tr.all_versions }}{% else %}{{ valid_at_display }}{% endif %}
-                </div>
+                {% if scope == 'all' %}
+                <div class="document-status">{{ tr.all_versions }}</div>
+                {% endif %}
             </div>
         </header>
 
         <dl class="overview-meta">
-            <div class="meta-item">
-                <dt>{{ tr.generated_on }}</dt>
-                <dd>{{ generated_on_display }}</dd>
-            </div>
-            <div class="meta-item">
-                <dt>{{ tr.tariff_count }}</dt>
-                <dd>{{ tariff_count }}</dd>
-            </div>
             <div class="meta-item">
                 <dt>{{ tr.vat_label }}</dt>
                 <dd>{{ vat_display }}</dd>
@@ -248,14 +254,31 @@
                 </colgroup>
                 <tbody>
                     {% for tariff in group.tariffs %}
-                    <tr class="tariff-header-row{% if forloop.counter0|divisibleby:2 %} even{% endif %}{% if not tariff.is_current %} superseded{% endif %}">
-                        <td colspan="2" class="tariff-name">
+                    {% comment %}One price folds onto the tariff's own row; two
+                    or more keep the header/band form so each band reads as a
+                    line of its own.{% endcomment %}
+                    <tr class="tariff-header-row{% if forloop.counter0|divisibleby:2 %} even{% endif %}{% if not tariff.is_current %} superseded{% endif %}{% if tariff.inline_price %} inline{% endif %}">
+                        <td class="tariff-name">
                             {{ tariff.name }}
-                            <span class="tariff-subtitle">{{ tariff.billing_mode_label }} · {{ tariff.validity }}</span>
-                            {% if tariff.notes %}<span class="tariff-notes">{{ tariff.notes }}</span>{% endif %}
+                            <span class="tariff-subtitle">{{ tariff.billing_mode_label }} · {{ tariff.validity }}{% if tariff.inline_price.label %} · {{ tariff.inline_price.label }}{% endif %}{% if tariff.inline_price.footnote_index %}<span class="footnote-marker">{{ tariff.inline_price.footnote_index }}</span>{% endif %}</span>
                         </td>
-                        <td colspan="2"></td>
+                        {% if tariff.inline_price %}
+                        <td class="price-recurrence">{{ tariff.inline_price.recurrence }}</td>
+                        <td class="numeric price-amount">{{ tariff.inline_price.amount }}</td>
+                        <td class="numeric">{{ tariff.inline_price.unit }}</td>
+                        {% else %}
+                        <td colspan="3"></td>
+                        {% endif %}
                     </tr>
+                    {% if tariff.notes %}
+                    {% comment %}Full width: a reference-product description is
+                    prose, and wrapping it inside the name column costs a line
+                    for nothing.{% endcomment %}
+                    <tr class="notes-row{% if forloop.counter0|divisibleby:2 %} even{% endif %}">
+                        <td colspan="4" class="tariff-notes">{{ tariff.notes }}</td>
+                    </tr>
+                    {% endif %}
+                    {% if not tariff.inline_price %}
                     {% for price in tariff.price_rows %}
                     <tr class="price-row{% if forloop.parentloop.counter0|divisibleby:2 %} even{% endif %}{% if not tariff.is_current %} superseded{% endif %}">
                         <td>{{ price.label }}{% if price.footnote_index %}<span class="footnote-marker">{{ price.footnote_index }}</span>{% endif %}</td>
@@ -264,6 +287,7 @@
                         <td class="numeric">{{ price.unit }}</td>
                     </tr>
                     {% endfor %}
+                    {% endif %}
                     {% endfor %}
                 </tbody>
             </table>

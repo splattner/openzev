@@ -264,19 +264,44 @@ ERSTELLT AM        TARIFE        MWST
 |---|---|
 | Document label | `tr["document_label"]` — "TARIFÜBERSICHT" |
 | Document number | The `as_of` date in `.document-number` style: light 22 pt with the year in `<strong>`, matching the invoice number's prefix/suffix split |
-| Status chip | `.document-status` — "Gültig am 05.09.2026", or "Alle Versionen" under `scope="all"` |
-| Meta band | Three `.eyebrow`-labelled cells: generated-on, tariff count, VAT mode |
+| Status chip | `.document-status` — "Alle Versionen", **only** under `scope="all"`. Under `scope="valid"` the document number already says what date the prices are true on, and a chip restating it made the document look like it was about dates |
+| Meta band | One `.eyebrow`-labelled cell: VAT mode. Generated-on and the tariff count were dropped — the first repeated a date the reader does not act on, the second is a fact they can see |
 | Category column | `rowspan` label cell, the same construction as the invoice's `.category-label-cell` (`backend/templates/invoices/invoice_pdf.html:786`) |
-| Tariff row | Name in `600` weight; second line, muted 7.5 pt: billing mode · validity |
+| Tariff row | Name in `600` weight; second line, muted 7.5 pt: billing mode · validity. **A tariff with exactly one price puts it on this row** and emits no band row — see §8.1 |
 | Band rows | Indented under the tariff; label left, recurrence in muted text right of it, amount right-aligned `tabular-nums` |
 | Superseded rows | `scope="all"` only — `--muted` ink, validity span in place of "ab" |
 | Footnotes | Numbered, below the table, only those actually referenced |
-| Page furniture | Running footer: ZEV name · document label · as-of date · `N / M` |
+| Page furniture | Running footer: ZEV name · document label · `N / M`. No date: it is the fourth printing of the same one |
 | `@page` | A4, the invoice's margins; no QR reservation, no named pages |
 
-The table breaks across pages with `thead` repeating and
-`tbody.tariff-group { break-inside: avoid }`, so a tariff's bands never split
-from their name.
+A **category** may break across pages; a **tariff** may not. `break-inside:
+avoid` on `.category-group` meant a six-levy block moved as one unit and left a
+third of a page blank, which is the opposite of compact. The unit that must
+stay whole is a tariff and its bands (`.tariff-table tr`, plus the inline form
+below), and `.category-title { break-after: avoid }` keeps a category header
+from stranding at the foot of a page.
+
+### 8.1 One price folds onto the tariff row
+
+Most tariffs have exactly one price — a levy, a monthly fee, a flat energy
+rate. Printing a header row and then a band row for a single number cost 20 mm
+per tariff and pushed a real 14-tariff ZEV onto two pages.
+
+`_build_tariff_row` therefore sets `inline_price` when `len(price_rows) == 1`,
+and the template renders the amount on the tariff's own row. `price_rows` is
+still populated, so nothing that reads the context loses a price.
+
+The lone row's label is dropped **only** when it is the flat band's name
+(`_label_is_redundant`): "Einheitstarif" distinguishes a band from HT/NT, and a
+tariff with no other band has nothing to distinguish. A fee's label names its
+split key and a percentage row's label carries its formula, so both are kept
+and render on the subtitle line — in the wide description column, where a
+formula does not wrap mid-unit.
+
+`Tariff.notes` moves to its own full-width row beneath, for the same reason.
+
+Measured on a production ZEV (14 active tariffs, 3 carrying notes): 378 mm of
+content over two pages became 263 mm on one.
 
 ## 9. API contracts
 

@@ -242,6 +242,72 @@ class TariffOverviewContentTests(TariffOverviewTestCase):
         self.assertEqual(row["amount"], "22.50")
         self.assertEqual(row["unit"], "Rp./kWh")
 
+    def test_single_band_tariff_folds_onto_one_row(self):
+        """One price needs no second line, and most tariffs have one price."""
+        self._energy_tariff(name="Single")
+        _flat_period(Tariff.objects.get(name="Single"), "0.22500")
+
+        ctx = _build_template_context(self.zev, date(2026, 6, 1), "valid")
+        tariff = ctx["groups"][0]["tariffs"][0]
+
+        self.assertIsNotNone(tariff["inline_price"])
+        self.assertEqual(tariff["inline_price"]["amount"], "22.50")
+        # "Einheitstarif" under a tariff with no other band says nothing.
+        self.assertEqual(tariff["inline_price"]["label"], "")
+
+    def test_multi_band_tariff_keeps_its_band_rows(self):
+        tariff = self._energy_tariff(name="HT/NT")
+        TariffPeriod.objects.create(
+            tariff=tariff, period_type="high", price_chf_per_kwh=Decimal("0.28000"),
+        )
+        TariffPeriod.objects.create(
+            tariff=tariff, period_type="low", price_chf_per_kwh=Decimal("0.18000"),
+        )
+
+        ctx = _build_template_context(self.zev, date(2026, 6, 1), "valid")
+        row = ctx["groups"][0]["tariffs"][0]
+
+        self.assertIsNone(row["inline_price"])
+        self.assertEqual(len(row["price_rows"]), 2)
+
+    def test_inline_form_keeps_a_label_that_carries_information(self):
+        """Only the flat band's name is dropped — a fee names its split key and
+        a percentage row carries its formula, and both must survive folding.
+        """
+        Tariff.objects.create(
+            zev=self.zev, name="Shared", category=TariffCategory.METERING,
+            billing_mode=BillingMode.SHARED_MONTHLY_FEE, split_key=SplitKey.WEIGHT,
+            fixed_price_chf=Decimal("12.00"), valid_from=date(2026, 1, 1),
+        )
+        grid = self._energy_tariff(name="Grid", energy_type=EnergyType.GRID)
+        _flat_period(grid, "0.29500")
+        Tariff.objects.create(
+            zev=self.zev, name="Pct", category=TariffCategory.ENERGY,
+            billing_mode=BillingMode.PERCENTAGE_OF_ENERGY, energy_type=EnergyType.LOCAL,
+            percentage=Decimal("65.00"), valid_from=date(2026, 1, 1),
+        )
+
+        ctx = _build_template_context(self.zev, date(2026, 6, 1), "valid")
+        by_name = {
+            t["name"]: t for group in ctx["groups"] for t in group["tariffs"]
+        }
+
+        self.assertEqual(
+            by_name["Shared"]["inline_price"]["label"],
+            TARIFF_OVERVIEW_TRANSLATIONS["de"]["fee_shared_weight"],
+        )
+        self.assertIn("65.00", by_name["Pct"]["inline_price"]["label"])
+
+    def test_context_carries_exactly_one_date(self):
+        """The as-of date. The generation date, the "valid as of" restatement
+        and the footer copy all said the same thing three more times.
+        """
+        ctx = _build_template_context(self.zev, date(2026, 6, 1), "valid")
+
+        self.assertIn("as_of_display", ctx)
+        for dropped in ("generated_on_display", "valid_at_display", "tariff_count"):
+            self.assertNotIn(dropped, ctx)
+
     def test_shared_fee_names_its_split(self):
         Tariff.objects.create(
             zev=self.zev, name="Shared fee", category=TariffCategory.METERING,
