@@ -4,7 +4,12 @@ import { useMutation, useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 
 import { groupItemsByCategory } from '../features/publicInvoice/grouping'
-import { fetchPublicInvoice, publicInvoicePdfUrl, requestMagicLink } from '../lib/api/public'
+import {
+    fetchPublicInvoice,
+    fetchPublicInvoiceCharts,
+    publicInvoicePdfUrl,
+    requestMagicLink,
+} from '../lib/api/public'
 
 /**
  * One invoice, opened from the QR printed on it. No account, no session.
@@ -30,6 +35,18 @@ export function PublicInvoicePage() {
     })
 
     const grouped = useMemo(() => (data ? groupItemsByCategory(data.items) : []), [data])
+
+    // Its own query, and not blocking the invoice: the server needs a full
+    // period of allocation work to draw these, so the figures should render
+    // while the pictures are still coming.
+    const { data: charts } = useQuery({
+        queryKey: ['public-invoice-charts', prefix, secret],
+        queryFn: () => fetchPublicInvoiceCharts(prefix, secret),
+        enabled: Boolean(data),
+        retry: false,
+    })
+
+    const chartList = charts?.charts ?? []
 
     const [linkRequested, setLinkRequested] = useState(false)
     const magicLink = useMutation({
@@ -139,6 +156,31 @@ export function PublicInvoicePage() {
                         </div>
                     ))}
                 </section>
+
+                {/* Optional chaining is not defensive habit here: this page is
+                    served to someone with no session, no navigation and no
+                    support channel, so an unexpected payload must degrade to a
+                    missing figure rather than a white screen. */}
+                {chartList.length > 0 && (
+                    <section className="public-invoice-charts">
+                        {/* Laid out like the invoice's insights page: a section
+                            heading and intro, then each figure under its own
+                            title and description. The SVGs and all of this copy
+                            come from the server, so the screen and the paper say
+                            the same things in the same language. */}
+                        {charts?.title && <h2>{charts.title}</h2>}
+                        {charts?.intro && <p className="muted">{charts.intro}</p>}
+                        {chartList.map((chart) => (
+                            <figure key={chart.key} className="public-invoice-chart">
+                                <figcaption>
+                                    <h3>{chart.title}</h3>
+                                    <p className="muted">{chart.description}</p>
+                                </figcaption>
+                                <div dangerouslySetInnerHTML={{ __html: chart.svg }} />
+                            </figure>
+                        ))}
+                    </section>
+                )}
 
                 <section className="public-invoice-more">
                     {linkRequested ? (

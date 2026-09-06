@@ -12,6 +12,7 @@ Read that section before adding a field.
 """
 import logging
 
+from django.core.cache import cache
 from django.http import FileResponse
 from rest_framework import status
 from rest_framework.decorators import (
@@ -32,7 +33,14 @@ from audit.services import record_audit_event
 
 from . import access_tokens
 from .emails import send_magic_link_email
+from .pdf import build_invoice_pdf_period_context
+from .pdf_charts import (
+    _build_energy_chart_svg,
+    _build_energy_flow_svg,
+    _build_hourly_profile_chart_svg,
+)
 from .models import InvoiceStatus
+from .pdf_translations import INVOICE_TRANSLATIONS
 from .pdf_stats import _build_energy_summary
 
 logger = logging.getLogger(__name__)
@@ -249,3 +257,109 @@ def magic_link_consume(request):
     response = Response({"detail": "Signed in."})
     set_auth_cookies(request, response, access=tokens["access"], refresh=tokens["refresh"])
     return response
+
+
+# Charts are minutes of allocation work away from the figures beside them:
+# building them reads every meter reading in the period
+# (``community_totals_by_timestamp``). They therefore live behind their own
+# route, so the invoice itself renders without waiting, and behind a cache, so
+# an unauthenticated caller cannot make the server redo that work per request.
+#
+# Keyed on the invoice's ``updated_at`` as well as its id: a regenerated
+# invoice must not keep serving the previous period's picture.
+_CHART_CACHE_SECONDS = 60 * 60
+
+# (key, title, description), in the order the insights page prints them.
+#
+# The headings travel with the pictures rather than being looked up in the
+# frontend's own locale, because a chart's *embedded* labels are written in the
+# ZEV's ``invoice_language``. A reader whose browser is English opening an
+# invoice a ZEV issues in German must not get an English heading over a German
+# diagram — the document has one language, and this is it.
+_CHART_COPY = (
+    ("energy", "chart_title", "chart_description"),
+    ("hourly", "hourly_chart_title", "hourly_chart_description"),
+    ("flow", "flow_title", "flow_description"),
+)
+
+
+def _empty_charts() -> dict:
+    return {"title": "", "intro": "", "charts": []}
+
+
+# Bumped whenever the payload *shape* changes, which is a different thing from
+# the invoice changing. Keying only on the invoice meant a deploy that
+# restructured this response kept serving the previous shape for an hour, to a
+# frontend that had just been taught to expect the new one — the page crashed
+# on a key that was no longer there. Data freshness and schema compatibility
+# need separate parts of the key because they change for separate reasons.
+_CHART_PAYLOAD_VERSION = 2
+
+
+def _chart_cache_key(invoice) -> str:
+    stamp = invoice.updated_at.isoformat() if invoice.updated_at else "new"
+    return f"public-invoice-charts:v{_CHART_PAYLOAD_VERSION}:{invoice.pk}:{stamp}"
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+@authentication_classes([])
+@throttle_classes([InvoiceLinkThrottle])
+def public_invoice_charts(request, prefix):
+    """The three figures the invoice's insights page prints.
+
+    Served **verbatim** from ``pdf_charts``, the same builders the PDF uses.
+    That is the point rather than an optimisation: the reader is holding the
+    page these came from, and a second rendering path would be somewhere the
+    screen and the paper could quietly start disagreeing.
+
+    This is also why the energy-flow diagram is here despite naming other
+    producers and showing community totals — it is printed on the same sheet as
+    the QR that led here, so serving it discloses nothing to this bearer. See
+    the spec's §9, which states that limit as "nothing beyond the printed
+    document" rather than as a list of forbidden fields.
+    """
+    token, error = _resolve(request, prefix)
+    if error is not None:
+        return error
+
+    invoice = token.invoice
+    cache_key = _chart_cache_key(invoice)
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return Response(cached)
+
+    lang = invoice.zev.invoice_language or "de"
+    # Copied, not used in place: INVOICE_TRANSLATIONS is a module-level
+    # constant shared by every invoice in the process, and pdf.py documents
+    # why writing into it is a bug. Nothing here mutates it today; copying
+    # costs nothing and removes the chance that something later does.
+    tr = dict(INVOICE_TRANSLATIONS.get(lang, INVOICE_TRANSLATIONS["de"]))
+    try:
+        period_context = build_invoice_pdf_period_context(invoice)
+        svgs = {
+            "energy": _build_energy_chart_svg(invoice, tr),
+            "hourly": _build_hourly_profile_chart_svg(
+                invoice, tr, shares_by_date=period_context.shares_by_date,
+            ),
+            "flow": _build_energy_flow_svg(
+                invoice, tr, period_stats=period_context.participant_stats,
+            ),
+        }
+    except Exception:
+        # The invoice already rendered without these. Failing the whole page
+        # for a missing picture would be the wrong trade.
+        logger.exception("Public charts failed for invoice %s", invoice.pk)
+        return Response(_empty_charts())
+
+    payload = {
+        "title": tr["insights_page_title"],
+        "intro": tr["insights_page_intro"],
+        "charts": [
+            {"key": key, "title": tr[title_key], "description": tr[desc_key], "svg": svgs[key]}
+            for key, title_key, desc_key in _CHART_COPY
+            if svgs[key]
+        ],
+    }
+    cache.set(cache_key, payload, _CHART_CACHE_SECONDS)
+    return Response(payload)

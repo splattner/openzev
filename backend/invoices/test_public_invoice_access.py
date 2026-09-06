@@ -422,3 +422,150 @@ class MagicLinkTests(PublicInvoiceTestCase):
 
         self.participant.user.refresh_from_db()
         self.assertFalse(self.participant.user.has_usable_password())
+
+
+class PublicInvoiceChartsTests(PublicInvoiceTestCase):
+    """The three figures from the invoice's insights page (spec §9)."""
+
+    CHARTS_URL = "/api/v1/public/invoices/{prefix}/charts/"
+
+    def setUp(self):
+        super().setUp()
+        from django.core.cache import cache
+
+        cache.clear()
+
+    def _charts(self, secret=None, headers=None):
+        return self.client.get(
+            self.CHARTS_URL.format(prefix=self.token.prefix),
+            {"s": self.secret if secret is None else secret},
+            **(headers or {}),
+        )
+
+    def test_returns_the_charts_in_the_invoice_order(self):
+        """Whatever renders, renders in the order the insights page prints.
+
+        This ZEV has no meter readings, so only the energy chart is buildable —
+        the profile and the flow diagram need consumption to describe. A chart
+        that cannot be drawn is omitted rather than sent as a null the page
+        would have to filter.
+        """
+        keys = [c["key"] for c in self._charts().json()["charts"]]
+
+        self.assertEqual(keys, [k for k in ("energy", "hourly", "flow") if k in keys])
+        self.assertIn("energy", keys)
+
+    def test_each_chart_carries_its_heading_and_description(self):
+        charts = self._charts().json()["charts"]
+
+        self.assertTrue(charts, "expected at least one chart to build")
+        for chart in charts:
+            self.assertTrue(chart["title"], chart["key"])
+            self.assertTrue(chart["description"], chart["key"])
+            self.assertIn("<svg", chart["svg"])
+
+    def test_headings_use_the_invoice_language_not_the_viewer_s(self):
+        """A German diagram under an English heading would read as a bug.
+
+        The chart's own labels are rendered in ``zev.invoice_language``, so the
+        text around it has to come from the same place rather than from the
+        browser's locale.
+        """
+        from .pdf_translations import INVOICE_TRANSLATIONS
+
+        self.zev.invoice_language = "fr"
+        self.zev.save()
+
+        body = self._charts(headers={"HTTP_ACCEPT_LANGUAGE": "en"}).json()
+
+        self.assertEqual(body["title"], INVOICE_TRANSLATIONS["fr"]["insights_page_title"])
+        self.assertEqual(
+            body["charts"][0]["title"], INVOICE_TRANSLATIONS["fr"]["chart_title"]
+        )
+
+    def test_a_bad_link_gets_nothing(self):
+        self.assertEqual(self._charts(secret="wrong").status_code, 404)
+
+    def test_zev_not_opted_in_gets_nothing(self):
+        self.zev.participant_invoice_access = False
+        self.zev.save()
+
+        self.assertEqual(self._charts().status_code, 404)
+
+    def test_the_second_request_is_served_from_cache(self):
+        """An unauthenticated caller must not be able to make the server redo
+        a full period's allocation work per request."""
+        from unittest.mock import patch
+
+        self._charts()
+        with patch(
+            "invoices.views_public.build_invoice_pdf_period_context"
+        ) as build:
+            self._charts()
+
+        build.assert_not_called()
+
+    def test_regenerating_the_invoice_invalidates_the_cache(self):
+        """The cache key carries updated_at, so a re-rendered invoice cannot
+        keep serving the previous period's picture."""
+        from invoices.views_public import _chart_cache_key
+
+        before = _chart_cache_key(self.invoice)
+        self.invoice.save()
+        self.invoice.refresh_from_db()
+
+        self.assertNotEqual(before, _chart_cache_key(self.invoice))
+
+    def test_a_chart_failure_does_not_fail_the_page(self):
+        from unittest.mock import patch
+
+        with patch(
+            "invoices.views_public.build_invoice_pdf_period_context",
+            side_effect=RuntimeError("boom"),
+        ):
+            resp = self._charts()
+
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.json()["charts"], [])
+
+    def test_a_hostile_participant_name_cannot_inject_markup(self):
+        """The page injects this SVG with dangerouslySetInnerHTML.
+
+        Producer and consumer nodes are labelled with ``participant_name``,
+        which an operator types. Everything reaching the SVG goes through
+        ``pdf_charts._esc``; this asserts it, because the cost of being wrong
+        is script execution on a page served without a session.
+        """
+        self.participant.first_name = '<script>alert("x")</script>'
+        self.participant.save()
+
+        body = self._charts().content.decode()
+
+        self.assertNotIn("<script>", body)
+        self.assertNotIn("</script>", body)
+
+    def test_the_cache_key_is_versioned_by_payload_shape(self):
+        """A deploy that restructures this response must not serve the old one.
+
+        Keying only on the invoice meant a shape change kept the previous
+        payload alive for an hour, to a frontend already expecting the new one.
+        The page crashed on a key that was no longer there.
+        """
+        from invoices.views_public import _CHART_PAYLOAD_VERSION, _chart_cache_key
+
+        self.assertIn(f":v{_CHART_PAYLOAD_VERSION}:", _chart_cache_key(self.invoice))
+
+    def test_every_response_carries_the_charts_key(self):
+        """Including the failure path, which the page renders without checking."""
+        from unittest.mock import patch
+
+        ok = self._charts().json()
+        with patch(
+            "invoices.views_public.build_invoice_pdf_period_context",
+            side_effect=RuntimeError("boom"),
+        ):
+            failed = self._charts().json()
+
+        for payload in (ok, failed):
+            self.assertIn("charts", payload)
+            self.assertIsInstance(payload["charts"], list)
