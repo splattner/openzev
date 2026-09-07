@@ -821,13 +821,7 @@ class InvoicePdfQrTests(TestCase):
 
 
 class InvoicePdfVatLabelTests(TestCase):
-    """The VAT label must show percent form, not the stored fraction.
-
-    Regression test: ``Invoice.vat_rate`` is stored as a fraction (0.0810),
-    and the template used to render it directly, producing "MwSt. (0.1%)"
-    instead of "MwSt. (8.1%)". The amounts were always correct — only the
-    label was wrong.
-    """
+    """The VAT label shows percent form, not the stored fraction."""
 
     def setUp(self):
         self.owner = User.objects.create_user(
@@ -881,9 +875,6 @@ class InvoicePdfVatLabelTests(TestCase):
         self.assertNotIn(f"<td>{INVOICE_TRANSLATIONS['de']['vat']} (", markup)
 
     def test_sample_context_renders_vat_row(self):
-        """The admin preview (sample context through the default template)
-        must render the VAT row with the percent label — the sample rate is
-        numeric so the template's {% if %} gate actually passes."""
         from .pdf import TEMPLATE_NAME
 
         html = _render_template(TEMPLATE_NAME, build_sample_invoice_context())

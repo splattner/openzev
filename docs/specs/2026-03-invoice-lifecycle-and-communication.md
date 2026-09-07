@@ -576,7 +576,7 @@ The invoice PDF template receives:
 | Key | Description |
 |---|---|
 | `invoice` | Invoice model instance |
-| `vat_rate_percent` | `Decimal` percentage derived from the stored fraction (`invoice.vat_rate × 100`; for example, `0.0810` becomes `8.1000`). The default template formats it to one decimal place in the VAT label and omits the VAT row when `invoice.vat_rate` is zero |
+| `vat_rate_percent` | `invoice.vat_rate × 100` as a `Decimal`; formatted to one decimal place in the VAT label |
 | `grouped_items` | Items grouped by `TariffCategory` (energy → grid_fees → levies → metering), each with category subtotal |
 | `zev` | ZEV model instance |
 | `owner_participant` | Participant record of the ZEV owner (for creditor address) |
@@ -594,11 +594,8 @@ The invoice PDF template receives:
 | `status_display` | Localized status label from `tr["status_values"]`; falls back to the raw status value |
 | `formatted_dates` | `invoice_date`, `period_start`, `period_end`, `due_date` formatted per `AppSettings.date_format_short` |
 
-Stored custom invoice templates are not rewritten when the shipped default
-changes. A customization that renders `invoice.vat_rate` directly in the VAT
-label must use `vat_rate_percent` instead (or be reset to the current default).
-PDFs already stored on invoices retain their original rendering until an owner
-or admin explicitly regenerates them through the invoice PDF action.
+Custom templates must use `vat_rate_percent` for the VAT label or be reset to
+the default. Stored PDFs keep the old label until regenerated.
 
 ### 8.3 Localization
 
@@ -791,7 +788,7 @@ Strips legacy period suffixes from `description` on serialization.
 | `TranslationParityTests` | §8.3: all four locales have identical, non-empty translation keys and identical `status_values` keys |
 | `PaletteConsistencyTests` | Chart color constants in `pdf_charts.py` match the CSS variables in the default template |
 | `StatusTranslationTests` | §8.2: `status_display` is localized from `tr["status_values"]` in the template context |
-| `InvoicePdfVatLabelTests` | §8.2: `vat_rate` is stored as a fraction, so the template renders the derived `vat_rate_percent` context value — a `0.0810` invoice shows `8.1%` (not `0.1%`), no `0.0%` row renders when the rate is zero, and the sample preview context (numeric rate, so the template gate passes) renders the VAT row through the same label |
+| `InvoicePdfVatLabelTests` | §8.2: percent conversion, zero-rate omission, and sample preview rendering |
 
 ### Frontend
 

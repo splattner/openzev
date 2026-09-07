@@ -40,9 +40,7 @@ def build_sample_invoice_context() -> dict:
             invoice_number="INV-2026-001",
             _status_display="Draft",
             subtotal_chf="450.00",
-            # Numeric (not a string): the template gates the VAT row on
-            # {% if invoice.vat_rate > 0 %}, which has no string coercion,
-            # so a string here would hide the row (or raise) in previews.
+            # Numeric because the template compares this value with zero.
             vat_rate=Decimal("0.0810"),
             vat_chf="36.45",
             total_chf="486.45",

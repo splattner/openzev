@@ -313,8 +313,7 @@ def _build_template_context(
         + _CLOSING_MM + _PAYMENT_MM
     )
 
-    # invoice.vat_rate is stored as a fraction (e.g. 0.0810); the template
-    # needs percent form (8.1) for the "MwSt. (8.1%)" label.
+    # Convert the stored fraction (0.0810) to percent form (8.1).
     vat_rate_percent = Decimal(invoice.vat_rate or 0) * 100
 
     return {
