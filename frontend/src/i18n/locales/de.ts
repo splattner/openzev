@@ -836,6 +836,9 @@ export const de = {
             markPaid: 'Als bezahlt markieren',
             pdfReady: 'Bereit',
             pdfMissing: 'Fehlt',
+            pdfGenerating: 'Wird erstellt…',
+            pdfsGenerating_one: '1 PDF wird erstellt…',
+            pdfsGenerating_other: '{{n}} PDFs werden erstellt…',
             failedEmails: '({{n}} fehlgeschlagen)',
             attempts: '{{n}} Versuche',
             menuSections: {
@@ -1765,6 +1768,7 @@ export const de = {
             local: 'Intern',
             grid: 'Netz',
             feedIn: 'Einspeisung',
+            generatingPdf: 'Rechnungsdokument wird erstellt…',
             accessLink: {
                 title: 'Zugangslink für Teilnehmende',
                 description:

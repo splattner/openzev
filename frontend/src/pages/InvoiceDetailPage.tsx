@@ -150,7 +150,14 @@ export function InvoiceDetailPage() {
                 that would drift from the issued document. Line-item detail lives
                 in the embedded PDF. */}
             <section aria-label={t('pdf.previewTitle')} className="page-stack">
-                {pdfExists ? (
+                {generating ? (
+                    <div className="page-stack">
+                        <p className="muted" role="status" aria-live="polite">
+                            {t('pages.invoiceDetail.generatingPdf')}
+                        </p>
+                        <PageSkeleton variant="card" />
+                    </div>
+                ) : pdfExists ? (
                     pdfError ? (
                         <div className="error-banner">{t('common.error')}</div>
                     ) : pdfLoading ? (
@@ -164,7 +171,7 @@ export function InvoiceDetailPage() {
                             {generateError ? <span className="text-error">{t('pdf.generateError')}</span> : t('pdf.noDocument')}
                         </p>
                         <button className="button" type="button" disabled={generating || pdfLoading} onClick={handleGeneratePdf}>
-                            {generating ? t('common.loading') : t('pages.invoiceDetail.generatePdf')}
+                            {t('pages.invoiceDetail.generatePdf')}
                         </button>
                     </div>
                 )}

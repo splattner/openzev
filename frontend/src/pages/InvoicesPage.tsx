@@ -6,6 +6,12 @@ import { InvoiceBatchToolbar } from '../features/invoices/InvoiceBatchToolbar'
 import { InvoiceDeleteModal } from '../features/invoices/InvoiceDeleteModal'
 import { InvoicesEmptyState } from '../features/invoices/InvoicesEmptyState'
 import { useInvoiceActions } from '../features/invoices/useInvoiceActions'
+import {
+    PDF_POLL_MS,
+    countPendingPdfs,
+    pdfWatchIsFinished,
+    usePdfWatch,
+} from '../features/invoices/pdfWatch'
 import { PeriodSelector } from '../components/PeriodSelector'
 import { getPreviousBillingPeriod, type BillingInterval } from '../lib/billingPeriod'
 import {
@@ -29,6 +35,10 @@ export function InvoicesPage() {
         period_start: '',
         period_end: '',
     })
+
+    // Declared above the query because it paces it; the query's own rows are
+    // what tell it when to stop, so the interval reads them from the query.
+    const { pdfWatch, startPdfWatch, stopPdfWatch } = usePdfWatch()
 
     const [deleteModalInvoiceId, setDeleteModalInvoiceId] = useState<string | null>(null)
     const [selectedEmailLogs, setSelectedEmailLogs] = useState<EmailLog[]>([])
@@ -56,11 +66,28 @@ export function InvoicesPage() {
                 period_end: period.period_end,
             }),
         enabled: !!selectedZevId && !!period.period_start && !!period.period_end,
-        refetchInterval: false,
+        // Poll only while an action's queued PDFs are still outstanding, and
+        // read that from the query's own latest rows rather than from state
+        // derived below — otherwise the interval would lag a render behind.
+        refetchInterval: (query) =>
+            pdfWatch && countPendingPdfs(query.state.data?.rows ?? []) > 0 ? PDF_POLL_MS : false,
         refetchIntervalInBackground: true,
     })
 
     const rows = periodOverviewQuery.data?.rows ?? []
+    const pendingPdfCount = countPendingPdfs(rows)
+    const isWaitingForPdfs = pdfWatch !== null && pendingPdfCount > 0
+
+    // End the watch when every invoice has its document, or the deadline passes.
+    useEffect(() => {
+        if (!pdfWatch) return
+        if (pdfWatchIsFinished(pdfWatch, pendingPdfCount, Date.now())) {
+            stopPdfWatch()
+            return
+        }
+        const timer = window.setTimeout(stopPdfWatch, pdfWatch.until - Date.now())
+        return () => window.clearTimeout(timer)
+    }, [pdfWatch, pendingPdfCount, stopPdfWatch])
 
     async function handleOpenEmailLogs(invoiceId: string, invoiceNumber: string) {
         try {
@@ -84,6 +111,7 @@ export function InvoicesPage() {
         getRowMenuItems,
         handleRetryEmail,
         retiringEmailId,
+        pdfGeneratingInvoiceId,
     } = useInvoiceActions({
         selectedZevId,
         period,
@@ -91,7 +119,15 @@ export function InvoicesPage() {
         userRole: user?.role,
         onOpenEmailLogs: handleOpenEmailLogs,
         onDeleteClick: (invoiceId) => setDeleteModalInvoiceId(invoiceId),
+        onPdfQueued: startPdfWatch,
     })
+
+    /** Whether this row's document is being produced right now. */
+    const isPdfPending = (row: typeof rows[number]) => {
+        if (!row.invoice) return false
+        if (pdfGeneratingInvoiceId === row.invoice.id) return true
+        return isWaitingForPdfs && !row.invoice.pdf_url
+    }
 
     const isOwnerOrAdmin = user?.role === 'admin' || user?.role === 'zev_owner'
 
@@ -153,11 +189,18 @@ export function InvoicesPage() {
                         />
                     )}
 
+                    {isWaitingForPdfs && (
+                        <p className="muted" role="status" aria-live="polite">
+                            {t('pages.invoices.pdfsGenerating', { n: pendingPdfCount })}
+                        </p>
+                    )}
+
                     <InvoicePeriodRowsTable
                         rows={rows}
                         onOpenEmailLogs={handleOpenEmailLogs}
                         getPrimaryRowAction={getPrimaryRowAction}
                         getRowMenuItems={getRowMenuItems}
+                        isPdfPending={isPdfPending}
                     />
                 </>
             )}

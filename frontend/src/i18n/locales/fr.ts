@@ -836,6 +836,9 @@ export const fr = {
             markPaid: 'Marquer comme payé',
             pdfReady: 'Prêt',
             pdfMissing: 'Manquant',
+            pdfGenerating: 'Génération…',
+            pdfsGenerating_one: 'Génération d’un PDF…',
+            pdfsGenerating_other: 'Génération de {{n}} PDF…',
             failedEmails: '({{n}} échoué(s))',
             attempts: '{{n}} tentatives',
             menuSections: {
@@ -1765,6 +1768,7 @@ export const fr = {
             local: 'Local',
             grid: 'Réseau',
             feedIn: 'Injection',
+            generatingPdf: 'Génération du document de facture…',
             accessLink: {
                 title: 'Lien d’accès pour les participants',
                 description:

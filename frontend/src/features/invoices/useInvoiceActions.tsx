@@ -58,6 +58,7 @@ export function useInvoiceActions({
     userRole,
     onOpenEmailLogs,
     onDeleteClick,
+    onPdfQueued,
 }: {
     selectedZevId: string
     period: { period_start: string; period_end: string }
@@ -65,6 +66,8 @@ export function useInvoiceActions({
     userRole: string | undefined
     onOpenEmailLogs: (invoiceId: string, invoiceNumber: string) => Promise<void>
     onDeleteClick: (invoiceId: string) => void
+    /** Called when an action queued PDF work the operator should see arrive. */
+    onPdfQueued: () => void
 }) {
     const { t } = useTranslation()
     const queryClient = useQueryClient()
@@ -103,6 +106,8 @@ export function useInvoiceActions({
             pushToast(t('pages.invoices.messages.generated'), 'success')
             invalidatePeriodOverview()
             invalidateInvoicesList()
+            // The invoice is saved; its PDF is queued and arrives later.
+            onPdfQueued()
         },
         onError: (error) => pushToast(formatApiError(error, t('pages.invoices.messages.generateFailed')), 'error'),
     })
@@ -185,15 +190,6 @@ export function useInvoiceActions({
 
     const batchPayload = { zev_id: selectedZevId, period_start: period.period_start, period_end: period.period_end }
 
-    // Bulk generation runs asynchronously on the backend; refresh the period
-    // overview a few times so results appear without a manual reload.
-    const scheduleOverviewRefresh = () => {
-        for (const delay of [3000, 8000, 15000, 30000]) {
-            window.setTimeout(() => {
-                invalidatePeriodOverview()
-            }, delay)
-        }
-    }
 
     const generateAllMutation = useMutation({
         mutationFn: () => generateInvoicesForZev(batchPayload),
@@ -201,7 +197,7 @@ export function useInvoiceActions({
             pushToast(t('pages.invoices.batch.generateAllQueued', { n: result.participant_count }), 'success')
             invalidatePeriodOverview()
             invalidateInvoicesList()
-            scheduleOverviewRefresh()
+            onPdfQueued()
         },
         onError: (error) => pushToast(formatApiError(error, t('pages.invoices.batch.generateAllFailed')), 'error'),
     })
@@ -234,7 +230,7 @@ export function useInvoiceActions({
         onSuccess: (result) => {
             pushToast(t('pages.invoices.batch.generateAllPdfsQueued', { n: result.invoice_count }), 'success')
             invalidatePeriodOverview()
-            scheduleOverviewRefresh()
+            onPdfQueued()
         },
         onError: (error) => pushToast(formatApiError(error, t('pages.invoices.batch.generateAllPdfsFailed')), 'error'),
     })
@@ -578,6 +574,8 @@ export function useInvoiceActions({
         emailPollingStartedAt,
         setEmailPollingStartedAt,
         retiringEmailId,
+        // The invoice whose PDF is being rendered inline right now, if any.
+        pdfGeneratingInvoiceId: pdfMutation.isPending ? pdfMutation.variables ?? null : null,
         // Stats & computed
         stats,
         recommendedBatchAction,

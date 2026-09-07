@@ -1,5 +1,5 @@
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faEllipsis, faEnvelope, faFileInvoice, faFilePdf } from '@fortawesome/free-solid-svg-icons'
+import { faEllipsis, faEnvelope, faFileInvoice, faFilePdf, faSpinner } from '@fortawesome/free-solid-svg-icons'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { ActionMenu, type ActionMenuItem } from '../../components/ActionMenu'
@@ -19,6 +19,8 @@ type InvoicePeriodRowsTableProps = {
   onOpenEmailLogs: (invoiceId: string, invoiceNumber: string) => void
   getPrimaryRowAction: (row: InvoicePeriodParticipantRow) => ActionMenuItem | null
   getRowMenuItems: (row: InvoicePeriodParticipantRow) => ActionMenuItem[]
+  /** True while this row's PDF is being rendered — queued or inline. */
+  isPdfPending: (row: InvoicePeriodParticipantRow) => boolean
 }
 
 export function InvoicePeriodRowsTable({
@@ -26,6 +28,7 @@ export function InvoicePeriodRowsTable({
   onOpenEmailLogs,
   getPrimaryRowAction,
   getRowMenuItems,
+  isPdfPending,
 }: InvoicePeriodRowsTableProps) {
   const { t } = useTranslation()
 
@@ -49,6 +52,7 @@ export function InvoicePeriodRowsTable({
             const latestEmailLog = getLatestEmailLog(invoice)
             const primaryAction = getPrimaryRowAction(row)
             const rowMenuItems = getRowMenuItems(row)
+            const pdfPending = isPdfPending(row)
 
             return (
               <tr key={row.participant_id}>
@@ -129,7 +133,12 @@ export function InvoicePeriodRowsTable({
                 <td>{invoice ? `CHF ${invoice.total_chf}` : <span className="muted">-</span>}</td>
                 <td>
                   {invoice ? (
-                    invoice.pdf_url ? (
+                    pdfPending ? (
+                      <span className="badge badge-info" role="status">
+                        <FontAwesomeIcon icon={faSpinner} spin fixedWidth />
+                        {t('pages.invoices.pdfGenerating')}
+                      </span>
+                    ) : invoice.pdf_url ? (
                       <div className="invoice-cell-stack">
                         <button type="button" onClick={() => { if (invoice) openInvoicePdf(invoice.id) }} className="table-inline-link">
                           <FontAwesomeIcon icon={faFilePdf} fixedWidth />

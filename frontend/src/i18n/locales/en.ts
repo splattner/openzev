@@ -845,6 +845,9 @@ export const en = {
             markPaid: 'Mark Paid',
             pdfReady: 'Ready',
             pdfMissing: 'Missing',
+            pdfGenerating: 'Generating\u2026',
+            pdfsGenerating_one: 'Generating 1 PDF\u2026',
+            pdfsGenerating_other: 'Generating {{n}} PDFs\u2026',
             failedEmails: '({{n}} failed)',
             attempts: '{{n}} attempts',
             menuSections: {
@@ -1776,6 +1779,7 @@ export const en = {
             local: 'Local',
             grid: 'Grid',
             feedIn: 'Feed-in',
+            generatingPdf: 'Generating the invoice document\u2026',
             accessLink: {
                 title: 'Participant access link',
                 description:

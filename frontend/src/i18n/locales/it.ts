@@ -836,6 +836,9 @@ export const it = {
             markPaid: 'Segna come pagato',
             pdfReady: 'Pronto',
             pdfMissing: 'Mancante',
+            pdfGenerating: 'In creazione…',
+            pdfsGenerating_one: 'Creazione di 1 PDF…',
+            pdfsGenerating_other: 'Creazione di {{n}} PDF…',
             failedEmails: '({{n}} non riuscito/i)',
             attempts: '{{n}} tentativi',
             menuSections: {
@@ -1765,6 +1768,7 @@ export const it = {
             local: 'Locale',
             grid: 'Rete',
             feedIn: 'Immissione',
+            generatingPdf: 'Creazione del documento di fattura…',
             accessLink: {
                 title: 'Link di accesso per i partecipanti',
                 description:
