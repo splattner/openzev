@@ -125,6 +125,7 @@ export function AdminEmailTemplatesPage() {
         { key: 'invoice_email', label: t('admin.emailTemplates.invoiceEmail'), fields: EMAIL_TEMPLATE_FIELDS.invoice_email },
         { key: 'participant_invitation', label: t('admin.emailTemplates.invitationEmail'), fields: EMAIL_TEMPLATE_FIELDS.participant_invitation },
         { key: 'email_verification', label: t('admin.emailTemplates.verificationEmail'), fields: EMAIL_TEMPLATE_FIELDS.email_verification },
+        { key: 'participant_magic_link', label: t('admin.emailTemplates.magicLinkEmail'), fields: EMAIL_TEMPLATE_FIELDS.participant_magic_link },
     ]
 
     return (

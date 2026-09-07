@@ -1,4 +1,16 @@
-export type EmailTemplateKey = 'invoice_email' | 'participant_invitation' | 'email_verification'
+/**
+ * The email templates the admin console can edit.
+ *
+ * This union must cover every key in the backend's `EMAIL_TEMPLATE_DEFAULTS`.
+ * The API already serves them all; a key missing here is simply invisible in
+ * the UI, with nothing failing to say so — which is how `participant_magic_link`
+ * shipped editable-by-API-only. `tests/email-template-parity.test.ts` guards it.
+ */
+export type EmailTemplateKey =
+    | 'invoice_email'
+    | 'participant_invitation'
+    | 'email_verification'
+    | 'participant_magic_link'
 
 export interface EmailField {
     variable: string
@@ -24,5 +36,11 @@ export const EMAIL_TEMPLATE_FIELDS: Record<EmailTemplateKey, EmailField[]> = {
     ],
     email_verification: [
         { variable: '{verify_url}', descriptionKey: 'admin.emailTemplates.fields.verifyUrl' },
+    ],
+    participant_magic_link: [
+        { variable: '{participant_name}', descriptionKey: 'admin.emailTemplates.fields.participantName' },
+        { variable: '{zev_name}', descriptionKey: 'admin.emailTemplates.fields.zevName' },
+        { variable: '{link_url}', descriptionKey: 'admin.emailTemplates.fields.linkUrl' },
+        { variable: '{valid_minutes}', descriptionKey: 'admin.emailTemplates.fields.validMinutes' },
     ],
 }
