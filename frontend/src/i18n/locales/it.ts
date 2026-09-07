@@ -303,6 +303,8 @@ export const it = {
             invoiceEmail: 'E-mail fattura',
             invitationEmail: 'E-mail di invito',
             verificationEmail: 'E-mail di verifica',
+            magicLinkEmail: 'E-mail con link di accesso',
+            magicLinkLanguageNote: 'Cos\u00ec com\u2019\u00e8, questa e-mail viene inviata nella lingua di fatturazione di ogni ZEV. Un testo personalizzato salvato qui la sostituisce per tutte e quattro le lingue.',
             subject: 'Oggetto:',
             body: 'Messaggio',
             variable: 'Variabile',
@@ -320,6 +322,8 @@ export const it = {
                 username: 'Nome utente del partecipante',
                 temporaryPassword: 'Password temporanea per il primo accesso',
                 verifyUrl: 'URL del link di verifica e-mail',
+                linkUrl: 'URL del link di accesso monouso',
+                validMinutes: 'Per quanti minuti resta valido il link di accesso',
             },
         },
     },
@@ -1761,6 +1765,18 @@ export const it = {
             local: 'Locale',
             grid: 'Rete',
             feedIn: 'Immissione',
+            accessLink: {
+                title: 'Link di accesso per i partecipanti',
+                description:
+                    'Il codice QR stampato su questa fattura la apre senza account. Non scade: revocarlo è l’unico modo per fermare un link finito nelle mani sbagliate.',
+                created: 'Stampato dal',
+                lastOpened: 'Ultima apertura',
+                neverOpened: 'Mai aperto',
+                revoke: 'Revoca il link',
+                revokeTitle: 'Revocare questo link di accesso?',
+                revokeWarning:
+                    'Il codice QR sulla fattura già inviata smetterà di funzionare definitivamente. Alla prossima generazione di questo PDF verrà creato un nuovo codice — le fatture ristampate non corrisponderanno più a quelle già spedite.',
+            },
         },
         dashboard: {
             openInvoicePdf: 'Apri PDF per fattura {{number}}',
@@ -1857,6 +1873,11 @@ export const it = {
                 ownerDescription: 'Genera e scarica i rendiconti annuali di tutti i partecipanti come archivio ZIP.',
                 download: 'Scarica rendiconto annuale',
                 downloadAll: 'Scarica tutti (ZIP)',
+                prepare: 'Prepara i rendiconti annuali (ZIP)',
+                preparing: 'Preparazione dei rendiconti annuali…',
+                prepareAgain: 'Prepara un nuovo export',
+                partialWarning: '{{omitted}} dei {{total}} rendiconti non sono stati generati e sono elencati in omitted.txt nell\'archivio.',
+                expired: 'Questo link di download è scaduto. Prepara un nuovo export per scaricare i dati aggiornati.',
                 error: 'Il rendiconto annuale non è stato generato. Riprova.',
             },
             financialSummary: {

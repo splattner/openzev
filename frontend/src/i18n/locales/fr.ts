@@ -303,6 +303,8 @@ export const fr = {
             invoiceEmail: 'E-mail de facture',
             invitationEmail: 'E-mail d\'invitation',
             verificationEmail: 'E-mail de vérification',
+            magicLinkEmail: 'E-mail de lien de connexion',
+            magicLinkLanguageNote: 'Tel quel, cet e-mail est envoy\u00e9 dans la langue de facturation de chaque ZEV. Un texte personnalis\u00e9 enregistr\u00e9 ici le remplace pour les quatre langues.',
             subject: 'Objet',
             body: 'Message',
             variable: 'Variable',
@@ -320,6 +322,8 @@ export const fr = {
                 username: 'Nom d\'utilisateur du participant',
                 temporaryPassword: 'Mot de passe temporaire pour la première connexion',
                 verifyUrl: 'URL du lien de vérification de l\'e-mail',
+                linkUrl: 'URL du lien de connexion à usage unique',
+                validMinutes: 'Durée de validité du lien de connexion, en minutes',
             },
         },
     },
@@ -1761,6 +1765,18 @@ export const fr = {
             local: 'Local',
             grid: 'Réseau',
             feedIn: 'Injection',
+            accessLink: {
+                title: 'Lien d’accès pour les participants',
+                description:
+                    'Le code QR imprimé sur cette facture l’ouvre sans compte. Il n’expire pas : le révoquer est le seul moyen d’arrêter un lien qui a échappé à son destinataire.',
+                created: 'Imprimé depuis le',
+                lastOpened: 'Dernière ouverture',
+                neverOpened: 'Jamais ouvert',
+                revoke: 'Révoquer le lien',
+                revokeTitle: 'Révoquer ce lien d’accès ?',
+                revokeWarning:
+                    'Le code QR de la facture déjà envoyée cessera définitivement de fonctionner. La prochaine génération de ce PDF produira un nouveau code — les factures réimprimées ne correspondront plus à celles déjà postées.',
+            },
         },
         dashboard: {
             openInvoicePdf: 'Ouvrir le PDF de la facture {{number}}',
@@ -1857,6 +1873,11 @@ export const fr = {
                 ownerDescription: 'Générez et téléchargez les décomptes annuels de tous les participants sous forme d\'archive ZIP.',
                 download: 'Télécharger le décompte annuel',
                 downloadAll: 'Tout télécharger (ZIP)',
+                prepare: 'Préparer les décomptes annuels (ZIP)',
+                preparing: 'Préparation des décomptes annuels…',
+                prepareAgain: 'Préparer un nouvel export',
+                partialWarning: '{{omitted}} décomptes sur {{total}} n\'ont pas pu être générés et figurent dans omitted.txt dans l\'archive.',
+                expired: 'Ce lien de téléchargement a expiré. Préparez un nouvel export pour télécharger les données actuelles.',
                 error: 'Le décompte annuel n\'a pas pu être généré. Veuillez réessayer.',
             },
             financialSummary: {

@@ -351,7 +351,7 @@ Reuses `_pdf_response(..., disposition="attachment")`.
 | Participant access | Excluded — no reachable UI, contract covers their own tariffs | A participant-facing tariff view is asked for; would need a Reports-page card |
 | Customisable `PdfTemplate` | No — consistent with the financial summary | An operator asks to rebrand it |
 | Per-kWh summary total | No | After the first version ships; it is the number people compare and deserves its own thought |
-| Audit event | No — annual statements and financial summaries are not audited either | Report downloads become auditable as a class |
+| Audit event | No — like single-PDF annual statements and financial summaries; only the whole-ZEV annual-statement ZIP is audited (export-job events, ADR 0017) | Report downloads become auditable as a class |
 
 ## 11. Frontend
 

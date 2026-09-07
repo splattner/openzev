@@ -244,15 +244,29 @@ the same module.
 
 #### Annual statement / financial summary downloads (frontend location)
 
-The three download endpoints below are consumed from the **/reports** route (`frontend/src/pages/ReportsPage.tsx`). No backend change.
+The single-document endpoints below and the export-job endpoints are consumed
+from the **/reports** route (`frontend/src/pages/ReportsPage.tsx`). The
+whole-ZEV ZIP is produced asynchronously: the frontend creates an export job,
+polls its status, and downloads the artifact when it completes (§8.1,
+ADR 0017).
 
 | Method | URL | Permission | Frontend usage |
 |---|---|---|---|
 | `GET` | `/invoices/invoices/annual-statement/` | Authenticated (participant sees own, admin/owner ZEV-scoped) | Participant "My annual statement" card: `downloadAnnualStatement({year})` (no `zev_id`, backend scopes by participant) |
-| `GET` | `/invoices/invoices/annual-statements-zip/` | `IsZevOwnerOrAdmin` | Admin/owner "Annual statements" card: `downloadAllAnnualStatements({year, zev_id})` — ZIP of all eligible participants for the selected ZEV; shared-data setup failure returns a generic `500` |
 | `GET` | `/invoices/invoices/financial-summary/` | Authenticated (optional `zev_id` / `participant_id`) | Both roles: `downloadFinancialSummary({year, zev_id?})` — `zev_id` supplied for admin/owner, omitted for participant |
 
-Role branches mirror the former dashboard behavior.
+Role branches mirror the former dashboard behavior. The old synchronous
+`GET /invoices/invoices/annual-statements-zip/` endpoint is gone.
+
+**Whole-ZEV annual-statement ZIP — export jobs** (`/api/v1/exports/`):
+
+| Method | URL | Permission | Description |
+|---|---|---|---|
+| `POST` | `/exports/jobs/` | `IsZevOwnerOrAdmin` on the named ZEV | Create a job: body `{export_type: "annual_statements", zev_id, params: {year}}`. Validates the year range and that the ZEV has participants active that year (`400`); an identical in-flight job is returned instead of duplicated; the job is persisted as `queued` and enqueued after the row is committed — an enqueue failure marks the job `failed` and returns `503`. Success returns `202 {detail, job}` and is audit-logged (`annual_statement_export.created`, status `queued`) |
+| `GET` | `/exports/jobs/` | Requester only + ZEV readable | The caller's own jobs for ZEVs they may still read, newest first (optional `export_type` / `zev_id` filters, `limit` ≤ 100). The frontend restores an in-flight or completed export after a reload by reading the newest matching job |
+| `GET` | `/exports/jobs/{id}/` | Requester only + ZEV readable | Job status payload: `status`, `params`, counts, `file_expires_at`, computed `expired`, safe `error_message`. `404` for others' jobs, `403` once the ZEV is no longer readable |
+| `GET` | `/exports/jobs/{id}/download/` | Requester only + ZEV readable | Streams the completed ZIP (`Content-Disposition: attachment; filename="annual-statements-{year}.zip"`); `404` when not `completed`, `410` when expired |
+
 
 ### 5.5 Period overview
 
@@ -462,21 +476,98 @@ Admin-only endpoints manage the global `EmailTemplate` overrides (§3.5) for the
    - Otherwise: render from the on-disk default using `render_to_string(template_name, context)`.
 3. Convert HTML → PDF via WeasyPrint through `render_pdf()` in `invoices/pdf_render.py`, which emits **PDF/A-3b** (`PDF_VARIANT = "pdf/a-3b"`) — a long-term archival format suitable for Swiss GeBüV retention, with WeasyPrint adding the XMP identification, sRGB OutputIntent, and font subsets. The same helper renders contract, annual statement, and financial summary PDFs. Because template content is admin-editable, the WeasyPrint fetcher is restricted to `data:` URIs (`ALLOWED_URL_PROTOCOLS` in `pdf_render.py`) — templates embed images as data URIs and cannot make the renderer read local files or request remote URLs.
 4. Save PDF to `invoice.pdf_file` (`invoices/pdf/invoice_{number}.pdf`).
+   `save_invoice_pdf()` writes the file without saving the (possibly stale)
+   invoice instance, then updates only `pdf_file`/`updated_at` via a
+   conditional `UPDATE` on the primary key — a concurrent approval or other
+   workflow change survives the save. If the row was deleted mid-render the
+   just-written file is removed and `Invoice.DoesNotExist` is raised instead
+   of recreating the record (the render counts as failed).
 
 `_render_pdfs()` groups invoices by `(zev_id, period_start, period_end)` and
-builds one `InvoicePdfPeriodContext` per group. The context holds the daily
-participant-share map, ZEV-wide participant statistics, timestamp totals and
-assignment windows used by the hourly-profile and energy-flow charts, so a
-batch derives them once rather than once per invoice. A single PDF render
-builds a fresh context on demand. The context records its ZEV and period and
-is rejected if used for another invoice scope. If a shared context cannot be
-built, every invoice in that ZEV-period is counted as failed and the same
-failing computation is not retried for each participant; failures while
-rendering an individual invoice remain isolated to that invoice.
+builds one `InvoicePdfPeriodContext` per group. The context explicitly
+carries the daily participant-share map, participant statistics, per-timestamp
+community totals, and assignment windows. The totals and windows are passed
+directly to `_compute_period_participant_stats()`. The context records its
+ZEV and period and is rejected if used for another invoice scope. A shared
+context failure marks every invoice in that ZEV-period failed, while
+individual render failures stay isolated. Invoice batches always render
+serially in the Celery worker process, as do the annual-statement export jobs
+(ADR 0017).
 
-The annual-statement ZIP similarly builds its yearly participant shares and
-ZEV timestamp totals once before rendering. Shared setup failure returns a
-generic `500`; failure in one participant's render omits only that statement.
+**Annual-statement exports (async export jobs).** Whole-ZEV annual-statement
+ZIPs are no longer rendered inside a web request. They run as Celery export
+jobs (`exports` app, ADR 0017): a persistent `ExportJob` row records the
+operation, `exports.tasks.run_export_job` executes it in the worker, and the
+completed ZIP is stored under `MEDIA_ROOT` (shared by web and worker in every
+deployment shape) for `EXPORT_RETENTION_HOURS` (default 24 h).
+
+- The job lifecycle is `queued → running → completed / failed`. The endpoint
+  claims queued rows atomically on execution, so duplicate task delivery never
+  renders the same job twice. A repeat request while an identical job (same
+  requester, ZEV and params) is still `queued` or `running` returns that job
+  instead of scheduling a second render — the match runs across *every*
+  active job for the requester/ZEV/type, not only the newest one, so an older
+  year's job still deduplicates a repeat of that year.
+- **Each job enforces its own time budget.** The Celery task carries a soft
+  limit at `EXPORT_RUNNER_TIMEOUT_S` (raised as `SoftTimeLimitExceeded` and
+  recorded as a clean failure) and a hard limit a grace above it that
+  terminates a render wedged inside native code. The batch renderer re-raises
+  `SoftTimeLimitExceeded` instead of treating it as one participant's failure,
+  so a mid-batch soft limit aborts the job and never publishes a (partial)
+  ZIP. The periodic sweep (`exports.tasks.sweep_export_jobs`, also run at the
+  start of every job) only recovers what the limits cannot: a `running` job
+  whose worker died is failed once it is past the hard limit plus a further
+  grace, and a `queued` job whose task was lost in the broker is failed only
+  after it has waited far longer than any healthy backlog, so a backed-up
+  queue is not misread as lost work. Recovery is a conditional `UPDATE` that
+  re-checks the staleness criteria, so a stale `queued` job claimed by a
+  worker between the sweep's selection and its write is left `running`, not
+  failed, and only real transitions are audited. If the task cannot be handed
+  to the broker at all, the job is marked `failed` immediately and creation
+  returns `503` — never a `202` for a job that will not run.
+- Rendering is **serial per job**, reusing `generate_annual_statement_pdf`; the
+  ZEV-wide share map and per-timestamp community totals are computed once per
+  batch (`invoices/annual_statement_export.build_annual_statements_zip`). An
+  earlier subprocess-pool variant was explored during design and removed
+  together with the request-timeout layering that existed only to sustain the
+  long synchronous download; the pool-vs-serial measurements are recorded in
+  ADR 0017's alternatives. Parallelizing one job's documents is deferred;
+  Celery already runs multiple jobs concurrently across workers.
+- The file is published **only after the ZIP is fully built and stored**, and
+  completion is a conditional `UPDATE` on the still-`running` row — a job the
+  sweep already failed is never resurrected by a late render (its artifact is
+  discarded). Retention starts **at completion**: `file_expires_at` =
+  `completed_at` + `EXPORT_RETENTION_HOURS`. A failure never leaves a partial
+  artifact; an orphaned file from a failed save is deleted.
+- ZIP entry names are the readable `last_first` portion sanitized/truncated to
+  the UTF-8 byte budget (`_ZIP_ENTRY_BYTE_BUDGET`, 180 bytes; Windows-invalid
+  and control characters become underscores); the participant's pk is appended
+  only when names collide within the batch — naming rules that moved from
+  `views_reports` unchanged.
+- Failure policy: one participant's statement failure omits only that statement
+  and lists it in an `omitted.txt` manifest (ID plus name) inside the archive;
+  the job still completes and the UI shows the omission counts. If every
+  statement fails, or the shared yearly-data calculation fails, the job is
+  `failed` with a safe error message and no download; tracebacks stay in the
+  server logs. Retry means creating a new job, never silent re-rendering.
+- Expiry and audit: the sweep deletes the stored file after the retention
+  window (job metadata rows are retained); the download endpoint returns `410`
+  once expired. Job creation (`queued`), completion and failure are recorded on
+  the audit stream (`annual_statement_export.*`), and requester scoping applies
+  to list, status and download access alike — including that a requester who
+  lost ownership of the ZEV stops seeing the jobs (ADR 0017).
+
+
+`render_pdf()` in `invoices/pdf_render.py` keeps one lazily-created
+`FontConfiguration` per process and serializes access with a process-local
+lock because Pango's font map is not thread-safe. A custom template that
+installs `@font-face` rules invalidates that configuration after the render,
+preventing document fonts and caches from leaking into later renders.
+The font-isolation regression test runs with both the default subsetter and
+forced FontTools fallback. It pins `SOURCE_DATE_EPOCH` so FontTools' embedded
+subset timestamps stay constant during byte-for-byte comparisons;
+otherwise crossing a wall-clock second changes font checksums and PDF offsets
+without changing the document layout.
 
 ### 8.2 Template context
 
@@ -628,6 +719,7 @@ Strips legacy period suffixes from `description` on serialization.
 - **Transition events:** state changes are persisted immediately via `save(update_fields=[...])`.
 - **Logging:** engine logs invoice number + participant + total on generation; email task logs success/failure.
 - **Role enforcement:** backend queryset scoping is the source of truth; frontend route guards are UX-only.
+- **Export-job audit trail:** whole-ZEV annual-statement exports record creation (`annual_statement_export.created`, `queued`) and outcome (`annual_statement_export.completed`/`failed`) events with counts and partial-failure metadata; artifacts expire after the retention window while job metadata is retained.
 - **Sensitive data:** invoice payloads (PDF, totals, participant details) are protected by role and ZEV-scope checks.
 
 ---
@@ -672,8 +764,9 @@ Strips legacy period suffixes from `description` on serialization.
 | `test_engine_edge_cases.py` | `InvoiceVatRateSelectionTests` | VAT rate active at period_end, zero VAT when no vat_number |
 | `test_email_formatting.py` | `InvoiceEmailFormattingTests` | §7.1–7.2: date format in email body, custom ZEV templates, auto-transition to sent |
 | `test_email_task.py` | 5 function-based tests | §7.2: missing invoice no-ops, no recipient skips with failed log, success records sent log and transitions status, failure marks log failed and retries, draft stays draft after send |
-| `test_batch_actions.py` | `TestInvoiceBatchActions`, `TestBulkGenerationTasks`, `TestBulkGenerationIsolatesPerParticipantFailures`, `TestInvoiceRetryEmailAction` | §5.4: approve-all approves only period drafts, send-all queues only approved invoices with recipient, cross-owner ZEV rejection, download-pdfs 404/ZIP; §5.2: generate-all / generate-pdfs-all queue background tasks, one locked invoice does not abort the batch, a failure after number issuance reuses the rolled-back invoice number (gapless and collision-free), the audit event reports the partial outcome, one PDF context is built per ZEV-period batch, a failed shared context is not retried per invoice, and a failed shared invoice-build is reported once per participant with a FAILED audit event; §7.3: retry-email rejects sent logs and other invoices' logs, queues failed recipient |
-| `test_reports.py` | `AnnualStatementTests`, `AnnualStatementsZipTests`, `FinancialSummaryTests` | §5.4: report permissions and scoping, annual-statement ZIP contents and participant validity filtering, one yearly participant-share and timestamp-total computation per ZIP, and a generic `500` when that shared computation fails |
+| `test_batch_actions.py` | `TestInvoiceBatchActions`, `TestBulkGenerationTasks`, `TestPdfsAreProducedWithTheInvoice`, `TestBulkGenerationIsolatesPerParticipantFailures`, `TestInvoiceRetryEmailAction` | §5.4: approve-all approves only period drafts, send-all queues only approved invoices with recipient, cross-owner ZEV rejection, download-pdfs 404/ZIP; §5.2: background task dispatch, invoice-number rollback, partial-outcome audits, aborted-batch audit events (`"aborted": true`, `"phase"` creation/rendering), serial soft-time-limit propagation, shared invoice-build failure reporting, and PDF-context reuse/failure; §7.3: retry-email validation and dispatch |
+| `test_reports.py` | `AnnualStatementTests` (10), `FinancialSummaryTests` (6), `MalformedInputTests` (5), `AnnualStatementMonthlyDataTests` (3) | §5.4/§8.2: single-statement report permissions and self-service scoping, malformed/out-of-range input handling, financial-summary fallbacks, and per-timestamp monthly data attribution (ADR 0013). The whole-ZEV ZIP tests moved to `exports/tests.py` with the job flow |
+| `exports/tests.py` | `ExportJobCreateTests` (17), `ExportJobListTests` (4), `ExportJobRunnerTests` (11), `ExportJobDownloadTests` (6), `ExportJobSweepTests` (5), `AnnualStatementExportBuilderTests` (13), `AnnualStatementExportRealRenderTests` (1, slow) | §5.4/§8.1 (ADR 0017): `202` creation with year/participant validation and `queued` audit, unknown or malformed `zev_id` → `404`, in-flight dedupe on the full validated params dict across any matching active job (not just the newest), per-type audit display/summaries/metadata from `ExportDefinition`, enqueue-after-commit wiring, enqueue failure → `503` + `failed`, requester-scoped list/status/download (including loss of ZEV ownership), task-level soft/hard time limits, one-claim duplicate delivery, retention anchored at completion, late completion never resurrecting a swept-failed job, soft time limits aborting a mid-batch render without publishing a (partial) ZIP, partial → completed with `omitted.txt` manifest and counts, all-fail / unexpected / publish failures → `failed` without an artifact, expired → `410` + `expired` flag, sweep file deletion with metadata retention, stale running / lost queued recovery that never fails a job claimed meanwhile (backlog-safe queued window), ZIP entry byte-budget + sanitization rules with pk appended only on collisions (including a final guard against readable names mimicking a pk-suffixed entry), storage roundtrip, and one real-render end-to-end job |
 | `test_invoice_numbering.py` | `TestNumberingIsScopedToTheZev`, `TestDuplicatesWithinOneZevAreStillRejected` | §4.1: two ZEVs on the default `INV` prefix both bill and each counts from 1; a duplicate number within one ZEV is refused at the database level (`bulk_create` bypasses `save()`) |
 | `test_serializers.py` | `InvoiceDescriptionSerializationTests` | §8.9: period suffix stripping in serializer |
 | `test_template_context.py` | `BuildSampleInvoiceContextTests`, `BuildSampleContractContextTests`, `BuildSampleAnnualStatementContextTests` | §5.7 preview: sample context required keys, invoice number/totals, `grouped_items` structure, formatted dates, annual-statement monthly data and chart |
@@ -685,6 +778,7 @@ Strips legacy period suffixes from `description` on serialization.
 |---|---|
 | `InvoicePdfQrTests` | §8.4: QR skip on missing debtor data, success path, text/binary writer compatibility, skip on `qrbill` rejection, QR built in all four languages. §8.2: context uses AppSettings date formats, invoice-number prefix/suffix split (hyphen, long prefix, no hyphen), translation dict is not mutated by context building, period-suffix stripping from item descriptions (§8.9), `status_display` translation, empty `due_date` formatting, `inline_qr_payment` enabled for small invoices and disabled for long invoices / invoices with notes / missing IBAN, sample invoice context exposes every key the default template uses. §8.5: energy comparison rendered with and without a prior period. §8.6: energy-flow SVG returns `None` without readings and renders with valid data; energy summary local-share computation and `None` case. §8.7: hourly profile buckets by local time (not UTC), returns `None` for daily-only resolution, and skips readings outside the participant's assignment window (ADR 0013). §8.8: savings `None` cases (no local energy, local rate ≥ grid rate) and bar-percentage computation. Default template structural layout checks (dedicated invoice/payment layouts) |
 | `PeriodParticipantStatsTests` | §8.6: per-timestamp participant stats — mid-period transfer splits readings between both holders, gap readings appear on no participant, stats reconcile with engine invoice totals |
+| `SaveInvoicePdfConcurrencyTests` | §8.1: concurrent approval survives the PDF save (only `pdf_file`/`updated_at` written back); concurrent delete raises instead of resurrecting the row, without orphaning items or files |
 | `AnnualStatementMonthlyDataTests` | Annual-statement monthly data: per-timestamp attribution across assignment changes, gap readings excluded |
 | `InvoicePdfRenderingTests` | Full WeasyPrint rendering: short invoice → 2 pages, long invoice → 3 pages, savings + many items → 3 pages, all four languages render without error; inline QR and separate payment slip geometry (106 mm height, bottom-aligned with page bottom) via PDF content-stream inspection; no QR clip rect on the insights page. Regression coverage for the render-time guard: wrapping multi-line descriptions that overflow the inline height estimate still produce exactly one slip (`_count_qr_slips`), and a long dedicated-payment invoice keeps a single bottom-aligned slip on its final page; a realistic EVU-style invoice with ~5 Abgaben across all four cost categories (energy, grid fees, levies, metering) paginates to ≥3 pages with exactly one slip |
 | `TranslationParityTests` | §8.3: all four locales have identical, non-empty translation keys and identical `status_values` keys |
@@ -702,6 +796,7 @@ Strips legacy period suffixes from `description` on serialization.
   periods with nothing to act on (e.g. future periods) both are hidden, not
   disabled; disabled state is reserved for transient `anyBatchPending`.
 - Email field reference is shared: `frontend/src/lib/emailTemplateFields.ts` defines `EMAIL_TEMPLATE_FIELDS`; `frontend/src/components/EmailFieldReference.tsx` (`email-field-reference`) is used by `ZevEmailTemplateFields` and `AdminEmailTemplatesPage`.
+- Annual-statement export card (admin/owner): prepare → poll → download with partial, failed and expired states. Polling stops on ZEV/year switch, and a create response that resolves after the user switched ZEV/year is discarded (the old selection's job is never shown under the new one); a failed job shows the backend's safe `error_message` when there is one; a single transient poll error is tolerated (only consecutive errors or a long wall-clock backstop end the poll); a failed download surfaces an error instead of crashing; an in-flight or completed export is restored after a reload (`AnnualStatementsExportCard`)
 - Build and type checks (`npm run build`)
 
 ### Manual verification
@@ -709,6 +804,7 @@ Strips legacy period suffixes from `description` on serialization.
 - Walk an invoice through all legal states: draft → approved → sent → paid
 - Attempt invalid transitions (approve paid, cancel paid) and verify rejection
 - Simulate email failure and verify retry + history correctness
+- Prepare a whole-ZEV annual-statement export and confirm unrelated API requests stay responsive while it renders; download it after completion
 - Verify QR-Rechnung renders with valid IBAN + addresses
 - Verify QR section is absent when addresses are incomplete
 
@@ -731,4 +827,6 @@ Strips legacy period suffixes from `description` on serialization.
 - [ ] Contract PDF template is hot-updatable by admin only via the same mechanism (§5.7)
 - [ ] Annual statement PDF template is hot-updatable by admin only via the same mechanism (§5.7)
 - [ ] Template preview renders submitted content with sample data for all three template types (§5.7)
+- [ ] Whole-ZEV annual statements are prepared asynchronously: the UI polls until the archive is ready, then downloads; partial failures show omission counts, total failure shows an error with retry (§5.4, §8.1)
+- [ ] Completed export artifacts expire after the retention window and downloads of expired artifacts return `410` (§8.1, ADR 0017)
 - [ ] Reset-to-default DELETE reverts to on-disk file without modifying it (§5.7)

@@ -515,6 +515,21 @@ export interface Invoice {
     pdf_url?: string | null
     items?: InvoiceItem[]
     email_logs?: EmailLog[]
+    /** Detail reads only; never carries the secret (see InvoiceAccessLink). */
+    access_link?: InvoiceAccessLink | null
+}
+
+/**
+ * State of the QR link printed on one invoice.
+ *
+ * The `prefix` identifies the token but cannot open anything on its own — the
+ * secret stays on the printed document — so this is safe to render.
+ */
+export interface InvoiceAccessLink {
+    prefix: string
+    created_at: string
+    /** Stamped at most hourly, so it answers "opened at all?", not "how often". */
+    last_used_at: string | null
 }
 
 export interface InvoicePeriodParticipantRow {
@@ -1009,6 +1024,13 @@ export interface PublicInvoiceItem {
 export interface PublicInvoice {
     invoice_number: string
     zev_name: string
+    /**
+     * The language the invoice was issued in — not a reader preference.
+     *
+     * The line items and the chart labels are already written in it, so the
+     * page renders itself in it too rather than in the browser's locale.
+     */
+    language: string
     participant_name: string
     period_start: string
     period_end: string
@@ -1025,4 +1047,23 @@ export interface PublicInvoice {
     } | null
     items: PublicInvoiceItem[]
     has_pdf: boolean
+}
+
+export type ExportJobStatus = 'queued' | 'running' | 'completed' | 'failed'
+
+export interface ExportJob {
+    id: string
+    export_type: 'annual_statements'
+    zev_id: string
+    params: { year: number }
+    status: ExportJobStatus
+    created_at: string
+    started_at: string | null
+    completed_at: string | null
+    file_expires_at: string | null
+    generated_count: number | null
+    omitted_count: number | null
+    omitted_participant_ids: string[]
+    error_message: string
+    expired: boolean
 }

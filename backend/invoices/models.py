@@ -228,6 +228,66 @@ DEFAULT_MAGIC_LINK_EMAIL_BODY = (
     "Best regards,\nOpenZEV"
 )
 
+# The sign-in mail is the one template whose recipient's language is known:
+# it is always sent to a participant of one ZEV, in answer to them scanning the
+# QR on a document written in that ZEV's ``invoice_language``. An English mail
+# arriving seconds after an Italian invoice is the most conspicuous instance of
+# a limitation the other three templates share and cannot fix — the invitation
+# has a ZEV too, but the verification mail is sent before any ZEV is known.
+#
+# A saved override still wins for every language: one row, one text. That is
+# the existing contract for ``EmailTemplate`` and this does not change it, so
+# customising the template opts out of translation. The admin console says so
+# on the tab.
+MAGIC_LINK_EMAIL_DEFAULTS_BY_LANGUAGE = {
+    "en": {
+        "subject": DEFAULT_MAGIC_LINK_EMAIL_SUBJECT,
+        "body": DEFAULT_MAGIC_LINK_EMAIL_BODY,
+    },
+    "de": {
+        "subject": "Ihr OpenZEV-Anmeldelink",
+        "body": (
+            "Guten Tag {participant_name}\n\n"
+            "Hier ist Ihr Anmeldelink für {zev_name}. Er öffnet Ihre "
+            "Abrechnungen und Ihren Verbrauch ohne Passwort:\n\n"
+            "{link_url}\n\n"
+            "Der Link ist {valid_minutes} Minuten gültig und kann einmal "
+            "verwendet werden.\n\n"
+            "Falls Sie ihn nicht angefordert haben, können Sie diese E-Mail "
+            "ignorieren — an Ihrem Konto hat sich nichts geändert.\n\n"
+            "Freundliche Grüsse\nOpenZEV"
+        ),
+    },
+    "fr": {
+        "subject": "Votre lien de connexion OpenZEV",
+        "body": (
+            "Bonjour {participant_name},\n\n"
+            "Voici votre lien de connexion pour {zev_name}. Il ouvre vos "
+            "décomptes et votre consommation sans mot de passe :\n\n"
+            "{link_url}\n\n"
+            "Le lien est valable {valid_minutes} minutes et ne peut être "
+            "utilisé qu'une seule fois.\n\n"
+            "Si vous ne l'avez pas demandé, vous pouvez ignorer cet e-mail — "
+            "rien n'a changé sur votre compte.\n\n"
+            "Cordialement,\nOpenZEV"
+        ),
+    },
+    "it": {
+        "subject": "Il suo link di accesso OpenZEV",
+        "body": (
+            "Buongiorno {participant_name},\n\n"
+            "Ecco il suo link di accesso per {zev_name}. Apre i suoi "
+            "conteggi e i suoi consumi senza password:\n\n"
+            "{link_url}\n\n"
+            "Il link è valido {valid_minutes} minuti e può essere usato una "
+            "sola volta.\n\n"
+            "Se non l'ha richiesto, può ignorare questa e-mail — sul suo "
+            "account non è cambiato nulla.\n\n"
+            "Cordiali saluti\nOpenZEV"
+        ),
+    },
+}
+
 EMAIL_TEMPLATE_DEFAULTS = {
     "invoice_email": {
         "subject": DEFAULT_INVOICE_EMAIL_SUBJECT,

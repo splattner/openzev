@@ -22,6 +22,8 @@ from .test_helpers import make_invoice, make_participant, make_zev
 
 PUBLIC_URL = "/api/v1/public/invoices/{prefix}/"
 PUBLIC_PDF_URL = "/api/v1/public/invoices/{prefix}/pdf/"
+REVOKE_URL = "/api/v1/invoices/invoices/{pk}/revoke-access/"
+DETAIL_URL = "/api/v1/invoices/invoices/{pk}/"
 
 
 class PublicInvoiceTestCase(TestCase):
@@ -142,6 +144,29 @@ class PublicInvoicePayloadTests(PublicInvoiceTestCase):
         self.invoice.save()
 
         self.assertIsNone(self._get().json()["energy_summary"])
+
+    def test_names_the_language_the_invoice_was_issued_in(self):
+        """The page renders in it; the reader's browser locale is not the answer."""
+        self.zev.invoice_language = "fr"
+        self.zev.save()
+
+        self.assertEqual(self._get().json()["language"], "fr")
+
+    def test_language_falls_back_to_german_like_the_pdf(self):
+        self.zev.invoice_language = ""
+        self.zev.save()
+
+        self.assertEqual(self._get().json()["language"], "de")
+
+    def test_the_payload_and_the_charts_agree_on_the_language(self):
+        """One document, one language — the two routes must not drift apart."""
+        from .views_public import _invoice_language
+
+        self.zev.invoice_language = "it"
+        self.zev.save()
+        self.invoice.refresh_from_db()
+
+        self.assertEqual(self._get().json()["language"], _invoice_language(self.invoice))
 
     def test_carries_the_line_items(self):
         items = self._get().json()["items"]
@@ -424,6 +449,141 @@ class MagicLinkTests(PublicInvoiceTestCase):
         self.assertFalse(self.participant.user.has_usable_password())
 
 
+class MagicLinkTemplateTests(PublicInvoiceTestCase):
+    """What the sign-in mail does when an operator's edit cannot be rendered.
+
+    The whole mail exists to carry one URL, so the failure that matters is not
+    odd wording — it is a body that reaches the participant with the literal
+    text ``{link_url}`` in it and no way to sign in.
+    """
+
+    REQUEST_URL = MagicLinkTests.REQUEST_URL
+
+    def setUp(self):
+        super().setUp()
+        self.participant.email = "anna@example.com"
+        self.participant.save()
+
+    def _request(self):
+        return self.client.post(
+            self.REQUEST_URL,
+            {"prefix": self.token.prefix, "s": self.secret},
+            format="json",
+        )
+
+    def _sent(self):
+        from django.core import mail
+
+        return mail.outbox[-1]
+
+    def _customise(self, *, subject="Sign in", body):
+        from .models import EmailTemplate
+
+        EmailTemplate.objects.create(
+            template_key="participant_magic_link", subject=subject, body=body,
+        )
+
+    def test_the_default_is_sent_in_the_zevs_invoice_language(self):
+        """The mail lands seconds after a document written in this language."""
+        self.zev.invoice_language = "it"
+        self.zev.save()
+
+        self._request()
+
+        self.assertIn("link di accesso", self._sent().subject)
+        self.assertIn("Buongiorno", self._sent().body)
+
+    def test_each_shipped_language_carries_the_link_placeholder(self):
+        """A translation that drops {link_url} would send an unusable mail."""
+        from .models import MAGIC_LINK_EMAIL_DEFAULTS_BY_LANGUAGE
+
+        for lang, texts in MAGIC_LINK_EMAIL_DEFAULTS_BY_LANGUAGE.items():
+            with self.subTest(lang=lang):
+                self.assertIn("{link_url}", texts["body"])
+                self.assertIn("{valid_minutes}", texts["body"])
+
+    def test_every_invoice_language_has_a_translation(self):
+        """A ZEV language with no mail would silently fall back to English."""
+        from zev.models import Zev
+        from .models import MAGIC_LINK_EMAIL_DEFAULTS_BY_LANGUAGE
+
+        offered = {code for code, _label in Zev._meta.get_field("invoice_language").choices}
+
+        self.assertEqual(offered, set(MAGIC_LINK_EMAIL_DEFAULTS_BY_LANGUAGE))
+
+    def test_an_unknown_language_falls_back_rather_than_failing(self):
+        self.zev.invoice_language = "rm"
+        self.zev.save()
+
+        self._request()
+
+        self.assertIn("/signin/", self._sent().body)
+
+    def test_a_custom_template_replaces_every_language(self):
+        """One row per key: customising opts out of translation, by design."""
+        self.zev.invoice_language = "it"
+        self.zev.save()
+        self._customise(subject="Custom", body="Sign in at {link_url}")
+
+        self._request()
+
+        self.assertEqual(self._sent().subject, "Custom")
+        self.assertNotIn("Buongiorno", self._sent().body)
+
+    def test_a_broken_custom_template_falls_back_in_the_right_language(self):
+        self.zev.invoice_language = "de"
+        self.zev.save()
+        self._customise(body="Hello {invoice_number} {link_url}")
+
+        self._request()
+
+        self.assertIn("Guten Tag", self._sent().body)
+        self.assertIn("/signin/", self._sent().body)
+
+    def test_a_customised_template_is_used(self):
+        self._customise(subject="Ihr Link für {zev_name}", body="Hier: {link_url}")
+
+        self._request()
+
+        self.assertEqual(self._sent().subject, f"Ihr Link für {self.zev.name}")
+        self.assertIn("/signin/", self._sent().body)
+
+    def test_an_unknown_placeholder_still_sends_a_usable_link(self):
+        """The regression this class exists for: never a body reading `{link_url}`."""
+        self._customise(body="Hello {invoice_number}, sign in at {link_url}")
+
+        self._request()
+
+        body = self._sent().body
+        self.assertNotIn("{link_url}", body)
+        self.assertIn("/signin/", body)
+
+    def test_malformed_braces_fall_back_rather_than_raising(self):
+        """`str.format` raises ValueError here, not KeyError."""
+        self._customise(body="Sign in at {link_url} {")
+
+        self._request()
+
+        self.assertIn("/signin/", self._sent().body)
+
+    def test_a_positional_field_falls_back(self):
+        """`{0}` raises IndexError against a keyword-only context."""
+        self._customise(body="Sign in at {0}")
+
+        self._request()
+
+        self.assertIn("/signin/", self._sent().body)
+
+    def test_a_broken_subject_does_not_break_the_body(self):
+        """Each half falls back on its own; a bad subject must not cost the link."""
+        self._customise(subject="Re: {nope}", body="Sign in at {link_url}")
+
+        self._request()
+
+        self.assertIn("/signin/", self._sent().body)
+        self.assertTrue(self._sent().subject)
+
+
 class PublicInvoiceChartsTests(PublicInvoiceTestCase):
     """The three figures from the invoice's insights page (spec §9)."""
 
@@ -569,3 +729,140 @@ class PublicInvoiceChartsTests(PublicInvoiceTestCase):
         for payload in (ok, failed):
             self.assertIn("charts", payload)
             self.assertIsInstance(payload["charts"], list)
+
+
+class RevokeAccessLinkTests(PublicInvoiceTestCase):
+    """The operator's only control over a printed link (spec §3, §8).
+
+    The token has no expiry, so if these tests pass and the endpoint is still
+    unreachable from the UI, the feature has a security control on paper only —
+    which is exactly the state this suite was written to end.
+    """
+
+    def _post_revoke(self, invoice=None):
+        return self.client.post(REVOKE_URL.format(pk=(invoice or self.invoice).pk))
+
+    def test_owner_revokes_and_the_printed_link_dies(self):
+        self.client.force_authenticate(self.owner)
+
+        resp = self._post_revoke()
+
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(self._get().status_code, 404, "the printed link is dead")
+
+    def test_revoking_leaves_the_response_showing_no_active_link(self):
+        self.client.force_authenticate(self.owner)
+
+        resp = self._post_revoke()
+
+        self.assertIsNone(resp.data["access_link"])
+
+    def test_a_second_revoke_is_404_rather_than_a_silent_no_op(self):
+        """Nothing was revoked, so the operator must not be told it was."""
+        self.client.force_authenticate(self.owner)
+        self._post_revoke()
+
+        self.assertEqual(self._post_revoke().status_code, 404)
+
+    def test_revoking_touches_no_other_invoice(self):
+        other = make_invoice(self.zev, self.participant, InvoiceStatus.SENT)
+        other_token = access_tokens.get_or_create_for_invoice(other)
+        self.client.force_authenticate(self.owner)
+
+        self._post_revoke()
+
+        other_token.refresh_from_db()
+        self.assertIsNone(other_token.revoked_at)
+
+    def test_the_next_render_mints_a_fresh_link(self):
+        """Revoking invalidates the paper already out there, not the feature."""
+        self.client.force_authenticate(self.owner)
+        self._post_revoke()
+
+        fresh = access_tokens.get_or_create_for_invoice(self.invoice)
+
+        self.assertNotEqual(fresh.prefix, self.token.prefix)
+
+    def test_revoking_records_an_audit_event_naming_the_token(self):
+        self.client.force_authenticate(self.owner)
+
+        self._post_revoke()
+
+        event = AuditEvent.objects.get(action_type="invoice_link.revoked")
+        self.assertEqual(event.target_id, str(self.invoice.pk))
+        self.assertEqual(event.metadata_json["token_prefix"], self.token.prefix)
+
+    def test_a_participant_cannot_revoke(self):
+        participant_user = make_user("revoke_participant", UserRole.PARTICIPANT)
+        self.client.force_authenticate(participant_user)
+
+        self.assertEqual(self._post_revoke().status_code, 403)
+
+    def test_another_owner_cannot_revoke(self):
+        stranger = make_user("revoke_stranger", UserRole.ZEV_OWNER)
+        self.client.force_authenticate(stranger)
+
+        self.assertEqual(self._post_revoke().status_code, 404)
+        self.token.refresh_from_db()
+        self.assertIsNone(self.token.revoked_at)
+
+    def test_anonymous_cannot_revoke(self):
+        self.assertIn(self._post_revoke().status_code, (401, 403))
+
+
+class InvoiceAccessLinkSerializerTests(PublicInvoiceTestCase):
+    """What the invoice detail payload says about the printed link."""
+
+    def test_detail_reports_the_active_link_without_the_secret(self):
+        self.client.force_authenticate(self.owner)
+
+        resp = self.client.get(DETAIL_URL.format(pk=self.invoice.pk))
+
+        link = resp.data["access_link"]
+        self.assertEqual(link["prefix"], self.token.prefix)
+        self.assertNotIn("secret", link)
+        # The secret must not reach the payload under any key.
+        self.assertNotIn(self.secret, str(resp.data))
+
+    def test_an_unopened_link_reports_no_last_use(self):
+        self.client.force_authenticate(self.owner)
+
+        resp = self.client.get(DETAIL_URL.format(pk=self.invoice.pk))
+
+        self.assertIsNone(resp.data["access_link"]["last_used_at"])
+
+    def test_opening_the_link_shows_up_on_the_invoice(self):
+        """The operator's answer to "did they ever look at it?"."""
+        self._get()
+        self.client.force_authenticate(self.owner)
+
+        resp = self.client.get(DETAIL_URL.format(pk=self.invoice.pk))
+
+        self.assertIsNotNone(resp.data["access_link"]["last_used_at"])
+
+    def test_an_invoice_with_no_token_reports_none(self):
+        untouched = make_invoice(self.zev, self.participant, InvoiceStatus.DRAFT)
+        self.client.force_authenticate(self.owner)
+
+        resp = self.client.get(DETAIL_URL.format(pk=untouched.pk))
+
+        self.assertIsNone(resp.data["access_link"])
+
+
+class ParticipantInvoiceAccessDefaultTests(TestCase):
+    """Nobody is opted in by an upgrade (spec acceptance criterion 8).
+
+    The flag changes a document participants receive and exposes figures
+    without a login. An operator turns that on deliberately; inheriting it from
+    a migration would be the one way this feature does harm on its own.
+    """
+
+    def test_a_new_zev_is_not_opted_in(self):
+        owner = make_user("default_owner", UserRole.ZEV_OWNER)
+
+        self.assertFalse(make_zev(owner, "Fresh ZEV").participant_invoice_access)
+
+    def test_the_field_default_is_off(self):
+        from zev.models import Zev
+
+        self.assertIs(Zev._meta.get_field("participant_invoice_access").default, False)

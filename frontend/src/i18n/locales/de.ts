@@ -303,6 +303,8 @@ export const de = {
             invoiceEmail: 'Rechnungs-E-Mail',
             invitationEmail: 'Einladungs-E-Mail',
             verificationEmail: 'Verifizierungs-E-Mail',
+            magicLinkEmail: 'Anmeldelink-E-Mail',
+            magicLinkLanguageNote: 'Unver\u00e4ndert wird diese E-Mail in der Rechnungssprache der jeweiligen ZEV versendet. Ein hier gespeicherter eigener Text ersetzt sie f\u00fcr alle vier Sprachen.',
             subject: 'Betreff:',
             body: 'Nachricht',
             variable: 'Variable',
@@ -320,6 +322,8 @@ export const de = {
                 username: 'Login-Benutzername des Teilnehmers',
                 temporaryPassword: 'Temporäres Passwort für die erste Anmeldung',
                 verifyUrl: 'URL des E-Mail-Verifizierungslinks',
+                linkUrl: 'URL des einmaligen Anmeldelinks',
+                validMinutes: 'Wie viele Minuten der Anmeldelink gültig bleibt',
             },
         },
     },
@@ -1761,6 +1765,18 @@ export const de = {
             local: 'Intern',
             grid: 'Netz',
             feedIn: 'Einspeisung',
+            accessLink: {
+                title: 'Zugangslink für Teilnehmende',
+                description:
+                    'Der QR-Code auf dieser Rechnung öffnet sie ohne Konto. Er läuft nicht ab — ein Link, der in falsche Hände geraten ist, lässt sich nur durch Widerrufen stoppen.',
+                created: 'Gedruckt seit',
+                lastOpened: 'Zuletzt geöffnet',
+                neverOpened: 'Nie geöffnet',
+                revoke: 'Link widerrufen',
+                revokeTitle: 'Diesen Zugangslink widerrufen?',
+                revokeWarning:
+                    'Der QR-Code auf der bereits versandten Rechnung funktioniert endgültig nicht mehr. Beim nächsten Erstellen dieses PDFs entsteht ein neuer Code — nachgedruckte Rechnungen stimmen dann nicht mehr mit den bereits verschickten überein.',
+            },
         },
         dashboard: {
             openInvoicePdf: 'PDF für Rechnung {{number}} öffnen',
@@ -1857,6 +1873,11 @@ export const de = {
                 ownerDescription: 'Jahresabrechnungen für alle Teilnehmer erstellen und als ZIP-Archiv herunterladen.',
                 download: 'Jahresabrechnung herunterladen',
                 downloadAll: 'Alle herunterladen (ZIP)',
+                prepare: 'Jahresabrechnungen vorbereiten (ZIP)',
+                preparing: 'Jahresabrechnungen werden vorbereitet…',
+                prepareAgain: 'Neuen Export vorbereiten',
+                partialWarning: '{{omitted}} von {{total}} Abrechnungen konnten nicht erstellt werden; sie sind in omitted.txt im Archiv aufgeführt.',
+                expired: 'Dieser Download-Link ist abgelaufen. Bereiten Sie einen neuen Export vor, um aktuelle Daten herunterzuladen.',
                 error: 'Jahresabrechnung konnte nicht erstellt werden. Bitte versuchen Sie es erneut.',
             },
             financialSummary: {

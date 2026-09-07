@@ -208,6 +208,185 @@ class TestBulkGenerationTasks:
         save_pdf.assert_called_once()
         assert save_pdf.call_args[0][0].pk == invoice.pk
 
+    def test_generate_all_records_aborted_audit_event_when_pdf_batch_dies(self):
+        """A timeout or worker crash during PDF rendering must not skip the
+        audit event: invoices are already saved, so the aborted outcome has
+        to reach the audit trail. No successful-document count is invented."""
+        from audit.models import AuditEvent, AuditEventStatus
+        from invoices.tasks import generate_zev_invoices_task
+
+        owner = OwnerFactory()
+        # The engine numbers from this ZEV's counter, so a distinct prefix
+        # keeps the factory's global INV- sequence from colliding with it.
+        zev = ZevFactory(owner=owner, invoice_prefix="ABT")
+        for _ in range(4):
+            _invoice(ParticipantFactory(zev=zev))
+
+        with (
+            mock.patch("invoices.pdf.save_invoice_pdf"),
+            mock.patch(
+                "invoices.tasks._render_pdfs",
+                side_effect=TimeoutError("PDF batch deadline exceeded"),
+            ) as render_pdfs,
+        ):
+            with pytest.raises(TimeoutError):
+                generate_zev_invoices_task(str(zev.id), "2026-01-01", "2026-01-31")
+
+        render_pdfs.assert_called_once()
+        event = AuditEvent.objects.filter(action_type="invoice.generate_all").latest("created_at")
+        assert event.status == AuditEventStatus.FAILED
+        assert event.metadata_json["aborted"] is True
+        assert event.metadata_json["invoice_count"] == 4
+        assert event.metadata_json["phase"] == "rendering"
+        assert "aborted" in event.summary
+
+    def test_generate_all_propagates_original_error_when_abort_audit_fails(self):
+        """A failed audit write must not replace the original task failure:
+        the aborted-batch event is best-effort, so the soft time limit still
+        reaches Celery."""
+        from billiard.exceptions import SoftTimeLimitExceeded
+        from django.db import DatabaseError
+
+        from invoices.tasks import generate_zev_invoices_task
+
+        owner = OwnerFactory()
+        zev = ZevFactory(owner=owner, invoice_prefix="ABT")
+        for _ in range(4):
+            _invoice(ParticipantFactory(zev=zev))
+
+        with (
+            mock.patch("invoices.pdf.save_invoice_pdf"),
+            mock.patch(
+                "invoices.tasks._render_pdfs",
+                side_effect=SoftTimeLimitExceeded(),
+            ),
+            mock.patch(
+                "invoices.tasks.record_audit_event",
+                side_effect=DatabaseError("audit store unavailable"),
+            ),
+        ):
+            with pytest.raises(SoftTimeLimitExceeded):
+                generate_zev_invoices_task(str(zev.id), "2026-01-01", "2026-01-31")
+
+    def test_generate_all_records_aborted_audit_event_when_creation_dies(self):
+        """A soft time limit during invoice creation must also reach the audit
+        trail, recording the creation phase. Creation never returned, so no
+        invoice/failure counts are invented."""
+        from billiard.exceptions import SoftTimeLimitExceeded
+
+        from audit.models import AuditEvent, AuditEventStatus
+        from invoices.tasks import generate_zev_invoices_task
+
+        owner = OwnerFactory()
+        zev = ZevFactory(owner=owner, invoice_prefix="ABT")
+
+        with mock.patch(
+            "invoices.engine.generate_invoices_for_zev",
+            side_effect=SoftTimeLimitExceeded(),
+        ):
+            with pytest.raises(SoftTimeLimitExceeded):
+                generate_zev_invoices_task(str(zev.id), "2026-01-01", "2026-01-31")
+
+        event = AuditEvent.objects.filter(action_type="invoice.generate_all").latest("created_at")
+        assert event.status == AuditEventStatus.FAILED
+        assert event.metadata_json["aborted"] is True
+        assert event.metadata_json["phase"] == "creation"
+        assert "invoice_count" not in event.metadata_json
+        assert "failures" not in event.metadata_json
+        assert "aborted" in event.summary
+
+    def test_generate_pdfs_all_records_aborted_audit_event_when_batch_dies(self):
+        from audit.models import AuditEvent, AuditEventStatus
+        from invoices.tasks import generate_zev_pdfs_task
+
+        owner = OwnerFactory()
+        # The engine numbers from this ZEV's counter, so a distinct prefix
+        # keeps the factory's global INV- sequence from colliding with it.
+        zev = ZevFactory(owner=owner, invoice_prefix="ABT")
+        for _ in range(4):
+            _invoice(ParticipantFactory(zev=zev))
+
+        with (
+            mock.patch("invoices.pdf.save_invoice_pdf"),
+            mock.patch(
+                "invoices.tasks._render_pdfs",
+                side_effect=RuntimeError("PDF worker exited with status 1"),
+            ) as render_pdfs,
+        ):
+            with pytest.raises(RuntimeError):
+                generate_zev_pdfs_task(str(zev.id), "2026-01-01", "2026-01-31")
+
+        render_pdfs.assert_called_once()
+        event = AuditEvent.objects.filter(
+            action_type="invoice.generate_pdfs_all",
+        ).latest("created_at")
+        assert event.status == AuditEventStatus.FAILED
+        assert event.metadata_json["aborted"] is True
+        # An aborted batch has no meaningful generated/failed counts.
+        assert "generated" not in event.metadata_json
+        assert "failed" not in event.metadata_json
+        assert "aborted" in event.summary
+
+    def test_serial_pdf_loop_propagates_soft_time_limit(self):
+        """A soft time limit is an abort, not a per-invoice failure: it must
+        propagate so the aborted-batch audit fires instead of counting it."""
+        from billiard.exceptions import SoftTimeLimitExceeded
+
+        from invoices.tasks import _render_pdfs
+
+        owner = OwnerFactory()
+        zev = ZevFactory(owner=owner)
+        invoice = _invoice(ParticipantFactory(zev=zev))
+        with (
+            mock.patch("invoices.pdf.build_invoice_pdf_period_context", side_effect=SoftTimeLimitExceeded),
+            pytest.raises(SoftTimeLimitExceeded),
+        ):
+            _render_pdfs([invoice])
+        with (
+            mock.patch("invoices.pdf.build_invoice_pdf_period_context"),
+            mock.patch("invoices.pdf.save_invoice_pdf", side_effect=SoftTimeLimitExceeded),
+            pytest.raises(SoftTimeLimitExceeded),
+        ):
+            _render_pdfs([invoice])
+
+    def test_render_pdfs_prefetches_items_once_per_batch(self):
+        """Both production entry shapes — the engine's plain list and a plain
+        period queryset — must render with a single items query, not one per
+        invoice. Like a real render, the fake save touches the items."""
+        from django.db import connection
+        from django.test.utils import CaptureQueriesContext
+
+        from invoices.models import Invoice
+        from invoices.tasks import _render_pdfs
+        from testing.factories import InvoiceItemFactory
+
+        owner = OwnerFactory()
+        zev = ZevFactory(owner=owner)
+        for _ in range(3):
+            InvoiceItemFactory(invoice=_invoice(ParticipantFactory(zev=zev)))
+
+        def _entries(shape):
+            qs = Invoice.objects.filter(zev=zev).order_by("invoice_number")
+            return list(qs) if shape == "list" else qs
+
+        for shape in ("list", "queryset"):
+            with (
+                mock.patch(
+                    "invoices.pdf.build_invoice_pdf_period_context",
+                    return_value=mock.sentinel.ctx,
+                ),
+                mock.patch("invoices.pdf.save_invoice_pdf") as save_pdf,
+            ):
+                save_pdf.side_effect = (
+                    lambda inv, period_context=None: list(inv.items.all())
+                )
+                with CaptureQueriesContext(connection) as ctx:
+                    assert _render_pdfs(_entries(shape)) == 0
+            item_queries = [
+                q for q in ctx.captured_queries if "invoices_invoiceitem" in q["sql"]
+            ]
+            assert len(item_queries) == 1, f"{shape} entry issued per-invoice item queries"
+
     def test_pdf_batch_builds_one_context_per_zev_period(self):
         from invoices.pdf import _build_template_context
         from invoices.tasks import _render_pdfs

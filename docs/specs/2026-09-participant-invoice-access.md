@@ -1,7 +1,7 @@
 # Feature Spec: Participant access from the invoice
 
 - Spec ID: SPEC-2026-participant-invoice-access
-- Status: Completed
+- Status: Completed (extended — see Increments)
 - Scope: Major
 - Type: Feature
 - Owners: Sebastian Plattner
@@ -10,6 +10,17 @@
 - Related Issues: [#589](https://github.com/splattner/openzev/issues/589)
 - Related ADRs: —
 - Impacted Areas: backend | frontend | docs
+
+### Increments
+
+| # | Delivered | PRs |
+|---|---|---|
+| 1 | Tier 1 endpoint, QR, public page, tier 2 magic link, opt-in setting | #591, #593, #594, #595 |
+| 2 | The insights-page charts on the public page. **Reopened §9**: its limit moved from a list of forbidden fields to a principle, because the flow diagram is both a "neighbour's figure" and a "ZEV-wide total" and is printed on the same sheet as the QR | #596 |
+| 3 | Gaps found reviewing the delivered feature: revocation made reachable (§3 and §8 promised it and nothing called `revoke()`), the admin console tab for the sign-in mail, the default-template fallback, the public page rendered in the invoice's language, and user-guide coverage | #602, #603, #604, #605, #606 |
+
+A spec marked Completed and then extended should say so in one place, rather
+than leaving a reader to infer it from a section that postdates the status.
 
 ---
 
@@ -70,8 +81,8 @@ Nobody invents a password at any point.
 
 | Actor | Capability |
 |---|---|
-| `admin` | Unchanged. Can revoke any invoice token via the admin console |
-| `zev_owner` | Opts their ZEV in; can revoke tokens for their own invoices |
+| `admin` | Unchanged. Can revoke the token on any invoice they can reach |
+| `zev_owner` | Opts their ZEV in; can revoke tokens on their own invoices |
 | `participant` | Unchanged when logged in; gains the two public paths below |
 | `guest` (bearer of an invoice) | Tier 1: read that one invoice. Tier 2: request a link to the address on file — never chooses the address |
 
@@ -187,8 +198,11 @@ by reading a permission class.
 
 `GET /api/v1/public/invoices/<prefix>/?s=<secret>`
 
-The prefix selects the row; the secret is compared against `hashed_secret` with
-`hmac.compare_digest`.
+The prefix selects the row; the secret is compared with `hmac.compare_digest`.
+It is stored in clear rather than hashed — see `InvoiceAccessToken.secret` for
+why, in short that hashing would defend nothing (the token and the invoice it
+protects share a database) while costing the reprintability the printed QR
+depends on.
 
 **Response 200:**
 
@@ -211,11 +225,10 @@ The prefix selects the row; the secret is compared against `hashed_secret` with
   },
   "items": [
     {"category": "energy", "description": "Solarstrom ZEV",
-     "quantity": "412.500", "unit": "kWh", "unit_price": "0.22500",
-     "total_chf": "92.81"}
+     "quantity": "412.500", "unit": "kWh", "total_chf": "92.81"}
   ],
-  "pdf_url": "/api/v1/public/invoices/ab12cd34ef56/pdf/?s=…",
-  "magic_link_available": true
+  "language": "de",
+  "has_pdf": true
 }
 ```
 
@@ -223,6 +236,17 @@ The prefix selects the row; the secret is compared against `hashed_secret` with
 |---|---|
 | 200 | Token found, not revoked, secret matches, ZEV opted in |
 | 404 | Unknown prefix, revoked token, secret mismatch, or ZEV not opted in |
+
+`language` is the ZEV's `invoice_language`, and it is **not a reader
+preference**: the line items were written in it by the billing engine and the
+chart labels are baked into the SVGs in it, so the page renders itself in it
+rather than in the visitor's browser locale. The frontend binds it with
+`getFixedT` — calling `changeLanguage` would persist the ZEV's language as the
+visitor's own app language.
+
+`has_pdf` rather than a URL: the PDF route is `§5.2`, addressed by the same
+prefix and secret, so a second copy of the credential in the payload would be
+one more place to leak it.
 | 429 | Throttled |
 
 **404 for every failure, including a wrong secret.** Distinguishing "no such
@@ -337,12 +361,53 @@ picture would be the wrong trade.
 asserts it — the cost of being wrong is script execution on a page served
 without a session.
 
+### 5.6 Revoking a printed link
+
+`POST /api/v1/invoices/invoices/<id>/revoke-access/` — `IsZevOwnerOrAdmin`,
+object scope inherited from `InvoiceViewSet.get_queryset`.
+
+The token has no expiry (§4.1), so this is the **only** way a printed link
+stops working, and §3 and §8 assumed it existed from the start. It did not:
+`access_tokens.revoke()` was written and tested but never called from anywhere
+— no endpoint, no UI, no admin registration — so until #602 the feature had a
+security control on paper only.
+
+| Status | When |
+|---|---|
+| 200 | Revoked; body is the updated invoice, whose `access_link` is now `null` |
+| 404 | No active link on this invoice, or the caller cannot reach the invoice |
+| 403 | Authenticated but not an owner or admin |
+
+A 404 rather than an idempotent 200 when there is nothing to revoke: telling an
+operator something was revoked when nothing was is the one answer that would
+leave them believing a live link is dead.
+
+Revocation is per invoice and touches no other token, mirroring the property the
+token itself is built around. The next render mints a fresh one, so revoking
+invalidates the paper already posted rather than locking the participant out.
+
+The invoice **detail** payload carries `access_link` — `prefix`, `created_at`,
+`last_used_at`, or `null` — so the UI can show the state and offer the control.
+Never the secret: the prefix identifies the row but cannot open anything without
+it, and it is what ties the card to the `invoice_link.*` audit events.
+
 ## 6. Async and integration behavior
 
 **Email.** A new `EMAIL_TEMPLATE_DEFAULTS` entry `participant_magic_link`,
 overridable through the existing `EmailTemplate` admin like
 `participant_invitation`. Context: `participant_name`, `zev_name`, `link_url`,
 `valid_minutes`.
+
+The API served it from the start, but the admin page rendered a hardcoded
+three-tab list, so it was editable by API only until #604 — a template nobody
+could reach through the UI, with nothing failing to say so.
+`tests/email-template-parity.test.ts` now reads `EMAIL_TEMPLATE_DEFAULTS` out of
+the backend source and asserts the UI covers every key.
+
+A template whose placeholders cannot be rendered falls back to the shipped
+**default**, not to the raw template (#603): this mail exists to carry one URL,
+and sending it raw delivers a body reading `{link_url}` — a sign-in email with
+no way to sign in.
 
 **QR rendering.** `qrcode==8.2` is already a dependency, distinct from
 `qrbill==1.2.0`. The Swiss QR-Rechnung payload is regulated and cannot carry a
@@ -387,9 +452,12 @@ paying the wrong thing is the only failure here that costs money.
 - Query: `useQuery({ queryKey: ['public-invoice', prefix, s], queryFn: fetchPublicInvoice })`
 - Renders: ZEV name, participant name, period, status, line items grouped by
   category in the invoice's own order, total, and a PDF download.
-- A "See all my statements" action, shown when `magic_link_available`, posting
-  to the request endpoint and then rendering "check your inbox" — the same panel
-  whether or not an address exists, matching the 202.
+- A **Send me a sign-in link** action posting to the request endpoint and then
+  rendering "check your inbox" — the same panel whether or not an address
+  exists, matching the 202. It is shown unconditionally: an earlier draft gated
+  it on a `magic_link_available` flag, but the endpoint answers 202 either way
+  by design, so a flag would have been a second, weaker answer to the question
+  the 202 refuses.
 - 404 renders a plain "This link is not valid" page with no detail and no retry
   affordance.
 
@@ -407,22 +475,29 @@ export interface PublicInvoiceItem {
   description: string
   quantity: string
   unit: string
-  unit_price: string
   total_chf: string
 }
 
 export interface PublicInvoice {
   invoice_number: string
   zev_name: string
+  /** The language the invoice was issued in — not a reader preference. */
+  language: string
   participant_name: string
   period_start: string
   period_end: string
   status: string
+  is_paid: boolean
   total_chf: string
   currency: string
+  energy_summary: {
+    local_kwh: string
+    grid_kwh: string
+    total_kwh: string
+    local_share_pct: string
+  } | null
   items: PublicInvoiceItem[]
-  pdf_url: string
-  magic_link_available: boolean
+  has_pdf: boolean
 }
 ```
 
@@ -554,15 +629,36 @@ Pure mapping only: the URL builder produces `/i/<prefix>?s=<secret>`, and the
 
 ### Acceptance criteria
 
-- [ ] A participant scans the QR on their invoice and sees that invoice, with no login
-- [ ] The same link shows nothing about any other invoice or participant
-- [ ] Regenerating the invoice PDF does not break a QR already in the post
-- [ ] Revoking a token breaks the printed link, and nothing else
-- [ ] "See all my statements" delivers a link to the address on file, and the
+- [x] A participant opens the link printed on their invoice and sees that
+      invoice, with no login
+- [x] The link shows nothing that is not printed on the document it came from
+- [x] Regenerating the invoice PDF does not break a QR already in the post
+- [x] Revoking a token breaks the printed link, and nothing else
+- [x] "Send me a sign-in link" delivers a link to the address on file, and the
       requester never names that address
-- [ ] A magic-link user reaches the participant portal without ever setting a password
-- [ ] A ZEV that has not opted in prints no QR and serves no public route
-- [ ] No migration opts an existing ZEV in
+- [x] A magic-link user reaches the participant portal without ever setting a password
+- [x] A ZEV that has not opted in prints no QR and serves no public route
+- [x] No migration opts an existing ZEV in
+- [x] An owner or admin can actually revoke a printed link, from the UI (#602)
+- [x] The sign-in mail is editable where operators look for it, and a bad edit
+      still delivers a working link (#603, #604)
+- [x] The public page renders in the language the invoice was issued in (#605)
+- [x] The user guide describes the setting, the QR and revocation (#606)
+- [ ] **Verified end to end against a running instance**: a phone camera opens
+      a printed QR, the page renders on that screen, the sign-in mail arrives,
+      and the link lands in the portal
+
+The second criterion originally read "shows nothing about any other invoice or
+**participant**". Increment 2 made that false: the energy-flow diagram names
+other producers, and §9 was rewritten to permit exactly that, on the grounds
+that the diagram is printed on the same sheet as the QR. The criterion now
+states the rule §9 actually enforces, so the two cannot be read against each
+other.
+
+The last criterion is deliberately unticked. Every step has tests and the parts
+have been exercised in isolation, but the chain has not been walked on real
+hardware — and the one time this code met a browser it crashed on a stale cache
+payload that no test had reason to construct.
 
 ## 13. Resolved in review
 
@@ -575,10 +671,12 @@ Pure mapping only: the URL builder produces `/i/<prefix>?s=<secret>`, and the
 
 ## 14. Open questions
 
-- **Should the operator *see* the view events?** They are recorded either way
-  (§8). Surfacing "this participant opened their bill" in the audit log is a
-  different question from recording it, and worth deciding before the log UI
-  gains a filter for it.
+- **Should the operator *see* the view events?** Partly answered: the invoice
+  detail page now shows `last_used_at` as "Last opened" on the access-link card
+  (#602), which covers "did they ever look at it?" — the question that actually
+  comes up before chasing a payment. Whether the audit log's UI should gain a
+  filter for `invoice_link.viewed` is still open, and is a different question
+  from recording them, which it already does.
 - **Does the savings callout belong on the public page?** `savings_data` is
   computed for the invoice already and is the most persuasive number a ZEV
   produces. It is also a claim rather than a measurement, and wants its own

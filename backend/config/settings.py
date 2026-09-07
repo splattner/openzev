@@ -49,6 +49,7 @@ INSTALLED_APPS = [
     "audit",
     "feasibility",
     "allocation",
+    "exports",
 ]
 
 MIDDLEWARE = [
@@ -252,4 +253,19 @@ CELERY_BEAT_SCHEDULE = {
         "task": "accounts.tasks.cleanup_expired_oauth_tokens",
         "schedule": 300.0,
     },
+    "cleanup-expired-export-jobs": {
+        "task": "exports.tasks.sweep_export_jobs",
+        "schedule": 3600.0,
+    },
 }
+
+# ── Async export jobs (ADR 0017) ────────────────────────────────────────────
+# Completed export artifacts (whole-ZEV annual-statement ZIPs) are kept for
+# this long after completion, then deleted by the periodic sweep
+# (exports.tasks.sweep_export_jobs). Job metadata rows are retained.
+EXPORT_RETENTION_HOURS = env.int("EXPORT_RETENTION_HOURS", default=24)
+
+# Soft time budget for one export job's render, in seconds (a hard limit
+# runs a grace above it). Rendering is serial per job, so this bounds how
+# long one job may occupy a worker before it is failed as stalled.
+EXPORT_RUNNER_TIMEOUT_S = env.int("EXPORT_RUNNER_TIMEOUT_S", default=1800)

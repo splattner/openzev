@@ -3,10 +3,17 @@ import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { PageSkeleton } from '../components/PageSkeleton'
 import { useTranslation } from 'react-i18next'
-import { fetchInvoice, fetchInvoicePdfBlob, generateInvoicePdf } from '../lib/api/invoices'
+import {
+    fetchInvoice,
+    fetchInvoicePdfBlob,
+    generateInvoicePdf,
+    revokeInvoiceAccessLink,
+} from '../lib/api/invoices'
 import { queryKeys } from '../lib/api/queryKeys'
 import { formatShortDate, useAppSettings } from '../lib/appSettings'
+import { useAuth } from '../lib/auth'
 import { PdfPreview } from '../components/PdfPreview'
+import { InvoiceAccessLinkCard } from '../features/invoices/InvoiceAccessLinkCard'
 
 /** Authenticated blob-fetch of the stored PDF artifact → object URL.
  * Fetches from the API endpoint (not /media/) so auth + 401-refresh works
@@ -55,6 +62,10 @@ export function InvoiceDetailPage() {
     const { t } = useTranslation()
     const { invoiceId } = useParams<{ invoiceId: string }>()
     const { settings } = useAppSettings()
+    const { user } = useAuth()
+    // Participants reach this page for their own invoices; revoking is a
+    // management control and must not be offered to the person holding the QR.
+    const canManageAccessLink = user?.role === 'admin' || user?.role === 'zev_owner'
 
     const invoiceQuery = useQuery({
         queryKey: queryKeys.invoices.detail(invoiceId as string),
@@ -123,6 +134,17 @@ export function InvoiceDetailPage() {
                     <div><strong>{t('pages.invoiceDetail.feedIn')}</strong><div>{inv.total_feed_in_kwh ?? '0'} kWh</div></div>
                 </div>
             </section>
+
+            {canManageAccessLink && inv.access_link != null && (
+                <InvoiceAccessLinkCard
+                    link={inv.access_link}
+                    onRevoke={async () => {
+                        if (!invoiceId) return
+                        await revokeInvoiceAccessLink(invoiceId)
+                        await invoiceQuery.refetch()
+                    }}
+                />
+            )}
 
             {/* The document itself: the stored PDF artifact, not an HTML facsimile
                 that would drift from the issued document. Line-item detail lives

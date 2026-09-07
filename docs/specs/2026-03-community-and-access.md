@@ -982,10 +982,22 @@ lists the test classes per module (test counts are the `test_*` methods).
 | `MeteringPointAssignmentValidationTests` | 9 | Unique assignment, no overlaps, historical OK, open-end blocks future, dates within participant window, self-update OK |
 | `AssignmentSaveOverlapGuardTests` | 5 | Overlap guard on save path |
 | `SeedDemoAssignmentReseedTests` | 1 | Demo seed re-creates assignments |
+| `SeedDemoSecondCommunityTests` | 5 | ZEV upsert is idempotent and refreshes config drift; legacy flagship name is renamed, not duplicated; other-owner legacy names untouched; each community carries the config its name implies; previous-month helper returns the complete prior month |
+| `SeedDemoSecondCommunitySeedTests` | 2 | Second community seeds a closed and an open month; re-seeding the second community is idempotent |
+| `SeedDemoQualityGapTests` | 2 | Deliberate quality gap deletes only the recent reading window; skipped when the period is too young |
+| `SeedDemoVatRateTests` | 5 | Swiss VAT history install; idempotent re-run; foreign rates untouched; admin-edited canonical row kept; overlapping custom dates preserved |
+| `SeedDemoCounterRefreshTests` | 2 | Re-seed resets the invoice counter; re-seed keeps the contract counter |
+| `SeedDemoHourlyHistoryTests` | 3 | History fills hourly up to the window; an hourly row sums the four quarter samples it replaces; skipped when the window precedes history |
+| `SeedDemoReadingResolutionTests` | 3 | Window is hourly until the fine 15-minute tail; last hourly row sums its quarter samples; short windows stay entirely 15-minute |
+| `SeedDemoInvoiceSettlementTests` | 2 | Closed run marks every invoice paid and the last cancelled; settlement survives a re-seed |
 | `MeteringPointReadingsDeletionTests` | 8 | Admin whole-meter and inclusive-range deletion; string/omitted false values stay bounded; invalid booleans and invalid/incomplete/reversed ranges return 400 without writes; non-admin denied |
 | `NextInvoiceNumberTests` | 3 | Invoice number allocation |
 | `SeedDemoPeriodHelpersTests` | 6 | Demo seed period helpers |
-| `SeedDemoTariffVersionTests` | 10 | Demo seed tariff versioning |
+| `SeedDemoTariffVersionTests` | 11 | Demo seed tariff versioning |
+| `SeedDemoLegacyNameCollisionTests` | 4 | Legacy row next to an already-migrated row dropped; duplicate legacy rows keep the newest; current-name upsert does not take over another owner's community; only the demo owner is affected |
+| `SeedDemoWindowShiftTests` | 1 | Shifted seed window leaves no readings outside it |
+| `SeedDemoAuditResetTests` | 1 | Audit reset clears demo trails but keeps events on other communities |
+| `SeedDemoEndToEndTests` | 1 | Seed runs end to end on a small fixed window and re-seeding is identical |
 
 **Other `zev/` test modules:**
 

@@ -55,6 +55,11 @@ metering points, and invoices point at participants — so the dialog greys out 
 section whose prerequisite is unticked and tells you what it needs. You cannot
 build an archive that could not be imported.
 
+**Participant invoice access does not travel.** An imported ZEV always arrives
+with **Participant QR code on the invoice** switched off, whatever the exporting
+instance had it set to. Importing an archive must never grant access to
+anything; if you want it on the new instance, turn it on there deliberately.
+
 Tariffs and invoices are deliberately **independent** of one another: an invoice
 records what was charged rather than pointing at a live tariff, so billing
 history can travel without the pricing structure and vice versa.

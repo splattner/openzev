@@ -67,6 +67,7 @@ Accessible via **Admin Dashboard**:
 - Track email delivery
 - Customize email templates
 - Configure ZEV settings (billing interval, VAT number, etc.)
+- Turn participant invoice access on or off, and revoke a printed access link
 
 **Restrictions:**
 - Cannot access other ZEVs (unless assigned to multiple)
@@ -113,6 +114,28 @@ A ZEV Owner is **scoped** to one or more ZEVs:
 - Household members with metering points
 - Small businesses with energy meters
 - Anyone with meter(s) in a ZEV community
+
+### Reaching a Participant Without an Account
+
+Participants do not have to hold an account to see their own bill. If the ZEV
+has [participant invoice access](02-zev-setup.md#participant-access-from-the-invoice)
+switched on, the QR code printed on an invoice opens **that one invoice** — no
+username, no password, no session.
+
+This is not a role. Whoever holds the printed invoice can open the page, and the
+page is limited to what that sheet of paper already shows: the total, whether it
+is paid, the line items, the consumption figures and the charts printed on the
+same insights page. It cannot reach another invoice, and it cannot change
+anything.
+
+From there, **Send me a sign-in link** emails a one-time link to the address on
+file, which does start a normal participant session with the ordinary
+participant scoping above. The requester never names the destination address —
+the invoice identifies who they are — so there is no way to use it to find out
+whether an address has an account.
+
+A ZEV owner or admin can revoke any printed link; see
+[Invoice Management → Participant access links](09-invoice-management.md#participant-access-links).
 
 ## Guest Role
 

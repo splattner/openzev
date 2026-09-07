@@ -18,6 +18,7 @@ from .serializers import (
     InvoiceListSerializer, InvoiceSerializer, GenerateInvoiceSerializer,
     GenerateZevInvoicesSerializer
 )
+from . import access_tokens
 from .engine import generate_invoice
 from .pdf import save_invoice_pdf
 from .tasks import (
@@ -404,6 +405,46 @@ class InvoiceViewSet(
             metadata={"recipient": recipient},
         )
         return Response({"detail": f"Email queued for {recipient}."})
+
+    @action(detail=True, methods=["post"], url_path="revoke-access",
+            permission_classes=[IsAuthenticated, IsZevOwnerOrAdmin])
+    def revoke_access(self, request, pk=None):
+        """Kill the access link printed on this invoice.
+
+        The printed token never expires — it is on a document that sits in a
+        folder for years — so this is the only way a leaked or mis-sent invoice
+        stops granting access. It is deliberately per-invoice: revoking one
+        link must not touch any other, which is the same property the token
+        itself is built around (``access_tokens`` module docstring).
+
+        The next PDF render mints a fresh token, so revoking does not lock the
+        participant out permanently; it invalidates the paper already out
+        there and nothing else.
+        """
+        invoice = self.get_object()
+        token = invoice.access_tokens.filter(revoked_at__isnull=True).first()
+        if token is None:
+            return Response(
+                {"error": "This invoice has no active access link."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        access_tokens.revoke(token)
+        _record_invoice_event(
+            request=request,
+            action_type="invoice_link.revoked",
+            summary=(
+                f"Revoked the printed access link for invoice "
+                f"{_invoice_target_display(invoice)}."
+            ),
+            invoice=invoice,
+            # The prefix identifies the row without being usable on its own —
+            # resolving still needs the secret. Recording it lets an operator
+            # tie this event to the `invoice_link.viewed` events that came
+            # before it.
+            metadata={"token_prefix": token.prefix},
+        )
+        return Response(self.get_serializer(invoice).data)
 
     def _perform_status_transition(self, request, *, action_type, workflow_fn, denied_verb, success_summary):
         """Shared body for the four status-transition actions below.

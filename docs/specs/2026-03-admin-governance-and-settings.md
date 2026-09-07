@@ -328,7 +328,7 @@ Template: `TEMPLATE_NAME = "invoices/invoice_pdf.html"` — editable by admins v
 - Includes: invoice, items grouped by category (`grouped_items`), zev, participant, owner_participant, QR-Rechnung SVG, `inline_qr_payment` flag, invoice-number prefix/suffix split, localized `status_display`, energy comparison chart SVG, hourly profile chart SVG, energy-flow Sankey SVG, energy summary KPIs, savings data, and the translation dict (`tr`)
 
 `generate_pdf(invoice)` renders HTML via `_render_template()`, which prefers a DB `PdfTemplate` override (rendered with `Template(content).render(Context(context))`) and falls back to `render_to_string()` for the on-disk default, then converts to PDF/A-3b via `render_pdf()` (`invoices/pdf_render.py`, shared with contract/annual-statement/financial-summary rendering).
-`save_invoice_pdf(invoice)` generates and attaches as `invoice_{number}.pdf`.
+`save_invoice_pdf(invoice)` generates and attaches as `invoice_{number}.pdf`, writing back only `pdf_file`/`updated_at` via a conditional row update (concurrent workflow changes survive; a concurrently deleted row raises instead of being recreated).
 
 ---
 

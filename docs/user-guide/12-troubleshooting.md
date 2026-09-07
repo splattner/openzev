@@ -33,7 +33,7 @@ docker compose logs
 
 ### Can't Access API
 
-**Problem:** http://localhost:8000 returns error or no connection.
+**Problem:** http://localhost:8001 returns error or no connection.
 
 **Checks:**
 1. Backend running? `docker compose ps`

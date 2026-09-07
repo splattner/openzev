@@ -68,6 +68,15 @@ function EmailTemplateEditor({
                         <span className="badge badge-info">{t('admin.customized')}</span>
                     )}
                 </div>
+                {/* The sign-in mail is the only template shipped in all four
+                    languages, and a saved override replaces it for every one of
+                    them — `EmailTemplate` holds one row per key. Customising it
+                    therefore opts out of translation, which is worth saying
+                    here rather than letting an admin discover it from a
+                    participant's confused reply. */}
+                {templateKey === 'participant_magic_link' && (
+                    <p className="muted">{t('admin.emailTemplates.magicLinkLanguageNote')}</p>
+                )}
                 {query.isLoading && <PageSkeleton variant="card" />}
                 {query.isError && <p className="error-banner">{t('common.error')}</p>}
                 {query.data && (
@@ -125,6 +134,7 @@ export function AdminEmailTemplatesPage() {
         { key: 'invoice_email', label: t('admin.emailTemplates.invoiceEmail'), fields: EMAIL_TEMPLATE_FIELDS.invoice_email },
         { key: 'participant_invitation', label: t('admin.emailTemplates.invitationEmail'), fields: EMAIL_TEMPLATE_FIELDS.participant_invitation },
         { key: 'email_verification', label: t('admin.emailTemplates.verificationEmail'), fields: EMAIL_TEMPLATE_FIELDS.email_verification },
+        { key: 'participant_magic_link', label: t('admin.emailTemplates.magicLinkEmail'), fields: EMAIL_TEMPLATE_FIELDS.participant_magic_link },
     ]
 
     return (

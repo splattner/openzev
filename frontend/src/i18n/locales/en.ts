@@ -312,6 +312,8 @@ export const en = {
             invoiceEmail: 'Invoice Email',
             invitationEmail: 'Invitation Email',
             verificationEmail: 'Verification Email',
+            magicLinkEmail: 'Sign-in Link Email',
+            magicLinkLanguageNote: 'Left as shipped, this email is sent in each ZEV\u2019s invoice language. Saving a custom text here replaces it for all four languages.',
             subject: 'Subject:',
             body: 'Body',
             variable: 'Variable',
@@ -329,6 +331,8 @@ export const en = {
                 username: 'Login username for the participant',
                 temporaryPassword: 'Temporary password for first login',
                 verifyUrl: 'Email verification link URL',
+                linkUrl: 'One-time sign-in link URL',
+                validMinutes: 'How many minutes the sign-in link stays valid',
             },
         },
     },
@@ -1772,6 +1776,18 @@ export const en = {
             local: 'Local',
             grid: 'Grid',
             feedIn: 'Feed-in',
+            accessLink: {
+                title: 'Participant access link',
+                description:
+                    'The QR code printed on this invoice opens it without an account. It does not expire, so revoking is the only way to stop a link that has gone astray.',
+                created: 'Printed since',
+                lastOpened: 'Last opened',
+                neverOpened: 'Never opened',
+                revoke: 'Revoke link',
+                revokeTitle: 'Revoke this access link?',
+                revokeWarning:
+                    'The QR code on the invoice already sent stops working for good. The next time you generate this PDF it gets a new code — but reprinted invoices will not match the ones already posted.',
+            },
         },
         dashboard: {
             openInvoicePdf: 'Open PDF for invoice {{number}}',
@@ -1868,6 +1884,11 @@ export const en = {
                 ownerDescription: 'Generate and download annual statements for all participants as a ZIP archive.',
                 download: 'Download Annual Statement',
                 downloadAll: 'Download All (ZIP)',
+                prepare: 'Prepare Annual Statements (ZIP)',
+                preparing: 'Preparing annual statements…',
+                prepareAgain: 'Prepare a New Export',
+                partialWarning: '{{omitted}} of {{total}} statements could not be generated and are listed in omitted.txt inside the archive.',
+                expired: 'This download link has expired. Prepare a new export to download current data.',
                 error: 'Failed to generate annual statement. Please try again.',
             },
             financialSummary: {
