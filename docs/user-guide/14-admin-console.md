@@ -143,20 +143,26 @@ Admins manage system-wide default email templates in **Admin Console → Email T
 
 ### Overview
 
-OpenZEV uses three email templates:
+OpenZEV uses four email templates:
 
 | Template | Purpose |
 | --- | --- |
 | **Invoice Email** | Sent to participants when invoices are delivered |
 | **Invitation Email** | Sent when a participant is invited to join a ZEV |
 | **Verification Email** | Sent for email address verification |
+| **Sign-in Link Email** | Sent when a participant asks for a sign-in link from the QR code on their invoice (see [Participant Access from the Invoice](02-zev-setup.md#participant-access-from-the-invoice)) |
+
+The **Sign-in Link Email** is the one template whose recipient never sees a copy
+of anything else you send — it exists only to carry `{link_url}`. If your edit
+uses a placeholder that does not exist, OpenZEV sends the shipped default
+instead, so the link always works even when the wording is not yours.
 
 Administrators can edit the default subject and body for each template. These defaults are used unless a ZEV owner has set a custom template for their ZEV.
 
 ### Accessing Email Templates
 
 1. Navigate to **Admin Console → Email Templates**
-2. The page displays three tabs — one per template type
+2. The page displays four tabs — one per template type
 
 ![Admin Email Templates](screenshots/14b-admin-email-templates.png)
 

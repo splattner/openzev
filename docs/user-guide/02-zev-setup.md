@@ -188,6 +188,25 @@ is still a draft) if you want it in the new shape.
 
 If no VAT rate is active for an invoice period, VAT defaults to **0%** in every mode.
 
+### Participant Access from the Invoice
+
+Off by default, and **no upgrade turns it on for you**.
+
+Tick **Participant QR code on the invoice** under **Manage (v)ZEV → Settings → General ZEV Settings** and every invoice you generate from then on carries a second QR code on its insights page. Scanning it opens that one invoice — the total, whether it is paid, the line items, the consumption figures and the same three charts the insights page prints — with no account and no password.
+
+The setting changes invoices **generated from now on**. Invoices already generated keep whatever they were printed with.
+
+What the QR deliberately cannot do: reach any other invoice, name any other participant beyond what the energy-flow diagram already prints on the same sheet, or change anything.
+
+Two things to know before turning it on:
+
+- **The link never expires.** It is printed on a document that sits in a folder for years, and a link that dies underneath it is a support ticket rather than a security control. Revoking is the control — see [Invoice Management → Participant access links](09-invoice-management.md#participant-access-links).
+- **Anyone holding the invoice can open it.** That is the design: the page shows nothing the printed page does not already show. But it does mean a photographed or mis-delivered invoice is readable by whoever has it, until you revoke the link.
+
+The QR sits on the insights page and never on a sheet carrying the QR-Rechnung, so the two codes cannot be confused; it is smaller and captioned "this is not a payment code" in all four languages. An invoice with no consumption gets no QR, because there would be nothing to show.
+
+From the page, **Send me a sign-in link** emails a one-time link to the address you have on file for that participant, which opens the ordinary participant portal. The requester never gets to say where it goes — the invoice identifies them — and nobody sets a password at any point.
+
 ### Email Templates
 
 **ZEV Owners** can customize invoice email templates in **ZEV Settings → Email Templates**:

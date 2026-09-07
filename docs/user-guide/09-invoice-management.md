@@ -117,6 +117,26 @@ PDF generation is a separate step from invoice creation.
 
 These buttons appear in the **PDF** column of the period overview table for any invoice that exists.
 
+## Participant Access Links
+
+Only relevant if you turned on **Participant QR code on the invoice** — see [ZEV Setup → Participant Access from the Invoice](02-zev-setup.md#participant-access-from-the-invoice). It is off by default.
+
+When it is on, every invoice you generate carries a QR code on its insights page that opens that one invoice without an account. The invoice detail page then shows a **Participant access link** card with:
+
+- **Printed since** — when the link was first minted, which is when the invoice first got a PDF.
+- **Last opened** — the last time somebody scanned it, or **Never opened**. Recorded at most once per hour, so it answers "has this been read at all?" rather than "how often". This is a useful thing to check before chasing a payment.
+- **Revoke link** — the only way to stop a printed link.
+
+### Revoking a link
+
+The link **never expires**, so revoking is the control. Revoke when an invoice was sent to the wrong address, or a participant tells you their copy went astray.
+
+Revoking is per invoice: it kills the QR on that invoice and touches nothing else, including the participant's other invoices.
+
+What it costs: the code on the copy already in the post stops working for good. The next time you generate that invoice's PDF it gets a fresh code, but a reprint will not match the sheet somebody is already holding. If the participant needs access again, send them the regenerated PDF.
+
+Revoking is recorded in the audit log, as is every first open of a link in a given hour.
+
 ## Sending Invoices by Email
 
 Once an invoice is approved, you can email it to the participant.
