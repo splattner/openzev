@@ -35,19 +35,32 @@ def send_magic_link_email(participant, zev, link) -> None:
         "valid_minutes": int(MAGIC_LINK_LIFETIME.total_seconds() // 60),
     }
 
-    def _render(template: str) -> str:
+    def _render(template: str, fallback: str) -> str:
+        """Fill ``template``, falling back to the shipped default on a bad edit.
+
+        An operator editing the template can mistype or invent a placeholder.
+        Sending the *raw* template would then deliver a mail whose body reads
+        ``{link_url}`` — a sign-in email with no way to sign in, which is worse
+        than one whose wording is not the operator's own. ``fallback`` is the
+        shipped default, whose placeholders are exactly this context, so it
+        always renders and always carries a working link.
+
+        Same policy as the invitation mail (``zev.services``); ``ValueError``
+        and ``IndexError`` cover malformed braces and positional fields, which
+        ``str.format`` raises instead of ``KeyError``.
+        """
         try:
             return template.format(**context)
-        except (KeyError, IndexError):
-            # An operator editing the template can remove or mistype a
-            # placeholder. A sign-in link that fails to send is worse than one
-            # whose wording is odd, so the raw template goes out instead.
-            logger.warning("Magic-link template has an unknown placeholder; sending raw.")
-            return template
+        except (KeyError, IndexError, ValueError):
+            logger.warning(
+                "Magic-link template has an unusable placeholder; "
+                "sending the default template instead."
+            )
+            return fallback.format(**context)
 
     EmailMessage(
-        subject=_render(subject_tpl),
-        body=_render(body_tpl),
+        subject=_render(subject_tpl, defaults["subject"]),
+        body=_render(body_tpl, defaults["body"]),
         from_email=settings.DEFAULT_FROM_EMAIL,
         to=[participant.email],
     ).send(fail_silently=False)

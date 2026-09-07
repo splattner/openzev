@@ -424,6 +424,84 @@ class MagicLinkTests(PublicInvoiceTestCase):
         self.assertFalse(self.participant.user.has_usable_password())
 
 
+class MagicLinkTemplateTests(PublicInvoiceTestCase):
+    """What the sign-in mail does when an operator's edit cannot be rendered.
+
+    The whole mail exists to carry one URL, so the failure that matters is not
+    odd wording — it is a body that reaches the participant with the literal
+    text ``{link_url}`` in it and no way to sign in.
+    """
+
+    REQUEST_URL = MagicLinkTests.REQUEST_URL
+
+    def setUp(self):
+        super().setUp()
+        self.participant.email = "anna@example.com"
+        self.participant.save()
+
+    def _request(self):
+        return self.client.post(
+            self.REQUEST_URL,
+            {"prefix": self.token.prefix, "s": self.secret},
+            format="json",
+        )
+
+    def _sent(self):
+        from django.core import mail
+
+        return mail.outbox[-1]
+
+    def _customise(self, *, subject="Sign in", body):
+        from .models import EmailTemplate
+
+        EmailTemplate.objects.create(
+            template_key="participant_magic_link", subject=subject, body=body,
+        )
+
+    def test_a_customised_template_is_used(self):
+        self._customise(subject="Ihr Link für {zev_name}", body="Hier: {link_url}")
+
+        self._request()
+
+        self.assertEqual(self._sent().subject, f"Ihr Link für {self.zev.name}")
+        self.assertIn("/signin/", self._sent().body)
+
+    def test_an_unknown_placeholder_still_sends_a_usable_link(self):
+        """The regression this class exists for: never a body reading `{link_url}`."""
+        self._customise(body="Hello {invoice_number}, sign in at {link_url}")
+
+        self._request()
+
+        body = self._sent().body
+        self.assertNotIn("{link_url}", body)
+        self.assertIn("/signin/", body)
+
+    def test_malformed_braces_fall_back_rather_than_raising(self):
+        """`str.format` raises ValueError here, not KeyError."""
+        self._customise(body="Sign in at {link_url} {")
+
+        self._request()
+
+        self.assertIn("/signin/", self._sent().body)
+
+    def test_a_positional_field_falls_back(self):
+        """`{0}` raises IndexError against a keyword-only context."""
+        self._customise(body="Sign in at {0}")
+
+        self._request()
+
+        self.assertIn("/signin/", self._sent().body)
+
+    def test_a_broken_subject_does_not_break_the_body(self):
+        """Each half falls back on its own; a bad subject must not cost the link."""
+        self._customise(subject="Re: {nope}", body="Sign in at {link_url}")
+
+        self._request()
+
+        self.assertIn("/signin/", self._sent().body)
+        self.assertTrue(self._sent().subject)
+
+
 class PublicInvoiceChartsTests(PublicInvoiceTestCase):
     """The three figures from the invoice's insights page (spec §9)."""
 
