@@ -1,5 +1,29 @@
 # Changelog
 
+## [1.11.0](https://github.com/splattner/openzev/compare/v1.10.3...v1.11.0) (2026-09-07)
+
+
+### Features
+
+* **admin:** edit the sign-in link email in the admin console ([#604](https://github.com/splattner/openzev/issues/604)) ([2e0c5ef](https://github.com/splattner/openzev/commit/2e0c5ef42b22a66b4096fcfd195f451e3202cde5))
+* **demo:** seed a full second community and populate the demo pages ([#600](https://github.com/splattner/openzev/issues/600)) ([878e8ba](https://github.com/splattner/openzev/commit/878e8ba053a0671cffc18820cb90a790d28b3052))
+* **invoices:** export annual statement ZIPs as async jobs ([#578](https://github.com/splattner/openzev/issues/578)) ([9c88fa0](https://github.com/splattner/openzev/commit/9c88fa08250bf59b6f2ac82ff1a30a92c4227230))
+* **invoices:** let owners revoke an invoice's printed access link ([#602](https://github.com/splattner/openzev/issues/602)) ([0e60ea3](https://github.com/splattner/openzev/commit/0e60ea3e167a0719d0a5a6d00a200f81d3593332))
+* **invoices:** opt-in setting and the passwordless sign-in link ([#595](https://github.com/splattner/openzev/issues/595)) ([82d83bb](https://github.com/splattner/openzev/commit/82d83bb5894c990cf4297920f6668dfa67068823))
+* **invoices:** print the access QR on the insights page ([#593](https://github.com/splattner/openzev/issues/593)) ([bd353a0](https://github.com/splattner/openzev/commit/bd353a06123ca51272f21de73cb9177ec6318d9c))
+* **invoices:** record whether an invoice's PDF is pending, ready or failed ([#611](https://github.com/splattner/openzev/issues/611)) ([87df19a](https://github.com/splattner/openzev/commit/87df19a5d911e915674e290173e8cbff6f4c6d91))
+* **invoices:** send the sign-in link email in the ZEV's invoice language ([#607](https://github.com/splattner/openzev/issues/607)) ([8144ac6](https://github.com/splattner/openzev/commit/8144ac6ddb0414f277d5a82d870210be8df08ebf))
+* **invoices:** serve one invoice from the link printed on it ([#591](https://github.com/splattner/openzev/issues/591)) ([1d705ef](https://github.com/splattner/openzev/commit/1d705efdc15d8eb40ac564b6f59d920515a87fdb))
+* **invoices:** show the invoice's charts on the public page ([#596](https://github.com/splattner/openzev/issues/596)) ([60d628d](https://github.com/splattner/openzev/commit/60d628d6f056647ac062369617a29d504736eaa3))
+* **invoices:** the page the invoice QR opens ([#594](https://github.com/splattner/openzev/issues/594)) ([59b9111](https://github.com/splattner/openzev/commit/59b911191fd43cdbfddcdaa1c290326cf27d486e))
+* **ui:** show invoice PDFs being generated instead of appearing silently ([#610](https://github.com/splattner/openzev/issues/610)) ([e3e183c](https://github.com/splattner/openzev/commit/e3e183c078eb654b3fe5c37e815e29fdf65d415a))
+
+
+### Bug Fixes
+
+* **invoices:** send the default magic-link mail when a custom one cannot render ([#603](https://github.com/splattner/openzev/issues/603)) ([2fd25bb](https://github.com/splattner/openzev/commit/2fd25bb3f602ef59d9cf2bf364fa7016efdfe967))
+* **ui:** render the public invoice page in the invoice's language ([#605](https://github.com/splattner/openzev/issues/605)) ([563d1a6](https://github.com/splattner/openzev/commit/563d1a6eceba7e9d6024004e64316c5ebc731461))
+
 ## [1.10.3](https://github.com/splattner/openzev/compare/v1.10.2...v1.10.3) (2026-09-06)
 
 
