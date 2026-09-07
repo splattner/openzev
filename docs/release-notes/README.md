@@ -8,6 +8,9 @@ of those changes matter to someone running a ZEV, and its titles are written
 for the person who made the change. These files are the part that has to be
 written by hand.
 
+- **Minor and major releases only.** Patch releases carry bug fixes and small
+  changes with no feature impact, which release-please's generated list already
+  covers; the missing patch versions here are deliberate, not an oversight.
 - One file per release, `<version>.md`, holding the prose only.
 - Drafted and reviewed here, then prepended to the `v<version>` GitHub release
   body when the release is cut. `CHANGELOG.md` stays purely release-please's

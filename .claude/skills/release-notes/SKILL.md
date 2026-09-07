@@ -15,6 +15,20 @@ list demoted under `## Full change list`. `CHANGELOG.md` stays purely
 release-please's output — nothing hand-written goes there, because every merge
 to `main` regenerates it.
 
+## Which releases get notes
+
+**Minor and major releases only.** A patch release carries bug fixes and small
+changes with no feature impact, and release-please's generated list already
+describes those adequately — a hand-written page saying the same thing in
+longer words is worse than none. `docs/release-notes/` therefore has gaps where
+patch versions were cut, and those gaps are correct: do not offer to backfill
+them.
+
+The exception is a patch that ships something an operator has to *act* on — a
+fix to wrong figures on a document already sent, a changed default, a manual
+migration step. That is rare, and it is a judgment call to raise once, not a
+reason to write notes for every patch.
+
 ## Three modes
 
 Read the argument. With no argument, work out which applies from the state on
