@@ -3,6 +3,14 @@ name: PR Quality
 on:
     pull_request:
         branches: [main]
+        paths-ignore:
+            # Prose only: nothing here is read by a test, embedded in an image,
+            # or loaded at runtime. A PR touching these *and* code still runs
+            # everything — paths-ignore skips only when every changed file
+            # matches.
+            - "docs/**"
+            - "**/*.md"
+            - ".claude/**"
 
 permissions:
     contents: read
