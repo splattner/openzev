@@ -849,7 +849,7 @@
                         </tr>
                         {% if invoice.vat_rate > 0 %}
                         <tr>
-                            <td>{{ tr.vat }} ({{ invoice.vat_rate|floatformat:1 }}%)</td>
+                            <td>{{ tr.vat }} ({{ vat_rate_percent|floatformat:1 }}%)</td>
                             <td class="numeric">CHF {{ invoice.vat_chf|floatformat:2 }}</td>
                         </tr>
                         {% endif %}

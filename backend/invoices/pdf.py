@@ -7,6 +7,7 @@ import io
 import logging
 from dataclasses import dataclass
 from datetime import date
+from decimal import Decimal
 from uuid import UUID
 
 from accounts.models import AppSettings
@@ -312,8 +313,13 @@ def _build_template_context(
         + _CLOSING_MM + _PAYMENT_MM
     )
 
+    # invoice.vat_rate is stored as a fraction (e.g. 0.0810); the template
+    # needs percent form (8.1) for the "MwSt. (8.1%)" label.
+    vat_rate_percent = Decimal(invoice.vat_rate or 0) * 100
+
     return {
         "invoice": invoice,
+        "vat_rate_percent": vat_rate_percent,
         "invoice_number_prefix": invoice_number_prefix,
         "invoice_number_suffix": invoice_number_suffix,
         "grouped_items": grouped_items,

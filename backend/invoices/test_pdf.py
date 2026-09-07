@@ -820,6 +820,77 @@ class InvoicePdfQrTests(TestCase):
         self.assertEqual(context["formatted_dates"]["due_date"], "")
 
 
+class InvoicePdfVatLabelTests(TestCase):
+    """The VAT label must show percent form, not the stored fraction.
+
+    Regression test: ``Invoice.vat_rate`` is stored as a fraction (0.0810),
+    and the template used to render it directly, producing "MwSt. (0.1%)"
+    instead of "MwSt. (8.1%)". The amounts were always correct — only the
+    label was wrong.
+    """
+
+    def setUp(self):
+        self.owner = User.objects.create_user(
+            username="vat_label_owner", password="pass1234", role=UserRole.ZEV_OWNER,
+        )
+        self.zev = Zev.objects.create(
+            name="VAT Label ZEV", owner=self.owner, zev_type="vzev",
+            start_date=date(2026, 1, 1), billing_interval="monthly",
+            invoice_prefix="V", bank_iban="CH9300762011623852957",
+            invoice_language="de",
+        )
+        self.participant = Participant.objects.create(
+            zev=self.zev, first_name="Alice", last_name="Muster",
+            email="alice@example.com", address_line1="Musterweg 3",
+            postal_code="3000", city="Bern", valid_from=date(2026, 1, 1),
+        )
+
+    def _invoice(self, **kwargs):
+        defaults = dict(
+            invoice_number="V-00001", zev=self.zev, participant=self.participant,
+            period_start=date(2026, 1, 1), period_end=date(2026, 1, 31),
+            subtotal_chf=Decimal("120.00"), vat_rate=Decimal("0.0810"),
+            vat_chf=Decimal("9.72"), total_chf=Decimal("129.72"),
+        )
+        defaults.update(kwargs)
+        return Invoice.objects.create(**defaults)
+
+    def test_context_exposes_vat_rate_percent(self):
+        context = _build_template_context(self._invoice())
+
+        self.assertEqual(context["vat_rate_percent"], Decimal("8.1000"))
+
+    def test_vat_row_shows_percent_not_fraction(self):
+        invoice = self._invoice()
+
+        for rate, expected_label in (
+            ("0.0260", "2.6%"),
+            ("0.0380", "3.8%"),
+            ("0.0810", "8.1%"),
+        ):
+            with self.subTest(rate=rate):
+                invoice.vat_rate = Decimal(rate)
+                markup = _render_invoice_markup(invoice)
+                self.assertIn(expected_label, markup)
+                self.assertNotIn(f"{Decimal(rate):.1f}%", markup)
+
+    def test_no_vat_row_when_rate_is_zero(self):
+        invoice = self._invoice(vat_rate=Decimal("0"), vat_chf=Decimal("0.00"))
+        markup = _render_invoice_markup(invoice)
+
+        self.assertNotIn(f"<td>{INVOICE_TRANSLATIONS['de']['vat']} (", markup)
+
+    def test_sample_context_renders_vat_row(self):
+        """The admin preview (sample context through the default template)
+        must render the VAT row with the percent label — the sample rate is
+        numeric so the template's {% if %} gate actually passes."""
+        from .pdf import TEMPLATE_NAME
+
+        html = _render_template(TEMPLATE_NAME, build_sample_invoice_context())
+
+        self.assertIn("8.1%", html)
+
+
 class InvoicePdfRenderingTests(TestCase):
     """Integration tests that render actual PDFs and verify page counts."""
 
@@ -926,7 +997,7 @@ class InvoicePdfRenderingTests(TestCase):
             total_local_kwh=Decimal("120.00"),
             total_grid_kwh=Decimal("150.00"),
             subtotal_chf=Decimal("120.00"),
-            vat_rate=Decimal("8.1000"),
+            vat_rate=Decimal("0.0810"),
             vat_chf=Decimal("9.72"),
             total_chf=Decimal("129.72"),
         )

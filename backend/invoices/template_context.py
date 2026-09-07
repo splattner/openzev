@@ -7,6 +7,8 @@ preview endpoints in views.py. They have no side effects and no Django
 request dependency, so they live here rather than in views.py.
 """
 
+from decimal import Decimal
+
 from .annual_statement import ANNUAL_TRANSLATIONS, _build_monthly_chart_svg
 from .contract_translations import CONTRACT_TRANSLATIONS
 from .pdf_translations import INVOICE_TRANSLATIONS
@@ -38,12 +40,16 @@ def build_sample_invoice_context() -> dict:
             invoice_number="INV-2026-001",
             _status_display="Draft",
             subtotal_chf="450.00",
-            vat_rate="8.1",
+            # Numeric (not a string): the template gates the VAT row on
+            # {% if invoice.vat_rate > 0 %}, which has no string coercion,
+            # so a string here would hide the row (or raise) in previews.
+            vat_rate=Decimal("0.0810"),
             vat_chf="36.45",
             total_chf="486.45",
             notes="Sample invoice for template preview.",
             zev=_Obj(invoice_language="en"),
         ),
+        "vat_rate_percent": Decimal("8.1"),
         "grouped_items": [
             {
                 "key": "energy",
