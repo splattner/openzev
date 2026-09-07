@@ -846,6 +846,8 @@ export const en = {
             pdfReady: 'Ready',
             pdfMissing: 'Missing',
             pdfGenerating: 'Generating\u2026',
+            pdfFailed: 'Failed',
+            pdfFailedHint: 'The last attempt to render this document failed. Use Regenerate PDF to try again.',
             pdfsGenerating_one: 'Generating 1 PDF\u2026',
             pdfsGenerating_other: 'Generating {{n}} PDFs\u2026',
             failedEmails: '({{n}} failed)',

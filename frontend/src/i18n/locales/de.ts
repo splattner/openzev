@@ -837,6 +837,8 @@ export const de = {
             pdfReady: 'Bereit',
             pdfMissing: 'Fehlt',
             pdfGenerating: 'Wird erstellt…',
+            pdfFailed: 'Fehlgeschlagen',
+            pdfFailedHint: 'Der letzte Versuch, dieses Dokument zu erstellen, ist fehlgeschlagen. Mit «PDF neu erstellen» erneut versuchen.',
             pdfsGenerating_one: '1 PDF wird erstellt…',
             pdfsGenerating_other: '{{n}} PDFs werden erstellt…',
             failedEmails: '({{n}} fehlgeschlagen)',

@@ -290,6 +290,22 @@ class RoundTripTests(TestCase):
             MeterReading.objects.filter(metering_point__zev=imported).count(), 3
         )
 
+    def test_an_imported_invoice_reports_no_document(self):
+        """The PDF does not travel, so its status must not either.
+
+        An imported invoice claiming "ready" would point the UI at a file the
+        archive never carried, and would keep the row out of the regeneration
+        the new instance actually needs.
+        """
+        from invoices.models import InvoicePdfStatus
+
+        result = self._import()
+        imported = Zev.objects.get(pk=result["zev_id"])
+
+        for invoice in imported.invoices.all():
+            self.assertEqual(invoice.pdf_status, InvoicePdfStatus.NONE)
+            self.assertFalse(invoice.pdf_file)
+
     def test_assignments_follow_the_right_participant_not_the_matching_surname(self):
         result = self._import()
         imported = Zev.objects.get(pk=result["zev_id"])
@@ -806,7 +822,10 @@ class SchemaParityTests(TestCase):
         "ASSIGNMENT_FIELDS": {"id", "metering_point", "participant", "created_at", "updated_at"},
         "TARIFF_FIELDS": {"id", "zev", "created_at", "updated_at"},
         "TARIFF_PERIOD_FIELDS": {"id", "tariff"},
-        "INVOICE_FIELDS": {"id", "zev", "participant", "pdf_file", "created_at", "updated_at"},
+        # ``pdf_status`` rides with ``pdf_file``: the document does not travel, so
+        # an imported invoice has none, and carrying the exporter's "ready"
+        # would describe a file that is not in the archive.
+        "INVOICE_FIELDS": {"id", "zev", "participant", "pdf_file", "pdf_status", "created_at", "updated_at"},
         "INVOICE_ITEM_FIELDS": {"id", "invoice"},
     }
 

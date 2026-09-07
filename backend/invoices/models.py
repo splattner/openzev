@@ -15,6 +15,22 @@ class InvoiceStatus(models.TextChoices):
     CANCELLED = "cancelled", "Cancelled"
 
 
+class InvoicePdfStatus(models.TextChoices):
+    """Where the invoice's document is, as distinct from the invoice's own status.
+
+    Rendering happens off the request, so ``pdf_file`` being empty answers
+    "is there a document" but not "is one coming". Without that second answer a
+    queued render and a failed one look identical, and the UI can only offer a
+    timeout. Shaped after ``EmailLog.Status``, which solved the same problem for
+    the other artifact an invoice produces asynchronously.
+    """
+
+    NONE = "none", "Not generated"
+    PENDING = "pending", "Generating"
+    READY = "ready", "Ready"
+    FAILED = "failed", "Failed"
+
+
 class Invoice(models.Model):
     """A billing document for one participant for one period."""
 
@@ -44,6 +60,13 @@ class Invoice(models.Model):
     total_chf = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     # Document
     pdf_file = models.FileField(upload_to="invoices/pdf/", blank=True, null=True)
+    # Set to READY inside the same conditional UPDATE that stores the file, so
+    # the status can never claim a document the row does not have.
+    pdf_status = models.CharField(
+        max_length=20,
+        choices=InvoicePdfStatus.choices,
+        default=InvoicePdfStatus.NONE,
+    )
     sent_at = models.DateTimeField(null=True, blank=True)
     due_date = models.DateField(null=True, blank=True)
     notes = models.TextField(blank=True)

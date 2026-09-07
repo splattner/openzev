@@ -837,6 +837,8 @@ export const fr = {
             pdfReady: 'Prêt',
             pdfMissing: 'Manquant',
             pdfGenerating: 'Génération…',
+            pdfFailed: 'Échec',
+            pdfFailedHint: 'La dernière tentative de génération de ce document a échoué. Utilisez « Régénérer le PDF » pour réessayer.',
             pdfsGenerating_one: 'Génération d’un PDF…',
             pdfsGenerating_other: 'Génération de {{n}} PDF…',
             failedEmails: '({{n}} échoué(s))',

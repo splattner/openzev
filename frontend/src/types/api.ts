@@ -494,6 +494,8 @@ export interface GridOperatorList {
     operators: GridOperator[]
 }
 
+export type InvoicePdfStatus = 'none' | 'pending' | 'ready' | 'failed'
+
 export interface Invoice {
     id: string
     invoice_number: string
@@ -513,6 +515,13 @@ export interface Invoice {
     total_feed_in_kwh?: string
     status: string
     pdf_url?: string | null
+    /**
+     * Where the document is, as distinct from the invoice's own `status`.
+     *
+     * `pdf_url` says whether one exists; this says whether one is coming. A
+     * queued render and a failed one both leave `pdf_url` null.
+     */
+    pdf_status?: InvoicePdfStatus
     items?: InvoiceItem[]
     email_logs?: EmailLog[]
     /** Detail reads only; never carries the secret (see InvoiceAccessLink). */

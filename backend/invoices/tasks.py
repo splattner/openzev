@@ -163,7 +163,20 @@ def _render_pdfs(invoices) -> int:
     """
     from django.db.models import prefetch_related_objects
 
+    from .models import Invoice, InvoicePdfStatus
     from .pdf import build_invoice_pdf_period_context, save_invoice_pdf
+
+    def mark_failed(invoice) -> None:
+        """Record that this invoice has no document and none is coming.
+
+        Keyed on the primary key rather than saved from the instance, which is
+        stale by now, and swallowed on error: a status write must not turn one
+        participant's failure into the batch's.
+        """
+        try:
+            Invoice.objects.filter(pk=invoice.pk).update(pdf_status=InvoicePdfStatus.FAILED)
+        except Exception:
+            logger.exception("Could not record PDF failure for invoice %s", invoice.pk)
 
     invoices = list(invoices)
     prefetch_related_objects(invoices, "items")
@@ -174,6 +187,7 @@ def _render_pdfs(invoices) -> int:
         key = (invoice.zev_id, invoice.period_start, invoice.period_end)
         if key in failed_periods:
             failed += 1
+            mark_failed(invoice)
             continue
 
         if key not in period_contexts:
@@ -184,6 +198,7 @@ def _render_pdfs(invoices) -> int:
             except Exception:
                 failed += 1
                 failed_periods.add(key)
+                mark_failed(invoice)
                 logger.exception(
                     "PDF period context generation failed for ZEV %s, %s to %s",
                     invoice.zev_id,
@@ -198,6 +213,7 @@ def _render_pdfs(invoices) -> int:
             raise
         except Exception as exc:
             failed += 1
+            mark_failed(invoice)
             logger.error("PDF generation failed for invoice %s: %s", invoice.invoice_number, exc)
     return failed
 
@@ -275,6 +291,7 @@ def generate_zev_invoices_task(self, zev_id: str, period_start: str, period_end:
 
     from zev.models import Zev
     from .engine import generate_invoices_for_zev
+    from .models import Invoice, InvoicePdfStatus
 
     try:
         zev = Zev.objects.get(pk=zev_id)
@@ -315,6 +332,14 @@ def generate_zev_invoices_task(self, zev_id: str, period_start: str, period_end:
     # Invoices are committed before their PDFs render, so a rendering abort
     # leaves usable draft rows behind; any invoice missing a PDF can still
     # get one later (generate-pdf, the email task, the bulk re-render).
+    #
+    # Marked pending before the batch starts: they were created a moment ago
+    # with no document, and the operator watching the period must be able to
+    # tell "about to be rendered" from "nobody ever asked".
+    if invoices:
+        Invoice.objects.filter(pk__in=[inv.pk for inv in invoices]).update(
+            pdf_status=InvoicePdfStatus.PENDING,
+        )
     try:
         pdf_failed = _render_pdfs(invoices)
     except BaseException as exc:

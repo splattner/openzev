@@ -13,7 +13,7 @@ from accounts.permissions import IsZevOwnerOrAdmin
 from allocation.errors import AllocationError
 from zev.models import Zev, Participant
 from zev.scoping import ZevScopedQuerySetMixin
-from .models import Invoice, InvoiceStatus, EmailLog
+from .models import Invoice, InvoicePdfStatus, InvoiceStatus, EmailLog
 from .serializers import (
     InvoiceListSerializer, InvoiceSerializer, GenerateInvoiceSerializer,
     GenerateZevInvoicesSerializer
@@ -236,6 +236,7 @@ class InvoiceViewSet(
         # lazily if it is still missing, and there is a per-invoice regenerate
         # action — so the failure is recorded and the response stands.
         try:
+            Invoice.objects.filter(pk=invoice.pk).update(pdf_status=InvoicePdfStatus.PENDING)
             generate_invoice_pdf_task.delay(str(invoice.pk))
         except Exception as exc:
             logger.error("Could not queue PDF generation for invoice %s: %s", invoice.invoice_number, exc)
@@ -247,6 +248,7 @@ class InvoiceViewSet(
                 invoice=invoice,
                 metadata={"error": str(exc)},
             )
+            Invoice.objects.filter(pk=invoice.pk).update(pdf_status=InvoicePdfStatus.FAILED)
         _record_invoice_event(
             request=request,
             action_type="invoice.generate",
@@ -369,9 +371,31 @@ class InvoiceViewSet(
     @action(detail=True, methods=["post"], url_path="generate-pdf",
             permission_classes=[IsAuthenticated, IsZevOwnerOrAdmin])
     def generate_pdf(self, request, pk=None):
-        """Generate / regenerate the PDF for an invoice."""
+        """Generate / regenerate the PDF for an invoice.
+
+        Renders inline rather than queueing, so it settles ``pdf_status``
+        itself: ``save_invoice_pdf`` writes READY with the file, and a failure
+        is recorded as FAILED here rather than left reading whatever the
+        previous attempt did.
+        """
         invoice = self.get_object()
-        save_invoice_pdf(invoice)
+        try:
+            save_invoice_pdf(invoice)
+        except Exception as exc:
+            logger.exception("PDF generation failed for invoice %s", invoice.invoice_number)
+            Invoice.objects.filter(pk=invoice.pk).update(pdf_status=InvoicePdfStatus.FAILED)
+            _record_invoice_event(
+                request=request,
+                action_type="invoice.generate_pdf",
+                summary=f"PDF generation failed for invoice {_invoice_target_display(invoice)}.",
+                status=AuditEventStatus.FAILED,
+                invoice=invoice,
+                metadata={"error": str(exc)},
+            )
+            return Response(
+                {"error": "Could not generate the PDF."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
         _record_invoice_event(
             request=request,
             action_type="invoice.generate_pdf",
@@ -645,6 +669,11 @@ class InvoiceViewSet(
             return error
 
         invoice_count = invoices.count()
+        # Marked before the task is queued: the worker may start rendering the
+        # moment it is, and it must not find rows it is about to overwrite.
+        Invoice.objects.filter(pk__in=invoices.values("pk")).update(
+            pdf_status=InvoicePdfStatus.PENDING,
+        )
         generate_zev_pdfs_task.delay(
             str(_zev.id),
             str(request.data["period_start"]),

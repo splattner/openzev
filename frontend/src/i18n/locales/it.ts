@@ -837,6 +837,8 @@ export const it = {
             pdfReady: 'Pronto',
             pdfMissing: 'Mancante',
             pdfGenerating: 'In creazione…',
+            pdfFailed: 'Non riuscito',
+            pdfFailedHint: 'L’ultimo tentativo di creare questo documento non è riuscito. Usare «Rigenera PDF» per riprovare.',
             pdfsGenerating_one: 'Creazione di 1 PDF…',
             pdfsGenerating_other: 'Creazione di {{n}} PDF…',
             failedEmails: '({{n}} non riuscito/i)',

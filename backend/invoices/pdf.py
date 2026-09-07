@@ -455,7 +455,7 @@ def save_invoice_pdf(
 ) -> None:
     """Generate PDF and attach it to the Invoice model.
 
-    Only ``pdf_file`` (and ``updated_at``) are written back, via a
+    Only ``pdf_file``, ``pdf_status`` and ``updated_at`` are written back, via a
     conditional ``UPDATE`` on the primary key. Rendering takes long enough
     that the passed ``invoice`` may be stale: saving the whole instance
     would overwrite a concurrent workflow change (e.g. revert an approval)
@@ -465,7 +465,7 @@ def save_invoice_pdf(
     """
     from django.utils import timezone
 
-    from .models import Invoice
+    from .models import Invoice, InvoicePdfStatus
 
     pdf_bytes = generate_pdf(invoice, period_context=period_context)
     filename = f"invoice_{invoice.invoice_number}.pdf"
@@ -474,7 +474,10 @@ def save_invoice_pdf(
     stored_name = invoice.pdf_file.name
     try:
         updated = Invoice.objects.filter(pk=invoice.pk).update(
-            pdf_file=stored_name, updated_at=timezone.now(),
+            pdf_file=stored_name,
+            # Same UPDATE as the file, so the status cannot outrun it.
+            pdf_status=InvoicePdfStatus.READY,
+            updated_at=timezone.now(),
         )
     except Exception:
         logger.exception(

@@ -122,11 +122,14 @@ export function InvoicesPage() {
         onPdfQueued: startPdfWatch,
     })
 
-    /** Whether this row's document is being produced right now. */
+    /** Whether this row's document is being produced right now.
+     *
+     * The local mutation matters as well as the stored status: the per-invoice
+     * regenerate renders inline, so the row is busy before any write lands. */
     const isPdfPending = (row: typeof rows[number]) => {
         if (!row.invoice) return false
         if (pdfGeneratingInvoiceId === row.invoice.id) return true
-        return isWaitingForPdfs && !row.invoice.pdf_url
+        return row.invoice.pdf_status === 'pending'
     }
 
     const isOwnerOrAdmin = user?.role === 'admin' || user?.role === 'zev_owner'

@@ -138,6 +138,13 @@ export function InvoicePeriodRowsTable({
                         <FontAwesomeIcon icon={faSpinner} spin fixedWidth />
                         {t('pages.invoices.pdfGenerating')}
                       </span>
+                    ) : invoice.pdf_status === 'failed' && !invoice.pdf_url ? (
+                      // Distinct from "Missing": nobody has to wonder whether
+                      // this one was ever asked for. Regenerate is the retry,
+                      // and it is already in the row's action menu.
+                      <span className="badge badge-danger" title={t('pages.invoices.pdfFailedHint')}>
+                        {t('pages.invoices.pdfFailed')}
+                      </span>
                     ) : invoice.pdf_url ? (
                       <div className="invoice-cell-stack">
                         <button type="button" onClick={() => { if (invoice) openInvoicePdf(invoice.id) }} className="table-inline-link">

@@ -162,6 +162,9 @@ TARIFF_PERIOD_FIELDS = (
     "label",
 )
 
+# The rendered document stays behind: ``pdf_file`` is not in the archive, so
+# neither is ``pdf_status``. An imported invoice reports "not generated"
+# and gets a document when one is next rendered on the new instance.
 INVOICE_FIELDS = (
     "invoice_number",
     "period_start",

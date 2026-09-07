@@ -52,6 +52,9 @@ class InvoiceListSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
             "pdf_file",
+            # Written only by the render pipeline (save_invoice_pdf and the
+            # tasks around it), never by client input.
+            "pdf_status",
             # Managed by workflow actions / billing engine, never by client input:
             "status",
             "total_local_kwh",

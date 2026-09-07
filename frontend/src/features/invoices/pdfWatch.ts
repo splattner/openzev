@@ -7,15 +7,15 @@ import type { InvoicePeriodParticipantRow } from '../../types/api'
  *
  * Creating an invoice queues its PDF (`generate_invoice_pdf_task`), and
  * "Regenerate all PDFs" queues a whole period, so the invoice row appears
- * before its document does. Nothing on the invoice records that a render is in
- * flight, so this is a client-side deadline rather than a status read: after an
- * action that queues one, poll the period overview while any invoice in it is
- * still missing a PDF.
+ * before its document does. `Invoice.pdf_status` records that, so the poll is
+ * a status read: after an action that queues work, re-read the period overview
+ * while any invoice in it is still `pending`.
  *
- * The watch gives up rather than polling forever. A render that failed leaves
- * `pdf_url` permanently null, which is indistinguishable from one still
- * running — the invoice carries no field that would tell them apart. Until it
- * does, "still pending after 90 seconds" is the only honest stopping rule.
+ * `pdf_status` gives the watch a terminal state to stop on: a failed render
+ * settles to `failed` and stops being counted, so the common failure ends the
+ * watch immediately instead of running it to the deadline. The deadline
+ * remains as the backstop for the case no status can cover — a worker killed
+ * mid-render leaves the row `pending` with nothing left to settle it.
  */
 
 /** How long to keep watching after an action queued PDF work. */
@@ -29,9 +29,15 @@ export const PDF_POLL_MS = 2_500
 
 export type PdfWatch = { startedAt: number; until: number } | null
 
-/** Invoices in this period that exist but have no PDF yet. */
+/**
+ * Invoices in this period whose document is still being rendered.
+ *
+ * Reads `pdf_status` rather than inferring from a missing `pdf_url`: a failed
+ * render also leaves `pdf_url` null, and counting those would hold the watch
+ * open until its deadline on every poll for the rest of the period's life.
+ */
 export function countPendingPdfs(rows: InvoicePeriodParticipantRow[]): number {
-    return rows.filter((row) => row.invoice && !row.invoice.pdf_url).length
+    return rows.filter((row) => row.invoice?.pdf_status === 'pending').length
 }
 
 export function usePdfWatch() {
