@@ -1761,6 +1761,18 @@ export const de = {
             local: 'Intern',
             grid: 'Netz',
             feedIn: 'Einspeisung',
+            accessLink: {
+                title: 'Zugangslink für Teilnehmende',
+                description:
+                    'Der QR-Code auf dieser Rechnung öffnet sie ohne Konto. Er läuft nicht ab — ein Link, der in falsche Hände geraten ist, lässt sich nur durch Widerrufen stoppen.',
+                created: 'Gedruckt seit',
+                lastOpened: 'Zuletzt geöffnet',
+                neverOpened: 'Nie geöffnet',
+                revoke: 'Link widerrufen',
+                revokeTitle: 'Diesen Zugangslink widerrufen?',
+                revokeWarning:
+                    'Der QR-Code auf der bereits versandten Rechnung funktioniert endgültig nicht mehr. Beim nächsten Erstellen dieses PDFs entsteht ein neuer Code — nachgedruckte Rechnungen stimmen dann nicht mehr mit den bereits verschickten überein.',
+            },
         },
         dashboard: {
             openInvoicePdf: 'PDF für Rechnung {{number}} öffnen',

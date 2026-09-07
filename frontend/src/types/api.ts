@@ -515,6 +515,21 @@ export interface Invoice {
     pdf_url?: string | null
     items?: InvoiceItem[]
     email_logs?: EmailLog[]
+    /** Detail reads only; never carries the secret (see InvoiceAccessLink). */
+    access_link?: InvoiceAccessLink | null
+}
+
+/**
+ * State of the QR link printed on one invoice.
+ *
+ * The `prefix` identifies the token but cannot open anything on its own — the
+ * secret stays on the printed document — so this is safe to render.
+ */
+export interface InvoiceAccessLink {
+    prefix: string
+    created_at: string
+    /** Stamped at most hourly, so it answers "opened at all?", not "how often". */
+    last_used_at: string | null
 }
 
 export interface InvoicePeriodParticipantRow {

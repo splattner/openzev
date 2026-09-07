@@ -90,6 +90,27 @@ class InvoiceSerializer(InvoiceListSerializer):
 
     items = InvoiceItemSerializer(many=True, read_only=True)
     email_logs = EmailLogSerializer(many=True, read_only=True)
+    access_link = serializers.SerializerMethodField()
+
+    def get_access_link(self, obj) -> dict | None:
+        """State of the access link printed on this invoice, or ``None``.
+
+        **Never the secret.** The prefix identifies the row but cannot open
+        anything on its own — resolving compares the secret as well — so it is
+        safe to show, and it is what ties this to the ``invoice_link.*`` audit
+        events. Whoever needs the working link reads it off the printed QR.
+
+        ``last_used_at`` is stamped at most hourly (``access_tokens.note_use``),
+        so it answers "has this been opened at all?" rather than "how often".
+        """
+        token = obj.access_tokens.filter(revoked_at__isnull=True).first()
+        if token is None:
+            return None
+        return {
+            "prefix": token.prefix,
+            "created_at": token.created_at,
+            "last_used_at": token.last_used_at,
+        }
 
 
 class GenerateInvoiceSerializer(serializers.Serializer):

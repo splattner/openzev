@@ -1772,6 +1772,18 @@ export const en = {
             local: 'Local',
             grid: 'Grid',
             feedIn: 'Feed-in',
+            accessLink: {
+                title: 'Participant access link',
+                description:
+                    'The QR code printed on this invoice opens it without an account. It does not expire, so revoking is the only way to stop a link that has gone astray.',
+                created: 'Printed since',
+                lastOpened: 'Last opened',
+                neverOpened: 'Never opened',
+                revoke: 'Revoke link',
+                revokeTitle: 'Revoke this access link?',
+                revokeWarning:
+                    'The QR code on the invoice already sent stops working for good. The next time you generate this PDF it gets a new code — but reprinted invoices will not match the ones already posted.',
+            },
         },
         dashboard: {
             openInvoicePdf: 'Open PDF for invoice {{number}}',

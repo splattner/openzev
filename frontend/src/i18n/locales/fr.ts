@@ -1761,6 +1761,18 @@ export const fr = {
             local: 'Local',
             grid: 'Réseau',
             feedIn: 'Injection',
+            accessLink: {
+                title: 'Lien d’accès pour les participants',
+                description:
+                    'Le code QR imprimé sur cette facture l’ouvre sans compte. Il n’expire pas : le révoquer est le seul moyen d’arrêter un lien qui a échappé à son destinataire.',
+                created: 'Imprimé depuis le',
+                lastOpened: 'Dernière ouverture',
+                neverOpened: 'Jamais ouvert',
+                revoke: 'Révoquer le lien',
+                revokeTitle: 'Révoquer ce lien d’accès ?',
+                revokeWarning:
+                    'Le code QR de la facture déjà envoyée cessera définitivement de fonctionner. La prochaine génération de ce PDF produira un nouveau code — les factures réimprimées ne correspondront plus à celles déjà postées.',
+            },
         },
         dashboard: {
             openInvoicePdf: 'Ouvrir le PDF de la facture {{number}}',

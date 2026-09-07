@@ -147,6 +147,18 @@ export async function generateInvoicePdf(invoiceId: string): Promise<{ pdf_url: 
   return data
 }
 
+/**
+ * Kill the access link printed on this invoice; resolves with the updated invoice.
+ *
+ * The printed token never expires, so this is the only way a leaked or
+ * mis-sent invoice stops granting access. The next PDF render mints a fresh
+ * one — this invalidates the paper already out there, nothing more.
+ */
+export async function revokeInvoiceAccessLink(invoiceId: string): Promise<Invoice> {
+  const { data } = await api.post<Invoice>(`/invoices/invoices/${invoiceId}/revoke-access/`)
+  return data
+}
+
 /** Fetch the authenticated PDF blob via the API (not /media/). */
 export async function fetchInvoicePdfBlob(invoiceId: string): Promise<Blob> {
   const response = await api.get<Blob>(`/invoices/invoices/${invoiceId}/pdf/`, {

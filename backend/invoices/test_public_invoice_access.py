@@ -22,6 +22,8 @@ from .test_helpers import make_invoice, make_participant, make_zev
 
 PUBLIC_URL = "/api/v1/public/invoices/{prefix}/"
 PUBLIC_PDF_URL = "/api/v1/public/invoices/{prefix}/pdf/"
+REVOKE_URL = "/api/v1/invoices/invoices/{pk}/revoke-access/"
+DETAIL_URL = "/api/v1/invoices/invoices/{pk}/"
 
 
 class PublicInvoiceTestCase(TestCase):
@@ -569,6 +571,124 @@ class PublicInvoiceChartsTests(PublicInvoiceTestCase):
         for payload in (ok, failed):
             self.assertIn("charts", payload)
             self.assertIsInstance(payload["charts"], list)
+
+
+class RevokeAccessLinkTests(PublicInvoiceTestCase):
+    """The operator's only control over a printed link (spec §3, §8).
+
+    The token has no expiry, so if these tests pass and the endpoint is still
+    unreachable from the UI, the feature has a security control on paper only —
+    which is exactly the state this suite was written to end.
+    """
+
+    def _post_revoke(self, invoice=None):
+        return self.client.post(REVOKE_URL.format(pk=(invoice or self.invoice).pk))
+
+    def test_owner_revokes_and_the_printed_link_dies(self):
+        self.client.force_authenticate(self.owner)
+
+        resp = self._post_revoke()
+
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(self._get().status_code, 404, "the printed link is dead")
+
+    def test_revoking_leaves_the_response_showing_no_active_link(self):
+        self.client.force_authenticate(self.owner)
+
+        resp = self._post_revoke()
+
+        self.assertIsNone(resp.data["access_link"])
+
+    def test_a_second_revoke_is_404_rather_than_a_silent_no_op(self):
+        """Nothing was revoked, so the operator must not be told it was."""
+        self.client.force_authenticate(self.owner)
+        self._post_revoke()
+
+        self.assertEqual(self._post_revoke().status_code, 404)
+
+    def test_revoking_touches_no_other_invoice(self):
+        other = make_invoice(self.zev, self.participant, InvoiceStatus.SENT)
+        other_token = access_tokens.get_or_create_for_invoice(other)
+        self.client.force_authenticate(self.owner)
+
+        self._post_revoke()
+
+        other_token.refresh_from_db()
+        self.assertIsNone(other_token.revoked_at)
+
+    def test_the_next_render_mints_a_fresh_link(self):
+        """Revoking invalidates the paper already out there, not the feature."""
+        self.client.force_authenticate(self.owner)
+        self._post_revoke()
+
+        fresh = access_tokens.get_or_create_for_invoice(self.invoice)
+
+        self.assertNotEqual(fresh.prefix, self.token.prefix)
+
+    def test_revoking_records_an_audit_event_naming_the_token(self):
+        self.client.force_authenticate(self.owner)
+
+        self._post_revoke()
+
+        event = AuditEvent.objects.get(action_type="invoice_link.revoked")
+        self.assertEqual(event.target_id, str(self.invoice.pk))
+        self.assertEqual(event.metadata_json["token_prefix"], self.token.prefix)
+
+    def test_a_participant_cannot_revoke(self):
+        participant_user = make_user("revoke_participant", UserRole.PARTICIPANT)
+        self.client.force_authenticate(participant_user)
+
+        self.assertEqual(self._post_revoke().status_code, 403)
+
+    def test_another_owner_cannot_revoke(self):
+        stranger = make_user("revoke_stranger", UserRole.ZEV_OWNER)
+        self.client.force_authenticate(stranger)
+
+        self.assertEqual(self._post_revoke().status_code, 404)
+        self.token.refresh_from_db()
+        self.assertIsNone(self.token.revoked_at)
+
+    def test_anonymous_cannot_revoke(self):
+        self.assertIn(self._post_revoke().status_code, (401, 403))
+
+
+class InvoiceAccessLinkSerializerTests(PublicInvoiceTestCase):
+    """What the invoice detail payload says about the printed link."""
+
+    def test_detail_reports_the_active_link_without_the_secret(self):
+        self.client.force_authenticate(self.owner)
+
+        resp = self.client.get(DETAIL_URL.format(pk=self.invoice.pk))
+
+        link = resp.data["access_link"]
+        self.assertEqual(link["prefix"], self.token.prefix)
+        self.assertNotIn("secret", link)
+        # The secret must not reach the payload under any key.
+        self.assertNotIn(self.secret, str(resp.data))
+
+    def test_an_unopened_link_reports_no_last_use(self):
+        self.client.force_authenticate(self.owner)
+
+        resp = self.client.get(DETAIL_URL.format(pk=self.invoice.pk))
+
+        self.assertIsNone(resp.data["access_link"]["last_used_at"])
+
+    def test_opening_the_link_shows_up_on_the_invoice(self):
+        """The operator's answer to "did they ever look at it?"."""
+        self._get()
+        self.client.force_authenticate(self.owner)
+
+        resp = self.client.get(DETAIL_URL.format(pk=self.invoice.pk))
+
+        self.assertIsNotNone(resp.data["access_link"]["last_used_at"])
+
+    def test_an_invoice_with_no_token_reports_none(self):
+        untouched = make_invoice(self.zev, self.participant, InvoiceStatus.DRAFT)
+        self.client.force_authenticate(self.owner)
+
+        resp = self.client.get(DETAIL_URL.format(pk=untouched.pk))
+
+        self.assertIsNone(resp.data["access_link"])
 
 
 class ParticipantInvoiceAccessDefaultTests(TestCase):
