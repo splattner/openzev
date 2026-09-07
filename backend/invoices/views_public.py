@@ -56,6 +56,18 @@ def _not_found():
     return Response({"detail": "This link is not valid."}, status=status.HTTP_404_NOT_FOUND)
 
 
+def _invoice_language(invoice) -> str:
+    """The language the invoice was issued in.
+
+    Every text on the document — the line-item descriptions the engine wrote,
+    the chart labels, the headings — is in this language, so it is also the
+    language the page reading that document should be in. The visitor's browser
+    locale is the wrong answer here: a German invoice opened on an English
+    phone must not print English headings over German line items.
+    """
+    return invoice.zev.invoice_language or "de"
+
+
 def _serialize_item(item) -> dict:
     return {
         "category": item.tariff_category,
@@ -76,6 +88,9 @@ def _serialize(invoice) -> dict:
     return {
         "invoice_number": invoice.invoice_number,
         "zev_name": invoice.zev.name,
+        # Not a preference — the language this document is written in. See
+        # _invoice_language.
+        "language": _invoice_language(invoice),
         "participant_name": invoice.participant.full_name,
         "period_start": invoice.period_start.isoformat(),
         "period_end": invoice.period_end.isoformat(),
@@ -272,10 +287,10 @@ _CHART_CACHE_SECONDS = 60 * 60
 # (key, title, description), in the order the insights page prints them.
 #
 # The headings travel with the pictures rather than being looked up in the
-# frontend's own locale, because a chart's *embedded* labels are written in the
-# ZEV's ``invoice_language``. A reader whose browser is English opening an
-# invoice a ZEV issues in German must not get an English heading over a German
-# diagram — the document has one language, and this is it.
+# frontend's own locale, because a chart's *embedded* labels are baked into the
+# SVG in ``_invoice_language`` and cannot be re-translated on the client at all.
+# The rest of the page follows the same rule by a different route: the payload
+# names the language (``_invoice_language``) and the page renders itself in it.
 _CHART_COPY = (
     ("energy", "chart_title", "chart_description"),
     ("hourly", "hourly_chart_title", "hourly_chart_description"),
@@ -329,7 +344,7 @@ def public_invoice_charts(request, prefix):
     if cached is not None:
         return Response(cached)
 
-    lang = invoice.zev.invoice_language or "de"
+    lang = _invoice_language(invoice)
     # Copied, not used in place: INVOICE_TRANSLATIONS is a module-level
     # constant shared by every invoice in the process, and pdf.py documents
     # why writing into it is a bug. Nothing here mutates it today; copying

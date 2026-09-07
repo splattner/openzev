@@ -20,7 +20,7 @@ import {
  * worse than showing a document.
  */
 export function PublicInvoicePage() {
-    const { t, i18n } = useTranslation()
+    const { t: tBrowser, i18n } = useTranslation()
     const { prefix = '' } = useParams<{ prefix: string }>()
     const [searchParams] = useSearchParams()
     const secret = searchParams.get('s') ?? ''
@@ -33,6 +33,22 @@ export function PublicInvoicePage() {
         // here is a 404 rather than a transient error.
         retry: false,
     })
+
+    // The document has one language, and the payload names it. Everything the
+    // reader is holding — the line-item descriptions the engine wrote, the
+    // labels baked into the chart SVGs — is in it, so translating the frame
+    // around them into the browser's locale would print an English "Grid fees"
+    // heading over German line items.
+    //
+    // `getFixedT` rather than `changeLanguage`: the app persists a language
+    // change to localStorage and re-renders every mounted tree, so switching
+    // globally would leave this visitor's whole app in the ZEV's language long
+    // after they closed the invoice. This binds one page, and nothing else.
+    const language = data?.language
+    const t = useMemo(
+        () => (language ? i18n.getFixedT(language) : tBrowser),
+        [language, i18n, tBrowser],
+    )
 
     const grouped = useMemo(() => (data ? groupItemsByCategory(data.items) : []), [data])
 
@@ -57,11 +73,15 @@ export function PublicInvoicePage() {
         onSettled: () => setLinkRequested(true),
     })
 
+    // Swiss formatting in the document's language, so the figures on screen
+    // are punctuated the way the printed ones are.
+    const locale = language ? `${language}-CH` : i18n.language
+
     const formatMoney = (value: string) =>
-        new Intl.NumberFormat(i18n.language, { minimumFractionDigits: 2 }).format(Number(value))
+        new Intl.NumberFormat(locale, { minimumFractionDigits: 2 }).format(Number(value))
 
     const formatDate = (value: string) =>
-        new Intl.DateTimeFormat(i18n.language, { dateStyle: 'medium' }).format(new Date(value))
+        new Intl.DateTimeFormat(locale, { dateStyle: 'medium' }).format(new Date(value))
 
     if (!prefix || !secret || isError) {
         return (
@@ -85,7 +105,10 @@ export function PublicInvoicePage() {
     }
 
     return (
-        <div className="public-invoice-page">
+        // Scoped rather than set on <html>: this page speaks the document's
+        // language, the app around it does not, and a screen reader needs to
+        // know which one it is reading.
+        <div className="public-invoice-page" lang={locale}>
             <main className="public-invoice-sheet">
                 <header className="public-invoice-header">
                     <div>

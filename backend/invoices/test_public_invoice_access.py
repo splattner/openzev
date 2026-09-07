@@ -143,6 +143,29 @@ class PublicInvoicePayloadTests(PublicInvoiceTestCase):
 
         self.assertIsNone(self._get().json()["energy_summary"])
 
+    def test_names_the_language_the_invoice_was_issued_in(self):
+        """The page renders in it; the reader's browser locale is not the answer."""
+        self.zev.invoice_language = "fr"
+        self.zev.save()
+
+        self.assertEqual(self._get().json()["language"], "fr")
+
+    def test_language_falls_back_to_german_like_the_pdf(self):
+        self.zev.invoice_language = ""
+        self.zev.save()
+
+        self.assertEqual(self._get().json()["language"], "de")
+
+    def test_the_payload_and_the_charts_agree_on_the_language(self):
+        """One document, one language — the two routes must not drift apart."""
+        from .views_public import _invoice_language
+
+        self.zev.invoice_language = "it"
+        self.zev.save()
+        self.invoice.refresh_from_db()
+
+        self.assertEqual(self._get().json()["language"], _invoice_language(self.invoice))
+
     def test_carries_the_line_items(self):
         items = self._get().json()["items"]
 

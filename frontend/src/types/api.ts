@@ -1009,6 +1009,13 @@ export interface PublicInvoiceItem {
 export interface PublicInvoice {
     invoice_number: string
     zev_name: string
+    /**
+     * The language the invoice was issued in — not a reader preference.
+     *
+     * The line items and the chart labels are already written in it, so the
+     * page renders itself in it too rather than in the browser's locale.
+     */
+    language: string
     participant_name: string
     period_start: string
     period_end: string
