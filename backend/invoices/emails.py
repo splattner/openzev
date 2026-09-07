@@ -20,10 +20,22 @@ def send_magic_link_email(participant, zev, link) -> None:
 
     The recipient is always ``participant.email`` and never anything the
     requester supplied — that is the whole trust anchor of tier 2.
-    """
-    from .models import EMAIL_TEMPLATE_DEFAULTS, EmailTemplate
 
-    defaults = EMAIL_TEMPLATE_DEFAULTS["participant_magic_link"]
+    Sent in the ZEV's ``invoice_language`` unless an operator has saved a
+    custom template, which then applies to every language: ``EmailTemplate``
+    holds one row per key, and this does not change that contract. So a
+    customised sign-in mail opts out of translation, deliberately and visibly
+    (the admin console tab says so).
+    """
+    from .models import (
+        MAGIC_LINK_EMAIL_DEFAULTS_BY_LANGUAGE,
+        EmailTemplate,
+    )
+
+    defaults = MAGIC_LINK_EMAIL_DEFAULTS_BY_LANGUAGE.get(
+        zev.invoice_language or "de",
+        MAGIC_LINK_EMAIL_DEFAULTS_BY_LANGUAGE["en"],
+    )
     override = EmailTemplate.objects.filter(template_key="participant_magic_link").first()
     subject_tpl = override.subject if override else defaults["subject"]
     body_tpl = override.body if override else defaults["body"]

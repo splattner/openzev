@@ -483,6 +483,63 @@ class MagicLinkTemplateTests(PublicInvoiceTestCase):
             template_key="participant_magic_link", subject=subject, body=body,
         )
 
+    def test_the_default_is_sent_in_the_zevs_invoice_language(self):
+        """The mail lands seconds after a document written in this language."""
+        self.zev.invoice_language = "it"
+        self.zev.save()
+
+        self._request()
+
+        self.assertIn("link di accesso", self._sent().subject)
+        self.assertIn("Buongiorno", self._sent().body)
+
+    def test_each_shipped_language_carries_the_link_placeholder(self):
+        """A translation that drops {link_url} would send an unusable mail."""
+        from .models import MAGIC_LINK_EMAIL_DEFAULTS_BY_LANGUAGE
+
+        for lang, texts in MAGIC_LINK_EMAIL_DEFAULTS_BY_LANGUAGE.items():
+            with self.subTest(lang=lang):
+                self.assertIn("{link_url}", texts["body"])
+                self.assertIn("{valid_minutes}", texts["body"])
+
+    def test_every_invoice_language_has_a_translation(self):
+        """A ZEV language with no mail would silently fall back to English."""
+        from zev.models import Zev
+        from .models import MAGIC_LINK_EMAIL_DEFAULTS_BY_LANGUAGE
+
+        offered = {code for code, _label in Zev._meta.get_field("invoice_language").choices}
+
+        self.assertEqual(offered, set(MAGIC_LINK_EMAIL_DEFAULTS_BY_LANGUAGE))
+
+    def test_an_unknown_language_falls_back_rather_than_failing(self):
+        self.zev.invoice_language = "rm"
+        self.zev.save()
+
+        self._request()
+
+        self.assertIn("/signin/", self._sent().body)
+
+    def test_a_custom_template_replaces_every_language(self):
+        """One row per key: customising opts out of translation, by design."""
+        self.zev.invoice_language = "it"
+        self.zev.save()
+        self._customise(subject="Custom", body="Sign in at {link_url}")
+
+        self._request()
+
+        self.assertEqual(self._sent().subject, "Custom")
+        self.assertNotIn("Buongiorno", self._sent().body)
+
+    def test_a_broken_custom_template_falls_back_in_the_right_language(self):
+        self.zev.invoice_language = "de"
+        self.zev.save()
+        self._customise(body="Hello {invoice_number} {link_url}")
+
+        self._request()
+
+        self.assertIn("Guten Tag", self._sent().body)
+        self.assertIn("/signin/", self._sent().body)
+
     def test_a_customised_template_is_used(self):
         self._customise(subject="Ihr Link für {zev_name}", body="Hier: {link_url}")
 

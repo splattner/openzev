@@ -304,6 +304,7 @@ export const it = {
             invitationEmail: 'E-mail di invito',
             verificationEmail: 'E-mail di verifica',
             magicLinkEmail: 'E-mail con link di accesso',
+            magicLinkLanguageNote: 'Cos\u00ec com\u2019\u00e8, questa e-mail viene inviata nella lingua di fatturazione di ogni ZEV. Un testo personalizzato salvato qui la sostituisce per tutte e quattro le lingue.',
             subject: 'Oggetto:',
             body: 'Messaggio',
             variable: 'Variabile',

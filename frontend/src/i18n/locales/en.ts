@@ -313,6 +313,7 @@ export const en = {
             invitationEmail: 'Invitation Email',
             verificationEmail: 'Verification Email',
             magicLinkEmail: 'Sign-in Link Email',
+            magicLinkLanguageNote: 'Left as shipped, this email is sent in each ZEV\u2019s invoice language. Saving a custom text here replaces it for all four languages.',
             subject: 'Subject:',
             body: 'Body',
             variable: 'Variable',
