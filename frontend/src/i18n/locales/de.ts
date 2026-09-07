@@ -1857,6 +1857,11 @@ export const de = {
                 ownerDescription: 'Jahresabrechnungen für alle Teilnehmer erstellen und als ZIP-Archiv herunterladen.',
                 download: 'Jahresabrechnung herunterladen',
                 downloadAll: 'Alle herunterladen (ZIP)',
+                prepare: 'Jahresabrechnungen vorbereiten (ZIP)',
+                preparing: 'Jahresabrechnungen werden vorbereitet…',
+                prepareAgain: 'Neuen Export vorbereiten',
+                partialWarning: '{{omitted}} von {{total}} Abrechnungen konnten nicht erstellt werden; sie sind in omitted.txt im Archiv aufgeführt.',
+                expired: 'Dieser Download-Link ist abgelaufen. Bereiten Sie einen neuen Export vor, um aktuelle Daten herunterzuladen.',
                 error: 'Jahresabrechnung konnte nicht erstellt werden. Bitte versuchen Sie es erneut.',
             },
             financialSummary: {

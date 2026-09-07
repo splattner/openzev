@@ -5,6 +5,10 @@ and dashboard endpoints before it, none of this is invoice-domain code — the
 reports are keyed on a participant, a ZEV and a year, and none of them touch
 the viewset's invoice queryset.
 
+Whole-ZEV annual-statement ZIPs moved to the async export-job flow
+(``exports`` app, ADR 0017); the downloads here are single-document and
+synchronous.
+
 The three handlers repeated the same three preambles (parse the year, resolve
 and authorise the ZEV, find the caller's own participant record), so those live
 here as module functions. What the handlers do *not* share is which parameters
@@ -12,13 +16,8 @@ they require and which errors they raise for a missing one, and that is left
 spelled out in each handler rather than folded into a parameterised helper.
 """
 
-import io
-import logging
-import zipfile
 from datetime import MAXYEAR, MINYEAR, date
 
-from allocation.read_model import community_totals_by_timestamp, eligible_participant_shares
-from allocation.validity import active_during, period_window
 from django.core.exceptions import ValidationError
 from django.http import HttpResponse
 from django.utils import timezone
@@ -34,9 +33,6 @@ from zev.models import Participant, Zev
 from .annual_statement import generate_annual_statement_pdf
 from .financial_summary import generate_financial_summary_pdf
 from .tariff_overview import generate_tariff_overview_pdf
-
-
-logger = logging.getLogger(__name__)
 
 
 def _parse_year(year_raw: str | None) -> tuple[int | None, Response | None]:
@@ -165,91 +161,6 @@ class AnnualStatementView(APIView):
             f"annual-statement-{year}-{participant.last_name}.pdf",
             disposition="inline",
         )
-
-
-class AnnualStatementsZipView(APIView):
-    """Annual statements for every participant of a ZEV, as one ZIP."""
-
-    permission_classes = [IsAuthenticated, IsZevOwnerOrAdmin]
-
-    def get(self, request, *args, **kwargs):
-        year_raw = request.query_params.get("year")
-        zev_id = request.query_params.get("zev_id")
-
-        if not year_raw or not zev_id:
-            return Response(
-                {"error": "year and zev_id are required."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        year, error = _parse_year(year_raw)
-        if error:
-            return error
-
-        zev, error = _get_authorised_zev(request, zev_id)
-        if error:
-            return error
-
-        year_start = date(year, 1, 1)
-        year_end = date(year, 12, 31)
-        participants = list(
-            active_during(zev.participants, year_start, year_end)
-            .order_by("last_name", "first_name")
-        )
-
-        if not participants:
-            return Response(
-                {"error": "No participants found for this ZEV and year."},
-                status=status.HTTP_404_NOT_FOUND,
-            )
-
-        buf = io.BytesIO()
-        share_windows = [
-            (p.id, p.valid_from, p.valid_to, p.allocation_weight)
-            for p in participants
-        ]
-        try:
-            shares_by_date = eligible_participant_shares(
-                zev,
-                year_start,
-                year_end,
-                windows=share_windows,
-            )
-            year_start_dt, year_end_dt = period_window(year_start, year_end)
-            zev_totals_by_ts = community_totals_by_timestamp(
-                zev, year_start_dt, year_end_dt,
-            )
-        except Exception:
-            logger.exception(
-                "Annual-statement shared-data calculation failed for ZEV %s and year %s",
-                zev.id,
-                year,
-            )
-            return Response(
-                {"error": "Could not generate annual statements."},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
-        with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
-            for participant in participants:
-                try:
-                    pdf_bytes = generate_annual_statement_pdf(
-                        participant,
-                        zev,
-                        year,
-                        shares_by_date=shares_by_date,
-                        zev_totals_by_ts=zev_totals_by_ts,
-                    )
-                    safe_name = f"{participant.last_name}_{participant.first_name}".replace(" ", "_")
-                    zf.writestr(f"annual-statement-{year}-{safe_name}.pdf", pdf_bytes)
-                except Exception:
-                    # Best effort: one participant's missing data must not sink
-                    # the whole archive.
-                    continue
-
-        buf.seek(0)
-        response = HttpResponse(buf.getvalue(), content_type="application/zip")
-        response["Content-Disposition"] = f'attachment; filename="annual-statements-{year}.zip"'
-        return response
 
 
 class FinancialSummaryView(APIView):

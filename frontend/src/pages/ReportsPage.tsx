@@ -1,12 +1,13 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useMutation } from '@tanstack/react-query'
-import { downloadAnnualStatement, downloadAllAnnualStatements, downloadFinancialSummary } from '../lib/api/invoices'
+import { downloadAnnualStatement, downloadFinancialSummary } from '../lib/api/invoices'
 import { downloadBlob } from '../lib/downloadBlob'
 import { useAuth } from '../lib/auth'
 import { useManagedZev } from '../lib/managedZev'
 import { ReportsEmptyState } from '../features/reports/ReportsEmptyState'
 import { YearDownloadCard } from '../features/reports/YearDownloadCard'
+import { AnnualStatementsExportCard } from '../features/reports/AnnualStatementsExportCard'
 import { PageSkeleton } from '../components/PageSkeleton'
 
 const YEAR_COUNT = 5
@@ -32,17 +33,12 @@ export function ReportsPage() {
     const [year, setYear] = useState(() => new Date().getFullYear() - 1)
     const selectedYear = years.includes(year) ? year : years[1]
 
+    // Disable the shared year selector while the ZIP card is preparing.
+    const [zipBusy, setZipBusy] = useState(false)
+
     const annualStatementMutation = useYearDownload(
         () => downloadAnnualStatement({ year: selectedYear }),
         () => `annual-statement-${selectedYear}.pdf`,
-    )
-
-    const allAnnualStatementsMutation = useYearDownload(
-        () => {
-            if (!selectedZevId) throw new Error('No ZEV selected')
-            return downloadAllAnnualStatements({ year: selectedYear, zev_id: selectedZevId })
-        },
-        () => `annual-statements-${selectedYear}.zip`,
     )
 
     const financialSummaryMutation = useYearDownload(
@@ -50,19 +46,7 @@ export function ReportsPage() {
         () => `financial-summary-${selectedYear}.pdf`,
     )
 
-    // One annual-statement card whose wording and mutation follow the role:
-    // admins/owners download the whole-ZEV ZIP, participants their own PDF.
-    const annualStatement = isZevScopedRole
-        ? {
-              mutation: allAnnualStatementsMutation,
-              descriptionKey: 'pages.reports.annualStatement.ownerDescription',
-              actionLabelKey: 'pages.reports.annualStatement.downloadAll',
-          }
-        : {
-              mutation: annualStatementMutation,
-              descriptionKey: 'pages.reports.annualStatement.description',
-              actionLabelKey: 'pages.reports.annualStatement.download',
-          }
+    const busy = zipBusy || annualStatementMutation.isPending || financialSummaryMutation.isPending
 
     return (
         <div className="page-stack">
@@ -84,7 +68,7 @@ export function ReportsPage() {
                                 aria-label={t('pages.reports.year')}
                                 value={selectedYear}
                                 onChange={(e) => setYear(Number(e.target.value))}
-                                disabled={annualStatement.mutation.isPending || financialSummaryMutation.isPending}
+                                disabled={busy}
                             >
                                 {years.map((y) => (
                                     <option key={y} value={y}>{y}</option>
@@ -94,14 +78,23 @@ export function ReportsPage() {
                     </div>
 
                     <div className="grid grid-2">
-                        <YearDownloadCard
-                            titleKey="pages.reports.annualStatement.title"
-                            descriptionKey={annualStatement.descriptionKey}
-                            busy={annualStatement.mutation.isPending}
-                            error={annualStatement.mutation.isError ? t('pages.reports.annualStatement.error') : null}
-                            onDownload={() => annualStatement.mutation.mutate()}
-                            actionLabelKey={annualStatement.actionLabelKey}
-                        />
+                        {isZevScopedRole ? (
+                            <AnnualStatementsExportCard
+                                zevId={selectedZevId}
+                                year={selectedYear}
+                                enabled={!!selectedZevId}
+                                onBusyChange={setZipBusy}
+                            />
+                        ) : (
+                            <YearDownloadCard
+                                titleKey="pages.reports.annualStatement.title"
+                                descriptionKey="pages.reports.annualStatement.description"
+                                busy={annualStatementMutation.isPending}
+                                error={annualStatementMutation.isError ? t('pages.reports.annualStatement.error') : null}
+                                onDownload={() => annualStatementMutation.mutate()}
+                                actionLabelKey="pages.reports.annualStatement.download"
+                            />
+                        )}
                         <YearDownloadCard
                             titleKey="pages.reports.financialSummary.title"
                             descriptionKey="pages.reports.financialSummary.description"

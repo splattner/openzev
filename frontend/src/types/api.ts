@@ -1026,3 +1026,22 @@ export interface PublicInvoice {
     items: PublicInvoiceItem[]
     has_pdf: boolean
 }
+
+export type ExportJobStatus = 'queued' | 'running' | 'completed' | 'failed'
+
+export interface ExportJob {
+    id: string
+    export_type: 'annual_statements'
+    zev_id: string
+    params: { year: number }
+    status: ExportJobStatus
+    created_at: string
+    started_at: string | null
+    completed_at: string | null
+    file_expires_at: string | null
+    generated_count: number | null
+    omitted_count: number | null
+    omitted_participant_ids: string[]
+    error_message: string
+    expired: boolean
+}

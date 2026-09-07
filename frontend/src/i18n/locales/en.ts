@@ -1868,6 +1868,11 @@ export const en = {
                 ownerDescription: 'Generate and download annual statements for all participants as a ZIP archive.',
                 download: 'Download Annual Statement',
                 downloadAll: 'Download All (ZIP)',
+                prepare: 'Prepare Annual Statements (ZIP)',
+                preparing: 'Preparing annual statements…',
+                prepareAgain: 'Prepare a New Export',
+                partialWarning: '{{omitted}} of {{total}} statements could not be generated and are listed in omitted.txt inside the archive.',
+                expired: 'This download link has expired. Prepare a new export to download current data.',
                 error: 'Failed to generate annual statement. Please try again.',
             },
             financialSummary: {

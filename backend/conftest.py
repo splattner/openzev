@@ -42,8 +42,10 @@ def _no_broker_calls(monkeypatch):
     nests inside this one.
     """
     from invoices.tasks import generate_invoice_pdf_task
+    from exports.tasks import run_export_job
 
     monkeypatch.setattr(generate_invoice_pdf_task, "delay", lambda *args, **kwargs: None)
+    monkeypatch.setattr(run_export_job, "delay", lambda *args, **kwargs: None)
 
 
 @pytest.fixture

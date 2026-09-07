@@ -162,8 +162,8 @@ The **Reports** page (`/reports`, sidebar entry **Berichte** / **Reports**) bund
 
 ![Reports page](screenshots/23-reports.png)
 
-- Pick a **year** in the selector at the top (defaults to the last completed year) — both cards download for that year.
-- **Annual Statement** — as **admin or ZEV owner**: all participants' statements of the selected ZEV as one **ZIP archive**. As **participant**: your own statement as a **PDF**.
+- Pick a **year** in the selector at the top (defaults to the last completed year) — both cards use that year.
+- **Annual Statement** — as **admin or ZEV owner**: all participants' statements of the selected ZEV as one **ZIP archive**. Click **Prepare Annual Statements (ZIP)**: the archive is generated in the background, and the card offers **Download All (ZIP)** once it is ready — for a large ZEV this takes a while, and you can reload the page and return later. If some statements could not be generated, the card shows how many were omitted and lists them in an `omitted.txt` file inside the archive. Download links expire after 24 hours; prepare a new export to get current data. As **participant**: your own statement as a **PDF** (immediate download).
 - **Tax Overview** — yearly tax overview for producers (net local-energy revenue and feed-in compensation) as a **PDF**.
 
 The header shows the currently selected ZEV. Reports are only available once a ZEV is selected; participants always receive their own documents.

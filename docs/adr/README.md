@@ -20,6 +20,7 @@ This directory captures key architectural decisions for OpenZEV.
 - [0014: Print parity via shared tokens and real-PDF previews](0014-print-parity-and-ui-tokens.md)
 - [0015: Retire MUI — TanStack Table and full Mantine consolidation](0015-retire-mui-tanstack-table.md)
 - [0016: Explicit VAT mode, with an "inclusive" treatment for non-registered ZEVs](0016-vat-mode-inclusive.md)
+- [0017: Async export jobs for whole-ZEV annual statements](0017-async-export-jobs.md) (supersedes the unmerged subprocess-pool experiment, recorded in its alternatives)
 
 ## Conventions
 

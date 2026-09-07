@@ -1857,6 +1857,11 @@ export const it = {
                 ownerDescription: 'Genera e scarica i rendiconti annuali di tutti i partecipanti come archivio ZIP.',
                 download: 'Scarica rendiconto annuale',
                 downloadAll: 'Scarica tutti (ZIP)',
+                prepare: 'Prepara i rendiconti annuali (ZIP)',
+                preparing: 'Preparazione dei rendiconti annuali…',
+                prepareAgain: 'Prepara un nuovo export',
+                partialWarning: '{{omitted}} dei {{total}} rendiconti non sono stati generati e sono elencati in omitted.txt nell\'archivio.',
+                expired: 'Questo link di download è scaduto. Prepara un nuovo export per scaricare i dati aggiornati.',
                 error: 'Il rendiconto annuale non è stato generato. Riprova.',
             },
             financialSummary: {

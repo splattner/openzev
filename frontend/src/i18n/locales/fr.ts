@@ -1857,6 +1857,11 @@ export const fr = {
                 ownerDescription: 'Générez et téléchargez les décomptes annuels de tous les participants sous forme d\'archive ZIP.',
                 download: 'Télécharger le décompte annuel',
                 downloadAll: 'Tout télécharger (ZIP)',
+                prepare: 'Préparer les décomptes annuels (ZIP)',
+                preparing: 'Préparation des décomptes annuels…',
+                prepareAgain: 'Préparer un nouvel export',
+                partialWarning: '{{omitted}} décomptes sur {{total}} n\'ont pas pu être générés et figurent dans omitted.txt dans l\'archive.',
+                expired: 'Ce lien de téléchargement a expiré. Préparez un nouvel export pour télécharger les données actuelles.',
                 error: 'Le décompte annuel n\'a pas pu être généré. Veuillez réessayer.',
             },
             financialSummary: {
