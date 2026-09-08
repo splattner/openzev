@@ -17,10 +17,13 @@ import {
 import { formatApiError } from '../../lib/api/errors'
 import { queryKeys } from '../../lib/api/queryKeys'
 import { formatShortDate, useAppSettings } from '../../lib/appSettings'
+import { todayLocalIso } from '../../lib/dates'
 import { useToast } from '../../lib/toast'
 import {
     defaultAssignmentForm,
     defaultMeteringPointForm,
+    getNextAssignmentGuidance,
+    isAssignmentCurrent,
     type MeteringPointStatusFilter,
     type MeteringPointTypeFilter,
 } from './useMeteringPointForms'
@@ -62,6 +65,27 @@ export function getScopedAndFilteredMeteringPoints(
     return { scopedMeteringPoints, meteringPoints }
 }
 
+export type MeteringPointCounts = {
+    activeCount: number
+    inactiveCount: number
+    /** Meters with a holder *today* — an assignment that already ended (or has yet to start) does not count. */
+    assignedCount: number
+}
+
+export function getMeteringPointCounts(
+    scopedMeteringPoints: MeteringPoint[],
+    assignmentsByMeteringPoint: Map<string, MeteringPointAssignment[]>,
+    todayIso: string,
+): MeteringPointCounts {
+    const activeCount = scopedMeteringPoints.filter((point) => point.is_active).length
+    const inactiveCount = scopedMeteringPoints.length - activeCount
+    const assignedCount = scopedMeteringPoints.filter((point) =>
+        (assignmentsByMeteringPoint.get(point.id) ?? []).some((assignment) => isAssignmentCurrent(assignment, todayIso)),
+    ).length
+
+    return { activeCount, inactiveCount, assignedCount }
+}
+
 export function useMeteringPointActions({
     selectedZevId,
     canManageMeteringPoints,
@@ -87,6 +111,7 @@ export function useMeteringPointActions({
     const [editingAssignId, setEditingAssignId] = useState<string | null>(null)
     const [showAssignModal, setShowAssignModal] = useState(false)
     const [selectedMpId, setSelectedMpId] = useState<string | null>(null)
+    const [assignHasOpenEndedWarning, setAssignHasOpenEndedWarning] = useState(false)
 
     // Delete data modal
     const [showDeleteDataModal, setShowDeleteDataModal] = useState(false)
@@ -137,8 +162,11 @@ export function useMeteringPointActions({
         mutationFn: deleteMeteringPoint,
         onSuccess: () => {
             pushToast(t('pages.meteringPoints.messages.deleted'), 'success')
-            void queryClient.invalidateQueries({ queryKey: queryKeys.metering.points(selectedZevId || undefined) })
-            void queryClient.invalidateQueries({ queryKey: queryKeys.metering.pointAssignments() })
+            // Deleting a metering point cascades to its readings and assignment
+            // history (MeterReading/MeteringPointAssignment both CASCADE on
+            // metering_point), so every reading-derived view is stale too —
+            // invalidate the whole metering namespace rather than enumerating keys.
+            void queryClient.invalidateQueries({ queryKey: ['metering'] })
         },
         onError: (error) => pushToast(formatApiError(error, t('pages.meteringPoints.messages.deleteFailed')), 'error'),
     })
@@ -156,6 +184,9 @@ export function useMeteringPointActions({
             )
             void queryClient.invalidateQueries({ queryKey: queryKeys.metering.pointAssignments() })
             void queryClient.invalidateQueries({ queryKey: queryKeys.metering.points(selectedZevId || undefined) })
+            // Participants derive has_metering_point_assignment / metering_points
+            // from these rows, so their readiness state changes too.
+            void queryClient.invalidateQueries({ queryKey: queryKeys.zev.participants(selectedZevId || undefined) })
         },
         onError: (error) => pushToast(formatApiError(error, t('pages.meteringPoints.messages.assignmentSaveFailed')), 'error'),
     })
@@ -166,6 +197,7 @@ export function useMeteringPointActions({
             pushToast(t('pages.meteringPoints.messages.assignmentRemoved'), 'success')
             void queryClient.invalidateQueries({ queryKey: queryKeys.metering.pointAssignments() })
             void queryClient.invalidateQueries({ queryKey: queryKeys.metering.points(selectedZevId || undefined) })
+            void queryClient.invalidateQueries({ queryKey: queryKeys.zev.participants(selectedZevId || undefined) })
         },
         onError: (error) => pushToast(formatApiError(error, t('pages.meteringPoints.messages.assignmentRemoveFailed')), 'error'),
     })
@@ -181,9 +213,24 @@ export function useMeteringPointActions({
         onSuccess: (result) => {
             pushToast(t('pages.meteringPoints.deleteData.success', { count: result.deleted_count }), 'success')
             closeDeleteDataModal()
+            // Deleted readings affect every reading-derived view (chart, raw
+            // data, dashboard summary, data-quality status).
+            void queryClient.invalidateQueries({ queryKey: ['metering'] })
         },
         onError: (error) => pushToast(formatApiError(error, t('pages.meteringPoints.deleteData.failed')), 'error'),
     })
+
+    // Declared ahead of the form handlers below: openCreateAssignModal reads
+    // it to prefill the next assignment's valid_from (see #619).
+    const assignmentsByMeteringPoint = useMemo(() => {
+        const map = new Map<string, MeteringPointAssignment[]>()
+        for (const a of assignmentsQuery.data ?? []) {
+            const list = map.get(a.metering_point) ?? []
+            list.push(a)
+            map.set(a.metering_point, list)
+        }
+        return map
+    }, [assignmentsQuery.data])
 
     // ── Form handlers ──────────────────────────────────────────────────────────────
 
@@ -231,7 +278,10 @@ export function useMeteringPointActions({
     function openCreateAssignModal(meteringPointId: string) {
         setSelectedMpId(meteringPointId)
         setEditingAssignId(null)
-        setAssignForm(defaultAssignmentForm(meteringPointId))
+        const existingAssignments = assignmentsByMeteringPoint.get(meteringPointId) ?? []
+        const { suggestedValidFrom, hasOpenEndedAssignment } = getNextAssignmentGuidance(existingAssignments, todayLocalIso())
+        setAssignForm({ ...defaultAssignmentForm(meteringPointId), valid_from: suggestedValidFrom })
+        setAssignHasOpenEndedWarning(hasOpenEndedAssignment)
         setShowAssignModal(true)
     }
 
@@ -245,6 +295,7 @@ export function useMeteringPointActions({
             valid_to: assignment.valid_to ?? null,
             allocation_mode: assignment.allocation_mode,
         })
+        setAssignHasOpenEndedWarning(false)
         setShowAssignModal(true)
     }
 
@@ -253,6 +304,7 @@ export function useMeteringPointActions({
         setEditingAssignId(null)
         setSelectedMpId(null)
         setAssignForm(defaultAssignmentForm())
+        setAssignHasOpenEndedWarning(false)
     }
 
     function submitAssignForm(event: FormEvent<HTMLFormElement>) {
@@ -344,16 +396,6 @@ export function useMeteringPointActions({
         [participantsQuery.data],
     )
 
-    const assignmentsByMeteringPoint = useMemo(() => {
-        const map = new Map<string, MeteringPointAssignment[]>()
-        for (const a of assignmentsQuery.data ?? []) {
-            const list = map.get(a.metering_point) ?? []
-            list.push(a)
-            map.set(a.metering_point, list)
-        }
-        return map
-    }, [assignmentsQuery.data])
-
     const assignParticipants = useMemo(() => {
         if (!selectedMpId) return participantsQuery.data ?? []
         const mp = meteringPointsQuery.data?.find((m) => m.id === selectedMpId)
@@ -361,9 +403,13 @@ export function useMeteringPointActions({
         return (participantsQuery.data ?? []).filter((p) => p.zev === mp.zev)
     }, [selectedMpId, meteringPointsQuery.data, participantsQuery.data])
 
-    const scopedMeteringPoints = (meteringPointsQuery.data ?? []).filter(
-        (point) => !canManageMeteringPoints || !selectedZevId || point.zev === selectedZevId,
-    )
+    const { scopedMeteringPoints, meteringPoints } = getScopedAndFilteredMeteringPoints(meteringPointsQuery.data ?? [], {
+        selectedZevId,
+        canManageMeteringPoints,
+        searchTerm,
+        statusFilter,
+        typeFilter,
+    })
 
     const filteredAssignmentsByMeteringPoint = new Map(
         Array.from(assignmentsByMeteringPoint.entries()).filter(([meteringPointId]) =>
@@ -371,23 +417,13 @@ export function useMeteringPointActions({
         ),
     )
 
-    const normalizedSearch = searchTerm.trim().toLowerCase()
-    const meteringPoints = scopedMeteringPoints.filter((point) => {
-        const matchesStatus = statusFilter === 'all'
-            || (statusFilter === 'active' && point.is_active)
-            || (statusFilter === 'inactive' && !point.is_active)
-        const matchesType = typeFilter === 'all' || point.meter_type === typeFilter
-        const matchesSearch = !normalizedSearch
-            || point.meter_id.toLowerCase().includes(normalizedSearch)
-            || (point.location_description ?? '').toLowerCase().includes(normalizedSearch)
-
-        return matchesStatus && matchesType && matchesSearch
-    })
-
-    const activeCount = scopedMeteringPoints.filter((point) => point.is_active).length
-    const inactiveCount = scopedMeteringPoints.length - activeCount
-    const assignedCount = scopedMeteringPoints.filter((point) => (filteredAssignmentsByMeteringPoint.get(point.id) ?? []).length > 0).length
-    const hasFilters = !!normalizedSearch || statusFilter !== 'all' || typeFilter !== 'all'
+    const todayIso = todayLocalIso()
+    const { activeCount, inactiveCount, assignedCount } = getMeteringPointCounts(
+        scopedMeteringPoints,
+        filteredAssignmentsByMeteringPoint,
+        todayIso,
+    )
+    const hasFilters = !!searchTerm.trim() || statusFilter !== 'all' || typeFilter !== 'all'
 
     return {
         // Queries
@@ -410,6 +446,7 @@ export function useMeteringPointActions({
         editingAssignId,
         showAssignModal,
         selectedMpId,
+        assignHasOpenEndedWarning,
         showDeleteDataModal,
         deleteDataTarget,
         deleteDataMode,

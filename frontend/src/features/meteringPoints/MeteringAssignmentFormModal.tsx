@@ -11,6 +11,8 @@ type MeteringAssignmentFormModalProps = {
   form: MeteringPointAssignmentInput
   participants: Participant[]
   isPending: boolean
+  /** The meter already has an assignment with no end date, which would overlap any new one — the user needs to close it first. */
+  hasOpenEndedWarning?: boolean
   onClose: () => void
   onSubmit: (event: FormEvent<HTMLFormElement>) => void
   setForm: Dispatch<SetStateAction<MeteringPointAssignmentInput>>
@@ -23,6 +25,7 @@ export function MeteringAssignmentFormModal({
   form,
   participants,
   isPending,
+  hasOpenEndedWarning,
   onClose,
   onSubmit,
   setForm,
@@ -33,6 +36,12 @@ export function MeteringAssignmentFormModal({
   return (
     <FormModal isOpen={isOpen} title={title} onClose={onClose}>
       <form onSubmit={onSubmit} className="form-grid">
+        {hasOpenEndedWarning && (
+          <div className="warning-banner" role="alert" style={{ gridColumn: '1 / -1' }}>
+            {t('pages.meteringPoints.assignForm.openEndedWarning')}
+          </div>
+        )}
+
         <label style={{ gridColumn: '1 / -1' }}>
           <span>{t('pages.meteringPoints.assignForm.participant')}</span>
           <select

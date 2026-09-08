@@ -315,6 +315,12 @@ export interface MeteringPoint {
     meter_type: 'consumption' | 'production' | 'bidirectional'
     is_active: boolean
     location_description?: string
+    /** Readings that a delete of this metering point would cascade-delete. */
+    reading_count: number
+    /** Assignment windows (any state) that a delete of this metering point would cascade-delete. */
+    assignment_count: number
+    first_reading_at: string | null
+    last_reading_at: string | null
 }
 
 export interface MeteringPointInput {

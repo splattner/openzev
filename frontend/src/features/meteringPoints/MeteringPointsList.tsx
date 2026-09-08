@@ -107,7 +107,11 @@ export function MeteringPointsList({
             onClick: () =>
               confirm({
                 title: t('pages.meteringPoints.deleteTitle'),
-                message: t('pages.meteringPoints.deleteMessage', { meterId: point.meter_id }),
+                message: t('pages.meteringPoints.deleteMessage', {
+                  meterId: point.meter_id,
+                  readingCount: point.reading_count,
+                  assignmentCount: point.assignment_count,
+                }),
                 confirmText: t('pages.meteringPoints.deleteConfirm'),
                 isDangerous: true,
                 onConfirm: () => onDeleteMeteringPoint(point.id),
@@ -129,7 +133,7 @@ export function MeteringPointsList({
               </div>
 
               <div className="metering-point-actions">
-                {canManageMeteringPoints && assignments.length === 0 && (
+                {canManageMeteringPoints && (
                   <button
                     className="button button-primary button-compact"
                     type="button"

@@ -35,6 +35,7 @@ export function MeteringPointsPage() {
         setAssignForm,
         editingAssignId,
         showAssignModal,
+        assignHasOpenEndedWarning,
         showDeleteDataModal,
         deleteDataTarget,
         deleteDataMode,
@@ -132,6 +133,7 @@ export function MeteringPointsPage() {
                 form={assignForm}
                 participants={assignParticipants}
                 isPending={saveAssignMutation.isPending}
+                hasOpenEndedWarning={assignHasOpenEndedWarning}
                 onClose={closeAssignModal}
                 onSubmit={submitAssignForm}
                 setForm={setAssignForm}

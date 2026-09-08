@@ -50,14 +50,18 @@ export function MeteringPointsToolbar({
             <span className="metering-summary-label">{t('pages.meteringPoints.summary.inactive')}</span>
             <span className="metering-summary-value">{inactiveCount}</span>
           </span>
-          <span className="metering-summary-stat">
-            <span className="metering-summary-label">{t('pages.meteringPoints.summary.assigned')}</span>
-            <span className="metering-summary-value">{assignedCount}</span>
-          </span>
-          <span className="metering-summary-stat">
-            <span className="metering-summary-label">{t('pages.meteringPoints.summary.unassigned')}</span>
-            <span className="metering-summary-value">{totalCount - assignedCount}</span>
-          </span>
+          {canManageMeteringPoints && (
+            <>
+              <span className="metering-summary-stat">
+                <span className="metering-summary-label">{t('pages.meteringPoints.summary.assigned')}</span>
+                <span className="metering-summary-value">{assignedCount}</span>
+              </span>
+              <span className="metering-summary-stat">
+                <span className="metering-summary-label">{t('pages.meteringPoints.summary.unassigned')}</span>
+                <span className="metering-summary-value">{totalCount - assignedCount}</span>
+              </span>
+            </>
+          )}
         </div>
 
         {canManageMeteringPoints && (

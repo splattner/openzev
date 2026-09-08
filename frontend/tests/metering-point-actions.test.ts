@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { getScopedAndFilteredMeteringPoints } from '../src/features/meteringPoints/useMeteringPointActions'
-import type { MeteringPoint } from '../src/types/api'
+import { getMeteringPointCounts, getScopedAndFilteredMeteringPoints } from '../src/features/meteringPoints/useMeteringPointActions'
+import type { MeteringPoint, MeteringPointAssignment } from '../src/types/api'
 
 const meteringPoints = [
   {
@@ -58,5 +58,45 @@ describe('metering point action helpers', () => {
       meter_type: 'bidirectional',
       is_active: true,
     })
+  })
+})
+
+describe('getMeteringPointCounts', () => {
+  const today = '2026-05-08'
+
+  function assignment(overrides: Partial<MeteringPointAssignment>): MeteringPointAssignment {
+    return { valid_from: '2026-01-01', valid_to: null, ...overrides } as MeteringPointAssignment
+  }
+
+  it('counts active/inactive from the scoped list, independent of assignments', () => {
+    const { activeCount, inactiveCount } = getMeteringPointCounts(meteringPoints, new Map(), today)
+    expect(activeCount).toBe(2)
+    expect(inactiveCount).toBe(1)
+  })
+
+  it('does not count a meter whose only assignment already ended', () => {
+    const assignments = new Map([['mp-1', [assignment({ valid_from: '2025-01-01', valid_to: '2026-01-31' })]]])
+    const { assignedCount } = getMeteringPointCounts(meteringPoints, assignments, today)
+    expect(assignedCount).toBe(0)
+  })
+
+  it('does not count a meter whose only assignment has not started yet', () => {
+    const assignments = new Map([['mp-1', [assignment({ valid_from: '2026-06-01', valid_to: null })]]])
+    const { assignedCount } = getMeteringPointCounts(meteringPoints, assignments, today)
+    expect(assignedCount).toBe(0)
+  })
+
+  it('counts a meter with an assignment in force today, even alongside ended ones', () => {
+    const assignments = new Map([
+      [
+        'mp-1',
+        [
+          assignment({ valid_from: '2025-01-01', valid_to: '2025-12-31' }),
+          assignment({ valid_from: '2026-01-01', valid_to: null }),
+        ],
+      ],
+    ])
+    const { assignedCount } = getMeteringPointCounts(meteringPoints, assignments, today)
+    expect(assignedCount).toBe(1)
   })
 })

@@ -5,6 +5,8 @@ import {
   defaultAssignmentForm,
   defaultMeteringPointForm,
   getAssignmentState,
+  getNextAssignmentGuidance,
+  isAssignmentCurrent,
 } from '../src/features/meteringPoints/useMeteringPointForms'
 import type { MeteringPointAssignment } from '../src/types/api'
 
@@ -57,5 +59,59 @@ describe('metering point form helpers', () => {
 
     expect(assignmentStateSortOrder('current')).toBeLessThan(assignmentStateSortOrder('upcoming'))
     expect(assignmentStateSortOrder('upcoming')).toBeLessThan(assignmentStateSortOrder('ended'))
+  })
+
+  it('treats only a currently-in-force assignment as "current"', () => {
+    const today = '2026-05-08'
+
+    expect(isAssignmentCurrent({ valid_from: '2026-05-01', valid_to: null } as MeteringPointAssignment, today)).toBe(true)
+    expect(isAssignmentCurrent({ valid_from: '2026-04-01', valid_to: '2026-04-30' } as MeteringPointAssignment, today)).toBe(false)
+    expect(isAssignmentCurrent({ valid_from: '2026-06-01', valid_to: null } as MeteringPointAssignment, today)).toBe(false)
+  })
+
+  describe('getNextAssignmentGuidance', () => {
+    const today = '2026-05-08'
+
+    it('suggests today when the meter has no assignment history', () => {
+      const guidance = getNextAssignmentGuidance([], today)
+      expect(guidance.suggestedValidFrom).toBe(today)
+      expect(guidance.hasOpenEndedAssignment).toBe(false)
+    })
+
+    it('suggests the day after the latest ended assignment (a tenant handover)', () => {
+      const guidance = getNextAssignmentGuidance(
+        [{ valid_from: '2025-01-01', valid_to: '2026-03-31' } as MeteringPointAssignment],
+        today,
+      )
+      expect(guidance.suggestedValidFrom).toBe('2026-04-01')
+      expect(guidance.hasOpenEndedAssignment).toBe(false)
+    })
+
+    it('picks the latest end date across multiple past assignments', () => {
+      const guidance = getNextAssignmentGuidance(
+        [
+          { valid_from: '2024-01-01', valid_to: '2024-12-31' } as MeteringPointAssignment,
+          { valid_from: '2025-01-01', valid_to: '2026-03-31' } as MeteringPointAssignment,
+        ],
+        today,
+      )
+      expect(guidance.suggestedValidFrom).toBe('2026-04-01')
+    })
+
+    it('flags an open-ended assignment so the caller can warn before it overlaps', () => {
+      const guidance = getNextAssignmentGuidance(
+        [{ valid_from: '2025-01-01', valid_to: null } as MeteringPointAssignment],
+        today,
+      )
+      expect(guidance.hasOpenEndedAssignment).toBe(true)
+    })
+
+    it('crosses a month/year boundary correctly', () => {
+      const guidance = getNextAssignmentGuidance(
+        [{ valid_from: '2025-01-01', valid_to: '2025-12-31' } as MeteringPointAssignment],
+        today,
+      )
+      expect(guidance.suggestedValidFrom).toBe('2026-01-01')
+    })
   })
 })
