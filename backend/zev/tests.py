@@ -1666,6 +1666,108 @@ class MeteringPointReadingsDeletionTests(TestCase):
 		self.assertEqual(resp.status_code, 403)
 
 
+class MeteringPointCascadeInfoTests(TestCase):
+	"""``reading_count``/``assignment_count``/first/last reading timestamps
+	describe the cascade a delete would take with it (metering_point.py#L27
+	CASCADEs both MeterReading and MeteringPointAssignment), so the frontend
+	can show it in the delete confirmation instead of a bare warning."""
+
+	def setUp(self):
+		self.admin_client = APIClient()
+		self.admin = make_user("admin_cascade_info", UserRole.ADMIN)
+
+		self.zev = Zev.objects.create(
+			name="Cascade Info ZEV",
+			owner=make_user("owner_cascade_info", UserRole.ZEV_OWNER),
+			zev_type="vzev",
+			invoice_prefix="CI",
+		)
+		self.metering_point = MeteringPoint.objects.create(
+			zev=self.zev,
+			meter_id="MP-CASCADE-1",
+			meter_type=MeteringPointType.CONSUMPTION,
+		)
+		self.empty_metering_point = MeteringPoint.objects.create(
+			zev=self.zev,
+			meter_id="MP-CASCADE-2",
+			meter_type=MeteringPointType.CONSUMPTION,
+		)
+
+		MeterReading.objects.create(
+			metering_point=self.metering_point,
+			timestamp=datetime(2026, 1, 10, 10, 0, tzinfo=timezone.utc),
+			energy_kwh="1.0000",
+			direction="in",
+		)
+		MeterReading.objects.create(
+			metering_point=self.metering_point,
+			timestamp=datetime(2026, 3, 20, 10, 0, tzinfo=timezone.utc),
+			energy_kwh="2.0000",
+			direction="in",
+		)
+
+		participant = Participant.objects.create(
+			zev=self.zev,
+			first_name="Anna",
+			last_name="Consumer",
+			valid_from=date(2026, 1, 1),
+		)
+		MeteringPointAssignment.objects.create(
+			metering_point=self.metering_point,
+			participant=participant,
+			valid_from=date(2026, 1, 1),
+		)
+
+		auth(self.admin_client, self.admin)
+
+	def test_list_reports_cascade_counts_and_reading_span(self):
+		resp = self.admin_client.get("/api/v1/zev/metering-points/")
+		self.assertEqual(resp.status_code, 200)
+
+		by_id = {row["id"]: row for row in resp.data["results"]}
+		row = by_id[str(self.metering_point.id)]
+		self.assertEqual(row["reading_count"], 2)
+		self.assertEqual(row["assignment_count"], 1)
+		self.assertEqual(row["first_reading_at"].date().isoformat(), "2026-01-10")
+		self.assertEqual(row["last_reading_at"].date().isoformat(), "2026-03-20")
+
+		empty_row = by_id[str(self.empty_metering_point.id)]
+		self.assertEqual(empty_row["reading_count"], 0)
+		self.assertEqual(empty_row["assignment_count"], 0)
+		self.assertIsNone(empty_row["first_reading_at"])
+		self.assertIsNone(empty_row["last_reading_at"])
+
+		# `resp.data` is the pre-render representation (raw datetime objects);
+		# confirm the actual JSON body — what the frontend receives — encodes
+		# the timestamp as an ISO 8601 string rather than failing to serialize.
+		json_row = {r["id"]: r for r in resp.json()["results"]}[str(self.metering_point.id)]
+		self.assertEqual(json_row["first_reading_at"][:10], "2026-01-10")
+
+	def test_retrieve_reports_cascade_counts(self):
+		resp = self.admin_client.get(f"/api/v1/zev/metering-points/{self.metering_point.id}/")
+		self.assertEqual(resp.status_code, 200)
+		self.assertEqual(resp.data["reading_count"], 2)
+		self.assertEqual(resp.data["assignment_count"], 1)
+
+	def test_create_response_reports_zero_counts_for_a_new_metering_point(self):
+		"""The instance create() returns isn't fetched through the annotated
+		queryset, so the serializer's SerializerMethodField fallback (a live
+		count) must kick in rather than raising or omitting the field."""
+		resp = self.admin_client.post(
+			"/api/v1/zev/metering-points/",
+			{
+				"zev": str(self.zev.id),
+				"meter_id": "MP-CASCADE-NEW",
+				"meter_type": MeteringPointType.CONSUMPTION,
+				"is_active": True,
+			},
+			format="json",
+		)
+		self.assertEqual(resp.status_code, 201)
+		self.assertEqual(resp.data["reading_count"], 0)
+		self.assertEqual(resp.data["assignment_count"], 0)
+
+
 class NextInvoiceNumberTests(TestCase):
 	"""Guards the F()-expression counter increment used during invoice generation."""
 

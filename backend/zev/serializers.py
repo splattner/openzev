@@ -9,10 +9,47 @@ from .tasks import trigger_geocode_if_address_present
 
 
 class MeteringPointSerializer(serializers.ModelSerializer):
+    """
+    ``reading_count``/``assignment_count``/``first_reading_at``/``last_reading_at``
+    describe what a delete of this metering point would cascade to (both
+    MeterReading and MeteringPointAssignment CASCADE on metering_point) so
+    the frontend can show it before the user confirms.
+
+    They read from queryset annotations when available (MeteringPointViewSet
+    annotates its queryset for exactly this) and fall back to a live count
+    otherwise, so the fields stay correct for instances not fetched through
+    that queryset (e.g. the instance returned by create()/update()).
+    """
+
+    reading_count = serializers.SerializerMethodField()
+    assignment_count = serializers.SerializerMethodField()
+    first_reading_at = serializers.SerializerMethodField()
+    last_reading_at = serializers.SerializerMethodField()
+
     class Meta:
         model = MeteringPoint
         fields = "__all__"
         read_only_fields = ["id", "created_at", "updated_at"]
+
+    def get_reading_count(self, obj):
+        if hasattr(obj, "reading_count"):
+            return obj.reading_count
+        return obj.readings.count()
+
+    def get_assignment_count(self, obj):
+        if hasattr(obj, "assignment_count"):
+            return obj.assignment_count
+        return obj.assignments.count()
+
+    def get_first_reading_at(self, obj):
+        if hasattr(obj, "first_reading_at"):
+            return obj.first_reading_at
+        return obj.readings.order_by("timestamp").values_list("timestamp", flat=True).first()
+
+    def get_last_reading_at(self, obj):
+        if hasattr(obj, "last_reading_at"):
+            return obj.last_reading_at
+        return obj.readings.order_by("-timestamp").values_list("timestamp", flat=True).first()
 
 
 class MeteringPointReadingsDeleteSerializer(serializers.Serializer):

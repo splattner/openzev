@@ -2,6 +2,7 @@ import logging
 import tempfile
 
 from django.conf import settings as django_settings
+from django.db.models import Count, Max, Min
 from django.http import FileResponse, HttpResponse
 from django.utils import timezone as dj_timezone
 from django.utils.crypto import get_random_string
@@ -662,7 +663,21 @@ class MeteringPointViewSet(AuditedCreateDestroyMixin, AuditedUpdateMixin, ZevSco
         return instance.meter_id
 
     def get_queryset(self):
-        return self.scope_queryset(MeteringPoint.objects.select_related("zev"))
+        # Annotate the cascade a delete would take with it (readings +
+        # assignment history), so the serializer can surface it without an
+        # N+1 query per metering point. `distinct=True` on each Count keeps
+        # the two independent reverse relations (readings, assignments) from
+        # inflating each other via the join; Min/Max are unaffected by that
+        # same join fan-out since duplicate rows don't change a min or max.
+        # Annotating drops the model's Meta.ordering (Django does not carry
+        # it into a GROUP BY query), so it has to be requested explicitly
+        # again or list responses come back in undefined order.
+        return self.scope_queryset(MeteringPoint.objects.select_related("zev")).annotate(
+            reading_count=Count("readings", distinct=True),
+            assignment_count=Count("assignments", distinct=True),
+            first_reading_at=Min("readings__timestamp"),
+            last_reading_at=Max("readings__timestamp"),
+        ).order_by("meter_id")
 
     def get_audit_create_summary(self, instance):
         return f"Created metering point {instance.meter_id}."
