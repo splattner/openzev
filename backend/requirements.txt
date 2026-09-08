@@ -70,7 +70,7 @@ tzlocal==5.4.4
 uritemplate==4.2.0
 vine==5.1.0
 wcwidth==0.8.2
-weasyprint==69.0
+weasyprint==70.0
 webencodings==0.5.1
 zopfli==0.4.3
 # MariaDB/MySQL support: install libmariadb-dev then add mysqlclient
