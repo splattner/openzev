@@ -635,16 +635,11 @@ Existing suites stay green (contract: 48 tests in `test_contract_context.py`; te
   now comes from the generated theme's `primaryColor`). Scripted WCAG AA ratio
   audit of the shipped semantic pairs passes; the one failure found
   (muted-on-brand-pale) was fixed by using `--ink-soft` on pale surfaces.
-- **Screenshot authentication** — `npm run screenshots` and `npm run shot`
-  use the `setup` project in `frontend/screenshots.config.ts` to log in once
-  per invocation. `screenshots/auth.setup.ts` saves the httpOnly JWT cookies
-  and expanded-sidebar preference in the gitignored
-  `frontend/screenshots/.auth/admin.json`; the `capture` project depends on
-  setup and gives each test an isolated context loaded from that state.
-  The login-page capture explicitly uses empty cookies and origins and runs
-  outside the authenticated suite's demo-ZEV pinning hook. Direct API helpers
-  reuse the API-scoped access cookie, logging in only when it is absent;
-  the one-off shot also reuses setup's session.
+- **Screenshot authentication** — the `setup` project logs in once per
+  invocation and saves the session to the gitignored
+  `frontend/screenshots/.auth/admin.json`; the `capture` project and the
+  one-off shot reuse it, API helpers reuse the access cookie, and the
+  login-page capture opts out to stay signed out.
 - **Screenshot regeneration** — `docs/user-guide/screenshots/*` re-captured
   against the redesigned UI (22/22 Playwright captures, de-CH, base viewport
   1440×900; `screenshots.config.ts` defaults to the full `chromium` channel

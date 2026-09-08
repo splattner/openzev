@@ -1,15 +1,4 @@
-/**
- * Shared helpers for screenshot capture.
- *
- * Extracted from ``capture.spec.ts`` so the one-off release-note helper
- * (``shot.spec.ts``) logs in, pins the demo ZEV and sizes a capture exactly
- * the way the user-guide shots do — a release note showing a differently
- * framed app than the guide would look like a different product.
- *
- * The capture functions take their output directory from the caller: the
- * user-guide shots are regenerated as the UI moves, while release-note shots
- * are frozen at the version they document, so the two sets never share a home.
- */
+/** Shared helpers for screenshot capture (user-guide + one-off release-note shots). */
 import { expect, type Page } from '@playwright/test'
 import path from 'path'
 import { fileURLToPath } from 'url'
