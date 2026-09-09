@@ -125,6 +125,21 @@ export function meteringPointDataRange(
     }
 }
 
+/**
+ * The chart bucket with the highest value for `field`, or `null` for an
+ * empty chart. 91 near-identical daily rows tell you nothing at a glance —
+ * this is what lets a stat badge say which one actually stands out (#651).
+ */
+export function peakChartPoint(
+    data: ChartDataPoint[],
+    field: 'in_kwh' | 'out_kwh',
+): ChartDataPoint | null {
+    if (data.length === 0) {
+        return null
+    }
+    return data.reduce((peak, point) => (point[field] > peak[field] ? point : peak), data[0])
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export function MeteringChartPage() {
@@ -224,6 +239,8 @@ export function MeteringChartPage() {
     const totalIn = data.reduce((sum, d) => sum + d.in_kwh, 0)
     const totalOut = data.reduce((sum, d) => sum + d.out_kwh, 0)
     const hasOut = data.some((d) => d.out_kwh > 0)
+    const averageIn = data.length > 0 ? totalIn / data.length : 0
+    const peakIn = peakChartPoint(data, 'in_kwh')
 
     // Sync the selected metering point to the URL
     const handleMpChange = useCallback((id: string) => {
@@ -411,6 +428,19 @@ export function MeteringChartPage() {
                                         label={t('pages.meteringData.stats.totalConsumption')}
                                         value={`${totalIn.toFixed(2)} kWh`}
                                     />
+                                    {peakIn && (
+                                        <>
+                                            <StatCard
+                                                label={t('pages.meteringData.stats.averageConsumption')}
+                                                value={`${averageIn.toFixed(2)} kWh`}
+                                            />
+                                            <StatCard
+                                                label={t('pages.meteringData.stats.peakConsumption')}
+                                                value={`${peakIn.in_kwh.toFixed(2)} kWh`}
+                                                hint={formatMeteringBucketLabel(peakIn.bucket, bucket, settings)}
+                                            />
+                                        </>
+                                    )}
                                     {hasOut && (
                                         <StatCard
                                             label={t(outReadingLabelKey(selectedMp?.meter_type, 'pages.meteringData.stats.totalProduction', 'pages.meteringData.stats.totalFeedIn'))}

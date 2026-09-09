@@ -1705,6 +1705,8 @@ export const it = {
             stats: {
                 meterId: 'ID contatore',
                 totalConsumption: 'Consumo totale (prelievo)',
+                averageConsumption: 'Consumo medio (prelievo)',
+                peakConsumption: 'Picco di consumo (prelievo)',
                 totalFeedIn: 'Immissione totale',
                 totalProduction: 'Produzione totale',
                 daysShown: 'Giorni mostrati',

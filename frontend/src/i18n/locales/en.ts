@@ -1716,6 +1716,8 @@ export const en = {
             stats: {
                 meterId: 'Meter ID',
                 totalConsumption: 'Total Consumption (IN)',
+                averageConsumption: 'Average Consumption (IN)',
+                peakConsumption: 'Peak Consumption (IN)',
                 totalFeedIn: 'Total Feed-in (OUT)',
                 totalProduction: 'Total Production (OUT)',
                 daysShown: 'Days shown',

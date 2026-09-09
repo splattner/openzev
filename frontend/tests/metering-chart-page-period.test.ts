@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { meteringPointDataRange, readPeriodFromSearchParams } from '../src/pages/MeteringChartPage'
+import { meteringPointDataRange, peakChartPoint, readPeriodFromSearchParams } from '../src/pages/MeteringChartPage'
 
 const SAVED_TZ = process.env.TZ
 
@@ -67,5 +67,29 @@ describe('meteringPointDataRange', () => {
 
   it('returns null when passed undefined (no metering point selected yet)', () => {
     expect(meteringPointDataRange(undefined)).toBeNull()
+  })
+})
+
+describe('peakChartPoint', () => {
+  const data = [
+    { bucket: '2026-01-01', in_kwh: 3, out_kwh: 1 },
+    { bucket: '2026-01-02', in_kwh: 9, out_kwh: 5 },
+    { bucket: '2026-01-03', in_kwh: 4, out_kwh: 2 },
+  ]
+
+  it('finds the bucket with the highest in_kwh (#651)', () => {
+    expect(peakChartPoint(data, 'in_kwh')).toEqual(data[1])
+  })
+
+  it('finds the bucket with the highest out_kwh independently', () => {
+    expect(peakChartPoint(data, 'out_kwh')).toEqual(data[1])
+  })
+
+  it('returns null for an empty chart', () => {
+    expect(peakChartPoint([], 'in_kwh')).toBeNull()
+  })
+
+  it('returns the single bucket for a one-point chart', () => {
+    expect(peakChartPoint([data[0]], 'in_kwh')).toEqual(data[0])
   })
 })

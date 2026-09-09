@@ -1705,6 +1705,8 @@ export const de = {
             stats: {
                 meterId: 'Zähler-ID',
                 totalConsumption: 'Gesamtverbrauch (Bezug)',
+                averageConsumption: 'Durchschnittlicher Verbrauch (Bezug)',
+                peakConsumption: 'Spitzenverbrauch (Bezug)',
                 totalFeedIn: 'Gesamte Einspeisung',
                 totalProduction: 'Gesamtproduktion',
                 daysShown: 'Angezeigte Tage',

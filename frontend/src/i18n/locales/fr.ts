@@ -1705,6 +1705,8 @@ export const fr = {
             stats: {
                 meterId: 'ID du compteur',
                 totalConsumption: 'Consommation totale (soutirage)',
+                averageConsumption: 'Consommation moyenne (soutirage)',
+                peakConsumption: 'Pointe de consommation (soutirage)',
                 totalFeedIn: 'Injection totale',
                 totalProduction: 'Production totale',
                 daysShown: 'Jours affichés',
