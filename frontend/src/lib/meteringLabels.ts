@@ -110,3 +110,25 @@ export function outReadingLabelKey(
 ): string {
     return meterType === 'production' ? whenProduction : otherwise
 }
+
+/**
+ * Label for a metering-point `<option>` — meter ID plus enough to tell two
+ * similarly-named meters apart at a glance (type, active/inactive, ZEV)
+ * without opening each one (#643). Reuses the same meter-type and
+ * active-state strings already shown on the Metering Points page, so the
+ * two lists describe a meter the same way.
+ */
+export function meteringPointOptionLabel(
+    mp: Pick<MeteringPoint, 'meter_id' | 'meter_type' | 'is_active'>,
+    zevName: string | undefined,
+    translate: (key: string) => string,
+): string {
+    const parts = [mp.meter_id, translate(`pages.meteringPoints.meterTypes.${mp.meter_type}`)]
+    if (!mp.is_active) {
+        parts.push(translate('pages.meteringPoints.inactive'))
+    }
+    if (zevName) {
+        parts.push(zevName)
+    }
+    return parts.join(' · ')
+}

@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { formatMeteringBucketLabel, outReadingLabelKey } from '../src/lib/meteringLabels'
+import { formatMeteringBucketLabel, meteringPointOptionLabel, outReadingLabelKey } from '../src/lib/meteringLabels'
 import type { AppSettings } from '../src/types/api'
 
 const SAVED_TZ = process.env.TZ
@@ -58,5 +58,30 @@ describe('outReadingLabelKey', () => {
   it('picks the feed-in key for a consumption meter or when the meter is unknown', () => {
     expect(outReadingLabelKey('consumption', 'series.production', 'series.feedIn')).toBe('series.feedIn')
     expect(outReadingLabelKey(undefined, 'series.production', 'series.feedIn')).toBe('series.feedIn')
+  })
+})
+
+describe('meteringPointOptionLabel', () => {
+  const translate = (key: string) => key
+
+  it('includes the meter type and ZEV name for an active meter (#643)', () => {
+    const mp = { meter_id: 'CH-DEMO-0001', meter_type: 'consumption' as const, is_active: true }
+    expect(meteringPointOptionLabel(mp, 'ZEV STWEG Sonnenhof', translate)).toBe(
+      'CH-DEMO-0001 · pages.meteringPoints.meterTypes.consumption · ZEV STWEG Sonnenhof',
+    )
+  })
+
+  it('adds an inactive marker for an inactive meter', () => {
+    const mp = { meter_id: 'CH-DEMO-0002', meter_type: 'production' as const, is_active: false }
+    expect(meteringPointOptionLabel(mp, undefined, translate)).toBe(
+      'CH-DEMO-0002 · pages.meteringPoints.meterTypes.production · pages.meteringPoints.inactive',
+    )
+  })
+
+  it('omits the ZEV segment when no name is known', () => {
+    const mp = { meter_id: 'CH-DEMO-0003', meter_type: 'bidirectional' as const, is_active: true }
+    expect(meteringPointOptionLabel(mp, undefined, translate)).toBe(
+      'CH-DEMO-0003 · pages.meteringPoints.meterTypes.bidirectional',
+    )
   })
 })

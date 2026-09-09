@@ -28,7 +28,7 @@ import {
 } from '../lib/billingPeriod'
 import { useAppSettings } from '../lib/appSettings'
 import { daysInPeriod, isValidIsoDate } from '../lib/dates'
-import { formatMeteringBucketLabel, outReadingLabelKey } from '../lib/meteringLabels'
+import { formatMeteringBucketLabel, meteringPointOptionLabel, outReadingLabelKey } from '../lib/meteringLabels'
 import type { AppSettings, ChartDataPoint } from '../types/api'
 import { CHART_GRID, CONS_COLORS, NEGATIVE_COLOR, PROD_COLORS } from '../lib/chartTokens'
 
@@ -312,8 +312,7 @@ export function MeteringChartPage() {
                                     <option value="">{t('pages.meteringData.selectMeteringPoint')}</option>
                                     {meteringPoints.map((mp) => (
                                         <option key={mp.id} value={mp.id}>
-                                            {mp.meter_id}
-                                            {zevNameById.has(mp.zev) ? ` (${zevNameById.get(mp.zev)})` : ''}
+                                            {meteringPointOptionLabel(mp, zevNameById.get(mp.zev), t)}
                                         </option>
                                     ))}
                                 </select>
@@ -363,8 +362,7 @@ export function MeteringChartPage() {
                                     <option value="">{t('pages.meteringData.allMeteringPoints')}</option>
                                     {meteringPoints.map((mp) => (
                                         <option key={mp.id} value={mp.id}>
-                                            {mp.meter_id}
-                                            {zevNameById.has(mp.zev) ? ` (${zevNameById.get(mp.zev)})` : ''}
+                                            {meteringPointOptionLabel(mp, zevNameById.get(mp.zev), t)}
                                         </option>
                                     ))}
                                 </select>
