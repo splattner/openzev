@@ -1,7 +1,8 @@
 import { useQuery } from '@tanstack/react-query'
 import { Tabs } from '@mantine/core'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
+import { DataTable, type ColumnDef } from '../components/DataTable'
 import { EmptyState } from '../components/EmptyState'
 import { PageSkeleton } from '../components/PageSkeleton'
 import { StatCard } from '../components/StatCard'
@@ -31,7 +32,7 @@ import {
 import { formatShortDate, useAppSettings } from '../lib/appSettings'
 import { daysInPeriod, formatUtcIsoDate, isValidIsoDate } from '../lib/dates'
 import { formatMeteringBucketLabel, meteringPointOptionLabel, outReadingLabelKey } from '../lib/meteringLabels'
-import type { AppSettings, ChartDataPoint, MeteringPoint } from '../types/api'
+import type { AppSettings, ChartDataPoint, DataQualitySeverity, MeteringPoint, MeteringPointDataQuality } from '../types/api'
 import { CHART_GRID, CONS_COLORS, NEGATIVE_COLOR, PROD_COLORS } from '../lib/chartTokens'
 
 // ── Custom Tooltip ────────────────────────────────────────────────────────────
@@ -87,6 +88,30 @@ const BUCKET_COUNT_LABEL_KEY: Record<'day' | 'hour' | 'month', string> = {
     day: 'pages.meteringData.stats.daysShown',
     hour: 'pages.meteringData.stats.hoursShown',
     month: 'pages.meteringData.stats.monthsShown',
+}
+
+/** Sortable numeric proxy for severity — worst first, so sorting the Status
+ * column ascending brings the red rows to the top (#648). */
+const SEVERITY_RANK: Record<DataQualitySeverity, number> = { red: 0, yellow: 1, green: 2 }
+
+/** The active Data Quality severity filter from `?quality_severity=`, or
+ * `'all'` if absent/invalid — a URL is never trusted input (#648). */
+export function readSeverityFilter(searchParams: URLSearchParams): DataQualitySeverity | 'all' {
+    const raw = searchParams.get('quality_severity')
+    return raw === 'red' || raw === 'yellow' || raw === 'green' ? raw : 'all'
+}
+
+/**
+ * The Data Quality rows to render: narrowed to `severityFilter` (or all of
+ * them), each carrying a numeric `severityRank` so the Status column can be
+ * sorted worst-first (#648).
+ */
+export function filterAndRankQualityRows(
+    points: MeteringPointDataQuality[],
+    severityFilter: DataQualitySeverity | 'all',
+): Array<MeteringPointDataQuality & { severityRank: number }> {
+    const filtered = severityFilter === 'all' ? points : points.filter((mp) => mp.severity === severityFilter)
+    return filtered.map((mp) => ({ ...mp, severityRank: SEVERITY_RANK[mp.severity] }))
 }
 
 /**
@@ -265,6 +290,53 @@ export function MeteringChartPage() {
         setSearchParams(next, { replace: true })
     }
 
+    // Jumping from a Data Quality row to that meter's chart changes both
+    // ?metering_point= and ?tab= at once (#648). Both handleMpChange and
+    // handleTabChange build their update from the render-time `searchParams`
+    // snapshot, so calling them back to back in one handler would have the
+    // second overwrite the first's change before either commits — this does
+    // both in a single functional update instead.
+    const handleJumpToChart = useCallback((meteringPointId: string) => {
+        setSelectedMpId(meteringPointId)
+        setSearchParams((previous) => {
+            const next = new URLSearchParams(previous)
+            next.set('metering_point', meteringPointId)
+            next.delete('tab')
+            return next
+        }, { replace: true })
+    }, [setSearchParams])
+
+    // Data Quality: click a severity card to filter the table to it; click
+    // the active one again to clear (#648). Persisted in the URL like the
+    // other filters/selectors on this page.
+    const severityFilter = readSeverityFilter(searchParams)
+    const handleSeverityFilterChange = useCallback((next: DataQualitySeverity | 'all') => {
+        setSearchParams((previous) => {
+            const nextParams = new URLSearchParams(previous)
+            if (next === 'all') {
+                nextParams.delete('quality_severity')
+            } else {
+                nextParams.set('quality_severity', next)
+            }
+            return nextParams
+        }, { replace: true })
+    }, [setSearchParams])
+
+    // Data Quality: which rows have their full gap list expanded in place,
+    // instead of the "+N more" dead end (#648).
+    const [expandedGapsIds, setExpandedGapsIds] = useState<ReadonlySet<string>>(new Set())
+    const toggleGapsExpanded = useCallback((meteringPointId: string) => {
+        setExpandedGapsIds((previous) => {
+            const next = new Set(previous)
+            if (next.has(meteringPointId)) {
+                next.delete(meteringPointId)
+            } else {
+                next.add(meteringPointId)
+            }
+            return next
+        })
+    }, [])
+
     const selectedMp = meteringPoints.find((m) => m.id === selectedMpId)
     const selectedMpDataRange = meteringPointDataRange(selectedMp)
 
@@ -282,6 +354,116 @@ export function MeteringChartPage() {
     }, [isManagedScope, selectedZevId, selectedMpId, meteringPoints, handleMpChange])
 
     const tickFormatter = (value: string) => formatMeteringBucketLabel(value, bucket, settings)
+
+    // Data Quality table rows: filtered to the active severity card, with a
+    // sortable numeric rank alongside the string severity (#648).
+    const qualityRows = useMemo(
+        () => filterAndRankQualityRows(qualityQuery.data?.metering_points ?? [], severityFilter),
+        [qualityQuery.data, severityFilter],
+    )
+
+    const qualityColumns = useMemo<ColumnDef<(typeof qualityRows)[number], unknown>[]>(() => [
+        {
+            accessorKey: 'meter_id',
+            header: t('meteringDataQuality.meterId'),
+            cell: (ctx) => (
+                <button
+                    type="button"
+                    className="table-inline-link"
+                    style={{ fontFamily: 'monospace', fontSize: '0.9em' }}
+                    onClick={() => handleJumpToChart(ctx.row.original.id)}
+                >
+                    {ctx.row.original.meter_id}
+                </button>
+            ),
+        },
+        {
+            accessorKey: 'participant_name',
+            header: t('meteringDataQuality.participant'),
+        },
+        {
+            accessorKey: 'data_completeness',
+            header: t('meteringDataQuality.dataCompleteness'),
+            cell: (ctx) => {
+                const mp = ctx.row.original
+                return (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <div style={{ width: '80px', height: '20px', background: 'var(--line-subtle)', borderRadius: '4px', overflow: 'hidden' }}>
+                            <div
+                                style={{
+                                    height: '100%',
+                                    background: mp.severity === 'green' ? PROD_COLORS[0] : mp.severity === 'yellow' ? CHART_GRID : NEGATIVE_COLOR,
+                                    width: `${mp.data_completeness}%`,
+                                }}
+                            />
+                        </div>
+                        <span style={{ fontSize: '0.875rem', fontWeight: 'bold' }}>{mp.data_completeness}%</span>
+                    </div>
+                )
+            },
+        },
+        {
+            accessorKey: 'severityRank',
+            header: t('meteringDataQuality.status'),
+            cell: (ctx) => {
+                const mp = ctx.row.original
+                return (
+                    <>
+                        <span
+                            style={{
+                                display: 'inline-block',
+                                padding: '0.25rem 0.75rem',
+                                borderRadius: '4px',
+                                fontSize: '0.875rem',
+                                fontWeight: 'bold',
+                                background: mp.severity === 'green' ? 'var(--success-100)' : mp.severity === 'yellow' ? 'var(--warning-100)' : 'var(--danger-100)',
+                                color: mp.severity === 'green' ? 'var(--success-700)' : mp.severity === 'yellow' ? 'var(--warning-800)' : 'var(--danger-700)',
+                            }}
+                        >
+                            {t(`meteringDataQuality.severity${mp.severity.charAt(0).toUpperCase() + mp.severity.slice(1)}`)}
+                        </span>
+                        {mp.assignment_overlap && (
+                            <div className="metering-dq-warning">{t('meteringDataQuality.assignmentOverlapWarning')}</div>
+                        )}
+                        {mp.unassigned_readings > 0 && (
+                            <div className="metering-dq-warning">
+                                {t('meteringDataQuality.unassignedWarning', { readings: mp.unassigned_readings, days: mp.unassigned_days })}
+                            </div>
+                        )}
+                    </>
+                )
+            },
+        },
+        {
+            id: 'gaps',
+            header: t('meteringDataQuality.gaps'),
+            enableSorting: false,
+            cell: (ctx) => {
+                const mp = ctx.row.original
+                if (mp.gaps.length === 0) {
+                    return <span style={{ color: 'var(--success-600)' }}>{t('meteringDataQuality.noGaps')}</span>
+                }
+                const expanded = expandedGapsIds.has(mp.id)
+                const visibleGaps = expanded ? mp.gaps : mp.gaps.slice(0, 1)
+                return (
+                    <div style={{ fontSize: '0.875rem' }}>
+                        {visibleGaps.map((gap, idx) => (
+                            <div key={idx} style={{ color: 'var(--text-body)' }}>
+                                {gap.start_date === gap.end_date ? <>{gap.start_date}</> : <>{gap.start_date} → {gap.end_date}</>}
+                            </div>
+                        ))}
+                        {mp.gaps.length > 1 && (
+                            <button type="button" className="table-inline-link" onClick={() => toggleGapsExpanded(mp.id)}>
+                                {expanded
+                                    ? t('meteringDataQuality.showFewerGaps')
+                                    : `+${mp.gaps.length - 1} ${t('meteringDataQuality.moreGaps')}`}
+                            </button>
+                        )}
+                    </div>
+                )
+            },
+        },
+    ], [t, expandedGapsIds, handleJumpToChart, toggleGapsExpanded])
 
     return (
         <div className="page-stack">
@@ -540,125 +722,81 @@ export function MeteringChartPage() {
                                     </div>
                                 ) : (
                                     <>
+                                        {/* Clickable filters (#648): click a card to narrow the table to
+                                            that severity, click the active one again to clear. */}
                                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
-                                            <div style={{ background: 'var(--success-100)', border: '1px solid var(--success-200)', borderRadius: '8px', padding: '1rem', textAlign: 'center' }}>
+                                            <button
+                                                type="button"
+                                                aria-pressed={severityFilter === 'green'}
+                                                onClick={() => handleSeverityFilterChange(severityFilter === 'green' ? 'all' : 'green')}
+                                                style={{
+                                                    background: 'var(--success-100)',
+                                                    border: `1px solid ${severityFilter === 'green' ? 'var(--success-700)' : 'var(--success-200)'}`,
+                                                    boxShadow: severityFilter === 'green' ? '0 0 0 2px var(--success-700)' : 'none',
+                                                    borderRadius: '8px',
+                                                    padding: '1rem',
+                                                    textAlign: 'center',
+                                                    cursor: 'pointer',
+                                                    font: 'inherit',
+                                                }}
+                                            >
                                                 <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'var(--success-700)' }}>
                                                     {qualityQuery.data.metering_points.filter((mp) => mp.severity === 'green').length}
                                                 </div>
                                                 <div style={{ fontSize: '0.875rem', color: 'var(--brand-mid)' }}>{t('meteringDataQuality.severityGreen')}</div>
-                                            </div>
-                                            <div style={{ background: 'var(--warning-100)', border: '1px solid var(--warning-200)', borderRadius: '8px', padding: '1rem', textAlign: 'center' }}>
+                                            </button>
+                                            <button
+                                                type="button"
+                                                aria-pressed={severityFilter === 'yellow'}
+                                                onClick={() => handleSeverityFilterChange(severityFilter === 'yellow' ? 'all' : 'yellow')}
+                                                style={{
+                                                    background: 'var(--warning-100)',
+                                                    border: `1px solid ${severityFilter === 'yellow' ? 'var(--warning-800)' : 'var(--warning-200)'}`,
+                                                    boxShadow: severityFilter === 'yellow' ? '0 0 0 2px var(--warning-800)' : 'none',
+                                                    borderRadius: '8px',
+                                                    padding: '1rem',
+                                                    textAlign: 'center',
+                                                    cursor: 'pointer',
+                                                    font: 'inherit',
+                                                }}
+                                            >
                                                 <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'var(--warning-800)' }}>
                                                     {qualityQuery.data.metering_points.filter((mp) => mp.severity === 'yellow').length}
                                                 </div>
                                                 <div style={{ fontSize: '0.875rem', color: 'var(--warning-800)' }}>{t('meteringDataQuality.severityYellow')}</div>
-                                            </div>
-                                            <div style={{ background: 'var(--danger-100)', border: '1px solid var(--danger-300)', borderRadius: '8px', padding: '1rem', textAlign: 'center' }}>
+                                            </button>
+                                            <button
+                                                type="button"
+                                                aria-pressed={severityFilter === 'red'}
+                                                onClick={() => handleSeverityFilterChange(severityFilter === 'red' ? 'all' : 'red')}
+                                                style={{
+                                                    background: 'var(--danger-100)',
+                                                    border: `1px solid ${severityFilter === 'red' ? 'var(--danger-700)' : 'var(--danger-300)'}`,
+                                                    boxShadow: severityFilter === 'red' ? '0 0 0 2px var(--danger-700)' : 'none',
+                                                    borderRadius: '8px',
+                                                    padding: '1rem',
+                                                    textAlign: 'center',
+                                                    cursor: 'pointer',
+                                                    font: 'inherit',
+                                                }}
+                                            >
                                                 <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'var(--danger-700)' }}>
                                                     {qualityQuery.data.metering_points.filter((mp) => mp.severity === 'red').length}
                                                 </div>
                                                 <div style={{ fontSize: '0.875rem', color: 'var(--danger-600)' }}>{t('meteringDataQuality.severityRed')}</div>
-                                            </div>
+                                            </button>
                                         </div>
 
                                         <div className="table-card">
-                                            <table>
-                                                <thead>
-                                                    <tr>
-                                                        <th>{t('meteringDataQuality.meterId')}</th>
-                                                        <th>{t('meteringDataQuality.participant')}</th>
-                                                        <th>{t('meteringDataQuality.dataCompleteness')}</th>
-                                                        <th>{t('meteringDataQuality.status')}</th>
-                                                        <th>{t('meteringDataQuality.gaps')}</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    {qualityQuery.data.metering_points.map((mp) => (
-                                                        <tr key={mp.id}>
-                                                            <td style={{ fontFamily: 'monospace', fontSize: '0.9em' }}>{mp.meter_id}</td>
-                                                            <td>{mp.participant_name}</td>
-                                                            <td>
-                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                                                    <div style={{ width: '80px', height: '20px', background: 'var(--line-subtle)', borderRadius: '4px', overflow: 'hidden' }}>
-                                                                        <div
-                                                                            style={{
-                                                                                height: '100%',
-                                                                                background:
-                                                                                    mp.severity === 'green'
-                                                                                        ? PROD_COLORS[0]
-                                                                                        : mp.severity === 'yellow'
-                                                                                          ? CHART_GRID
-                                                                                          : NEGATIVE_COLOR,
-                                                                                width: `${mp.data_completeness}%`,
-                                                                            }}
-                                                                        />
-                                                                    </div>
-                                                                    <span style={{ fontSize: '0.875rem', fontWeight: 'bold' }}>{mp.data_completeness}%</span>
-                                                                </div>
-                                                            </td>
-                                                            <td>
-                                                                <span
-                                                                    style={{
-                                                                        display: 'inline-block',
-                                                                        padding: '0.25rem 0.75rem',
-                                                                        borderRadius: '4px',
-                                                                        fontSize: '0.875rem',
-                                                                        fontWeight: 'bold',
-                                                                        background:
-                                                                            mp.severity === 'green'
-                                                                                        ? 'var(--success-100)'
-                                                                                        : mp.severity === 'yellow'
-                                                                                          ? 'var(--warning-100)'
-                                                                                          : 'var(--danger-100)',
-                                                                        color:
-                                                                            mp.severity === 'green'
-                                                                                        ? 'var(--success-700)'
-                                                                                        : mp.severity === 'yellow'
-                                                                                          ? 'var(--warning-800)'
-                                                                                          : 'var(--danger-700)',
-                                                                    }}
-                                                                >
-                                                                    {t(`meteringDataQuality.severity${mp.severity.charAt(0).toUpperCase() + mp.severity.slice(1)}`)}
-                                                                </span>
-                                                                {mp.assignment_overlap && (
-                                                                    <div className="metering-dq-warning">
-                                                                        {t('meteringDataQuality.assignmentOverlapWarning')}
-                                                                    </div>
-                                                                )}
-                                                                {mp.unassigned_readings > 0 && (
-                                                                    <div className="metering-dq-warning">
-                                                                        {t('meteringDataQuality.unassignedWarning', { readings: mp.unassigned_readings, days: mp.unassigned_days })}
-                                                                    </div>
-                                                                )}
-                                                            </td>
-                                                            <td style={{ fontSize: '0.875rem' }}>
-                                                                {mp.gaps.length === 0 ? (
-                                                                    <span style={{ color: 'var(--success-600)' }}>{t('meteringDataQuality.noGaps')}</span>
-                                                                ) : (
-                                                                    <div>
-                                                                        {mp.gaps.slice(0, 1).map((gap, idx) => (
-                                                                            <div key={idx} style={{ color: 'var(--text-body)' }}>
-                                                                                {gap.start_date === gap.end_date ? (
-                                                                                    <>{gap.start_date}</>
-                                                                                ) : (
-                                                                                    <>
-                                                                                        {gap.start_date} → {gap.end_date}
-                                                                                    </>
-                                                                                )}
-                                                                            </div>
-                                                                        ))}
-                                                                        {mp.gaps.length > 1 && (
-                                                                            <div style={{ color: 'var(--text-muted)', fontSize: '0.8em' }}>
-                                                                                +{mp.gaps.length - 1} {t('meteringDataQuality.moreGaps')}
-                                                                            </div>
-                                                                        )}
-                                                                    </div>
-                                                                )}
-                                                            </td>
-                                                        </tr>
-                                                    ))}
-                                                </tbody>
-                                            </table>
+                                            <DataTable
+                                                // Remounts on filter change so pagination/sort state (internal
+                                                // to DataTable) doesn't strand the viewer on a now-empty page.
+                                                key={severityFilter}
+                                                data={qualityRows}
+                                                columns={qualityColumns}
+                                                getRowId={(row) => row.id}
+                                                emptyMessage={t('meteringDataQuality.noneMatchFilter')}
+                                            />
                                         </div>
                                     </>
                                 )}

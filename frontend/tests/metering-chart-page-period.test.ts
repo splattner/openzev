@@ -1,5 +1,12 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { meteringPointDataRange, peakChartPoint, readPeriodFromSearchParams } from '../src/pages/MeteringChartPage'
+import {
+  filterAndRankQualityRows,
+  meteringPointDataRange,
+  peakChartPoint,
+  readPeriodFromSearchParams,
+  readSeverityFilter,
+} from '../src/pages/MeteringChartPage'
+import type { MeteringPointDataQuality } from '../src/types/api'
 
 const SAVED_TZ = process.env.TZ
 
@@ -91,5 +98,52 @@ describe('peakChartPoint', () => {
 
   it('returns the single bucket for a one-point chart', () => {
     expect(peakChartPoint([data[0]], 'in_kwh')).toEqual(data[0])
+  })
+})
+
+describe('readSeverityFilter', () => {
+  it('reads a valid severity (#648)', () => {
+    expect(readSeverityFilter(new URLSearchParams({ quality_severity: 'red' }))).toBe('red')
+    expect(readSeverityFilter(new URLSearchParams({ quality_severity: 'yellow' }))).toBe('yellow')
+    expect(readSeverityFilter(new URLSearchParams({ quality_severity: 'green' }))).toBe('green')
+  })
+
+  it('falls back to "all" when absent or invalid', () => {
+    expect(readSeverityFilter(new URLSearchParams())).toBe('all')
+    expect(readSeverityFilter(new URLSearchParams({ quality_severity: 'purple' }))).toBe('all')
+  })
+})
+
+describe('filterAndRankQualityRows', () => {
+  const mp = (id: string, severity: MeteringPointDataQuality['severity']): MeteringPointDataQuality => ({
+    id,
+    meter_id: `CH-${id}`,
+    participant_name: 'Someone',
+    severity,
+    data_completeness: severity === 'green' ? 100 : severity === 'yellow' ? 50 : 0,
+    days_with_data: 0,
+    total_days: 0,
+    gaps: [],
+    unassigned_days: 0,
+    unassigned_readings: 0,
+    assignment_overlap: false,
+  })
+  const points = [mp('1', 'green'), mp('2', 'red'), mp('3', 'yellow')]
+
+  it('passes every row through unfiltered for "all", tagged with a severity rank (#648)', () => {
+    const rows = filterAndRankQualityRows(points, 'all')
+    expect(rows.map((r) => r.id)).toEqual(['1', '2', '3'])
+    expect(rows.find((r) => r.id === '2')?.severityRank).toBe(0) // red: worst, sorts first
+    expect(rows.find((r) => r.id === '3')?.severityRank).toBe(1) // yellow
+    expect(rows.find((r) => r.id === '1')?.severityRank).toBe(2) // green: best, sorts last
+  })
+
+  it('narrows to exactly the selected severity', () => {
+    expect(filterAndRankQualityRows(points, 'red').map((r) => r.id)).toEqual(['2'])
+    expect(filterAndRankQualityRows(points, 'yellow').map((r) => r.id)).toEqual(['3'])
+  })
+
+  it('returns an empty array when nothing matches', () => {
+    expect(filterAndRankQualityRows([mp('1', 'green')], 'red')).toEqual([])
   })
 })

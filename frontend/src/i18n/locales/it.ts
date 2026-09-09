@@ -1937,6 +1937,8 @@ export const it = {
         severityYellow: 'Parziale',
         severityRed: 'Mancante',
         moreGaps: 'altre lacune',
+        showFewerGaps: 'Mostra meno',
+        noneMatchFilter: 'Nessun punto di misurazione corrisponde a questo filtro.',
         unassignedWarning: '{{readings}} letture su {{days}} giorni senza assegnazione — non fatturate',
         assignmentOverlapWarning: 'Finestre di assegnazione sovrapposte — riassegnare il contatore interessato',
     },

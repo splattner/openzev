@@ -1937,6 +1937,8 @@ export const de = {
         severityYellow: 'Teilweise',
         severityRed: 'Fehlend',
         moreGaps: 'weitere Lücken',
+        showFewerGaps: 'Weniger anzeigen',
+        noneMatchFilter: 'Keine Messstellen entsprechen diesem Filter.',
         unassignedWarning: '{{readings}} Messwerte an {{days}} Tagen ohne Zuordnung — nicht verrechnet',
         assignmentOverlapWarning: 'Überlappende Zuordnungsfenster — betroffenen Zähler neu zuweisen',
     },

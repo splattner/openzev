@@ -1948,6 +1948,8 @@ export const en = {
         severityYellow: 'Partial',
         severityRed: 'Missing',
         moreGaps: 'more gaps',
+        showFewerGaps: 'Show fewer',
+        noneMatchFilter: 'No metering points match this filter.',
         unassignedWarning: '{{readings}} readings over {{days}} days with no assignment holder — not billed',
         assignmentOverlapWarning: 'Overlapping assignment windows — reassign the affected meter',
     },

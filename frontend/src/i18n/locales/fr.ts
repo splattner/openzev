@@ -1937,6 +1937,8 @@ export const fr = {
         severityYellow: 'Partiel',
         severityRed: 'Manquant',
         moreGaps: 'plus de lacunes',
+        showFewerGaps: 'Afficher moins',
+        noneMatchFilter: 'Aucun point de mesure ne correspond à ce filtre.',
         unassignedWarning: '{{readings}} relevés sur {{days}} jours sans attribution — non facturés',
         assignmentOverlapWarning: 'Fenêtres d\'attribution qui se chevauchent — réaffecter le compteur concerné',
     },
