@@ -1706,7 +1706,9 @@ export const de = {
                 totalConsumption: 'Gesamtverbrauch (Bezug)',
                 totalFeedIn: 'Gesamte Einspeisung',
                 totalProduction: 'Gesamtproduktion',
-                dataPoints: 'Datenpunkte',
+                daysShown: 'Angezeigte Tage',
+                hoursShown: 'Angezeigte Stunden',
+                monthsShown: 'Angezeigte Monate',
             },
             series: {
                 consumption: 'Verbrauch (Bezug)',

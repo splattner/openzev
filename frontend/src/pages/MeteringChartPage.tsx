@@ -95,6 +95,17 @@ function CustomTooltip({
  */
 const MAX_HOURLY_RESOLUTION_DAYS = 31
 
+/**
+ * `data.length` is a count of chart *buckets*, not readings — the raw-data
+ * table right below reports far more (e.g. 24 readings/day), so the label
+ * has to say which one it is instead of a bare "Data points" (#645).
+ */
+const BUCKET_COUNT_LABEL_KEY: Record<'day' | 'hour' | 'month', string> = {
+    day: 'pages.meteringData.stats.daysShown',
+    hour: 'pages.meteringData.stats.hoursShown',
+    month: 'pages.meteringData.stats.monthsShown',
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export function MeteringChartPage() {
@@ -358,7 +369,7 @@ export function MeteringChartPage() {
                                         />
                                     )}
                                     <StatBadge
-                                        label={t('pages.meteringData.stats.dataPoints')}
+                                        label={t(BUCKET_COUNT_LABEL_KEY[bucket])}
                                         value={String(data.length)}
                                         color="var(--text-muted)"
                                     />

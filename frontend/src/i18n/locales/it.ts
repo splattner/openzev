@@ -1706,7 +1706,9 @@ export const it = {
                 totalConsumption: 'Consumo totale (prelievo)',
                 totalFeedIn: 'Immissione totale',
                 totalProduction: 'Produzione totale',
-                dataPoints: 'Punti dati',
+                daysShown: 'Giorni mostrati',
+                hoursShown: 'Ore mostrate',
+                monthsShown: 'Mesi mostrati',
             },
             series: {
                 consumption: 'Consumo (prelievo)',

@@ -1706,7 +1706,9 @@ export const fr = {
                 totalConsumption: 'Consommation totale (soutirage)',
                 totalFeedIn: 'Injection totale',
                 totalProduction: 'Production totale',
-                dataPoints: 'Points de données',
+                daysShown: 'Jours affichés',
+                hoursShown: 'Heures affichées',
+                monthsShown: 'Mois affichés',
             },
             series: {
                 consumption: 'Consommation (soutirage)',

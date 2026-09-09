@@ -1717,7 +1717,9 @@ export const en = {
                 totalConsumption: 'Total Consumption (IN)',
                 totalFeedIn: 'Total Feed-in (OUT)',
                 totalProduction: 'Total Production (OUT)',
-                dataPoints: 'Data points',
+                daysShown: 'Days shown',
+                hoursShown: 'Hours shown',
+                monthsShown: 'Months shown',
             },
             series: {
                 consumption: 'Consumption (IN)',
