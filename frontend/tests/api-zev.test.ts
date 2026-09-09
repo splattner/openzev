@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   downloadParticipantContractPdf,
   fetchMeteringPointAssignments,
+  fetchMeteringPoints,
 } from '../src/lib/api/zev'
 import { api } from '../src/lib/api/client'
 
@@ -36,6 +37,26 @@ describe('zev api module', () => {
 
     const result = await fetchMeteringPointAssignments('mp-1')
     expect(result).toEqual([{ id: 'a-1' }])
+  })
+
+  it('fetches metering points without a zev filter by default', async () => {
+    apiMock.onGet('/zev/metering-points/').reply((config) => {
+      expect(config.params).toEqual({})
+      return [200, { count: 0, next: null, previous: null, results: [] }]
+    })
+
+    const result = await fetchMeteringPoints()
+    expect(result).toEqual([])
+  })
+
+  it('fetches metering points scoped to a zev when given one (#640)', async () => {
+    apiMock.onGet('/zev/metering-points/').reply((config) => {
+      expect(config.params).toEqual({ zev_id: 'zev-1' })
+      return [200, { count: 1, next: null, previous: null, results: [{ id: 'mp-1' }] }]
+    })
+
+    const result = await fetchMeteringPoints('zev-1')
+    expect(result).toEqual([{ id: 'mp-1' }])
   })
 
   it('downloads participant contract and revokes generated object URL', async () => {

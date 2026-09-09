@@ -248,7 +248,7 @@ export function useMeteringPointActions({
     })
     const meteringPointsQuery = useQuery({
         queryKey: queryKeys.metering.points(selectedZevId || undefined),
-        queryFn: fetchMeteringPoints,
+        queryFn: () => fetchMeteringPoints(selectedZevId || undefined),
     })
     const assignmentsQuery = useQuery({
         queryKey: queryKeys.metering.pointAssignments(),

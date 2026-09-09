@@ -131,7 +131,10 @@ export function MeteringChartPage() {
 
     // Data queries
     const zevsQuery = useQuery({ queryKey: queryKeys.zev.list(), queryFn: fetchZevs })
-    const mpQuery = useQuery({ queryKey: queryKeys.metering.points(selectedZevId || undefined), queryFn: fetchMeteringPoints })
+    const mpQuery = useQuery({
+        queryKey: queryKeys.metering.points(selectedZevId || undefined),
+        queryFn: () => fetchMeteringPoints(selectedZevId || undefined),
+    })
 
     const chartQuery = useQuery({
         queryKey: queryKeys.metering.chartData(selectedMpId, period.from, period.to, bucket),

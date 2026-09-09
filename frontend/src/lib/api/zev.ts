@@ -93,8 +93,9 @@ export async function fetchGridOperators(): Promise<GridOperatorList> {
   return data
 }
 
-export async function fetchMeteringPoints(): Promise<MeteringPoint[]> {
-  return fetchAllPages<MeteringPoint>('/zev/metering-points/')
+export async function fetchMeteringPoints(zevId?: string): Promise<MeteringPoint[]> {
+  const params = zevId ? { zev_id: zevId } : {}
+  return fetchAllPages<MeteringPoint>('/zev/metering-points/', params)
 }
 
 export async function createMeteringPoint(payload: MeteringPointInput): Promise<MeteringPoint> {
