@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { Tabs } from '@mantine/core'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { PageSkeleton } from '../components/PageSkeleton'
 import { useTranslation } from 'react-i18next'
@@ -27,7 +27,7 @@ import {
     getCurrentBillingPeriod,
 } from '../lib/billingPeriod'
 import { useAppSettings } from '../lib/appSettings'
-import { daysInPeriod } from '../lib/dates'
+import { daysInPeriod, isValidIsoDate } from '../lib/dates'
 import { formatMeteringBucketLabel, outReadingLabelKey } from '../lib/meteringLabels'
 import type { AppSettings, ChartDataPoint } from '../types/api'
 import { CHART_GRID, CONS_COLORS, NEGATIVE_COLOR, PROD_COLORS } from '../lib/chartTokens'
@@ -106,6 +106,21 @@ const BUCKET_COUNT_LABEL_KEY: Record<'day' | 'hour' | 'month', string> = {
     month: 'pages.meteringData.stats.monthsShown',
 }
 
+/**
+ * The period from `?from=`/`?to=`, or `null` if either is missing/invalid
+ * or the range is reversed. A URL is never trusted input (#647): a
+ * hand-edited or stale pair falls back to the current billing period
+ * instead of feeding a broken range to the chart/quality queries.
+ */
+export function readPeriodFromSearchParams(searchParams: URLSearchParams): { from: string; to: string } | null {
+    const from = searchParams.get('from')
+    const to = searchParams.get('to')
+    if (!isValidIsoDate(from) || !isValidIsoDate(to) || from > to) {
+        return null
+    }
+    return { from, to }
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export function MeteringChartPage() {
@@ -121,12 +136,38 @@ export function MeteringChartPage() {
 
     // Controlled state
     const [selectedMpId, setSelectedMpId] = useState<string>(searchParams.get('metering_point') ?? '')
-    const [period, setPeriod] = useState<{ from: string; to: string }>(() => getCurrentBillingPeriod(interval))
+    const [period, setPeriodState] = useState<{ from: string; to: string }>(
+        () => readPeriodFromSearchParams(searchParams) ?? getCurrentBillingPeriod(interval),
+    )
     const [bucket, setBucket] = useState<'day' | 'hour' | 'month'>('day')
 
+    // Sync the selected period to the URL, so a shared link reproduces it
+    // (#647). Uses the functional setSearchParams form so this callback's
+    // identity stays stable regardless of other URL changes (tab, metering
+    // point) — it's only meant to fire on a genuine period change.
+    const handlePeriodChange = useCallback((next: { from: string; to: string }) => {
+        setPeriodState(next)
+        setSearchParams((previous) => {
+            const nextParams = new URLSearchParams(previous)
+            nextParams.set('from', next.from)
+            nextParams.set('to', next.to)
+            return nextParams
+        }, { replace: true })
+    }, [setSearchParams])
+
+    // Skip exactly the first auto-reset below when the URL already named an
+    // explicit period (a restored/shared link) — otherwise the ZEV query
+    // settling from its placeholder interval to the real one on first load
+    // would immediately overwrite the restored period.
+    const skipInitialAutoResetRef = useRef(readPeriodFromSearchParams(searchParams) !== null)
+
     useEffect(() => {
-        setPeriod(getCurrentBillingPeriod(interval))
-    }, [selectedZevId, interval])
+        if (skipInitialAutoResetRef.current) {
+            skipInitialAutoResetRef.current = false
+            return
+        }
+        handlePeriodChange(getCurrentBillingPeriod(interval))
+    }, [selectedZevId, interval, handlePeriodChange])
 
     const periodDays = daysInPeriod(period.from, period.to)
     const hourlyResolutionAvailable = periodDays <= MAX_HOURLY_RESOLUTION_DAYS
@@ -249,7 +290,7 @@ export function MeteringChartPage() {
                         interval={interval}
                         from={period.from}
                         to={period.to}
-                        onChange={setPeriod}
+                        onChange={handlePeriodChange}
                     />
 
                     {activeTab === 'chart' && (

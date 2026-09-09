@@ -53,3 +53,22 @@ export function daysInPeriod(from: string, to: string): number {
     if (Number.isNaN(fromMs) || Number.isNaN(toMs)) return 0
     return Math.round((toMs - fromMs) / 86_400_000) + 1
 }
+
+const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/
+
+/**
+ * True for a well-formed `YYYY-MM-DD` string that parses to a real calendar
+ * date. A URL query param is never trusted input — a hand-edited or stale
+ * `?from=`/`?to=` must fall back to a default instead of producing an
+ * `Invalid Date` somewhere downstream.
+ */
+export function isValidIsoDate(value: string | null | undefined): value is string {
+    if (!value || !ISO_DATE_PATTERN.test(value)) return false
+    const ms = Date.parse(`${value}T00:00:00Z`)
+    if (Number.isNaN(ms)) return false
+    // Date.parse rolls an out-of-range day/month over into the next one
+    // (e.g. "2026-02-30" silently becomes March 2) instead of rejecting it —
+    // round-tripping catches that instead of accepting a date that isn't
+    // the one the string names.
+    return formatUtcIsoDate(new Date(ms)) === value
+}
