@@ -1720,6 +1720,8 @@ export const de = {
             rawTableError: 'Rohdatentabelle konnte nicht geladen werden.',
             noReadingsTitle: 'Keine Messwerte in diesem Zeitraum',
             noReadings: 'Keine Messwerte für den gewählten Zeitraum und die gewählte Messstelle gefunden.',
+            noReadingsWithRange: 'Keine Messwerte für diesen Zeitraum. Diese Messstelle hat Daten von {{from}} bis {{to}}.',
+            jumpToAvailableData: 'Zu verfügbaren Daten springen',
             noRawReadings: 'Keine Rohmesswerte für den gewählten Zeitraum gefunden.',
             rawTable: {
                 title: 'Rohdaten nach Tag',

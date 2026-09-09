@@ -1720,6 +1720,8 @@ export const fr = {
             rawTableError: 'Échec du chargement du tableau de données brutes.',
             noReadingsTitle: 'Aucun relevé pour cette période',
             noReadings: 'Aucun relevé trouvé pour la période et le point de mesure sélectionnés.',
+            noReadingsWithRange: 'Aucun relevé pour cette période. Ce compteur dispose de données du {{from}} au {{to}}.',
+            jumpToAvailableData: 'Aller aux données disponibles',
             noRawReadings: 'Aucun relevé brut trouvé pour la période sélectionnée.',
             rawTable: {
                 title: 'Données brutes par jour',

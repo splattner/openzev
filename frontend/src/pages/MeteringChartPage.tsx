@@ -28,10 +28,10 @@ import {
     type BillingInterval,
     getCurrentBillingPeriod,
 } from '../lib/billingPeriod'
-import { useAppSettings } from '../lib/appSettings'
-import { daysInPeriod, isValidIsoDate } from '../lib/dates'
+import { formatShortDate, useAppSettings } from '../lib/appSettings'
+import { daysInPeriod, formatUtcIsoDate, isValidIsoDate } from '../lib/dates'
 import { formatMeteringBucketLabel, meteringPointOptionLabel, outReadingLabelKey } from '../lib/meteringLabels'
-import type { AppSettings, ChartDataPoint } from '../types/api'
+import type { AppSettings, ChartDataPoint, MeteringPoint } from '../types/api'
 import { CHART_GRID, CONS_COLORS, NEGATIVE_COLOR, PROD_COLORS } from '../lib/chartTokens'
 
 // ── Custom Tooltip ────────────────────────────────────────────────────────────
@@ -102,6 +102,27 @@ export function readPeriodFromSearchParams(searchParams: URLSearchParams): { fro
         return null
     }
     return { from, to }
+}
+
+/**
+ * The civil-day range a metering point actually has readings for, or `null`
+ * if it has none yet. Used to turn the "no readings for this period" dead
+ * end into a jump to a period that does have data (#642).
+ *
+ * `first_reading_at`/`last_reading_at` are full timestamps; converted with
+ * UTC getters to match how the backend buckets/labels metering days
+ * everywhere else on this page (#635).
+ */
+export function meteringPointDataRange(
+    mp: Pick<MeteringPoint, 'first_reading_at' | 'last_reading_at'> | undefined,
+): { from: string; to: string } | null {
+    if (!mp?.first_reading_at || !mp.last_reading_at) {
+        return null
+    }
+    return {
+        from: formatUtcIsoDate(new Date(mp.first_reading_at)),
+        to: formatUtcIsoDate(new Date(mp.last_reading_at)),
+    }
 }
 
 // ── Page ──────────────────────────────────────────────────────────────────────
@@ -228,6 +249,7 @@ export function MeteringChartPage() {
     }
 
     const selectedMp = meteringPoints.find((m) => m.id === selectedMpId)
+    const selectedMpDataRange = meteringPointDataRange(selectedMp)
 
     useEffect(() => {
         if (!isManagedScope || !selectedZevId) {
@@ -404,7 +426,15 @@ export function MeteringChartPage() {
                                 {data.length === 0 ? (
                                     <EmptyState
                                         titleKey="pages.meteringData.noReadingsTitle"
-                                        descriptionKey="pages.meteringData.noReadings"
+                                        descriptionKey={selectedMpDataRange ? 'pages.meteringData.noReadingsWithRange' : 'pages.meteringData.noReadings'}
+                                        descriptionOptions={selectedMpDataRange ? {
+                                            from: formatShortDate(selectedMpDataRange.from, settings),
+                                            to: formatShortDate(selectedMpDataRange.to, settings),
+                                        } : undefined}
+                                        actions={selectedMpDataRange ? [{
+                                            labelKey: 'pages.meteringData.jumpToAvailableData',
+                                            onClick: () => handlePeriodChange(selectedMpDataRange),
+                                        }] : undefined}
                                     />
                                 ) : (
                                     <div className="card" style={{ padding: '1.5rem' }}>

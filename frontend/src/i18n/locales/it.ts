@@ -1720,6 +1720,8 @@ export const it = {
             rawTableError: 'Impossibile caricare la tabella dei dati grezzi.',
             noReadingsTitle: 'Nessuna lettura in questo periodo',
             noReadings: 'Nessuna lettura trovata per il periodo e il punto di misurazione selezionati.',
+            noReadingsWithRange: 'Nessuna lettura per questo periodo. Questo contatore ha dati dal {{from}} al {{to}}.',
+            jumpToAvailableData: 'Vai ai dati disponibili',
             noRawReadings: 'Nessuna lettura grezza trovata per il periodo selezionato.',
             rawTable: {
                 title: 'Dati grezzi per giorno',

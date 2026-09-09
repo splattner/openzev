@@ -8,8 +8,10 @@ import { EmptyState } from '../src/components/EmptyState'
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true
 
+const mockT = vi.fn((key: string) => key)
+
 vi.mock('react-i18next', () => ({
-    useTranslation: () => ({ t: (key: string) => key }),
+    useTranslation: () => ({ t: mockT }),
 }))
 
 let container: HTMLDivElement
@@ -193,6 +195,21 @@ describe('EmptyState', () => {
         const desc = descId ? container.querySelector(`#${CSS.escape(descId)}`) : null
         expect(desc?.tagName).toBe('P')
         expect(desc?.textContent).toBe('pages.zevs.emptyState.description')
+    })
+
+    it('passes descriptionOptions through to t() for interpolated descriptions (#642)', () => {
+        act(() => {
+            root.render(
+                wrap(
+                    createElement(EmptyState, {
+                        titleKey: 'pages.zevs.emptyState.title',
+                        descriptionKey: 'pages.meteringData.noReadingsWithRange',
+                        descriptionOptions: { from: '01.01.2026', to: '31.03.2026' },
+                    }),
+                ),
+            )
+        })
+        expect(mockT).toHaveBeenCalledWith('pages.meteringData.noReadingsWithRange', { from: '01.01.2026', to: '31.03.2026' })
     })
 
     it('renders no actions row when actions is empty or omitted', () => {

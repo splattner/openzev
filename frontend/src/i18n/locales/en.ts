@@ -1731,6 +1731,8 @@ export const en = {
             rawTableError: 'Failed to load raw metering data table.',
             noReadingsTitle: 'No readings in this period',
             noReadings: 'No readings found for the selected period and metering point.',
+            noReadingsWithRange: 'No readings for this period. This meter has data from {{from}} to {{to}}.',
+            jumpToAvailableData: 'Jump to available data',
             noRawReadings: 'No raw metering readings found for the selected period.',
             rawTable: {
                 title: 'Raw Data by Day',
