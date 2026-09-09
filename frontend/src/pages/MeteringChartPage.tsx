@@ -313,13 +313,13 @@ export function MeteringChartPage() {
                                     <StatBadge
                                         label={t('pages.meteringData.stats.totalConsumption')}
                                         value={`${totalIn.toFixed(2)} kWh`}
-                                        color={PROD_COLORS[0]}
+                                        color={CONS_COLORS[0]}
                                     />
                                     {hasOut && (
                                         <StatBadge
                                             label={t('pages.meteringData.stats.totalFeedIn')}
                                             value={`${totalOut.toFixed(2)} kWh`}
-                                            color={CONS_COLORS[0]}
+                                            color={PROD_COLORS[0]}
                                         />
                                     )}
                                     <StatBadge
@@ -363,7 +363,7 @@ export function MeteringChartPage() {
                                                 <Bar
                                                     dataKey="in_kwh"
                                                     name={t('pages.meteringData.series.consumption')}
-                                                    fill={PROD_COLORS[0]}
+                                                    fill={CONS_COLORS[0]}
                                                     radius={[3, 3, 0, 0]}
                                                     maxBarSize={48}
                                                 />
@@ -371,7 +371,7 @@ export function MeteringChartPage() {
                                                     <Bar
                                                         dataKey="out_kwh"
                                                         name={t('pages.meteringData.series.feedIn')}
-                                                        fill={CONS_COLORS[0]}
+                                                        fill={PROD_COLORS[0]}
                                                         radius={[3, 3, 0, 0]}
                                                         maxBarSize={48}
                                                     />
