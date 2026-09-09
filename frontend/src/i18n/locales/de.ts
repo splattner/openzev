@@ -1691,6 +1691,7 @@ export const de = {
             description: 'Energiewerte visualisieren und Datenqualität pro Messstelle überwachen.',
             meteringPoint: 'Messstelle *',
             selectMeteringPoint: 'Messstelle auswählen…',
+            wholeZevTotal: 'Gesamte (v)ZEV (alle Messstellen)',
             noPointSelectedTitle: 'Keine Messstelle ausgewählt',
             noPointSelected: 'Wählen Sie oben eine Messstelle aus, um ihre Energieablesungen zu sehen.',
             allMeteringPoints: 'Alle Messstellen…',
@@ -1704,6 +1705,7 @@ export const de = {
             },
             stats: {
                 meterId: 'Zähler-ID',
+                zev: 'ZEV',
                 totalConsumption: 'Gesamtverbrauch (Bezug)',
                 averageConsumption: 'Durchschnittlicher Verbrauch (Bezug)',
                 peakConsumption: 'Spitzenverbrauch (Bezug)',
@@ -1740,6 +1742,7 @@ export const de = {
                 zeroConsumptionFlag: 'Kein Verbrauch',
                 negativeReadingsWarning: '{{count}} negative(r) Messwert(e) an diesem Tag — unten hervorgehoben.',
                 duplicateReadingsWarning: '{{count}} Zeitstempel haben mehr als einen Messwert für dieselbe Richtung — sie wurden summiert statt einzeln angezeigt.',
+                unavailableForZevTotal: 'Rohdaten pro Messwert sind für die gesamte (v)ZEV nicht verfügbar — wählen Sie eine bestimmte Messstelle aus, um sie zu sehen.',
             },
         },
         zevSettings: {

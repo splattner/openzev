@@ -165,6 +165,15 @@ export function peakChartPoint(
     return data.reduce((peak, point) => (point[field] > peak[field] ? point : peak), data[0])
 }
 
+/**
+ * Sentinel `<select>` value for "every meter in the managed ZEV, summed" —
+ * distinct from both a real metering-point UUID and the "" empty selection,
+ * so it round-trips through the URL and query keys the same way a real
+ * metering point does (#650). Offered only in managed scope with a ZEV
+ * selected; a participant has no single "their ZEV" to aggregate by.
+ */
+const ALL_METERING_POINTS_VALUE = '__zev_total__'
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export function MeteringChartPage() {
@@ -232,11 +241,22 @@ export function MeteringChartPage() {
         queryFn: () => fetchMeteringPoints(selectedZevId || undefined),
     })
 
+    const isZevTotal = selectedMpId === ALL_METERING_POINTS_VALUE
     const chartQuery = useQuery({
-        queryKey: queryKeys.metering.chartData(selectedMpId, period.from, period.to, bucket),
+        // Distinct cache entry per ZEV, since the "meteringPointId" slot of
+        // the key is the same fixed sentinel regardless of which ZEV is
+        // being totalled.
+        queryKey: queryKeys.metering.chartData(
+            isZevTotal ? `zev:${selectedZevId}` : selectedMpId,
+            period.from,
+            period.to,
+            bucket,
+        ),
         queryFn: () =>
-            fetchChartData({ meteringPoint: selectedMpId, dateFrom: period.from, dateTo: period.to, bucket }),
-        enabled: !!selectedMpId,
+            isZevTotal
+                ? fetchChartData({ zevId: selectedZevId, dateFrom: period.from, dateTo: period.to, bucket })
+                : fetchChartData({ meteringPoint: selectedMpId, dateFrom: period.from, dateTo: period.to, bucket }),
+        enabled: isZevTotal ? !!selectedZevId : !!selectedMpId,
     })
 
     const qualityQuery = useQuery({
@@ -344,7 +364,7 @@ export function MeteringChartPage() {
         if (!isManagedScope || !selectedZevId) {
             return
         }
-        if (!selectedMpId) {
+        if (!selectedMpId || selectedMpId === ALL_METERING_POINTS_VALUE) {
             return
         }
         const stillVisible = meteringPoints.some((meteringPoint) => meteringPoint.id === selectedMpId)
@@ -514,6 +534,11 @@ export function MeteringChartPage() {
                                     onChange={(e) => handleMpChange(e.target.value)}
                                 >
                                     <option value="">{t('pages.meteringData.selectMeteringPoint')}</option>
+                                    {isManagedScope && selectedZevId && (
+                                        <option value={ALL_METERING_POINTS_VALUE}>
+                                            {t('pages.meteringData.wholeZevTotal')}
+                                        </option>
+                                    )}
                                     {meteringPoints.map((mp) => (
                                         <option key={mp.id} value={mp.id}>
                                             {meteringPointOptionLabel(mp, zevNameById.get(mp.zev), t)}
@@ -606,6 +631,12 @@ export function MeteringChartPage() {
                                             value={selectedMp.meter_id}
                                         />
                                     )}
+                                    {isZevTotal && (
+                                        <StatCard
+                                            label={t('pages.meteringData.stats.zev')}
+                                            value={zevNameById.get(selectedZevId) ?? selectedZevId}
+                                        />
+                                    )}
                                     <StatCard
                                         label={t('pages.meteringData.stats.totalConsumption')}
                                         value={`${totalIn.toFixed(2)} kWh`}
@@ -696,13 +727,17 @@ export function MeteringChartPage() {
                                     </div>
                                 )}
 
-                                <RawMeteringTable
-                                    meteringPointId={selectedMpId}
-                                    dateFrom={period.from}
-                                    dateTo={period.to}
-                                    hasOut={hasOut}
-                                    meterType={selectedMp?.meter_type}
-                                />
+                                {isZevTotal ? (
+                                    <p className="muted">{t('pages.meteringData.rawTable.unavailableForZevTotal')}</p>
+                                ) : (
+                                    <RawMeteringTable
+                                        meteringPointId={selectedMpId}
+                                        dateFrom={period.from}
+                                        dateTo={period.to}
+                                        hasOut={hasOut}
+                                        meterType={selectedMp?.meter_type}
+                                    />
+                                )}
                             </>
                         )}
                     </div>

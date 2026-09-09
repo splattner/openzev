@@ -1702,6 +1702,7 @@ export const en = {
             description: 'Visualize energy readings and monitor data quality per metering point.',
             meteringPoint: 'Metering Point *',
             selectMeteringPoint: 'Select metering point…',
+            wholeZevTotal: 'Whole ZEV total (all meters)',
             noPointSelectedTitle: 'No metering point selected',
             noPointSelected: 'Select a metering point above to view its energy readings.',
             allMeteringPoints: 'All metering points…',
@@ -1715,6 +1716,7 @@ export const en = {
             },
             stats: {
                 meterId: 'Meter ID',
+                zev: 'ZEV',
                 totalConsumption: 'Total Consumption (IN)',
                 averageConsumption: 'Average Consumption (IN)',
                 peakConsumption: 'Peak Consumption (IN)',
@@ -1751,6 +1753,7 @@ export const en = {
                 zeroConsumptionFlag: 'Zero consumption',
                 negativeReadingsWarning: '{{count}} negative reading(s) on this day — highlighted below.',
                 duplicateReadingsWarning: '{{count}} timestamp(s) have more than one reading for the same direction — they were summed rather than shown separately.',
+                unavailableForZevTotal: 'Raw per-reading data isn\'t available for the whole-ZEV total — select a specific metering point to see it.',
             },
         },
         zevSettings: {

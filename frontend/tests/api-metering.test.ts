@@ -2,6 +2,7 @@ import MockAdapter from 'axios-mock-adapter'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   bulkDeleteImportLogs,
+  fetchChartData,
   fetchMeteringDataQualityStatus,
   uploadMeteringFile,
 } from '../src/lib/api/metering'
@@ -58,6 +59,47 @@ describe('metering api module', () => {
     })
 
     expect(result.overall_status).toBe('ok')
+  })
+
+  it('requests chart data for a single metering point', async () => {
+    apiMock.onGet('/metering/readings/chart-data/').reply((config) => {
+      expect(config.params).toEqual({
+        metering_point: 'mp-1',
+        zev_id: undefined,
+        date_from: '2026-01-01',
+        date_to: '2026-01-31',
+        bucket: 'day',
+      })
+      return [200, [{ bucket: '2026-01-01T00:00:00+00:00', in_kwh: 1, out_kwh: 0 }]]
+    })
+
+    const result = await fetchChartData({
+      meteringPoint: 'mp-1',
+      dateFrom: '2026-01-01',
+      dateTo: '2026-01-31',
+    })
+
+    expect(result).toHaveLength(1)
+  })
+
+  it('requests chart data aggregated by zevId instead of a single meter (#650)', async () => {
+    apiMock.onGet('/metering/readings/chart-data/').reply((config) => {
+      expect(config.params).toEqual({
+        metering_point: undefined,
+        zev_id: 'zev-1',
+        date_from: '2026-01-01',
+        date_to: '2026-01-31',
+        bucket: 'hour',
+      })
+      return [200, []]
+    })
+
+    await fetchChartData({
+      zevId: 'zev-1',
+      dateFrom: '2026-01-01',
+      dateTo: '2026-01-31',
+      bucket: 'hour',
+    })
   })
 
   it('sends csv upload settings as multipart form-data fields', async () => {

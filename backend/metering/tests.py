@@ -1040,6 +1040,131 @@ class ChartDataEndpointTests(TestCase):
 
 		self.assertEqual(resp.status_code, 400)
 
+	def test_chart_data_zev_id_aggregates_across_metering_points(self):
+		"""zev_id sums every metering point in the ZEV into one series (#650)."""
+		second_mp = MeteringPoint.objects.create(
+			zev=self.zev,
+			meter_id="CH-CHART-2",
+			meter_type=MeteringPointType.CONSUMPTION,
+		)
+		MeterReading.objects.create(
+			metering_point=second_mp,
+			timestamp=datetime(2026, 4, 1, 0, 0, tzinfo=timezone.utc),
+			energy_kwh=Decimal("3.0"),
+			direction=ReadingDirection.IN,
+			resolution=ReadingResolution.FIFTEEN_MIN,
+		)
+		auth(self.client, self.owner)
+
+		resp = self.client.get(
+			"/api/v1/metering/readings/chart-data/",
+			{"zev_id": str(self.zev.id), "date_from": "2026-04-01", "date_to": "2026-04-01"},
+		)
+
+		self.assertEqual(resp.status_code, 200)
+		self.assertEqual(len(resp.data), 1)
+		# self.mp's 1.5 + 2.5 (from setUp) plus second_mp's 3.0.
+		self.assertAlmostEqual(resp.data[0]["in_kwh"], 7.0)
+
+	def test_chart_data_zev_id_excludes_other_zevs(self):
+		other_owner = make_user("chart_other_owner", UserRole.ZEV_OWNER)
+		other_zev = Zev.objects.create(name="Other ZEV", owner=other_owner, zev_type="vzev", invoice_prefix="O")
+		other_mp = MeteringPoint.objects.create(
+			zev=other_zev,
+			meter_id="CH-CHART-OTHER",
+			meter_type=MeteringPointType.CONSUMPTION,
+		)
+		MeterReading.objects.create(
+			metering_point=other_mp,
+			timestamp=datetime(2026, 4, 1, 0, 0, tzinfo=timezone.utc),
+			energy_kwh=Decimal("99.0"),
+			direction=ReadingDirection.IN,
+			resolution=ReadingResolution.FIFTEEN_MIN,
+		)
+		auth(self.client, self.owner)
+
+		resp = self.client.get(
+			"/api/v1/metering/readings/chart-data/",
+			{"zev_id": str(self.zev.id), "date_from": "2026-04-01", "date_to": "2026-04-01"},
+		)
+
+		self.assertEqual(resp.status_code, 200)
+		# Only self.mp's own 1.5 + 2.5 — the other ZEV's 99.0 must not appear.
+		self.assertAlmostEqual(resp.data[0]["in_kwh"], 4.0)
+
+	def test_chart_data_zev_id_respects_participant_scoping(self):
+		"""A participant querying zev_id still only sees their own assigned
+		meters summed in, not every meter in the ZEV."""
+		participant_user = make_user("chart_participant", UserRole.PARTICIPANT)
+		participant = Participant.objects.create(
+			zev=self.zev,
+			user=participant_user,
+			first_name="Anna",
+			last_name="Participant",
+			email="anna.chart@example.com",
+			valid_from=date(2026, 1, 1),
+		)
+		MeteringPointAssignment.objects.create(
+			metering_point=self.mp,
+			participant=participant,
+			valid_from=date(2026, 1, 1),
+		)
+		# A second, unassigned-to-this-participant metering point in the same ZEV.
+		unowned_mp = MeteringPoint.objects.create(
+			zev=self.zev,
+			meter_id="CH-CHART-UNOWNED",
+			meter_type=MeteringPointType.CONSUMPTION,
+		)
+		MeterReading.objects.create(
+			metering_point=unowned_mp,
+			timestamp=datetime(2026, 4, 1, 0, 0, tzinfo=timezone.utc),
+			energy_kwh=Decimal("50.0"),
+			direction=ReadingDirection.IN,
+			resolution=ReadingResolution.FIFTEEN_MIN,
+		)
+		auth(self.client, participant_user)
+
+		resp = self.client.get(
+			"/api/v1/metering/readings/chart-data/",
+			{"zev_id": str(self.zev.id), "date_from": "2026-04-01", "date_to": "2026-04-01"},
+		)
+
+		self.assertEqual(resp.status_code, 200)
+		# Only the participant's own assigned meter (1.5 + 2.5) — not the other meter's 50.0.
+		self.assertAlmostEqual(resp.data[0]["in_kwh"], 4.0)
+
+	def test_chart_data_metering_point_and_zev_id_combine_as_a_narrowing_filter(self):
+		"""metering_point + zev_id together mean "this meter, but only if it's
+		in this ZEV" — a defensive combination, not aggregate mode; matches
+		zev_id's existing behavior on every other endpoint via
+		ZevScopedQuerySetMixin (see test_reading_visibility.py)."""
+		auth(self.client, self.owner)
+
+		matching = self.client.get(
+			"/api/v1/metering/readings/chart-data/",
+			{"metering_point": str(self.mp.id), "zev_id": str(self.zev.id), "date_from": "2026-04-01", "date_to": "2026-04-01"},
+		)
+		self.assertEqual(matching.status_code, 200)
+		self.assertAlmostEqual(matching.data[0]["in_kwh"], 4.0)
+
+		other_zev = Zev.objects.create(name="Unrelated ZEV", owner=self.owner, zev_type="vzev", invoice_prefix="U")
+		mismatched = self.client.get(
+			"/api/v1/metering/readings/chart-data/",
+			{"metering_point": str(self.mp.id), "zev_id": str(other_zev.id), "date_from": "2026-04-01", "date_to": "2026-04-01"},
+		)
+		self.assertEqual(mismatched.status_code, 200)
+		self.assertEqual(mismatched.data, [])
+
+	def test_chart_data_rejects_invalid_zev_id(self):
+		auth(self.client, self.owner)
+
+		resp = self.client.get(
+			"/api/v1/metering/readings/chart-data/",
+			{"zev_id": "not-a-uuid"},
+		)
+
+		self.assertEqual(resp.status_code, 400)
+
 
 class SharedMeteringDashboardTests(TestCase):
 	"""A community-allocated meter distributes its energy across every eligible

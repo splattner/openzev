@@ -1691,6 +1691,7 @@ export const fr = {
             description: 'Visualiser les relevés d\'énergie et surveiller la qualité des données par point de mesure.',
             meteringPoint: 'Point de mesure *',
             selectMeteringPoint: 'Sélectionner un point de mesure…',
+            wholeZevTotal: 'Total du (v)ZEV (tous les compteurs)',
             noPointSelectedTitle: 'Aucun point de mesure sélectionné',
             noPointSelected: 'Sélectionnez un point de mesure ci-dessus pour consulter ses relevés d\'énergie.',
             allMeteringPoints: 'Tous les points de mesure…',
@@ -1704,6 +1705,7 @@ export const fr = {
             },
             stats: {
                 meterId: 'ID du compteur',
+                zev: 'ZEV',
                 totalConsumption: 'Consommation totale (soutirage)',
                 averageConsumption: 'Consommation moyenne (soutirage)',
                 peakConsumption: 'Pointe de consommation (soutirage)',
@@ -1740,6 +1742,7 @@ export const fr = {
                 zeroConsumptionFlag: 'Consommation nulle',
                 negativeReadingsWarning: '{{count}} relevé(s) négatif(s) ce jour-là — mis en évidence ci-dessous.',
                 duplicateReadingsWarning: '{{count}} horodatage(s) ont plus d\'un relevé pour la même direction — ils ont été additionnés plutôt qu\'affichés séparément.',
+                unavailableForZevTotal: 'Les données brutes par relevé ne sont pas disponibles pour le total du (v)ZEV — sélectionnez un point de mesure spécifique pour les consulter.',
             },
         },
         zevSettings: {

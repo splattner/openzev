@@ -61,14 +61,22 @@ class MeterReadingViewSet(ZevScopedQuerySetMixin, viewsets.ModelViewSet):
         Return aggregated energy readings (kWh) grouped by time bucket.
 
         Query params:
-          metering_point  – UUID of the metering point (required)
+          metering_point  – UUID of a single metering point
+          zev_id          – UUID of a ZEV; already applied by
+                             self.get_queryset() (ZevScopedQuerySetMixin),
+                             including validating it's a UUID. Give it
+                             without metering_point to aggregate across
+                             every metering point in that ZEV instead of one
+                             meter (#650) — the two can also be combined, to
+                             narrow one meter's data to a specific ZEV.
           date_from       – YYYY-MM-DD (optional)
           date_to         – YYYY-MM-DD (optional)
           bucket          – day | hour | month  (default: day)
         """
         mp_id = request.query_params.get("metering_point")
-        if not mp_id:
-            return Response({"error": "metering_point query parameter is required."}, status=400)
+        zev_id = request.query_params.get("zev_id")
+        if not mp_id and not zev_id:
+            return Response({"error": "metering_point or zev_id query parameter is required."}, status=400)
 
         date_from = request.query_params.get("date_from")
         date_to = request.query_params.get("date_to")
@@ -76,7 +84,12 @@ class MeterReadingViewSet(ZevScopedQuerySetMixin, viewsets.ModelViewSet):
 
         trunc_fn = {"day": TruncDay, "hour": TruncHour, "month": TruncMonth}.get(bucket, TruncDay)
 
-        qs = self.get_queryset().filter(metering_point_id=mp_id)
+        # get_queryset() -> scope_queryset() already narrows by ?zev_id= (and
+        # validates it), so a bare zev_id here — no metering_point — leaves
+        # every metering point in that ZEV in qs, which is the aggregate.
+        qs = self.get_queryset()
+        if mp_id:
+            qs = qs.filter(metering_point_id=mp_id)
         # Independent optional bounds: a lone date_from/date_to still filters.
         if date_from:
             qs = qs.filter(timestamp__gte=period_start_dt(date_type.fromisoformat(date_from)))

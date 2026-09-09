@@ -122,7 +122,9 @@ export async function previewCsvImport(payload: {
 }
 
 export async function fetchChartData(params: {
-  meteringPoint: string
+  /** Exactly one of meteringPoint / zevId — the latter aggregates every metering point in that ZEV (#650). */
+  meteringPoint?: string
+  zevId?: string
   dateFrom?: string
   dateTo?: string
   bucket?: 'day' | 'hour' | 'month'
@@ -130,6 +132,7 @@ export async function fetchChartData(params: {
   const { data } = await api.get<ChartDataPoint[]>('/metering/readings/chart-data/', {
     params: {
       metering_point: params.meteringPoint,
+      zev_id: params.zevId,
       date_from: params.dateFrom,
       date_to: params.dateTo,
       bucket: params.bucket ?? 'day',
