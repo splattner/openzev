@@ -2,7 +2,9 @@ import { useQuery } from '@tanstack/react-query'
 import { Tabs } from '@mantine/core'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
+import { EmptyState } from '../components/EmptyState'
 import { PageSkeleton } from '../components/PageSkeleton'
+import { StatCard } from '../components/StatCard'
 import { useTranslation } from 'react-i18next'
 import {
     Bar,
@@ -31,25 +33,6 @@ import { daysInPeriod, isValidIsoDate } from '../lib/dates'
 import { formatMeteringBucketLabel, outReadingLabelKey } from '../lib/meteringLabels'
 import type { AppSettings, ChartDataPoint } from '../types/api'
 import { CHART_GRID, CONS_COLORS, NEGATIVE_COLOR, PROD_COLORS } from '../lib/chartTokens'
-
-// ── Summary stat card ─────────────────────────────────────────────────────────
-
-function StatBadge({ label, value, color }: { label: string; value: string; color: string }) {
-    return (
-        <div
-            style={{
-                background: 'var(--surface-card)',
-                border: `2px solid ${color}`,
-                borderRadius: 8,
-                padding: '0.6rem 1.2rem',
-                minWidth: 140,
-            }}
-        >
-            <p className="muted" style={{ margin: 0, fontSize: '0.78rem' }}>{label}</p>
-            <p style={{ margin: 0, fontWeight: 700, fontSize: '1.15rem', color }}>{value}</p>
-        </div>
-    )
-}
 
 // ── Custom Tooltip ────────────────────────────────────────────────────────────
 
@@ -376,53 +359,55 @@ export function MeteringChartPage() {
                 <Tabs.Panel value="chart">
                     <div className="page-stack">
                         {!selectedMpId && (
-                            <div className="card" style={{ textAlign: 'center', padding: '3rem 1rem', color: 'var(--text-muted)' }}>
-                                {t('pages.meteringData.noPointSelected')}
-                            </div>
+                            <EmptyState
+                                titleKey="pages.meteringData.noPointSelectedTitle"
+                                descriptionKey="pages.meteringData.noPointSelected"
+                            />
                         )}
 
-                        {selectedMpId && chartQuery.isLoading && (
-                            <div className="card" style={{ textAlign: 'center', padding: '2rem' }}>
-                                {t('pages.meteringData.loadingChart')}
-                            </div>
-                        )}
+                        {selectedMpId && chartQuery.isLoading && <PageSkeleton variant="card" />}
                         {selectedMpId && chartQuery.isError && (
-                            <div className="card error-banner">{t('pages.meteringData.chartError')}</div>
+                            <div className="card error-banner">{formatApiError(chartQuery.error)}</div>
                         )}
 
                         {selectedMpId && chartQuery.isSuccess && (
                             <>
-                                <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+                                {/* Matches the inline grid the other stat rows use; there is no
+                                    shared `.stat-grid` class in the stylesheet. */}
+                                <div
+                                    style={{
+                                        display: 'grid',
+                                        gap: '1rem',
+                                        gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
+                                    }}
+                                >
                                     {selectedMp && (
-                                        <StatBadge
+                                        <StatCard
                                             label={t('pages.meteringData.stats.meterId')}
                                             value={selectedMp.meter_id}
-                                            color="var(--text-primary)"
                                         />
                                     )}
-                                    <StatBadge
+                                    <StatCard
                                         label={t('pages.meteringData.stats.totalConsumption')}
                                         value={`${totalIn.toFixed(2)} kWh`}
-                                        color={CONS_COLORS[0]}
                                     />
                                     {hasOut && (
-                                        <StatBadge
+                                        <StatCard
                                             label={t(outReadingLabelKey(selectedMp?.meter_type, 'pages.meteringData.stats.totalProduction', 'pages.meteringData.stats.totalFeedIn'))}
                                             value={`${totalOut.toFixed(2)} kWh`}
-                                            color={PROD_COLORS[0]}
                                         />
                                     )}
-                                    <StatBadge
+                                    <StatCard
                                         label={t(BUCKET_COUNT_LABEL_KEY[bucket])}
                                         value={String(data.length)}
-                                        color="var(--text-muted)"
                                     />
                                 </div>
 
                                 {data.length === 0 ? (
-                                    <div className="card" style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
-                                        {t('pages.meteringData.noReadings')}
-                                    </div>
+                                    <EmptyState
+                                        titleKey="pages.meteringData.noReadingsTitle"
+                                        descriptionKey="pages.meteringData.noReadings"
+                                    />
                                 ) : (
                                     <div className="card" style={{ padding: '1.5rem' }}>
                                         <ResponsiveContainer width="100%" height={380}>

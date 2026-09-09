@@ -7,6 +7,7 @@ import { fetchRawMeteringData, fetchRawMeteringDay } from '../lib/api/metering'
 import { queryKeys } from '../lib/api/queryKeys'
 import { formatShortDate, useAppSettings } from '../lib/appSettings'
 import { outReadingLabelKey } from '../lib/meteringLabels'
+import { PageSkeleton } from './PageSkeleton'
 import type { MeteringPoint, RawMeteringReading } from '../types/api'
 
 /** UTC HH:MM — matches how the importer stored the timestamps (naive stamped as UTC). */
@@ -287,7 +288,7 @@ export function RawMeteringTable({
             </p>
 
             {summaryQuery.isLoading ? (
-                <div className="raw-metering-detail-status muted">{t('pages.meteringData.loadingRawTable')}</div>
+                <PageSkeleton variant="tableRows" />
             ) : summaryQuery.isError ? (
                 <div className="error-banner">{t('pages.meteringData.rawTableError')}</div>
             ) : days.length === 0 ? (
