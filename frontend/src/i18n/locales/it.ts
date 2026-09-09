@@ -1694,6 +1694,8 @@ export const it = {
             wholeZevTotal: 'Totale (v)ZEV (tutti i contatori)',
             noPointSelectedTitle: 'Nessun punto di misurazione selezionato',
             noPointSelected: 'Seleziona sopra un punto di misurazione per visualizzare le letture dell\'energia.',
+            zevTotalUnavailableTitle: 'Totale ZEV non disponibile',
+            zevTotalUnavailable: 'Questa vista richiede uno ZEV gestito, non disponibile per il tuo account.',
             allMeteringPoints: 'Tutti i punti di misurazione…',
             meterIdOptional: 'ID contatore (opzionale)',
             resolution: 'Risoluzione',

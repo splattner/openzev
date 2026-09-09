@@ -259,14 +259,21 @@ export function MeteringChartPage() {
         enabled: isZevTotal ? !!selectedZevId : !!selectedMpId,
     })
 
+    // The Data Quality tab has no concept of "whole ZEV total" — it already
+    // lists every metering point in the selected ZEV as its own row, which
+    // is what the sentinel would mean here anyway. Forwarding it as a
+    // metering_point filter would 500 the request (it isn't a UUID, #671),
+    // so it's treated the same as "no meter filter" on this tab.
+    const qualityMeteringPointFilter = isZevTotal ? undefined : selectedMpId || undefined
+
     const qualityQuery = useQuery({
-        queryKey: queryKeys.metering.qualityStatus(period.from, period.to, isManagedScope ? selectedZevId || undefined : undefined, selectedMpId || undefined),
+        queryKey: queryKeys.metering.qualityStatus(period.from, period.to, isManagedScope ? selectedZevId || undefined : undefined, qualityMeteringPointFilter),
         queryFn: () =>
             fetchMeteringDataQualityStatus({
                 dateFrom: period.from,
                 dateTo: period.to,
                 zevId: selectedZevId && isManagedScope ? selectedZevId : undefined,
-                meteringPointId: selectedMpId || undefined,
+                meteringPointId: qualityMeteringPointFilter,
             }),
         // Expensive (one query per visible metering point server-side) and
         // only shown on the Data Quality tab — don't run it just because the
@@ -367,11 +374,18 @@ export function MeteringChartPage() {
         if (!selectedMpId || selectedMpId === ALL_METERING_POINTS_VALUE) {
             return
         }
+        // Wait for the real list before reconciling — meteringPoints is []
+        // while mpQuery is still loading, which would otherwise read as
+        // "not visible" and clear a `?metering_point=` deep link before it
+        // ever had a chance to match (#674).
+        if (!mpQuery.isSuccess) {
+            return
+        }
         const stillVisible = meteringPoints.some((meteringPoint) => meteringPoint.id === selectedMpId)
         if (!stillVisible) {
             handleMpChange('')
         }
-    }, [isManagedScope, selectedZevId, selectedMpId, meteringPoints, handleMpChange])
+    }, [isManagedScope, selectedZevId, selectedMpId, meteringPoints, handleMpChange, mpQuery.isSuccess])
 
     const tickFormatter = (value: string) => formatMeteringBucketLabel(value, bucket, settings)
 
@@ -585,7 +599,11 @@ export function MeteringChartPage() {
                             <label>
                                 <span>{t('pages.meteringData.meterIdOptional')}</span>
                                 <select
-                                    value={selectedMpId}
+                                    // The "whole ZEV total" sentinel has no matching option here
+                                    // (this tab already lists every meter as its own row) — show
+                                    // it as the "all metering points" option instead of a value
+                                    // React can't match to anything (#671).
+                                    value={isZevTotal ? '' : selectedMpId}
                                     onChange={(e) => handleMpChange(e.target.value)}
                                 >
                                     <option value="">{t('pages.meteringData.allMeteringPoints')}</option>
@@ -606,6 +624,19 @@ export function MeteringChartPage() {
                             <EmptyState
                                 titleKey="pages.meteringData.noPointSelectedTitle"
                                 descriptionKey="pages.meteringData.noPointSelected"
+                            />
+                        )}
+
+                        {/* "Whole ZEV total" is only offered when isManagedScope && selectedZevId
+                            (see the dropdown below), but the selection is shareable via URL
+                            (#647) — a participant, or an owner with no ZEV selected, can land
+                            here with the sentinel set and no ZEV to total. chartQuery stays
+                            disabled in that case, so without this branch nothing renders at
+                            all (#673). */}
+                        {isZevTotal && !selectedZevId && (
+                            <EmptyState
+                                titleKey="pages.meteringData.zevTotalUnavailableTitle"
+                                descriptionKey="pages.meteringData.zevTotalUnavailable"
                             />
                         )}
 

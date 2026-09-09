@@ -1694,6 +1694,8 @@ export const de = {
             wholeZevTotal: 'Gesamte (v)ZEV (alle Messstellen)',
             noPointSelectedTitle: 'Keine Messstelle ausgewählt',
             noPointSelected: 'Wählen Sie oben eine Messstelle aus, um ihre Energieablesungen zu sehen.',
+            zevTotalUnavailableTitle: 'ZEV-Gesamtsumme nicht verfügbar',
+            zevTotalUnavailable: 'Diese Ansicht benötigt einen verwalteten ZEV, der für Ihr Konto nicht verfügbar ist.',
             allMeteringPoints: 'Alle Messstellen…',
             meterIdOptional: 'Zähler-ID (optional)',
             resolution: 'Auflösung',

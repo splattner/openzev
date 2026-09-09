@@ -1705,6 +1705,8 @@ export const en = {
             wholeZevTotal: 'Whole ZEV total (all meters)',
             noPointSelectedTitle: 'No metering point selected',
             noPointSelected: 'Select a metering point above to view its energy readings.',
+            zevTotalUnavailableTitle: 'Whole-ZEV total unavailable',
+            zevTotalUnavailable: 'This view needs a managed ZEV, which isn\'t available for your account.',
             allMeteringPoints: 'All metering points…',
             meterIdOptional: 'Meter ID (optional)',
             resolution: 'Resolution',

@@ -1694,6 +1694,8 @@ export const fr = {
             wholeZevTotal: 'Total du (v)ZEV (tous les compteurs)',
             noPointSelectedTitle: 'Aucun point de mesure sélectionné',
             noPointSelected: 'Sélectionnez un point de mesure ci-dessus pour consulter ses relevés d\'énergie.',
+            zevTotalUnavailableTitle: 'Total RCP indisponible',
+            zevTotalUnavailable: 'Cette vue nécessite un RCP géré, qui n\'est pas disponible pour votre compte.',
             allMeteringPoints: 'Tous les points de mesure…',
             meterIdOptional: 'ID du compteur (optionnel)',
             resolution: 'Résolution',
