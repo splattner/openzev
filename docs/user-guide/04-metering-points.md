@@ -1,16 +1,16 @@
 # Metering Points
 
-This guide covers metering point types, configuration, and validation in OpenZEV.
+This guide covers metering point types, configuration, and maintenance in OpenZEV.
 
 ## What is a Metering Point?
 
 A **metering point** is a physical or logical energy meter:
-- Owned and operated by a participant
+- Assigned to a participant over a validity window rather than owned outright — see [Assignment Validity Periods](#assignment-validity-periods) below
 - Measures energy consumption or production
 - Records readings at regular intervals (typically hourly)
 - Forms the basis for invoice calculations
 
-A single participant can own multiple metering points (e.g., PV on roof + home consumption).
+A single participant can be assigned multiple metering points (e.g., PV on roof + home consumption).
 
 ![Metering points page](screenshots/04-metering-points.png)
 
@@ -28,35 +28,21 @@ OpenZEV supports three metering point types:
 
 **ZEV Owners** create metering points in **Metering Points**.
 
-1. Click **Add Metering Point**
+1. Click **New Metering Point**
 2. Enter details:
-   - **Metering Point ID** — Equipment/MSID number (required, must be unique)
-   - **Type** — `Consumption`, `Production`, or `Bidirectional`
-   - **Description** (optional, e.g., "Roof solar panel")
-   - **Meter Manufacturer** (optional, for reference)
-   - **Data Resolution** — `hourly`, `daily`, or `monthly` (defaults to hourly)
+   - **Meter ID** — Equipment/MSID number (required, must be unique)
+   - **Meter type** — `Consumption`, `Production`, or `Bidirectional`
+   - **Active** — inventory status (defaults to on)
+   - **Location** (optional, e.g., "Roof solar panel")
 
-3. Click **Create**
+3. Click **Create Metering Point**
 
-4. Configure participant assignment window (if applicable):
-   - **Valid From:** Assignment start date
-   - **Valid To:** Assignment end date (leave empty for ongoing)
-   - **Allocation:** `Personal` (default) or `Community` — see below
+4. To bill this meter, assign a participant: click **Assign participant** on
+   its card and set the assignment's validity window — see below.
 
-## Data Resolution
-
-**Data resolution** determines the granularity of recorded readings:
-
-- **Hourly (default):** One reading per hour — most common for modern smart meters
-- **Daily:** One reading per day — typical for older meters or aggregated data
-- **Monthly:** One reading per month — rarely used; supports legacy data
-
-The resolution affects:
-- Import file format expectations
-- Timestamp-level billing allocation accuracy
-- Data storage and query performance
-
-> **Tip:** For accurate billing, use hourly resolution if available.
+> **Tip:** **Active** only tracks whether a meter is in inventory; on its own
+> it does not affect billing. To *stop billing* a meter, end its assignment
+> instead — see [Decommissioning a Meter](#decommissioning-a-meter).
 
 ## Assignment Validity Periods
 
@@ -150,38 +136,35 @@ A participant only shares readings from days they were actually a member. A
 mid-period joiner pays nothing towards community energy measured before their
 join date, and a leaver's share stops on their leave date.
 
-> **Note:** An **inactive** community meter (`Is Active` = false) bills nobody
+> **Note:** An **inactive** community meter (**Active** = off) bills nobody
 > for per-metering-point fees, exactly like an inactive personal meter. Its
 > historical readings still count towards the community energy pool.
 
-## Viewing Metering Point Details
+## What a Metering Point Card Shows
 
-Click on a metering point to see:
-- All readings imported for this point
-- Current assignment window and status
-- Last reading timestamp
-- Data quality indicators (gaps, outliers)
+Each card on the **Metering Points** page shows, at a glance:
 
-## Metering Point Validation
+- The **meter ID** and its **location** (or "No location set")
+- **Active**/**Inactive** and meter-**type** badges
+- A **data-health badge** — `Healthy`, `Data gaps`, `Data at risk`, or `No
+  data yet`, based on the last 30 days of readings; click it to open the
+  metering point's data-quality view
+- **Last reading** date, or "No readings received yet"
+- A **No current holder** warning if the meter has readings but no
+  participant is currently assigned to it
+- Its current assignment (holder and validity window), or its full
+  assignment history if it has more than one
 
-OpenZEV validates metering points during import:
-
-| Check | Requirement | Impact |
-| --- | --- | --- |
-| **ID Uniqueness** | No duplicate metering point IDs | Import fails if duplicate |
-| **Participant** | Metering point assigned to valid participant | Import warns if participant inactive |
-| **Assignment Window** | Reading timestamp within assignment Valid From/To | Readings rejected outside period |
-| **Resolution Match** | Import matches declared resolution | Import warns on mismatch |
+Click **Chart** on a card for the metering point's full reading history.
 
 ## Meter Maintenance
 
 ### Updating a Metering Point
 
 1. Go to **Metering Points**
-2. Select meter
-3. Click **Edit**
-4. Update fields (ID, type, assignment)
-5. Click **Save**
+2. Open the meter's **⋯ More** menu and click **Edit**
+3. Update its ID, type, active status, or location
+4. Click **Save Changes**
 
 > **Warning:** Changing a meter ID retroactively can break billing audit trails. Prefer creating a new meter and adjusting assignment windows.
 
@@ -189,12 +172,13 @@ OpenZEV validates metering points during import:
 
 To stop billing a meter:
 
-1. Select the metering point
-2. Click **Edit**
-3. Set **Is Active** to false
-4. Click **Save**
+1. Open the meter's **⋯ More** menu and click **Edit**
+2. Set **Active** to off
+3. Click **Save Changes**
 
-Inactive meters are skipped in normal operations; historical data remains available for audits.
+Deactivating a meter removes it from data-health and "needs attention"
+monitoring; on its own it does not stop billing — end its assignment for
+that (see the tip above). Historical data remains available either way.
 
 ## Metering Point and Billing
 
