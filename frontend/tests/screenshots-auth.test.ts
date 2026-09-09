@@ -33,7 +33,7 @@ describe('screenshot authentication', () => {
     const { page, post } = mockPage([undefined, 'new-access'])
     await expect(getAdminToken(page)).resolves.toBe('new-access')
     expect(post).toHaveBeenCalledExactlyOnceWith(`${API_BASE}/auth/token/`, {
-      data: { username: expect.any(String), password: expect.any(String) },
+      data: { email: expect.any(String), password: expect.any(String) },
     })
   })
 

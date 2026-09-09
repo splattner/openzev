@@ -16,7 +16,7 @@ import { AUTH_STATE_PATH, API_BASE, BASE, USER, PASS } from './helpers'
 
 setup('authenticate as admin', async ({ request }) => {
   const resp = await request.post(`${API_BASE}/auth/token/`, {
-    data: { username: USER, password: PASS },
+    data: { email: USER, password: PASS },
   })
   expect(resp.ok(), `Login failed (${resp.status()})`).toBeTruthy()
 

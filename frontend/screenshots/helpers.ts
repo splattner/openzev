@@ -7,7 +7,7 @@ export const BASE = process.env.SCREENSHOT_BASE_URL ?? 'http://localhost:8080'
 // The docker compose stack publishes the API on 8001 (see seed_demo's summary
 // output); 8000 is only reachable in a bare `python manage.py runserver` setup.
 export const API_BASE = process.env.SCREENSHOT_API_URL ?? 'http://localhost:8001/api/v1'
-export const USER = process.env.SCREENSHOT_USER ?? 'admin'
+export const USER = process.env.SCREENSHOT_USER ?? 'admin@openzev.local'
 export const PASS = process.env.SCREENSHOT_PASSWORD ?? 'admin1234'
 
 const __filename = fileURLToPath(import.meta.url)
@@ -72,7 +72,7 @@ export async function getAdminToken(page: Page): Promise<string> {
   if (existing) return existing
 
   const resp = await page.request.post(`${API_BASE}/auth/token/`, {
-    data: { username: USER, password: PASS },
+    data: { email: USER, password: PASS },
   })
   expect(resp.ok(), `Admin login failed (${resp.status()})`).toBeTruthy()
   const token = await readCookie()

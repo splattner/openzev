@@ -162,14 +162,18 @@ test.describe('User Guide Screenshots', () => {
   test('05-metering-data', async ({ page }) => {
     await navigateTo(page, '/metering-data')
     await page.waitForSelector('.card', { timeout: 10_000 })
-    // Select the first metering point that can carry readings.
+    // Select the first metering point that can carry readings — skipping the
+    // "whole ZEV total" option (value __zev_total__, see
+    // ALL_METERING_POINTS_VALUE in MeteringChartPage.tsx), which sorts right
+    // after the empty placeholder and would otherwise be picked first,
+    // hiding the Raw Readings Table this screenshot is meant to show.
     const mpSelect = page.locator('select').first()
     const options = mpSelect.locator('option')
     const count = await options.count()
     for (let i = 1; i < count; i++) {
       const label = await options.nth(i).textContent()
       const value = await options.nth(i).getAttribute('value')
-      if (value && label) {
+      if (value && value !== '__zev_total__' && label) {
         await mpSelect.selectOption(value)
         await page.waitForTimeout(1000)
 
