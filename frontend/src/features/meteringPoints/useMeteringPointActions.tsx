@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useMemo, useState, type FormEvent } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useSearchParams } from 'react-router-dom'
 import { useConfirmDialog } from '../../components/ConfirmDialog'
 import {
     createMeteringPoint,
@@ -28,7 +29,12 @@ import {
     getNextAssignmentGuidance,
     isAssignmentCurrent,
     isMeteringPointHolderLess,
+    METERING_POINT_FILTER_KEYS,
     meteringPointNeedsAttention,
+    readMeteringPointAssignmentFilter,
+    readMeteringPointAttentionFilter,
+    readMeteringPointStatusFilter,
+    readMeteringPointTypeFilter,
     type MeteringPointAssignmentFilter,
     type MeteringPointAttentionFilter,
     type MeteringPointHealth,
@@ -162,19 +168,75 @@ export function useMeteringPointActions({
     const [deleteDataFrom, setDeleteDataFrom] = useState('')
     const [deleteDataTo, setDeleteDataTo] = useState('')
 
-    // Filtering
-    const [searchTerm, setSearchTerm] = useState('')
-    const [statusFilter, setStatusFilter] = useState<MeteringPointStatusFilter>('all')
-    const [typeFilter, setTypeFilter] = useState<MeteringPointTypeFilter>('all')
-    const [attentionFilter, setAttentionFilter] = useState<MeteringPointAttentionFilter>('all')
-    const [assignmentFilter, setAssignmentFilter] = useState<MeteringPointAssignmentFilter>('all')
+    // ── Filtering — mirrored into the URL (#625) ────────────────────────────────────
+    //
+    // Local state is still the source of truth React renders from (matches the
+    // metering_point/tab pattern MeteringChartPage already uses) — each setter
+    // below just also writes the corresponding query param, and the lazy
+    // useState initializers below read it back on mount. That round-trip is
+    // what makes a filtered view survive "click Chart, then Back": the click
+    // unmounts this page for a different route, and Back remounts it fresh
+    // with the URL (and therefore the filters) already restored, no separate
+    // rehydration effect required.
+    const [searchParams, setSearchParams] = useSearchParams()
+    const FILTER = METERING_POINT_FILTER_KEYS
+
+    const [searchTerm, setSearchTermState] = useState(() => searchParams.get(FILTER.search) ?? '')
+    const [statusFilter, setStatusFilterState] = useState<MeteringPointStatusFilter>(
+        () => readMeteringPointStatusFilter(searchParams.get(FILTER.status)),
+    )
+    const [typeFilter, setTypeFilterState] = useState<MeteringPointTypeFilter>(
+        () => readMeteringPointTypeFilter(searchParams.get(FILTER.type)),
+    )
+    const [attentionFilter, setAttentionFilterState] = useState<MeteringPointAttentionFilter>(
+        () => readMeteringPointAttentionFilter(searchParams.get(FILTER.attention)),
+    )
+    const [assignmentFilter, setAssignmentFilterState] = useState<MeteringPointAssignmentFilter>(
+        () => readMeteringPointAssignmentFilter(searchParams.get(FILTER.assignment)),
+    )
+
+    /** Sets or removes one query param, without touching the others already there. */
+    function writeFilterParam(key: string, value: string, isDefault: boolean) {
+        setSearchParams((previous) => {
+            const next = new URLSearchParams(previous)
+            if (isDefault) next.delete(key)
+            else next.set(key, value)
+            return next
+        }, { replace: true })
+    }
+
+    function setSearchTerm(value: string) {
+        setSearchTermState(value)
+        writeFilterParam(FILTER.search, value, value === '')
+    }
+    function setStatusFilter(value: MeteringPointStatusFilter) {
+        setStatusFilterState(value)
+        writeFilterParam(FILTER.status, value, value === 'all')
+    }
+    function setTypeFilter(value: MeteringPointTypeFilter) {
+        setTypeFilterState(value)
+        writeFilterParam(FILTER.type, value, value === 'all')
+    }
+    function setAttentionFilter(value: MeteringPointAttentionFilter) {
+        setAttentionFilterState(value)
+        writeFilterParam(FILTER.attention, value, value === 'all')
+    }
+    function setAssignmentFilter(value: MeteringPointAssignmentFilter) {
+        setAssignmentFilterState(value)
+        writeFilterParam(FILTER.assignment, value, value === 'all')
+    }
 
     function clearFilters() {
-        setSearchTerm('')
-        setStatusFilter('all')
-        setTypeFilter('all')
-        setAttentionFilter('all')
-        setAssignmentFilter('all')
+        setSearchTermState('')
+        setStatusFilterState('all')
+        setTypeFilterState('all')
+        setAttentionFilterState('all')
+        setAssignmentFilterState('all')
+        setSearchParams((previous) => {
+            const next = new URLSearchParams(previous)
+            Object.values(FILTER).forEach((key) => next.delete(key))
+            return next
+        }, { replace: true })
     }
 
     // ── Queries ──────────────────────────────────────────────────────────────────

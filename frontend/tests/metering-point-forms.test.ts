@@ -12,6 +12,10 @@ import {
   isMeteringPointHolderLess,
   meteringPointHealthBadgeClass,
   meteringPointNeedsAttention,
+  readMeteringPointAssignmentFilter,
+  readMeteringPointAttentionFilter,
+  readMeteringPointStatusFilter,
+  readMeteringPointTypeFilter,
 } from '../src/features/meteringPoints/useMeteringPointForms'
 import type { MeteringPoint, MeteringPointAssignment, MeteringPointDataQuality } from '../src/types/api'
 
@@ -208,5 +212,37 @@ describe('metering point form helpers', () => {
     expect(meteringPointHealthBadgeClass('yellow')).toBe('badge badge-warning')
     expect(meteringPointHealthBadgeClass('red')).toBe('badge badge-danger')
     expect(meteringPointHealthBadgeClass('no_data')).toBe('badge badge-neutral')
+  })
+
+  describe('reading filters from the URL (#625)', () => {
+    it('reads a valid status filter and falls back to "all" for anything else', () => {
+      expect(readMeteringPointStatusFilter('active')).toBe('active')
+      expect(readMeteringPointStatusFilter('inactive')).toBe('inactive')
+      expect(readMeteringPointStatusFilter('all')).toBe('all')
+      expect(readMeteringPointStatusFilter(null)).toBe('all')
+      expect(readMeteringPointStatusFilter('')).toBe('all')
+      expect(readMeteringPointStatusFilter('bogus')).toBe('all')
+    })
+
+    it('reads a valid type filter and falls back to "all" for anything else', () => {
+      expect(readMeteringPointTypeFilter('consumption')).toBe('consumption')
+      expect(readMeteringPointTypeFilter('production')).toBe('production')
+      expect(readMeteringPointTypeFilter('bidirectional')).toBe('bidirectional')
+      expect(readMeteringPointTypeFilter(null)).toBe('all')
+      expect(readMeteringPointTypeFilter('solar')).toBe('all')
+    })
+
+    it('reads a valid attention filter and falls back to "all" for anything else', () => {
+      expect(readMeteringPointAttentionFilter('attention')).toBe('attention')
+      expect(readMeteringPointAttentionFilter(null)).toBe('all')
+      expect(readMeteringPointAttentionFilter('urgent')).toBe('all')
+    })
+
+    it('reads a valid assignment filter and falls back to "all" for anything else', () => {
+      expect(readMeteringPointAssignmentFilter('assigned')).toBe('assigned')
+      expect(readMeteringPointAssignmentFilter('unassigned')).toBe('unassigned')
+      expect(readMeteringPointAssignmentFilter(null)).toBe('all')
+      expect(readMeteringPointAssignmentFilter('maybe')).toBe('all')
+    })
   })
 })

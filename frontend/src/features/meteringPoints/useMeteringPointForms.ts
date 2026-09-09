@@ -150,3 +150,34 @@ export function meteringPointHealthBadgeClass(health: MeteringPointHealth): stri
   if (health === 'red') return 'badge badge-danger'
   return 'badge badge-neutral'
 }
+
+// ── Filters as URL state (#625) ─────────────────────────────────────────────
+//
+// Each `read*` function turns a raw `?param=` value (or a hand-edited/stale
+// one that no longer matches the type) into a valid filter value, falling
+// back to the unfiltered default rather than throwing — a URL is never
+// trusted input. Pairs with the query-param names in `META_POINT_FILTER_KEYS`.
+
+export const METERING_POINT_FILTER_KEYS = {
+  search: 'search',
+  status: 'status',
+  type: 'type',
+  attention: 'attention',
+  assignment: 'assignment',
+} as const
+
+export function readMeteringPointStatusFilter(value: string | null): MeteringPointStatusFilter {
+  return value === 'active' || value === 'inactive' ? value : 'all'
+}
+
+export function readMeteringPointTypeFilter(value: string | null): MeteringPointTypeFilter {
+  return value === 'consumption' || value === 'production' || value === 'bidirectional' ? value : 'all'
+}
+
+export function readMeteringPointAttentionFilter(value: string | null): MeteringPointAttentionFilter {
+  return value === 'attention' ? 'attention' : 'all'
+}
+
+export function readMeteringPointAssignmentFilter(value: string | null): MeteringPointAssignmentFilter {
+  return value === 'assigned' || value === 'unassigned' ? value : 'all'
+}

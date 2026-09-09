@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next'
 import { ConfirmDialog } from '../components/ConfirmDialog'
+import { PageSkeleton } from '../components/PageSkeleton'
 import { MeteringAssignmentFormModal } from '../features/meteringPoints/MeteringAssignmentFormModal'
 import { MeteringDeleteDataModal } from '../features/meteringPoints/MeteringDeleteDataModal'
 import { MeteringPointsEmptyState } from '../features/meteringPoints/MeteringPointsEmptyState'
@@ -90,10 +91,43 @@ export function MeteringPointsPage() {
 
     // ── Loading / error ───────────────────────────────────────────────────────────
     if (meteringPointsQuery.isLoading) {
-        return <div className="card">{t('pages.meteringPoints.loading')}</div>
+        return (
+            <div className="page-stack">
+                <header>
+                    <h2>{t('pages.meteringPoints.title')}</h2>
+                    <p className="muted">
+                        {canManageMeteringPoints
+                            ? t('pages.meteringPoints.adminDescription')
+                            : t('pages.meteringPoints.participantDescription')}
+                    </p>
+                </header>
+                <PageSkeleton variant="cardList" />
+            </div>
+        )
     }
     if (meteringPointsQuery.isError) {
-        return <div className="card error-banner">{t('pages.meteringPoints.loadFailed')}</div>
+        return (
+            <div className="page-stack">
+                <header>
+                    <h2>{t('pages.meteringPoints.title')}</h2>
+                    <p className="muted">
+                        {canManageMeteringPoints
+                            ? t('pages.meteringPoints.adminDescription')
+                            : t('pages.meteringPoints.participantDescription')}
+                    </p>
+                </header>
+                <div className="card error-banner">
+                    <p style={{ margin: '0 0 0.75rem' }}>{t('pages.meteringPoints.loadFailed')}</p>
+                    <button
+                        className="button button-secondary"
+                        type="button"
+                        onClick={() => meteringPointsQuery.refetch()}
+                    >
+                        {t('common.retry')}
+                    </button>
+                </div>
+            </div>
+        )
     }
 
     return (
