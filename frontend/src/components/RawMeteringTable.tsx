@@ -4,11 +4,64 @@ import { Fragment, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { fetchRawMeteringData, fetchRawMeteringDay } from '../lib/api/metering'
+import { fetchMeteringPointAssignments } from '../lib/api/zev'
 import { queryKeys } from '../lib/api/queryKeys'
 import { formatShortDate, useAppSettings } from '../lib/appSettings'
 import { outReadingLabelKey } from '../lib/meteringLabels'
 import { PageSkeleton } from './PageSkeleton'
-import type { MeteringPoint, RawMeteringReading } from '../types/api'
+import type { MeteringPoint, MeteringPointAssignment, RawMeteringDailyRow, RawMeteringReading } from '../types/api'
+
+// ── Anomaly detection (#652) ──────────────────────────────────────────────────
+//
+// Lightweight, non-ML checks over readings already fetched for this page —
+// no separate anomaly-detection endpoint. Flags surface as small warning
+// badges rather than requiring the viewer to eyeball every value.
+
+/** True if some assignment covers this metering point on this civil day. */
+function hasAssignmentOnDay(assignments: MeteringPointAssignment[], date: string): boolean {
+    return assignments.some((a) => a.valid_from <= date && (!a.valid_to || a.valid_to >= date))
+}
+
+/**
+ * Day-summary-level flags: don't require expanding the day.
+ *
+ * `zeroConsumptionWithHolder` is scoped to days with an assignment holder —
+ * a holder-less meter reading zero all day is unremarkable (nobody's
+ * tracking it), so flagging it would just be noise on top of the
+ * unassigned-readings warning the Data Quality tab already reports.
+ */
+export function dayAnomalyFlags(
+    day: Pick<RawMeteringDailyRow, 'date' | 'in_kwh' | 'out_kwh'>,
+    assignments: MeteringPointAssignment[],
+): { zeroConsumptionWithHolder: boolean; negativeTotal: boolean } {
+    return {
+        zeroConsumptionWithHolder: day.in_kwh === 0 && hasAssignmentOnDay(assignments, day.date),
+        negativeTotal: day.in_kwh < 0 || day.out_kwh < 0,
+    }
+}
+
+/**
+ * Reading-level flags: only available once a day's individual readings are
+ * fetched (expanding it). A duplicate (timestamp, direction) pair is
+ * otherwise silently summed into one interval by pivotByInterval/
+ * buildHourGrid below — this is what would otherwise hide that from view.
+ */
+export function readingAnomalies(readings: RawMeteringReading[]): {
+    negativeCount: number
+    duplicateCount: number
+} {
+    const negativeCount = readings.filter((r) => r.energy_kwh < 0).length
+    const seen = new Map<string, number>()
+    for (const r of readings) {
+        const key = `${r.timestamp}|${r.direction}`
+        seen.set(key, (seen.get(key) ?? 0) + 1)
+    }
+    let duplicateCount = 0
+    for (const count of seen.values()) {
+        if (count > 1) duplicateCount += 1
+    }
+    return { negativeCount, duplicateCount }
+}
 
 /** UTC HH:MM — matches how the importer stored the timestamps (naive stamped as UTC). */
 function formatTimeOnly(ts: string): string {
@@ -89,9 +142,18 @@ function HourGrid({
                         {SLOT_MINUTES.map((minute, slot) => (
                             <tr key={minute}>
                                 <th scope="row">:{String(minute).padStart(2, '0')}</th>
-                                {HOURS.map((h) => (
-                                    <td key={h}>{kwh(grid[slot][h])}</td>
-                                ))}
+                                {HOURS.map((h) => {
+                                    const value = grid[slot][h]
+                                    // A negative reading is corrupt data, not just unusual —
+                                    // flagged in place rather than requiring the viewer to
+                                    // eyeball every cell (#652).
+                                    const isNegative = value !== null && value < 0
+                                    return (
+                                        <td key={h} style={isNegative ? { color: 'var(--danger-700)', fontWeight: 700 } : undefined}>
+                                            {kwh(value)}
+                                        </td>
+                                    )
+                                })}
                             </tr>
                         ))}
                     </tbody>
@@ -217,6 +279,7 @@ function RawDayDetail({
     const dayHasOut = readings.some((r) => r.direction === 'out')
     // Only label the grids when both directions are present; otherwise it's unambiguous.
     const showCaptions = dayHasIn && dayHasOut
+    const { negativeCount, duplicateCount } = readingAnomalies(readings)
 
     return (
         <tr className="raw-metering-detail-row">
@@ -229,6 +292,16 @@ function RawDayDetail({
                     <div className="raw-metering-detail-status muted">{t('pages.meteringData.noRawReadings')}</div>
                 ) : (
                     <div className="raw-metering-detail-body">
+                        {negativeCount > 0 && (
+                            <div className="raw-metering-anomaly raw-metering-anomaly-danger">
+                                {t('pages.meteringData.rawTable.negativeReadingsWarning', { count: negativeCount })}
+                            </div>
+                        )}
+                        {duplicateCount > 0 && (
+                            <div className="raw-metering-anomaly">
+                                {t('pages.meteringData.rawTable.duplicateReadingsWarning', { count: duplicateCount })}
+                            </div>
+                        )}
                         <DaySparkline intervals={intervals} hasIn={dayHasIn} hasOut={dayHasOut} meterType={meterType} />
                         {dayHasIn && (
                             <HourGrid
@@ -276,6 +349,14 @@ export function RawMeteringTable({
         enabled: !!meteringPointId,
     })
 
+    // Only needed to scope the zero-consumption anomaly flag to days with an
+    // actual holder (#652) — not shown anywhere else in this table.
+    const assignmentsQuery = useQuery({
+        queryKey: queryKeys.metering.pointAssignments(meteringPointId),
+        queryFn: () => fetchMeteringPointAssignments(meteringPointId),
+        enabled: !!meteringPointId,
+    })
+
     const days = summaryQuery.data ?? []
     // Date + In + Reading count, plus Feed-in when the meter exports.
     const colSpan = hasOut ? 4 : 3
@@ -306,6 +387,7 @@ export function RawMeteringTable({
                     <tbody>
                         {days.map((day) => {
                             const isOpen = expanded === day.date
+                            const flags = dayAnomalyFlags(day, assignmentsQuery.data ?? [])
                             return (
                                 <Fragment key={day.date}>
                                     <tr
@@ -326,6 +408,16 @@ export function RawMeteringTable({
                                                 ▸
                                             </span>
                                             {formatShortDate(day.date, settings)}
+                                            {flags.negativeTotal && (
+                                                <span className="raw-metering-day-flag raw-metering-day-flag-danger">
+                                                    {t('pages.meteringData.rawTable.negativeTotalFlag')}
+                                                </span>
+                                            )}
+                                            {flags.zeroConsumptionWithHolder && (
+                                                <span className="raw-metering-day-flag">
+                                                    {t('pages.meteringData.rawTable.zeroConsumptionFlag')}
+                                                </span>
+                                            )}
                                         </td>
                                         <td className="raw-metering-num">{day.in_kwh.toFixed(4)}</td>
                                         {hasOut && <td className="raw-metering-num">{day.out_kwh.toFixed(4)}</td>}

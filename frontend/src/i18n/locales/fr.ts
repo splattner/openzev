@@ -1736,6 +1736,10 @@ export const fr = {
                 inKwh: 'Soutirage (kWh)',
                 outKwh: 'Injection (kWh)',
                 productionKwh: 'Production (kWh)',
+                negativeTotalFlag: 'Valeur négative',
+                zeroConsumptionFlag: 'Consommation nulle',
+                negativeReadingsWarning: '{{count}} relevé(s) négatif(s) ce jour-là — mis en évidence ci-dessous.',
+                duplicateReadingsWarning: '{{count}} horodatage(s) ont plus d\'un relevé pour la même direction — ils ont été additionnés plutôt qu\'affichés séparément.',
             },
         },
         zevSettings: {

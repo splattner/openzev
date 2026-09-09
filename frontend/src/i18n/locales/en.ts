@@ -1747,6 +1747,10 @@ export const en = {
                 inKwh: 'Consumption (kWh)',
                 outKwh: 'Feed-in (kWh)',
                 productionKwh: 'Production (kWh)',
+                negativeTotalFlag: 'Negative value',
+                zeroConsumptionFlag: 'Zero consumption',
+                negativeReadingsWarning: '{{count}} negative reading(s) on this day — highlighted below.',
+                duplicateReadingsWarning: '{{count}} timestamp(s) have more than one reading for the same direction — they were summed rather than shown separately.',
             },
         },
         zevSettings: {

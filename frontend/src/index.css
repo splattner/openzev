@@ -822,6 +822,34 @@ label {
   transform: rotate(90deg);
 }
 
+/* Anomaly flags (#652) — a small inline badge next to the day it's about,
+   and a fuller-width banner inside the expanded day detail. */
+.raw-metering-day-flag {
+  display: inline-block;
+  padding: 0.05rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  background: var(--warning-100);
+  color: var(--warning-800);
+}
+
+.raw-metering-day-flag-danger {
+  background: var(--danger-100);
+  color: var(--danger-700);
+}
+
+.raw-metering-anomaly {
+  margin-bottom: 0.75rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--warning-800);
+}
+
+.raw-metering-anomaly-danger {
+  color: var(--danger-700);
+}
+
 /* Expanded interval detail */
 .raw-metering-detail-cell {
   padding: 0 !important;

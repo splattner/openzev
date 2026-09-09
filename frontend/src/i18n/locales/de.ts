@@ -1736,6 +1736,10 @@ export const de = {
                 inKwh: 'Bezug (kWh)',
                 outKwh: 'Einspeisung (kWh)',
                 productionKwh: 'Produktion (kWh)',
+                negativeTotalFlag: 'Negativer Wert',
+                zeroConsumptionFlag: 'Kein Verbrauch',
+                negativeReadingsWarning: '{{count}} negative(r) Messwert(e) an diesem Tag — unten hervorgehoben.',
+                duplicateReadingsWarning: '{{count}} Zeitstempel haben mehr als einen Messwert für dieselbe Richtung — sie wurden summiert statt einzeln angezeigt.',
             },
         },
         zevSettings: {
