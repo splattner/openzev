@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { dayAnomalyFlags, readingAnomalies } from '../src/components/RawMeteringTable'
+import { dataBarPercent, dayAnomalyFlags, readingAnomalies } from '../src/components/RawMeteringTable'
 import type { MeteringPointAssignment, RawMeteringReading } from '../src/types/api'
 
 function assignment(overrides: Partial<MeteringPointAssignment> = {}): MeteringPointAssignment {
@@ -93,5 +93,26 @@ describe('readingAnomalies', () => {
 
   it('reports nothing for an empty list', () => {
     expect(readingAnomalies([])).toEqual({ negativeCount: 0, duplicateCount: 0 })
+  })
+})
+
+describe('dataBarPercent', () => {
+  it('scales a value to the period max (#641)', () => {
+    expect(dataBarPercent(5, 10)).toBe(50)
+    expect(dataBarPercent(10, 10)).toBe(100)
+    expect(dataBarPercent(0, 10)).toBe(0)
+  })
+
+  it('uses the magnitude of a negative value, not a blank bar', () => {
+    expect(dataBarPercent(-5, 10)).toBe(50)
+  })
+
+  it('never exceeds 100 even if a value somehow exceeds the given max', () => {
+    expect(dataBarPercent(15, 10)).toBe(100)
+  })
+
+  it('returns 0 rather than dividing by zero when every value in the period is zero', () => {
+    expect(dataBarPercent(0, 0)).toBe(0)
+    expect(dataBarPercent(5, 0)).toBe(0)
   })
 })

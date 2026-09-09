@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { CHART_LOCAL, FLOW_LOCAL_CONS } from '../lib/chartTokens'
-import { Fragment, useState } from 'react'
+import { Fragment, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { fetchRawMeteringData, fetchRawMeteringDay } from '../lib/api/metering'
@@ -92,6 +92,25 @@ function pivotByInterval(readings: RawMeteringReading[]): IntervalRow[] {
 function kwh(value: number | null): string {
     return value === null ? '–' : value.toFixed(4)
 }
+
+/**
+ * Data-bar width (0–100) for a value relative to the largest magnitude in
+ * the period — an outlier day should be visible without reading every
+ * number (#641). `Math.abs` so a negative total (already separately
+ * flagged red, see dayAnomalyFlags) still gets a proportional bar instead
+ * of a blank one.
+ */
+export function dataBarPercent(value: number, maxAbs: number): number {
+    if (maxAbs <= 0) {
+        return 0
+    }
+    return Math.min(100, (Math.abs(value) / maxAbs) * 100)
+}
+
+/** Rows-per-page for the day-summary table — a quarter (~91 days) or a year
+ * (365) otherwise renders every row at once and dwarfs the chart above it
+ * (#641). A month-ish chunk keeps each page a natural, readable unit. */
+const DAYS_PER_PAGE = 31
 
 // ── Hour × 15-minute grid ───────────────────────────────────────────────────────
 
@@ -342,6 +361,7 @@ export function RawMeteringTable({
     const { t } = useTranslation()
     const { settings } = useAppSettings()
     const [expanded, setExpanded] = useState<string | null>(null)
+    const [page, setPage] = useState(0)
 
     const summaryQuery = useQuery({
         queryKey: queryKeys.metering.rawData(meteringPointId, dateFrom, dateTo),
@@ -357,9 +377,21 @@ export function RawMeteringTable({
         enabled: !!meteringPointId,
     })
 
+    // Back to page 1 whenever the meter or period changes, rather than
+    // stranding the viewer on e.g. page 4 of a now much-shorter list (#641).
+    useEffect(() => {
+        setPage(0)
+    }, [meteringPointId, dateFrom, dateTo])
+
     const days = summaryQuery.data ?? []
     // Date + In + Reading count, plus Feed-in when the meter exports.
     const colSpan = hasOut ? 4 : 3
+    const pageCount = Math.max(1, Math.ceil(days.length / DAYS_PER_PAGE))
+    const visibleDays = days.slice(page * DAYS_PER_PAGE, (page + 1) * DAYS_PER_PAGE)
+    // Bar scale spans the whole period, not just the visible page, so a
+    // day's bar stays comparable after paging (#641).
+    const maxIn = Math.max(0, ...days.map((d) => Math.abs(d.in_kwh)))
+    const maxOut = Math.max(0, ...days.map((d) => Math.abs(d.out_kwh)))
 
     return (
         <div className="table-card raw-metering">
@@ -385,9 +417,11 @@ export function RawMeteringTable({
                         </tr>
                     </thead>
                     <tbody>
-                        {days.map((day) => {
+                        {visibleDays.map((day) => {
                             const isOpen = expanded === day.date
                             const flags = dayAnomalyFlags(day, assignmentsQuery.data ?? [])
+                            const inBarPct = dataBarPercent(day.in_kwh, maxIn)
+                            const outBarPct = dataBarPercent(day.out_kwh, maxOut)
                             return (
                                 <Fragment key={day.date}>
                                     <tr
@@ -419,8 +453,22 @@ export function RawMeteringTable({
                                                 </span>
                                             )}
                                         </td>
-                                        <td className="raw-metering-num">{day.in_kwh.toFixed(4)}</td>
-                                        {hasOut && <td className="raw-metering-num">{day.out_kwh.toFixed(4)}</td>}
+                                        {/* A data-bar backdrop scaled to the period's max makes an
+                                            outlier day visible without reading every row (#641). */}
+                                        <td
+                                            className="raw-metering-num"
+                                            style={{ background: `linear-gradient(to right, var(--brand-pale) ${inBarPct}%, transparent ${inBarPct}%)` }}
+                                        >
+                                            {day.in_kwh.toFixed(4)}
+                                        </td>
+                                        {hasOut && (
+                                            <td
+                                                className="raw-metering-num"
+                                                style={{ background: `linear-gradient(to right, var(--brand-pale) ${outBarPct}%, transparent ${outBarPct}%)` }}
+                                            >
+                                                {day.out_kwh.toFixed(4)}
+                                            </td>
+                                        )}
                                         <td className="raw-metering-num">{day.readings_count}</td>
                                     </tr>
                                     {isOpen && (
@@ -436,6 +484,38 @@ export function RawMeteringTable({
                         })}
                     </tbody>
                 </table>
+            )}
+
+            {days.length > DAYS_PER_PAGE && (
+                <div className="data-table-footer actions-row actions-row-end muted" style={{ fontSize: '0.82rem', alignItems: 'center' }}>
+                    <span>
+                        {t('common.pagination.range', {
+                            from: page * DAYS_PER_PAGE + 1,
+                            to: Math.min((page + 1) * DAYS_PER_PAGE, days.length),
+                            total: days.length,
+                        })}
+                    </span>
+                    <span style={{ flex: 1 }} />
+                    <button
+                        className="button button-secondary button-compact"
+                        type="button"
+                        aria-label={t('common.pagination.previous')}
+                        onClick={() => setPage((p) => p - 1)}
+                        disabled={page === 0}
+                    >
+                        ‹
+                    </button>
+                    <span>{page + 1} / {pageCount}</span>
+                    <button
+                        className="button button-secondary button-compact"
+                        type="button"
+                        aria-label={t('common.pagination.next')}
+                        onClick={() => setPage((p) => p + 1)}
+                        disabled={page >= pageCount - 1}
+                    >
+                        ›
+                    </button>
+                </div>
             )}
         </div>
     )
