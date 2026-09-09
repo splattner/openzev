@@ -25,6 +25,8 @@ export const defaultAssignmentForm = (meteringPointId = ''): MeteringPointAssign
 
 export type MeteringPointStatusFilter = 'all' | 'active' | 'inactive'
 export type MeteringPointTypeFilter = 'all' | MeteringPoint['meter_type']
+/** Whether the meter has a holder *today* — mirrors `getMeteringPointCounts`' `assignedCount`. */
+export type MeteringPointAssignmentFilter = 'all' | 'assigned' | 'unassigned'
 export type AssignmentState = 'current' | 'upcoming' | 'ended'
 
 export function getAssignmentState(assignment: MeteringPointAssignment, todayIso: string): AssignmentState {

@@ -29,6 +29,7 @@ import {
     isAssignmentCurrent,
     isMeteringPointHolderLess,
     meteringPointNeedsAttention,
+    type MeteringPointAssignmentFilter,
     type MeteringPointAttentionFilter,
     type MeteringPointHealth,
     type MeteringPointStatusFilter,
@@ -52,6 +53,9 @@ export function getScopedAndFilteredMeteringPoints(
         typeFilter,
         attentionFilter = 'all',
         needsAttentionByMeteringPoint,
+        assignmentFilter = 'all',
+        isAssignedByMeteringPoint,
+        participantNamesByMeteringPoint,
     }: {
         selectedZevId: string | null
         canManageMeteringPoints: boolean
@@ -61,6 +65,11 @@ export function getScopedAndFilteredMeteringPoints(
         attentionFilter?: MeteringPointAttentionFilter
         /** Only consulted when `attentionFilter` is `'attention'`; a missing entry does not match. */
         needsAttentionByMeteringPoint?: Map<string, boolean>
+        assignmentFilter?: MeteringPointAssignmentFilter
+        /** Only consulted when `assignmentFilter` isn't `'all'`; a missing entry counts as unassigned. */
+        isAssignedByMeteringPoint?: Map<string, boolean>
+        /** Space-joined names of every participant ever assigned to the meter, so search can match "which meter is Anna's?". */
+        participantNamesByMeteringPoint?: Map<string, string>
     },
 ) {
     const scopedMeteringPoints = points.filter(
@@ -76,10 +85,15 @@ export function getScopedAndFilteredMeteringPoints(
         const matchesSearch = !normalizedSearch
             || point.meter_id.toLowerCase().includes(normalizedSearch)
             || (point.location_description ?? '').toLowerCase().includes(normalizedSearch)
+            || (participantNamesByMeteringPoint?.get(point.id) ?? '').toLowerCase().includes(normalizedSearch)
         const matchesAttention = attentionFilter === 'all'
             || !!needsAttentionByMeteringPoint?.get(point.id)
+        const isAssigned = !!isAssignedByMeteringPoint?.get(point.id)
+        const matchesAssignment = assignmentFilter === 'all'
+            || (assignmentFilter === 'assigned' && isAssigned)
+            || (assignmentFilter === 'unassigned' && !isAssigned)
 
-        return matchesStatus && matchesType && matchesSearch && matchesAttention
+        return matchesStatus && matchesType && matchesSearch && matchesAttention && matchesAssignment
     })
 
     return { scopedMeteringPoints, meteringPoints }
@@ -153,6 +167,15 @@ export function useMeteringPointActions({
     const [statusFilter, setStatusFilter] = useState<MeteringPointStatusFilter>('all')
     const [typeFilter, setTypeFilter] = useState<MeteringPointTypeFilter>('all')
     const [attentionFilter, setAttentionFilter] = useState<MeteringPointAttentionFilter>('all')
+    const [assignmentFilter, setAssignmentFilter] = useState<MeteringPointAssignmentFilter>('all')
+
+    function clearFilters() {
+        setSearchTerm('')
+        setStatusFilter('all')
+        setTypeFilter('all')
+        setAttentionFilter('all')
+        setAssignmentFilter('all')
+    }
 
     // ── Queries ──────────────────────────────────────────────────────────────────
 
@@ -490,6 +513,34 @@ export function useMeteringPointActions({
         return map
     }, [meteringPointsQuery.data, meteringPointHealthById, meteringPointHolderLessById])
 
+    // Empty for a role with no assignment data loaded, same as
+    // meteringPointHolderLessById — the "Assigned"/"Unassigned" chips are
+    // hidden for that role in the toolbar, so this never needs to fall back.
+    const isAssignedByMeteringPoint = useMemo(() => {
+        const map = new Map<string, boolean>()
+        for (const point of meteringPointsQuery.data ?? []) {
+            map.set(
+                point.id,
+                (assignmentsByMeteringPoint.get(point.id) ?? []).some((assignment) => isAssignmentCurrent(assignment, todayIso)),
+            )
+        }
+        return map
+    }, [meteringPointsQuery.data, assignmentsByMeteringPoint, todayIso])
+
+    // Every participant ever assigned, not just the current holder — a
+    // search for a former tenant's name should still find their old meter.
+    const participantNamesByMeteringPoint = useMemo(() => {
+        const map = new Map<string, string>()
+        for (const [meteringPointId, assignments] of assignmentsByMeteringPoint.entries()) {
+            const names = assignments
+                .map((assignment) => participantNameById.get(assignment.participant))
+                .filter((name): name is string => !!name)
+                .join(' ')
+            map.set(meteringPointId, names)
+        }
+        return map
+    }, [assignmentsByMeteringPoint, participantNameById])
+
     const { scopedMeteringPoints, meteringPoints } = getScopedAndFilteredMeteringPoints(meteringPointsQuery.data ?? [], {
         selectedZevId,
         canManageMeteringPoints,
@@ -498,6 +549,9 @@ export function useMeteringPointActions({
         typeFilter,
         attentionFilter,
         needsAttentionByMeteringPoint,
+        assignmentFilter,
+        isAssignedByMeteringPoint,
+        participantNamesByMeteringPoint,
     })
 
     const filteredAssignmentsByMeteringPoint = new Map(
@@ -512,7 +566,11 @@ export function useMeteringPointActions({
         todayIso,
         needsAttentionByMeteringPoint,
     )
-    const hasFilters = !!searchTerm.trim() || statusFilter !== 'all' || typeFilter !== 'all' || attentionFilter !== 'all'
+    const hasFilters = !!searchTerm.trim()
+        || statusFilter !== 'all'
+        || typeFilter !== 'all'
+        || attentionFilter !== 'all'
+        || assignmentFilter !== 'all'
 
     return {
         // Queries
@@ -553,6 +611,9 @@ export function useMeteringPointActions({
         setTypeFilter,
         attentionFilter,
         setAttentionFilter,
+        assignmentFilter,
+        setAssignmentFilter,
+        clearFilters,
         // Form handlers
         openCreateMpModal,
         openEditMpModal,

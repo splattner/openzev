@@ -1350,7 +1350,7 @@ export const it = {
             },
             filters: {
                 search: 'Ricerca',
-                searchPlaceholder: 'ID contatore o posizione',
+                searchPlaceholder: 'ID contatore, posizione o partecipante',
                 status: 'Stato',
                 allStatuses: 'Tutti gli stati',
                 type: 'Tipo',
@@ -1360,6 +1360,7 @@ export const it = {
                 needsAttention: 'Richiede attenzione',
                 clear: 'Reimposta filtri',
             },
+            filteredCount: 'Visualizzati {{shown}} di {{total}} punti di misura',
             emptyState: {
                 title: 'Nessun punto di misura ancora',
                 description: 'Aggiungi un punto di misura e assegnalo a un partecipante per includerlo nella fatturazione.',
@@ -1371,11 +1372,13 @@ export const it = {
                 description: 'Prova uno stato, tipo o termine di ricerca diverso.',
             },
             noAssignments: 'Nessuna assegnazione di partecipante ancora.',
+            noLocation: 'Nessuna posizione impostata',
             active: 'Attivo',
             inactive: 'Inattivo',
             moreActions: 'Altro',
             openEnded: 'Senza fine',
             communityBadge: 'Comunitario',
+            heldBySince: 'Assegnato a {{name}} dal {{date}}',
             assignmentState: {
                 current: 'Corrente',
                 upcoming: 'In arrivo',

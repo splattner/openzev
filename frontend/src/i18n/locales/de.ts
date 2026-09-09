@@ -1350,7 +1350,7 @@ export const de = {
             },
             filters: {
                 search: 'Suche',
-                searchPlaceholder: 'Messpunkt-ID oder Ort',
+                searchPlaceholder: 'Messpunkt-ID, Ort oder Teilnehmer',
                 status: 'Status',
                 allStatuses: 'Alle Status',
                 type: 'Typ',
@@ -1360,6 +1360,7 @@ export const de = {
                 needsAttention: 'Benötigt Aufmerksamkeit',
                 clear: 'Filter zurücksetzen',
             },
+            filteredCount: '{{shown}} von {{total}} Zählpunkten angezeigt',
             emptyState: {
                 title: 'Noch keine Zählpunkte',
                 description: 'Fügen Sie einen Zählpunkt hinzu und weisen Sie ihn einem Teilnehmer zu, damit er in die Abrechnung einfliesst.',
@@ -1371,11 +1372,13 @@ export const de = {
                 description: 'Versuchen Sie einen anderen Status, Typ oder Suchbegriff.',
             },
             noAssignments: 'Noch keine Teilnehmerzuweisungen.',
+            noLocation: 'Kein Standort angegeben',
             active: 'Aktiv',
             inactive: 'Inaktiv',
             moreActions: 'Mehr',
             openEnded: 'Offen',
             communityBadge: 'Gemeinschaft',
+            heldBySince: 'Zugewiesen an {{name}} seit {{date}}',
             assignmentState: {
                 current: 'Aktuell',
                 upcoming: 'Bevorstehend',

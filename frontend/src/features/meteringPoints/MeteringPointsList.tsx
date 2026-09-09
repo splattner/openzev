@@ -75,6 +75,31 @@ export function MeteringPointsList({
   const { t } = useTranslation()
   const todayIso = todayLocalIso()
 
+  // Shared by both the compact (single current holder) and expanded assignment
+  // rendering below — Remove lives in the overflow menu everywhere, matching
+  // the meter-level Edit/Delete pattern instead of a standalone danger button.
+  function assignmentMenuItems(assignment: MeteringPointAssignment): ActionMenuItem[] {
+    return [
+      {
+        key: 'remove',
+        label: t('pages.meteringPoints.removeAssignment'),
+        icon: <FontAwesomeIcon icon={faTrash} fixedWidth />,
+        disabled: deleteAssignmentPending || dialogLoading,
+        danger: true,
+        onClick: () =>
+          confirm({
+            title: t('pages.meteringPoints.removeAssignTitle'),
+            message: t('pages.meteringPoints.removeAssignMessage', {
+              name: participantNameById.get(assignment.participant) ?? assignment.participant,
+            }),
+            confirmText: t('pages.meteringPoints.removeAssignConfirm'),
+            isDangerous: true,
+            onConfirm: () => onDeleteAssignment(assignment.id),
+          }),
+      },
+    ]
+  }
+
   return (
     <div className="metering-point-list">
       {meteringPoints.map((point) => {
@@ -90,6 +115,10 @@ export function MeteringPointsList({
 
         const health = healthByMeteringPoint.get(point.id) ?? 'no_data'
         const isHolderLess = holderLessByMeteringPoint.get(point.id) ?? false
+        // The common case (one tenant, ongoing) doesn't need the full
+        // history layout — collapse it to a single line (#624).
+        const isSingleCurrentHolder = sortedAssignments.length === 1
+          && getAssignmentState(sortedAssignments[0], todayIso) === 'current'
 
         const pointMenuItems: ActionMenuItem[] = []
         if (canManageMeteringPoints) {
@@ -134,6 +163,8 @@ export function MeteringPointsList({
           <article key={point.id} className="metering-point-card">
             <div className="metering-point-card-header">
               <div className="metering-point-title">
+                <strong>{point.meter_id}</strong>
+                <span className="muted">{point.location_description || t('pages.meteringPoints.noLocation')}</span>
                 <div className="metering-point-badges">
                   <span className={point.is_active ? 'badge badge-success' : 'badge badge-danger'}>
                     {point.is_active ? t('pages.meteringPoints.active') : t('pages.meteringPoints.inactive')}
@@ -154,7 +185,6 @@ export function MeteringPointsList({
                     </span>
                   )}
                 </div>
-                <strong>{point.meter_id}</strong>
                 <span className="muted">
                   {point.last_reading_at
                     ? t('pages.meteringPoints.lastReading', { date: formatDateTime(point.last_reading_at, settings) })
@@ -193,7 +223,36 @@ export function MeteringPointsList({
 
             {canManageMeteringPoints && (
               <div className="metering-point-body">
-                {sortedAssignments.length > 0 ? (
+                {isSingleCurrentHolder ? (
+                  <div className="metering-assignment-compact">
+                    <span>
+                      {t('pages.meteringPoints.heldBySince', {
+                        name: participantNameById.get(sortedAssignments[0].participant) ?? sortedAssignments[0].participant,
+                        date: formatShortDate(sortedAssignments[0].valid_from, settings),
+                      })}
+                      {sortedAssignments[0].allocation_mode === 'community' && (
+                        <span className="badge badge-info metering-assignment-compact-badge">
+                          {t('pages.meteringPoints.communityBadge')}
+                        </span>
+                      )}
+                    </span>
+                    <div className="metering-assignment-actions">
+                      <button
+                        className="button button-secondary button-compact"
+                        type="button"
+                        onClick={() => onOpenEditAssignment(sortedAssignments[0])}
+                      >
+                        <FontAwesomeIcon icon={faPen} fixedWidth />
+                        {t('common.edit')}
+                      </button>
+                      <ActionMenu
+                        label={t('pages.meteringPoints.moreActions')}
+                        icon={<FontAwesomeIcon icon={faEllipsis} fixedWidth />}
+                        items={assignmentMenuItems(sortedAssignments[0])}
+                      />
+                    </div>
+                  </div>
+                ) : sortedAssignments.length > 0 ? (
                   <div className="metering-assignment-list">
                     {sortedAssignments.map((assignment) => {
                       const assignmentState = getAssignmentState(assignment, todayIso)
@@ -226,25 +285,11 @@ export function MeteringPointsList({
                               <FontAwesomeIcon icon={faPen} fixedWidth />
                               {t('common.edit')}
                             </button>
-                            <button
-                              className="button button-danger button-compact"
-                              type="button"
-                              disabled={deleteAssignmentPending || dialogLoading}
-                              onClick={() =>
-                                confirm({
-                                  title: t('pages.meteringPoints.removeAssignTitle'),
-                                  message: t('pages.meteringPoints.removeAssignMessage', {
-                                    name: participantNameById.get(assignment.participant) ?? assignment.participant,
-                                  }),
-                                  confirmText: t('pages.meteringPoints.removeAssignConfirm'),
-                                  isDangerous: true,
-                                  onConfirm: () => onDeleteAssignment(assignment.id),
-                                })
-                              }
-                            >
-                              <FontAwesomeIcon icon={faTrash} fixedWidth />
-                              {t('pages.meteringPoints.removeAssignment')}
-                            </button>
+                            <ActionMenu
+                              label={t('pages.meteringPoints.moreActions')}
+                              icon={<FontAwesomeIcon icon={faEllipsis} fixedWidth />}
+                              items={assignmentMenuItems(assignment)}
+                            />
                           </div>
                         </div>
                       )

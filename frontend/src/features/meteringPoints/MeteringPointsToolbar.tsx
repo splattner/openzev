@@ -1,7 +1,13 @@
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faPlus } from '@fortawesome/free-solid-svg-icons'
 import { useTranslation } from 'react-i18next'
-import type { MeteringPointAttentionFilter, MeteringPointStatusFilter, MeteringPointTypeFilter } from './useMeteringPointForms'
+import { METER_TYPE_OPTIONS } from '../../lib/options'
+import type {
+  MeteringPointAssignmentFilter,
+  MeteringPointAttentionFilter,
+  MeteringPointStatusFilter,
+  MeteringPointTypeFilter,
+} from './useMeteringPointForms'
 
 type MeteringPointsToolbarProps = {
   canManageMeteringPoints: boolean
@@ -14,10 +20,13 @@ type MeteringPointsToolbarProps = {
   statusFilter: MeteringPointStatusFilter
   typeFilter: MeteringPointTypeFilter
   attentionFilter: MeteringPointAttentionFilter
+  assignmentFilter: MeteringPointAssignmentFilter
   onChangeSearchTerm: (value: string) => void
   onChangeStatusFilter: (value: MeteringPointStatusFilter) => void
   onChangeTypeFilter: (value: MeteringPointTypeFilter) => void
   onChangeAttentionFilter: (value: MeteringPointAttentionFilter) => void
+  onChangeAssignmentFilter: (value: MeteringPointAssignmentFilter) => void
+  onClearFilters: () => void
   onOpenCreateModal: () => void
 }
 
@@ -32,10 +41,13 @@ export function MeteringPointsToolbar({
   statusFilter,
   typeFilter,
   attentionFilter,
+  assignmentFilter,
   onChangeSearchTerm,
   onChangeStatusFilter,
   onChangeTypeFilter,
   onChangeAttentionFilter,
+  onChangeAssignmentFilter,
+  onClearFilters,
   onOpenCreateModal,
 }: MeteringPointsToolbarProps) {
   const { t } = useTranslation()
@@ -43,35 +55,58 @@ export function MeteringPointsToolbar({
   return (
     <section className="card metering-toolbar">
       <div className="metering-toolbar-header">
+        {/* Each chip both reports a count and toggles the matching filter — clicking an
+            already-active chip clears just that dimension, so this doubles as "Clear filters"
+            when Total is clicked (every dimension reset at once). */}
         <div className="metering-summary" aria-label={t('pages.meteringPoints.summaryLabel')}>
-          <span className="metering-summary-stat">
+          <button type="button" className="metering-summary-stat" onClick={onClearFilters}>
             <span className="metering-summary-label">{t('pages.meteringPoints.summary.total')}</span>
             <span className="metering-summary-value">{totalCount}</span>
-          </span>
-          <span className="metering-summary-stat">
+          </button>
+          <button
+            type="button"
+            className={`metering-summary-stat${statusFilter === 'active' ? ' is-active' : ''}`}
+            onClick={() => onChangeStatusFilter(statusFilter === 'active' ? 'all' : 'active')}
+          >
             <span className="metering-summary-label">{t('pages.meteringPoints.summary.active')}</span>
             <span className="metering-summary-value">{activeCount}</span>
-          </span>
-          <span className="metering-summary-stat">
+          </button>
+          <button
+            type="button"
+            className={`metering-summary-stat${statusFilter === 'inactive' ? ' is-active' : ''}`}
+            onClick={() => onChangeStatusFilter(statusFilter === 'inactive' ? 'all' : 'inactive')}
+          >
             <span className="metering-summary-label">{t('pages.meteringPoints.summary.inactive')}</span>
             <span className="metering-summary-value">{inactiveCount}</span>
-          </span>
+          </button>
           {canManageMeteringPoints && (
             <>
-              <span className="metering-summary-stat">
+              <button
+                type="button"
+                className={`metering-summary-stat${assignmentFilter === 'assigned' ? ' is-active' : ''}`}
+                onClick={() => onChangeAssignmentFilter(assignmentFilter === 'assigned' ? 'all' : 'assigned')}
+              >
                 <span className="metering-summary-label">{t('pages.meteringPoints.summary.assigned')}</span>
                 <span className="metering-summary-value">{assignedCount}</span>
-              </span>
-              <span className="metering-summary-stat">
+              </button>
+              <button
+                type="button"
+                className={`metering-summary-stat${assignmentFilter === 'unassigned' ? ' is-active' : ''}`}
+                onClick={() => onChangeAssignmentFilter(assignmentFilter === 'unassigned' ? 'all' : 'unassigned')}
+              >
                 <span className="metering-summary-label">{t('pages.meteringPoints.summary.unassigned')}</span>
                 <span className="metering-summary-value">{totalCount - assignedCount}</span>
-              </span>
+              </button>
             </>
           )}
-          <span className="metering-summary-stat">
+          <button
+            type="button"
+            className={`metering-summary-stat${attentionFilter === 'attention' ? ' is-active' : ''}`}
+            onClick={() => onChangeAttentionFilter(attentionFilter === 'attention' ? 'all' : 'attention')}
+          >
             <span className="metering-summary-label">{t('pages.meteringPoints.summary.needsAttention')}</span>
             <span className="metering-summary-value">{needsAttentionCount}</span>
-          </span>
+          </button>
         </div>
 
         {canManageMeteringPoints && (
@@ -103,9 +138,11 @@ export function MeteringPointsToolbar({
           <span>{t('pages.meteringPoints.filters.type')}</span>
           <select value={typeFilter} onChange={(event) => onChangeTypeFilter(event.target.value as MeteringPointTypeFilter)}>
             <option value="all">{t('pages.meteringPoints.filters.allTypes')}</option>
-            <option value="consumption">{t('pages.meteringPoints.meterTypes.consumption')}</option>
-            <option value="production">{t('pages.meteringPoints.meterTypes.production')}</option>
-            <option value="bidirectional">{t('pages.meteringPoints.meterTypes.bidirectional')}</option>
+            {METER_TYPE_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {t(option.labelKey)}
+              </option>
+            ))}
           </select>
         </label>
         <label>

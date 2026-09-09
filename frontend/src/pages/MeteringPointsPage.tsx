@@ -52,6 +52,9 @@ export function MeteringPointsPage() {
         setTypeFilter,
         attentionFilter,
         setAttentionFilter,
+        assignmentFilter,
+        setAssignmentFilter,
+        clearFilters,
         openCreateMpModal,
         openEditMpModal,
         closeMpModal,
@@ -115,10 +118,13 @@ export function MeteringPointsPage() {
                 statusFilter={statusFilter}
                 typeFilter={typeFilter}
                 attentionFilter={attentionFilter}
+                assignmentFilter={assignmentFilter}
                 onChangeSearchTerm={setSearchTerm}
                 onChangeStatusFilter={setStatusFilter}
                 onChangeTypeFilter={setTypeFilter}
                 onChangeAttentionFilter={setAttentionFilter}
+                onChangeAssignmentFilter={setAssignmentFilter}
+                onClearFilters={clearFilters}
                 onOpenCreateModal={openCreateMpModal}
             />
 
@@ -148,6 +154,12 @@ export function MeteringPointsPage() {
                 submitLabel={editingAssignId ? t('pages.meteringPoints.saveAssignment') : t('pages.meteringPoints.assignParticipant')}
             />
 
+            {hasFilters && meteringPoints.length > 0 && (
+                <p className="muted metering-filtered-count">
+                    {t('pages.meteringPoints.filteredCount', { shown: meteringPoints.length, total: scopedMeteringPoints.length })}
+                </p>
+            )}
+
             {/* ── Metering Points List ──────────────────────────────────────────────── */}
             <div className="table-card">
                 {scopedMeteringPoints.length === 0 ? (
@@ -162,12 +174,7 @@ export function MeteringPointsPage() {
                         canManageMeteringPoints={canManageMeteringPoints}
                         hasFilters={hasFilters}
                         onOpenCreateModal={openCreateMpModal}
-                        onClearFilters={() => {
-                            setSearchTerm('')
-                            setStatusFilter('all')
-                            setTypeFilter('all')
-                            setAttentionFilter('all')
-                        }}
+                        onClearFilters={clearFilters}
                     />
                 ) : (
                     <MeteringPointsList

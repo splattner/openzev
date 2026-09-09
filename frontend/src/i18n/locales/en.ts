@@ -1361,7 +1361,7 @@ export const en = {
             },
             filters: {
                 search: 'Search',
-                searchPlaceholder: 'Meter ID or location',
+                searchPlaceholder: 'Meter ID, location, or participant',
                 status: 'Status',
                 allStatuses: 'All statuses',
                 type: 'Type',
@@ -1371,6 +1371,7 @@ export const en = {
                 needsAttention: 'Needs attention',
                 clear: 'Clear filters',
             },
+            filteredCount: 'Showing {{shown}} of {{total}} metering points',
             emptyState: {
                 title: 'No metering points yet',
                 description: 'Add a metering point, then assign it to a participant to include it in billing.',
@@ -1382,11 +1383,13 @@ export const en = {
                 description: 'Try a different status, type, or search term.',
             },
             noAssignments: 'No participant assignments yet.',
+            noLocation: 'No location set',
             active: 'Active',
             inactive: 'Inactive',
             moreActions: 'More',
             openEnded: 'Open-ended',
             communityBadge: 'Community',
+            heldBySince: 'Held by {{name}} since {{date}}',
             assignmentState: {
                 current: 'Current',
                 upcoming: 'Upcoming',

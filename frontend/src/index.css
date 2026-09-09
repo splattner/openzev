@@ -1601,6 +1601,18 @@ input.recurrence-chip-input {
   border-radius: 999px;
   background: var(--surface);
   border: 1px solid var(--border-default);
+  font: inherit;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.metering-summary-stat:hover {
+  border-color: var(--brand-mid);
+}
+
+.metering-summary-stat.is-active {
+  background: var(--brand-pale);
+  border-color: var(--brand-mid);
 }
 
 .metering-summary-label {
@@ -1630,7 +1642,12 @@ input.recurrence-chip-input {
   border: 1px solid var(--border-default);
   border-radius: 1rem;
   overflow: hidden;
-  background: rgba(255, 255, 255, 0.96);
+  background: var(--white);
+}
+
+.metering-filtered-count {
+  margin: 0;
+  font-size: 0.85rem;
 }
 
 .metering-point-card-header {
@@ -1690,6 +1707,21 @@ input.recurrence-chip-input {
 .metering-assignment-main {
   display: grid;
   gap: 0.3rem;
+}
+
+/* The common case — one tenant, ongoing — collapsed to a single line instead
+   of the full bordered row (#624). */
+.metering-assignment-compact {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  font-size: 0.9rem;
+}
+
+.metering-assignment-compact-badge {
+  margin-left: 0.5rem;
 }
 
 .metering-no-assignments {

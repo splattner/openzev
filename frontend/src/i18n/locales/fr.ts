@@ -1350,7 +1350,7 @@ export const fr = {
             },
             filters: {
                 search: 'Recherche',
-                searchPlaceholder: 'ID compteur ou emplacement',
+                searchPlaceholder: 'ID compteur, emplacement ou participant',
                 status: 'Statut',
                 allStatuses: 'Tous les statuts',
                 type: 'Type',
@@ -1360,6 +1360,7 @@ export const fr = {
                 needsAttention: 'Nécessite une attention',
                 clear: 'Réinitialiser les filtres',
             },
+            filteredCount: '{{shown}} sur {{total}} points de mesure affichés',
             emptyState: {
                 title: 'Aucun point de mesure pour le moment',
                 description: 'Ajoutez un point de mesure, puis assignez-le à un participant pour l’inclure dans la facturation.',
@@ -1371,11 +1372,13 @@ export const fr = {
                 description: 'Essayez un autre statut, type ou terme de recherche.',
             },
             noAssignments: 'Aucune attribution de participant pour le moment.',
+            noLocation: 'Aucun emplacement défini',
             active: 'Actif',
             inactive: 'Inactif',
             moreActions: 'Plus',
             openEnded: 'Ouverte',
             communityBadge: 'Communautaire',
+            heldBySince: 'Attribué à {{name}} depuis le {{date}}',
             assignmentState: {
                 current: 'Actuelle',
                 upcoming: 'À venir',

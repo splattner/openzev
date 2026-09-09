@@ -99,6 +99,68 @@ describe('metering point action helpers', () => {
     // mp-3 has no entry in the map at all — absence must not match.
     expect(filteredMeteringPoints.map((point) => point.id)).toEqual(['mp-1'])
   })
+
+  it('matches search against an assigned participant\'s name, not just meter ID or location', () => {
+    const { meteringPoints: filteredMeteringPoints } = getScopedAndFilteredMeteringPoints(meteringPoints, {
+      selectedZevId: null,
+      canManageMeteringPoints: false,
+      searchTerm: 'anna',
+      statusFilter: 'all',
+      typeFilter: 'all',
+      participantNamesByMeteringPoint: new Map([['mp-1', 'Anna Consumer']]),
+    })
+
+    expect(filteredMeteringPoints.map((point) => point.id)).toEqual(['mp-1'])
+  })
+
+  it('leaves every meter in when the assignment filter is "all"', () => {
+    const { meteringPoints: filteredMeteringPoints } = getScopedAndFilteredMeteringPoints(meteringPoints, {
+      selectedZevId: null,
+      canManageMeteringPoints: false,
+      searchTerm: '',
+      statusFilter: 'all',
+      typeFilter: 'all',
+      assignmentFilter: 'all',
+      isAssignedByMeteringPoint: new Map([['mp-1', true]]),
+    })
+    expect(filteredMeteringPoints).toHaveLength(3)
+  })
+
+  it('narrows to meters with a current holder when the assignment filter is "assigned"', () => {
+    const { meteringPoints: filteredMeteringPoints } = getScopedAndFilteredMeteringPoints(meteringPoints, {
+      selectedZevId: null,
+      canManageMeteringPoints: false,
+      searchTerm: '',
+      statusFilter: 'all',
+      typeFilter: 'all',
+      assignmentFilter: 'assigned',
+      isAssignedByMeteringPoint: new Map([
+        ['mp-1', true],
+        ['mp-2', false],
+      ]),
+    })
+
+    // mp-3 has no entry at all — absence counts as unassigned, so it's excluded too.
+    expect(filteredMeteringPoints.map((point) => point.id)).toEqual(['mp-1'])
+  })
+
+  it('narrows to meters without a current holder when the assignment filter is "unassigned"', () => {
+    const { meteringPoints: filteredMeteringPoints } = getScopedAndFilteredMeteringPoints(meteringPoints, {
+      selectedZevId: null,
+      canManageMeteringPoints: false,
+      searchTerm: '',
+      statusFilter: 'all',
+      typeFilter: 'all',
+      assignmentFilter: 'unassigned',
+      isAssignedByMeteringPoint: new Map([
+        ['mp-1', true],
+        ['mp-2', false],
+      ]),
+    })
+
+    // mp-3 has no entry at all — absence counts as unassigned, so it's included.
+    expect(filteredMeteringPoints.map((point) => point.id).sort()).toEqual(['mp-2', 'mp-3'])
+  })
 })
 
 describe('getMeteringPointCounts', () => {
