@@ -50,6 +50,8 @@ export function MeteringPointsPage() {
         setStatusFilter,
         typeFilter,
         setTypeFilter,
+        attentionFilter,
+        setAttentionFilter,
         openCreateMpModal,
         openEditMpModal,
         closeMpModal,
@@ -69,7 +71,10 @@ export function MeteringPointsPage() {
         activeCount,
         inactiveCount,
         assignedCount,
+        needsAttentionCount,
         hasFilters,
+        meteringPointHealthById,
+        meteringPointHolderLessById,
         dialog,
         confirm,
         dialogLoading,
@@ -105,12 +110,15 @@ export function MeteringPointsPage() {
                 activeCount={activeCount}
                 inactiveCount={inactiveCount}
                 assignedCount={assignedCount}
+                needsAttentionCount={needsAttentionCount}
                 searchTerm={searchTerm}
                 statusFilter={statusFilter}
                 typeFilter={typeFilter}
+                attentionFilter={attentionFilter}
                 onChangeSearchTerm={setSearchTerm}
                 onChangeStatusFilter={setStatusFilter}
                 onChangeTypeFilter={setTypeFilter}
+                onChangeAttentionFilter={setAttentionFilter}
                 onOpenCreateModal={openCreateMpModal}
             />
 
@@ -158,6 +166,7 @@ export function MeteringPointsPage() {
                             setSearchTerm('')
                             setStatusFilter('all')
                             setTypeFilter('all')
+                            setAttentionFilter('all')
                         }}
                     />
                 ) : (
@@ -166,6 +175,8 @@ export function MeteringPointsPage() {
                         meteringPoints={meteringPoints}
                         assignmentsByMeteringPoint={filteredAssignmentsByMeteringPoint}
                         participantNameById={participantNameById}
+                        healthByMeteringPoint={meteringPointHealthById}
+                        holderLessByMeteringPoint={meteringPointHolderLessById}
                         canManageMeteringPoints={canManageMeteringPoints}
                         canDeleteData={user?.role === 'admin'}
                         deleteMeteringPointPending={deleteMpMutation.isPending}

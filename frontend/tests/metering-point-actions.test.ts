@@ -59,6 +59,46 @@ describe('metering point action helpers', () => {
       is_active: true,
     })
   })
+
+  it('leaves every meter in when the attention filter is "all", with or without a map', () => {
+    const { meteringPoints: withoutMap } = getScopedAndFilteredMeteringPoints(meteringPoints, {
+      selectedZevId: null,
+      canManageMeteringPoints: false,
+      searchTerm: '',
+      statusFilter: 'all',
+      typeFilter: 'all',
+    })
+    expect(withoutMap).toHaveLength(3)
+
+    const { meteringPoints: withMap } = getScopedAndFilteredMeteringPoints(meteringPoints, {
+      selectedZevId: null,
+      canManageMeteringPoints: false,
+      searchTerm: '',
+      statusFilter: 'all',
+      typeFilter: 'all',
+      attentionFilter: 'all',
+      needsAttentionByMeteringPoint: new Map([['mp-1', true]]),
+    })
+    expect(withMap).toHaveLength(3)
+  })
+
+  it('narrows to flagged meters when the attention filter is "attention"', () => {
+    const { meteringPoints: filteredMeteringPoints } = getScopedAndFilteredMeteringPoints(meteringPoints, {
+      selectedZevId: null,
+      canManageMeteringPoints: false,
+      searchTerm: '',
+      statusFilter: 'all',
+      typeFilter: 'all',
+      attentionFilter: 'attention',
+      needsAttentionByMeteringPoint: new Map([
+        ['mp-1', true],
+        ['mp-2', false],
+      ]),
+    })
+
+    // mp-3 has no entry in the map at all — absence must not match.
+    expect(filteredMeteringPoints.map((point) => point.id)).toEqual(['mp-1'])
+  })
 })
 
 describe('getMeteringPointCounts', () => {
@@ -98,5 +138,20 @@ describe('getMeteringPointCounts', () => {
     ])
     const { assignedCount } = getMeteringPointCounts(meteringPoints, assignments, today)
     expect(assignedCount).toBe(1)
+  })
+
+  it('defaults needsAttentionCount to 0 when no map is passed', () => {
+    const { needsAttentionCount } = getMeteringPointCounts(meteringPoints, new Map(), today)
+    expect(needsAttentionCount).toBe(0)
+  })
+
+  it('counts flagged meters from the scoped list only', () => {
+    const needsAttention = new Map([
+      ['mp-1', true],
+      ['mp-2', true],
+      ['mp-3', false],
+    ])
+    const { needsAttentionCount } = getMeteringPointCounts(meteringPoints, new Map(), today, needsAttention)
+    expect(needsAttentionCount).toBe(2)
   })
 })

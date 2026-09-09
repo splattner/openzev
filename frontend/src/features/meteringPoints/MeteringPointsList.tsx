@@ -5,18 +5,21 @@ import {
   faEllipsis,
   faPen,
   faTrash,
+  faTriangleExclamation,
   faUserPlus,
 } from '@fortawesome/free-solid-svg-icons'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { ActionMenu, type ActionMenuItem } from '../../components/ActionMenu'
-import { formatShortDate } from '../../lib/appSettings'
+import { formatDateTime, formatShortDate } from '../../lib/appSettings'
 import { todayLocalIso } from '../../lib/dates'
 import type { AppSettings, MeteringPoint, MeteringPointAssignment } from '../../types/api'
 import {
   assignmentStateBadgeClass,
   assignmentStateSortOrder,
   getAssignmentState,
+  meteringPointHealthBadgeClass,
+  type MeteringPointHealth,
 } from './useMeteringPointForms'
 
 type ConfirmOptions = {
@@ -31,6 +34,9 @@ type MeteringPointsListProps = {
   meteringPoints: MeteringPoint[]
   assignmentsByMeteringPoint: Map<string, MeteringPointAssignment[]>
   participantNameById: Map<string, string>
+  healthByMeteringPoint: Map<string, MeteringPointHealth>
+  /** Empty for a role that has no assignment data loaded (see the hook) — never render a false positive from a missing entry. */
+  holderLessByMeteringPoint: Map<string, boolean>
   settings: AppSettings
   canManageMeteringPoints: boolean
   canDeleteData: boolean
@@ -50,6 +56,8 @@ export function MeteringPointsList({
   meteringPoints,
   assignmentsByMeteringPoint,
   participantNameById,
+  healthByMeteringPoint,
+  holderLessByMeteringPoint,
   settings,
   canManageMeteringPoints,
   canDeleteData,
@@ -79,6 +87,9 @@ export function MeteringPointsList({
           if (stateDelta !== 0) return stateDelta
           return right.valid_from.localeCompare(left.valid_from)
         })
+
+        const health = healthByMeteringPoint.get(point.id) ?? 'no_data'
+        const isHolderLess = holderLessByMeteringPoint.get(point.id) ?? false
 
         const pointMenuItems: ActionMenuItem[] = []
         if (canManageMeteringPoints) {
@@ -128,8 +139,27 @@ export function MeteringPointsList({
                     {point.is_active ? t('pages.meteringPoints.active') : t('pages.meteringPoints.inactive')}
                   </span>
                   <span className="badge badge-neutral">{t(`pages.meteringPoints.meterTypes.${point.meter_type}`)}</span>
+                  <Link
+                    className={meteringPointHealthBadgeClass(health)}
+                    style={{ textDecoration: 'none' }}
+                    to={`/metering-data?metering_point=${point.id}&tab=quality`}
+                    title={t('pages.meteringPoints.health.linkHint')}
+                  >
+                    {t(`pages.meteringPoints.health.${health}`)}
+                  </Link>
+                  {isHolderLess && (
+                    <span className="badge badge-danger" title={t('pages.meteringPoints.holderLessHint')}>
+                      <FontAwesomeIcon icon={faTriangleExclamation} fixedWidth />
+                      {t('pages.meteringPoints.holderLessBadge')}
+                    </span>
+                  )}
                 </div>
                 <strong>{point.meter_id}</strong>
+                <span className="muted">
+                  {point.last_reading_at
+                    ? t('pages.meteringPoints.lastReading', { date: formatDateTime(point.last_reading_at, settings) })
+                    : t('pages.meteringPoints.neverReceivedData')}
+                </span>
               </div>
 
               <div className="metering-point-actions">

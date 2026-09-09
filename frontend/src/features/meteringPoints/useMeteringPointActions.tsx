@@ -15,6 +15,7 @@ import {
     updateMeteringPointAssignment,
 } from '../../lib/api/zev'
 import { formatApiError } from '../../lib/api/errors'
+import { fetchMeteringDataQualityStatus } from '../../lib/api/metering'
 import { queryKeys } from '../../lib/api/queryKeys'
 import { formatShortDate, useAppSettings } from '../../lib/appSettings'
 import { todayLocalIso } from '../../lib/dates'
@@ -22,12 +23,24 @@ import { useToast } from '../../lib/toast'
 import {
     defaultAssignmentForm,
     defaultMeteringPointForm,
+    getMeteringPointHealth,
+    getMeteringPointHealthWindow,
     getNextAssignmentGuidance,
     isAssignmentCurrent,
+    isMeteringPointHolderLess,
+    meteringPointNeedsAttention,
+    type MeteringPointAttentionFilter,
+    type MeteringPointHealth,
     type MeteringPointStatusFilter,
     type MeteringPointTypeFilter,
 } from './useMeteringPointForms'
-import type { MeteringPoint, MeteringPointAssignment, MeteringPointAssignmentInput, MeteringPointInput } from '../../types/api'
+import type {
+    MeteringPoint,
+    MeteringPointAssignment,
+    MeteringPointAssignmentInput,
+    MeteringPointDataQuality,
+    MeteringPointInput,
+} from '../../types/api'
 
 export function getScopedAndFilteredMeteringPoints(
     points: MeteringPoint[],
@@ -37,12 +50,17 @@ export function getScopedAndFilteredMeteringPoints(
         searchTerm,
         statusFilter,
         typeFilter,
+        attentionFilter = 'all',
+        needsAttentionByMeteringPoint,
     }: {
         selectedZevId: string | null
         canManageMeteringPoints: boolean
         searchTerm: string
         statusFilter: MeteringPointStatusFilter
         typeFilter: MeteringPointTypeFilter
+        attentionFilter?: MeteringPointAttentionFilter
+        /** Only consulted when `attentionFilter` is `'attention'`; a missing entry does not match. */
+        needsAttentionByMeteringPoint?: Map<string, boolean>
     },
 ) {
     const scopedMeteringPoints = points.filter(
@@ -58,8 +76,10 @@ export function getScopedAndFilteredMeteringPoints(
         const matchesSearch = !normalizedSearch
             || point.meter_id.toLowerCase().includes(normalizedSearch)
             || (point.location_description ?? '').toLowerCase().includes(normalizedSearch)
+        const matchesAttention = attentionFilter === 'all'
+            || !!needsAttentionByMeteringPoint?.get(point.id)
 
-        return matchesStatus && matchesType && matchesSearch
+        return matchesStatus && matchesType && matchesSearch && matchesAttention
     })
 
     return { scopedMeteringPoints, meteringPoints }
@@ -70,20 +90,24 @@ export type MeteringPointCounts = {
     inactiveCount: number
     /** Meters with a holder *today* — an assignment that already ended (or has yet to start) does not count. */
     assignedCount: number
+    /** Meters flagged by `meteringPointNeedsAttention` — see #623. */
+    needsAttentionCount: number
 }
 
 export function getMeteringPointCounts(
     scopedMeteringPoints: MeteringPoint[],
     assignmentsByMeteringPoint: Map<string, MeteringPointAssignment[]>,
     todayIso: string,
+    needsAttentionByMeteringPoint: Map<string, boolean> = new Map(),
 ): MeteringPointCounts {
     const activeCount = scopedMeteringPoints.filter((point) => point.is_active).length
     const inactiveCount = scopedMeteringPoints.length - activeCount
     const assignedCount = scopedMeteringPoints.filter((point) =>
         (assignmentsByMeteringPoint.get(point.id) ?? []).some((assignment) => isAssignmentCurrent(assignment, todayIso)),
     ).length
+    const needsAttentionCount = scopedMeteringPoints.filter((point) => needsAttentionByMeteringPoint.get(point.id)).length
 
-    return { activeCount, inactiveCount, assignedCount }
+    return { activeCount, inactiveCount, assignedCount, needsAttentionCount }
 }
 
 export function useMeteringPointActions({
@@ -98,6 +122,10 @@ export function useMeteringPointActions({
     const { settings } = useAppSettings()
     const { t } = useTranslation()
     const { dialog, confirm, handleConfirm, handleCancel, isLoading: dialogLoading } = useConfirmDialog()
+
+    // Plain value, not a hook — safe to compute once up front and reuse
+    // everywhere below (assignment prefill, counts, health).
+    const todayIso = todayLocalIso()
 
     // ── Modal form state ──────────────────────────────────────────────────────────
 
@@ -124,6 +152,7 @@ export function useMeteringPointActions({
     const [searchTerm, setSearchTerm] = useState('')
     const [statusFilter, setStatusFilter] = useState<MeteringPointStatusFilter>('all')
     const [typeFilter, setTypeFilter] = useState<MeteringPointTypeFilter>('all')
+    const [attentionFilter, setAttentionFilter] = useState<MeteringPointAttentionFilter>('all')
 
     // ── Queries ──────────────────────────────────────────────────────────────────
 
@@ -140,6 +169,24 @@ export function useMeteringPointActions({
         queryKey: queryKeys.metering.pointAssignments(),
         queryFn: () => fetchMeteringPointAssignments(),
         enabled: canManageMeteringPoints,
+    })
+    // Not role-gated: the endpoint scopes readings to what the caller may
+    // see (a participant's own assigned meters), so the health indicator
+    // stays accurate for every role instead of being hidden for some (#623).
+    const healthWindow = getMeteringPointHealthWindow(todayIso)
+    const dataQualityQuery = useQuery({
+        queryKey: queryKeys.metering.qualityStatus(
+            healthWindow.from,
+            healthWindow.to,
+            canManageMeteringPoints ? (selectedZevId || undefined) : undefined,
+            undefined,
+        ),
+        queryFn: () =>
+            fetchMeteringDataQualityStatus({
+                dateFrom: healthWindow.from,
+                dateTo: healthWindow.to,
+                zevId: canManageMeteringPoints ? (selectedZevId || undefined) : undefined,
+            }),
     })
 
     // ── Mutations ──────────────────────────────────────────────────────────────────
@@ -279,7 +326,7 @@ export function useMeteringPointActions({
         setSelectedMpId(meteringPointId)
         setEditingAssignId(null)
         const existingAssignments = assignmentsByMeteringPoint.get(meteringPointId) ?? []
-        const { suggestedValidFrom, hasOpenEndedAssignment } = getNextAssignmentGuidance(existingAssignments, todayLocalIso())
+        const { suggestedValidFrom, hasOpenEndedAssignment } = getNextAssignmentGuidance(existingAssignments, todayIso)
         setAssignForm({ ...defaultAssignmentForm(meteringPointId), valid_from: suggestedValidFrom })
         setAssignHasOpenEndedWarning(hasOpenEndedAssignment)
         setShowAssignModal(true)
@@ -403,12 +450,54 @@ export function useMeteringPointActions({
         return (participantsQuery.data ?? []).filter((p) => p.zev === mp.zev)
     }, [selectedMpId, meteringPointsQuery.data, participantsQuery.data])
 
+    // ── Data health (#623) ────────────────────────────────────────────────────────
+
+    const qualityByMeteringPoint = useMemo(() => {
+        const map = new Map<string, MeteringPointDataQuality>()
+        for (const dq of dataQualityQuery.data?.metering_points ?? []) {
+            map.set(dq.id, dq)
+        }
+        return map
+    }, [dataQualityQuery.data])
+
+    const meteringPointHealthById = useMemo(() => {
+        const map = new Map<string, MeteringPointHealth>()
+        for (const point of meteringPointsQuery.data ?? []) {
+            map.set(point.id, getMeteringPointHealth(point, qualityByMeteringPoint.get(point.id)))
+        }
+        return map
+    }, [meteringPointsQuery.data, qualityByMeteringPoint])
+
+    // Empty (rather than computed with an empty assignment map, which would
+    // read every meter as holder-less) when assignments aren't loaded for
+    // this role — see isMeteringPointHolderLess's contract.
+    const meteringPointHolderLessById = useMemo(() => {
+        const map = new Map<string, boolean>()
+        if (!canManageMeteringPoints) return map
+        for (const point of meteringPointsQuery.data ?? []) {
+            map.set(point.id, isMeteringPointHolderLess(point, assignmentsByMeteringPoint.get(point.id) ?? [], todayIso))
+        }
+        return map
+    }, [canManageMeteringPoints, meteringPointsQuery.data, assignmentsByMeteringPoint, todayIso])
+
+    const needsAttentionByMeteringPoint = useMemo(() => {
+        const map = new Map<string, boolean>()
+        for (const point of meteringPointsQuery.data ?? []) {
+            const health = meteringPointHealthById.get(point.id) ?? 'no_data'
+            const holderLess = meteringPointHolderLessById.get(point.id) ?? false
+            map.set(point.id, meteringPointNeedsAttention(point, health, holderLess))
+        }
+        return map
+    }, [meteringPointsQuery.data, meteringPointHealthById, meteringPointHolderLessById])
+
     const { scopedMeteringPoints, meteringPoints } = getScopedAndFilteredMeteringPoints(meteringPointsQuery.data ?? [], {
         selectedZevId,
         canManageMeteringPoints,
         searchTerm,
         statusFilter,
         typeFilter,
+        attentionFilter,
+        needsAttentionByMeteringPoint,
     })
 
     const filteredAssignmentsByMeteringPoint = new Map(
@@ -417,19 +506,20 @@ export function useMeteringPointActions({
         ),
     )
 
-    const todayIso = todayLocalIso()
-    const { activeCount, inactiveCount, assignedCount } = getMeteringPointCounts(
+    const { activeCount, inactiveCount, assignedCount, needsAttentionCount } = getMeteringPointCounts(
         scopedMeteringPoints,
         filteredAssignmentsByMeteringPoint,
         todayIso,
+        needsAttentionByMeteringPoint,
     )
-    const hasFilters = !!searchTerm.trim() || statusFilter !== 'all' || typeFilter !== 'all'
+    const hasFilters = !!searchTerm.trim() || statusFilter !== 'all' || typeFilter !== 'all' || attentionFilter !== 'all'
 
     return {
         // Queries
         participantsQuery,
         meteringPointsQuery,
         assignmentsQuery,
+        dataQualityQuery,
         // Mutations
         saveMpMutation,
         deleteMpMutation,
@@ -461,6 +551,8 @@ export function useMeteringPointActions({
         setStatusFilter,
         typeFilter,
         setTypeFilter,
+        attentionFilter,
+        setAttentionFilter,
         // Form handlers
         openCreateMpModal,
         openEditMpModal,
@@ -483,7 +575,12 @@ export function useMeteringPointActions({
         activeCount,
         inactiveCount,
         assignedCount,
+        needsAttentionCount,
         hasFilters,
+        // Data health (#623)
+        meteringPointHealthById,
+        meteringPointHolderLessById,
+        needsAttentionByMeteringPoint,
         // Dialog
         dialog,
         confirm,

@@ -1,7 +1,7 @@
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faPlus } from '@fortawesome/free-solid-svg-icons'
 import { useTranslation } from 'react-i18next'
-import type { MeteringPointStatusFilter, MeteringPointTypeFilter } from './useMeteringPointForms'
+import type { MeteringPointAttentionFilter, MeteringPointStatusFilter, MeteringPointTypeFilter } from './useMeteringPointForms'
 
 type MeteringPointsToolbarProps = {
   canManageMeteringPoints: boolean
@@ -9,12 +9,15 @@ type MeteringPointsToolbarProps = {
   activeCount: number
   inactiveCount: number
   assignedCount: number
+  needsAttentionCount: number
   searchTerm: string
   statusFilter: MeteringPointStatusFilter
   typeFilter: MeteringPointTypeFilter
+  attentionFilter: MeteringPointAttentionFilter
   onChangeSearchTerm: (value: string) => void
   onChangeStatusFilter: (value: MeteringPointStatusFilter) => void
   onChangeTypeFilter: (value: MeteringPointTypeFilter) => void
+  onChangeAttentionFilter: (value: MeteringPointAttentionFilter) => void
   onOpenCreateModal: () => void
 }
 
@@ -24,12 +27,15 @@ export function MeteringPointsToolbar({
   activeCount,
   inactiveCount,
   assignedCount,
+  needsAttentionCount,
   searchTerm,
   statusFilter,
   typeFilter,
+  attentionFilter,
   onChangeSearchTerm,
   onChangeStatusFilter,
   onChangeTypeFilter,
+  onChangeAttentionFilter,
   onOpenCreateModal,
 }: MeteringPointsToolbarProps) {
   const { t } = useTranslation()
@@ -62,6 +68,10 @@ export function MeteringPointsToolbar({
               </span>
             </>
           )}
+          <span className="metering-summary-stat">
+            <span className="metering-summary-label">{t('pages.meteringPoints.summary.needsAttention')}</span>
+            <span className="metering-summary-value">{needsAttentionCount}</span>
+          </span>
         </div>
 
         {canManageMeteringPoints && (
@@ -96,6 +106,13 @@ export function MeteringPointsToolbar({
             <option value="consumption">{t('pages.meteringPoints.meterTypes.consumption')}</option>
             <option value="production">{t('pages.meteringPoints.meterTypes.production')}</option>
             <option value="bidirectional">{t('pages.meteringPoints.meterTypes.bidirectional')}</option>
+          </select>
+        </label>
+        <label>
+          <span>{t('pages.meteringPoints.filters.attention')}</span>
+          <select value={attentionFilter} onChange={(event) => onChangeAttentionFilter(event.target.value as MeteringPointAttentionFilter)}>
+            <option value="all">{t('pages.meteringPoints.filters.allAttention')}</option>
+            <option value="attention">{t('pages.meteringPoints.filters.needsAttention')}</option>
           </select>
         </label>
       </div>

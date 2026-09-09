@@ -1346,6 +1346,7 @@ export const de = {
                 inactive: 'Inaktiv',
                 assigned: 'Zugewiesen',
                 unassigned: 'Ohne Zuweisung',
+                needsAttention: 'Benötigt Aufmerksamkeit',
             },
             filters: {
                 search: 'Suche',
@@ -1354,6 +1355,9 @@ export const de = {
                 allStatuses: 'Alle Status',
                 type: 'Typ',
                 allTypes: 'Alle Typen',
+                attention: 'Aufmerksamkeit',
+                allAttention: 'Alle Zählpunkte',
+                needsAttention: 'Benötigt Aufmerksamkeit',
                 clear: 'Filter zurücksetzen',
             },
             emptyState: {
@@ -1377,6 +1381,17 @@ export const de = {
                 upcoming: 'Bevorstehend',
                 ended: 'Beendet',
             },
+            health: {
+                green: 'Gesund',
+                yellow: 'Datenlücken',
+                red: 'Daten gefährdet',
+                no_data: 'Noch keine Daten',
+                linkHint: 'Datenqualitätsansicht für diesen Zählpunkt öffnen',
+            },
+            lastReading: 'Letzter Messwert: {{date}}',
+            neverReceivedData: 'Noch keine Messwerte empfangen',
+            holderLessBadge: 'Kein aktueller Inhaber',
+            holderLessHint: 'Für diesen Zählpunkt liegen Messwerte vor, aber aktuell ist kein Teilnehmer zugewiesen — seine Energie kann nicht verrechnet werden.',
             form: {
                 meterId: 'Zähler-ID *',
                 meterType: 'Zählertyp',

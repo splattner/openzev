@@ -1357,6 +1357,7 @@ export const en = {
                 inactive: 'Inactive',
                 assigned: 'Assigned',
                 unassigned: 'Unassigned',
+                needsAttention: 'Needs attention',
             },
             filters: {
                 search: 'Search',
@@ -1365,6 +1366,9 @@ export const en = {
                 allStatuses: 'All statuses',
                 type: 'Type',
                 allTypes: 'All types',
+                attention: 'Attention',
+                allAttention: 'All metering points',
+                needsAttention: 'Needs attention',
                 clear: 'Clear filters',
             },
             emptyState: {
@@ -1388,6 +1392,17 @@ export const en = {
                 upcoming: 'Upcoming',
                 ended: 'Ended',
             },
+            health: {
+                green: 'Healthy',
+                yellow: 'Data gaps',
+                red: 'Data at risk',
+                no_data: 'No data yet',
+                linkHint: 'Open the data quality view for this metering point',
+            },
+            lastReading: 'Last reading: {{date}}',
+            neverReceivedData: 'No readings received yet',
+            holderLessBadge: 'No current holder',
+            holderLessHint: 'This meter has recorded readings but no participant is currently assigned to it — its energy cannot be billed.',
             form: {
                 meterId: 'Meter ID *',
                 meterType: 'Meter type',

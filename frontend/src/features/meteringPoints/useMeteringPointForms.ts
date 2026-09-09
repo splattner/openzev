@@ -1,5 +1,11 @@
 import { todayLocalIso } from '../../lib/dates'
-import type { MeteringPoint, MeteringPointAssignment, MeteringPointAssignmentInput, MeteringPointInput } from '../../types/api'
+import type {
+  MeteringPoint,
+  MeteringPointAssignment,
+  MeteringPointAssignmentInput,
+  MeteringPointDataQuality,
+  MeteringPointInput,
+} from '../../types/api'
 
 export const defaultMeteringPointForm = (): MeteringPointInput => ({
   zev: '',
@@ -78,4 +84,67 @@ export function getNextAssignmentGuidance(assignments: MeteringPointAssignment[]
     suggestedValidFrom: latestValidTo ? addDaysIso(latestValidTo, 1) : todayIso,
     hasOpenEndedAssignment,
   }
+}
+
+// ── Data health (#623) ──────────────────────────────────────────────────────
+
+const HEALTH_WINDOW_DAYS = 30
+
+/** The rolling window the health check inspects — mirrors the data-quality-status endpoint's own default (today − 30 days to today), so the two stay in sync without either hard-coding the other's default. */
+export function getMeteringPointHealthWindow(todayIso: string, days = HEALTH_WINDOW_DAYS): { from: string; to: string } {
+  return { from: addDaysIso(todayIso, -days), to: todayIso }
+}
+
+export type MeteringPointHealth = 'green' | 'yellow' | 'red' | 'no_data'
+
+/**
+ * A meter's data-health state: `no_data` when it has never received a
+ * reading (distinct from a completeness of 0% within the window, which is
+ * `red` — a meter whose imports stopped is a different problem than one
+ * that never started), otherwise the data-quality-status severity for the
+ * inspection window.
+ */
+export function getMeteringPointHealth(
+  point: Pick<MeteringPoint, 'reading_count'>,
+  quality: MeteringPointDataQuality | undefined,
+): MeteringPointHealth {
+  if (!point.reading_count) return 'no_data'
+  return quality?.severity ?? 'no_data'
+}
+
+/**
+ * A meter with recorded readings but no assignment valid *today* — its
+ * energy is being metered but cannot be attributed (and therefore not
+ * billed) to anyone. Mirrors the Participants page's "no metering point"
+ * warning from the other direction.
+ *
+ * `false` for an inactive meter (out of billing scope) or one with no
+ * readings yet (nothing to attribute) — those are surfaced via
+ * `getMeteringPointHealth` instead, not this warning.
+ */
+export function isMeteringPointHolderLess(
+  point: Pick<MeteringPoint, 'is_active' | 'reading_count'>,
+  assignments: MeteringPointAssignment[],
+  todayIso: string,
+): boolean {
+  if (!point.is_active || !point.reading_count) return false
+  return !assignments.some((assignment) => isAssignmentCurrent(assignment, todayIso))
+}
+
+/** Whether a meter should be surfaced by the "needs attention" filter before a billing run. Always `false` for an inactive meter — it is out of billing scope. */
+export function meteringPointNeedsAttention(
+  point: Pick<MeteringPoint, 'is_active'>,
+  health: MeteringPointHealth,
+  holderLess: boolean,
+): boolean {
+  return point.is_active && (health !== 'green' || holderLess)
+}
+
+export type MeteringPointAttentionFilter = 'all' | 'attention'
+
+export function meteringPointHealthBadgeClass(health: MeteringPointHealth): string {
+  if (health === 'green') return 'badge badge-success'
+  if (health === 'yellow') return 'badge badge-warning'
+  if (health === 'red') return 'badge badge-danger'
+  return 'badge badge-neutral'
 }

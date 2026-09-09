@@ -1346,6 +1346,7 @@ export const it = {
                 inactive: 'Inattivi',
                 assigned: 'Assegnati',
                 unassigned: 'Non assegnati',
+                needsAttention: 'Richiede attenzione',
             },
             filters: {
                 search: 'Ricerca',
@@ -1354,6 +1355,9 @@ export const it = {
                 allStatuses: 'Tutti gli stati',
                 type: 'Tipo',
                 allTypes: 'Tutti i tipi',
+                attention: 'Attenzione',
+                allAttention: 'Tutti i punti di misura',
+                needsAttention: 'Richiede attenzione',
                 clear: 'Reimposta filtri',
             },
             emptyState: {
@@ -1377,6 +1381,17 @@ export const it = {
                 upcoming: 'In arrivo',
                 ended: 'Terminata',
             },
+            health: {
+                green: 'Sano',
+                yellow: 'Lacune nei dati',
+                red: 'Dati a rischio',
+                no_data: 'Nessun dato ancora',
+                linkHint: 'Apri la vista qualità dei dati per questo punto di misura',
+            },
+            lastReading: 'Ultima lettura: {{date}}',
+            neverReceivedData: 'Nessuna lettura ricevuta ancora',
+            holderLessBadge: 'Nessun titolare attuale',
+            holderLessHint: 'Questo contatore ha letture registrate ma nessun partecipante è attualmente assegnato — la sua energia non può essere fatturata.',
             form: {
                 meterId: 'ID contatore *',
                 meterType: 'Tipo di contatore',

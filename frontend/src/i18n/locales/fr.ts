@@ -1346,6 +1346,7 @@ export const fr = {
                 inactive: 'Inactifs',
                 assigned: 'Attribués',
                 unassigned: 'Non attribués',
+                needsAttention: 'Nécessite une attention',
             },
             filters: {
                 search: 'Recherche',
@@ -1354,6 +1355,9 @@ export const fr = {
                 allStatuses: 'Tous les statuts',
                 type: 'Type',
                 allTypes: 'Tous les types',
+                attention: 'Attention',
+                allAttention: 'Tous les points de mesure',
+                needsAttention: 'Nécessite une attention',
                 clear: 'Réinitialiser les filtres',
             },
             emptyState: {
@@ -1377,6 +1381,17 @@ export const fr = {
                 upcoming: 'À venir',
                 ended: 'Terminée',
             },
+            health: {
+                green: 'Sain',
+                yellow: 'Lacunes de données',
+                red: 'Données à risque',
+                no_data: 'Pas encore de données',
+                linkHint: 'Ouvrir la vue de qualité des données pour ce point de mesure',
+            },
+            lastReading: 'Dernier relevé : {{date}}',
+            neverReceivedData: 'Aucun relevé reçu pour le moment',
+            holderLessBadge: 'Aucun titulaire actuel',
+            holderLessHint: "Ce compteur a des relevés enregistrés mais aucun participant n'y est actuellement assigné — son énergie ne peut pas être facturée.",
             form: {
                 meterId: 'ID compteur *',
                 meterType: 'Type de compteur',
