@@ -1,3 +1,4 @@
+import uuid
 from datetime import date as date_type, timedelta, timezone as dt_timezone
 
 from allocation.validity import period_end_exclusive_dt, period_start_dt, period_window
@@ -297,9 +298,10 @@ class MeterReadingViewSet(ZevScopedQuerySetMixin, viewsets.ModelViewSet):
         Detect missing daily readings per metering point over a date range.
 
         Query params:
-          date_from  – YYYY-MM-DD (default: 30 days ago)
-          date_to    – YYYY-MM-DD (default: today)
-          zev_id     – UUID (optional, for filtering)
+          date_from       – YYYY-MM-DD (default: 30 days ago)
+          date_to         – YYYY-MM-DD (default: today)
+          zev_id          – UUID (optional, for filtering)
+          metering_point  – UUID (optional, narrows to a single meter)
 
         Returns array of metering points with gaps and data completeness.
         """
@@ -310,10 +312,32 @@ class MeterReadingViewSet(ZevScopedQuerySetMixin, viewsets.ModelViewSet):
         date_from = date_type.fromisoformat(date_from_str) if date_from_str else today - timedelta(days=30)
         date_to = date_type.fromisoformat(date_to_str) if date_to_str else today
 
-        # ``zev_id`` is already applied by ``scope_queryset``.
-        qs = self.get_queryset()
-        mp_ids = qs.values_list("metering_point_id", flat=True).distinct()
-        metering_points = MeteringPoint.objects.filter(id__in=mp_ids)
+        # Scoped from ``MeteringPoint`` directly (mirroring
+        # ``MeteringPointViewSet``'s own role scoping) rather than from
+        # existing ``MeterReading`` rows, so a meter that has never received
+        # a single reading — the worst data-quality state there is — still
+        # gets a 0%-complete row instead of being silently omitted (#634).
+        user = request.user
+        if user.is_admin:
+            metering_points = MeteringPoint.objects.all()
+        elif user.is_zev_owner:
+            metering_points = MeteringPoint.objects.filter(zev__owner=user)
+        else:
+            metering_points = MeteringPoint.objects.filter(
+                assignments__participant__user=user
+            ).distinct()
+
+        zev_id = request.query_params.get("zev_id")
+        if zev_id:
+            try:
+                uuid.UUID(str(zev_id))
+            except (ValueError, AttributeError, TypeError):
+                return Response({"error": "zev_id must be a valid UUID."}, status=400)
+            metering_points = metering_points.filter(zev_id=zev_id)
+
+        metering_point_id = request.query_params.get("metering_point")
+        if metering_point_id:
+            metering_points = metering_points.filter(id=metering_point_id)
 
         result = compute_data_quality_status(metering_points, date_from, date_to, today)
         return Response({

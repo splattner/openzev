@@ -716,6 +716,98 @@ class DataQualityStatusTests(TestCase):
 		self.assertEqual(healthy_status["unassigned_readings"], 0)
 		self.assertEqual(healthy_status["data_completeness"], 28)
 
+	def test_metering_point_filter_narrows_to_one_meter(self):
+		"""``metering_point`` query param narrows the result to a single meter (#633)."""
+		auth(self.client, self.owner)
+
+		other = MeteringPoint.objects.create(
+			zev=self.zev,
+			meter_id="CH-DQ-OTHER",
+			meter_type=MeteringPointType.CONSUMPTION,
+		)
+		MeterReading.objects.create(
+			metering_point=self.metering_point,
+			timestamp=datetime(2026, 1, 2, 12, 0, tzinfo=timezone.utc),
+			energy_kwh=Decimal("10.0"),
+			direction=ReadingDirection.IN,
+			resolution=ReadingResolution.DAILY,
+		)
+		MeterReading.objects.create(
+			metering_point=other,
+			timestamp=datetime(2026, 1, 2, 12, 0, tzinfo=timezone.utc),
+			energy_kwh=Decimal("5.0"),
+			direction=ReadingDirection.IN,
+			resolution=ReadingResolution.DAILY,
+		)
+
+		resp = self.client.get(
+			"/api/v1/metering/readings/data-quality-status/",
+			{
+				"date_from": "2026-01-01",
+				"date_to": "2026-01-07",
+				"metering_point": str(other.id),
+			},
+		)
+
+		self.assertEqual(resp.status_code, 200)
+		self.assertEqual(len(resp.data["metering_points"]), 1)
+		self.assertEqual(resp.data["metering_points"][0]["meter_id"], "CH-DQ-OTHER")
+
+	def test_meter_with_no_readings_still_reported_as_red(self):
+		"""A metering point with zero readings is the worst case, not an
+		invisible one (#634): it must still appear, at 0% complete."""
+		auth(self.client, self.owner)
+
+		untouched = MeteringPoint.objects.create(
+			zev=self.zev,
+			meter_id="CH-DQ-UNTOUCHED",
+			meter_type=MeteringPointType.CONSUMPTION,
+		)
+
+		resp = self.client.get(
+			"/api/v1/metering/readings/data-quality-status/",
+			{"date_from": "2026-01-01", "date_to": "2026-01-07"},
+		)
+
+		self.assertEqual(resp.status_code, 200)
+		by_meter = {mp["meter_id"]: mp for mp in resp.data["metering_points"]}
+		self.assertIn("CH-DQ-UNTOUCHED", by_meter)
+		untouched_status = by_meter["CH-DQ-UNTOUCHED"]
+		self.assertEqual(untouched_status["data_completeness"], 0)
+		self.assertEqual(untouched_status["severity"], "red")
+
+	def test_meter_with_no_readings_visible_to_participant_only_if_assigned(self):
+		"""A participant only sees an unread meter once they hold it — no
+		leakage of other holders' empty meters via the zero-reading fix."""
+		auth(self.client, self.participant_user)
+
+		unrelated = MeteringPoint.objects.create(
+			zev=self.zev,
+			meter_id="CH-DQ-UNRELATED",
+			meter_type=MeteringPointType.CONSUMPTION,
+		)
+
+		resp = self.client.get(
+			"/api/v1/metering/readings/data-quality-status/",
+			{"date_from": "2026-01-01", "date_to": "2026-01-07"},
+		)
+
+		self.assertEqual(resp.status_code, 200)
+		meter_ids = {mp["meter_id"] for mp in resp.data["metering_points"]}
+		self.assertIn("CH-DQ-001", meter_ids)
+		self.assertNotIn("CH-DQ-UNRELATED", meter_ids)
+
+	def test_invalid_zev_id_returns_400(self):
+		auth(self.client, self.owner)
+
+		resp = self.client.get(
+			"/api/v1/metering/readings/data-quality-status/",
+			{"zev_id": "not-a-uuid"},
+		)
+
+		self.assertEqual(resp.status_code, 400)
+
+
 class ChartDataEndpointTests(TestCase):
 	"""Regression cover for /metering/readings/chart-data/.
 
