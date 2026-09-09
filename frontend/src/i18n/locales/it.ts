@@ -1699,6 +1699,7 @@ export const it = {
                 hour: 'Oraria',
                 day: 'Giornaliera',
                 month: 'Mensile',
+                hourlyUnavailableHint: 'La risoluzione oraria è disponibile solo per periodi di {{maxDays}} giorni o meno.',
             },
             stats: {
                 meterId: 'ID contatore',

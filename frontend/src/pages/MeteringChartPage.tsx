@@ -27,6 +27,7 @@ import {
     getCurrentBillingPeriod,
 } from '../lib/billingPeriod'
 import { useAppSettings } from '../lib/appSettings'
+import { daysInPeriod } from '../lib/dates'
 import { formatMeteringBucketLabel } from '../lib/meteringLabels'
 import type { AppSettings, ChartDataPoint } from '../types/api'
 import { CHART_GRID, CONS_COLORS, NEGATIVE_COLOR, PROD_COLORS } from '../lib/chartTokens'
@@ -87,6 +88,13 @@ function CustomTooltip({
     )
 }
 
+/**
+ * Beyond this many days, hourly resolution renders too many bars to be
+ * useful (or safe) in the browser — a ZEV on an annual billing interval
+ * defaults to a ~365-day period, which would otherwise be 8,760 bars.
+ */
+const MAX_HOURLY_RESOLUTION_DAYS = 31
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export function MeteringChartPage() {
@@ -109,6 +117,18 @@ export function MeteringChartPage() {
         setPeriod(getCurrentBillingPeriod(interval))
     }, [selectedZevId, interval])
 
+    const periodDays = daysInPeriod(period.from, period.to)
+    const hourlyResolutionAvailable = periodDays <= MAX_HOURLY_RESOLUTION_DAYS
+
+    // Fall back to daily if the period grows past the hourly cap (e.g. a
+    // billing-interval switch, or navigating to a longer period) while
+    // hourly was selected.
+    useEffect(() => {
+        if (bucket === 'hour' && !hourlyResolutionAvailable) {
+            setBucket('day')
+        }
+    }, [bucket, hourlyResolutionAvailable])
+
     // Data queries
     const zevsQuery = useQuery({ queryKey: queryKeys.zev.list(), queryFn: fetchZevs })
     const mpQuery = useQuery({ queryKey: queryKeys.metering.points(selectedZevId || undefined), queryFn: fetchMeteringPoints })
@@ -129,6 +149,10 @@ export function MeteringChartPage() {
                 zevId: selectedZevId && isManagedScope ? selectedZevId : undefined,
                 meteringPointId: selectedMpId || undefined,
             }),
+        // Expensive (one query per visible metering point server-side) and
+        // only shown on the Data Quality tab — don't run it just because the
+        // Chart tab happened to be open (#638).
+        enabled: activeTab === 'quality',
     })
 
     const meteringPoints = (mpQuery.data ?? []).filter(
@@ -246,10 +270,21 @@ export function MeteringChartPage() {
                                     value={bucket}
                                     onChange={(e) => setBucket(e.target.value as 'day' | 'hour' | 'month')}
                                 >
-                                    <option value="hour">{t('pages.meteringData.resolutions.hour')}</option>
+                                    <option
+                                        value="hour"
+                                        disabled={!hourlyResolutionAvailable}
+                                        title={hourlyResolutionAvailable ? undefined : t('pages.meteringData.resolutions.hourlyUnavailableHint', { maxDays: MAX_HOURLY_RESOLUTION_DAYS })}
+                                    >
+                                        {t('pages.meteringData.resolutions.hour')}
+                                    </option>
                                     <option value="day">{t('pages.meteringData.resolutions.day')}</option>
                                     <option value="month">{t('pages.meteringData.resolutions.month')}</option>
                                 </select>
+                                {!hourlyResolutionAvailable && (
+                                    <small className="muted">
+                                        {t('pages.meteringData.resolutions.hourlyUnavailableHint', { maxDays: MAX_HOURLY_RESOLUTION_DAYS })}
+                                    </small>
+                                )}
                             </label>
                         </div>
                     )}

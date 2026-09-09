@@ -38,3 +38,18 @@ export function formatUtcIsoDate(date: Date): string {
 export function todayLocalIso(): string {
     return formatIsoDate(new Date())
 }
+
+/**
+ * Inclusive day count between two `YYYY-MM-DD` dates.
+ *
+ * Parses both as UTC midnight so a DST transition in the viewer's timezone
+ * can't shift the count by a day — the two dates are calendar boundaries,
+ * not instants, so there is no "local time" for them to begin with.
+ */
+export function daysInPeriod(from: string, to: string): number {
+    if (!from || !to) return 0
+    const fromMs = Date.parse(`${from}T00:00:00Z`)
+    const toMs = Date.parse(`${to}T00:00:00Z`)
+    if (Number.isNaN(fromMs) || Number.isNaN(toMs)) return 0
+    return Math.round((toMs - fromMs) / 86_400_000) + 1
+}

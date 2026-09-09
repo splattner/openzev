@@ -1699,6 +1699,7 @@ export const de = {
                 hour: 'Stündlich',
                 day: 'Täglich',
                 month: 'Monatlich',
+                hourlyUnavailableHint: 'Stündliche Auflösung ist nur für Zeiträume von {{maxDays}} Tagen oder weniger verfügbar.',
             },
             stats: {
                 meterId: 'Zähler-ID',

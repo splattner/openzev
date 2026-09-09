@@ -1710,6 +1710,7 @@ export const en = {
                 hour: 'Hourly',
                 day: 'Daily',
                 month: 'Monthly',
+                hourlyUnavailableHint: 'Hourly resolution is only available for periods of {{maxDays}} days or less.',
             },
             stats: {
                 meterId: 'Meter ID',

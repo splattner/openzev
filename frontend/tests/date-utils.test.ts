@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { formatIsoDate, formatUtcIsoDate, todayLocalIso } from '../src/lib/dates'
+import { daysInPeriod, formatIsoDate, formatUtcIsoDate, todayLocalIso } from '../src/lib/dates'
 
 const SAVED_TZ = process.env.TZ
 
@@ -32,5 +32,27 @@ describe('formatUtcIsoDate', () => {
 describe('todayLocalIso', () => {
   it('returns today in the local timezone', () => {
     expect(todayLocalIso()).toBe(formatIsoDate(new Date()))
+  })
+})
+
+describe('daysInPeriod', () => {
+  it('counts a single day as 1', () => {
+    expect(daysInPeriod('2026-01-01', '2026-01-01')).toBe(1)
+  })
+
+  it('counts a whole month inclusively', () => {
+    expect(daysInPeriod('2026-01-01', '2026-01-31')).toBe(31)
+  })
+
+  it('is unaffected by a DST transition in the viewer timezone', () => {
+    // America/New_York springs forward on 2026-03-08; a local-time diff
+    // would lose an hour here and risk an off-by-one day count.
+    expect(daysInPeriod('2026-03-01', '2026-03-31')).toBe(31)
+  })
+
+  it('returns 0 for missing or unparseable bounds', () => {
+    expect(daysInPeriod('', '2026-01-31')).toBe(0)
+    expect(daysInPeriod('2026-01-01', '')).toBe(0)
+    expect(daysInPeriod('not-a-date', '2026-01-31')).toBe(0)
   })
 })
