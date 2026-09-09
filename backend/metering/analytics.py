@@ -17,7 +17,7 @@ from allocation.read_model import (
     community_totals_by_timestamp,
     eligible_participant_shares,
 )
-from allocation.validity import active_during, active_on, period_window
+from allocation.validity import active_during, period_window
 from allocation.split import split_consumption, split_production
 from allocation.windows import AssignmentWindows
 from zev.models import (
@@ -710,14 +710,13 @@ def compute_hourly_profile(selected_zev_id, participant_ids, start_dt, end_dt, p
 # Data quality
 # ---------------------------------------------------------------------------
 
-def compute_data_quality_status(metering_points, date_from, date_to, today):
+def compute_data_quality_status(metering_points, date_from, date_to):
     """
     Detect missing daily readings per metering point, and readings that have
     no assignment holder at their timestamp.
 
     metering_points – MeteringPoint queryset.
     date_from / date_to – date objects defining the inspection window.
-    today           – date object (passed in so callers can control "now").
 
     A reading whose metering point has no assignment active at the reading's
     UTC civil date is billed to nobody but still inflates the ZEV pool (ADR
@@ -727,6 +726,14 @@ def compute_data_quality_status(metering_points, date_from, date_to, today):
     date-granular), and the per-meter ``assignment_overlap`` flag marks
     metering points whose windows overlap, so one corrupt meter degrades to
     one bad row instead of failing the whole status page.
+
+    The displayed ``participant_name`` is the holder of the assignment with
+    the latest ``valid_from`` among those overlapping ``[date_from,
+    date_to]`` — i.e. the most recent holder *within the reviewed period*,
+    not whoever holds the meter today. Resolving via ``today`` would show a
+    reviewer of e.g. last quarter's data the participant who has since moved
+    in, which is both misleading (wrong contact to follow up a gap with) and
+    an unnecessary cross-participant exposure of who holds a meter now.
 
     Returns a list of status dicts, one per metering point.
     """
@@ -749,11 +756,19 @@ def compute_data_quality_status(metering_points, date_from, date_to, today):
     for row in assignment_rows:
         windows_by_mp.setdefault(row[0], []).append(row)
 
-    current_holders = {}
-    for assignment in active_on(
-        MeteringPointAssignment.objects.filter(metering_point__in=metering_points), today
-    ).order_by("-valid_from").select_related("participant"):
-        current_holders.setdefault(assignment.metering_point_id, assignment.participant.full_name)
+    # The most recent assignment (by valid_from) among those overlapping the
+    # period, per metering point — see the "displayed participant_name"
+    # note above. ``row[1]`` is valid_from, ``row[3]`` is participant_id.
+    period_holder_by_mp = {
+        mp_id: max(rows, key=lambda row: row[1])[3]
+        for mp_id, rows in windows_by_mp.items()
+    }
+    participant_names = {
+        participant.id: participant.full_name
+        for participant in Participant.objects.filter(
+            id__in=set(period_holder_by_mp.values())
+        )
+    }
 
     result = []
     for mp in metering_points:
@@ -815,7 +830,7 @@ def compute_data_quality_status(metering_points, date_from, date_to, today):
         result.append({
             "id": str(mp.id),
             "meter_id": mp.meter_id,
-            "participant_name": current_holders.get(mp.id, "Unassigned"),
+            "participant_name": participant_names.get(period_holder_by_mp.get(mp.id), "Unassigned"),
             "severity": severity,
             "data_completeness": data_completeness,
             "days_with_data": len(days_with_data),

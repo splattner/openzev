@@ -807,6 +807,103 @@ class DataQualityStatusTests(TestCase):
 
 		self.assertEqual(resp.status_code, 400)
 
+	def test_participant_name_reflects_period_holder_not_todays_holder(self):
+		"""Reviewing a past period shows who held the meter *then*, not
+		whoever has since moved in (#639)."""
+		auth(self.client, self.owner)
+
+		assignment = MeteringPointAssignment.objects.get(metering_point=self.metering_point)
+		assignment.valid_to = date(2026, 1, 15)
+		assignment.save()
+
+		successor = Participant.objects.create(
+			zev=self.zev,
+			first_name="Carol",
+			last_name="Successor",
+			email="carol@example.com",
+			valid_from=date(2026, 1, 16),
+		)
+		MeteringPointAssignment.objects.create(
+			metering_point=self.metering_point,
+			participant=successor,
+			valid_from=date(2026, 1, 16),
+		)
+		MeterReading.objects.create(
+			metering_point=self.metering_point,
+			timestamp=datetime(2026, 1, 2, 12, 0, tzinfo=timezone.utc),
+			energy_kwh=Decimal("10.0"),
+			direction=ReadingDirection.IN,
+			resolution=ReadingResolution.DAILY,
+		)
+
+		resp = self.client.get(
+			"/api/v1/metering/readings/data-quality-status/",
+			{"date_from": "2026-01-01", "date_to": "2026-01-15"},
+		)
+
+		self.assertEqual(resp.status_code, 200)
+		mp_status = resp.data["metering_points"][0]
+		self.assertEqual(mp_status["participant_name"], "Bob Monitor")
+
+	def test_participant_name_uses_most_recent_holder_within_a_mixed_period(self):
+		"""When the meter changed hands mid-period, the more recent of the
+		two in-period holders is shown."""
+		auth(self.client, self.owner)
+
+		assignment = MeteringPointAssignment.objects.get(metering_point=self.metering_point)
+		assignment.valid_to = date(2026, 1, 15)
+		assignment.save()
+
+		successor = Participant.objects.create(
+			zev=self.zev,
+			first_name="Carol",
+			last_name="Successor",
+			email="carol2@example.com",
+			valid_from=date(2026, 1, 16),
+		)
+		MeteringPointAssignment.objects.create(
+			metering_point=self.metering_point,
+			participant=successor,
+			valid_from=date(2026, 1, 16),
+		)
+		MeterReading.objects.create(
+			metering_point=self.metering_point,
+			timestamp=datetime(2026, 1, 2, 12, 0, tzinfo=timezone.utc),
+			energy_kwh=Decimal("10.0"),
+			direction=ReadingDirection.IN,
+			resolution=ReadingResolution.DAILY,
+		)
+
+		resp = self.client.get(
+			"/api/v1/metering/readings/data-quality-status/",
+			{"date_from": "2026-01-01", "date_to": "2026-01-20"},
+		)
+
+		self.assertEqual(resp.status_code, 200)
+		mp_status = resp.data["metering_points"][0]
+		self.assertEqual(mp_status["participant_name"], "Carol Successor")
+
+	def test_participant_name_unassigned_when_no_assignment_overlaps_period(self):
+		auth(self.client, self.owner)
+
+		MeteringPointAssignment.objects.filter(metering_point=self.metering_point).delete()
+		MeterReading.objects.create(
+			metering_point=self.metering_point,
+			timestamp=datetime(2026, 1, 2, 12, 0, tzinfo=timezone.utc),
+			energy_kwh=Decimal("10.0"),
+			direction=ReadingDirection.IN,
+			resolution=ReadingResolution.DAILY,
+		)
+
+		resp = self.client.get(
+			"/api/v1/metering/readings/data-quality-status/",
+			{"date_from": "2026-01-01", "date_to": "2026-01-07"},
+		)
+
+		self.assertEqual(resp.status_code, 200)
+		mp_status = resp.data["metering_points"][0]
+		self.assertEqual(mp_status["participant_name"], "Unassigned")
+
 
 class ChartDataEndpointTests(TestCase):
 	"""Regression cover for /metering/readings/chart-data/.

@@ -339,7 +339,7 @@ class MeterReadingViewSet(ZevScopedQuerySetMixin, viewsets.ModelViewSet):
         if metering_point_id:
             metering_points = metering_points.filter(id=metering_point_id)
 
-        result = compute_data_quality_status(metering_points, date_from, date_to, today)
+        result = compute_data_quality_status(metering_points, date_from, date_to)
         return Response({
             "date_from": date_from.isoformat(),
             "date_to": date_to.isoformat(),
