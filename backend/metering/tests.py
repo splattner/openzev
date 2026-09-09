@@ -758,7 +758,7 @@ class DataQualityStatusTests(TestCase):
 		invisible one (#634): it must still appear, at 0% complete."""
 		auth(self.client, self.owner)
 
-		untouched = MeteringPoint.objects.create(
+		MeteringPoint.objects.create(
 			zev=self.zev,
 			meter_id="CH-DQ-UNTOUCHED",
 			meter_type=MeteringPointType.CONSUMPTION,
@@ -781,7 +781,7 @@ class DataQualityStatusTests(TestCase):
 		leakage of other holders' empty meters via the zero-reading fix."""
 		auth(self.client, self.participant_user)
 
-		unrelated = MeteringPoint.objects.create(
+		MeteringPoint.objects.create(
 			zev=self.zev,
 			meter_id="CH-DQ-UNRELATED",
 			meter_type=MeteringPointType.CONSUMPTION,
