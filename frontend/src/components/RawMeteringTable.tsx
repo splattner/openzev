@@ -6,7 +6,8 @@ import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'rec
 import { fetchRawMeteringData, fetchRawMeteringDay } from '../lib/api/metering'
 import { queryKeys } from '../lib/api/queryKeys'
 import { formatShortDate, useAppSettings } from '../lib/appSettings'
-import type { RawMeteringReading } from '../types/api'
+import { outReadingLabelKey } from '../lib/meteringLabels'
+import type { MeteringPoint, RawMeteringReading } from '../types/api'
 
 /** UTC HH:MM — matches how the importer stored the timestamps (naive stamped as UTC). */
 function formatTimeOnly(ts: string): string {
@@ -124,7 +125,17 @@ function SparkTooltip({
 }
 
 /** Compact intraday curve of a day's 15-minute values; complements the exact-value grid below. */
-function DaySparkline({ intervals, hasIn, hasOut }: { intervals: IntervalRow[]; hasIn: boolean; hasOut: boolean }) {
+function DaySparkline({
+    intervals,
+    hasIn,
+    hasOut,
+    meterType,
+}: {
+    intervals: IntervalRow[]
+    hasIn: boolean
+    hasOut: boolean
+    meterType: MeteringPoint['meter_type'] | undefined
+}) {
     const { t } = useTranslation()
     return (
         <div className="raw-metering-sparkline">
@@ -166,7 +177,7 @@ function DaySparkline({ intervals, hasIn, hasOut }: { intervals: IntervalRow[]; 
                         <Area
                             type="monotone"
                             dataKey="out"
-                            name={t('pages.meteringData.series.feedIn')}
+                            name={t(outReadingLabelKey(meterType, 'pages.meteringData.series.production', 'pages.meteringData.series.feedIn'))}
                             stroke={CHART_LOCAL}
                             strokeWidth={1.5}
                             fill="url(#rawSparkOut)"
@@ -186,10 +197,12 @@ function RawDayDetail({
     meteringPointId,
     date,
     colSpan,
+    meterType,
 }: {
     meteringPointId: string
     date: string
     colSpan: number
+    meterType: MeteringPoint['meter_type'] | undefined
 }) {
     const { t } = useTranslation()
     const query = useQuery({
@@ -215,7 +228,7 @@ function RawDayDetail({
                     <div className="raw-metering-detail-status muted">{t('pages.meteringData.noRawReadings')}</div>
                 ) : (
                     <div className="raw-metering-detail-body">
-                        <DaySparkline intervals={intervals} hasIn={dayHasIn} hasOut={dayHasOut} />
+                        <DaySparkline intervals={intervals} hasIn={dayHasIn} hasOut={dayHasOut} meterType={meterType} />
                         {dayHasIn && (
                             <HourGrid
                                 readings={readings}
@@ -227,7 +240,7 @@ function RawDayDetail({
                             <HourGrid
                                 readings={readings}
                                 direction="out"
-                                caption={showCaptions ? t('pages.meteringData.rawTable.outKwh') : undefined}
+                                caption={showCaptions ? t(outReadingLabelKey(meterType, 'pages.meteringData.rawTable.productionKwh', 'pages.meteringData.rawTable.outKwh')) : undefined}
                             />
                         )}
                     </div>
@@ -244,11 +257,13 @@ export function RawMeteringTable({
     dateFrom,
     dateTo,
     hasOut,
+    meterType,
 }: {
     meteringPointId: string
     dateFrom: string
     dateTo: string
     hasOut: boolean
+    meterType?: MeteringPoint['meter_type']
 }) {
     const { t } = useTranslation()
     const { settings } = useAppSettings()
@@ -283,7 +298,7 @@ export function RawMeteringTable({
                         <tr>
                             <th>{t('pages.meteringData.rawTable.day')}</th>
                             <th className="raw-metering-num">{t('pages.meteringData.rawTable.inTotal')}</th>
-                            {hasOut && <th className="raw-metering-num">{t('pages.meteringData.rawTable.outTotal')}</th>}
+                            {hasOut && <th className="raw-metering-num">{t(outReadingLabelKey(meterType, 'pages.meteringData.rawTable.productionTotal', 'pages.meteringData.rawTable.outTotal'))}</th>}
                             <th className="raw-metering-num">{t('pages.meteringData.rawTable.rawReadings')}</th>
                         </tr>
                     </thead>
@@ -320,6 +335,7 @@ export function RawMeteringTable({
                                             meteringPointId={meteringPointId}
                                             date={day.date}
                                             colSpan={colSpan}
+                                            meterType={meterType}
                                         />
                                     )}
                                 </Fragment>

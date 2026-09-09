@@ -28,7 +28,7 @@ import {
 } from '../lib/billingPeriod'
 import { useAppSettings } from '../lib/appSettings'
 import { daysInPeriod } from '../lib/dates'
-import { formatMeteringBucketLabel } from '../lib/meteringLabels'
+import { formatMeteringBucketLabel, outReadingLabelKey } from '../lib/meteringLabels'
 import type { AppSettings, ChartDataPoint } from '../types/api'
 import { CHART_GRID, CONS_COLORS, NEGATIVE_COLOR, PROD_COLORS } from '../lib/chartTokens'
 
@@ -352,7 +352,7 @@ export function MeteringChartPage() {
                                     />
                                     {hasOut && (
                                         <StatBadge
-                                            label={t('pages.meteringData.stats.totalFeedIn')}
+                                            label={t(outReadingLabelKey(selectedMp?.meter_type, 'pages.meteringData.stats.totalProduction', 'pages.meteringData.stats.totalFeedIn'))}
                                             value={`${totalOut.toFixed(2)} kWh`}
                                             color={PROD_COLORS[0]}
                                         />
@@ -405,7 +405,7 @@ export function MeteringChartPage() {
                                                 {hasOut && (
                                                     <Bar
                                                         dataKey="out_kwh"
-                                                        name={t('pages.meteringData.series.feedIn')}
+                                                        name={t(outReadingLabelKey(selectedMp?.meter_type, 'pages.meteringData.series.production', 'pages.meteringData.series.feedIn'))}
                                                         fill={PROD_COLORS[0]}
                                                         radius={[3, 3, 0, 0]}
                                                         maxBarSize={48}
@@ -421,6 +421,7 @@ export function MeteringChartPage() {
                                     dateFrom={period.from}
                                     dateTo={period.to}
                                     hasOut={hasOut}
+                                    meterType={selectedMp?.meter_type}
                                 />
                             </>
                         )}

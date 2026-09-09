@@ -1,4 +1,4 @@
-import type { AppSettings } from '../types/api'
+import type { AppSettings, MeteringPoint } from '../types/api'
 
 /**
  * The backend buckets metering readings in UTC (``TruncDay``/``TruncHour``/
@@ -92,4 +92,21 @@ export function formatMeteringBucketLabel(
     } catch {
         return bucket
     }
+}
+
+/**
+ * Pick the i18n key for a meter's OUT-direction readings.
+ *
+ * `OUT` means different things depending on the meter (`allocation/read_model.py`):
+ * on a `production` meter it *is* the production, not an export to the grid;
+ * "feed-in" only describes `OUT` on a `bidirectional` meter, where it's
+ * production exceeding local consumption. Labeling a pure-production meter's
+ * output as "feed-in" misdescribes what the number means.
+ */
+export function outReadingLabelKey(
+    meterType: MeteringPoint['meter_type'] | undefined,
+    whenProduction: string,
+    otherwise: string,
+): string {
+    return meterType === 'production' ? whenProduction : otherwise
 }

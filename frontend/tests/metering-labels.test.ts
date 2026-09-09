@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { formatMeteringBucketLabel } from '../src/lib/meteringLabels'
+import { formatMeteringBucketLabel, outReadingLabelKey } from '../src/lib/meteringLabels'
 import type { AppSettings } from '../src/types/api'
 
 const SAVED_TZ = process.env.TZ
@@ -43,5 +43,20 @@ describe('formatMeteringBucketLabel', () => {
 
   it('falls back to the raw bucket string when it cannot be parsed', () => {
     expect(formatMeteringBucketLabel('not-a-date', 'day', settings)).toBe('not-a-date')
+  })
+})
+
+describe('outReadingLabelKey', () => {
+  it('picks the production key for a production meter', () => {
+    expect(outReadingLabelKey('production', 'series.production', 'series.feedIn')).toBe('series.production')
+  })
+
+  it('picks the feed-in key for a bidirectional meter', () => {
+    expect(outReadingLabelKey('bidirectional', 'series.production', 'series.feedIn')).toBe('series.feedIn')
+  })
+
+  it('picks the feed-in key for a consumption meter or when the meter is unknown', () => {
+    expect(outReadingLabelKey('consumption', 'series.production', 'series.feedIn')).toBe('series.feedIn')
+    expect(outReadingLabelKey(undefined, 'series.production', 'series.feedIn')).toBe('series.feedIn')
   })
 })
