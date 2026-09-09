@@ -448,6 +448,30 @@ class MeteringRawDataEndpointTests(TestCase):
 		self.assertEqual(resp.status_code, 200)
 		self.assertEqual(len(resp.data), 2)
 
+	def test_rejects_invalid_metering_point(self):
+		auth(self.client, self.owner)
+		resp = self.client.get(
+			"/api/v1/metering/readings/raw-data/",
+			{"metering_point": "__zev_total__"},
+		)
+		self.assertEqual(resp.status_code, 400)
+
+	def test_rejects_invalid_date_from(self):
+		auth(self.client, self.owner)
+		resp = self.client.get(
+			"/api/v1/metering/readings/raw-data/",
+			{"metering_point": str(self.metering_point.id), "date_from": "not-a-date"},
+		)
+		self.assertEqual(resp.status_code, 400)
+
+	def test_rejects_invalid_detail_date(self):
+		auth(self.client, self.owner)
+		resp = self.client.get(
+			"/api/v1/metering/readings/raw-data/",
+			{"metering_point": str(self.metering_point.id), "date": "not-a-date"},
+		)
+		self.assertEqual(resp.status_code, 400)
+
 class DataQualityStatusTests(TestCase):
 	def setUp(self):
 		self.client = APIClient()
@@ -807,6 +831,28 @@ class DataQualityStatusTests(TestCase):
 
 		self.assertEqual(resp.status_code, 400)
 
+	def test_invalid_metering_point_returns_400(self):
+		"""A stray non-UUID value (e.g. the chart tab's whole-ZEV-total
+		sentinel leaking through, #671) must 400, not 500."""
+		auth(self.client, self.owner)
+
+		resp = self.client.get(
+			"/api/v1/metering/readings/data-quality-status/",
+			{"metering_point": "__zev_total__"},
+		)
+
+		self.assertEqual(resp.status_code, 400)
+
+	def test_invalid_date_from_returns_400(self):
+		auth(self.client, self.owner)
+
+		resp = self.client.get(
+			"/api/v1/metering/readings/data-quality-status/",
+			{"date_from": "not-a-date"},
+		)
+
+		self.assertEqual(resp.status_code, 400)
+
 	def test_participant_name_reflects_period_holder_not_todays_holder(self):
 		"""Reviewing a past period shows who held the meter *then*, not
 		whoever has since moved in (#639)."""
@@ -1161,6 +1207,28 @@ class ChartDataEndpointTests(TestCase):
 		resp = self.client.get(
 			"/api/v1/metering/readings/chart-data/",
 			{"zev_id": "not-a-uuid"},
+		)
+
+		self.assertEqual(resp.status_code, 400)
+
+	def test_chart_data_rejects_invalid_metering_point(self):
+		"""A stray non-UUID value (e.g. the chart tab's whole-ZEV-total
+		sentinel leaking through, #671) must 400, not 500."""
+		auth(self.client, self.owner)
+
+		resp = self.client.get(
+			"/api/v1/metering/readings/chart-data/",
+			{"metering_point": "__zev_total__"},
+		)
+
+		self.assertEqual(resp.status_code, 400)
+
+	def test_chart_data_rejects_invalid_date_from(self):
+		auth(self.client, self.owner)
+
+		resp = self.client.get(
+			"/api/v1/metering/readings/chart-data/",
+			{"metering_point": str(self.mp.id), "date_from": "not-a-date"},
 		)
 
 		self.assertEqual(resp.status_code, 400)

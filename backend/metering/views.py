@@ -8,6 +8,7 @@ from django.db.models.functions import TruncDate, TruncDay, TruncHour, TruncMont
 from django.utils.dateparse import parse_date
 from rest_framework import mixins, viewsets, status
 from rest_framework.decorators import action
+from rest_framework.exceptions import ValidationError
 from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -27,6 +28,32 @@ from .analytics import (
 )
 from audit.models import AuditActionCategory, AuditEventStatus
 from audit.services import record_audit_event
+
+
+def _validated_uuid(raw, field_name):
+    """Parse a UUID query param, or raise a 400 if it's present but malformed.
+
+    Returns the raw string unchanged (still filterable) — the point is
+    rejecting garbage before it reaches the ORM as an uncaught
+    ``django.core.exceptions.ValidationError`` (a 500), not converting it.
+    """
+    if not raw:
+        return None
+    try:
+        uuid.UUID(str(raw))
+    except (ValueError, AttributeError, TypeError):
+        raise ValidationError({field_name: ["Must be a valid UUID."]}) from None
+    return raw
+
+
+def _validated_date(raw, field_name):
+    """Parse a YYYY-MM-DD query param, or raise a 400 if it's present but malformed."""
+    if not raw:
+        return None
+    parsed = parse_date(raw)
+    if parsed is None:
+        raise ValidationError({field_name: ["Must be a valid date (YYYY-MM-DD)."]})
+    return parsed
 
 
 class MeterReadingViewSet(ZevScopedQuerySetMixin, viewsets.ModelViewSet):
@@ -73,13 +100,13 @@ class MeterReadingViewSet(ZevScopedQuerySetMixin, viewsets.ModelViewSet):
           date_to         – YYYY-MM-DD (optional)
           bucket          – day | hour | month  (default: day)
         """
-        mp_id = request.query_params.get("metering_point")
+        mp_id = _validated_uuid(request.query_params.get("metering_point"), "metering_point")
         zev_id = request.query_params.get("zev_id")
         if not mp_id and not zev_id:
             return Response({"error": "metering_point or zev_id query parameter is required."}, status=400)
 
-        date_from = request.query_params.get("date_from")
-        date_to = request.query_params.get("date_to")
+        date_from = _validated_date(request.query_params.get("date_from"), "date_from")
+        date_to = _validated_date(request.query_params.get("date_to"), "date_to")
         bucket = request.query_params.get("bucket", "day")
 
         trunc_fn = {"day": TruncDay, "hour": TruncHour, "month": TruncMonth}.get(bucket, TruncDay)
@@ -92,9 +119,9 @@ class MeterReadingViewSet(ZevScopedQuerySetMixin, viewsets.ModelViewSet):
             qs = qs.filter(metering_point_id=mp_id)
         # Independent optional bounds: a lone date_from/date_to still filters.
         if date_from:
-            qs = qs.filter(timestamp__gte=period_start_dt(date_type.fromisoformat(date_from)))
+            qs = qs.filter(timestamp__gte=period_start_dt(date_from))
         if date_to:
-            qs = qs.filter(timestamp__lt=period_end_exclusive_dt(date_type.fromisoformat(date_to)))
+            qs = qs.filter(timestamp__lt=period_end_exclusive_dt(date_to))
 
         rows = (
             qs.annotate(bucket=trunc_fn("timestamp", tzinfo=dt_timezone.utc))
@@ -132,16 +159,16 @@ class MeterReadingViewSet(ZevScopedQuerySetMixin, viewsets.ModelViewSet):
         (a naive CSV timestamp is stamped as UTC), so day boundaries here line up
         with the times shown in the UI.
         """
-        mp_id = request.query_params.get("metering_point")
+        mp_id = _validated_uuid(request.query_params.get("metering_point"), "metering_point")
         if not mp_id:
             return Response({"error": "metering_point query parameter is required."}, status=400)
 
         qs = self.get_queryset().filter(metering_point_id=mp_id)
 
         # ── Detail mode: one day's individual readings ─────────────────────────
-        detail_date = request.query_params.get("date")
+        detail_date = _validated_date(request.query_params.get("date"), "date")
         if detail_date:
-            day = date_type.fromisoformat(detail_date)
+            day = detail_date
             day_start, day_end = period_window(day, day)
             readings = qs.filter(
                 timestamp__gte=day_start, timestamp__lt=day_end
@@ -158,12 +185,12 @@ class MeterReadingViewSet(ZevScopedQuerySetMixin, viewsets.ModelViewSet):
             ])
 
         # ── Summary mode: one aggregated row per UTC day ───────────────────────
-        date_from = request.query_params.get("date_from")
-        date_to = request.query_params.get("date_to")
+        date_from = _validated_date(request.query_params.get("date_from"), "date_from")
+        date_to = _validated_date(request.query_params.get("date_to"), "date_to")
         if date_from:
-            qs = qs.filter(timestamp__gte=period_start_dt(date_type.fromisoformat(date_from)))
+            qs = qs.filter(timestamp__gte=period_start_dt(date_from))
         if date_to:
-            qs = qs.filter(timestamp__lt=period_end_exclusive_dt(date_type.fromisoformat(date_to)))
+            qs = qs.filter(timestamp__lt=period_end_exclusive_dt(date_to))
 
         rows = (
             qs.annotate(day=TruncDay("timestamp", tzinfo=dt_timezone.utc))
@@ -318,12 +345,9 @@ class MeterReadingViewSet(ZevScopedQuerySetMixin, viewsets.ModelViewSet):
 
         Returns array of metering points with gaps and data completeness.
         """
-        date_from_str = request.query_params.get("date_from")
-        date_to_str = request.query_params.get("date_to")
-
         today = date_type.today()
-        date_from = date_type.fromisoformat(date_from_str) if date_from_str else today - timedelta(days=30)
-        date_to = date_type.fromisoformat(date_to_str) if date_to_str else today
+        date_from = _validated_date(request.query_params.get("date_from"), "date_from") or today - timedelta(days=30)
+        date_to = _validated_date(request.query_params.get("date_to"), "date_to") or today
 
         # Scoped from ``MeteringPoint`` directly (mirroring
         # ``MeteringPointViewSet``'s own role scoping) rather than from
@@ -340,15 +364,11 @@ class MeterReadingViewSet(ZevScopedQuerySetMixin, viewsets.ModelViewSet):
                 assignments__participant__user=user
             ).distinct()
 
-        zev_id = request.query_params.get("zev_id")
+        zev_id = _validated_uuid(request.query_params.get("zev_id"), "zev_id")
         if zev_id:
-            try:
-                uuid.UUID(str(zev_id))
-            except (ValueError, AttributeError, TypeError):
-                return Response({"error": "zev_id must be a valid UUID."}, status=400)
             metering_points = metering_points.filter(zev_id=zev_id)
 
-        metering_point_id = request.query_params.get("metering_point")
+        metering_point_id = _validated_uuid(request.query_params.get("metering_point"), "metering_point")
         if metering_point_id:
             metering_points = metering_points.filter(id=metering_point_id)
 
