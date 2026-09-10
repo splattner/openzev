@@ -64,18 +64,23 @@ test.describe('User Guide Screenshots', () => {
     expect(pinned, 'Demo ZEV not found — run seed_demo before capturing screenshots').toBe(true)
   })
 
-  // 02 — Dashboard
+  // 02 — Manager Overview
   test('02-dashboard', async ({ page }) => {
     await navigateTo(page, '/')
-    // Wait for dashboard content (stat cards or similar)
-    await page.waitForSelector('.card', { timeout: 10_000 })
+    await page.waitForSelector('#billing-periods', { timeout: 15_000 })
+    await screenshotFull(page, '02-dashboard')
+  })
+
+  // 02c — Manager Energy balance (the former dashboard statistics surface)
+  test('02c-energy-balance', async ({ page }) => {
+    await navigateTo(page, '/dashboard')
+    await page.waitForSelector('.period-selector', { timeout: 10_000 })
     await Promise.all([
       page.waitForResponse(response => response.url().includes('/dashboard-summary/') && response.ok()),
       goToPreviousPeriod(page),
     ])
-    // The energy-flow Sankey only renders once the period has readings.
     await page.waitForSelector('.sankey-participant-label', { timeout: 15_000 })
-    await screenshotFull(page, '02-dashboard')
+    await screenshotFull(page, '02c-energy-balance')
   })
 
   // 02b — Participant Dashboard (via impersonation)
@@ -204,6 +209,21 @@ test.describe('User Guide Screenshots', () => {
     await page.waitForSelector('form, .card', { timeout: 10_000 })
     await screenshotFull(page, '06-zev-settings')
   })
+
+  // Phase 3 surfaces have their own guide captures so tab placement and
+  // selected-community/platform context stay visible in the documentation.
+  for (const [name, route] of [
+    ['06b-zev-billing-settings', '/zev-settings/billing'],
+    ['08e-billing-emails', '/billing/emails'],
+    ['08f-billing-statements', '/billing/statements'],
+    ['10b-admin-health', '/admin/health'],
+  ]) {
+    test(name, async ({ page }) => {
+      await navigateTo(page, route)
+      await expect(page.locator('[role="tab"][aria-selected="true"]')).toBeVisible()
+      await screenshotFull(page, name)
+    })
+  }
 
   // 07 — Tariffs
   test('07-tariffs', async ({ page }) => {
