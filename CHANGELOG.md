@@ -1,5 +1,40 @@
 # Changelog
 
+## [1.12.0](https://github.com/splattner/openzev/compare/v1.11.0...v1.12.0) (2026-09-10)
+
+
+### Features
+
+* **invoices:** phase-2 readiness/attention API, cockpit, /me/invoices ([#679](https://github.com/splattner/openzev/issues/679)) ([14a9977](https://github.com/splattner/openzev/commit/14a9977bfaf7b1733d119783ef4e5f05ffaf8280))
+* **metering-data:** add a whole-ZEV total option to the metering-point selector ([#669](https://github.com/splattner/openzev/issues/669)) ([6e3cb4c](https://github.com/splattner/openzev/commit/6e3cb4c7576fd0bbf68f993a4e7e7782c5f99201)), closes [#650](https://github.com/splattner/openzev/issues/650)
+* **metering-data:** add average and peak consumption stat badges ([#665](https://github.com/splattner/openzev/issues/665)) ([1056bf8](https://github.com/splattner/openzev/commit/1056bf8ae8262b14548e06fc3d6dcb4d3e4ccd1e)), closes [#651](https://github.com/splattner/openzev/issues/651)
+* **metering-data:** clickable severity filters, sortable table, expandable gaps, row-to-chart links ([#667](https://github.com/splattner/openzev/issues/667)) ([b907c7f](https://github.com/splattner/openzev/commit/b907c7f80e43382f1586f6f88f779d4f4334c7ff)), closes [#648](https://github.com/splattner/openzev/issues/648)
+* **metering-data:** flag zero-consumption days, negative readings, and duplicate timestamps ([#668](https://github.com/splattner/openzev/issues/668)) ([2d75c3d](https://github.com/splattner/openzev/commit/2d75c3d6e9efe4fa190a6bd252cdf86bb4165de3)), closes [#652](https://github.com/splattner/openzev/issues/652)
+* **metering-data:** paginate the raw-data table and add data-bars to spot outlier days ([#670](https://github.com/splattner/openzev/issues/670)) ([006a8f1](https://github.com/splattner/openzev/commit/006a8f11c36571a76d654041ff591294adc72a77)), closes [#641](https://github.com/splattner/openzev/issues/641)
+* **metering-data:** persist the selected period in the URL ([#661](https://github.com/splattner/openzev/issues/661)) ([1d3e84f](https://github.com/splattner/openzev/commit/1d3e84f7099a23c942ec3535a055f5d80ffe443f)), closes [#647](https://github.com/splattner/openzev/issues/647)
+* **metering-data:** show meter type, active state, and ZEV in the meter dropdown ([#664](https://github.com/splattner/openzev/issues/664)) ([b2f218d](https://github.com/splattner/openzev/commit/b2f218d532b4f8eb0b79c9b26217e8584a717a75)), closes [#643](https://github.com/splattner/openzev/issues/643)
+* **metering-data:** turn the "no readings" empty state into a jump to the meter's actual data range ([#663](https://github.com/splattner/openzev/issues/663)) ([f6bc3bd](https://github.com/splattner/openzev/commit/f6bc3bdf434aa18364f80a45bd6735d663538bf1)), closes [#642](https://github.com/splattner/openzev/issues/642)
+* **metering-points:** persist filters in the URL, align loading/error with the rest of the app ([#625](https://github.com/splattner/openzev/issues/625)) ([#631](https://github.com/splattner/openzev/issues/631)) ([71cde1a](https://github.com/splattner/openzev/commit/71cde1a900cbc4be5309a667906eaf279e19837e))
+* **metering-points:** redesign the list — identity-first cards, clickable filters, denser layout ([#624](https://github.com/splattner/openzev/issues/624)) ([#630](https://github.com/splattner/openzev/issues/630)) ([8242625](https://github.com/splattner/openzev/commit/82426250926539b702158efe9a292a3475b76787))
+* **metering-points:** surface data health, last reading, and holder-less meters ([#623](https://github.com/splattner/openzev/issues/623)) ([#629](https://github.com/splattner/openzev/issues/629)) ([15bf7d9](https://github.com/splattner/openzev/commit/15bf7d98298bebda593bff1925efd027e5008b16))
+* **metering:** scope the metering-point fetch to the selected ZEV server-side ([#659](https://github.com/splattner/openzev/issues/659)) ([b26d6d4](https://github.com/splattner/openzev/commit/b26d6d4c2c21c8f7ac439f5dbd751c20a246c3f6)), closes [#640](https://github.com/splattner/openzev/issues/640)
+* **nav:** consolidate billing, settings, and admin workflows ([#680](https://github.com/splattner/openzev/issues/680)) ([b234ec0](https://github.com/splattner/openzev/commit/b234ec016ea8ff62f34fd036d9b2aef6fec4ab43))
+* **nav:** reorganize navigation around everyday tasks ([#678](https://github.com/splattner/openzev/issues/678)) ([612d67b](https://github.com/splattner/openzev/commit/612d67b83dc25bfa280372e4be76c5cfe1caa59a))
+
+
+### Bug Fixes
+
+* **invoices:** display the correct VAT percentage in invoice PDFs ([#615](https://github.com/splattner/openzev/issues/615)) ([991fb3c](https://github.com/splattner/openzev/commit/991fb3c730b793b59d9d2f28a81f0e516cfcc685))
+* **metering-data:** cap hourly resolution to short periods and stop the quality query firing on the chart tab ([#656](https://github.com/splattner/openzev/issues/656)) ([e8e128a](https://github.com/splattner/openzev/commit/e8e128a17340e962bc09c63d604bb0070a3ed12b))
+* **metering-data:** correct UTC bucket-label drift and producer/consumer color swap ([#655](https://github.com/splattner/openzev/issues/655)) ([aa38cea](https://github.com/splattner/openzev/commit/aa38cead2c3c95d4cfad54a873fa46626259f353))
+* **metering-data:** label a production meter's OUT readings as production, not feed-in ([#658](https://github.com/splattner/openzev/issues/658)) ([5b82be6](https://github.com/splattner/openzev/commit/5b82be68b770603a287415f5bc1835622ad0f626)), closes [#644](https://github.com/splattner/openzev/issues/644)
+* **metering-data:** label the bucket-count stat by what it counts ([#660](https://github.com/splattner/openzev/issues/660)) ([d9e92ff](https://github.com/splattner/openzev/commit/d9e92ff95bdc7eba99f7b4c4a2a95192e8f91490)), closes [#645](https://github.com/splattner/openzev/issues/645)
+* **metering-data:** stop the whole-ZEV-total sentinel and mp-list race from breaking the chart/quality tabs ([#681](https://github.com/splattner/openzev/issues/681)) ([9dec9c4](https://github.com/splattner/openzev/commit/9dec9c491aa7e6192e0630a3066158a3c75ecbb2))
+* **metering-points:** assign-button dead end, stale caches, wrong counts, silent cascade delete ([#628](https://github.com/splattner/openzev/issues/628)) ([8040713](https://github.com/splattner/openzev/commit/804071371a7ef12f1f3e105fc141c37fea99669f))
+* **metering:** apply metering_point filter and stop hiding zero-reading meters on data-quality endpoint ([#654](https://github.com/splattner/openzev/issues/654)) ([f155df3](https://github.com/splattner/openzev/commit/f155df375526a208bc2128bf9aca7668cc0b8dc4))
+* **metering:** Data Quality shows the period's holder, not today's ([#657](https://github.com/splattner/openzev/issues/657)) ([c2390a8](https://github.com/splattner/openzev/commit/c2390a82eb04c62a2e5ee966f3b503efd44afe72)), closes [#639](https://github.com/splattner/openzev/issues/639)
+* **metering:** validate metering_point/date params on the metering-data endpoints, return 400 not 500 ([#677](https://github.com/splattner/openzev/issues/677)) ([a12cb57](https://github.com/splattner/openzev/commit/a12cb576299294f0838f3b6ced2dc19209c53f51))
+
 ## [1.11.0](https://github.com/splattner/openzev/compare/v1.10.3...v1.11.0) (2026-09-07)
 
 
