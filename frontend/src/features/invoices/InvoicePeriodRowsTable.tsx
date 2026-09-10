@@ -177,7 +177,7 @@ export function InvoicePeriodRowsTable({
                       <Link
                         className="button button-secondary button-compact"
                         style={{ textDecoration: 'none' }}
-                        to={`/invoices/${invoice.id}`}
+                        to={`/billing/invoices/${invoice.id}`}
                       >
                         <FontAwesomeIcon icon={faFileInvoice} fixedWidth />
                         {t('pages.invoices.openDetails')}

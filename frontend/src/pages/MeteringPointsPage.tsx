@@ -16,7 +16,8 @@ import { useManagedZev } from '../lib/managedZev'
 
 export function MeteringPointsPage() {
     const { user } = useAuth()
-    const { selectedZevId } = useManagedZev()
+    const { selectedZevId, selectedZev } = useManagedZev()
+    const participantScopeName = user?.zev_count === 1 ? user?.zev_name : undefined
     const { settings } = useAppSettings()
     const { t } = useTranslation()
     const canManageMeteringPoints = user?.role === 'admin' || user?.role === 'zev_owner'
@@ -133,6 +134,7 @@ export function MeteringPointsPage() {
     return (
         <div className="page-stack">
             <header>
+                {(selectedZev?.name || participantScopeName) ? <p className="eyebrow">{selectedZev?.name ?? participantScopeName}</p> : null}
                 <h2>{t('pages.meteringPoints.title')}</h2>
                 <p className="muted">
                     {canManageMeteringPoints

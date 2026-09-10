@@ -87,18 +87,22 @@ both communities. Issued contract snapshots are retained.
 ### 2. Explore as Admin
 
 If logged in as admin:
-- Go to **Admin Dashboard** to see system-wide KPIs
-- View **Accounts**, **ZEV Management**, and Regional/VAT **Settings**
+- Go to **Platform → Overview** to see system-wide KPIs
+- View **ZEVs**, **Accounts**, **Invoices**, and **System Settings** (regional/VAT)
+- To work inside a community: open **Platform → ZEVs** and click **Manage** on a row — this selects the ZEV and takes you to its dashboard. (While under `/admin` the shell shows the **Platform administration** indicator instead of the switcher.)
+- The sidebar ZEV switcher (top-left) selects the working community anywhere else; the selected community is shown above the page title on every page, so it stays visible even when the navigation scrolls, the sidebar is collapsed, or you are on mobile
 
 ### 3. Explore as ZEV Owner
 
 If logged in as a ZEV owner:
-- Go to **ZEV Settings** to configure your community parameters
+- Go to **Setup → Settings** to configure your community parameters
 - Go to **Participants** to view member list
 - Go to **Metering Points** to see participant meters
-- Go to **Metering Data** to import readings and check data quality
+- Go to **Metering** for consumption charts and the data quality tab
+- Go to **Metering Imports** to import readings
 - Go to **Tariffs** to configure energy pricing
-- Go to **Invoices** to generate and manage billing
+- Go to **Billing** to generate and manage invoices
+- Go to **Reports** for annual statements and financial summaries
 
 ![Dashboard](screenshots/02-dashboard.png)
 
@@ -106,8 +110,8 @@ If logged in as a ZEV owner:
 
 Login as a participant (Anna or Ben):
 - **Dashboard** shows your energy consumption/production overview
-- **Metering Data** shows your consumption charts
-- **Invoices** lists your personal invoices (read-only)
+- **My consumption** shows your consumption charts
+- **Annual statement** shows your yearly statement and financial summary
 
 ![Participant Dashboard](screenshots/02b-participant-dashboard.png)
 
@@ -139,7 +143,7 @@ Tag variants:
 ## What's Next?
 
 - **Operators:** See [ZEV Setup and Configuration](02-zev-setup.md)
-- **Data Management:** See [Metering Data Import](05-metering-import.md)
+- **Data Management:** See [Metering Imports](05-metering-import.md)
 - **Billing:** See [Tariff Configuration](07-tariff-configuration.md)
 - **Understanding Roles:** See [Roles and Permissions](11-roles-and-permissions.md)
 

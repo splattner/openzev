@@ -238,6 +238,7 @@ export function TariffsPage() {
     return (
         <div className="page-stack">
             <header>
+                {selectedZev?.name ? <p className="eyebrow">{selectedZev.name}</p> : null}
                 <h2>{t('pages.tariffs.title')}</h2>
                 <p className="muted">{t('pages.tariffs.description')}</p>
             </header>

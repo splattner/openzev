@@ -1,4 +1,4 @@
-# Metering Data Import
+# Metering Imports
 
 This guide covers importing metering (consumption and production) readings into OpenZEV.
 
@@ -31,8 +31,7 @@ Prepare your data as CSV or Excel with columns:
 
 ### Step-by-Step Import
 
-1. **Go to Metering Import**
-   - Navigate: **Metering Data → Import** (or **Imports** on home page)
+1. **Go to Metering Imports**
 
 2. **Upload File**
    - Click **Choose File**
@@ -94,7 +93,7 @@ Failed rows:
 
 OpenZEV supports the Swiss **SDAT-CH** metering data standard (used by utility providers).
 
-1. Go to **Metering Import → SDAT-CH**
+1. Go to **Metering Imports**
 2. Upload your SDAT-CH file
 3. OpenZEV automatically parses:
    - Metering point IDs
@@ -186,7 +185,7 @@ Solution: Update [Participant Validity](03-participant-management.md#updating-va
 If you find errors in imported data:
 
 1. Prepare corrected CSV
-2. Go to **Metering Import**
+2. Go to **Metering Imports**
 3. Choose **Merge mode** (default, safe) or **Replace range** (careful!)
    - **Merge:** New readings are added; existing unchanged
    - **Replace range:** Delete all readings in date range, then add new ones
@@ -198,7 +197,7 @@ If you find errors in imported data:
 
 ## Data Quality Checks
 
-After import, review **Metering Data → Data Quality** to see:
+After import, review **Metering → Data Quality** (`/metering/quality`) to see:
 - Coverage per metering point
 - Missing readings
 - Gaps vs. assignment/participant validity windows

@@ -102,6 +102,7 @@ export function DashboardPage() {
 
     const summary = summaryQuery.data
     const selectedZevName = selectedZev?.name
+    const participantScopeName = user?.zev_count === 1 ? user?.zev_name : undefined
     const selectedParticipantName = summary?.role === 'zev_owner' ? summary.selected_participant_name : undefined
     const ownerTimeline = useMemo(
         () => (summary?.role === 'zev_owner' ? summary.timeline : []),
@@ -157,7 +158,7 @@ export function DashboardPage() {
     return (
         <div className="page-stack">
             <header>
-                {selectedZevName ? <p className="eyebrow">{selectedZevName}</p> : null}
+                {(selectedZevName || participantScopeName) ? <p className="eyebrow">{selectedZevName ?? participantScopeName}</p> : null}
                 <h2>{t('dashboard.title')}</h2>
                 <p className="muted">{t('dashboard.description')}</p>
             </header>
@@ -307,7 +308,7 @@ export function DashboardPage() {
                                             amount: sumTotalChf(openInvoices).toFixed(2),
                                         })}
                                     </span>
-                                    <Link to="/invoices">{t('pages.dashboard.openInvoices.viewAll')}</Link>
+                                    <Link to="/billing/invoices">{t('pages.dashboard.openInvoices.viewAll')}</Link>
                                 </div>
                             </>
                         )}
@@ -521,7 +522,7 @@ export function DashboardPage() {
                                                     <Link
                                                         className="button button-primary"
                                                         style={{ textDecoration: 'none' }}
-                                                        to={`/invoices/${invoice.id}`}
+                                                        to={`/billing/invoices/${invoice.id}`}
                                                     >
                                                         {t('pages.dashboard.viewDetails')}
                                                     </Link>

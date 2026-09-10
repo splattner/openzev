@@ -10,7 +10,7 @@ OpenZEV provides charts of consumption and production per metering point.
 
 ### Accessing Metering Charts
 
-Navigate to **Metering Data** to see charts.
+Navigate to **Metering** to see charts.
 
 ### Filtering Your View
 
@@ -212,7 +212,7 @@ affected and how billing was handled for those readings.
 
 ## Next Steps
 
-- **Fix import issues:** [Metering Data Import](05-metering-import.md)
+- **Fix import issues:** [Metering Imports](05-metering-import.md)
 - **Set metering point details:** [Metering Points](04-metering-points.md)
 - **Configure tariffs:** [Tariff Configuration](07-tariff-configuration.md)
 - **Generate invoices:** [Invoice Management](09-invoice-management.md)

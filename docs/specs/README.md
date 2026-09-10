@@ -96,6 +96,11 @@ These specs describe the current major product capabilities and should be update
 - `2026-08-contract-pdf-redesign.md`
 - `2026-08-ui-redesign-pdf-style.md`
 
+Larger reworks may also ship a *decision spec* recording frozen decisions and
+future contracts (e.g. `2026-09-navigation-regroup.md`, linked from the
+baseline sections it changes). Decision specs are not baselines — retire them
+once the baselines fully cover the behavior they describe.
+
 ## Frontend reference specs
 
 These specs capture reusable UI and interaction patterns and should be consulted

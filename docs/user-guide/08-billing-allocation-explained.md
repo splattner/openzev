@@ -268,7 +268,7 @@ nothing is billed twice.
 
 **VAT:**
 - Applied only if ZEV has a VAT number configured
-- Rate selected by invoice period end date from [Admin Console → VAT Settings](14-admin-console.md#vat-settings)
+- Rate selected by invoice period end date from [Platform → System Settings → VAT](14-admin-console.md#vat-settings)
 - If no rate is active, VAT defaults to 0%
 
 **Final total:**

@@ -206,5 +206,5 @@ Participant records are kept permanently for:
 ## Next Steps
 
 - **Assign metering points:** [Metering Points](04-metering-points.md)
-- **Import consumption data:** [Metering Data Import](05-metering-import.md)
+- **Import consumption data:** [Metering Imports](05-metering-import.md)
 - **Check billing:** [How Energy Allocation Works](08-billing-allocation-explained.md)

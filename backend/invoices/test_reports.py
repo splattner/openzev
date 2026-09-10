@@ -11,6 +11,7 @@ now (ADR 0017); its endpoint, lifecycle, expiry and archive-content tests live
 in ``exports/tests.py`` alongside the job model.
 """
 
+import uuid
 from datetime import date, datetime
 from datetime import timezone as dt_timezone
 from decimal import Decimal
@@ -20,6 +21,7 @@ from rest_framework.test import APIClient
 
 from accounts.models import UserRole
 from testing.helpers import authenticate as auth, make_user
+from zev.models import Participant
 
 from .test_helpers import make_participant, make_zev
 
@@ -119,6 +121,38 @@ class AnnualStatementTests(ReportTestCase):
         self.client.credentials()
 
         self.assertEqual(self.client.get(ANNUAL_STATEMENT, {"year": 2026}).status_code, 401)
+
+    def test_me_label_agrees_with_statement_for_multiple_memberships(self):
+        """Surname ordering and UUID ordering disagree here; both reads must
+        serve the ``Aar`` membership's community."""
+        puser = make_user("rpt_multi", UserRole.PARTICIPANT)
+        Participant.objects.create(
+            id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
+            zev=self.other_zev,
+            user=puser,
+            first_name="Zed",
+            last_name="Zulu",
+            email="zed@example.com",
+            valid_from=date(2026, 1, 1),
+        )
+        Participant.objects.create(
+            id=uuid.UUID("ffffffff-ffff-ffff-ffff-ffffffffffff"),
+            zev=self.zev,
+            user=puser,
+            first_name="Anna",
+            last_name="Aar",
+            email="anna@example.com",
+            valid_from=date(2026, 1, 1),
+        )
+
+        auth(self.client, puser)
+        me = self.client.get("/api/v1/auth/me/")
+        self.assertEqual(me.status_code, 200)
+        self.assertEqual(me.data["zev_name"], "Report ZEV")
+
+        statement = self.client.get(ANNUAL_STATEMENT, {"year": 2026})
+        self.assertEqual(statement.status_code, 200)
+        self.assertIn("annual-statement-2026-Aar.pdf", statement["Content-Disposition"])
 
 
 class FinancialSummaryTests(ReportTestCase):

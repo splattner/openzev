@@ -4,10 +4,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, createElement } from 'react'
 import { FeasibilityCalculatorPage } from '../src/pages/FeasibilityCalculatorPage'
 
-// jsdom does not enable the React act() environment by default; without this
-// flag every act() call warns and deferred work is not flushed reliably.
-globalThis.IS_REACT_ACT_ENVIRONMENT = true
-
 const t = (key: string) => key
 const { calculateFeasibility } = vi.hoisted(() => ({ calculateFeasibility: vi.fn() }))
 

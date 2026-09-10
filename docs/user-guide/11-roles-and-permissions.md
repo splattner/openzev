@@ -173,7 +173,7 @@ has no access to a ZEV's data until an admin links it to a participant.
 
 ![Admin accounts page](screenshots/11-admin-accounts.png)
 
-1. Go to **Admin → Accounts**
+1. Go to **Platform → Accounts**
 2. Click **Create New Account**
 3. Enter:
    - **Email** (login credential)
@@ -186,7 +186,7 @@ User receives invitation email with password setup link.
 
 ### Update User Role
 
-1. Go to **Admin → Accounts**
+1. Go to **Platform → Accounts**
 2. Click on user name
 3. Click **Edit**
 4. Change **Role** or **ZEV Assignments**
@@ -196,7 +196,7 @@ Changes take effect immediately.
 
 ### Remove User
 
-1. Go to **Admin → Accounts**
+1. Go to **Platform → Accounts**
 2. Click on user
 3. Click **Deactivate**
 

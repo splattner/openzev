@@ -96,7 +96,7 @@ export function PageSkeleton({ variant }: PageSkeletonProps) {
         )
     }
 
-    // page — eyebrow + title + KPI row + 2 cards (for full-page RouteFallback)
+    // page — eyebrow + title + KPI row + 2 cards
     return (
         <div className="page-stack">
             <div>

@@ -220,7 +220,7 @@ label {
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  gap: 2rem;
+  gap: 1.25rem;
   padding: 2rem;
   background: var(--sidebar-bg);
   color: var(--white);
@@ -228,7 +228,8 @@ label {
   height: 100dvh;
   position: sticky;
   top: 0;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 .sidebar.collapsed {
@@ -245,13 +246,38 @@ label {
   gap: 1.5rem;
   flex: 1;
   min-width: 0;
-  min-height: 0;
+  min-height: 4.5rem;
   overflow-x: hidden;
   overflow-y: auto;
   padding-right: 0.25rem;
   scrollbar-width: thin;
   scrollbar-color: rgba(148, 163, 184, 0.5) transparent;
   align-content: start;
+}
+
+.sidebar-fixed {
+  display: grid;
+  gap: 1rem;
+  flex-shrink: 1;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  grid-template-rows: auto minmax(0, auto);
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.5) transparent;
+}
+
+.sidebar-fixed::-webkit-scrollbar {
+  width: 8px;
+}
+
+.sidebar-fixed::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.45);
+  border-radius: 999px;
+}
+
+.sidebar-fixed::-webkit-scrollbar-track {
+  background: transparent;
 }
 
 .sidebar-top::-webkit-scrollbar {
@@ -280,7 +306,9 @@ label {
 }
 
 .sidebar-logo {
-  width: min(100%, 280px);
+  max-width: 150px;
+  max-height: clamp(56px, 17dvh, 150px);
+  width: auto;
   height: auto;
   display: block;
   margin: 0 auto;
@@ -321,32 +349,29 @@ label {
 
 .nav-list {
   display: grid;
-  gap: 0.5rem;
+  gap: 0.35rem;
   min-width: 0;
 }
 
-.nav-link,
-.nav-toggle {
+.nav-link {
   width: 100%;
   min-width: 0;
   display: flex;
   align-items: center;
   gap: 0.8rem;
-  padding: 0.9rem 1rem;
-  min-height: 2.75rem;
+  padding: 0.55rem 0.85rem;
+  min-height: 2.4rem;
   border-radius: 0.9rem;
   color: var(--brand-accent);
   transition: background 0.2s ease, color 0.2s ease;
 }
 
-.nav-link:hover,
-.nav-toggle:hover {
+.nav-link:hover {
   background: rgba(255, 255, 255, 0.08);
   color: var(--white);
 }
 
-.nav-link.active,
-.nav-toggle.active {
+.nav-link.active {
   background: var(--sidebar-active);
   color: var(--brand-deep);
   font-weight: 650;
@@ -355,24 +380,8 @@ label {
 
 .nav-section {
   display: grid;
-  gap: 0.4rem;
+  gap: 0.3rem;
   min-width: 0;
-}
-
-.nav-toggle {
-  border: 0;
-  background: transparent;
-  justify-content: space-between;
-  cursor: pointer;
-  text-align: left;
-}
-
-.nav-toggle-main {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.8rem;
-  min-width: 0;
-  flex: 1;
 }
 
 .nav-icon {
@@ -396,27 +405,140 @@ label {
   text-overflow: ellipsis;
 }
 
-.nav-caret {
-  font-size: 1.1rem;
-  line-height: 1;
-}
-
-.nav-sublist {
-  display: grid;
-  gap: 0.4rem;
-  padding-left: 1rem;
-  min-width: 0;
-}
-
-.nav-sublist .nav-link {
-  padding: 0.75rem 0.9rem;
-  font-size: 0.95rem;
+/* First labelled group — same clearance as nav-standalone, no divider. */
+.nav-section-start {
+  margin-top: 1rem;
 }
 
 .nav-section-end {
   margin-top: 0.75rem;
-  padding-top: 0.75rem;
+  padding-top: 0.6rem;
   border-top: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+.nav-standalone {
+  margin-top: 1rem;
+}
+
+.nav-group-label {
+  padding: 0.35rem 0.85rem 0.1rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--brand-accent);
+  opacity: 0.75;
+}
+
+.sidebar-zev-menu {
+  margin-bottom: 0.25rem;
+}
+
+/* Inline expander — the sidebar clips floating content; override the
+ * header-era trigger width so the switcher fits the column. */
+.sidebar-zev-menu,
+.sidebar-zev-menu .user-menu-trigger,
+.sidebar-zev-menu .zev-menu-dropdown {
+  min-width: 0;
+  width: 100%;
+}
+
+.sidebar-zev-menu .user-menu-trigger {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(148, 163, 184, 0.3);
+}
+.sidebar-zev-menu .user-meta strong { color: var(--white); }
+.sidebar-zev-menu .user-meta small { color: rgba(255, 255, 255, 0.7); }
+.sidebar-zev-menu .user-meta { min-width: 0; }
+.sidebar-zev-menu .user-meta strong,
+.sidebar-zev-menu .user-meta small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sidebar-zev-menu .user-menu-dropdown {
+  position: static;
+  margin-top: 0.35rem;
+  min-height: 12rem;
+}
+
+.sidebar-zev-menu,
+.sidebar-zev-menu .user-menu-section {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.sidebar-zev-menu .user-menu-dropdown {
+  display: flex;
+  flex-direction: column;
+}
+.sidebar-zev-menu .user-menu-trigger,
+.sidebar-zev-menu .user-menu-section-title {
+  flex-shrink: 0;
+}
+.sidebar-zev-menu .user-menu-dropdown,
+.sidebar-zev-menu .user-menu-section,
+.zev-dropdown-list {
+  flex: 1 1 auto;
+}
+
+.shell-collapsed .sidebar-zev-menu .user-meta { display: none; }
+.shell-collapsed .sidebar-zev-menu .user-menu-trigger {
+  justify-content: center;
+  padding: 0.5rem;
+}
+/* Hide the list in the collapsed sidebar. */
+.shell-collapsed .sidebar-zev-menu .user-menu-dropdown { display: none; }
+
+/* Platform scope: switcher unmounted, group-label tint stays readable. */
+.shell-scope-platform .nav-group-label {
+  color: var(--white);
+  opacity: 0.85;
+}
+
+/* Scope chip — shared flex/truncation base; context modifiers below. */
+.sidebar-scope-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.55rem 0.75rem;
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.sidebar-scope-chip .nav-icon {
+  flex-shrink: 0;
+}
+
+.sidebar-scope-chip-label {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* Sidebar twin: full-width platform indicator replacing the switcher. */
+.sidebar-scope-chip {
+  width: 100%;
+  min-height: 2.4rem;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  border-radius: 0.9rem;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--white);
+}
+
+.sidebar-scope-chip .nav-icon {
+  color: var(--gold);
+}
+
+.shell-collapsed .sidebar-scope-chip {
+  justify-content: center;
+  padding: 0.5rem;
+}
+
+.shell-collapsed .sidebar-scope-chip-label {
+  display: none;
 }
 
 .sidebar-footer {
@@ -474,18 +596,13 @@ label {
   width: 3rem;
 }
 
-.shell-collapsed .nav-link,
-.shell-collapsed .nav-toggle {
+.shell-collapsed .nav-link {
   justify-content: center;
   padding: 0.9rem 0.75rem;
 }
 
 .shell-collapsed .nav-label,
-.shell-collapsed .nav-caret {
-  display: none;
-}
-
-.shell-collapsed .nav-sublist {
+.shell-collapsed .nav-group-label {
   display: none;
 }
 
@@ -498,7 +615,7 @@ label {
   align-items: center;
   gap: 0.75rem;
   justify-content: flex-end;
-  margin-bottom: 1rem;
+  margin-bottom: 0.5rem;
 }
 
 .impersonation-banner {
@@ -517,16 +634,9 @@ label {
   padding: 0.35rem 0.65rem;
 }
 
-.zev-menu {
-  min-width: 340px;
-}
-
-.zev-menu-dropdown {
-  min-width: 340px;
-}
-
 .zev-dropdown-list {
-  max-height: 220px;
+  max-height: min(220px, 30dvh);
+  min-height: 2.75rem;
   overflow-y: auto;
   display: grid;
   gap: 0.35rem;
@@ -2370,7 +2480,6 @@ input.recurrence-chip-input {
     transform: translateX(-100%);
     transition: transform 0.25s ease;
     padding: 1.5rem;
-    overflow-y: auto;
   }
 
   .sidebar.mobile-open {
@@ -2410,13 +2519,8 @@ input.recurrence-chip-input {
     gap: 0.5rem;
   }
 
-  /* User/ZEV menu triggers: remove fixed min-width */
+  /* User menu trigger: remove fixed min-width */
   .user-menu-trigger {
-    min-width: 0;
-  }
-
-  .zev-menu,
-  .zev-menu-dropdown {
     min-width: 0;
   }
 

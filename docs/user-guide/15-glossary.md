@@ -96,7 +96,7 @@ Higher price per kWh during peak hours (e.g., 06:00–22:00). Used in time-of-us
 ## I
 
 **Import**
-Process of uploading metering data (CSV, Excel, SDAT-CH) into OpenZEV. See [Metering Import](05-metering-import.md).
+Process of uploading metering data (CSV, Excel, SDAT-CH) into OpenZEV. See [Metering Imports](05-metering-import.md).
 
 **Invoice**
 Bill generated for a participant covering a billing period. Contains energy charges and fixed fees. See [Invoice Management](09-invoice-management.md).
@@ -153,7 +153,7 @@ Granularity of metering readings: hourly (1 reading per hour), daily (1 per day)
 ## S
 
 **SDAT-CH**
-Swiss standard for metering data exchange. OpenZEV supports SDAT-CH uploads. See [Metering Import](05-metering-import.md).
+Swiss standard for metering data exchange. OpenZEV supports SDAT-CH uploads. See [Metering Imports](05-metering-import.md).
 
 **Self-Consumption / Self-Sufficiency**
 The fraction of local energy vs. total consumption. Example: 60 kWh local ÷ 100 kWh total = 60% self-consumption.
@@ -180,7 +180,7 @@ Specific point in time when a reading was recorded (e.g., 2026-01-15 14:00:00).
 
 **Timezone**
 Offset used to interpret a timestamp. Readings are stored on the UTC timeline;
-there is no timezone selector in the import UI. See [Metering Import](05-metering-import.md#timestamp-handling).
+there is no timezone selector in the import UI. See [Metering Imports](05-metering-import.md#timestamp-handling).
 
 ## V
 

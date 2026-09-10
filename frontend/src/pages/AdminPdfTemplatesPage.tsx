@@ -762,7 +762,7 @@ export function AdminPdfTemplatesPage() {
     return (
         <div className="page-stack">
             <header>
-                <p className="eyebrow">{t('nav.adminConsole')}</p>
+                <p className="eyebrow">{t('nav.platformScope')}</p>
                 <h2>{t('admin.pdfTemplates')}</h2>
                 <p className="muted">
                     {t('admin.pdfTemplatesDescription')}

@@ -82,12 +82,12 @@ docker compose logs
 ### "Metering point not found" on import
 
 Import fails because a metering point ID in the file doesn't exist. See
-[Metering Data Import → Handling Import Errors](05-metering-import.md#handling-import-errors).
+[Metering Imports → Handling Import Errors](05-metering-import.md#handling-import-errors).
 
 ### "Timestamp outside validity period"
 
 Readings are rejected because the timestamp falls outside the meter's assignment
-validity window. See [Metering Data Import](05-metering-import.md) and
+validity window. See [Metering Imports](05-metering-import.md) and
 [Metering Points → Assignment Validity](04-metering-points.md#assignment-validity-periods).
 
 ### Import hangs or times out
@@ -117,10 +117,10 @@ Many meters show "Missing". Diagnose the gaps with
 **Problem:** Generate invoices button disabled or returns error.
 
 **Checks:**
-1. Metering data imported? Check **Metering Data → Charting**
+1. Metering data imported? Check **Metering → Chart**
 2. Tariffs configured? Check **Tariffs**
 3. Participants active? Check **Participants**
-4. Data quality OK? Check **Metering Data → Data Quality**
+4. Data quality OK? Check **Metering → Data Quality**
 
 ### Invoice totals seem wrong
 
@@ -265,6 +265,6 @@ When reporting issues, include:
 
 ## Next Steps
 
-- Review specific guide for your issue (e.g., [Metering Import](05-metering-import.md))
+- Review specific guide for your issue (e.g., [Metering Imports](05-metering-import.md))
 - Check [Email Configuration](10-email-configuration.md) for email issues
 - Visit [GitHub Issues](https://github.com/splattner/openzev/issues) to search for your issue or report new ones

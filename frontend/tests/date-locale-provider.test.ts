@@ -17,21 +17,8 @@ describe('CivilDateInput under DateLocaleProvider', () => {
     let root: ReturnType<typeof createRoot>
 
     beforeEach(() => {
-        ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
-        // MantineProvider reads prefers-color-scheme; jsdom has no matchMedia.
-        Object.defineProperty(window, 'matchMedia', {
-            writable: true,
-            value: (query: string) => ({
-                matches: false,
-                media: query,
-                onchange: null,
-                addListener: () => undefined,
-                removeListener: () => undefined,
-                addEventListener: () => undefined,
-                removeEventListener: () => undefined,
-                dispatchEvent: () => false,
-            }),
-        })
+        // matchMedia (MantineProvider reads prefers-color-scheme) comes from
+        // tests/setup.ts.
         container = document.createElement('div')
         document.body.appendChild(container)
         root = createRoot(container)

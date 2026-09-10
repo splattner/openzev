@@ -70,4 +70,11 @@ describe('locale parity and integrity', () => {
       }
     }
   })
+
+  it('uses Accounts (not Accounts & Participants) for the admin users page', () => {
+    expect(en.nav.adminAccounts).toBe('Accounts')
+    expect(de.nav.adminAccounts).toBe('Konten')
+    expect(fr.nav.adminAccounts).toBe('Comptes')
+    expect(itLocale.nav.adminAccounts).toBe('Account')
+  })
 })

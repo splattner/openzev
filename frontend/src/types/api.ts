@@ -13,6 +13,10 @@ export interface User {
     last_name: string
     role: UserRole
     must_change_password: boolean
+    /** Participants only: name of their community (from /auth/me). */
+    zev_name?: string | null
+    /** Participants only: number of held memberships (from /auth/me). */
+    zev_count?: number | null
     /** Present when this session is an impersonation session. */
     impersonated_by?: User
 }

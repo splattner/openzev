@@ -1,0 +1,163 @@
+import { describe, it, expect, vi } from 'vitest'
+import { createElement } from 'react'
+import { createRoot } from 'react-dom/client'
+import { act } from 'react'
+import { MemoryRouter, Outlet } from 'react-router-dom'
+import { MantineProvider } from '@mantine/core'
+import { AppRoutes } from '../src/components/AppRoutes'
+import type { UserRole } from '../src/types/api'
+
+vi.mock('react-i18next', () => ({
+    useTranslation: () => ({
+        t: (k: string) => k,
+        i18n: { language: 'en', changeLanguage: vi.fn() },
+    }),
+}))
+
+const mockAuth = vi.fn()
+
+vi.mock('../src/lib/auth', () => ({
+    useAuth: () => mockAuth(),
+}))
+
+vi.mock('../src/lib/managedZev', () => ({
+    ManagedZevProvider: (props: { children: unknown }) => props.children,
+    useManagedZev: () => ({}),
+}))
+
+vi.mock('../src/components/Layout', () => ({
+    Layout: () => createElement(Outlet),
+}))
+
+function marker(id: string) {
+    return () => createElement('div', { 'data-testid': `page-${id}` }, id)
+}
+
+vi.mock('../src/pages/DashboardPage', () => ({ DashboardPage: marker('dashboard') }))
+vi.mock('../src/pages/AccountProfilePage', () => ({ AccountProfilePage: marker('account') }))
+vi.mock('../src/pages/AdminDashboardPage', () => ({ AdminDashboardPage: marker('admin') }))
+vi.mock('../src/pages/AdminSystemSettingsPage', () => ({ AdminSystemSettingsPage: marker('admin-system-settings') }))
+vi.mock('../src/pages/AdminPdfTemplatesPage', () => ({ AdminPdfTemplatesPage: marker('admin-pdf-templates') }))
+vi.mock('../src/pages/AdminEmailTemplatesPage', () => ({ AdminEmailTemplatesPage: marker('admin-email-templates') }))
+vi.mock('../src/pages/AdminInvoicesPage', () => ({ AdminInvoicesPage: marker('admin-invoices') }))
+vi.mock('../src/pages/AdminAuditLogsPage', () => ({ AuditLogsPage: marker('audit-logs') }))
+vi.mock('../src/pages/AdminAccountsPage', () => ({ AdminAccountsPage: marker('admin-accounts') }))
+vi.mock('../src/pages/AdminApiKeysPage', () => ({ AdminApiKeysPage: marker('admin-api-keys') }))
+vi.mock('../src/pages/ZevListPage', () => ({ ZevListPage: marker('admin-zevs') }))
+vi.mock('../src/pages/ParticipantsPage', () => ({ ParticipantsPage: marker('participants') }))
+vi.mock('../src/pages/ZevSettingsPage', () => ({ ZevSettingsPage: marker('zev-settings') }))
+vi.mock('../src/pages/MeteringPointsPage', () => ({ MeteringPointsPage: marker('metering-points') }))
+vi.mock('../src/pages/MeteringChartPage', () => ({ MeteringChartPage: marker('metering-chart') }))
+vi.mock('../src/pages/TariffsPage', () => ({ TariffsPage: marker('tariffs') }))
+vi.mock('../src/pages/InvoicesPage', () => ({ InvoicesPage: marker('invoices') }))
+vi.mock('../src/pages/InvoiceDetailPage', () => ({ InvoiceDetailPage: marker('invoice-detail') }))
+vi.mock('../src/pages/ReportsPage', () => ({ ReportsPage: marker('reports') }))
+vi.mock('../src/pages/FeasibilityCalculatorPage', () => ({ FeasibilityCalculatorPage: marker('feasibility') }))
+vi.mock('../src/pages/ImportsPage', () => ({ ImportsPage: marker('imports') }))
+vi.mock('../src/pages/LoginPage', () => ({ LoginPage: marker('login') }))
+vi.mock('../src/pages/VerifyEmailPage', () => ({ VerifyEmailPage: marker('verify-email') }))
+vi.mock('../src/pages/OAuthCallbackPage', () => ({ OAuthCallbackPage: marker('oauth') }))
+vi.mock('../src/pages/NotFoundPage', () => ({ NotFoundPage: marker('not-found') }))
+
+function mockRole(role: UserRole) {
+    mockAuth.mockReturnValue({
+        isAuthenticated: true,
+        isLoading: false,
+        isImpersonating: false,
+        impersonator: null,
+        user: {
+            id: 7,
+            username: `${role}@example.com`,
+            email: `${role}@example.com`,
+            first_name: '',
+            last_name: '',
+            role,
+            must_change_password: false,
+        },
+    })
+}
+
+async function renderPath(path: string) {
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+    const root = createRoot(container)
+    await act(async () => {
+        root.render(
+            createElement(
+                MemoryRouter,
+                { initialEntries: [path] },
+                // Mantine context for the lazy-loading fallback (PageSkeleton).
+                createElement(MantineProvider, null, createElement(AppRoutes)),
+            ),
+        )
+    })
+    return {
+        shows: (id: string) => container.querySelector(`[data-testid="page-${id}"]`) !== null,
+        unmount: () => {
+            act(() => root.unmount())
+            container.remove()
+        },
+    }
+}
+
+// path → [page marker when allowed] × per-role expectation.
+// DENY lands on "/" (dashboard marker) via ProtectedRoute — that is what
+// makes a wrong guard fail here instead of staying green.
+const MATRIX: Array<{ path: string; marker: string; allow: Record<UserRole, boolean> }> = [
+    { path: '/metering/chart', marker: 'metering-chart', allow: { admin: true, zev_owner: true, participant: true } },
+    { path: '/metering/quality', marker: 'metering-chart', allow: { admin: true, zev_owner: true, participant: false } },
+    { path: '/metering/imports', marker: 'imports', allow: { admin: true, zev_owner: true, participant: false } },
+    { path: '/metering-points', marker: 'metering-points', allow: { admin: true, zev_owner: true, participant: true } },
+    { path: '/billing/invoices', marker: 'invoices', allow: { admin: true, zev_owner: true, participant: false } },
+    { path: '/billing/invoices/42', marker: 'invoice-detail', allow: { admin: true, zev_owner: true, participant: true } },
+    { path: '/me/statement', marker: 'reports', allow: { admin: false, zev_owner: false, participant: true } },
+    { path: '/reports', marker: 'reports', allow: { admin: true, zev_owner: true, participant: true } },
+    { path: '/participants', marker: 'participants', allow: { admin: true, zev_owner: true, participant: false } },
+    { path: '/tariffs', marker: 'tariffs', allow: { admin: true, zev_owner: true, participant: false } },
+    { path: '/zev-settings', marker: 'zev-settings', allow: { admin: true, zev_owner: true, participant: false } },
+    { path: '/feasibility', marker: 'feasibility', allow: { admin: true, zev_owner: true, participant: false } },
+    { path: '/account', marker: 'account', allow: { admin: true, zev_owner: true, participant: true } },
+    { path: '/audit-logs', marker: 'audit-logs', allow: { admin: true, zev_owner: true, participant: false } },
+    { path: '/admin/audit-logs', marker: 'audit-logs', allow: { admin: true, zev_owner: false, participant: false } },
+    { path: '/admin', marker: 'admin', allow: { admin: true, zev_owner: false, participant: false } },
+    { path: '/admin/system-settings', marker: 'admin-system-settings', allow: { admin: true, zev_owner: false, participant: false } },
+    { path: '/admin/accounts', marker: 'admin-accounts', allow: { admin: true, zev_owner: false, participant: false } },
+    { path: '/admin/api-keys', marker: 'admin-api-keys', allow: { admin: true, zev_owner: false, participant: false } },
+    { path: '/admin/zevs', marker: 'admin-zevs', allow: { admin: true, zev_owner: false, participant: false } },
+    { path: '/admin/invoices', marker: 'admin-invoices', allow: { admin: true, zev_owner: false, participant: false } },
+    { path: '/admin/pdf-templates', marker: 'admin-pdf-templates', allow: { admin: true, zev_owner: false, participant: false } },
+    { path: '/admin/email-templates', marker: 'admin-email-templates', allow: { admin: true, zev_owner: false, participant: false } },
+    // Legacy admin redirects inherit the target's guard: admins land on the
+    // target page, everyone else lands on / via the target guard (no bypass).
+    { path: '/admin/settings/regional', marker: 'admin-system-settings', allow: { admin: true, zev_owner: false, participant: false } },
+    { path: '/admin/settings/vat', marker: 'admin-system-settings', allow: { admin: true, zev_owner: false, participant: false } },
+    { path: '/admin/features', marker: 'admin-system-settings', allow: { admin: true, zev_owner: false, participant: false } },
+    { path: '/admin/oauth', marker: 'admin-system-settings', allow: { admin: true, zev_owner: false, participant: false } },
+    { path: '/metering', marker: 'metering-chart', allow: { admin: true, zev_owner: true, participant: true } },
+    { path: '/billing', marker: 'invoices', allow: { admin: true, zev_owner: true, participant: false } },
+    { path: '/invoices', marker: 'invoices', allow: { admin: true, zev_owner: true, participant: false } },
+    { path: '/invoices/42', marker: 'invoice-detail', allow: { admin: true, zev_owner: true, participant: true } },
+    { path: '/imports', marker: 'imports', allow: { admin: true, zev_owner: true, participant: false } },
+    { path: '/metering-data?tab=quality', marker: 'metering-chart', allow: { admin: true, zev_owner: true, participant: false } },
+    { path: '/metering-data?metering_point=7', marker: 'metering-chart', allow: { admin: true, zev_owner: true, participant: true } },
+]
+
+describe('route guard matrix (tests AppRoutes, not the guard in isolation)', () => {
+    it.each(MATRIX)('$path', async (row) => {
+        const roles: UserRole[] = ['admin', 'zev_owner', 'participant']
+        for (const role of roles) {
+            mockRole(role)
+            const page = await renderPath(row.path)
+            if (row.allow[role]) {
+                expect(page.shows(row.marker)).toBe(true)
+                if (row.marker !== 'dashboard') {
+                    expect(page.shows('dashboard')).toBe(false)
+                }
+            } else {
+                expect(page.shows(row.marker)).toBe(false)
+                expect(page.shows('dashboard')).toBe(true)
+            }
+            page.unmount()
+        }
+    })
+})

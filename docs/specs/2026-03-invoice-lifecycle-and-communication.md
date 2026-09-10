@@ -245,7 +245,7 @@ the same module.
 #### Annual statement / financial summary downloads (frontend location)
 
 The single-document endpoints below and the export-job endpoints are consumed
-from the **/reports** route (`frontend/src/pages/ReportsPage.tsx`). The
+from the **/reports** route (`frontend/src/pages/ReportsPage.tsx`) — the owner/admin Reports view; participants reach the same page (participant branch) via **/me/statement** in the sidebar. The
 whole-ZEV ZIP is produced asynchronously: the frontend creates an export job,
 polls its status, and downloads the artifact when it completes (§8.1,
 ADR 0017).
@@ -256,7 +256,11 @@ ADR 0017).
 | `GET` | `/invoices/invoices/financial-summary/` | Authenticated (optional `zev_id` / `participant_id`) | Both roles: `downloadFinancialSummary({year, zev_id?})` — `zev_id` supplied for admin/owner, omitted for participant |
 
 Role branches mirror the former dashboard behavior. The old synchronous
-`GET /invoices/invoices/annual-statements-zip/` endpoint is gone.
+`GET /invoices/invoices/annual-statements-zip/` endpoint is gone. Participant self-service
+resolves to the shared self-service membership
+(`zev.services.own_participant_for_user`) — the same record named by
+`zev_name` on `GET /auth/me/` — so the label and the downloaded document
+always agree, including for multi-membership users.
 
 **Whole-ZEV annual-statement ZIP — export jobs** (`/api/v1/exports/`):
 
@@ -266,7 +270,6 @@ Role branches mirror the former dashboard behavior. The old synchronous
 | `GET` | `/exports/jobs/` | Requester only + ZEV readable | The caller's own jobs for ZEVs they may still read, newest first (optional `export_type` / `zev_id` filters, `limit` ≤ 100). The frontend restores an in-flight or completed export after a reload by reading the newest matching job |
 | `GET` | `/exports/jobs/{id}/` | Requester only + ZEV readable | Job status payload: `status`, `params`, counts, `file_expires_at`, computed `expired`, safe `error_message`. `404` for others' jobs, `403` once the ZEV is no longer readable |
 | `GET` | `/exports/jobs/{id}/download/` | Requester only + ZEV readable | Streams the completed ZIP (`Content-Disposition: attachment; filename="annual-statements-{year}.zip"`); `404` when not `completed`, `410` when expired |
-
 
 ### 5.5 Period overview
 
@@ -768,8 +771,7 @@ Strips legacy period suffixes from `description` on serialization.
 | `test_engine_edge_cases.py` | `InvoiceVatRateSelectionTests` | VAT rate active at period_end, zero VAT when no vat_number |
 | `test_email_formatting.py` | `InvoiceEmailFormattingTests` | §7.1–7.2: date format in email body, custom ZEV templates, auto-transition to sent |
 | `test_email_task.py` | 5 function-based tests | §7.2: missing invoice no-ops, no recipient skips with failed log, success records sent log and transitions status, failure marks log failed and retries, draft stays draft after send |
-| `test_batch_actions.py` | `TestInvoiceBatchActions`, `TestBulkGenerationTasks`, `TestPdfsAreProducedWithTheInvoice`, `TestBulkGenerationIsolatesPerParticipantFailures`, `TestInvoiceRetryEmailAction` | §5.4: approve-all approves only period drafts, send-all queues only approved invoices with recipient, cross-owner ZEV rejection, download-pdfs 404/ZIP; §5.2: background task dispatch, invoice-number rollback, partial-outcome audits, aborted-batch audit events (`"aborted": true`, `"phase"` creation/rendering), serial soft-time-limit propagation, shared invoice-build failure reporting, and PDF-context reuse/failure; §7.3: retry-email validation and dispatch |
-| `test_reports.py` | `AnnualStatementTests` (10), `FinancialSummaryTests` (6), `MalformedInputTests` (5), `AnnualStatementMonthlyDataTests` (3) | §5.4/§8.2: single-statement report permissions and self-service scoping, malformed/out-of-range input handling, financial-summary fallbacks, and per-timestamp monthly data attribution (ADR 0013). The whole-ZEV ZIP tests moved to `exports/tests.py` with the job flow |
+| `test_reports.py` | `AnnualStatementTests` (11), `FinancialSummaryTests` (6), `MalformedInputTests` (5), `AnnualStatementMonthlyDataTests` (3) | §5.4/§8.2: single-statement report permissions and self-service scoping, malformed/out-of-range input handling, financial-summary fallbacks, `/auth/me` label-vs-download agreement for multi-membership users, and per-timestamp monthly data attribution (ADR 0013). The whole-ZEV ZIP tests moved to `exports/tests.py` with the job flow |
 | `exports/tests.py` | `ExportJobCreateTests` (17), `ExportJobListTests` (4), `ExportJobRunnerTests` (11), `ExportJobDownloadTests` (6), `ExportJobSweepTests` (5), `AnnualStatementExportBuilderTests` (13), `AnnualStatementExportRealRenderTests` (1, slow) | §5.4/§8.1 (ADR 0017): `202` creation with year/participant validation and `queued` audit, unknown or malformed `zev_id` → `404`, in-flight dedupe on the full validated params dict across any matching active job (not just the newest), per-type audit display/summaries/metadata from `ExportDefinition`, enqueue-after-commit wiring, enqueue failure → `503` + `failed`, requester-scoped list/status/download (including loss of ZEV ownership), task-level soft/hard time limits, one-claim duplicate delivery, retention anchored at completion, late completion never resurrecting a swept-failed job, soft time limits aborting a mid-batch render without publishing a (partial) ZIP, partial → completed with `omitted.txt` manifest and counts, all-fail / unexpected / publish failures → `failed` without an artifact, expired → `410` + `expired` flag, sweep file deletion with metadata retention, stale running / lost queued recovery that never fails a job claimed meanwhile (backlog-safe queued window), ZIP entry byte-budget + sanitization rules with pk appended only on collisions (including a final guard against readable names mimicking a pk-suffixed entry), storage roundtrip, and one real-render end-to-end job |
 | `test_invoice_numbering.py` | `TestNumberingIsScopedToTheZev`, `TestDuplicatesWithinOneZevAreStillRejected` | §4.1: two ZEVs on the default `INV` prefix both bill and each counts from 1; a duplicate number within one ZEV is refused at the database level (`bulk_create` bypasses `save()`) |
 | `test_serializers.py` | `InvoiceDescriptionSerializationTests` | §8.9: period suffix stripping in serializer |

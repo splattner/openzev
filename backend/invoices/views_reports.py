@@ -113,7 +113,9 @@ def _is_self_service(request) -> bool:
 
 
 def _own_participant(request) -> Participant | None:
-    return Participant.objects.filter(user=request.user).first()
+    from zev.services import own_participant_for_user
+
+    return own_participant_for_user(request.user)
 
 
 def _pdf_response(pdf_bytes: bytes, filename: str, *, disposition: str) -> HttpResponse:

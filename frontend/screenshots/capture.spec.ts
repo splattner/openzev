@@ -160,7 +160,7 @@ test.describe('User Guide Screenshots', () => {
 
   // 05 — Metering Data / Charts (with a metering point selected)
   test('05-metering-data', async ({ page }) => {
-    await navigateTo(page, '/metering-data')
+    await navigateTo(page, '/metering/chart')
     await page.waitForSelector('.card', { timeout: 10_000 })
     // Select the first metering point that can carry readings — skipping the
     // "whole ZEV total" option (value __zev_total__, see
@@ -228,7 +228,7 @@ test.describe('User Guide Screenshots', () => {
 
   // 08 — Invoices (period overview)
   test('08-invoices', async ({ page }) => {
-    await navigateTo(page, '/invoices')
+    await navigateTo(page, '/billing/invoices')
     await page.waitForSelector('.period-selector', { timeout: 10_000 })
     // The page opens on the last complete period — exactly where seed_demo
     // bills — so no period navigation here (see goToPreviousPeriod docstring).
@@ -259,7 +259,7 @@ test.describe('User Guide Screenshots', () => {
 
     // screenshotFull grows the viewport to the content height, so the embedded
     // PDF viewer — which Chromium only paints inside the viewport — renders.
-    await navigateTo(page, `/invoices/${invoice!.id}`)
+    await navigateTo(page, `/billing/invoices/${invoice!.id}`)
     await page.waitForSelector('.grid-4', { timeout: 10_000 })
     await page.waitForSelector('iframe[title]', { timeout: 15_000 })
     await page.waitForTimeout(3500)
@@ -270,7 +270,7 @@ test.describe('User Guide Screenshots', () => {
 
   // 09 — Imports
   test('09-imports', async ({ page }) => {
-    await navigateTo(page, '/imports')
+    await navigateTo(page, '/metering/imports')
     await page.waitForSelector('.card', { timeout: 10_000 })
     await screenshotFull(page, '09-imports')
   })
@@ -291,14 +291,14 @@ test.describe('User Guide Screenshots', () => {
 
   // 12 — Admin Regional Settings
   test('12-admin-regional-settings', async ({ page }) => {
-    await navigateTo(page, '/admin/settings/regional')
+    await navigateTo(page, '/admin/system-settings?tab=regional')
     await page.waitForSelector('form, .card', { timeout: 10_000 })
     await screenshotFull(page, '12-admin-regional-settings')
   })
 
-  // 13 — Admin VAT Settings (4th tab of System Settings; legacy URL redirects to it)
+  // 13 — Admin VAT Settings (4th tab of System Settings)
   test('13-admin-vat-settings', async ({ page }) => {
-    await navigateTo(page, '/admin/settings/vat')
+    await navigateTo(page, '/admin/system-settings?tab=vat')
     await page.waitForURL('**/admin/system-settings?tab=vat', { timeout: 10_000 })
     await page.waitForSelector('form, table, .card', { timeout: 10_000 })
     await screenshotFull(page, '13-admin-vat-settings')

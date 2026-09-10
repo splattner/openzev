@@ -19,7 +19,7 @@ Welcome to the OpenZEV user documentation. This guide covers everything you need
 
 ## Operations and Data Management
 
-- **[Metering Data Import](05-metering-import.md)** — CSV/Excel and SDAT-CH import workflows
+- **[Metering Imports](05-metering-import.md)** — CSV/Excel and SDAT-CH import workflows
 - **[Metering Analysis](06-metering-analysis.md)** — Charting, filtering, and data quality checks
 - **[Tariff Configuration](07-tariff-configuration.md)** — Set up tariffs, periods, and pricing, or import them from your grid operator
 
@@ -31,7 +31,7 @@ Welcome to the OpenZEV user documentation. This guide covers everything you need
 
 ## Administration
 
-- **[Admin Console](14-admin-console.md)** — ZEV management, regional settings, VAT, PDF templates, email templates, feature flags
+- **[Platform Administration](14-admin-console.md)** — ZEV management, accounts, regional settings, VAT, PDF templates, email templates, feature flags — grouped in the sidebar under **Platform**
 - **[ZEV Export and Import](17-zev-transfer.md)** — Move a whole community between instances as an archive
 
 ## Automation

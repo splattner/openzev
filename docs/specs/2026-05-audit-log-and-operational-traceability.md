@@ -93,7 +93,10 @@ The same read-only audit view is rendered in two scopes:
 
 - admin scope at `/admin/audit-logs`, with global visibility and search
   enabled,
-- owner scope at `/audit-logs`, with ZEV-scoped visibility and search disabled.
+- owner scope at `/audit-logs`, bound to the globally selected community
+  (no independent community selector; search disabled). Changing the
+  selection resets pagination and closes the open event drawer; no events
+  are requested before a valid selection exists.
 
 ### ZEV resolution rules
 
@@ -424,10 +427,11 @@ avoid noise.
 UI elements:
 
 1. Date range filters.
-2. ZEV select (options from `fetchAuditFilterOptions`/`queryKeys.admin.auditFilterOptions`;
-   derived from the audit queryset itself, so the options match the visible
-   event scope: owner scope shows only ZEVs the owner has events for, admin
-   scope all ZEVs with events).
+2. ZEV select, admin scope only (options from `fetchAuditFilterOptions`/
+   `queryKeys.admin.auditFilterOptions`, derived from the audit queryset
+   itself, so the options match the visible event scope). The owner scope
+   has no community selector: the request `zev` is the globally selected
+   community.
 3. Actor select (options from the same `fetchAuditFilterOptions` endpoint —
    distinct users who actually acted on visible events, including owners and
    admins; `id` + `username` only, no email or names; unrelated accounts never
@@ -686,6 +690,10 @@ create-only):
 **File:** `frontend/src/lib/api/audit.ts` (client), `frontend/src/pages/AdminAuditLogsPage.tsx` (page)
 
 - `frontend/tests/api-audit.test.ts` for client request/response handling.
+- `frontend/tests/audit-log-scope.test.ts` for the owner scope binding:
+  request carries the selected community, switching rescopes and resets
+  page/drawer, clearing filters keeps the scope, no request without a
+  selection, admin scope keeps its own selector.
 - Component/manual validation via `npm run lint`, `npm run build`, and
   `npm run test:unit`.
 

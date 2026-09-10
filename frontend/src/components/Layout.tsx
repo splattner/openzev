@@ -1,28 +1,37 @@
 import { type ReactNode, useEffect, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { Link, NavLink, Outlet, matchPath, useLocation, useMatch, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '../lib/auth'
 import { useManagedZev } from '../lib/managedZev'
 import { fetchUsers } from '../lib/api/auth'
 import { queryKeys } from '../lib/api/queryKeys'
-import type { UserRole } from '../types/api'
 import { LanguageSelector } from './LanguageSelector'
 import pkg from '../../package.json'
 
-/** Nav sections grouped under the "(v)ZEV verwalten" accordion. */
-const MANAGE_SECTION_PREFIXES = ['/participants', '/zev-settings', '/metering-points', '/metering-data']
-
-function isManageSectionPath(pathname: string): boolean {
-    return MANAGE_SECTION_PREFIXES.some((prefix) => pathname.startsWith(prefix))
-}
-
-/**
- * Nav visibility for /reports: admins and owners get the whole-ZEV view,
- * participants their own statement — matching the route's allowedRoles.
- */
-export function canSeeReports(role: UserRole | undefined): boolean {
-    return role === 'admin' || role === 'zev_owner' || role === 'participant'
+function SidebarLink({ to, label, icon, active, end, className }: {
+    to: string
+    label: string
+    icon: ReactNode
+    active?: boolean
+    end?: boolean
+    className?: string
+}) {
+    // Link, not NavLink: active state is computed here to control class + aria-current.
+    const { pathname } = useLocation()
+    const isActive = active ?? matchPath({ path: to, end: end ?? to === '/' }, pathname) != null
+    const ariaCurrent = isActive ? (pathname === to ? 'page' : 'true') : undefined
+    return (
+        <Link
+            to={to}
+            className={`nav-link${isActive ? ' active' : ''}${className ? ` ${className}` : ''}`}
+            title={label}
+            aria-current={ariaCurrent}
+        >
+            <span className="nav-icon">{icon}</span>
+            <span className="nav-label">{label}</span>
+        </Link>
+    )
 }
 
 export function Layout() {
@@ -39,8 +48,6 @@ export function Layout() {
     const [isUserMenuOpen, setIsUserMenuOpen] = useState(false)
     const [isZevMenuOpen, setIsZevMenuOpen] = useState(false)
     const [isStoppingImpersonation, setIsStoppingImpersonation] = useState(false)
-    const [isManageNavOpen, setIsManageNavOpen] = useState(isManageSectionPath(location.pathname))
-    const [isAdminNavOpen, setIsAdminNavOpen] = useState(location.pathname.startsWith('/admin'))
     const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
         if (typeof window === 'undefined') {
             return false
@@ -50,16 +57,6 @@ export function Layout() {
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
     const userMenuRef = useRef<HTMLDivElement | null>(null)
     const zevMenuRef = useRef<HTMLDivElement | null>(null)
-
-    useEffect(() => {
-        if (location.pathname.startsWith('/admin')) {
-            setIsAdminNavOpen(true)
-            setIsManageNavOpen(false)
-        } else if (isManageSectionPath(location.pathname)) {
-            setIsManageNavOpen(true)
-            setIsAdminNavOpen(false)
-        }
-    }, [location.pathname])
 
     useEffect(() => {
         window.localStorage.setItem('openzev.sidebarCollapsed', String(isSidebarCollapsed))
@@ -96,8 +93,13 @@ export function Layout() {
 
     const displayName = `${user?.first_name ?? ''} ${user?.last_name ?? ''}`.trim() || user?.username || ''
     const canManage = user?.role === 'admin' || user?.role === 'zev_owner'
-    const adminIsActive = location.pathname.startsWith('/admin')
-    const manageIsActive = isManageSectionPath(location.pathname)
+    const isParticipant = user?.role === 'participant'
+    // Hub entries light on their sub-routes; Imports (transitional) lights only itself.
+    const meteringChartMatch = useMatch('/metering/chart')
+    const meteringQualityMatch = useMatch('/metering/quality')
+    const meteringActive = meteringChartMatch != null || meteringQualityMatch != null
+    const billingMatch = useMatch('/billing/*')
+    const billingActive = billingMatch != null
 
     const ownerById = new Map((usersQuery.data ?? []).map((candidate) => [candidate.id, candidate]))
     const selectedZevOwner = selectedZev ? ownerById.get(selectedZev.owner) : undefined
@@ -106,15 +108,26 @@ export function Layout() {
         ? `${effectiveOwner.first_name} ${effectiveOwner.last_name}`.trim() || effectiveOwner.username
         : '-'
 
+    // /admin/*: platform scope. Switcher inert; ZEV entry goes through Manage on /admin/zevs.
+    const isPlatformScope = location.pathname.startsWith('/admin')
+
+    // Close the ZEV menu when entering platform scope.
+    useEffect(() => {
+        if (isPlatformScope) {
+            setIsZevMenuOpen(false)
+        }
+    }, [isPlatformScope])
+
     return (
-        <div className={`shell${isSidebarCollapsed ? ' shell-collapsed' : ''}`}>
+        <div className={`shell${isSidebarCollapsed ? ' shell-collapsed' : ''}${isPlatformScope ? ' shell-scope-platform' : ''}`}>
             {/* Mobile overlay */}
             <div
                 className={`sidebar-overlay${isMobileMenuOpen ? ' visible' : ''}`}
                 onClick={() => setIsMobileMenuOpen(false)}
             />
             <aside className={`sidebar${isSidebarCollapsed ? ' collapsed' : ''}${isMobileMenuOpen ? ' mobile-open' : ''}`}>
-                <div className="sidebar-top">
+                {/* Persistent scope context (replaces switcher on platform routes). */}
+                <div className="sidebar-fixed">
                     <div className="sidebar-brand-row">
                         <div className="sidebar-brand">
                             <img
@@ -134,208 +147,131 @@ export function Layout() {
                         </button>
                     </div>
 
+                    {/* Platform scope swaps the switcher for an explicit indicator. */}
+                    {canManage && isPlatformScope && (
+                        <div className="sidebar-scope-chip" title={t('nav.platformScope')}>
+                            <span className="nav-icon" aria-hidden="true"><PlatformIcon /></span>
+                            <span className="sidebar-scope-chip-label">{t('nav.platformScope')}</span>
+                        </div>
+                    )}
+
+                    {/* Exactly one managed community means there is nothing to
+                        switch — the page eyebrows carry the name instead. */}
+                    {canManage && !isPlatformScope && managedZevs.length !== 1 && (
+                        <div className="user-menu zev-menu sidebar-zev-menu" ref={zevMenuRef}>
+                            <button
+                                type="button"
+                                className="user-menu-trigger"
+                                aria-label={selectedZev?.name ? t('nav.manageZevFor', { name: selectedZev.name }) : t('nav.manageZev')}
+                                aria-expanded={isZevMenuOpen}
+                                aria-controls="zev-menu-list"
+                                onClick={() => {
+                                    // Auto-expand sidebar if collapsed before opening menu.
+                                    if (isSidebarCollapsed) {
+                                        setIsSidebarCollapsed(false)
+                                        setIsZevMenuOpen(true)
+                                    } else {
+                                        setIsZevMenuOpen((prev) => !prev)
+                                    }
+                                }}
+                            >
+                                <span className="user-avatar" aria-hidden="true">🏢</span>
+                                <span className="user-meta">
+                                    <strong>{selectedZev?.name || t('nav.noZevSelected')}</strong>
+                                    <small>{selectedZevOwnerName} · {effectiveOwner?.email || '-'}</small>
+                                </span>
+                            </button>
+
+                            {isZevMenuOpen && (
+                                <div className="user-menu-dropdown zev-menu-dropdown" id="zev-menu-list">
+                                    <div className="user-menu-section">
+                                        <div className="user-menu-section-title">{t('nav.manageZev')}</div>
+                                        <div className="zev-dropdown-list" role="group" aria-label={t('nav.manageZev')}>
+                                            {managedZevLoading ? (
+                                                <div className="zev-dropdown-item zev-dropdown-item-muted">{t('nav.loadingZevs')}</div>
+                                            ) : managedZevs.length === 0 ? (
+                                                <div className="zev-dropdown-item zev-dropdown-item-muted">{t('nav.noZevAvailable')}</div>
+                                            ) : (
+                                                managedZevs.map((zev) => {
+                                                    const isSelected = zev.id === selectedZevId
+                                                    return (
+                                                        <button
+                                                            key={zev.id}
+                                                            type="button"
+                                                            className={`zev-dropdown-item${isSelected ? ' active' : ''}`}
+                                                            onClick={() => {
+                                                                if (isSelectable) {
+                                                                    setSelectedZevId(zev.id)
+                                                                }
+                                                                setIsZevMenuOpen(false)
+                                                            }}
+                                                            disabled={!isSelectable && !isSelected}
+                                                            aria-current={isSelected ? 'true' : undefined}
+                                                        >
+                                                            {zev.name}
+                                                        </button>
+                                                    )
+                                                })
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
+
+                <div className="sidebar-top">
                     <nav className="nav-list">
-                        <NavLink
-                            to="/"
-                            className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}
-                            title={t('nav.dashboard')}
-                        >
-                            <span className="nav-icon"><DashboardIcon /></span>
-                            <span className="nav-label">{t('nav.dashboard')}</span>
-                        </NavLink>
+                        <SidebarLink to="/" label={t('nav.dashboard')} icon={<DashboardIcon />} />
 
                         {canManage && (
-                            <div className="nav-section">
-                                {isSidebarCollapsed ? (
-                                    <NavLink
-                                        to="/participants"
-                                        className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}
-                                        title={t('nav.manageZev')}
-                                    >
-                                        <span className="nav-icon"><BuildingIcon /></span>
-                                        <span className="nav-label">{t('nav.manageZev')}</span>
-                                    </NavLink>
-                                ) : (
-                                    <>
-                                        <button
-                                            type="button"
-                                            className={`nav-toggle${manageIsActive ? ' active' : ''}`}
-                                            onClick={() => setIsManageNavOpen((prev) => {
-                                                const next = !prev
-                                                if (next) setIsAdminNavOpen(false)
-                                                return next
-                                            })}
-                                            title={t('nav.manageZev')}
-                                        >
-                                            <span className="nav-toggle-main">
-                                                <span className="nav-icon"><BuildingIcon /></span>
-                                                <span className="nav-label">{t('nav.manageZev')}</span>
-                                            </span>
-                                            <span className="nav-caret" aria-hidden="true">{isManageNavOpen ? '−' : '+'}</span>
-                                        </button>
-                                        {isManageNavOpen && (
-                                            <div className="nav-sublist">
-                                                <NavLink to="/participants" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`} title={t('nav.participants')}>
-                                                    <span className="nav-icon"><UsersIcon /></span>
-                                                    <span className="nav-label">{t('nav.participants')}</span>
-                                                </NavLink>
+                            <>
+                                <SidebarLink to="/metering/chart" label={t('nav.metering')} icon={<ChartIcon />} active={meteringActive} />
 
-                                                <NavLink to="/metering-points" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`} title={t('nav.meteringPoints')}>
-                                                    <span className="nav-icon"><PlugIcon /></span>
-                                                    <span className="nav-label">{t('nav.meteringPoints')}</span>
-                                                </NavLink>
-                                                <NavLink to="/metering-data" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`} title={t('nav.meteringData')}>
-                                                    <span className="nav-icon"><ChartIcon /></span>
-                                                    <span className="nav-label">{t('nav.meteringData')}</span>
-                                                </NavLink>
-                                                <NavLink to="/zev-settings" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`} title={t('nav.zevSettings')}>
-                                                    <span className="nav-icon"><SettingsIcon /></span>
-                                                    <span className="nav-label">{t('nav.zevSettings')}</span>
-                                                </NavLink>
-                                            </div>
-                                        )}
-                                    </>
-                                )}
+                                <SidebarLink to="/billing/invoices" label={t('nav.billing')} icon={<InvoiceIcon />} active={billingActive} />
+
+                                <SidebarLink to="/metering/imports" label={t('nav.imports')} icon={<ImportIcon />} />
+
+                                <SidebarLink to="/reports" label={t('nav.reports')} icon={<ReportsIcon />} />
+                            </>
+                        )}
+
+                        {isParticipant && (
+                            <>
+                                <SidebarLink to="/metering/chart" label={t('nav.myConsumption')} icon={<ChartIcon />} />
+
+                                <SidebarLink to="/me/statement" label={t('nav.annualStatement')} icon={<ReportsIcon />} />
+                            </>
+                        )}
+
+                        {canManage && (
+                            <div className="nav-section nav-section-start" role="group" aria-label={t('nav.setupGroup')}>
+                                <div className="nav-group-label" aria-hidden="true">{t('nav.setupGroup')}</div>
+                                <SidebarLink to="/participants" label={t('nav.participants')} icon={<UsersIcon />} />
+                                <SidebarLink to="/metering-points" label={t('nav.meteringPoints')} icon={<PlugIcon />} />
+                                <SidebarLink to="/tariffs" label={t('nav.tariffs')} icon={<TagIcon />} />
+                                <SidebarLink to="/zev-settings" label={t('nav.zevSettings')} icon={<SettingsIcon />} />
+                                <SidebarLink to="/audit-logs" label={t('nav.auditLogs')} icon={<AuditIcon />} />
                             </div>
                         )}
 
                         {canManage && (
-                            <NavLink
-                                to="/tariffs"
-                                className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}
-                                title={t('nav.tariffs')}
-                            >
-                                <span className="nav-icon"><TagIcon /></span>
-                                <span className="nav-label">{t('nav.tariffs')}</span>
-                            </NavLink>
-                        )}
-
-                        {canManage && (
-                            <NavLink
-                                to="/invoices"
-                                className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}
-                                title={t('nav.invoices')}
-                            >
-                                <span className="nav-icon"><InvoiceIcon /></span>
-                                <span className="nav-label">{t('nav.invoices')}</span>
-                            </NavLink>
-                        )}
-
-                        {canSeeReports(user?.role) && (
-                            <NavLink
-                                to="/reports"
-                                className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}
-                                title={t('nav.reports')}
-                            >
-                                <span className="nav-icon"><ReportsIcon /></span>
-                                <span className="nav-label">{t('nav.reports')}</span>
-                            </NavLink>
-                        )}
-
-                        {canManage && (
-                            <NavLink
-                                to="/feasibility"
-                                className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}
-                                title={t('nav.feasibility')}
-                            >
-                                <span className="nav-icon"><CalculatorIcon /></span>
-                                <span className="nav-label">{t('nav.feasibility')}</span>
-                            </NavLink>
-                        )}
-
-                        {canManage && (
-                            <NavLink
-                                to="/imports"
-                                className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}
-                                title={t('nav.imports')}
-                            >
-                                <span className="nav-icon"><ImportIcon /></span>
-                                <span className="nav-label">{t('nav.imports')}</span>
-                            </NavLink>
-                        )}
-
-                        {canManage && (
-                            <NavLink
-                                to="/audit-logs"
-                                className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}
-                                title={t('nav.auditLogs')}
-                            >
-                                <span className="nav-icon"><AuditIcon /></span>
-                                <span className="nav-label">{t('nav.auditLogs')}</span>
-                            </NavLink>
+                            <SidebarLink to="/feasibility" label={t('nav.feasibility')} icon={<CalculatorIcon />} className="nav-standalone" />
                         )}
 
                         {user?.role === 'admin' && (
-                            <div className="nav-section nav-section-end">
-                                {isSidebarCollapsed ? (
-                                    <NavLink
-                                        to="/admin"
-                                        className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}
-                                        title={t('nav.adminConsole')}
-                                    >
-                                        <span className="nav-icon"><SettingsIcon /></span>
-                                        <span className="nav-label">{t('nav.adminConsole')}</span>
-                                    </NavLink>
-                                ) : (
-                                    <>
-                                        <button
-                                            type="button"
-                                            className={`nav-toggle${adminIsActive ? ' active' : ''}`}
-                                            onClick={() => setIsAdminNavOpen((prev) => {
-                                                const next = !prev
-                                                if (next) setIsManageNavOpen(false)
-                                                return next
-                                            })}
-                                            title={t('nav.adminConsole')}
-                                        >
-                                            <span className="nav-toggle-main">
-                                                <span className="nav-icon"><SettingsIcon /></span>
-                                                <span className="nav-label">{t('nav.adminConsole')}</span>
-                                            </span>
-                                            <span className="nav-caret" aria-hidden="true">{isAdminNavOpen ? '−' : '+'}</span>
-                                        </button>
-                                        {isAdminNavOpen && (
-                                            <div className="nav-sublist">
-                                                <NavLink to="/admin" end className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`} title={t('nav.adminOverview')}>
-                                                    <span className="nav-icon"><OverviewIcon /></span>
-                                                    <span className="nav-label">{t('nav.adminOverview')}</span>
-                                                </NavLink>
-                                                <NavLink to="/admin/zevs" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`} title={t('nav.zevs')}>
-                                                    <span className="nav-icon"><BuildingIcon /></span>
-                                                    <span className="nav-label">{t('nav.zevs')}</span>
-                                                </NavLink>
-                                                <NavLink to="/admin/accounts" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`} title={t('nav.adminAccounts')}>
-                                                    <span className="nav-icon"><UsersIcon /></span>
-                                                    <span className="nav-label">{t('nav.adminAccounts')}</span>
-                                                </NavLink>
-                                                <NavLink to="/admin/api-keys" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`} title={t('nav.adminApiKeys')}>
-                                                    <span className="nav-icon"><KeyIcon /></span>
-                                                    <span className="nav-label">{t('nav.adminApiKeys')}</span>
-                                                </NavLink>
-                                                <NavLink to="/admin/invoices" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`} title={t('nav.adminInvoices')}>
-                                                    <span className="nav-icon"><InvoiceIcon /></span>
-                                                    <span className="nav-label">{t('nav.adminInvoices')}</span>
-                                                </NavLink>
-                                                <NavLink to="/admin/system-settings" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`} title={t('nav.adminSystemSettings')}>
-                                                    <span className="nav-icon"><SettingsIcon /></span>
-                                                    <span className="nav-label">{t('nav.adminSystemSettings')}</span>
-                                                </NavLink>
-                                                <NavLink to="/admin/pdf-templates" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`} title={t('nav.adminPdfTemplates')}>
-                                                    <span className="nav-icon"><PdfIcon /></span>
-                                                    <span className="nav-label">{t('nav.adminPdfTemplates')}</span>
-                                                </NavLink>
-                                                <NavLink to="/admin/email-templates" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`} title={t('nav.adminEmailTemplates')}>
-                                                    <span className="nav-icon"><MailIcon /></span>
-                                                    <span className="nav-label">{t('nav.adminEmailTemplates')}</span>
-                                                </NavLink>
-                                                <NavLink to="/admin/audit-logs" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`} title={t('nav.adminAuditLogs')}>
-                                                    <span className="nav-icon"><AuditIcon /></span>
-                                                    <span className="nav-label">{t('nav.adminAuditLogs')}</span>
-                                                </NavLink>
-                                            </div>
-                                        )}
-                                    </>
-                                )}
+                            <div className="nav-section nav-section-end" role="group" aria-label={t('nav.platformGroup')}>
+                                <div className="nav-group-label" aria-hidden="true">{t('nav.platformGroup')}</div>
+                                <SidebarLink to="/admin" end label={t('nav.adminOverview')} icon={<OverviewIcon />} />
+                                <SidebarLink to="/admin/zevs" label={t('nav.zevs')} icon={<BuildingIcon />} />
+                                <SidebarLink to="/admin/accounts" label={t('nav.adminAccounts')} icon={<UsersIcon />} />
+                                <SidebarLink to="/admin/api-keys" label={t('nav.adminApiKeys')} icon={<KeyIcon />} />
+                                <SidebarLink to="/admin/invoices" label={t('nav.adminInvoices')} icon={<InvoiceIcon />} />
+                                <SidebarLink to="/admin/system-settings" label={t('nav.adminSystemSettings')} icon={<SettingsIcon />} />
+                                <SidebarLink to="/admin/pdf-templates" label={t('nav.adminPdfTemplates')} icon={<PdfIcon />} />
+                                <SidebarLink to="/admin/email-templates" label={t('nav.adminEmailTemplates')} icon={<MailIcon />} />
+                                <SidebarLink to="/admin/audit-logs" label={t('nav.adminAuditLogs')} icon={<AuditIcon />} />
                             </div>
                         )}
                     </nav>
@@ -390,58 +326,6 @@ export function Layout() {
                             >
                                 {t('nav.stopImpersonation')}
                             </button>
-                        </div>
-                    )}
-
-                    {canManage && (
-                        <div className="user-menu zev-menu" ref={zevMenuRef}>
-                            <button
-                                type="button"
-                                className="user-menu-trigger"
-                                onClick={() => setIsZevMenuOpen((prev) => !prev)}
-                            >
-                                <span className="user-avatar" aria-hidden="true">🏢</span>
-                                <span className="user-meta">
-                                    <strong>{selectedZev?.name || t('nav.noZevSelected')}</strong>
-                                    <small>{selectedZevOwnerName} · {effectiveOwner?.email || '-'}</small>
-                                </span>
-                            </button>
-
-                            {isZevMenuOpen && (
-                                <div className="user-menu-dropdown zev-menu-dropdown">
-                                    <div className="user-menu-section">
-                                        <div className="user-menu-section-title">{t('nav.manageZev')}</div>
-                                        <div className="zev-dropdown-list" role="listbox" aria-label={t('nav.manageZev')}>
-                                            {managedZevLoading ? (
-                                                <div className="zev-dropdown-item zev-dropdown-item-muted">{t('nav.loadingZevs')}</div>
-                                            ) : managedZevs.length === 0 ? (
-                                                <div className="zev-dropdown-item zev-dropdown-item-muted">{t('nav.noZevAvailable')}</div>
-                                            ) : (
-                                                managedZevs.map((zev) => {
-                                                    const isSelected = zev.id === selectedZevId
-                                                    return (
-                                                        <button
-                                                            key={zev.id}
-                                                            type="button"
-                                                            className={`zev-dropdown-item${isSelected ? ' active' : ''}`}
-                                                            onClick={() => {
-                                                                if (isSelectable) {
-                                                                    setSelectedZevId(zev.id)
-                                                                }
-                                                                setIsZevMenuOpen(false)
-                                                            }}
-                                                            disabled={!isSelectable && !isSelected}
-                                                            aria-selected={isSelected}
-                                                        >
-                                                            {zev.name}
-                                                        </button>
-                                                    )
-                                                })
-                                            )}
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
                         </div>
                     )}
 
@@ -550,6 +434,10 @@ function SettingsIcon() {
 
 function OverviewIcon() {
     return <IconSvg path="M4 4h7v7H4zm9 0h7v4h-7zM4 13h4v7H4zm6 3h10v4H10z" />
+}
+
+function PlatformIcon() {
+    return <IconSvg path="M3 21h18M5 21V7l7-4 7 4v14M9 9h.01M9 13h.01M9 17h.01M15 9h.01M15 13h.01M15 17h.01" />
 }
 
 function PdfIcon() {

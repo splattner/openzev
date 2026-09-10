@@ -407,9 +407,17 @@ Validates old password, sets new password, clears `must_change_password`.
 
 **Endpoint:** `GET | PATCH /api/v1/auth/me/` (IsAuthenticated)
 
-- GET → returns `UserSerializer` of current user.
+- GET → returns `UserSerializer` of current user. For participants the
+  response additionally carries `zev_name: string` — the name of the
+  community of their self-service membership
+  (`zev.services.own_participant_for_user`, the model's default surname
+  ordering; the same record the annual-statement and financial-summary
+  downloads serve) — plus `zev_count: number`, the number of held
+  memberships. `zev_name` is absent when the participant has no membership
+  (`zev_count` is then `0`); admins/owners never get either field.
 - PATCH → partial update of own profile fields (name, email). Role change
-  validation: admin cannot change own role; non-admin cannot change role at all.
+  validation: admin cannot change own role; non-admin cannot change role at
+  all. The response is shaped like GET (including `zev_name`).
 
 ### 5.7 Impersonation
 
@@ -669,17 +677,23 @@ On update:
 | `/participants` | `admin`, `zev_owner` | `ParticipantsPage` |
 | `/zev-settings` | `admin`, `zev_owner` | `ZevSettingsPage` |
 | `/metering-points` | any authenticated | `MeteringPointsPage` |
-| `/metering-data` | any authenticated | `MeteringChartPage` |
+| `/metering/chart` | any authenticated | `MeteringChartPage` (`tab="chart"`, wrapped in default-allow `ProtectedRoute` so tab switches don't remount) |
+| `/metering/quality` | `admin`, `zev_owner` | `MeteringChartPage` (`tab="quality"`) — intentional participant restriction: quality shows whole-ZEV severity counts, participant names, and overlap warnings (operator view; backend role-scoping means no leak either way) |
+| `/metering-data` | any authenticated | alias → `/metering/chart`, except `?tab=quality` → guarded `/metering/quality`; `tab` is always stripped, remaining params preserved |
+| `/metering/imports` | `admin`, `zev_owner` | `ImportsPage` |
 | `/tariffs` | `admin`, `zev_owner` | `TariffsPage` |
-| `/invoices` | `admin`, `zev_owner` | `InvoicesPage` |
+| `/billing/invoices` | `admin`, `zev_owner` | `InvoicesPage` |
+| `/invoices` | `admin`, `zev_owner` | alias → `/billing/invoices` (query preserved) |
+| `/invoices/:invoiceId` | any authenticated | alias → `/billing/invoices/:invoiceId` (param + query preserved) |
+| `/billing/invoices/:invoiceId` | any authenticated | `InvoiceDetailPage` |
+| `/imports` | `admin`, `zev_owner` | alias → `/metering/imports` (query preserved) |
+| `/me/statement` | `participant` | `ReportsPage` (participant branch; impersonating admins carry the participant role) — recorded exception 2 of the permission contract (see `2026-09-navigation-regroup.md` §4) |
+| `/login` | public | `LoginPage` |
+| `/verify-email` | public | `VerifyEmailPage` |
 
 Legacy admin routes `/admin/settings/regional`, `/admin/settings/vat`,
 `/admin/features`, and `/admin/oauth` redirect into tabs on
 `/admin/system-settings` and remain admin-only.
-| `/invoices/:invoiceId` | any authenticated | `InvoiceDetailPage` |
-| `/imports` | `admin`, `zev_owner` | `ImportsPage` |
-| `/login` | public | `LoginPage` |
-| `/verify-email` | public | `VerifyEmailPage` |
 
 ### 9.3 Navigation visibility
 
@@ -688,11 +702,52 @@ The sidebar (`Layout.tsx`) shows sections conditionally:
 | Section | Condition |
 |---|---|
 | Dashboard | always |
-| Manage (v)Zev group (participants, metering points, metering data, ZEV settings) | `canManage` = `role == 'admin' \|\| role == 'zev_owner'` |
-| Tariffs | `canManage` |
-| Invoices | `canManage` |
-| Imports | `canManage` |
-| Admin Console group (overview, ZEV list, accounts, regional settings, VAT, PDF templates) | `role == 'admin'` |
+| Metering (`/metering/chart`, active on `/metering/chart` + `/metering/quality`) | `canManage` (visible to admins and owners only) |
+| Billing (`/billing/invoices`, active on `/billing/*`) | `canManage` (visible to admins and owners only) |
+| Imports | `canManage` (visible to admins and owners only) |
+| Reports | `canManage` (visible to admins and owners only in nav; the `/reports` route itself still allows participants) |
+| My consumption (`/metering/chart`), Annual statement (`/me/statement`) | `role == 'participant'` |
+| Setup group (participants, metering points, tariffs, ZEV settings, audit logs) | `canManage` |
+| Feasibility | `canManage` |
+| Platform group (all nine `/admin/*` pages, flat) | `role == 'admin'` |
+
+The ZEV switcher lives at the sidebar top for `canManage` roles (inline
+expander, full sidebar width, expands-first when collapsed, auto-closes on
+entry into platform scope) only when there is something to switch — several
+managed communities, or none (empty state). With exactly one managed
+community it is unmounted; participants get no switcher.
+Every ZEV-scoped page header carries the selected ZEV name as an eyebrow
+above the page title. Participant pages show their community name from
+`zev_name` on `GET /auth/me/` only with a single membership
+(`zev_count == 1`): dashboard and metering data aggregate or list across
+every held membership, so a single name would mislabel the scope. Two pages
+keep an unconditional label because their scope always matches: the
+statement page (both downloads serve the self-service membership) and the
+invoice detail page (the invoice's own `zev_name`; a deep link may land on
+an invoice of a different community than the global selection). The owner
+audit-logs page follows the Setup convention (selected ZEV name); every
+`/admin/*` page instead shows the platform label (`nav.platformScope`), so
+platform headers never name a community and never a role.
+Group labels (`nav.setupGroup`, `nav.platformGroup`) separate ZEV-scoped
+entries from platform tooling. Under `/admin/*` the shell adds
+`shell-scope-platform`: the switcher is unmounted in favour of a translated
+"Platform administration" chip (`nav.platformScope`) in the sidebar context
+block. There is no header scope chip: every ZEV-scoped page header names the
+selected ZEV as an eyebrow, so the working context stays visible when the nav
+scrolls, the sidebar collapses, or the sidebar lives in the mobile drawer.
+The Manage action on `/admin/zevs` (`setSelectedZevId` + jump to `/`) is
+how an admin enters a ZEV's working scope from platform scope.
+
+Active navigation state is exposed to assistive tech: the active sidebar
+entry carries `aria-current` alongside its visual class — `"page"` on the
+exact route, `"true"` on hub entries visually active on sub-routes (Metering
+on `/metering/chart` + `/metering/quality`, Billing on `/billing/*`).
+
+Scope: this rework ships the flat nav, canonical routes + aliases, and
+the Manage entry point. Route/permission decisions and the
+readiness/attention contract are recorded in
+[2026-09-navigation-regroup.md](2026-09-navigation-regroup.md) (the WIP
+tag `ux-audit-handoff-v1` is archival context only).
 
 ### 9.4 ManagedZevProvider (global ZEV context)
 
@@ -939,7 +994,7 @@ interface ParticipantAccountCreateResult { participant: Participant; account: Us
 Line counts are not tracked here — they drift with every change. The inventory
 lists the test classes per module (test counts are the `test_*` methods).
 
-**`accounts/tests.py`** (13 test classes):
+**`accounts/tests.py`** (15 test classes):
 
 | Class | Tests | Description |
 |---|---|---|
@@ -950,6 +1005,7 @@ lists the test classes per module (test counts are the `test_*` methods).
 | `FeatureFlagsApiTests` | 5 | Anonymous 401 and non-admin 403 on list; admin can list and toggle; defaults sync on read |
 | `ImpersonationTests` | 4 | Admin can impersonate participant/owner; non-admin blocked; admin cannot impersonate admin |
 | `LinkedAccountSafetyTests` | 8 | Admin can edit linked account; cannot delete linked; can delete unlinked; cannot delete last admin (with audit-denied assertion); can delete self when other admin exists (with audit actor SET_NULL assertion); can delete other admin when multiple exist; cannot change own role (via both detail and me endpoints) |
+| `MeEndpointParticipantContextTests` | 4 | Participant `GET /auth/me/` carries `zev_name` + `zev_count`; `zev_name` absent without membership and for admins; count reported with two memberships |
 | `AppSettingsTests` | 3 | Authenticated user reads settings; admin updates; non-admin cannot update |
 | `VatRateSettingsTests` | 4 | Admin CRUD; non-admin blocked; overlap rejection; valid_to validation |
 | `OAuthProviderConfigTests` | 5 | Admin creates provider (internal host URLs, scheme-less URLs, default redirect URL); non-admin blocked; login initiate uses provider redirect URL |
@@ -1014,6 +1070,24 @@ lists the test classes per module (test counts are the `test_*` methods).
 - `npm run build` verifies type-safety and route correctness.
 - `ProtectedRoute` handles loading, unauthenticated, forced password change,
   and role gating.
+- `frontend/tests/layout-nav.test.ts` — flat-nav visibility per role,
+  collapsed switcher naming, impersonation banner, `aria-current` alignment
+  (incl. `/metering/quality`), and the sidebar scope chip (platform vs ZEV;
+  there is no header chip) with page eyebrows. `frontend/tests/route-guard-matrix.test.ts` — the §9.2 route →
+  role matrix against `AppRoutes` for all three roles.
+  `frontend/tests/route-aliases.test.ts` — legacy alias redirects preserve
+  query and params.   `frontend/tests/community-eyebrow.test.ts` — invoice
+  detail shows the invoice's own community (not the global selection);
+  dashboard, chart, and metering points show `zev_name` only with a single
+  membership (`zev_count == 1`) and no eyebrow with several; owner
+  audit-logs shows the selected ZEV while admin audit-logs and admin
+  invoices show the platform label.
+  `frontend/tests/audit-log-scope.test.ts` — owner audit-logs request
+  scope follows the global selection (switch rescopes and resets
+  page/drawer, clear-filters keeps the scope, no request without a
+  selection); admin scope keeps its own community selector. See
+  [2026-09-navigation-regroup.md](2026-09-navigation-regroup.md) for the
+  frozen decisions.
 
 ---
 

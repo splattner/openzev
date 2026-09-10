@@ -397,6 +397,83 @@ class LinkedAccountSafetyTests(TestCase):
 		self.assertEqual(resp.status_code, 400)
 
 
+class MeEndpointParticipantContextTests(TestCase):
+	def _auth(self, client, user, password="pass1234"):
+		_cookie_auth(client, user.username, password)
+
+	def test_participant_me_includes_community_name(self):
+		client = APIClient()
+		owner = User.objects.create_user(username="owner_me", password="pass1234", role=UserRole.ZEV_OWNER)
+		zev = Zev.objects.create(name="Context ZEV", owner=owner, zev_type="vzev", invoice_prefix="C")
+		participant_user = User.objects.create_user(username="p_me", password="pass1234", role=UserRole.PARTICIPANT)
+		Participant.objects.create(
+			zev=zev,
+			user=participant_user,
+			first_name="Anna",
+			last_name="Consumer",
+			email="anna@example.com",
+			valid_from=date(2026, 1, 1),
+		)
+
+		self._auth(client, participant_user)
+		resp = client.get("/api/v1/auth/me/")
+
+		self.assertEqual(resp.status_code, 200)
+		self.assertEqual(resp.data["zev_name"], "Context ZEV")
+		self.assertEqual(resp.data["zev_count"], 1)
+
+	def test_admin_me_has_no_community_name(self):
+		client = APIClient()
+		admin = User.objects.create_user(username="admin_me", password="pass1234", role=UserRole.ADMIN)
+
+		self._auth(client, admin)
+		resp = client.get("/api/v1/auth/me/")
+
+		self.assertEqual(resp.status_code, 200)
+		self.assertNotIn("zev_name", resp.data)
+
+	def test_participant_without_membership_has_no_community_name(self):
+		client = APIClient()
+		participant_user = User.objects.create_user(username="p_lone", password="pass1234", role=UserRole.PARTICIPANT)
+
+		self._auth(client, participant_user)
+		resp = client.get("/api/v1/auth/me/")
+
+		self.assertEqual(resp.status_code, 200)
+		self.assertNotIn("zev_name", resp.data)
+		self.assertEqual(resp.data["zev_count"], 0)
+
+	def test_participant_with_two_memberships_reports_count(self):
+		client = APIClient()
+		owner = User.objects.create_user(username="owner_multi", password="pass1234", role=UserRole.ZEV_OWNER)
+		first_zev = Zev.objects.create(name="First ZEV", owner=owner, zev_type="vzev", invoice_prefix="F")
+		second_zev = Zev.objects.create(name="Second ZEV", owner=owner, zev_type="vzev", invoice_prefix="S")
+		participant_user = User.objects.create_user(username="p_multi", password="pass1234", role=UserRole.PARTICIPANT)
+		Participant.objects.create(
+			zev=first_zev,
+			user=participant_user,
+			first_name="Zed",
+			last_name="Zulu",
+			email="zed@example.com",
+			valid_from=date(2026, 1, 1),
+		)
+		Participant.objects.create(
+			zev=second_zev,
+			user=participant_user,
+			first_name="Anna",
+			last_name="Aar",
+			email="anna@example.com",
+			valid_from=date(2026, 1, 1),
+		)
+
+		self._auth(client, participant_user)
+		resp = client.get("/api/v1/auth/me/")
+
+		self.assertEqual(resp.status_code, 200)
+		self.assertEqual(resp.data["zev_name"], "Second ZEV")
+		self.assertEqual(resp.data["zev_count"], 2)
+
+
 class AppSettingsTests(TestCase):
 	def _auth(self, client, user, password="pass1234"):
 		_cookie_auth(client, user.username, password)

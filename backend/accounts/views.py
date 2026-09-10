@@ -26,8 +26,7 @@ from .models import (
     VatRate,
 )
 from .serializers import (
-    UserSerializer, UserCreateSerializer,
-    ChangePasswordSerializer, CustomTokenObtainPairSerializer,
+    UserSerializer, UserCreateSerializer, ChangePasswordSerializer, CustomTokenObtainPairSerializer,
     ApiKeySerializer, ApiKeyCreateSerializer, AdminApiKeySerializer,
     AppSettingsSerializer,
     FeatureFlagSerializer,
@@ -263,6 +262,24 @@ class VatRateDetailView(generics.RetrieveUpdateDestroyAPIView):
         )
 
 
+def _serialize_me(user):
+    """Serialize the current user, adding the participant's community name.
+
+    Participants have no managed-ZEV selection, so their community comes from
+    their membership here (``zev.services.own_participant_for_user``, shared
+    with the statement downloads).
+    """
+    data = UserSerializer(user).data
+    if user.role == UserRole.PARTICIPANT:
+        from zev.services import own_participant_for_user
+
+        participant = own_participant_for_user(user)
+        if participant is not None:
+            data["zev_name"] = participant.zev.name
+        data["zev_count"] = user.participations.count()
+    return data
+
+
 @api_view(["GET", "PATCH"])
 @permission_classes([IsAuthenticated])
 def me(request):
@@ -273,7 +290,7 @@ def me(request):
     the impersonation banner without reading any token from storage.
     """
     if request.method == "GET":
-        data = UserSerializer(request.user).data
+        data = _serialize_me(request.user)
         token = request.auth
         # An API key authenticates as exactly one user and carries no
         # impersonation state, so only JWTs are inspected for the claim.
@@ -291,7 +308,7 @@ def me(request):
     serializer = UserSerializer(request.user, data=request.data, partial=True, context={"request": request})
     serializer.is_valid(raise_exception=True)
     serializer.save()
-    return Response(serializer.data)
+    return Response(_serialize_me(serializer.instance))
 
 
 @api_view(["POST"])

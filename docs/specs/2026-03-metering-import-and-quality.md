@@ -573,6 +573,15 @@ page never 400s wholesale. For a flagged meter, `unassigned_days` /
 `unassigned_readings` are 0 (holders cannot be resolved); gap detection and
 severity are unaffected.
 
+**Frontend routes:** chart and quality are routes, not
+query state — `/metering/chart` (all roles) and `/metering/quality`
+(`admin`/`zev_owner`, same `MeteringChartPage` mounted with `tab`). Both
+share the `ProtectedRoute` shell so tab switches don't remount the page
+(period/resolution persist); legacy `/metering-data?tab=quality` redirects
+to the guarded quality route with `tab` stripped. The quality query only
+fires on the quality tab (`enabled: tab === 'quality'`) with
+`zev_id` for managed roles.
+
 ### 5.6 Import endpoints
 
 | Method | URL | Permission | Description |

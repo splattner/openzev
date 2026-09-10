@@ -12,11 +12,6 @@ import { createElement } from 'react'
 import { createRoot } from 'react-dom/client'
 import { act } from 'react'
 import { YearDownloadCard } from '../src/features/reports/YearDownloadCard'
-import { canSeeReports } from '../src/components/Layout'
-
-// jsdom does not enable the React act() environment by default; without this
-// flag every act() call warns and deferred work is not flushed reliably.
-globalThis.IS_REACT_ACT_ENVIRONMENT = true
 
 function renderCard(props: Parameters<typeof YearDownloadCard>[0]) {
     const container = document.createElement('div')
@@ -72,16 +67,6 @@ describe('reports i18n', () => {
         for (const locale of [en, de, fr, itLocale] as any[]) {
             expect((locale.dashboard as any).quickStart).toBeUndefined()
         }
-    })
-})
-
-describe('reports nav visibility', () => {
-    it('canSeeReports matches the route allowedRoles', () => {
-        expect(canSeeReports('admin')).toBe(true)
-        expect(canSeeReports('zev_owner')).toBe(true)
-        expect(canSeeReports('participant')).toBe(true)
-        expect(canSeeReports('guest')).toBe(false)
-        expect(canSeeReports(undefined)).toBe(false)
     })
 })
 

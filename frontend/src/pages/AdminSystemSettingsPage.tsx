@@ -237,7 +237,7 @@ export function AdminSystemSettingsPage() {
     return (
         <div className="page-stack">
             <header>
-                <p className="eyebrow">{t('adminSystemSettings.eyebrow')}</p>
+                <p className="eyebrow">{t('nav.platformScope')}</p>
                 <h2>{t('adminSystemSettings.title')}</h2>
                 <p className="muted">{t('adminSystemSettings.description')}</p>
             </header>

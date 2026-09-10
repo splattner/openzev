@@ -129,7 +129,6 @@ describe('useInvoiceActions hook', () => {
   let root: ReturnType<typeof createRoot>
 
   beforeEach(() => {
-    ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
     mutationInstances.length = 0
     pushToast.mockClear()
     invalidateQueries.mockClear()
@@ -215,7 +214,6 @@ describe('recommendedBatchAction ordering', () => {
   let root: ReturnType<typeof createRoot>
 
   beforeEach(() => {
-    ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
     mutationInstances.length = 0
     container = document.createElement('div')
     document.body.appendChild(container)

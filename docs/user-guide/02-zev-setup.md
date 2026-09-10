@@ -64,11 +64,11 @@ New ZEV owners can register themselves and create their ZEV without admin involv
 
 ### Option B: Admin-Created ZEV (with Owner Wizard)
 
-Admins can create a ZEV together with a new owner account in a single step. See [Admin Console → ZEV Management](14-admin-console.md#zev-management) for details.
+Admins can create a ZEV together with a new owner account in a single step. See [Platform → ZEVs](14-admin-console.md#zev-management) for details.
 
 ## ZEV Settings
 
-**ZEV Owners** configure their community in **ZEV Settings** (accessible from the sidebar).
+**ZEV Owners** configure their community in **ZEV Settings** (sidebar: **Setup → Settings**).
 
 ![ZEV settings](screenshots/06-zev-settings.png)
 
@@ -133,7 +133,7 @@ Choose how often invoices are generated:
   already the final amounts your participants should pay.
 
 - **VAT-registered** — enter your **VAT Number** (UID format), and ask an admin
-  to configure VAT rates ([Admin Console → VAT Settings](14-admin-console.md#vat-settings)).
+  to configure VAT rates ([Platform → VAT Settings](14-admin-console.md#vat-settings)).
   Tariff prices are treated as net; the invoice adds the active rate on top and
   shows a VAT line. You reclaim the VAT you pay upstream in your own VAT return.
 
@@ -218,7 +218,7 @@ Both fields support variable placeholders such as `{invoice_number}`, `{zev_name
 
 Leave fields blank to use the system defaults. If a template contains an invalid placeholder, the system falls back to defaults automatically.
 
-For more details on email delivery, see [Email Configuration](10-email-configuration.md). For system-wide default email templates managed by admins, see [Admin Console → Email Templates](14-admin-console.md#email-templates).
+For more details on email delivery, see [Email Configuration](10-email-configuration.md). For system-wide default email templates managed by admins, see [Platform → Email Templates](14-admin-console.md#email-templates).
 
 ## Access Control
 
@@ -244,7 +244,7 @@ Participants automatically see only their own metering data and invoices (ZEV-sc
 
 If running multiple ZEVs:
 
-1. **Global navigation:** Use the ZEV selector in the top navigation bar
+1. **ZEV switcher:** Use the ZEV switcher at the top of the sidebar (top-left); the selected community is also shown above the page title on every page. Under Platform pages (`/admin/*`) the switcher is replaced by the **Platform administration** indicator — enter a ZEV via **Platform → ZEVs → Manage** instead
 2. **Each ZEV is independent:** Tariffs, participants, and invoices are isolated
 3. **Owners can manage one or more ZEVs:** Admin can assign ownership of additional ZEVs
 
@@ -252,6 +252,6 @@ If running multiple ZEVs:
 
 - **Add participants:** [Managing Participants](03-participant-management.md)
 - **Configure metering points:** [Metering Points](04-metering-points.md)
-- **Import readings:** [Metering Data Import](05-metering-import.md)
+- **Import readings:** [Metering Imports](05-metering-import.md)
 - **Set up tariffs:** [Tariff Configuration](07-tariff-configuration.md)
 - **Email setup:** [Email Configuration](10-email-configuration.md)

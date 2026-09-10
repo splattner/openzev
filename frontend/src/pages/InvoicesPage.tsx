@@ -155,6 +155,7 @@ export function InvoicesPage() {
     return (
         <div className="page-stack">
             <header>
+                {selectedZev?.name ? <p className="eyebrow">{selectedZev.name}</p> : null}
                 <h2>{t('pages.invoices.title')}</h2>
                 <p className="muted">{t('pages.invoices.description')}</p>
             </header>

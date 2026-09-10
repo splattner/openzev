@@ -49,6 +49,13 @@ def build_unique_username(*, first_name: str, last_name: str, email: str | None 
     return username
 
 
+def own_participant_for_user(user):
+    """Self-service membership shared by ``/auth/me`` and report downloads."""
+    from .models import Participant
+
+    return Participant.objects.filter(user=user).select_related("zev").first()
+
+
 def sync_participant_user_fields(participant, user) -> None:
     # Owners and admins can also have participant records. Updating their
     # profile or sending an invitation must not remove management access.

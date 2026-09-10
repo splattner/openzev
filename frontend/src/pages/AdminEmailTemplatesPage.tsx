@@ -140,7 +140,7 @@ export function AdminEmailTemplatesPage() {
     return (
         <div className="page-stack">
             <header>
-                <p className="eyebrow">{t('nav.adminConsole')}</p>
+                <p className="eyebrow">{t('nav.platformScope')}</p>
                 <h2>{t('admin.emailTemplates.title')}</h2>
                 <p className="muted">
                     {t('admin.emailTemplates.description')}

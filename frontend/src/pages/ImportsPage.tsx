@@ -419,6 +419,7 @@ export function ImportsPage() {
     return (
         <div className="page-stack">
             <header>
+                {selectedZev?.name ? <p className="eyebrow">{selectedZev.name}</p> : null}
                 <h2>{t('pages.imports.title')}</h2>
                 <p className="muted">{t('pages.imports.description')}</p>
             </header>

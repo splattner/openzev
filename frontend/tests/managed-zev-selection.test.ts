@@ -175,7 +175,6 @@ describe('ManagedZevProvider selection persistence', () => {
     let resolveFetch: ((value: Zev[]) => void) | undefined
 
     beforeEach(() => {
-        ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
         localStorage.clear()
         authState.current = null
         resolveFetch = undefined

@@ -145,6 +145,20 @@ describe('ReportsPage role branches', () => {
         unmount()
     })
 
+    it('owner with several communities still renders the scope eyebrow', async () => {
+        mockOwner({
+            selectedZevId: 'zev-1',
+            selectedZev: { id: 'zev-1', name: 'Demo' },
+            managedZevs: [{ id: 'zev-1' }, { id: 'zev-2' }],
+        })
+
+        const { container, unmount } = renderReportsPage()
+        await flush()
+        expect(container.textContent).toContain('Demo')
+        expect(container.textContent).toContain('pages.reports.title')
+        unmount()
+    })
+
     it('year selector defaults to last completed year', async () => {
         mockOwner({
             selectedZevId: 'zev-1',

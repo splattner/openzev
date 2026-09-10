@@ -16,21 +16,15 @@ vi.mock('react-i18next', () => ({
 
 let container: HTMLDivElement
 let root: ReturnType<typeof createRoot>
+// setReducedMotion() replaces window.matchMedia wholesale — capture the
+// shared setup.ts original so the specialized test restores it after
+// itself instead of leaking into subsequent tests (clearAllMocks can't).
+let originalMatchMedia: typeof window.matchMedia | undefined
 
 beforeEach(() => {
-    Object.defineProperty(window, 'matchMedia', {
-        writable: true,
-        value: (query: string) => ({
-            matches: false,
-            media: query,
-            onchange: null,
-            addListener: () => undefined,
-            removeListener: () => undefined,
-            addEventListener: () => undefined,
-            removeEventListener: () => undefined,
-            dispatchEvent: () => false,
-        }),
-    })
+    // Default matchMedia comes from tests/setup.ts; the reduced-motion
+    // override below (setReducedMotion) is the only per-test exception.
+    originalMatchMedia ??= window.matchMedia
     container = document.createElement('div')
     document.body.appendChild(container)
     root = createRoot(container)
@@ -39,6 +33,12 @@ beforeEach(() => {
 afterEach(() => {
     act(() => root.unmount())
     container.remove()
+    if (originalMatchMedia) {
+        Object.defineProperty(window, 'matchMedia', {
+            writable: true,
+            value: originalMatchMedia,
+        })
+    }
     vi.clearAllMocks()
 })
 

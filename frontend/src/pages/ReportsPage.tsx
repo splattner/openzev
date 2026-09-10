@@ -27,6 +27,8 @@ export function ReportsPage() {
     const isZevScopedRole = user?.role === 'admin' || user?.role === 'zev_owner'
     const hasValidZev = !isZevScopedRole || !!(selectedZevId && selectedZev)
     const showGuard = isZevScopedRole && !hasValidZev && !managedZevLoading
+    // Owners read the name from the switcher selection; participants from /auth/me.
+    const scopeName = isZevScopedRole ? selectedZev?.name : user?.zev_name
 
     // Recomputed per render so a long-lived session picks up the year rollover.
     const years = Array.from({ length: YEAR_COUNT }, (_, i) => new Date().getFullYear() - i)
@@ -51,7 +53,7 @@ export function ReportsPage() {
     return (
         <div className="page-stack">
             <header>
-                {isZevScopedRole && selectedZev?.name ? <p className="eyebrow">{selectedZev.name}</p> : null}
+                {scopeName ? <p className="eyebrow">{scopeName}</p> : null}
                 <h2>{t('pages.reports.title')}</h2>
                 <p className="muted">{t('pages.reports.description')}</p>
             </header>

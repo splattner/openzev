@@ -206,7 +206,7 @@ export function MeteringPointsList({
                 <Link
                   className="button button-secondary button-compact"
                   style={{ textDecoration: 'none' }}
-                  to={`/metering-data?metering_point=${point.id}`}
+                  to={`/metering/chart?metering_point=${point.id}`}
                 >
                   <FontAwesomeIcon icon={faChartLine} fixedWidth />
                   {t('pages.meteringPoints.chart')}

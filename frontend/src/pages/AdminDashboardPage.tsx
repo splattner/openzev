@@ -16,7 +16,7 @@ export function AdminDashboardPage() {
 
     const header = (
         <header>
-            <p className="eyebrow">{t('nav.adminConsole')}</p>
+            <p className="eyebrow">{t('nav.platformScope')}</p>
             <h2>{t('nav.adminOverview')}</h2>
         </header>
     )

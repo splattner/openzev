@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import {
     faArrowLeft,
@@ -13,6 +14,7 @@ import {
     faUser,
     faXmark,
 } from '@fortawesome/free-solid-svg-icons'
+import { useManagedZev } from '../lib/managedZev'
 import { ConfirmDialog, useConfirmDialog } from '../components/ConfirmDialog'
 import { ZevEmailTemplateFields } from '../components/ZevEmailTemplateFields'
 import { ZevGeneralSettingsFields } from '../components/ZevGeneralSettingsFields'
@@ -70,6 +72,8 @@ export function ZevListPage() {
     const { settings } = useAppSettings()
     const isAdmin = user?.role === 'admin'
     const { t } = useTranslation()
+    const navigate = useNavigate()
+    const { setSelectedZevId } = useManagedZev()
     const queryClient = useQueryClient()
     const { dialog, confirm, handleConfirm, handleCancel, isLoading: dialogLoading } = useConfirmDialog()
 
@@ -357,6 +361,7 @@ export function ZevListPage() {
         return (
             <div className="page-stack">
                 <header>
+                    <p className="eyebrow">{t('nav.platformScope')}</p>
                     <h2>{t('pages.zevs.title')}</h2>
                     <p className="muted">{t('pages.zevs.description')}</p>
                 </header>
@@ -395,6 +400,7 @@ export function ZevListPage() {
     return (
         <div className="page-stack">
             <header>
+                <p className="eyebrow">{t('nav.platformScope')}</p>
                 <h2>{t('pages.zevs.title')}</h2>
                 <p className="muted">{t('pages.zevs.description')}</p>
             </header>
@@ -860,6 +866,17 @@ export function ZevListPage() {
                                 <td>{t(`pages.zevs.billingIntervals.${zev.billing_interval}` as Parameters<typeof t>[0], { defaultValue: zev.billing_interval })}</td>
                                 <td className="actions-cell">
                                     <div className="actions-cell-content">
+                                        <button
+                                            className="button button-secondary button-compact"
+                                            type="button"
+                                            onClick={() => {
+                                                setSelectedZevId(zev.id)
+                                                navigate('/')
+                                            }}
+                                        >
+                                            <FontAwesomeIcon icon={faArrowRight} fixedWidth />
+                                            {t('pages.zevs.manage')}
+                                        </button>
                                         <button className="button button-primary button-compact" type="button" onClick={() => startEdit(zev)}>
                                             <FontAwesomeIcon icon={faPen} fixedWidth />
                                             {t('common.edit')}

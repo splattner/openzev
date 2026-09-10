@@ -63,6 +63,7 @@ export function ZevSettingsPage() {
     return (
         <div className="page-stack">
             <header>
+                {selectedZev?.name ? <p className="eyebrow">{selectedZev.name}</p> : null}
                 <h2>{t('pages.zevSettings.title')}</h2>
                 <p className="muted">{t('pages.zevSettings.description')}</p>
             </header>

@@ -78,6 +78,7 @@ export function AdminApiKeysPage() {
     return (
         <div className="page-stack">
             <header>
+                <p className="eyebrow">{t('nav.platformScope')}</p>
                 <h2>{t('pages.adminApiKeys.title')}</h2>
                 <p className="muted">{t('pages.adminApiKeys.description')}</p>
             </header>

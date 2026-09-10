@@ -197,7 +197,7 @@ If a metering point has **no readings** in an invoice period:
 
 ## Next Steps
 
-- **Import readings:** [Metering Data Import](05-metering-import.md)
+- **Import readings:** [Metering Imports](05-metering-import.md)
 - **Check data quality:** [Metering Analysis](06-metering-analysis.md)
 - **Configure tariffs:** [Tariff Configuration](07-tariff-configuration.md)
 - **Understand billing:** [How Energy Allocation Works](08-billing-allocation-explained.md)

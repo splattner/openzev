@@ -256,6 +256,7 @@ export function AdminAccountsPage() {
     return (
         <div className="page-stack">
             <header>
+                <p className="eyebrow">{t('nav.platformScope')}</p>
                 <h2>{t('pages.accounts.title')}</h2>
                 <p className="muted">{t('pages.accounts.description')}</p>
             </header>

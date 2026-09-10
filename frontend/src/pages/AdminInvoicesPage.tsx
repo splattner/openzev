@@ -139,7 +139,7 @@ export function AdminInvoicesPage() {
     return (
         <div className="page-stack">
             <header>
-                <p className="eyebrow">{t('adminInvoices.eyebrow')}</p>
+                <p className="eyebrow">{t('nav.platformScope')}</p>
                 <h2>{t('adminInvoices.title')}</h2>
                 <p className="muted">{t('adminInvoices.description')}</p>
             </header>

@@ -154,7 +154,7 @@ column is the quickest way to tell whether anything still does.
 
 ### An administrator can revoke your key
 
-Administrators see every key in the system under **Admin Console → API Keys**,
+Administrators see every key in the system under **Platform → API Keys**,
 with its owner, prefix, scope, last use and expiry — and can revoke any of them.
 This exists for offboarding and for responding to a leak: a key has to be
 killable by someone other than the person who lost it.

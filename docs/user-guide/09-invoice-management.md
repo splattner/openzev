@@ -178,15 +178,15 @@ Deletion is permanent; the invoice is removed from the database.
 
 ## Annual Statements and Tax Overviews (Reports)
 
-The **Reports** page (`/reports`, sidebar entry **Berichte** / **Reports**) bundles the yearly document downloads that were previously scattered across the dashboard:
+The **Reports** page (`/reports`, sidebar entry **Reports**) bundles the yearly document downloads that were previously scattered across the dashboard:
 
 ![Reports page](screenshots/23-reports.png)
 
 - Pick a **year** in the selector at the top (defaults to the last completed year) — both cards use that year.
-- **Annual Statement** — as **admin or ZEV owner**: all participants' statements of the selected ZEV as one **ZIP archive**. Click **Prepare Annual Statements (ZIP)**: the archive is generated in the background, and the card offers **Download All (ZIP)** once it is ready — for a large ZEV this takes a while, and you can reload the page and return later. If some statements could not be generated, the card shows how many were omitted and lists them in an `omitted.txt` file inside the archive. Download links expire after 24 hours; prepare a new export to get current data. As **participant**: your own statement as a **PDF** (immediate download).
+- **Annual Statement** — as **admin or ZEV owner** (sidebar **Reports**): all participants' statements of the selected ZEV as one **ZIP archive**. Click **Prepare Annual Statements (ZIP)**: the archive is generated in the background, and the card offers **Download All (ZIP)** once it is ready — for a large ZEV this takes a while, and you can reload the page and return later. If some statements could not be generated, the card shows how many were omitted and lists them in an `omitted.txt` file inside the archive. Download links expire after 24 hours; prepare a new export to get current data. As **participant** (sidebar **Annual statement**, `/me/statement`): your own statement as a **PDF** (immediate download).
 - **Tax Overview** — yearly tax overview for producers (net local-energy revenue and feed-in compensation) as a **PDF**.
 
-The header shows the currently selected ZEV. Reports are only available once a ZEV is selected; participants always receive their own documents.
+Each page shows the currently selected community above the page title. Reports are only available once a ZEV is selected; participants always receive their own documents.
 
 ## Troubleshooting
 
@@ -194,10 +194,10 @@ The header shows the currently selected ZEV. Reports are only available once a Z
 
 **Causes:**
 - No active participants with metering-point assignments overlapping the selected period.
-- The wrong ZEV is selected in the global ZEV selector.
+- The wrong ZEV is selected (check the community name above the page title).
 
 **Fix:**
-1. Check the ZEV selector in the top navigation.
+1. Check the ZEV switcher at the top of the sidebar (or the community name above the page title).
 2. Verify that [Participants](03-participant-management.md) exist and have [metering-point assignments](04-metering-points.md) covering the period.
 
 ### Invoice totals look wrong

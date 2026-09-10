@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { Tabs } from '@mantine/core'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { DataTable, type ColumnDef } from '../components/DataTable'
 import { EmptyState } from '../components/EmptyState'
 import { PageSkeleton } from '../components/PageSkeleton'
@@ -176,16 +176,16 @@ const ALL_METERING_POINTS_VALUE = '__zev_total__'
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
-export function MeteringChartPage() {
+export function MeteringChartPage({ tab }: { tab: 'chart' | 'quality' }) {
+    const navigate = useNavigate()
     const [searchParams, setSearchParams] = useSearchParams()
     const { t } = useTranslation()
     const { user } = useAuth()
     const { settings } = useAppSettings()
     const { selectedZevId, selectedZev } = useManagedZev()
+    const participantScopeName = user?.zev_count === 1 ? user?.zev_name : undefined
     const isManagedScope = user?.role === 'admin' || user?.role === 'zev_owner'
     const interval: BillingInterval = (selectedZev?.billing_interval as BillingInterval) ?? 'monthly'
-
-    const activeTab = searchParams.get('tab') === 'quality' ? 'quality' : 'chart'
 
     // Controlled state
     const [selectedMpId, setSelectedMpId] = useState<string>(searchParams.get('metering_point') ?? '')
@@ -195,18 +195,23 @@ export function MeteringChartPage() {
     const [bucket, setBucket] = useState<'day' | 'hour' | 'month'>('day')
 
     // Sync the selected period to the URL, so a shared link reproduces it
-    // (#647). Uses the functional setSearchParams form so this callback's
-    // identity stays stable regardless of other URL changes (tab, metering
-    // point) — it's only meant to fire on a genuine period change.
+    // (#647). The router's setSearchParams is not a stable identity, so it
+    // goes through a ref: the callback below must keep a stable identity or
+    // the auto-reset effect underneath refires on every render and snaps the
+    // period back (breaking prev/next navigation).
+    const setSearchParamsRef = useRef(setSearchParams)
+    useEffect(() => {
+        setSearchParamsRef.current = setSearchParams
+    })
     const handlePeriodChange = useCallback((next: { from: string; to: string }) => {
         setPeriodState(next)
-        setSearchParams((previous) => {
+        setSearchParamsRef.current((previous) => {
             const nextParams = new URLSearchParams(previous)
             nextParams.set('from', next.from)
             nextParams.set('to', next.to)
             return nextParams
         }, { replace: true })
-    }, [setSearchParams])
+    }, [])
 
     // Skip exactly the first auto-reset below when the URL already named an
     // explicit period (a restored/shared link) — otherwise the ZEV query
@@ -235,7 +240,8 @@ export function MeteringChartPage() {
     }, [bucket, hourlyResolutionAvailable])
 
     // Data queries
-    const zevsQuery = useQuery({ queryKey: queryKeys.zev.list(), queryFn: fetchZevs })
+    // Operator-only lookup; /zevs/ is 403 for participants.
+    const zevsQuery = useQuery({ queryKey: queryKeys.zev.list(), queryFn: fetchZevs, enabled: isManagedScope })
     const mpQuery = useQuery({
         queryKey: queryKeys.metering.points(selectedZevId || undefined),
         queryFn: () => fetchMeteringPoints(selectedZevId || undefined),
@@ -278,7 +284,7 @@ export function MeteringChartPage() {
         // Expensive (one query per visible metering point server-side) and
         // only shown on the Data Quality tab — don't run it just because the
         // Chart tab happened to be open (#638).
-        enabled: activeTab === 'quality',
+        enabled: tab === 'quality',
     })
 
     const meteringPoints = (mpQuery.data ?? []).filter(
@@ -306,32 +312,25 @@ export function MeteringChartPage() {
         setSearchParams(next, { replace: true })
     }, [searchParams, setSearchParams])
 
-    // ?tab=quality makes the quality view shareable
+    // Retain query parameters when switching route-based tabs.
     const handleTabChange = (value: string | null) => {
         const next = new URLSearchParams(searchParams)
-        if (value === 'quality') {
-            next.set('tab', 'quality')
-        } else {
-            next.delete('tab')
-        }
-        setSearchParams(next, { replace: true })
+        next.delete('tab')
+        const qs = next.toString()
+        navigate(`/metering/${value === 'quality' ? 'quality' : 'chart'}${qs ? `?${qs}` : ''}`, { replace: true })
     }
 
-    // Jumping from a Data Quality row to that meter's chart changes both
-    // ?metering_point= and ?tab= at once (#648). Both handleMpChange and
-    // handleTabChange build their update from the render-time `searchParams`
-    // snapshot, so calling them back to back in one handler would have the
-    // second overwrite the first's change before either commits — this does
-    // both in a single functional update instead.
+    // Jumping from a Data Quality row to that meter's chart changes both the
+    // route and ?metering_point= at once (#648). Keep the remaining filters so
+    // the period survives the route-based tab switch.
     const handleJumpToChart = useCallback((meteringPointId: string) => {
         setSelectedMpId(meteringPointId)
-        setSearchParams((previous) => {
-            const next = new URLSearchParams(previous)
-            next.set('metering_point', meteringPointId)
-            next.delete('tab')
-            return next
-        }, { replace: true })
-    }, [setSearchParams])
+        const next = new URLSearchParams(searchParams)
+        next.set('metering_point', meteringPointId)
+        next.delete('tab')
+        const qs = next.toString()
+        navigate(`/metering/chart${qs ? `?${qs}` : ''}`, { replace: true })
+    }, [navigate, searchParams])
 
     // Data Quality: click a severity card to filter the table to it; click
     // the active one again to clear (#648). Persisted in the URL like the
@@ -502,19 +501,20 @@ export function MeteringChartPage() {
     return (
         <div className="page-stack">
             <header>
+                {(selectedZev?.name || participantScopeName) ? <p className="eyebrow">{selectedZev?.name ?? participantScopeName}</p> : null}
                 <h2>{t('pages.meteringData.title')}</h2>
                 <p className="muted">{t('pages.meteringData.description')}</p>
             </header>
 
             <Tabs
                 classNames={{ root: 'app-tabs', list: 'app-tabs-list', tab: 'app-tabs-tab' }}
-                value={activeTab}
+                value={tab}
                 keepMounted={false}
                 onChange={handleTabChange}
             >
                 <Tabs.List aria-label={t('pages.meteringData.title')}>
                     <Tabs.Tab value="chart">{t('nav.meteringData')}</Tabs.Tab>
-                    <Tabs.Tab value="quality">{t('nav.meteringDataQuality')}</Tabs.Tab>
+                    {isManagedScope && <Tabs.Tab value="quality">{t('nav.meteringDataQuality')}</Tabs.Tab>}
                 </Tabs.List>
 
                 <div
@@ -531,7 +531,7 @@ export function MeteringChartPage() {
                         onChange={handlePeriodChange}
                     />
 
-                    {activeTab === 'chart' && (
+                    {tab === 'chart' && (
                         <div
                             className="inline-form"
                             style={{
@@ -586,7 +586,7 @@ export function MeteringChartPage() {
                         </div>
                     )}
 
-                    {activeTab === 'quality' && (
+                    {tab === 'quality' && (
                         <div
                             className="inline-form"
                             style={{

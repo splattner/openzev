@@ -1,6 +1,9 @@
-# Admin Console
+# Platform Administration
 
-This guide covers all administration features available to users with the **Admin** role. The Admin Console is accessible from the sidebar under **Admin Console**.
+> This guide retains its historical filename (`14-admin-console.md`) and old
+> anchor links; the product term is now **Platform**.
+
+This guide covers all administration features available to users with the **Admin** role. The platform tooling lives in the sidebar under **Platform** (routes `/admin/*`). While there, the shell shows a persistent **Platform administration** indicator and no tenant context is displayed — the ZEV switcher is hidden until you re-enter a community via **ZEVs → Manage** (your previously selected community is preserved).
 
 For general role information, see [Roles and Permissions](11-roles-and-permissions.md).
 
@@ -8,8 +11,9 @@ For general role information, see [Roles and Permissions](11-roles-and-permissio
 
 Admins can view and manage all ZEVs in the system.
 
-1. Go to **Admin Console → ZEV Management**
+1. Go to **Platform → ZEVs**
 2. The list shows all ZEVs with their name, type, owner, and status
+3. Click **Manage** on a row to enter that ZEV's working scope (selects the ZEV and opens its dashboard)
 
 ### Creating a ZEV (with Owner Wizard)
 
@@ -30,11 +34,11 @@ Admins can also create a bare ZEV (without the wizard) via the standard CRUD int
 ## System Settings
 
 Regional display settings, feature flags, OAuth providers, and VAT rates are consolidated
-under **Admin Console → System Settings**.
+under **Platform → System Settings**.
 
 ### Regional
 
-Configure regional display settings in **Admin Console → System Settings → Regional**:
+Configure regional display settings in **Platform → System Settings → Regional**:
 
 ![Regional settings](screenshots/12-admin-regional-settings.png)
 
@@ -46,12 +50,12 @@ Configure regional display settings in **Admin Console → System Settings → R
 
 ### Features
 
-Feature flags are managed in **Admin Console → System Settings → Features**.
+Feature flags are managed in **Platform → System Settings → Features**.
 See [Feature Flags](#feature-flags) below.
 
 ### OAuth
 
-Configure external OAuth login providers in **Admin Console → System Settings → OAuth**:
+Configure external OAuth login providers in **Platform → System Settings → OAuth**:
 
 - **Name** — Provider identifier (e.g. `github`)
 - **Display Name** — Human-readable label shown on the login page
@@ -69,24 +73,28 @@ Configure external OAuth login providers in **Admin Console → System Settings 
 
 ### VAT
 
-Configure VAT rates in **Admin Console → System Settings → VAT** — the fourth tab. See [VAT Settings](#vat-settings) for validity-window behavior and the workflow.
+Configure VAT rates in **Platform → System Settings → VAT** — the fourth tab. See [VAT Settings](#vat-settings) for validity-window behavior and the workflow.
 
 ## Audit Logs
 
 The audit log is the cross-cutting, append-only event stream of privileged,
 billing-relevant, and destructive actions.
 
-- **Admin Console → Audit Logs** (`/admin/audit-logs`) — admins can view **all**
+- **Platform → Audit Logs** (`/admin/audit-logs`) — admins can view **all**
   events across the platform.
 - `/audit-logs` — admins **and ZEV owners** can view events scoped to their
   communities. Owners only see events for ZEVs they manage; they cannot see
   global or other-ZEV events.
 
-The page supports filters (date range, ZEV, actor, category, action type,
-status, and text search) and an event detail view that shows the summary,
-reason, structured field diff, and metadata. Text search is available only to
-admin users; everyone else sees the ZEV/actor/category/status filters. Events
-are read-only — there is no public write endpoint.
+- **Setup → Audit Logs** (`/audit-logs`) — ZEV owners see events scoped to
+  their communities and **follow the global community selection**: there is
+  no community selector here, and no text search. Available filters are
+  date range, actor, category, action type, and status.
+
+**Platform → Audit Logs** supports the full filter set: date range,
+community (ZEV) selector, actor, category, action type, status, and text
+search. Text search is available only to admin users. Events are
+read-only — there is no public write endpoint.
 
 The API is `GET /api/v1/audit/events/` (list) and
 `GET /api/v1/audit/events/{id}/` (detail). See the access spec
@@ -100,7 +108,7 @@ API keys.
 
 - **Account Profile → API Keys** — a user manages their own keys (create with a
   name and expiry, and revoke). See [API Keys](16-api-keys.md).
-- **Admin Console → API Keys** (`/admin/api-keys`) — admins can view all keys
+- **Platform → API Keys** (`/admin/api-keys`) — admins can view all keys
   across users and **revoke** any of them. This page is revoke-only; keys are
   created by their owner.
 
@@ -109,7 +117,7 @@ API keys.
 
 ## VAT Settings
 
-Admins configure VAT rates in **Admin Console → System Settings → VAT** (fourth tab).
+Admins configure VAT rates in **Platform → System Settings → VAT** (fourth tab).
 
 ![VAT settings](screenshots/13-admin-vat-settings.png)
 
@@ -118,14 +126,14 @@ VAT rates are validity-window based — you can set rates for specific time peri
 ### How VAT Works
 
 1. A ZEV owner enters their **VAT Number** (Swiss UID format) in [ZEV Settings](02-zev-setup.md#vat-configuration)
-2. An admin configures the applicable VAT rate(s) in **Admin Console → System Settings → VAT**
+2. An admin configures the applicable VAT rate(s) in **Platform → System Settings → VAT**
 3. When invoices are generated, the system looks up the active rate for the invoice period
 
 If no VAT number is set on the ZEV, or no VAT rate is active for an invoice period, VAT defaults to **0%**.
 
 ## Invoice PDF Templates
 
-Admins can manage the HTML/CSS template used for invoice PDF generation in **Admin Console → PDF Templates**.
+Admins can manage the HTML/CSS template used for invoice PDF generation in **Platform → PDF Templates**.
 
 ![PDF templates](screenshots/14-admin-pdf-templates.png)
 
@@ -137,7 +145,7 @@ Admins can manage the HTML/CSS template used for invoice PDF generation in **Adm
 
 ## Email Templates
 
-Admins manage system-wide default email templates in **Admin Console → Email Templates**.
+Admins manage system-wide default email templates in **Platform → Email Templates**.
 
 > **Note:** ZEV owners can also customize email templates for their own ZEV in **ZEV Settings → Email Templates**. See [ZEV Setup](02-zev-setup.md#email-templates) for per-ZEV customization, and [Email Configuration](10-email-configuration.md) for SMTP setup and delivery tracking.
 
@@ -161,7 +169,7 @@ Administrators can edit the default subject and body for each template. These de
 
 ### Accessing Email Templates
 
-1. Navigate to **Admin Console → Email Templates**
+1. Navigate to **Platform → Email Templates**
 2. The page displays four tabs — one per template type
 
 ![Admin Email Templates](screenshots/14b-admin-email-templates.png)
@@ -212,7 +220,7 @@ Templates that have not been customized do not show the reset button.
 
 ## Invoice Management
 
-Admins can view and manage all invoices across all ZEVs in **Admin Console → Invoice Management**.
+Admins can view and manage all invoices across all ZEVs in **Platform → Invoices**.
 
 ![Admin invoice management](screenshots/17-admin-invoices.png)
 
@@ -253,7 +261,7 @@ Feature flags can be controlled by:
 
 1. Code defaults (defined in backend code)
 2. Environment variable overrides
-3. Admin Console toggles
+3. Platform toggles (System Settings → Features)
 
 The backend and frontend both read the same feature flag state.
 
@@ -268,7 +276,7 @@ The backend and frontend both read the same feature flag state.
 For each flag, OpenZEV resolves the final state in this order:
 
 1. Environment variable `FEATURE_<FLAG_NAME_IN_UPPERCASE>`
-2. Value stored in database (set via Admin Console)
+2. Value stored in database (set via Platform → System Settings → Features)
 3. Code default
 4. `false` fallback
 
@@ -278,9 +286,9 @@ For `zev_self_registration_enabled`, the environment variable key is:
 FEATURE_ZEV_SELF_REGISTRATION_ENABLED=true
 ```
 
-### Admin Console Usage
+### Managing flags via the UI
 
-Manage flags in **Admin Console → System Settings → Features**.
+Manage flags in **Platform → System Settings → Features**.
 
 Each flag has:
 
@@ -321,7 +329,7 @@ This ensures the feature is disabled in both UI and API layers.
 #### Read feature flags
 
 - `GET /api/v1/auth/feature-flags/`
-- Admin only (returns the full flag list; used by the admin console)
+- Admin only (returns the full flag list; used by the Platform system settings)
 
 #### Read self-registration status (public)
 

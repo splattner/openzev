@@ -72,8 +72,8 @@ already rely on role-aware access and ZEV scoping.
 | `/participants` | `frontend/src/pages/ParticipantsPage.tsx` | `allowedRoles={['admin', 'zev_owner']}` |
 | `/metering-points` | `frontend/src/pages/MeteringPointsPage.tsx` | authenticated route; page logic further limits available actions |
 | `/tariffs` | `frontend/src/pages/TariffsPage.tsx` | `allowedRoles={['admin', 'zev_owner']}` |
-| `/invoices` | `frontend/src/pages/InvoicesPage.tsx` | `allowedRoles={['admin', 'zev_owner']}` |
-| `/imports` | `frontend/src/pages/ImportsPage.tsx` | `allowedRoles={['admin', 'zev_owner']}` |
+| `/billing/invoices` | `frontend/src/pages/InvoicesPage.tsx` | `allowedRoles={['admin', 'zev_owner']}` (`/invoices` stays as alias) |
+| `/metering/imports` | `frontend/src/pages/ImportsPage.tsx` | `allowedRoles={['admin', 'zev_owner']}` (`/imports` stays as alias) |
 
 **ZEV scoping rule:** when a page works on tenant-owned data, it must render
 from already-scoped data in query results and additionally narrow to
@@ -218,7 +218,7 @@ Default rule:
 Current application:
 
 - `TariffsPage` uses category sections for `energy`, `grid_fees`, `levies`, and `metering`.
-- `MeteringChartPage` uses tabs for chart versus quality views over the same period selection.
+- `MeteringChartPage` uses tabs for chart versus quality views over the same period selection. The tabs are routes (`/metering/chart`, `/metering/quality`) sharing one page instance — see the route table in `2026-03-community-and-access.md` §9.2.
 - `AdminEmailTemplatesPage` and `AdminPdfTemplatesPage` are valid tab examples because each tab is a separate template editor document.
 - Tab strips use Mantine `Tabs` with the `.app-tabs` contract and render their content as `Tabs.Panel` inside the same root; hand-rolled tab strips are not permitted.
 - `AdminSystemSettingsPage` predates this contract (default-styled `Tabs` embedded in a card, panels rendered outside the root) and is pending migration.
@@ -277,14 +277,14 @@ These pages define the current management-page reference set.
 #### `InvoicesPage`
 
 - File: `frontend/src/pages/InvoicesPage.tsx`
-- Route: `/invoices`
+- Route: `/billing/invoices` (`/invoices` stays as alias)
 - Query key: `['invoice-period-overview', selectedZevId, period.period_start, period.period_end]`
 - Pattern: period navigation via `BillingPeriodSelector`, batch toolbar, compact structured table rows, primary/secondary/overflow actions.
 
 #### `ImportsPage`
 
 - File: `frontend/src/pages/ImportsPage.tsx`
-- Route: `/imports`
+- Route: `/metering/imports` (`/imports` stays as alias)
 - Query keys: `['imports']`, `['zevs']`
 - Pattern: top-level action card, `DataTable` for import logs, per-row protocol/delete actions, destructive bulk-delete modal, import wizard modal.
 

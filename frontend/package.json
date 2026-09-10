@@ -15,6 +15,7 @@
     "preview": "vite preview",
     "screenshots": "playwright test --config screenshots.config.ts screenshots/capture.spec.ts",
     "shot": "playwright test --config screenshots.config.ts screenshots/shot.spec.ts",
+    "test:browser": "playwright test --config screenshots.config.ts screenshots/layout-overflow.spec.ts",
     "lint:style": "stylelint \"src/**/*.css\""
   },
   "dependencies": {

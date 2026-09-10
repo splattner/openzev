@@ -1,10 +1,11 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { fetchAuditEvents, fetchAuditFilterOptions } from '../lib/api/audit'
 import { queryKeys } from '../lib/api/queryKeys'
 import { formatDateTime, useAppSettings } from '../lib/appSettings'
 import { useAuth } from '../lib/auth'
+import { useManagedZev } from '../lib/managedZev'
 import { AuditEventDrawer } from '../features/audit/AuditEventDrawer'
 import type { AuditActionCategory, AuditEvent, AuditEventFilters, AuditEventStatus } from '../types/api'
 
@@ -70,6 +71,13 @@ export function AuditLogsPage({ scope }: AuditLogsPageProps) {
 
     const isAdminView = scope === 'admin'
     const canUseSearch = isAdminView && user?.role === 'admin'
+    const { selectedZev, selectedZevId, isLoading: managedZevLoading } = useManagedZev()
+
+    useEffect(() => {
+        if (isAdminView) return
+        setFilters((previous) => ({ ...previous, page: 1 }))
+        setSelectedEventId(null)
+    }, [isAdminView, selectedZevId])
 
     const apiFilters = useMemo<AuditEventFilters>(
         () => ({
@@ -78,18 +86,19 @@ export function AuditLogsPage({ scope }: AuditLogsPageProps) {
             action_type: filters.actionType || undefined,
             target_type: filters.targetType || undefined,
             status: (filters.status || undefined) as AuditEventStatus | undefined,
-            zev: filters.zev || undefined,
+            zev: isAdminView ? filters.zev || undefined : selectedZevId || undefined,
             actor_user: filters.actorUser ? Number(filters.actorUser) : undefined,
             date_from: filters.dateFrom || undefined,
             date_to: filters.dateTo || undefined,
             q: canUseSearch ? filters.search || undefined : undefined,
         }),
-        [canUseSearch, filters.actionCategory, filters.actionType, filters.actorUser, filters.dateFrom, filters.dateTo, filters.page, filters.search, filters.status, filters.targetType, filters.zev],
+        [canUseSearch, isAdminView, selectedZevId, filters.actionCategory, filters.actionType, filters.actorUser, filters.dateFrom, filters.dateTo, filters.page, filters.search, filters.status, filters.targetType, filters.zev],
     )
 
     const eventsQuery = useQuery({
         queryKey: queryKeys.admin.auditEvents(apiFilters),
         queryFn: () => fetchAuditEvents(apiFilters),
+        enabled: isAdminView || (!managedZevLoading && !!selectedZevId),
     })
 
     // The ZEV/actor filter options come from the audit API itself, so they are
@@ -130,7 +139,9 @@ export function AuditLogsPage({ scope }: AuditLogsPageProps) {
     return (
         <div className="page-stack">
             <header>
-                <p className="eyebrow">{t(isAdminView ? 'pages.auditLogs.eyebrowAdmin' : 'pages.auditLogs.eyebrowOwner')}</p>
+                {isAdminView
+                    ? <p className="eyebrow">{t('nav.platformScope')}</p>
+                    : selectedZev?.name ? <p className="eyebrow">{selectedZev.name}</p> : null}
                 <h2>{t('pages.auditLogs.title')}</h2>
                 <p className="muted">{t('pages.auditLogs.description')}</p>
             </header>
@@ -148,17 +159,19 @@ export function AuditLogsPage({ scope }: AuditLogsPageProps) {
                             ))}
                         </select>
                     </label>
-                    <label>
-                        {t('pages.auditLogs.filters.zev')}
-                        <select value={filters.zev} onChange={(event) => updateFilter('zev', event.target.value)}>
-                            <option value="">{t('pages.auditLogs.filters.all')}</option>
-                            {(optionsQuery.data?.zevs ?? []).map((zev) => (
-                                <option key={zev.id} value={zev.id}>
-                                    {zev.name}
-                                </option>
-                            ))}
-                        </select>
-                    </label>
+                    {isAdminView && (
+                        <label>
+                            {t('pages.auditLogs.filters.zev')}
+                            <select value={filters.zev} onChange={(event) => updateFilter('zev', event.target.value)}>
+                                <option value="">{t('pages.auditLogs.filters.all')}</option>
+                                {(optionsQuery.data?.zevs ?? []).map((zev) => (
+                                    <option key={zev.id} value={zev.id}>
+                                        {zev.name}
+                                    </option>
+                                ))}
+                            </select>
+                        </label>
+                    )}
                     <label>
                         {t('pages.auditLogs.filters.actor')}
                         <select value={filters.actorUser} onChange={(event) => updateFilter('actorUser', event.target.value)}>

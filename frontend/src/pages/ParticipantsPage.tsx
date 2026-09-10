@@ -44,7 +44,7 @@ export function ParticipantsPage() {
     const { dialog, confirm, handleConfirm, handleCancel, isLoading: dialogLoading } = useConfirmDialog()
     const { user } = useAuth()
     const { settings } = useAppSettings()
-    const { selectedZevId } = useManagedZev()
+    const { selectedZevId, selectedZev } = useManagedZev()
     const { t } = useTranslation()
     const isManagedScope = user?.role === 'admin' || user?.role === 'zev_owner'
     const { data, isLoading, isError } = useQuery({
@@ -251,6 +251,7 @@ export function ParticipantsPage() {
     return (
         <div className="page-stack">
             <header>
+                {selectedZev?.name ? <p className="eyebrow">{selectedZev.name}</p> : null}
                 <h2>{t('pages.participants.title')}</h2>
                 <p className="muted">{t('pages.participants.description')}</p>
             </header>

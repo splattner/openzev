@@ -109,13 +109,14 @@ export function InvoiceDetailPage() {
         <div className="page-stack">
             <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
                 <div>
+                    {inv.zev_name ? <p className="eyebrow">{inv.zev_name}</p> : null}
                     <h2 style={{ marginBottom: '0.2rem' }}>{t('pages.invoiceDetail.title', { number: inv.invoice_number })}</h2>
                     <p className="muted" style={{ margin: 0 }}>
                         {inv.participant_name} · {formatShortDate(inv.period_start, settings)} → {formatShortDate(inv.period_end, settings)}
                     </p>
                 </div>
-                <Link to="/invoices" className="button button-primary" style={{ textDecoration: 'none' }}>
-                    {t('pages.invoiceDetail.backToInvoices')}
+                <Link to={user?.role === 'participant' ? '/' : '/billing/invoices'} className="button button-primary" style={{ textDecoration: 'none' }}>
+                    {user?.role === 'participant' ? t('common.back') : t('pages.invoiceDetail.backToInvoices')}
                 </Link>
             </header>
 

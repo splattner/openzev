@@ -23,7 +23,7 @@ added later, but today an import is a copy.
 
 ## Exporting
 
-1. Open **(v)ZEV verwalten → Einstellungen** for the community.
+1. Open **Setup → Settings → Export / transfer** for the community.
 2. Scroll to **Export ZEV** and click **Export ZEV**.
 3. Pick the sections you want. The **structure sections are pre-ticked** — ZEV
    settings, participants, metering points and tariffs — and readings and
@@ -82,7 +82,7 @@ history can travel without the pricing structure and vice versa.
 Importing is **admin-only**, because it creates a ZEV and only admins create
 ZEVs on an OpenZEV instance.
 
-1. Open **Admin Console → ZEVs**.
+1. Open **Platform → ZEVs**.
 2. Click **Import ZEV**.
 3. Choose the `.zip` archive. OpenZEV reads its manifest and shows what is inside,
    with a row count per section.
@@ -200,5 +200,5 @@ import them as separate steps.
 
 - [ZEV Setup](02-zev-setup.md) — creating a community from scratch
 - [Participant Management](03-participant-management.md) — linking accounts after an import
-- [Metering Import](05-metering-import.md) — loading readings on their own
-- [Admin Console](14-admin-console.md) — where the import lives
+- [Metering Imports](05-metering-import.md) — loading readings on their own
+- [Platform Administration](14-admin-console.md) — where the import lives (sidebar group **Platform**)
