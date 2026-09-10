@@ -1,5 +1,4 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Tabs } from '@mantine/core'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { PageSkeleton } from '../components/PageSkeleton'
 import { useTranslation } from 'react-i18next'
@@ -22,7 +21,7 @@ import { PdfPreview } from '../components/PdfPreview'
 
 const PDF_TEMPLATE_TABS = ['invoice', 'contract', 'annual_statement'] as const
 
-type PdfTemplateTab = (typeof PDF_TEMPLATE_TABS)[number]
+export type PdfTemplateTab = (typeof PDF_TEMPLATE_TABS)[number]
 
 interface FieldGroup {
     title: string
@@ -190,7 +189,6 @@ function TemplateEditor({
     onReset,
     isSaving,
     isResetting,
-    title,
     fieldGroups,
     templateType,
 }: {
@@ -201,7 +199,6 @@ function TemplateEditor({
     onReset: () => void
     isSaving: boolean
     isResetting: boolean
-    title: string
     fieldGroups: FieldGroup[]
     templateType: 'invoice' | 'contract' | 'annual_statement'
 }) {
@@ -290,12 +287,9 @@ function TemplateEditor({
     return (
         <div className="content-with-aside">
             <section className="card page-stack">
-                <div className="actions-row">
-                    <h3 style={{ margin: 0 }}>{title}</h3>
-                    {data?.is_customized && (
-                        <span className="badge badge-info">{t('admin.customized')}</span>
-                    )}
-                </div>
+                {data?.is_customized && (
+                    <div><span className="badge badge-info">{t('admin.customized')}</span></div>
+                )}
                 {isLoading && <PageSkeleton variant="card" />}
                 {isError && <p className="error-banner">{t('common.error')}</p>}
                 {data && (
@@ -410,11 +404,19 @@ function TemplateEditor({
     )
 }
 
-export function AdminPdfTemplatesPage() {
+/**
+ * `embedded` drops the page header and picker (mounted inside the admin Templates hub
+ * since phase 3; /admin/pdf-templates stays as a deep-link alias).
+ */
+export function AdminPdfTemplatesPage({ embedded = false, template }: {
+    embedded?: boolean
+    template?: PdfTemplateTab
+}) {
     const { t } = useTranslation()
     const { pushToast } = useToast()
     const queryClient = useQueryClient()
-    const [activeTab, setActiveTab] = useState<PdfTemplateTab>('invoice')
+    const [selectedTemplate, setSelectedTemplate] = useState<PdfTemplateTab>('invoice')
+    const activeTab = template ?? selectedTemplate
 
     const tabLabels: Record<PdfTemplateTab, string> = {
         invoice: t('admin.invoiceTemplate'),
@@ -761,6 +763,7 @@ export function AdminPdfTemplatesPage() {
 
     return (
         <div className="page-stack">
+            {!embedded && (
             <header>
                 <p className="eyebrow">{t('nav.platformScope')}</p>
                 <h2>{t('admin.pdfTemplates')}</h2>
@@ -768,68 +771,58 @@ export function AdminPdfTemplatesPage() {
                     {t('admin.pdfTemplatesDescription')}
                 </p>
             </header>
+            )}
 
-            <Tabs
-                classNames={{ root: 'app-tabs', list: 'app-tabs-list', tab: 'app-tabs-tab' }}
-                value={activeTab}
-                keepMounted={false}
-                onChange={(value) => {
-                    if (value) setActiveTab(value as PdfTemplateTab)
-                }}
-            >
-                <Tabs.List aria-label={t('admin.pdfTemplates')}>
-                    {PDF_TEMPLATE_TABS.map((tab) => (
-                        <Tabs.Tab key={tab} value={tab}>
-                            {tabLabels[tab]}
-                        </Tabs.Tab>
-                    ))}
-                </Tabs.List>
+            {!embedded && (
+                <label>
+                    <span>{t('pages.adminTemplates.selectTemplate')}</span>
+                    <select value={activeTab} onChange={(event) => setSelectedTemplate(event.target.value as PdfTemplateTab)}>
+                        {PDF_TEMPLATE_TABS.map((tab) => <option key={tab} value={tab}>{tabLabels[tab]}</option>)}
+                    </select>
+                </label>
+            )}
 
-                <Tabs.Panel value="invoice">
-                    <TemplateEditor
-                        data={invoiceTemplateQuery.data}
-                        isLoading={invoiceTemplateQuery.isLoading}
-                        isError={invoiceTemplateQuery.isError}
-                        onSave={(content) => saveInvoiceMutation.mutate(content)}
-                        onReset={() => resetInvoiceMutation.mutate()}
-                        isSaving={saveInvoiceMutation.isPending}
-                        isResetting={resetInvoiceMutation.isPending}
-                        title={t('admin.invoiceTemplate')}
-                        fieldGroups={invoiceFieldGroups}
-                        templateType="invoice"
-                    />
-                </Tabs.Panel>
+            {activeTab === 'invoice' && (
+                <TemplateEditor
+                    data={invoiceTemplateQuery.data}
+                    isLoading={invoiceTemplateQuery.isLoading}
+                    isError={invoiceTemplateQuery.isError}
+                    onSave={(content) => saveInvoiceMutation.mutate(content)}
+                    onReset={() => resetInvoiceMutation.mutate()}
+                    isSaving={saveInvoiceMutation.isPending}
+                    isResetting={resetInvoiceMutation.isPending}
+                    fieldGroups={invoiceFieldGroups}
+                    templateType="invoice"
+                />
+            )}
 
-                <Tabs.Panel value="contract">
-                    <TemplateEditor
-                        data={contractTemplateQuery.data}
-                        isLoading={contractTemplateQuery.isLoading}
-                        isError={contractTemplateQuery.isError}
-                        onSave={(content) => saveContractMutation.mutate(content)}
-                        onReset={() => resetContractMutation.mutate()}
-                        isSaving={saveContractMutation.isPending}
-                        isResetting={resetContractMutation.isPending}
-                        title={t('admin.contractTemplate')}
-                        fieldGroups={contractFieldGroups}
-                        templateType="contract"
-                    />
-                </Tabs.Panel>
+            {activeTab === 'contract' && (
+                <TemplateEditor
+                    data={contractTemplateQuery.data}
+                    isLoading={contractTemplateQuery.isLoading}
+                    isError={contractTemplateQuery.isError}
+                    onSave={(content) => saveContractMutation.mutate(content)}
+                    onReset={() => resetContractMutation.mutate()}
+                    isSaving={saveContractMutation.isPending}
+                    isResetting={resetContractMutation.isPending}
+                    fieldGroups={contractFieldGroups}
+                    templateType="contract"
+                />
+            )}
 
-                <Tabs.Panel value="annual_statement">
-                    <TemplateEditor
-                        data={annualStatementTemplateQuery.data}
-                        isLoading={annualStatementTemplateQuery.isLoading}
-                        isError={annualStatementTemplateQuery.isError}
-                        onSave={(content) => saveAnnualStatementMutation.mutate(content)}
-                        onReset={() => resetAnnualStatementMutation.mutate()}
-                        isSaving={saveAnnualStatementMutation.isPending}
-                        isResetting={resetAnnualStatementMutation.isPending}
-                        title={t('admin.annualStatementTemplate')}
-                        fieldGroups={annualStatementFieldGroups}
-                        templateType="annual_statement"
-                    />
-                </Tabs.Panel>
-            </Tabs>
+            {activeTab === 'annual_statement' && (
+                <TemplateEditor
+                    data={annualStatementTemplateQuery.data}
+                    isLoading={annualStatementTemplateQuery.isLoading}
+                    isError={annualStatementTemplateQuery.isError}
+                    onSave={(content) => saveAnnualStatementMutation.mutate(content)}
+                    onReset={() => resetAnnualStatementMutation.mutate()}
+                    isSaving={saveAnnualStatementMutation.isPending}
+                    isResetting={resetAnnualStatementMutation.isPending}
+                    fieldGroups={annualStatementFieldGroups}
+                    templateType="annual_statement"
+                />
+            )}
         </div>
     )
 }

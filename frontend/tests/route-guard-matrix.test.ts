@@ -34,6 +34,7 @@ function marker(id: string) {
 }
 
 vi.mock('../src/pages/DashboardPage', () => ({ DashboardPage: marker('dashboard') }))
+vi.mock('../src/pages/HomePage', () => ({ HomePage: marker('home') }))
 vi.mock('../src/pages/AccountProfilePage', () => ({ AccountProfilePage: marker('account') }))
 vi.mock('../src/pages/AdminDashboardPage', () => ({ AdminDashboardPage: marker('admin') }))
 vi.mock('../src/pages/AdminSystemSettingsPage', () => ({ AdminSystemSettingsPage: marker('admin-system-settings') }))
@@ -45,7 +46,10 @@ vi.mock('../src/pages/AdminAccountsPage', () => ({ AdminAccountsPage: marker('ad
 vi.mock('../src/pages/AdminApiKeysPage', () => ({ AdminApiKeysPage: marker('admin-api-keys') }))
 vi.mock('../src/pages/ZevListPage', () => ({ ZevListPage: marker('admin-zevs') }))
 vi.mock('../src/pages/ParticipantsPage', () => ({ ParticipantsPage: marker('participants') }))
-vi.mock('../src/pages/ZevSettingsPage', () => ({ ZevSettingsPage: marker('zev-settings') }))
+vi.mock('../src/pages/ZevSettingsPage', () => ({
+    ZevSettingsPage: marker('zev-settings'),
+    ZevSettingsTabRoute: marker('zev-settings'),
+}))
 vi.mock('../src/pages/MeteringPointsPage', () => ({ MeteringPointsPage: marker('metering-points') }))
 vi.mock('../src/pages/MeteringChartPage', () => ({ MeteringChartPage: marker('metering-chart') }))
 vi.mock('../src/pages/TariffsPage', () => ({ TariffsPage: marker('tariffs') }))
@@ -59,6 +63,13 @@ vi.mock('../src/pages/LoginPage', () => ({ LoginPage: marker('login') }))
 vi.mock('../src/pages/VerifyEmailPage', () => ({ VerifyEmailPage: marker('verify-email') }))
 vi.mock('../src/pages/OAuthCallbackPage', () => ({ OAuthCallbackPage: marker('oauth') }))
 vi.mock('../src/pages/NotFoundPage', () => ({ NotFoundPage: marker('not-found') }))
+// Hub shells (phase 3) render their first panel; the embedded page mocks
+// above carry the markers.
+vi.mock('../src/pages/BillingHubPage', () => ({ BillingHubPage: marker('billing-hub') }))
+vi.mock('../src/pages/AdminOverviewHubPage', () => ({ AdminOverviewHubPage: marker('admin-overview-hub') }))
+vi.mock('../src/pages/AdminAccountsHubPage', () => ({ AdminAccountsHubPage: marker('admin-accounts-hub') }))
+vi.mock('../src/pages/AdminTemplatesHubPage', () => ({ AdminTemplatesHubPage: marker('admin-templates-hub') }))
+vi.mock('../src/pages/AdminSystemHealthPanel', () => ({ AdminSystemHealthPanel: marker('admin-system-health') }))
 
 function mockRole(role: UserRole) {
     mockAuth.mockReturnValue({
@@ -102,14 +113,19 @@ async function renderPath(path: string) {
 }
 
 // path → [page marker when allowed] × per-role expectation.
-// DENY lands on "/" (dashboard marker) via ProtectedRoute — that is what
+// DENY lands on "/" (role-aware home marker) via ProtectedRoute — that is what
 // makes a wrong guard fail here instead of staying green.
 const MATRIX: Array<{ path: string; marker: string; allow: Record<UserRole, boolean> }> = [
+    { path: '/dashboard', marker: 'dashboard', allow: { admin: true, zev_owner: true, participant: true } },
     { path: '/metering/chart', marker: 'metering-chart', allow: { admin: true, zev_owner: true, participant: true } },
     { path: '/metering/quality', marker: 'metering-chart', allow: { admin: true, zev_owner: true, participant: false } },
-    { path: '/metering/imports', marker: 'imports', allow: { admin: true, zev_owner: true, participant: false } },
+    { path: '/metering/imports', marker: 'metering-chart', allow: { admin: true, zev_owner: true, participant: false } },
     { path: '/metering-points', marker: 'metering-points', allow: { admin: true, zev_owner: true, participant: true } },
-    { path: '/billing/invoices', marker: 'invoices', allow: { admin: true, zev_owner: true, participant: false } },
+    { path: '/metering/points', marker: 'metering-points', allow: { admin: true, zev_owner: true, participant: true } },
+    { path: '/billing/periods', marker: 'home', allow: { admin: true, zev_owner: true, participant: true } },
+    { path: '/billing/invoices', marker: 'billing-hub', allow: { admin: true, zev_owner: true, participant: false } },
+    { path: '/billing/emails', marker: 'billing-hub', allow: { admin: true, zev_owner: true, participant: false } },
+    { path: '/billing/statements', marker: 'billing-hub', allow: { admin: true, zev_owner: true, participant: false } },
     { path: '/billing/invoices/42', marker: 'invoice-detail', allow: { admin: true, zev_owner: true, participant: true } },
     { path: '/me/statement', marker: 'reports', allow: { admin: false, zev_owner: false, participant: true } },
     { path: '/me/invoices', marker: 'my-invoices', allow: { admin: false, zev_owner: false, participant: true } },
@@ -117,29 +133,31 @@ const MATRIX: Array<{ path: string; marker: string; allow: Record<UserRole, bool
     { path: '/participants', marker: 'participants', allow: { admin: true, zev_owner: true, participant: false } },
     { path: '/tariffs', marker: 'tariffs', allow: { admin: true, zev_owner: true, participant: false } },
     { path: '/zev-settings', marker: 'zev-settings', allow: { admin: true, zev_owner: true, participant: false } },
+    { path: '/zev-settings/audit', marker: 'zev-settings', allow: { admin: true, zev_owner: true, participant: false } },
     { path: '/feasibility', marker: 'feasibility', allow: { admin: true, zev_owner: true, participant: false } },
     { path: '/account', marker: 'account', allow: { admin: true, zev_owner: true, participant: true } },
-    { path: '/audit-logs', marker: 'audit-logs', allow: { admin: true, zev_owner: true, participant: false } },
-    { path: '/admin/audit-logs', marker: 'audit-logs', allow: { admin: true, zev_owner: false, participant: false } },
-    { path: '/admin', marker: 'admin', allow: { admin: true, zev_owner: false, participant: false } },
+    // Audit log lives in the ZEV settings hub now: legacy URL redirects into
+    // the hub's audit tab (marker = the settings page).
+    { path: '/audit-logs', marker: 'zev-settings', allow: { admin: true, zev_owner: true, participant: false } },
+    { path: '/admin', marker: 'admin-overview-hub', allow: { admin: true, zev_owner: false, participant: false } },
+    { path: '/admin/zevs', marker: 'admin-overview-hub', allow: { admin: true, zev_owner: false, participant: false } },
+    { path: '/admin/invoices', marker: 'admin-overview-hub', allow: { admin: true, zev_owner: false, participant: false } },
+    { path: '/admin/audit', marker: 'admin-overview-hub', allow: { admin: true, zev_owner: false, participant: false } },
+    { path: '/admin/audit-logs', marker: 'admin-overview-hub', allow: { admin: true, zev_owner: false, participant: false } },
+    { path: '/admin/health', marker: 'admin-overview-hub', allow: { admin: true, zev_owner: false, participant: false } },
+    { path: '/admin/accounts', marker: 'admin-accounts-hub', allow: { admin: true, zev_owner: false, participant: false } },
+    { path: '/admin/accounts/api-keys', marker: 'admin-accounts-hub', allow: { admin: true, zev_owner: false, participant: false } },
+    { path: '/admin/api-keys', marker: 'admin-accounts-hub', allow: { admin: true, zev_owner: false, participant: false } },
+    { path: '/admin/templates', marker: 'admin-templates-hub', allow: { admin: true, zev_owner: false, participant: false } },
+    { path: '/admin/templates/pdf', marker: 'admin-templates-hub', allow: { admin: true, zev_owner: false, participant: false } },
+    { path: '/admin/pdf-templates', marker: 'admin-templates-hub', allow: { admin: true, zev_owner: false, participant: false } },
+    { path: '/admin/email-templates', marker: 'admin-templates-hub', allow: { admin: true, zev_owner: false, participant: false } },
     { path: '/admin/system-settings', marker: 'admin-system-settings', allow: { admin: true, zev_owner: false, participant: false } },
-    { path: '/admin/accounts', marker: 'admin-accounts', allow: { admin: true, zev_owner: false, participant: false } },
-    { path: '/admin/api-keys', marker: 'admin-api-keys', allow: { admin: true, zev_owner: false, participant: false } },
-    { path: '/admin/zevs', marker: 'admin-zevs', allow: { admin: true, zev_owner: false, participant: false } },
-    { path: '/admin/invoices', marker: 'admin-invoices', allow: { admin: true, zev_owner: false, participant: false } },
-    { path: '/admin/pdf-templates', marker: 'admin-pdf-templates', allow: { admin: true, zev_owner: false, participant: false } },
-    { path: '/admin/email-templates', marker: 'admin-email-templates', allow: { admin: true, zev_owner: false, participant: false } },
-    // Legacy admin redirects inherit the target's guard: admins land on the
-    // target page, everyone else lands on / via the target guard (no bypass).
-    { path: '/admin/settings/regional', marker: 'admin-system-settings', allow: { admin: true, zev_owner: false, participant: false } },
-    { path: '/admin/settings/vat', marker: 'admin-system-settings', allow: { admin: true, zev_owner: false, participant: false } },
-    { path: '/admin/features', marker: 'admin-system-settings', allow: { admin: true, zev_owner: false, participant: false } },
-    { path: '/admin/oauth', marker: 'admin-system-settings', allow: { admin: true, zev_owner: false, participant: false } },
     { path: '/metering', marker: 'metering-chart', allow: { admin: true, zev_owner: true, participant: true } },
-    { path: '/billing', marker: 'invoices', allow: { admin: true, zev_owner: true, participant: false } },
-    { path: '/invoices', marker: 'invoices', allow: { admin: true, zev_owner: true, participant: false } },
+    { path: '/billing', marker: 'billing-hub', allow: { admin: true, zev_owner: true, participant: false } },
+    { path: '/invoices', marker: 'billing-hub', allow: { admin: true, zev_owner: true, participant: false } },
     { path: '/invoices/42', marker: 'invoice-detail', allow: { admin: true, zev_owner: true, participant: true } },
-    { path: '/imports', marker: 'imports', allow: { admin: true, zev_owner: true, participant: false } },
+    { path: '/imports', marker: 'metering-chart', allow: { admin: true, zev_owner: true, participant: false } },
     { path: '/metering-data?tab=quality', marker: 'metering-chart', allow: { admin: true, zev_owner: true, participant: false } },
     { path: '/metering-data?metering_point=7', marker: 'metering-chart', allow: { admin: true, zev_owner: true, participant: true } },
 ]
@@ -152,12 +170,12 @@ describe('route guard matrix (tests AppRoutes, not the guard in isolation)', () 
             const page = await renderPath(row.path)
             if (row.allow[role]) {
                 expect(page.shows(row.marker)).toBe(true)
-                if (row.marker !== 'dashboard') {
-                    expect(page.shows('dashboard')).toBe(false)
+                if (row.marker !== 'home') {
+                    expect(page.shows('home')).toBe(false)
                 }
             } else {
                 expect(page.shows(row.marker)).toBe(false)
-                expect(page.shows('dashboard')).toBe(true)
+                expect(page.shows('home')).toBe(true)
             }
             page.unmount()
         }

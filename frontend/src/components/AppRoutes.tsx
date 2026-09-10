@@ -8,20 +8,16 @@ import { PageSkeleton } from './PageSkeleton'
 import { ManagedZevProvider } from '../lib/managedZev'
 
 const AccountProfilePage = lazy(async () => ({ default: (await import('../pages/AccountProfilePage')).AccountProfilePage }))
-const AdminDashboardPage = lazy(async () => ({ default: (await import('../pages/AdminDashboardPage')).AdminDashboardPage }))
-const AdminAccountsPage = lazy(async () => ({ default: (await import('../pages/AdminAccountsPage')).AdminAccountsPage }))
-const AdminApiKeysPage = lazy(async () => ({ default: (await import('../pages/AdminApiKeysPage')).AdminApiKeysPage }))
-const AdminPdfTemplatesPage = lazy(async () => ({ default: (await import('../pages/AdminPdfTemplatesPage')).AdminPdfTemplatesPage }))
-const AdminEmailTemplatesPage = lazy(async () => ({ default: (await import('../pages/AdminEmailTemplatesPage')).AdminEmailTemplatesPage }))
-const AdminInvoicesPage = lazy(async () => ({ default: (await import('../pages/AdminInvoicesPage')).AdminInvoicesPage }))
+const AdminOverviewHubPage = lazy(async () => ({ default: (await import('../pages/AdminOverviewHubPage')).AdminOverviewHubPage }))
+const AdminAccountsHubPage = lazy(async () => ({ default: (await import('../pages/AdminAccountsHubPage')).AdminAccountsHubPage }))
+const AdminTemplatesHubPage = lazy(async () => ({ default: (await import('../pages/AdminTemplatesHubPage')).AdminTemplatesHubPage }))
+const BillingHubPage = lazy(async () => ({ default: (await import('../pages/BillingHubPage')).BillingHubPage }))
 const FeasibilityCalculatorPage = lazy(async () => ({ default: (await import('../pages/FeasibilityCalculatorPage')).FeasibilityCalculatorPage }))
-const AuditLogsPage = lazy(async () => ({ default: (await import('../pages/AdminAuditLogsPage')).AuditLogsPage }))
 const AdminSystemSettingsPage = lazy(async () => ({ default: (await import('../pages/AdminSystemSettingsPage')).AdminSystemSettingsPage }))
 const DashboardPage = lazy(async () => ({ default: (await import('../pages/DashboardPage')).DashboardPage }))
-const ImportsPage = lazy(async () => ({ default: (await import('../pages/ImportsPage')).ImportsPage }))
+const HomePage = lazy(async () => ({ default: (await import('../pages/HomePage')).HomePage }))
 const ReportsPage = lazy(async () => ({ default: (await import('../pages/ReportsPage')).ReportsPage }))
 const InvoiceDetailPage = lazy(async () => ({ default: (await import('../pages/InvoiceDetailPage')).InvoiceDetailPage }))
-const InvoicesPage = lazy(async () => ({ default: (await import('../pages/InvoicesPage')).InvoicesPage }))
 const MyInvoicesPage = lazy(async () => ({ default: (await import('../pages/MyInvoicesPage')).MyInvoicesPage }))
 const LoginPage = lazy(async () => ({ default: (await import('../pages/LoginPage')).LoginPage }))
 const MeteringChartPage = lazy(async () => ({ default: (await import('../pages/MeteringChartPage')).MeteringChartPage }))
@@ -32,8 +28,7 @@ const PublicInvoicePage = lazy(async () => ({ default: (await import('../pages/P
 const ParticipantsPage = lazy(async () => ({ default: (await import('../pages/ParticipantsPage')).ParticipantsPage }))
 const TariffsPage = lazy(async () => ({ default: (await import('../pages/TariffsPage')).TariffsPage }))
 const VerifyEmailPage = lazy(async () => ({ default: (await import('../pages/VerifyEmailPage')).VerifyEmailPage }))
-const ZevListPage = lazy(async () => ({ default: (await import('../pages/ZevListPage')).ZevListPage }))
-const ZevSettingsPage = lazy(async () => ({ default: (await import('../pages/ZevSettingsPage')).ZevSettingsPage }))
+const ZevSettingsTabRoute = lazy(async () => ({ default: (await import('../pages/ZevSettingsPage')).ZevSettingsTabRoute }))
 const OAuthCallbackPage = lazy(async () => ({ default: (await import('../pages/OAuthCallbackPage')).OAuthCallbackPage }))
 
 function AuthRouteFallback() {
@@ -63,16 +58,74 @@ export function AppRoutes() {
             </ProtectedRoute>
           }
         >
-          <Route index element={<DashboardPage />} />
+          <Route index element={<HomePage />} />
+          <Route path="dashboard" element={<DashboardPage />} />
           <Route path="account" element={<AccountProfilePage />} />
+          {/* Admin console (nav-regroup phase 3): four hub pages with
+              tab-as-route. Legacy /admin/* URLs redirect into the matching
+              hub tab so deep links keep working. */}
           <Route
             path="admin"
             element={
               <ProtectedRoute allowedRoles={['admin']}>
-                <AdminDashboardPage />
+                <AdminOverviewHubPage />
               </ProtectedRoute>
             }
           />
+          {(['overview', 'zevs', 'invoices', 'audit', 'health'] as const).map((adminTab) => (
+            <Route
+              key={adminTab}
+              path={`admin/${adminTab}`}
+              element={
+                <ProtectedRoute allowedRoles={['admin']}>
+                  <AdminOverviewHubPage tab={adminTab} />
+                </ProtectedRoute>
+              }
+            />
+          ))}
+          <Route
+            path="admin/accounts"
+            element={
+              <ProtectedRoute allowedRoles={['admin']}>
+                <AdminAccountsHubPage />
+              </ProtectedRoute>
+            }
+          />
+          {(['users', 'api-keys'] as const).map((accountsTab) => (
+            <Route
+              key={accountsTab}
+              path={`admin/accounts/${accountsTab === 'api-keys' ? 'api-keys' : 'users'}`}
+              element={
+                <ProtectedRoute allowedRoles={['admin']}>
+                  <AdminAccountsHubPage tab={accountsTab} />
+                </ProtectedRoute>
+              }
+            />
+          ))}
+          <Route path="admin/api-keys" element={<AliasNavigate to="/admin/accounts/api-keys" />} />
+          <Route
+            path="admin/templates"
+            element={
+              <ProtectedRoute allowedRoles={['admin']}>
+                <AdminTemplatesHubPage />
+              </ProtectedRoute>
+            }
+          />
+          {(['pdf', 'email'] as const).map((templatesTab) => (
+            <Route
+              key={templatesTab}
+              path={`admin/templates/${templatesTab}`}
+              element={
+                <ProtectedRoute allowedRoles={['admin']}>
+                  <AdminTemplatesHubPage tab={templatesTab} />
+                </ProtectedRoute>
+              }
+            />
+          ))}
+          <Route path="admin/pdf-templates" element={<AliasNavigate to="/admin/templates/pdf" />} />
+          <Route path="admin/email-templates" element={<AliasNavigate to="/admin/templates/email" />} />
+          {/* Legacy audit-log deep link → admin Overview audit tab. */}
+          <Route path="admin/audit-logs" element={<AliasNavigate to="/admin/audit" />} />
           <Route
             path="admin/system-settings"
             element={
@@ -83,72 +136,8 @@ export function AppRoutes() {
           />
           <Route path="admin/settings/regional" element={<AliasNavigate to="/admin/system-settings?tab=regional" />} />
           <Route path="admin/settings/vat" element={<AliasNavigate to="/admin/system-settings?tab=vat" />} />
-          <Route
-            path="admin/pdf-templates"
-            element={
-              <ProtectedRoute allowedRoles={['admin']}>
-                <AdminPdfTemplatesPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="admin/email-templates"
-            element={
-              <ProtectedRoute allowedRoles={['admin']}>
-                <AdminEmailTemplatesPage />
-              </ProtectedRoute>
-            }
-          />
           <Route path="admin/features" element={<AliasNavigate to="/admin/system-settings?tab=features" />} />
           <Route path="admin/oauth" element={<AliasNavigate to="/admin/system-settings?tab=oauth" />} />
-          <Route
-            path="admin/invoices"
-            element={
-              <ProtectedRoute allowedRoles={['admin']}>
-                <AdminInvoicesPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="admin/audit-logs"
-            element={
-              <ProtectedRoute allowedRoles={['admin']}>
-                <AuditLogsPage scope="admin" />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="audit-logs"
-            element={
-              <ProtectedRoute allowedRoles={['admin', 'zev_owner']}>
-                <AuditLogsPage scope="owner" />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="admin/accounts"
-            element={
-              <ProtectedRoute allowedRoles={['admin']}>
-                <AdminAccountsPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="admin/api-keys"
-            element={
-              <ProtectedRoute allowedRoles={['admin']}>
-                <AdminApiKeysPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="admin/zevs"
-            element={
-              <ProtectedRoute allowedRoles={['admin']}>
-                <ZevListPage />
-              </ProtectedRoute>
-            }
-          />
           <Route
             path="participants"
             element={
@@ -157,16 +146,30 @@ export function AppRoutes() {
               </ProtectedRoute>
             }
           />
+          {/* ZEV settings hub (phase 3): tabs are sub-routes; /zev-settings
+              renders the first tab. */}
           <Route
             path="zev-settings"
             element={
               <ProtectedRoute allowedRoles={['admin', 'zev_owner']}>
-                <ZevSettingsPage />
+                <ZevSettingsTabRoute />
               </ProtectedRoute>
             }
           />
-          <Route path="metering-points" element={<MeteringPointsPage />} />
-          {/* Same component types at the same tree positions so tab navigation preserves page state. */}
+          <Route
+            path="zev-settings/:tab"
+            element={
+              <ProtectedRoute allowedRoles={['admin', 'zev_owner']}>
+                <ZevSettingsTabRoute />
+              </ProtectedRoute>
+            }
+          />
+          {/* Phase-3 canonical route for metering points; legacy
+              /metering-points stays as an alias. Participants keep deep-link
+              access (default-allow, read-only, never gated on canManage). */}
+          <Route path="metering/points" element={<MeteringPointsPage />} />
+          <Route path="metering-points" element={<AliasNavigate to="/metering/points" />} />
+          {/* Keep identical wrappers so tab navigation preserves page state. */}
           <Route
             path="metering/chart"
             element={
@@ -193,11 +196,37 @@ export function AppRoutes() {
               </ProtectedRoute>
             }
           />
+          {/* Period work now lives on the manager Overview. Keep the former
+              tab URL as a guarded compatibility redirect. */}
+          <Route
+            path="billing/periods"
+            element={
+              <ProtectedRoute allowedRoles={['admin', 'zev_owner']}>
+                <AliasNavigate to="/" />
+              </ProtectedRoute>
+            }
+          />
           <Route
             path="billing/invoices"
             element={
               <ProtectedRoute allowedRoles={['admin', 'zev_owner']}>
-                <InvoicesPage />
+                <BillingHubPage tab="invoices" />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="billing/emails"
+            element={
+              <ProtectedRoute allowedRoles={['admin', 'zev_owner']}>
+                <BillingHubPage tab="emails" />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="billing/statements"
+            element={
+              <ProtectedRoute allowedRoles={['admin', 'zev_owner']}>
+                <BillingHubPage tab="statements" />
               </ProtectedRoute>
             }
           />
@@ -205,6 +234,10 @@ export function AppRoutes() {
           <Route path="billing" element={<AliasNavigate to="/billing/invoices" />} />
           <Route path="invoices" element={<AliasNavigate to="/billing/invoices" />} />
           <Route path="invoices/:invoiceId" element={<InvoiceDetailAlias />} />
+          {/* Audit log moved into the hubs (phase 3): the ZEV log is a
+              ZEV-settings tab, the platform log an admin Overview tab.
+              Legacy URLs redirect so deep links keep working. */}
+          <Route path="audit-logs" element={<AliasNavigate to="/zev-settings/audit" />} />
           <Route
             path="me/statement"
             element={
@@ -240,11 +273,13 @@ export function AppRoutes() {
             }
           />
           <Route path="imports" element={<AliasNavigate to="/metering/imports" />} />
+          {/* Import history is a Metering-hub tab (phase 3); the same route
+              renders the hub shell so tab state stays consistent. */}
           <Route
             path="metering/imports"
             element={
               <ProtectedRoute allowedRoles={['admin', 'zev_owner']}>
-                <ImportsPage />
+                <MeteringChartPage tab="imports" />
               </ProtectedRoute>
             }
           />

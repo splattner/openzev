@@ -1,6 +1,8 @@
 import { type EmailLog } from '../types/api'
 import { formatDateTime, useAppSettings } from '../lib/appSettings'
 import { useTranslation } from 'react-i18next'
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
+import { faRotate, faXmark } from '@fortawesome/free-solid-svg-icons'
 
 interface EmailLogsModalProps {
     invoiceNumber: string
@@ -124,12 +126,12 @@ export function EmailLogsModal({
 
                                 {log.status === 'failed' && onRetry && (
                                     <button
-                                        className="button button-secondary"
-                                        style={{ fontSize: '0.85rem', padding: '0.4rem 0.8rem' }}
+                                        className="button button-primary button-compact"
                                         onClick={() => onRetry(log.id)}
                                         disabled={isRetrying}
                                         type="button"
                                     >
+                                        <FontAwesomeIcon icon={faRotate} fixedWidth />
                                         {isRetrying ? t('pages.invoices.emailLogs.retrying') : t('pages.invoices.emailLogs.retry')}
                                     </button>
                                 )}
@@ -140,6 +142,7 @@ export function EmailLogsModal({
 
                 <div style={{ marginTop: '2rem', display: 'flex', justifyContent: 'flex-end' }}>
                     <button className="button button-secondary" onClick={onClose} type="button">
+                        <FontAwesomeIcon icon={faXmark} fixedWidth />
                         {t('common.close')}
                     </button>
                 </div>

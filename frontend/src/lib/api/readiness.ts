@@ -2,8 +2,8 @@ import type { AttentionItem, ReadinessPeriod, ReadinessResponse } from '../../ty
 import { api } from './client'
 
 /**
- * Readiness / attention API (nav-regroup phase 2, spec
- * docs/specs/2026-09-navigation-regroup.md §7).
+ * Readiness / attention API (contract:
+ * docs/specs/2026-03-invoice-lifecycle-and-communication.md §5.6a).
  *
  * Two stable URLs: the readiness cockpit (where am I in this period?) and
  * the attention list (what needs me across periods?). The backend resolves

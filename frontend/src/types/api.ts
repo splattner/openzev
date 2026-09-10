@@ -47,6 +47,32 @@ export interface AppSettingsInput {
     date_time_format?: DateTimeFormat
 }
 
+/** Admin-only platform health snapshot (nav-regroup phase 3):
+ * every probe is best-effort — "unknown" means the probe could not run
+ * (e.g. no broker in this environment), not that the system is broken. */
+export type SystemHealthStatus = 'ok' | 'degraded' | 'unknown'
+
+export interface SystemHealth {
+    database: {
+        status: SystemHealthStatus
+        engine: string
+        size_bytes: number | null
+    }
+    celery: {
+        status: SystemHealthStatus
+        workers_responding: number | null
+        queue_depth: number | null
+        broker_configured: boolean
+        detail?: string
+    }
+    email: {
+        status: SystemHealthStatus
+        mode: 'smtp' | 'console' | 'memory' | 'other'
+        backend: string
+    }
+    checked_at: string
+}
+
 export interface VatRate {
     id: number
     rate: string
@@ -538,6 +564,10 @@ export interface Invoice {
     email_logs?: EmailLog[]
     /** Detail reads only; never carries the secret (see InvoiceAccessLink). */
     access_link?: InvoiceAccessLink | null
+    /** Id of the newest email attempt (list serializer annotation).
+     * The retry endpoint is log-scoped, so the email-delivery tab needs the
+     * log id to offer an inline retry off the list payload. */
+    last_email_log_id?: string | null
 }
 
 /**
@@ -750,6 +780,8 @@ export interface ReadinessPeriod {
         end: string
         interval: string | null
         source: 'calendar' | 'invoice'
+        /** False while the period is still collecting data. */
+        ended: boolean
     }
     steps: ReadinessStep[]
     next_action: ReadinessNextAction
@@ -759,8 +791,8 @@ export interface ReadinessPeriod {
 
 /**
  * Cross-period attention items only (nav-regroup phase 2, spec §7): the types
- * the readiness cockpit cannot show as steps. They render inside the cockpit
- * card; tariff/metering/assignment gaps and setup state are cockpit-step
+ * the readiness cockpit cannot show as steps. Overview groups them by period
+ * or into community notices; tariff/metering/assignment gaps and setup state are readiness
  * concerns and are not emitted here.
  */
 export type AttentionItemType = 'email_failed' | 'invoice_overdue' | 'participant_validity'

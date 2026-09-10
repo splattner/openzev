@@ -1,4 +1,4 @@
-"""Readiness and attention endpoints (contract: nav-regroup spec §7)."""
+"""Readiness and attention endpoints (contract: invoice-lifecycle spec §5.6a)."""
 
 import re
 import uuid

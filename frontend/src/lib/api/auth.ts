@@ -14,6 +14,7 @@ import type {
   OAuthProviderConfigInput,
   RegisterInput,
   SocialAccount,
+  SystemHealth,
   User,
   UserInput,
   VatRate,
@@ -37,6 +38,13 @@ export async function fetchMe(): Promise<User> {
 
 export async function fetchAppSettings(): Promise<AppSettings> {
   const { data } = await api.get<AppSettings>('/auth/app-settings/')
+  return data
+}
+
+/** Admin-only platform health snapshot for the admin Overview hub's
+ * System-health tab (phase 3). */
+export async function fetchSystemHealth(): Promise<SystemHealth> {
+  const { data } = await api.get<SystemHealth>('/auth/system-health/')
   return data
 }
 

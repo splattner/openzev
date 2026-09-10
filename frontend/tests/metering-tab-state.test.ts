@@ -149,6 +149,14 @@ function buttonByText(container: HTMLElement, text: string) {
 }
 
 describe('metering tab state', () => {
+    it('opens the exact historical range from a cockpit deep link', async () => {
+        const { container, unmount } = await renderChart('/metering/quality?period_start=2025-02-01&period_end=2025-02-28')
+        const range = container.querySelector('.period-selector-range')?.textContent
+        expect(range).toContain('2025-02-01')
+        expect(range).toContain('2025-02-28')
+        unmount()
+    }, 30000)
+
     it('keeps the selected period and resolution across tab switches (no remount)', async () => {
         const { container, unmount } = await renderChart()
         const range = () => container.querySelector('.period-selector-range')?.textContent ?? ''

@@ -7,7 +7,7 @@ export function InvoicesEmptyState() {
       descriptionKey="pages.invoices.emptyState.description"
       actions={[
         { labelKey: 'pages.invoices.emptyState.participantsAction', to: '/participants', variant: 'primary' },
-        { labelKey: 'pages.invoices.emptyState.meteringPointsAction', to: '/metering-points', variant: 'secondary' },
+        { labelKey: 'pages.invoices.emptyState.meteringPointsAction', to: '/metering/points', variant: 'secondary' },
         { labelKey: 'pages.invoices.emptyState.tariffsAction', to: '/tariffs', variant: 'secondary' },
       ]}
     />

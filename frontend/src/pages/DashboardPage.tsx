@@ -19,11 +19,7 @@ import {
     fetchMeteringDashboardSummary,
 } from '../lib/api/metering'
 import { fetchInvoices, openInvoicePdf } from '../lib/api/invoices'
-import { fetchAttention, fetchReadiness } from '../lib/api/readiness'
 import { queryKeys } from '../lib/api/queryKeys'
-import { formatIsoDate } from '../lib/dates'
-import { isInvoiceOverdue, selectOpenInvoices, sumTotalChf } from '../features/invoices/openInvoices'
-import { OPEN_INVOICE_STATUSES } from '../features/invoices/invoiceStatus'
 import { formatMeteringBucketLabel } from '../lib/meteringLabels'
 import { formatShortDate, useAppSettings } from '../lib/appSettings'
 import { useAuth } from '../lib/auth'
@@ -32,7 +28,6 @@ import { PageSkeleton } from '../components/PageSkeleton'
 import { StatCard } from '../components/StatCard'
 import { PeriodSelector } from '../components/PeriodSelector'
 import { EnergyFlowChart } from '../components/EnergyFlowChart'
-import { BillingCockpit } from '../components/BillingCockpit'
 import {
     type BillingInterval,
     getCurrentBillingPeriod,
@@ -51,20 +46,6 @@ export function DashboardPage() {
     const [selectedParticipantId, setSelectedParticipantId] = useState('')
 
     const isZevScopedRole = user?.role === 'admin' || user?.role === 'zev_owner'
-
-    // Phase-2 cockpit: one readiness query (server-resolved cockpit period,
-    // no date picker) and one cross-period attention query, rendered together
-    // inside the cockpit card.
-    const readinessQuery = useQuery({
-        queryKey: queryKeys.invoices.readiness(selectedZevId || undefined),
-        queryFn: () => fetchReadiness(selectedZevId!),
-        enabled: isZevScopedRole && !!selectedZevId,
-    })
-    const attentionQuery = useQuery({
-        queryKey: queryKeys.invoices.attention(selectedZevId || undefined),
-        queryFn: () => fetchAttention(selectedZevId!),
-        enabled: isZevScopedRole && !!selectedZevId,
-    })
 
     const formatBucketLabel = (value: string) => formatMeteringBucketLabel(value, bucket, settings)
     const formatBucketTooltipLabel = (label: unknown) => formatBucketLabel(String(label ?? ''))
@@ -96,13 +77,12 @@ export function DashboardPage() {
             }),
         enabled: user?.role === 'participant' || (isZevScopedRole && !!selectedZevId),
     })
-    const openInvoiceStatusFilter = isZevScopedRole ? OPEN_INVOICE_STATUSES.join(',') : undefined
     const invoicesQuery = useQuery({
-        queryKey: queryKeys.invoices.list(selectedZevId || undefined, openInvoiceStatusFilter),
-        queryFn: () => fetchInvoices(selectedZevId || undefined, { status: openInvoiceStatusFilter }),
-        // Participants see their own invoices server-side; owner/admin read
-        // the selected ZEV's invoices for the open-invoice exception list.
-        enabled: user?.role === 'participant' || (isZevScopedRole && !!selectedZevId),
+        queryKey: queryKeys.invoices.list(),
+        queryFn: () => fetchInvoices(),
+        // Managers use Overview's period cards. Participants still receive
+        // their own invoices here from the role-scoped endpoint.
+        enabled: user?.role === 'participant',
     })
     const hourlyProfileQuery = useQuery({
         queryKey: queryKeys.metering.hourlyProfile(period.from, period.to, selectedZevId || undefined, selectedParticipantId || undefined),
@@ -154,15 +134,6 @@ export function DashboardPage() {
             ),
         [invoicesQuery.data],
     )
-    const today = useMemo(() => formatIsoDate(new Date()), [])
-    const openInvoices = useMemo(
-        () => selectOpenInvoices(invoicesQuery.data ?? []),
-        [invoicesQuery.data],
-    )
-    const openOverdueCount = useMemo(
-        () => openInvoices.filter((invoice) => isInvoiceOverdue(invoice, today)).length,
-        [openInvoices, today],
-    )
     const ownerSelfConsumption = useMemo(() => {
         if (summary?.role !== 'zev_owner') return null
         const { produced_kwh, exported_kwh } = summary.zev_totals
@@ -175,17 +146,13 @@ export function DashboardPage() {
         <div className="page-stack">
             <header>
                 {(selectedZevName || participantScopeName) ? <p className="eyebrow">{selectedZevName ?? participantScopeName}</p> : null}
-                <h2>{t('dashboard.title')}</h2>
-                <p className="muted">{t('dashboard.description')}</p>
+                <h2>
+                    {t(isZevScopedRole ? 'pages.energyBalancePage.title' : 'dashboard.title')}
+                </h2>
+                <p className="muted">
+                    {t(isZevScopedRole ? 'pages.energyBalancePage.description' : 'dashboard.description')}
+                </p>
             </header>
-
-            {/* Phase-2 action area: the cockpit period is resolved server-side
-                and never follows the date selector, so it sits above the
-                selector — the selector then stays adjacent to the analytics
-                it actually controls. */}
-            {isZevScopedRole && selectedZevId && (
-                <BillingCockpit readinessQuery={readinessQuery} attentionQuery={attentionQuery} />
-            )}
 
             {(user?.role === 'admin' || user?.role === 'zev_owner') && (
                 <section className="card">
@@ -294,53 +261,9 @@ export function DashboardPage() {
                         </section>
                     )}
 
-                    {/* Short exception list (spec §5.1): open invoices still
-                        awaiting payment, filtered server-side so later pages
-                        are not dropped; selectOpenInvoices is a client-side
-                        fallback. */}
-                    <section className="card">
-                        <h3 style={{ marginTop: 0 }}>{t('pages.dashboard.openInvoices.title')}</h3>
-                        {invoicesQuery.isLoading ? (
-                            <PageSkeleton variant="tableRows" />
-                        ) : invoicesQuery.isError ? (
-                            <p className="muted">{t('pages.dashboard.failedInvoices')}</p>
-                        ) : openInvoices.length === 0 ? (
-                            <p className="muted">{t('pages.dashboard.openInvoices.empty')}</p>
-                        ) : (
-                            <>
-                                <ul className="open-invoices-list">
-                                    {openInvoices.slice(0, 5).map((invoice) => (
-                                        <li key={invoice.id}>
-                                            <span className="open-invoice-main">
-                                                <span className="open-invoice-number">{invoice.invoice_number}</span>
-                                                <span className="open-invoice-participant">{invoice.participant_name}</span>
-                                            </span>
-                                            <span className="open-invoice-amount">CHF {invoice.total_chf}</span>
-                                            {isInvoiceOverdue(invoice, today) ? (
-                                                <span className="badge badge-danger">{t('pages.dashboard.openInvoices.overdue')}</span>
-                                            ) : (
-                                                <span className="badge badge-info">{t('pages.dashboard.openInvoices.open')}</span>
-                                            )}
-                                        </li>
-                                    ))}
-                                </ul>
-                                <div className="open-invoices-foot">
-                                    <span>
-                                        {t('pages.dashboard.openInvoices.outstanding', {
-                                            openCount: openInvoices.length,
-                                            overdueCount: openOverdueCount,
-                                            amount: sumTotalChf(openInvoices).toFixed(2),
-                                        })}
-                                    </span>
-                                    <Link to="/billing/invoices">{t('pages.dashboard.openInvoices.viewAll')}</Link>
-                                </div>
-                            </>
-                        )}
-                    </section>
-
                     <section className="card">
                         <h3 style={{ marginTop: 0 }}>
-                            {t('pages.dashboard.energyBalance')}
+                            {t('pages.dashboard.consumptionAndProduction')}
                             {selectedZevName ? ` — ${selectedZevName}` : ''}
                             {selectedParticipantName ? ` — ${selectedParticipantName}` : ''}
                         </h3>

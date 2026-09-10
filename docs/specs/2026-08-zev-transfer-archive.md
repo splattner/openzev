@@ -247,6 +247,7 @@ has no readings).
 
 ### `frontend/src/features/zev/ZevExportModal.tsx`
 
+- Opened from `/zev-settings/export` (Settings → Export / transfer). The dialog remains mounted at the settings-hub level.
 - Export button opens `TransferSectionPicker` bound to `selected`
   (`useState<TransferSectionName[]>(INITIAL_SELECTION)`). The modal stays
   mounted while closed, so `selected` is reset back to the structure-only
@@ -263,6 +264,7 @@ has no readings).
 
 ### `frontend/src/features/zev/ZevImportModal.tsx`
 
+- Opened from `/admin/zevs` (Platform → Overview → ZEVs).
 - Uploads the zip, calls `inspect-archive` first, shows per-section row counts
   and a name field, then submits `import-archive` with the chosen sections;
   per-entry errors are listed from the response body.

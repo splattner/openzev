@@ -67,7 +67,11 @@ const defaultCreateForm = (): ZevWizardInput => ({
 
 type WizardStep = 1 | 2 | 3 | 4 | 5
 
-export function ZevListPage() {
+/**
+ * `embedded` drops the page header (mounted inside an admin hub tab since
+ * phase 3).
+ */
+export function ZevListPage({ embedded = false }: { embedded?: boolean }) {
     const { user } = useAuth()
     const { settings } = useAppSettings()
     const isAdmin = user?.role === 'admin'
@@ -360,11 +364,13 @@ export function ZevListPage() {
     if (isLoading)
         return (
             <div className="page-stack">
+                {!embedded && (
                 <header>
                     <p className="eyebrow">{t('nav.platformScope')}</p>
                     <h2>{t('pages.zevs.title')}</h2>
                     <p className="muted">{t('pages.zevs.description')}</p>
                 </header>
+                )}
                 <PageSkeleton variant="table" />
             </div>
         )
@@ -399,11 +405,12 @@ export function ZevListPage() {
 
     return (
         <div className="page-stack">
+{!embedded && (
             <header>
                 <p className="eyebrow">{t('nav.platformScope')}</p>
                 <h2>{t('pages.zevs.title')}</h2>
                 <p className="muted">{t('pages.zevs.description')}</p>
-            </header>
+            </header>)}
 
             <div className="actions-row actions-row-gap-lg mb-1">
                 {isAdmin ? (
@@ -858,6 +865,14 @@ export function ZevListPage() {
                                         <span className="badge badge-info">
                                             {zev.zev_type.toUpperCase()}
                                         </span>
+                                        {/* Setup completeness mirrors the readiness
+                                            contract (phase 3): an empty IBAN is
+                                            the one blank-able billing setting. */}
+                                        {!zev.bank_iban?.trim() && (
+                                            <span className="badge badge-warning" title={t('pages.zevs.setupIncompleteHint')}>
+                                                {t('pages.zevs.setupIncomplete')}
+                                            </span>
+                                        )}
                                     </div>
                                 </td>
                                 <td>{ownerNameById.get(zev.owner) ?? (user?.id === zev.owner ? user.username : zev.owner)}</td>

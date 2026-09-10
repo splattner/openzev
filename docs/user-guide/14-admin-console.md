@@ -3,7 +3,18 @@
 > This guide retains its historical filename (`14-admin-console.md`) and old
 > anchor links; the product term is now **Platform**.
 
-This guide covers all administration features available to users with the **Admin** role. The platform tooling lives in the sidebar under **Platform** (routes `/admin/*`). While there, the shell shows a persistent **Platform administration** indicator and no tenant context is displayed — the ZEV switcher is hidden until you re-enter a community via **ZEVs → Manage** (your previously selected community is preserved).
+This guide covers all administration features available to users with the **Admin** role. The platform tooling lives in the sidebar under **Platform** (routes `/admin/*`). While there, the shell shows a persistent **Platform administration** indicator and no tenant context is displayed — the ZEV switcher is hidden until you re-enter a community via **Overview → ZEVs → Manage** (your previously selected community is preserved).
+
+The Platform group has four entries (hubs with tabs-as-routes):
+
+- **Overview** (`/admin`) — KPIs · ZEVs · All invoices · Platform audit log · System health
+- **Accounts** (`/admin/accounts`) — Users · API keys
+- **Templates** (`/admin/templates`) — PDF templates · Email templates
+- **System Settings** (`/admin/system-settings`) — Regional · Features · OAuth · VAT
+
+Legacy routes (`/admin/zevs`, `/admin/invoices`, `/admin/audit-logs`,
+`/admin/api-keys`, `/admin/pdf-templates`, `/admin/email-templates`) redirect
+to the matching hub tab.
 
 For general role information, see [Roles and Permissions](11-roles-and-permissions.md).
 
@@ -11,8 +22,10 @@ For general role information, see [Roles and Permissions](11-roles-and-permissio
 
 Admins can view and manage all ZEVs in the system.
 
-1. Go to **Platform → ZEVs**
-2. The list shows all ZEVs with their name, type, owner, and status
+1. Go to **Platform → Overview → ZEVs**
+2. The list shows all ZEVs with their name, type, owner, and status. A
+   **Setup incomplete** badge marks ZEVs with no IBAN configured — billing
+   cannot issue payable QR invoices for them yet.
 3. Click **Manage** on a row to enter that ZEV's working scope (selects the ZEV and opens its dashboard)
 
 ### Creating a ZEV (with Owner Wizard)
@@ -80,18 +93,19 @@ Configure VAT rates in **Platform → System Settings → VAT** — the fourth t
 The audit log is the cross-cutting, append-only event stream of privileged,
 billing-relevant, and destructive actions.
 
-- **Platform → Audit Logs** (`/admin/audit-logs`) — admins can view **all**
+- **Platform → Overview → Audit log** (`/admin/audit`) — admins can view **all**
   events across the platform.
-- `/audit-logs` — admins **and ZEV owners** can view events scoped to their
-  communities. Owners only see events for ZEVs they manage; they cannot see
-  global or other-ZEV events.
+- **Setup → ZEV settings → Audit log** (`/zev-settings/audit`) — admins **and
+  ZEV owners** can view events scoped to their communities. Owners only see
+  events for ZEVs they manage; they cannot see global or other-ZEV events.
+  (The legacy route `/audit-logs` redirects here.)
 
-- **Setup → Audit Logs** (`/audit-logs`) — ZEV owners see events scoped to
+- **Setup → Settings → Audit log** (`/zev-settings/audit`) — ZEV owners see events scoped to
   their communities and **follow the global community selection**: there is
   no community selector here, and no text search. Available filters are
   date range, actor, category, action type, and status.
 
-**Platform → Audit Logs** supports the full filter set: date range,
+**Platform → Overview → Audit Logs** supports the full filter set: date range,
 community (ZEV) selector, actor, category, action type, status, and text
 search. Text search is available only to admin users. Events are
 read-only — there is no public write endpoint.
@@ -101,6 +115,23 @@ The API is `GET /api/v1/audit/events/` (list) and
 [2026-05-audit-log-and-operational-traceability.md](../specs/2026-05-audit-log-and-operational-traceability.md)
 for the data model and redaction rules.
 
+## System Health
+
+**Platform → Overview → System health** (`/admin/health`) shows a read-only
+snapshot of platform infrastructure:
+
+- **Database** — engine (PostgreSQL/SQLite) and size; `degraded` if the probe
+  fails
+- **Celery** — number of workers responding to a ping and the Redis queue
+  depth; `unknown` means no broker is reachable (local development without
+  Redis reports unknown, which is a valid state, not an outage)
+- **Email** — the configured backend mode (SMTP, console, in-memory, custom)
+
+The snapshot is taken when the tab is opened (no auto-refresh). Probes are
+best-effort — a failing probe never breaks the page.
+
+![System health](screenshots/10b-admin-health.png)
+
 ## API Keys
 
 Automated integrations (imports, monitoring scripts) authenticate with per-user
@@ -108,9 +139,10 @@ API keys.
 
 - **Account Profile → API Keys** — a user manages their own keys (create with a
   name and expiry, and revoke). See [API Keys](16-api-keys.md).
-- **Platform → API Keys** (`/admin/api-keys`) — admins can view all keys
-  across users and **revoke** any of them. This page is revoke-only; keys are
-  created by their owner.
+- **Platform → Accounts → API keys** (`/admin/accounts/api-keys`) — admins can
+  view all keys across users and **revoke** any of them. This view is
+  revoke-only; keys are created by their owner. (The legacy route
+  `/admin/api-keys` redirects here.)
 
 > **Security:** API keys grant the same access as the owning account. Treat them
 > like passwords, and revoke unused or exposed keys promptly.
@@ -133,7 +165,7 @@ If no VAT number is set on the ZEV, or no VAT rate is active for an invoice peri
 
 ## Invoice PDF Templates
 
-Admins can manage the HTML/CSS template used for invoice PDF generation in **Platform → PDF Templates**.
+Admins can manage the HTML/CSS template used for invoice PDF generation in **Platform → Templates → PDF templates** (`/admin/templates/pdf`).
 
 ![PDF templates](screenshots/14-admin-pdf-templates.png)
 
@@ -145,9 +177,9 @@ Admins can manage the HTML/CSS template used for invoice PDF generation in **Pla
 
 ## Email Templates
 
-Admins manage system-wide default email templates in **Platform → Email Templates**.
+Admins manage system-wide default email templates in **Platform → Templates → Email templates** (`/admin/templates/email`).
 
-> **Note:** ZEV owners can also customize email templates for their own ZEV in **ZEV Settings → Email Templates**. See [ZEV Setup](02-zev-setup.md#email-templates) for per-ZEV customization, and [Email Configuration](10-email-configuration.md) for SMTP setup and delivery tracking.
+> **Note:** ZEV owners can also customize email templates for their own ZEV in **ZEV Settings → Documents & emails**. See [ZEV Setup](02-zev-setup.md#email-templates) for per-ZEV customization, and [Email Configuration](10-email-configuration.md) for SMTP setup and delivery tracking.
 
 ### Overview
 
@@ -169,7 +201,7 @@ Administrators can edit the default subject and body for each template. These de
 
 ### Accessing Email Templates
 
-1. Navigate to **Platform → Email Templates**
+1. Navigate to **Platform → Templates → Email templates**
 2. The page displays four tabs — one per template type
 
 ![Admin Email Templates](screenshots/14b-admin-email-templates.png)
@@ -220,7 +252,7 @@ Templates that have not been customized do not show the reset button.
 
 ## Invoice Management
 
-Admins can view and manage all invoices across all ZEVs in **Platform → Invoices**.
+Admins can view and manage all invoices across all ZEVs in **Platform → Overview → Invoices** (`/admin/invoices`).
 
 ![Admin invoice management](screenshots/17-admin-invoices.png)
 

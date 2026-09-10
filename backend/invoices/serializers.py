@@ -43,6 +43,7 @@ class InvoiceListSerializer(serializers.ModelSerializer):
     zev_name = serializers.CharField(source="zev.name", read_only=True)
     pdf_url = serializers.SerializerMethodField()
     last_email_status = serializers.SerializerMethodField()
+    last_email_log_id = serializers.SerializerMethodField()
 
     class Meta:
         model = Invoice
@@ -92,13 +93,32 @@ class InvoiceListSerializer(serializers.ModelSerializer):
         """
         if "last_email_status" in obj.__dict__:
             return obj.last_email_status
-        log = (
+        log = self._latest_email_log(obj)
+        return log.status if log else None
+
+    def get_last_email_log_id(self, obj) -> str | None:
+        """Id of the newest email log — the retry endpoint is log-scoped, so
+        the Billing email-delivery tab (phase 3) can offer an inline retry
+        off the list payload without fetching the nested logs."""
+        if "last_email_log_id" in obj.__dict__:
+            annotated = obj.last_email_log_id
+            return str(annotated) if annotated else None
+        log = self._latest_email_log(obj)
+        return str(log.id) if log else None
+
+    @staticmethod
+    def _latest_email_log(obj):
+        # Detail and period-overview already load all logs. Reuse that data,
+        # including an empty prefetch, instead of querying again per invoice.
+        logs = getattr(obj, "_prefetched_objects_cache", {}).get("email_logs")
+        if logs is not None:
+            return max(logs, key=lambda log: (log.created_at, log.id), default=None)
+        return (
             EmailLog.objects.filter(invoice_id=obj.pk)
             .order_by("-created_at", "-id")
-            .only("status")
+            .only("id", "status")
             .first()
         )
-        return log.status if log else None
 
 
 class InvoiceSerializer(InvoiceListSerializer):

@@ -2,27 +2,27 @@
 
 This guide covers generating, reviewing, and managing invoices for participants.
 
-## Billing Cockpit (Dashboard)
+## Billing Work by Period (Overview)
 
-The operator dashboard opens with the **Billing cockpit**: the most recent
-ended billing period that still needs you, with one step per workflow stage —
-Metering data, meter assignments, tariffs, generate, approve, send, track
-payments. Each step shows its state (OK, needs attention, pending, done);
-steps that open an actionable page link to it (a step that merely waits on an
-upstream one — e.g. payments before anything was sent — has no link), and the
-**next action** badge links to the step that needs you first. Data problems
-never block generation — they soft-gate as warnings.
+The manager **Overview** groups billing work into one card per period, oldest
+open period first. Each card shows the period status, the server-selected next
+action, overdue invoices and failed deliveries, and any additional warnings.
+Open **Period details** to see the remaining workflow steps and the compact
+**Checked and complete** checklist. Steps that open an actionable page link to
+it; a step that merely waits on an upstream one has no link. Data problems
+never block generation — they appear as warnings. When locked invoices from an
+earlier interval overlap the period (for example, paid monthly invoices under a
+new quarterly rhythm), the card shows a generation conflict with a link to the
+blocking invoices instead of offering generation.
 
-The cockpit resolves the most recent ended period that still has open work,
-then shows all seven steps for that period. Step completion and period
-resolution are separate: a period counts as open when it holds a draft or
+Period resolution and step completion are separate: a period counts as open
+when it holds a draft or
 approved invoice, or a billable participant (active with a meter assignment)
 with no invoice — a partial batch generation therefore keeps the period open
 even after those invoices are sent. The later steps are trailing states, not
 gates: approve/send/pay track the period's active invoices, so an older
 period can be fully sent yet still show an unpaid payments step or an
-unresolved failed delivery on its step list without pinning the cockpit to
-it. Cancelled invoices are withdrawn and count neither for nor against any
+unresolved failed delivery. Cancelled invoices are withdrawn and count neither for nor against any
 step — but one still counts as an existing invoice, so it suppresses the
 missing-invoice prompt for its participant until the operator regenerates it.
 
@@ -33,20 +33,25 @@ boundary after the community's start date.
 Three "nothing to do right now" states look similar but behave differently:
 
 - **First run** — a brand-new ZEV with no participants **or** no metering
-  points yet replaces the cockpit with a setup checklist.
+  points yet shows a setup checklist.
 - **Awaiting first period** — participants and meters exist, but the first
   billing period has not ended yet. Missing meter assignments and a blank
   IBAN still show as warnings above the waiting message.
 - **Caught up** — no ended period needs you right now (nothing waiting at
-  draft/approved, every eligible participant invoiced); the cockpit shows the
-  most recent ended period. Trailing steps such as unpaid invoices can still
-  appear there.
+  draft/approved, every eligible participant invoiced); Overview shows a quiet
+  **Up to date** message and keeps completed periods collapsed below it.
 
-Inside the cockpit card, below the step list, cross-period alerts appear when
-they exist: unresolved failed invoice emails (a later successful retry clears
-the item), overdue sent invoices, and participant validity endings that still
-hold meter assignments. Tariff coverage, metering gaps, unassigned readings
-and setup state are already covered by the cockpit steps above.
+An unfinished setup never hides behind a green status: with active
+participants but no current meter assignment Overview says nothing is
+billable yet and links to meter assignment, and a missing IBAN for QR bills
+stays visible beside normal period work without blocking generation.
+
+Invoice alerts appear in the matching period card: unresolved failed invoice
+emails (a later successful retry clears the item) and overdue sent invoices.
+Alerts without a billing period, including participant validity endings that
+still hold meter assignments, appear under **Community notices**. Tariff
+coverage, metering gaps, unassigned readings and setup state are already
+covered by readiness steps or setup guidance.
 
 ## Participant View: My Invoices
 
@@ -73,11 +78,49 @@ Draft → Approved → Sent → Paid
 - **Approved** — locked for review; can be emailed, marked paid, or deleted.
 - **Sent** — email was sent to the participant; can be resent or marked paid.
 - **Paid** — fully settled; no further actions.
-- **Cancelled** — removed from the active workflow; can be deleted or regenerated. A cancelled invoice does not count as generated for its period: the cockpit still asks you to generate a replacement. The backend supports cancellation, but there is currently no cancel button in the UI.
+- **Cancelled** — removed from the active workflow; can be deleted or regenerated. A cancelled invoice does not count as generated for its period: its period card still asks you to generate a replacement. The backend supports cancellation, but there is currently no cancel button in the UI.
+
+## Billing Hub (Invoices · Emails · Statements)
+
+The sidebar entry **Billing** (`/billing/invoices`) opens the invoice-first
+billing hub. Its tabs are routes — each is directly linkable:
+
+- **Invoices** (`/billing/invoices`) — the period-based invoice view (below).
+- **Emails** (`/billing/emails`) — delivery status of approved, sent, and paid
+  invoices: the latest email status per invoice, a filter by status, a
+  failed-email banner, **View history** for the actual attempt log, and an
+  inline **Retry** per failed latest attempt.
+- **Statements** (`/billing/statements`) — the yearly whole-ZEV annual-statement
+  ZIP downloads (see
+  [Annual Statements and Tax Overviews](#annual-statements-and-tax-overviews-billing--reports)).
+
+The per-period work cards live on **Overview**. The running period is separated
+as **Collecting data** and never exposes readiness actions. Ended periods with
+open work remain visible as cards; fully completed ended periods are collapsed.
+The primary action follows the backend-selected next step. **Open invoices**
+deep-links into Billing with that exact period preselected
+(`/billing/invoices?period_start=…&period_end=…`). Periods from an earlier
+billing interval keep their exact entries after a switch, so a January monthly
+invoice stays reachable next to its Jan–Mar quarter.
+
+The former `/billing/periods` bookmark redirects to Overview (see the
+Manager Overview screenshot in [Getting Started](01-getting-started.md)).
+
+The card action opens the workflow that needs attention, such as metering
+quality or tariffs. **Open invoices** opens that period's invoices.
+
+![Email delivery and retries](screenshots/08e-billing-emails.png)
+
+After a retry is accepted, the tab shows it as pending while the worker
+starts. It updates automatically when the next delivery attempt is recorded.
+Invoice rows themselves keep only the latest delivery-state badge; detailed
+attempts and errors are kept in the Emails tab's history panel.
+
+![Annual statement downloads](screenshots/08f-billing-statements.png)
 
 ## Period-Based Invoice View
 
-The **Invoices** page shows one billing period at a time. There are no status filters — you navigate between periods instead.
+The **Invoices** tab shows one billing period at a time. There are no status filters — you navigate between periods instead.
 
 ### Period Navigation
 
@@ -96,7 +139,7 @@ The period is automatically set based on the selected ZEV's billing interval.
 - **New community:** with no completed period yet, the page opens on the
   community's **first aligned period** instead of an empty one.
 - **Deep links:** opening a link that carries a period (`?period_start=…&
-  period_end=…` — from the dashboard cockpit, an attention item, or your own
+  period_end=…` — from an Overview period card, an attention item, or your own
   bookmark) shows that **exact period**, including historical periods from an
   earlier billing interval after a switch. Ranges that would start before the
   community existed are ignored and fall back to the default.
@@ -119,7 +162,7 @@ Each row in the table represents one **participant** who had active metering-poi
 | **Metering Data** | Green "complete" badge if all assigned metering points have daily readings for the full period. Red "missing" badge otherwise, with a count of points with data vs. total and a list of missing meter IDs with the number of missing days each. |
 | **Invoice** | The invoice number, or "Not created" if no invoice exists yet. |
 | **Status** | Badge showing the invoice status (`Draft`, `Approved`, `Sent`, `Paid`, `Cancelled`), or a neutral "Not created" badge. |
-| **Email** | Latest email delivery status badge (`pending`, `sent`, `failed`). A small button shows the sent/total count (e.g. `1/2`) and opens the **Email Logs** modal. If any emails failed, a red count is shown. Multiple attempts are indicated. |
+| **Email** | Latest email delivery status badge (`pending`, `sent`, `failed`). Open **Billing → Emails** for attempt history, errors, and retry. |
 | **Total** | Invoice total in CHF. |
 | **PDF** | **Generate PDF** button (or **Open PDF** + **Regenerate** if a PDF already exists). |
 | **Actions** | Per-invoice action buttons (see below). |
@@ -255,17 +298,26 @@ Invoices can be deleted to clean up incorrect or test data.
 
 Deletion is permanent; the invoice is removed from the database.
 
-## Annual Statements and Tax Overviews (Reports)
+## Annual Statements and Tax Overviews (Billing + Reports)
 
-The **Reports** page (`/reports`, sidebar entry **Reports**) bundles the yearly document downloads that were previously scattered across the dashboard:
+Yearly document downloads are split by role:
+
+- **Admin or ZEV owner** — sidebar **Billing → Statements** (`/billing/statements`):
+  the whole-ZEV annual-statement **ZIP archive** and the yearly **tax overview**
+  PDF for the selected ZEV, with the shared year selector.
+  The **Reports** page (`/reports`) contains the ZEV-level tax overview and
+  describes the analytics views that will be added there.
+- **Participant** — sidebar **Annual statement** (`/me/statement`): your own
+  annual statement as a **PDF**, plus the **tax overview** PDF if you are a
+  producer.
 
 ![Reports page](screenshots/23-reports.png)
 
-- Pick a **year** in the selector at the top (defaults to the last completed year) — both cards use that year.
-- **Annual Statement** — as **admin or ZEV owner** (sidebar **Reports**): all participants' statements of the selected ZEV as one **ZIP archive**. Click **Prepare Annual Statements (ZIP)**: the archive is generated in the background, and the card offers **Download All (ZIP)** once it is ready — for a large ZEV this takes a while, and you can reload the page and return later. If some statements could not be generated, the card shows how many were omitted and lists them in an `omitted.txt` file inside the archive. Download links expire after 24 hours; prepare a new export to get current data. As **participant** (sidebar **Annual statement**, `/me/statement`): your own statement as a **PDF** (immediate download).
+- Pick a **year** in the selector at the top (defaults to the last completed year) — all downloads on the page use that year.
+- **Annual Statement ZIP** — as **admin or ZEV owner** (sidebar **Billing → Statements**): all participants' statements of the selected ZEV as one **ZIP archive**. Click **Prepare Annual Statements (ZIP)**: the archive is generated in the background, and the card offers **Download All (ZIP)** once it is ready — for a large ZEV this takes a while, and you can reload the page and return later. If some statements could not be generated, the card shows how many were omitted and lists them in an `omitted.txt` file inside the archive. Download links expire after 24 hours; prepare a new export to get current data. As **participant** (sidebar **Annual statement**, `/me/statement`): your own statement as a **PDF** (immediate download).
 - **Tax Overview** — yearly tax overview for producers (net local-energy revenue and feed-in compensation) as a **PDF**.
 
-Each page shows the currently selected community above the page title. Reports are only available once a ZEV is selected; participants always receive their own documents.
+Each page shows the currently selected community above the page title. Documents are only available once a ZEV is selected (owners) or once billing has run (participants).
 
 ## Troubleshooting
 

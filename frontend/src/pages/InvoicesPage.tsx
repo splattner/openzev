@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { useEffect, useMemo, useState } from 'react'
-import { useTranslation } from 'react-i18next'
 import { useSearchParams } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { InvoicePeriodRowsTable } from '../features/invoices/InvoicePeriodRowsTable'
 import { InvoiceBatchToolbar } from '../features/invoices/InvoiceBatchToolbar'
 import { InvoiceDeleteModal } from '../features/invoices/InvoiceDeleteModal'
@@ -20,17 +20,16 @@ import {
     invoiceRangeFromParams,
     type BillingInterval,
 } from '../lib/billingPeriod'
-import {
-    fetchEmailLogs,
-    fetchInvoicePeriodOverview,
-} from '../lib/api/invoices'
+import { fetchInvoicePeriodOverview } from '../lib/api/invoices'
 import { queryKeys } from '../lib/api/queryKeys'
-import { EmailLogsModal } from '../components/EmailLogsModal'
 import { useAuth } from '../lib/auth'
 import { useManagedZev } from '../lib/managedZev'
-import type { EmailLog } from '../types/api'
 
-export function InvoicesPage() {
+/**
+ * The period-scoped invoice table (Billing hub → Invoices tab since phase 3).
+ * `embedded` drops the page header because the hub renders it.
+ */
+export function InvoicesPage({ embedded = false }: { embedded?: boolean }) {
     const { t } = useTranslation()
     const { selectedZevId, selectedZev } = useManagedZev()
     const { user } = useAuth()
@@ -53,9 +52,6 @@ export function InvoicesPage() {
     const { pdfWatch, startPdfWatch, stopPdfWatch } = usePdfWatch()
 
     const [deleteModalInvoiceId, setDeleteModalInvoiceId] = useState<string | null>(null)
-    const [selectedEmailLogs, setSelectedEmailLogs] = useState<EmailLog[]>([])
-    const [showEmailModal, setShowEmailModal] = useState(false)
-    const [selectedInvoiceNumber, setSelectedInvoiceNumber] = useState('')
 
     // Destination contract: the URL's exact period wins (cockpit + historical
     // attention links); otherwise the latest completed period.
@@ -126,17 +122,6 @@ export function InvoicesPage() {
         return () => window.clearTimeout(timer)
     }, [pdfWatch, pendingPdfCount, stopPdfWatch])
 
-    async function handleOpenEmailLogs(invoiceId: string, invoiceNumber: string) {
-        try {
-            const logs = await fetchEmailLogs(invoiceId)
-            setSelectedEmailLogs(logs)
-            setSelectedInvoiceNumber(invoiceNumber)
-            setShowEmailModal(true)
-        } catch {
-            // Error is handled by the UI
-        }
-    }
-
     const {
         deleteMutation,
         downloadAllPdfsMutation,
@@ -146,15 +131,12 @@ export function InvoicesPage() {
         batchMenuItems,
         getPrimaryRowAction,
         getRowMenuItems,
-        handleRetryEmail,
-        retiringEmailId,
         pdfGeneratingInvoiceId,
     } = useInvoiceActions({
         selectedZevId,
         period,
         rows,
         userRole: user?.role,
-        onOpenEmailLogs: handleOpenEmailLogs,
         onDeleteClick: (invoiceId) => setDeleteModalInvoiceId(invoiceId),
         onPdfQueued: startPdfWatch,
     })
@@ -180,22 +162,19 @@ export function InvoicesPage() {
 
     if (!selectedZevId) {
         return (
-            <div className="page-stack">
-                <header>
-                    <h2>{t('pages.invoices.title')}</h2>
-                    <p className="muted">{t('pages.invoices.selectZev')}</p>
-                </header>
-            </div>
+            <div className="card">{t('pages.invoices.selectZev')}</div>
         )
     }
 
     return (
         <div className="page-stack">
-            <header>
-                {selectedZev?.name ? <p className="eyebrow">{selectedZev.name}</p> : null}
-                <h2>{t('pages.invoices.title')}</h2>
-                <p className="muted">{t('pages.invoices.description')}</p>
-            </header>
+            {!embedded && (
+                <header>
+                    {selectedZev?.name ? <p className="eyebrow">{selectedZev.name}</p> : null}
+                    <h2>{t('pages.invoices.title')}</h2>
+                    <p className="muted">{t('pages.invoices.description')}</p>
+                </header>
+            )}
 
             <section className="card">
                 <PeriodSelector
@@ -240,7 +219,6 @@ export function InvoicesPage() {
                     <InvoicePeriodRowsTable
                         rows={rows}
                         period={period}
-                        onOpenEmailLogs={handleOpenEmailLogs}
                         getPrimaryRowAction={getPrimaryRowAction}
                         getRowMenuItems={getRowMenuItems}
                         isPdfPending={isPdfPending}
@@ -260,21 +238,6 @@ export function InvoicesPage() {
                 }}
             />
 
-            <EmailLogsModal
-                invoiceNumber={selectedInvoiceNumber}
-                emailLogs={selectedEmailLogs}
-                isOpen={showEmailModal}
-                onClose={() => setShowEmailModal(false)}
-                onRetry={(emailLogId) => {
-                    const currentInvoiceId = rows
-                        .map((row) => row.invoice)
-                        .find((invoice) => invoice?.invoice_number === selectedInvoiceNumber)?.id
-                    if (currentInvoiceId) {
-                        handleRetryEmail(currentInvoiceId, emailLogId)
-                    }
-                }}
-                isRetrying={retiringEmailId !== null}
-            />
         </div>
     )
 }

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from 'react'
+import { useEffect, useState, type ChangeEvent, type FormEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Skeleton, Switch, Tabs } from '@mantine/core'
 import { useReducedMotion } from '@mantine/hooks'
@@ -145,19 +145,6 @@ export function AdminSystemSettingsPage() {
     const providers = oauthProvidersQuery.data ?? []
     const oauthMutationPending = createOAuthMutation.isPending || updateOAuthMutation.isPending
 
-    const tabDescription = useMemo(() => {
-        switch (activeTab) {
-            case 'features':
-                return t('adminSystemSettings.tabs.features.description')
-            case 'oauth':
-                return t('adminSystemSettings.tabs.oauth.description')
-            case 'vat':
-                return t('adminSystemSettings.tabs.vat.description')
-            default:
-                return t('adminSystemSettings.tabs.regional.description')
-        }
-    }, [activeTab, t])
-
     function setActiveTab(tab: SystemSettingsTab) {
         setSearchParams(tab === 'regional' ? {} : { tab })
     }
@@ -242,24 +229,21 @@ export function AdminSystemSettingsPage() {
                 <p className="muted">{t('adminSystemSettings.description')}</p>
             </header>
 
-            <section className="card" style={{ paddingBottom: '0.5rem' }}>
-                <Tabs
-                    value={activeTab}
-                    onChange={(value) => setActiveTab(getValidTab(value ?? 'regional'))}
-                    keepMounted={false}
-                >
-                    <Tabs.List>
-                        <Tabs.Tab value="regional">{t('adminSystemSettings.tabs.regional.label')}</Tabs.Tab>
-                        <Tabs.Tab value="features">{t('adminSystemSettings.tabs.features.label')}</Tabs.Tab>
-                        <Tabs.Tab value="oauth">{t('adminSystemSettings.tabs.oauth.label')}</Tabs.Tab>
-                        <Tabs.Tab value="vat">{t('adminSystemSettings.tabs.vat.label')}</Tabs.Tab>
-                    </Tabs.List>
-                </Tabs>
-                <p className="muted" style={{ marginBottom: 0 }}>{tabDescription}</p>
-            </section>
+            <Tabs
+                classNames={{ root: 'app-tabs', list: 'app-tabs-list', tab: 'app-tabs-tab' }}
+                value={activeTab}
+                onChange={(value) => setActiveTab(getValidTab(value ?? 'regional'))}
+                keepMounted={false}
+            >
+                <Tabs.List>
+                    <Tabs.Tab value="regional">{t('adminSystemSettings.tabs.regional.label')}</Tabs.Tab>
+                    <Tabs.Tab value="features">{t('adminSystemSettings.tabs.features.label')}</Tabs.Tab>
+                    <Tabs.Tab value="oauth">{t('adminSystemSettings.tabs.oauth.label')}</Tabs.Tab>
+                    <Tabs.Tab value="vat">{t('adminSystemSettings.tabs.vat.label')}</Tabs.Tab>
+                </Tabs.List>
 
-            {activeTab === 'regional' && (
-                <section className="card" style={{ maxWidth: 760 }}>
+                <Tabs.Panel value="regional">
+                <section className="card">
                     <div style={{ marginBottom: '1rem' }}>
                         <h3 style={{ marginTop: 0, marginBottom: '0.35rem' }}>{t('adminSystemSettings.regional.title')}</h3>
                         <p className="muted" style={{ margin: 0 }}>{t('adminSystemSettings.regional.description')}</p>
@@ -340,10 +324,10 @@ export function AdminSystemSettingsPage() {
                         </form>
                     )}
                 </section>
-            )}
+                </Tabs.Panel>
 
-            {activeTab === 'features' && (
-                <section className="card" style={{ maxWidth: 880 }}>
+                <Tabs.Panel value="features">
+                <section className="card">
                     <div style={{ marginBottom: '1rem' }}>
                         <h3 style={{ marginTop: 0, marginBottom: '0.35rem' }}>{t('features.title')}</h3>
                         <p className="muted" style={{ margin: 0 }}>{t('features.description')}</p>
@@ -393,9 +377,9 @@ export function AdminSystemSettingsPage() {
                         </table>
                     )}
                 </section>
-            )}
+                </Tabs.Panel>
 
-            {activeTab === 'oauth' && (
+                <Tabs.Panel value="oauth">
                 <div className="table-card">
                     <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', alignItems: 'flex-start', flexWrap: 'wrap', marginBottom: '1rem' }}>
                         <div>
@@ -474,9 +458,10 @@ export function AdminSystemSettingsPage() {
                         </table>
                     )}
                 </div>
-            )}
+                </Tabs.Panel>
 
-            {activeTab === 'vat' && <VatSettingsSection />}
+                <Tabs.Panel value="vat"><VatSettingsSection /></Tabs.Panel>
+            </Tabs>
 
             <FormModal
                 isOpen={showOAuthForm}

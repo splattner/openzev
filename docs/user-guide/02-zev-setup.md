@@ -64,17 +64,27 @@ New ZEV owners can register themselves and create their ZEV without admin involv
 
 ### Option B: Admin-Created ZEV (with Owner Wizard)
 
-Admins can create a ZEV together with a new owner account in a single step. See [Platform → ZEVs](14-admin-console.md#zev-management) for details.
+Admins can create a ZEV together with a new owner account in a single step. See [Platform → Overview → ZEVs](14-admin-console.md#zev-management) for details.
 
 ## ZEV Settings
 
-**ZEV Owners** configure their community in **ZEV Settings** (sidebar: **Setup → Settings**).
+**ZEV Owners** configure their community in **ZEV Settings** (sidebar entry
+**Setup → Settings**, `/zev-settings`). The settings are organized into tabs:
+
+- **General** — name, start date, ZEV type, grid connection
+- **Billing & payment** — billing interval, invoice language, payment terms,
+  invoice prefix, VAT, bank details
+- **Documents & emails** — invoice email template, contract/tariff notes
+- **Audit log** — this ZEV's audit events (see
+  [Audit Logs](14-admin-console.md#audit-logs))
+- **Export / transfer** — whole-ZEV export archive (see
+  [ZEV Transfer](../specs/2026-08-zev-transfer-archive.md))
 
 ![ZEV settings](screenshots/06-zev-settings.png)
 
 ### General Settings
 
-The settings form is organized into sections:
+The General and Billing & payment tabs hold the settings form sections:
 
 #### Basic Information
 
@@ -96,6 +106,8 @@ The settings form is organized into sections:
 | **Grid Connection Point** | Verknüpfungspunkt / EAN identifier | No |
 
 #### Billing & Payment
+
+![Billing and payment settings](screenshots/06b-zev-billing-settings.png)
 
 | Setting | Purpose | Required |
 | --- | --- | --- |
@@ -209,7 +221,7 @@ From the page, **Send me a sign-in link** emails a one-time link to the address 
 
 ### Email Templates
 
-**ZEV Owners** can customize invoice email templates in **ZEV Settings → Email Templates**:
+**ZEV Owners** can customize invoice email templates in **ZEV Settings → Documents & emails**:
 
 - **Subject line** — Email subject sent with invoices
 - **Email body** — Message body sent with invoice PDF attachment
@@ -218,7 +230,7 @@ Both fields support variable placeholders such as `{invoice_number}`, `{zev_name
 
 Leave fields blank to use the system defaults. If a template contains an invalid placeholder, the system falls back to defaults automatically.
 
-For more details on email delivery, see [Email Configuration](10-email-configuration.md). For system-wide default email templates managed by admins, see [Platform → Email Templates](14-admin-console.md#email-templates).
+For more details on email delivery, see [Email Configuration](10-email-configuration.md). For system-wide default email templates managed by admins, see [Platform → Templates → Email templates](14-admin-console.md#email-templates).
 
 ## Access Control
 
@@ -244,7 +256,7 @@ Participants automatically see only their own metering data and invoices (ZEV-sc
 
 If running multiple ZEVs:
 
-1. **ZEV switcher:** Use the ZEV switcher at the top of the sidebar (top-left); the selected community is also shown above the page title on every page. Under Platform pages (`/admin/*`) the switcher is replaced by the **Platform administration** indicator — enter a ZEV via **Platform → ZEVs → Manage** instead
+1. **ZEV switcher:** Use the ZEV switcher at the top of the sidebar (top-left); the selected community is also shown above the page title on every page. Under Platform pages (`/admin/*`) the switcher is replaced by the **Platform administration** indicator — enter a ZEV via **Platform → Overview → ZEVs → Manage** instead
 2. **Each ZEV is independent:** Tariffs, participants, and invoices are isolated
 3. **Owners can manage one or more ZEVs:** Admin can assign ownership of additional ZEVs
 

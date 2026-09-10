@@ -50,7 +50,7 @@ in the frontend.
 ### Out of scope
 
 - Marketing or public-auth screens (`LoginPage`, verification, OAuth callback)
-- Admin settings/editor screens that are document-like rather than CRUD management lists (the admin email/PDF template editors and the admin system settings tabs are covered as tab examples in §7.2)
+- Admin settings/editor screens that are document-like rather than CRUD management lists (the template picker and admin system settings tabs are covered in §7.2)
 - Backend API, serializer, permission, or data model changes
 - A separate component library extraction or token system split from `index.css`
 
@@ -95,7 +95,7 @@ defined by shared frontend primitives and CSS contracts.
 | `frontend/src/components/BillingPeriodSelector.tsx` | `BillingPeriodSelector` | Specialized period-navigation control for invoice workflows; uses the same button language as management-page actions. |
 | `frontend/src/components/StatCard.tsx` | `StatCard` | Summary-stat card for page-level counts and metrics. Renders a `stat-label`, an `h3` value, and an optional muted `hint`. Variants: `tone` (`success`/`warning`/`danger`, colors the `h3`), `flat` (no card chrome, for tiles nested inside a `.card`), and `accent` (dark hero variant — at most one per view and mutually exclusive with `tone`/`flat`). Pages must use `StatCard` instead of hand-rolled `.stat-card` markup or local KPI-tile patterns. Kept exceptions (not KPI tiles): `.status-tile-*` (status-color legend) and the compact pill counters `.metering-summary-*`/`.participant-summary-*`. |
 | `@mantine/core` `Tabs` (`classNames` `app-tabs`/`app-tabs-list`/`app-tabs-tab`) | `Tabs`, `Tabs.List`, `Tabs.Tab`, `Tabs.Panel` | Mantine Tabs + the `app-tabs` classNames for mutually exclusive, document-like views. Mantine v9 emits hashed classes only, so the hooks must be passed via `classNames={{ root: 'app-tabs', list: 'app-tabs-list', tab: 'app-tabs-tab' }}`. All tab content renders as `Tabs.Panel` inside the same `Tabs` root (root `keepMounted={false}` when inactive content must unmount; shared controls may sit between list and panels) so every tab's `aria-controls` resolves to a real `tabpanel`. No hand-rolled strips. |
-| `frontend/src/components/PageSkeleton.tsx` | `PageSkeleton` | Loading placeholder using Mantine `Skeleton`. Variants: `page` (eyebrow + title + KPI row + 2 cards for full-page `isLoading`), `kpiRow` (4 stat blocks for stats/fact rows), `table` (5 fading rows inside `.card` for `DataTable` pages), `tableRows` (same rows without outer `.card` for nested contexts like Dashboard open-invoices), `cardList` (3 card blocks for card-list pages), `card` (single `.card` for inline sections). Every `isLoading` return must render a skeleton — no `t('common.loading')` text cards. Preserves page `header` on loading where possible (e.g. `AdminDashboardPage` pattern). Wraps Mantine shimmer via `useReducedMotion() → animate={false}` + `@media (prefers-reduced-motion: reduce) → .skeleton-block`. |
+| `frontend/src/components/PageSkeleton.tsx` | `PageSkeleton` | Loading placeholder using Mantine `Skeleton`. Variants: `page` (eyebrow + title + KPI row + 2 cards for full-page `isLoading`), `kpiRow` (4 stat blocks for stats/fact rows), `table` (5 fading rows inside `.card` for `DataTable` pages), `tableRows` (same rows without outer `.card` for nested contexts like Overview open invoices), `cardList` (3 card blocks for card-list pages), `card` (single `.card` for inline sections). Every `isLoading` return must render a skeleton — no `t('common.loading')` text cards. Preserves page `header` on loading where possible (e.g. `AdminDashboardPage` pattern). Wraps Mantine shimmer via `useReducedMotion() → animate={false}` + `@media (prefers-reduced-motion: reduce) → .skeleton-block`. |
 | `frontend/src/components/EmptyState.tsx` | `EmptyState` | Factory for list empty states. Props `titleKey`, `descriptionKey`, `actions?: ({ labelKey, variant?: 'primary'\|'secondary', icon? } & ({ to: string } \| { onClick: () => void }))[]`. Renders `<section className="card empty-state" aria-labelledby aria-describedby>` with `h3`, muted `p`, `.actions-row.actions-row-wrap`. Every primary list page shows one with ≥1 next-step CTA when `!isLoading && results.length === 0` (viewers still get `participants` CTA). Thin wrappers `TariffEmptyState`, `InvoicesEmptyState`, `MeteringPointsEmptyState` (and participant no-results) delegate to it. |
 
 ### 4.2 CSS contracts
@@ -110,7 +110,7 @@ language and should be reused instead of ad hoc page-local CSS when possible:
 | `.page-stack` | Vertical page layout spacing |
 | `.card`, `.table-card`, `.stat-card` | Primary container surfaces |
 | `.stat-card--accent`, `.stat-card--success`, `.stat-card--warning`, `.stat-card--danger`, `.stat-card--flat` | `StatCard` variants — `accent` dark hero (`var(--brand-deep)`, white `h3`, ≤1 per view); tone colors the `h3` (`var(--success-600)`/`var(--warning-800)`/`var(--danger-600)`); `flat` strips border/shadow/hover-lift for tiles inside a `.card` |
-| `.button`, `.button-secondary`, `.button-danger`, `.button-compact` | Shared button system (flat `var(--interactive)` fill since SPEC-2026-08-ui-redesign-pdf-style Phase 2; hover `var(--interactive-hover)`) |
+| `.button`, `.button-secondary`, `.button-danger`, `.button-compact` | Shared button system (flat `var(--interactive)` fill; see SPEC-2026-08-ui-redesign-pdf-style; hover `var(--interactive-hover)`) |
 | `.badge`, `.badge-neutral`, `.badge-info`, `.badge-success`, `.badge-danger`, `.badge-warning` (+ invoice workflow variants `.badge-draft/.badge-approved/.badge-sent/.badge-paid/.badge-cancelled`) | Small semantic status/category labels — filled desaturated fills from the generated `--status-*` semantics, never gold-on-white |
 | `.error-banner`, `.warning-banner` | Page-level error/warning callouts — error states render as `card error-banner`, warnings as `.warning-banner` (filled desaturated `--danger-100` / `--warning-100` fills; no inline gold borders) |
 | `.actions-row`, `.actions-row-wrap`, `.actions-row-end` | Inline action layouts |
@@ -135,6 +135,15 @@ redesign: sticky `thead`, 36px row rhythm, row-hover on `var(--surface)`, and
 right-aligned tabular numerals for quantities/money. All values resolve through
 the design tokens (`design/tokens.json` → `frontend/src/styles/tokens.css`);
 raw hex colors are lint-barred (stylelint `color-no-hex` + hex sweep).
+
+The single-column `.page-stack` and `.app-tabs` grids use
+`grid-template-columns: minmax(0, 1fr)`. This lets embedded tables scroll
+inside `.table-scroll` without their minimum content width expanding the
+hub or the whole page on mobile. The Billing email
+delivery table and My invoices table use `.billing-workflow-table` (48rem
+minimum width) inside `.table-scroll`,
+with `.billing-period-cell` preventing date-range wrapping. Narrow screens
+scroll the table instead of squeezing its dates into tall rows.
 
 ### 4.3 Icon contract
 
@@ -217,9 +226,13 @@ Default rule:
 
 Current application:
 
+- Overview uses period cards for open billing work, a quiet current-period row,
+  and collapsed completed history. Each card owns its readiness and invoice
+  alerts; no separate cockpit or open-invoices list repeats them. Period-card
+  actions use text labels without decorative arrows.
 - `TariffsPage` uses category sections for `energy`, `grid_fees`, `levies`, and `metering`.
-- `MeteringChartPage` uses tabs for chart versus quality views over the same period selection. The tabs are routes (`/metering/chart`, `/metering/quality`) sharing one page instance — see the route table in `2026-03-community-and-access.md` §9.2.
-- `AdminEmailTemplatesPage` and `AdminPdfTemplatesPage` are valid tab examples because each tab is a separate template editor document.
+- `MeteringChartPage` uses routed Chart, Quality and Import history tabs sharing one page instance (`/metering/chart`, `/metering/quality`, `/metering/imports`). Chart and Quality share the period selection; Imports hides these controls and does not request chart data. See `2026-03-community-and-access.md` §9.2.
+- The Templates hub renders all seven template editors as one standard tab strip with two labelled rows: PDF on one line, Email on the next, both left-bound via a fixed tag column — with no icons and no nested category/document tab bars. The active tab identifies the document; the editor does not repeat it as a heading.
 - Tab strips use Mantine `Tabs` with the `.app-tabs` contract and render their content as `Tabs.Panel` inside the same root; hand-rolled tab strips are not permitted.
 - `AdminSystemSettingsPage` predates this contract (default-styled `Tabs` embedded in a card, panels rendered outside the root) and is pending migration.
 
@@ -270,7 +283,7 @@ These pages define the current management-page reference set.
 #### `MeteringPointsPage`
 
 - File: `frontend/src/pages/MeteringPointsPage.tsx`
-- Route: `/metering-points`
+- Route: `/metering/points` (`/metering-points` stays as alias)
 - Query keys: `['participants']`, `['metering-points']`, `['metering-point-assignments']`
 - Pattern: summary toolbar, filters, metering-point cards, nested assignment rows, direct and overflow actions, confirm flows.
 
@@ -279,7 +292,31 @@ These pages define the current management-page reference set.
 - File: `frontend/src/pages/InvoicesPage.tsx`
 - Route: `/billing/invoices` (`/invoices` stays as alias)
 - Query key: `['invoice-period-overview', selectedZevId, period.period_start, period.period_end]`
-- Pattern: period navigation via `BillingPeriodSelector`, batch toolbar, compact structured table rows, primary/secondary/overflow actions.
+- Pattern: period navigation via `BillingPeriodSelector`, batch toolbar,
+  compact structured table rows, primary/secondary/overflow actions. The email
+  column carries only the latest delivery-state badge; delivery history is
+  owned by `BillingEmailsPage`.
+
+#### `OverviewPage`
+
+- File: `frontend/src/pages/OverviewPage.tsx`
+- Route: `/` for `admin` and `zev_owner` (role-dispatched by `HomePage`)
+- Query keys: readiness, readiness list, and attention
+- Pattern: setup guidance followed by period cards with primary actions and
+  invoice alerts. Running periods are informational (`ended: false`). Native
+  period disclosures show pending steps with linked titles, status badges, and
+  explicit open actions, followed by a compact vertical OK/done checklist.
+  Completed history uses exact-date rows with explicit
+  **Open invoices** buttons, without repeated completed labels.
+
+#### `BillingEmailsPage`
+
+- File: `frontend/src/pages/BillingEmailsPage.tsx`
+- Route: `/billing/emails`
+- Query key: selected-ZEV invoice list filtered to `approved,sent,paid`
+- Pattern: one delivery-status filter, latest-state badges, secondary **View
+  history** buttons, primary failed-delivery retry, and on-demand
+  `EmailLogsModal` history.
 
 #### `ImportsPage`
 

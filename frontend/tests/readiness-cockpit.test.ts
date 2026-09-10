@@ -155,7 +155,7 @@ describe('BillingCockpit (phase 2 readiness stepper)', () => {
         page.unmount()
     })
 
-    it('renders the resolved cockpit period and the eight steps', () => {
+    it('renders open steps and collapses completed steps into one summary', () => {
         const page = render(
             createElement(BillingCockpit, {
                 readinessQuery: { isLoading: false, isError: false, data: GREEN_READINESS },
@@ -166,8 +166,40 @@ describe('BillingCockpit (phase 2 readiness stepper)', () => {
         for (const key of ['metering', 'assignments', 'tariffs', 'generated', 'generation_conflicts', 'approved', 'sent', 'paid']) {
             expect(page.html()).toContain('data-status=')
             expect(page.text()).toContain(`pages.dashboard.cockpit.stepLabels.${key}`)
-        }        expect(page.text()).toContain('pages.dashboard.cockpit.nextActionLabels.generate')
+        }
+        expect(page.text()).toContain('pages.dashboard.cockpit.nextActionLabels.generate')
         expect(page.text()).toContain('pages.dashboard.cockpit.nextUp')
+        const completed = page.container.querySelector('details.cockpit-completed')
+        expect(completed).not.toBeNull()
+        expect(completed?.hasAttribute('open')).toBe(false)
+        expect(completed?.querySelector('summary')?.textContent)
+            .toContain('pages.dashboard.cockpit.completedSummary')
+        expect(page.container.querySelector('section.card > ol.cockpit-steps')?.children).toHaveLength(3)
+        const footer = page.container.querySelector('.cockpit-foot')
+        expect(footer?.firstElementChild?.textContent).toBe('pages.dashboard.cockpit.nextUp')
+        expect(footer?.querySelector('a')?.className).toContain('button-primary')
+        page.unmount()
+    })
+
+    it('reduces a caught-up cockpit to a single status line', () => {
+        const page = render(createElement(BillingCockpit, {
+            readinessQuery: {
+                isLoading: false,
+                isError: false,
+                data: {
+                    ...GREEN_READINESS,
+                    steps: GREEN_READINESS.steps.map((step) => ({
+                        ...step,
+                        status: step.key === 'metering' ? 'ok' : 'done',
+                    })),
+                    next_action: 'none',
+                    caught_up: true,
+                },
+            },
+        }))
+        expect(page.container.querySelector('.cockpit-caught-up')).not.toBeNull()
+        expect(page.container.querySelector('.cockpit-steps')).toBeNull()
+        expect(page.container.querySelector('.cockpit-foot')).toBeNull()
         page.unmount()
     })
 
@@ -278,6 +310,18 @@ describe('BillingCockpit (phase 2 readiness stepper)', () => {
         expect(page.text()).toContain('pages.dashboard.cockpit.setupParticipants')
         expect(page.text()).toContain('pages.dashboard.cockpit.setupMeteringPoints')
         expect(page.text()).toContain('pages.dashboard.cockpit.setupTariffs')
+        expect(page.container.querySelector('a[href="/zev-settings/billing"]')?.closest('li')?.getAttribute('data-complete')).toBe('false')
+        page.unmount()
+    })
+
+    it('shows the waiting message when setup is complete but no period has ended', () => {
+        const page = render(createElement(BillingCockpit, {
+            readinessQuery: { isLoading: false, isError: false, data: {
+                zev_id: '1', period: null, setup: null, steps: [], next_action: 'none', awaiting_first_period: true,
+            } },
+        }))
+        expect(page.text()).toContain('pages.dashboard.cockpit.awaitingFirstPeriod')
+        expect(page.container.querySelector('.cockpit-setup-list')).toBeNull()
         page.unmount()
     })
 

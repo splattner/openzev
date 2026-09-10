@@ -347,29 +347,56 @@ Template: `TEMPLATE_NAME = "invoices/invoice_pdf.html"` — editable by admins v
 
 ### 9.2 Admin routes
 
-All admin routes are nested under `/admin/*` and wrapped with `<ProtectedRoute allowedRoles={['admin']}>`:
+All admin routes are nested under `/admin/*` and wrapped with `<ProtectedRoute allowedRoles={['admin']}>`.
+The admin console is organized into four hubs with routed sections; legacy URLs redirect to the matching section:
 
 | Route | Page component | Purpose |
 |---|---|---|
-| `/admin` | `AdminDashboardPage` | Platform statistics dashboard |
-| `/admin/system-settings` | `AdminSystemSettingsPage` | Tabbed system settings for date formats, feature flags, OAuth providers, and VAT rates |
-| `/admin/pdf-templates` | `AdminPdfTemplatesPage` | Invoice, contract, and annual-statement HTML template editor |
-| `/admin/accounts` | `AdminAccountsPage` | User account management |
-| `/admin/zevs` | `ZevListPage` | ZEV list management |
+| `/admin` | `AdminOverviewHubPage` | Overview hub (default tab `overview`) |
+| `/admin/overview` | `AdminOverviewHubPage tab="overview"` | KPIs dashboard (embedded `AdminDashboardPage`, see §9.3) |
+| `/admin/zevs` | `AdminOverviewHubPage tab="zevs"` | ZEV list (embedded `ZevListPage`; “Setup incomplete” badge when `bank_iban` is empty) |
+| `/admin/invoices` | `AdminOverviewHubPage tab="invoices"` | All invoices (embedded `AdminInvoicesPage`) |
+| `/admin/audit` | `AdminOverviewHubPage tab="audit"` | Platform audit log (embedded `AuditLogsPage scope="admin"`) |
+| `/admin/health` | `AdminOverviewHubPage tab="health"` | System health (`AdminSystemHealthPanel`, see §9.3a) |
+| `/admin/accounts` | `AdminAccountsHubPage` | Accounts hub (default tab `users`) |
+| `/admin/accounts/users` · `/admin/accounts/api-keys` | `AdminAccountsHubPage tab=…` | Embedded `AdminAccountsPage` / `AdminApiKeysPage` |
+| `/admin/templates` | `AdminTemplatesHubPage` | Templates hub (default category `pdf`) |
+| `/admin/templates/pdf` · `/admin/templates/email` | `AdminTemplatesHubPage tab=…` | Embedded `AdminPdfTemplatesPage` / `AdminEmailTemplatesPage` |
+| `/admin/system-settings` | `AdminSystemSettingsPage` | System settings on the standard tab strip (`.app-tabs`) for date formats, feature flags, OAuth providers, and VAT rates |
 
-Legacy routes `/admin/settings/regional`, `/admin/settings/vat`, `/admin/features`, and `/admin/oauth`
-remain available as redirects into the corresponding tab of
-`/admin/system-settings`.
+Legacy routes `/admin/settings/regional`, `/admin/settings/vat`, `/admin/features`,
+`/admin/oauth`, `/admin/audit-logs`, `/admin/api-keys`, `/admin/pdf-templates`,
+and `/admin/email-templates` remain available as redirects into the
+corresponding hub tab or `/admin/system-settings` tab.
 
 ### 9.3 AdminDashboardPage
 
 **File:** `frontend/src/pages/AdminDashboardPage.tsx`
 
+- Mounted as the Overview tab of `AdminOverviewHubPage`
+  (`embedded` drops the page header; the hub renders it). Standalone KPI
+  behavior is otherwise unchanged.
 - Query: `useQuery({ queryKey: queryKeys.invoices.dashboard(), queryFn: fetchDashboardStats, refetchInterval: 30000 })` — auto-refreshes every 30 seconds.
 - Header: `eyebrow` + `h2` (page-contract) inside `.page-stack`; loading/error/no-data states are inline (`muted` / `card error-banner`) without separate early returns so the header is always visible.
 - KPI row: three `StatCard` in `.grid.grid-3` — ZEVs, Participants, and Total revenue (`formatChf` from `frontend/src/lib/numbers.ts`, Swiss grouping `de-CH`, e.g. `CHF 1'234.56`) as the single dark `accent` card. Pending/failed email counts are deliberately not repeated here — they live in the Email Statistics breakdown below.
 - Invoice status breakdown: `card` with `h2` + 5-tile grid (`draft/approved/sent/paid/cancelled`) using the desaturated workflow palette from the invoice badges (`frontend/src/index.css` — `.status-tile-draft/.status-tile-cancelled` → `var(--status-neutral)`, `.status-tile-approved/.status-tile-sent` → `var(--status-info)`, `.status-tile-paid` → `var(--status-success)`) with dark ink text (`var(--ink-soft)` / `var(--success-700)`). Intentionally *not* `StatCard` — a flat status-color legend inside a card, like the email tiles.
 - Email statistics: `card` with `h2` + `.grid.grid-4` of four flat `StatCard` (`flat`, no card chrome) — `total` (no tone), `sent`/`pending`/`failed` (`flat` + conditional `tone="success"`/`"warning"`/`"danger"` only when the count is > 0; zero renders neutral to avoid alarmist coloring, unlike the always-colored invoice status legend).
+
+### 9.3a AdminSystemHealthPanel
+
+**File:** `frontend/src/pages/AdminSystemHealthPanel.tsx`
+
+- Query: `useQuery({ queryKey: queryKeys.auth.systemHealth(), queryFn: fetchSystemHealth, staleTime: 60_000 })`
+  — a point-in-time snapshot fetched when the tab opens, no auto-refresh.
+- Three probe cards in `.grid.grid-3`, each with a status dot (`.dot` —
+  `.dot-success`/`.dot-warning`/`.dot-info` mapped from `ok`/`degraded`/`unknown`):
+  Database (engine + `formatBytes` size; SQLite uses page count × page size,
+  including in-memory databases), Celery (workers responding, Redis
+  default-queue depth, exception-class-only `detail` on broker errors), Email (backend mode label).
+- Backend: `GET /api/v1/auth/system-health/` (admin-only; see the access spec
+  §10.1). Probes are best-effort — an unreachable broker reports
+  `status: "unknown"`, never a 500, mirroring the readiness cockpit's
+  soft-gating philosophy.
 
 ### 9.4 AdminSystemSettingsPage
 
@@ -377,8 +404,13 @@ remain available as redirects into the corresponding tab of
 
 - Canonical route: `/admin/system-settings`
 - Uses query-param tabs: `regional`, `features`, `oauth`, `vat`
-- Renders one page shell with a tab bar and per-tab content.
+- Renders one standard Mantine `Tabs` strip (`.app-tabs` contract, bare under the
+  page header — no wrapping card, no strip-level description) with one
+  `Tabs.Panel` per tab; `keepMounted={false}` unmounts inactive panels. Each
+  panel is full-width and carries its own title and description.
 - `TAB_ORDER = ['regional', 'features', 'oauth', 'vat']`; `getValidTab()` falls back to `regional`.
+- Covered by `frontend/tests/system-settings-tabs.test.ts` (strip contract, panel
+  switching, invalid-tab default).
 - **Regional tab:**
     - Loads current settings from `useAppSettings()`.
     - Form with 3 dropdowns: short date format, long date format, date & time format.
@@ -404,9 +436,12 @@ remain available as redirects into the corresponding tab of
 **File:** `frontend/src/features/settings/VatSettingsSection.tsx`
 
 - Query: `useQuery({ queryKey: ['vat-rates'], queryFn: fetchVatRates })`.
+- Layout: root is a `.page-stack` (stats grid, full-width form card, rate list);
+  the form fields use a wrapping `repeat(auto-fit, minmax(200px, 1fr))` grid.
 - **Summary cards:** three `StatCard` components above the form — configured rate count, today's active rate (percentage, or the translated "none" label), and count of scheduled rates with `valid_from` in the future.
 - **Create/Edit form:** 3 fields (rate %, valid_from date input with app-settings format, valid_to date input optional). Default rate: `8.1`. The frontend converts percentage to fraction before sending (`(percentage / 100).toFixed(4)`). Dates use the shared `CivilDateInput` (`frontend/src/components/CivilDateInput.tsx`, a Mantine `DatePickerInput` typing civil dates in the app's configured format); calendar localization comes from the app-level Mantine `DatesProvider` supplied by `DateLocaleProvider` (`frontend/src/components/DateLocaleProvider.tsx`, mounted in `main.tsx`), which maps the active UI language to a dayjs locale for month names, weekday order, and picker text. Submitting an empty valid_from is rejected client-side with a toast (`adminVatSettings.messages.missingValidFrom`).
-- **Rate table:** displays rate as percentage (`(rate × 100).toFixed(2)%`), valid_from (formatted), valid_to (formatted or "Open"), with Edit/Delete buttons.
+- **Rate table:** inside `.table-card`, a `data-table` (same shared table styling
+  as the Features and OAuth tabs) displays rate as percentage (`(rate × 100).toFixed(2)%`), valid_from (formatted), valid_to (formatted or "Open"), with Edit/Delete buttons.
 - **Delete:** Uses `ConfirmDialog` component for destructive confirmation.
 - **Validation feedback:** API errors (overlap, invalid range) displayed via toast.
 
@@ -414,8 +449,11 @@ remain available as redirects into the corresponding tab of
 
 **File:** `frontend/src/pages/AdminPdfTemplatesPage.tsx`
 
-- Tabbed editor with three tabs: invoice (`fetchInvoicePdfTemplate`), contract (`fetchContractPdfTemplate`), and annual statement (`fetchAnnualStatementPdfTemplate`); each tab has its own query, save mutation, and reset mutation.
-- Each tab shows the template name, an `is_customized` badge when a DB override exists, and a large monospace `TemplateTextarea` with an overlay that highlights `{{ }}`/`{% %}` template variables and shows field-description tooltips on hover.
+- `AdminTemplatesHubPage` renders one standard Mantine `Tabs` strip (`.app-tabs` contract) with two labelled rows — PDF on one line, Email on the next. A fixed tag column keeps both rows left-bound; on narrow screens each tag stacks above its tabs. There are no icons. The active tab's `Tabs.Panel` mounts the matching embedded editor; `keepMounted={false}` unmounts the rest. There are no repeated editor titles and no hub description.
+- Category routes remain `/admin/templates/{pdf,email}`; `?template=` selects `invoice`, `contract`, `annual_statement`, `invoice_email`, `participant_invitation`, `email_verification`, or `participant_magic_link`. Missing, invalid, or other-category values fall back to that category's invoice template. Tab changes replace the URL, preserving unrelated query parameters.
+- Both editor pages accept optional `template` and `embedded` props; embedded mode omits their header and picker. Standalone pages retain a category-specific select. Switching templates unmounts the previous editor (discarding unsaved edits, as before); PDF preview cleanup aborts pending renders and revokes object URLs.
+- Editor with three templates: invoice (`fetchInvoicePdfTemplate`), contract (`fetchContractPdfTemplate`), and annual statement (`fetchAnnualStatementPdfTemplate`); each template has its own query, save mutation, and reset mutation.
+- The selected template shows an `is_customized` badge when a DB override exists and a large monospace `TemplateTextarea` with an overlay that highlights `{{ }}`/`{% %}` template variables and shows field-description tooltips on hover.
 - A `FieldReference` sidebar lists the available context variables per template type (invoice, participant, ZEV, owner, line-item loops, charts/savings, translations). VAT fields distinguish the stored fraction from the display percentage.
 - **Preview:** `previewPdfTemplateBlob(content, templateType, signal)` POSTs the current editor content to `preview-pdf-template/` with `output: "pdf"`, fetches the returned bytes as a Blob, and renders them in an iframe via an object URL inside `PdfPreview` (the app's shared authenticated document embed). A source toggle shows the escaped rendered HTML as text; render errors show an error banner.
 - **Save** sends the content string to the matching update endpoint; success toast displays the `detail` message from the response.
@@ -425,18 +463,29 @@ remain available as redirects into the corresponding tab of
 
 **File:** `frontend/src/pages/ZevSettingsPage.tsx`
 
-Accessible to `admin` and `zev_owner` at route `/zev-settings`. Uses the globally selected ZEV from `useManagedZev()`.
+Accessible to `admin` and `zev_owner` at `/zev-settings` (General) and
+`/zev-settings/:tab`. `ZevSettingsTabRoute` rejects unknown tabs. Uses the
+globally selected ZEV from `useManagedZev()`; all tabs share the same form
+state and submit the complete form through `updateZev`. Switching tabs
+preserves unsaved edits; changing the selected ZEV reloads its values.
+Success invalidates the ZEV list and the cockpit and period-list readiness
+queries. `ZevGeneralSettingsFields` accepts `group: general | billing | documents`;
+omitting it renders every group for existing full-form consumers.
 
-Two form sections sharing the same submit mutation (`updateZev`):
+- **General** (`general`): name, start date, ZEV type, grid operator (including
+  ElCom ID and tariff-source URL), grid connection point.
+- **Billing & payment** (`billing`): billing interval, invoice language,
+  payment term, `itemize_tariff_bands`, `participant_invoice_access`, invoice
+  prefix, VAT treatment (`vat_mode`), VAT number (only when registered), bank
+  name and IBAN.
+- **Documents & emails** (`documents`): email template fields below, notes,
+  local tariff notes and additional contract notes.
+- **Audit log** (`audit`): embedded `AuditLogsPage scope="owner"`, locked to
+  the selected ZEV; no platform-wide log or free-text search.
+- **Export / transfer** (`export`): opens `ZevExportModal` for the selected
+  ZEV. Import remains on the platform ZEVs tab.
 
-**Section 1 — General Settings** (via `ZevGeneralSettingsFields` component):
-- Name, start date (DatePicker with app-settings format), ZEV type (ZEV/vZEV), billing interval, invoice language
-- Grid connection: grid operator, grid connection point
-- General: name, start date, ZEV type, billing interval, invoice language, payment term, itemise price bands on the invoice (`itemize_tariff_bands` checkbox)
-- Payment details: invoice prefix, VAT treatment (`vat_mode` selector), VAT number (shown only when treatment is `registered`), bank name, bank IBAN
-- Notes, local tariff notes (contract PDF), additional contract notes (contract PDF)
-
-**Section 2 — Email Template** (via `ZevEmailTemplateFields` component):
+**Email template fields** (via `ZevEmailTemplateFields`):
 - Subject line input with placeholder showing system default
 - Body textarea (10 rows) with placeholder showing system default
 - Reset buttons to clear custom templates (reverts to system default)
@@ -591,9 +640,16 @@ Tests cover dashboard access (`test_invoice_dashboard_is_admin_only`) confirming
 
 - AdminSystemSettingsPage: tab selector switches between regional settings, feature flags, OAuth providers, and VAT rates. Regional format selector renders all 4 options per format type, preview updates live, and save mutation calls `updateAppSettings`.
 - VatSettingsSection (VAT tab): form validates percentage 0–100, converts to fraction, create/edit/delete flows work. Overlap errors display as toast.
-- AdminPdfTemplatesPage: three template tabs (invoice/contract/annual statement) load server content, save sends updated content, preview renders a real sample-data PDF (`output: "pdf"`), reset-to-default reverts customized templates.
-- AdminDashboardPage: stats display, auto-refresh at 30s interval.
-- ZevSettingsPage: general settings + email template sections both submit via `updateZev`. Reset buttons clear custom templates. Template variable reference is visible.
+- AdminPdfTemplatesPage: three templates (invoice/contract/annual statement) load server content, save sends updated content, preview renders a real sample-data PDF (`output: "pdf"`), reset-to-default reverts customized templates.
+- AdminDashboardPage: stats display, auto-refresh at 30s interval (as the
+  Overview hub tab).
+- `accounts/test_system_health.py` (8 tests): 401 unauthenticated,
+  403 for owner/participant, response shape for all probes, unknown-broker
+  degradation (bounded connection retries and credential-safe diagnostics),
+  configured queue selection, broken-DB-probe degradation, zero-worker
+  degradation, and real Kombu publication failure without reconnect retries.
+  Tests never broadcast to real workers.
+- ZevSettingsPage: the root and sub-routes share `ZevSettingsTabRoute`, preserving unsaved form state when leaving the initial General tab. General settings + email template sections both submit via `updateZev`; success invalidates the ZEV list and both readiness forms. Reset buttons clear custom templates. Template variable reference is visible.
 
 ### 13.3 Acceptance criteria
 
@@ -608,4 +664,3 @@ Tests cover dashboard access (`test_invoice_dashboard_is_admin_only`) confirming
 - [ ] Contract PDFs render in the ZEV's configured language (de/fr/it/en) and include local tariff notes and additional contract notes
 - [ ] Invoice PDFs use `AppSettings.date_format_short` for all formatted dates
 - [ ] Changing settings does not retroactively modify already-generated PDFs or sent emails
-

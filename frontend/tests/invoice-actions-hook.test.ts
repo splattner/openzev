@@ -122,7 +122,6 @@ function createHarness(rowsOverride?: unknown[], periodOverride?: { period_start
         },
       ] as any,
       userRole: 'participant',
-      onOpenEmailLogs: vi.fn(),
       onDeleteClick: vi.fn(),
     })
 
@@ -185,34 +184,6 @@ describe('useInvoiceActions hook', () => {
     )
   })
 
-  it('tracks retry-email state and forwards settle callbacks', async () => {
-    const { Harness, getResult } = createHarness()
-
-    act(() => {
-      root.render(createElement(Harness))
-    })
-
-    const result = getResult()
-    expect(result).not.toBeNull()
-
-    await act(async () => {
-      result!.handleRetryEmail('invoice-approved', 'log-1')
-    })
-
-    expect(getResult()!.retiringEmailId).toBe('log-1')
-    expect(mutationInstances[7]?.mutate).toHaveBeenCalledWith(
-      { invoiceId: 'invoice-approved', emailLogId: 'log-1' },
-      expect.objectContaining({ onSettled: expect.any(Function) }),
-    )
-
-    await act(async () => {
-      const call = mutationInstances[7]?.mutate.mock.calls[0]
-      const options = call?.[1] as { onSettled?: () => void }
-      options?.onSettled?.()
-    })
-
-    expect(getResult()!.retiringEmailId).toBeNull()
-  })
 })
 
 /**

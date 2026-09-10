@@ -15,7 +15,11 @@ import type { Invoice } from '../types/api'
 // Stable empty array so the useMemo below keeps a consistent dependency reference.
 const EMPTY_INVOICES: Invoice[] = []
 
-export function AdminInvoicesPage() {
+/**
+ * `embedded` drops the page header (mounted inside the admin Overview hub
+ * since phase 3; /admin/invoices stays as a deep-link alias).
+ */
+export function AdminInvoicesPage({ embedded = false }: { embedded?: boolean }) {
     const { t } = useTranslation()
     const queryClient = useQueryClient()
     const { pushToast } = useToast()
@@ -138,11 +142,13 @@ export function AdminInvoicesPage() {
 
     return (
         <div className="page-stack">
+            {!embedded && (
             <header>
                 <p className="eyebrow">{t('nav.platformScope')}</p>
                 <h2>{t('adminInvoices.title')}</h2>
                 <p className="muted">{t('adminInvoices.description')}</p>
             </header>
+            )}
 
             <section className="card">
                 {invoicesQuery.isLoading && <p>{t('adminInvoices.loading')}</p>}

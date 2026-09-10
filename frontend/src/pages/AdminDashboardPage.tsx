@@ -6,7 +6,11 @@ import { PageSkeleton } from '../components/PageSkeleton'
 import { queryKeys } from '../lib/api/queryKeys'
 import { formatChf } from '../lib/numbers'
 
-export function AdminDashboardPage() {
+/**
+ * `embedded` drops the page header (mounted as the Overview tab of the
+ * admin hub since phase 3).
+ */
+export function AdminDashboardPage({ embedded = false }: { embedded?: boolean }) {
     const { t } = useTranslation()
     const { data: stats, isLoading, error } = useQuery({
         queryKey: queryKeys.invoices.dashboard(),
@@ -14,7 +18,7 @@ export function AdminDashboardPage() {
         refetchInterval: 30000,
     })
 
-    const header = (
+    const header = embedded ? null : (
         <header>
             <p className="eyebrow">{t('nav.platformScope')}</p>
             <h2>{t('nav.adminOverview')}</h2>

@@ -52,7 +52,7 @@ export function MyInvoicesPage() {
             ) : (
                 <section className="table-card">
                     <div className="table-scroll">
-                        <table>
+                        <table className="billing-workflow-table">
                             <thead>
                                 <tr>
                                     <th scope="col">{t('pages.myInvoices.col.invoice')}</th>
@@ -68,7 +68,7 @@ export function MyInvoicesPage() {
                                     <tr key={invoice.id}>
                                         <td>{invoice.invoice_number}</td>
                                         {showCommunity && <td>{invoice.zev_name}</td>}
-                                        <td>
+                                        <td className="billing-period-cell">
                                             {formatShortDate(invoice.period_start, settings)} →{' '}
                                             {formatShortDate(invoice.period_end, settings)}
                                         </td>

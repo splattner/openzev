@@ -91,8 +91,8 @@ export function InvoiceDetailPage() {
 
     const inv = invoiceQuery.data
 
-    // Return link follows its origin (dashboard open-invoice list, the
-    // invoices period it came from, or My invoices); participants without
+    // Return link follows its origin (the invoice period it came from, or My
+    // invoices); participants without
     // one fall back to /me/invoices.
     const isParticipant = user?.role === 'participant'
     const origin = (location.state as { from?: string; period_start?: string; period_end?: string } | null)

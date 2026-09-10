@@ -60,7 +60,7 @@ class InvoiceListPayloadTests(TestCase):
             unit_price_chf=Decimal("0.05000"),
             total_chf=Decimal("0.20"),
         )
-        EmailLog.objects.create(
+        self.log = EmailLog.objects.create(
             invoice=self.invoice,
             recipient="list@example.com",
             subject="Invoice",
@@ -187,6 +187,21 @@ class InvoiceListPayloadTests(TestCase):
             [],
             "list must not query invoices_emaillog outside the annotation subquery",
         )
+        # Phase 3 (email-retry tab): the same subquery also feeds
+        # last_email_log_id, so it must ride the same single SELECT too.
+        self.assertIn(
+            'AS "last_email_log_id"',
+            touched,
+            "list must annotate last_email_log_id in the same invoice SELECT",
+        )
+        # Rows are ordered by (-period_end, participant), so the logged and
+        # the no-log invoice can land in either order — find them by id, not
+        # by position (the period-overview test above pins the same rule).
+        by_id = {r["id"]: r for r in resp.data["results"]}
+        self.assertEqual(
+            by_id[str(self.invoice.id)]["last_email_log_id"], str(self.log.pk)
+        )
+        self.assertIsNone(by_id[str(self.no_log_invoice.id)]["last_email_log_id"])
 
     def test_annotated_null_row_stays_constant_query_count(self):
         """Invoices without email logs must not trigger a per-row fallback
@@ -230,3 +245,20 @@ class InvoiceListPayloadTests(TestCase):
         touched = " ".join(q["sql"] for q in ctx.captured_queries)
         self.assertIn("invoices_invoiceitem", touched)
         self.assertIn("invoices_emaillog", touched)
+        self.assertEqual(len(self._standalone_email_log_queries(ctx.captured_queries)), 1)
+        self.assertEqual(resp.data["last_email_log_id"], str(self.log.pk))
+
+    def test_prefetched_latest_email_fields_do_not_query_and_agree_on_ties(self):
+        from invoices.models import Invoice
+
+        newer = EmailLog.objects.create(
+            invoice=self.invoice, recipient="new@example.com", subject="Retry", status="failed",
+        )
+        EmailLog.objects.filter(pk=newer.pk).update(created_at=self.log.created_at)
+        latest = max((self.log, newer), key=lambda log: log.id)
+        for invoice_id, expected in ((self.invoice.pk, latest), (self.no_log_invoice.pk, None)):
+            invoice = Invoice.objects.prefetch_related("email_logs").get(pk=invoice_id)
+            serializer = InvoiceSerializer()
+            with self.assertNumQueries(0):
+                self.assertEqual(serializer.get_last_email_status(invoice), expected.status if expected else None)
+                self.assertEqual(serializer.get_last_email_log_id(invoice), str(expected.pk) if expected else None)

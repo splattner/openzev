@@ -102,7 +102,7 @@ export function VatSettingsSection() {
     }
 
     return (
-        <>
+        <div className="page-stack">
             <section
                 style={{
                     display: 'grid',
@@ -118,7 +118,7 @@ export function VatSettingsSection() {
                 <StatCard label={t('adminVatSettings.stats.scheduled')} value={futureVatRatesCount} />
             </section>
 
-            <section className="card page-stack" style={{ maxWidth: 860 }}>
+            <section className="card page-stack">
                 <h3 style={{ marginTop: 0 }}>{editingId ? t('adminVatSettings.editTitle') : t('adminVatSettings.createTitle')}</h3>
                 <form
                     className="page-stack"
@@ -129,7 +129,7 @@ export function VatSettingsSection() {
                         saveMutation.mutate({ id: editingId ?? undefined, payload })
                     }}
                 >
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
                         <label>
                             <span>{t('adminVatSettings.form.rate')}</span>
                             <input
@@ -177,7 +177,7 @@ export function VatSettingsSection() {
                 </form>
             </section>
 
-            <section className="page-stack" style={{ maxWidth: 860 }}>
+            <section className="page-stack">
                 <h3 style={{ marginTop: 0 }}>{t('adminVatSettings.listTitle')}</h3>
                 {vatRatesQuery.isLoading ? (
                     <div className="muted">{t('adminVatSettings.loading')}</div>
@@ -185,7 +185,7 @@ export function VatSettingsSection() {
                     <div className="muted">{t('adminVatSettings.empty')}</div>
                 ) : (
                     <div className="table-card">
-                        <table>
+                        <table className="data-table">
                             <thead>
                                 <tr>
                                     <th>{t('adminVatSettings.table.rate')}</th>
@@ -251,6 +251,6 @@ export function VatSettingsSection() {
                     onCancel={handleCancel}
                 />
             )}
-        </>
+        </div>
     )
 }

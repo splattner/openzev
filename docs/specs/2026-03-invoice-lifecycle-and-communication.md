@@ -244,11 +244,13 @@ the same module.
 
 #### Annual statement / financial summary downloads (frontend location)
 
-The single-document endpoints below and the export-job endpoints are consumed
-from the **/reports** route (`frontend/src/pages/ReportsPage.tsx`) — the owner/admin Reports view; participants reach the same page (participant branch) via **/me/statement** in the sidebar. The
-whole-ZEV ZIP is produced asynchronously: the frontend creates an export job,
-polls its status, and downloads the artifact when it completes (§8.1,
-ADR 0017).
+The single-document endpoints below are consumed from the **/reports** route
+(`frontend/src/pages/ReportsPage.tsx`) — the owner/admin Reports view;
+participants reach the same page (participant branch) via **/me/statement**
+in the sidebar. The whole-ZEV ZIP is produced asynchronously and lives in
+the Billing hub's Annual statements tab (**/billing/statements**,
+`BillingStatementsPage`): the frontend creates an export job, polls its
+status, and downloads the artifact when it completes (§8.1, ADR 0017).
 
 | Method | URL | Permission | Frontend usage |
 |---|---|---|---|
@@ -317,7 +319,7 @@ always agree, including for multi-membership users.
 |---|---|---|---|
 | `GET` | `/invoices/dashboard/` | `admin` only | Aggregated stats: ZEV count, participant count, invoice counts by status, total revenue, recent invoices, email stats |
 
-### 5.6a Readiness and attention (nav-regroup phase 2)
+### 5.6a Readiness and attention
 
 Pure computation lives in `invoices/readiness.py`; the endpoints in
 `views_readiness.py` mirror the period-overview RBAC pattern (`zev_id`
@@ -326,8 +328,8 @@ required → 400, unknown ZEV → 404, non-owner → 403 via `IsZevOwnerOrAdmin`
 | Method | URL | Permission | Query params | Description |
 |---|---|---|---|---|
 | `GET` | `/invoices/invoices/readiness/` | `IsZevOwnerOrAdmin` | `zev_id`; or `zev_id` + `period_start` + `period_end`; or `zev_id` + `periods=all` | Period readiness for the billing cockpit. Parameterless form resolves the **cockpit period** server-side: the most recent ENDED period with open work — a draft/approved invoice, or a billable participant (active with an assignment) who has no invoice (partial batch generation); sent/paid/cancelled are trailing/withdrawn states; an invoice covers only its exact `(start, end)`, and aligned periods begin on/after the community start (a mid-period start has no partial first period; a period whose every day is covered by sent/paid invoices from an earlier interval counts as settled — paid monthly periods do not reopen as regeneration work, while partly locked-covered periods are an explicit `generation_conflicts` warn step (`next_action: review_generation_conflicts`) instead of ordinary generation). No work at all → one of three flagged states: `setup` (readiness-state block — `complete`/`reason`/`assignment_link` plus advisory `billing_settings_complete`/`billing_settings_link`; `period: null` only when master data is empty), `awaiting_first_period` (nothing has ended yet; `period: null`, but the
-`setup` block is still present), or `caught_up` (the most recent ended period is returned with `caught_up: true` plus a completed `setup` block — only setup/awaiting are `period: null`, and the caught-up steps may still show trailing items such as unpaid invoices; parameterless cockpit responses always carry `setup`, explicit-period ones never do). A pending invoice from an earlier billing interval stays visible even when its period no longer aligns with the current interval; duplicate invoices for one participant/period resolve to the newest one everywhere, and attention/readiness links land on the period overview, whose rows persist for participants holding an invoice even after their assignment ends (so retry/mark-paid actions stay reachable). `periods=all` returns the union of current-calendar and exact invoice periods (deduplicated by both dates, newest-first by end/start, with `source` ∈ calendar | invoice and a configured `interval` only when the exact dates align) with `history_from`/`total_periods`/`truncated` metadata, computed from one shared dataset (constant query count, not a per-period walk); explicit ranges are bounded to five years. |
-| `GET` | `/invoices/invoices/attention/` | `IsZevOwnerOrAdmin` | `zev_id` | Cross-period attention items only (the types the readiness cockpit cannot show as steps): `email_failed`, `invoice_overdue`, `participant_validity` — tariff coverage, cockpit data gaps and setup state are readiness-step concerns and are not repeated here. Each item carries a `link`, its own period ref where item-scoped, structured fields for frontend localization, and a stable type-prefixed `id` (record identity, never list position). Failed-email items appear only while the **newest** attempt failed (a later success clears them); one per invoice. Rendered as a cross-period alert list inside the cockpit card. |
+`setup` block is still present), or `caught_up` (the most recent ended period is returned with `caught_up: true` plus a completed `setup` block — only setup/awaiting are `period: null`, and the caught-up steps may still show trailing items such as unpaid invoices; parameterless cockpit responses always carry `setup`, explicit-period ones never do). A pending invoice from an earlier billing interval stays visible even when its period no longer aligns with the current interval; duplicate invoices for one participant/period resolve to the newest one everywhere, and attention/readiness links land on the period overview, whose rows persist for participants holding an invoice even after their assignment ends (so retry/mark-paid actions stay reachable). `periods=all` returns the union of current-calendar and exact invoice periods (deduplicated by both dates, newest-first by end/start, with `source` ∈ calendar | invoice, `ended: boolean`, and a configured `interval` only when the exact dates align) with `history_from`/`total_periods`/`truncated` metadata, computed from one shared dataset (constant query count, not a per-period walk); `ended` is true only when `period.end < today`, so the running period can be displayed as data collection rather than actionable readiness; explicit ranges are bounded to five years. |
+| `GET` | `/invoices/invoices/attention/` | `IsZevOwnerOrAdmin` | `zev_id` | Cross-period attention items only (the types the readiness cockpit cannot show as steps): `email_failed`, `invoice_overdue`, `participant_validity` — tariff coverage, cockpit data gaps and setup state are readiness-step concerns and are not repeated here. Each item carries a `link`, its own period ref where item-scoped, structured fields for frontend localization, and a stable type-prefixed `id` (record identity, never list position). Failed-email items appear only while the **newest** attempt failed (a later success clears them); one per invoice. On Overview, grouped into the matching period card or a community notice when not period-scoped. |
 
 `Readiness` payload: `{period: {start, end, interval} | null, steps: [{key,
 status, count, [total], [failed], [detail], [link], [detail_data]}],
@@ -342,14 +344,19 @@ the UI localizes from `detail_data`. Both single-period and bulk readiness
 ignore failed email attempts for paid/cancelled invoices, and count the newest
 attempt for every other invoice in the exact period. Cross-period alerts remain
 visible when readiness is loading, unavailable, or has no period; attention
-loading and failure states are shown independently. Full contract: `2026-09-navigation-regroup.md` §7.
+loading and failure states are shown independently.
 
-Since phase 2 the invoice serializers expose `last_email_status` (newest
+The invoice serializers expose `last_email_status` (newest
 `EmailLog` status per invoice). On list pages it arrives as a `Subquery`
 annotation inside the one SELECT (no per-row N+1); the detail-shaped
-serializer inherits the field too, so detail/overview/echo responses are no
-longer shape-identical to pre-phase-2 — on those (non-annotated) objects the
-value comes from a bounded per-object lookup (see §9.1).
+serializer inherits the field too. On non-annotated detail/overview/echo
+objects the value reuses prefetched logs, falling back to a per-object lookup only when
+neither annotation nor prefetch is present (see §9.1).
+
+The serializers expose `last_email_log_id` alongside the status, including inherited
+detail shapes; both list annotations use `-created_at, -id` ordering. The ID
+feeds `/invoices/invoices/{id}/retry-email/{logId}/`. The setup block uses
+non-empty `bank_iban` for `settings_complete` (no new billing restriction).
 
 ### 5.7 PDF template management
 
@@ -733,8 +740,15 @@ Two shapes, split by cost. `InvoiceListSerializer` returns all invoice fields pl
 - `last_email_status`: status of the newest `EmailLog` for the invoice (`null`
   when none) — on list pages served by a `Subquery` annotation inside the one
   SELECT (no per-row N+1); on detail-shaped objects (detail read, workflow
-  echoes, period overview) by a bounded per-object lookup, since
-  `InvoiceSerializer` already embeds full `email_logs`.
+  echoes, period overview) from prefetched `email_logs`, with a per-object
+  lookup only when neither annotation nor prefetch is present.
+- `last_email_log_id`: string ID of that newest `EmailLog` (`null` when none),
+  on both list and detail shapes. List annotations distinguish a present null
+  from an absent annotation, so log-less rows never add per-row queries.
+  Prefetched logs use the maximum `(created_at, id)`; fallback lookups and
+  both annotations order by `-created_at, -id`, keeping
+  status and retry ID paired even when timestamps tie. The Billing emails tab
+  passes it to the log-scoped retry endpoint.
 
 `InvoiceSerializer` subclasses it and adds the nested read-only relations:
 - `items`: nested `InvoiceItemSerializer` (read-only).
@@ -742,7 +756,7 @@ Two shapes, split by cost. `InvoiceListSerializer` returns all invoice fields pl
 
 `InvoiceViewSet.get_serializer_class()` returns the list variant for `action == "list"` and the full one everywhere else (retrieve, the workflow actions that echo an invoice back, and `compute_period_overview`, which builds `InvoiceSerializer` directly). `get_queryset()` matches: the `prefetch_related("items", "email_logs")` is applied for every action *except* `list`, so the database cost drops with the payload rather than being paid for fields that are no longer rendered.
 
-The split exists because the list is the one unbounded read: `AdminInvoicesPage` passes no ZEV filter and walks every invoice in the instance one page at a time, so each nested line item and email-log row is paid for once per invoice across the whole dataset. Measured on 50 invoices × 8 items, one page went from 151.4 KiB to 33.2 KiB (4.6×, 78% smaller) and from 4 queries to 2; at the client walker's 200-page cap that is 29.6 MiB → 6.5 MiB. No list consumer reads the nested arrays — `AdminInvoicesPage` renders `invoice_number`/`zev_name`/`participant_name`/period/`total_chf`/`status`, `DashboardPage` reads `status`/`pdf_url`/`period_*`/`total_chf`. In `frontend/src/types/api.ts` both fields are already optional (`items?`, `email_logs?`), so no frontend change was required. See #488.
+The split exists because the list is the one unbounded read: `AdminInvoicesPage` passes no ZEV filter and walks every invoice in the instance one page at a time, so each nested line item and email-log row is paid for once per invoice across the whole dataset. Measured on 50 invoices × 8 items, one page went from 151.4 KiB to 33.2 KiB (4.6×, 78% smaller) and from 4 queries to 2; at the client walker's 200-page cap that is 29.6 MiB → 6.5 MiB. No list consumer reads the nested arrays — `AdminInvoicesPage` renders `invoice_number`/`zev_name`/`participant_name`/period/`total_chf`/`status`, `OpenInvoicesCard` reads workflow/amount fields, and `BillingEmailsPage` reads the annotated latest-email fields before loading history on demand. In `frontend/src/types/api.ts` both fields are optional (`items?`, `email_logs?`). See #488.
 
 Read-only fields: `id`, `invoice_number`, `created_at`, `updated_at`, `pdf_file`, plus all billing-engine/workflow fields that never come from client input: `status`, `total_local_kwh`, `total_grid_kwh`, `total_feed_in_kwh`, `subtotal_chf`, `vat_rate`, `vat_chf`, `total_chf`, `period_start`, `period_end`, `zev`, `participant`, `sent_at`, `due_date`. Generic create/update/partial_update endpoints are not exposed; creation happens only via `generate`/`generate-all`, mutations only via the workflow actions.
 
@@ -756,6 +770,70 @@ Strips legacy period suffixes from `description` on serialization.
 |---|---|---|
 | `GenerateInvoiceSerializer` | `participant_id`, `period_start`, `period_end` | `period_start < period_end` |
 | `GenerateZevInvoicesSerializer` | `zev_id`, `period_start`, `period_end` | (none — dates validated downstream) |
+
+### 9.4 Manager Overview and billing email delivery
+
+`OverviewPage` is the canonical manager work surface. It renders
+`BillingCockpit` in `setupOnly` mode (first-run checklist, awaiting-first-period
+message, assignment and IBAN warnings), followed by `BillingPeriodsPage`.
+The standalone cockpit workflow and `OpenInvoicesCard` are not rendered on
+Overview. Energy balance remains a separate `/dashboard` page.
+
+`BillingPeriodsPage` requests `fetchReadinessList(selectedZevId)` and receives
+the independently queried attention response from Overview. `groupPeriodCards`
+merges readiness and invoice alerts by both period dates, oldest start/end
+first. Alerts for historical periods absent from readiness create their own
+cards; participant-validity and periodless alerts remain in a community notice
+section. Loading and failures are independent: available alerts remain visible
+when readiness is unavailable, and history/caught-up claims are suppressed
+while attention is loading or failed.
+
+Each open period renders a `BillingPeriodCard`: localized month or month range,
+year, exact formatted date range, semantic status, localized next-step detail,
+visible overdue/delivery-failure counts, a text-only workflow link, and collapsed
+period details. The backend `next_action` selects its matching warn/todo step;
+its link is used unchanged. Without that link, the card opens an alert's link
+or the exact-date invoice overview. Approval is labelled **Review invoices**
+because approval still happens in Billing. Other readiness warnings remain
+visible with their resolution links. Delivery-failure counts use the maximum
+of readiness and attention counts, not their sum. Expanded details retain
+other steps and group alerts by invoice ID, so one invoice with two issues has
+one detail row. Pending detail steps appear first with explicit status badges;
+both their titles and explicit open actions link to the relevant workflow, even
+when multiple steps share a destination. OK/done steps share a compact vertical checklist under
+**Checked and complete**, without repeated status or detail sentences. No backend English `detail` or `label` is rendered.
+
+Running periods (`ended: false`) never expose readiness actions or warnings.
+They appear below open cards as **Collecting data**; a real invoice alert can
+instead place that period in the work grid, without exposing its readiness
+steps. Omitted `ended` remains compatible with older responses (treated as
+ended). Completed periods are collapsed into newest-first rows with exact
+dates and an explicit **Open invoices** button placed directly after the period;
+rows do not repeat the completed status. With completed periods, no open work, no community notices and both
+queries successful, an **Up to date** message is shown. First-run and waiting
+states remain owned by the setup component.
+
+The complete primary-work area reserves two text lines so card actions align
+whether it contains one wrapping message or two short messages. The card grid uses three columns, two at viewport widths ≤1150px, and one at
+≤700px. No arrow decorations appear in period dates or actions; disclosures
+use plus/minus. `overview-period-cards.test.ts` covers exact-date grouping,
+historical alerts, ordering, running periods, independent community notices,
+invoice deduplication, backend-selected actions and delivery count deduplication.
+The former `/billing/periods` route still redirects to Overview.
+
+`BillingEmailsPage` requests the selected ZEV's `approved,sent,paid` invoice
+list with one local filter (`all`, `failed`, `pending`, `sent`). It is the
+canonical email-history surface: **View history** loads `fetchEmailLogs` on
+demand into `EmailLogsModal`; the invoice table itself shows only the latest
+delivery-state badge. Failed latest attempts with `last_email_log_id` expose
+Retry. Buttons are disabled during the request; success invalidates invoice
+queries. While the tab stays mounted, an accepted retry is displayed as
+pending until the worker creates a new latest log, preventing repeat clicks on
+the old failed attempt. Polling runs every 3 seconds while a log or an accepted
+retry is pending. This local queued indication is not a backend delivery
+guarantee and resets on unmount. `useInvoiceActions` invalidates
+`queryKeys.invoices.readinessList(zevId)` after workflow mutations alongside
+the cockpit readiness and attention caches.
 
 ---
 
@@ -806,6 +884,7 @@ Strips legacy period suffixes from `description` on serialization.
 | `test_workflow.py` | `InvoiceEngineGuardTests` | §4.4: regenerate approved/paid → 409, regenerate draft/cancelled → success |
 | `test_period_overview.py` | `InvoicePeriodOverviewTests` | §5.5: metering completeness, missing-day detection, partial-assignment windows, no-assignment exclusion, cross-ZEV permission denial |
 | `test_period_overview_unit.py` | `ComputePeriodOverviewTests` (10 tests) | §5.5 unit level: complete/incomplete participants, single missing day, exclusion without assignment, partial-assignment required-day windows and gaps, invoice period matching, row ordering, multiple-metering-point counts |
+| `test_readiness.py` | 20 test classes (96 tests) | §5.6a: cockpit period resolution, bulk parity and stable query count, exact historical periods, running-versus-ended lifecycle metadata, first-run/awaiting/caught-up states, structured step details, attention and RBAC |
 | `test_engine_edge_cases.py` | `InvoiceMathEdgeCaseTests` | Edge cases: monthly fee month-boundary counting, tariff validity windows, zero/negative fees, rounding |
 | `test_engine_edge_cases.py` | `InvoiceVatRateSelectionTests` | VAT rate active at period_end, zero VAT when no vat_number |
 | `test_email_formatting.py` | `InvoiceEmailFormattingTests` | §7.1–7.2: date format in email body, custom ZEV templates, auto-transition to sent |
@@ -834,7 +913,14 @@ Strips legacy period suffixes from `description` on serialization.
 ### Frontend
 
 - Invoice action button visibility by role and status
-- Email status display and retry button behavior
+- Invoice rows show only the latest email state; Billing Emails loads attempt
+  history on demand and protects retries while queued/pending
+- Role-aware home routing, invoices-first Billing tab order, and the
+  `/billing/periods` compatibility redirect
+- Cockpit compaction (open steps visible, completed steps collapsed, caught-up
+  one-line state) and label-before-primary-CTA order
+- Running periods display **Collecting data** while only ended periods are
+  classified as actionable or complete
 - Period overview metering completeness indicators
 - Batch toolbar (`InvoiceBatchToolbar`): "Alle PDFs herunterladen" renders only
   when the period has at least one PDF (`pdfCount > 0`); "Weitere Sammelaktionen"

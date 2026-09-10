@@ -80,7 +80,7 @@ both communities. Issued contract snapshots are retained.
 
 1. Navigate to http://localhost:8080
 2. Login with admin credentials (or ZEV owner to manage a community)
-3. You'll see the main dashboard
+3. Managers land on **Overview**; participants land on their personal dashboard
 
 ![Login page](screenshots/01-login.png)
 
@@ -89,22 +89,25 @@ both communities. Issued contract snapshots are retained.
 If logged in as admin:
 - Go to **Platform → Overview** to see system-wide KPIs
 - View **ZEVs**, **Accounts**, **Invoices**, and **System Settings** (regional/VAT)
-- To work inside a community: open **Platform → ZEVs** and click **Manage** on a row — this selects the ZEV and takes you to its dashboard. (While under `/admin` the shell shows the **Platform administration** indicator instead of the switcher.)
+- To work inside a community: open **Platform → Overview → ZEVs** and click **Manage** on a row — this selects the ZEV and takes you to its operational Overview. (While under `/admin` the shell shows the **Platform administration** indicator instead of the switcher.)
 - The sidebar ZEV switcher (top-left) selects the working community anywhere else; the selected community is shown above the page title on every page, so it stays visible even when the navigation scrolls, the sidebar is collapsed, or you are on mobile
 
 ### 3. Explore as ZEV Owner
 
 If logged in as a ZEV owner:
-- Go to **Setup → Settings** to configure your community parameters
+- Go to **Overview** for setup guidance and billing work grouped by period
+- Go to **Energy balance** to analyse production, consumption, self-consumption, and grid exchange for a period
+- Go to **Settings** to configure your community parameters (General · Billing & payment · Documents & emails · Audit log · Export/transfer)
 - Go to **Participants** to view member list
 - Go to **Metering Points** to see participant meters
-- Go to **Metering** for consumption charts and the data quality tab
-- Go to **Metering Imports** to import readings
+- Go to **Metering** for consumption charts, data quality, and import history
 - Go to **Tariffs** to configure energy pricing
-- Go to **Billing** to generate and manage invoices
+- Go to **Billing** to generate and manage invoices, inspect/retry email delivery, and download statements
 - Go to **Reports** for annual statements and financial summaries
 
-![Dashboard](screenshots/02-dashboard.png)
+![Manager Overview](screenshots/02-dashboard.png)
+
+![Manager Energy balance](screenshots/02c-energy-balance.png)
 
 ### 4. View as Participant
 

@@ -1,6 +1,7 @@
-"""Readiness and attention endpoint tests (nav-regroup phase 2).
+"""Readiness and attention endpoint tests.
 
-Covers the frozen contract in docs/specs/2026-09-navigation-regroup.md §7:
+Covers the contract in docs/specs/2026-03-invoice-lifecycle-and-communication.md
+§5.6a:
 the three readiness forms, cockpit-period resolution (most recent ENDED
 period with open work), step statuses (ok|warn|todo|done — never `blocked`),
 the first-run setup block, the awaiting-first-period and caught-up states,
@@ -23,6 +24,7 @@ from accounts.models import UserRole
 from invoices.models import EmailLog, Invoice, InvoiceStatus
 from invoices.readiness import (
     compute_attention,
+    compute_period_list,
     compute_readiness,
     compute_readiness_many,
     period_end,
@@ -855,6 +857,24 @@ class ReadinessEndpointTests(ReadinessTestCase):
         self.assertEqual(setup["reason"], "no_billable_assignment")
         self.assertFalse(setup["billing_settings_complete"])
         self.assertIs(response.data["awaiting_first_period"], True)
+
+    def test_setup_block_reports_real_settings_completeness(self):
+        """settings_complete is real (phase 3): the blank-able IBAN drives it.
+
+        No factory sets bank_iban, so a default ZEV reports False — and a ZEV
+        with an IBAN reports True. Pinned here because phase 2 hard-coded True.
+        """
+        empty = make_zev(self.other_owner, "No IBAN ZEV")
+        auth(self.client, self.other_owner)
+        response = self.client.get("/api/v1/invoices/invoices/readiness/", {"zev_id": str(empty.id)})
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.data["setup"]["settings_complete"])
+
+        empty.bank_iban = "CH93 0076 2011 6238 5295 7"
+        empty.save()
+        response = self.client.get("/api/v1/invoices/invoices/readiness/", {"zev_id": str(empty.id)})
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.data["setup"]["settings_complete"])
 
 
 class AttentionTests(ReadinessTestCase):
@@ -1691,6 +1711,15 @@ class GenerationConflictTests(ReadinessTestCase):
 class HistoricalPeriodListTests(ReadinessTestCase):
     """Interval changes must not hide exact historical invoice periods."""
 
+    def test_list_marks_running_period_separately_from_ended_periods(self):
+        entries = compute_period_list(self.zev, today=FROZEN_TODAY)
+        by_dates = {
+            (entry["period"]["start"], entry["period"]["end"]): entry["period"]
+            for entry in entries
+        }
+        self.assertFalse(by_dates[("2026-09-01", "2026-09-30")]["ended"])
+        self.assertTrue(by_dates[("2026-08-01", "2026-08-31")]["ended"])
+
     def test_monthly_invoice_period_survives_quarterly_switch(self):
         from invoices.test_helpers import make_invoice
 
@@ -1800,7 +1829,7 @@ class InitialSetupGuidanceTests(ReadinessTestCase):
         setup = response.data.get("setup")
         self.assertIsNotNone(setup)
         self.assertFalse(setup["complete"])
-        self.assertEqual(setup["assignment_link"], "/metering-points")
+        self.assertEqual(setup["assignment_link"], "/metering/points")
 
     def test_blank_iban_stays_discoverable_with_normal_master_data(self):
         self.zev.bank_iban = ""
@@ -1811,7 +1840,7 @@ class InitialSetupGuidanceTests(ReadinessTestCase):
         setup = response.data.get("setup")
         self.assertIsNotNone(setup)
         self.assertFalse(setup["billing_settings_complete"])
-        self.assertEqual(setup["billing_settings_link"], "/zev-settings")
+        self.assertEqual(setup["billing_settings_link"], "/zev-settings/billing")
 
     def test_completed_setup_clears_the_guidance(self):
         MeteringPointAssignment.objects.filter(participant=self.participant).delete()

@@ -27,7 +27,6 @@ import {
     generateInvoicesForZev,
     markInvoicePaid,
     markInvoiceSent,
-    retryFailedEmail,
     sendAllInvoices,
     sendInvoiceEmail,
 } from '../../lib/api/invoices'
@@ -58,7 +57,6 @@ export function useInvoiceActions({
     period,
     rows,
     userRole,
-    onOpenEmailLogs,
     onDeleteClick,
     onPdfQueued,
 }: {
@@ -66,7 +64,6 @@ export function useInvoiceActions({
     period: { period_start: string; period_end: string }
     rows: InvoicePeriodParticipantRow[]
     userRole: string | undefined
-    onOpenEmailLogs: (invoiceId: string, invoiceNumber: string) => Promise<void>
     onDeleteClick: (invoiceId: string) => void
     /** Called when an action queued PDF work the operator should see arrive. */
     onPdfQueued: () => void
@@ -79,7 +76,6 @@ export function useInvoiceActions({
     // ── Email polling state ──────────────────────────────────────────────
     const [pollingInvoiceId, setPollingInvoiceId] = useState<string | null>(null)
     const [emailPollingStartedAt, setEmailPollingStartedAt] = useState<number | null>(null)
-    const [retiringEmailId, setRetiringEmailId] = useState<string | null>(null)
 
     const periodOverviewInvalidationKey = useMemo(
         () => (
@@ -95,16 +91,16 @@ export function useInvoiceActions({
         void queryClient.invalidateQueries({ queryKey: periodOverviewInvalidationKey })
     }, [periodOverviewInvalidationKey, queryClient])
 
-    // Invalidate the ['invoices','list'] prefix so both the unfiltered lists
-    // and the dashboard's status-filtered key are refreshed.
+    // Invalidate the ['invoices','list'] prefix so all invoice lists refresh.
     const invalidateInvoicesList = useCallback(() => {
         void queryClient.invalidateQueries({ queryKey: queryKeys.invoices.lists() })
     }, [queryClient])
 
-    // Billing mutations also move the dashboard cockpit: readiness steps and
-    // cross-period attention derive from the same invoice states.
+    // Billing mutations also move Overview's period cards: readiness steps
+    // and cross-period attention derive from the same invoice states.
     const invalidateCockpit = useCallback(() => {
         void queryClient.invalidateQueries({ queryKey: queryKeys.invoices.readiness(selectedZevId) })
+        void queryClient.invalidateQueries({ queryKey: queryKeys.invoices.readinessList(selectedZevId) })
         void queryClient.invalidateQueries({ queryKey: queryKeys.invoices.attention(selectedZevId) })
     }, [queryClient, selectedZevId])
 
@@ -187,20 +183,6 @@ export function useInvoiceActions({
             invalidateCockpit()
         },
         onError: (error) => pushToast(formatApiError(error, t('pages.invoices.messages.markPaidFailed')), 'error'),
-    })
-
-    const retryEmailMutation = useMutation({
-        mutationFn: (params: { invoiceId: string; emailLogId: string }) =>
-            retryFailedEmail(params.invoiceId, params.emailLogId),
-        onSuccess: (_result, variables) => {
-            pushToast(t('pages.invoices.messages.retryQueued'), 'success')
-            setPollingInvoiceId(variables.invoiceId)
-            setEmailPollingStartedAt(Date.now())
-            invalidatePeriodOverview()
-            invalidateInvoicesList()
-            invalidateCockpit()
-        },
-        onError: (error) => pushToast(formatApiError(error, t('pages.invoices.messages.retryEmailFailed')), 'error'),
     })
 
     // ── Batch mutations ──────────────────────────────────────────────
@@ -329,18 +311,6 @@ export function useInvoiceActions({
             window.clearTimeout(timeoutId)
         }
     }, [pollingInvoiceId, emailPollingStartedAt, pushToast, t])
-
-    // ── Helper callbacks ──────────────────────────────────────────────
-
-    function handleRetryEmail(invoiceId: string, emailLogId: string) {
-        setRetiringEmailId(emailLogId)
-        retryEmailMutation.mutate(
-            { invoiceId, emailLogId },
-            {
-                onSettled: () => setRetiringEmailId(null),
-            },
-        )
-    }
 
     // ── Stats computation ──────────────────────────────────────────────
 
@@ -579,16 +549,6 @@ export function useInvoiceActions({
             disabled: pdfMutation.isPending,
         })
 
-        if (invoice.email_logs?.length) {
-            items.push({
-                key: 'email-logs',
-                label: t('pages.invoices.viewLogs'),
-                icon: <FontAwesomeIcon icon={faEnvelope} fixedWidth />,
-                section: t('pages.invoices.menuSections.email'),
-                onClick: () => onOpenEmailLogs(invoice.id, invoice.invoice_number),
-            })
-        }
-
         if (invoice.status === 'approved') {
             items.push({
                 key: 'mark-sent',
@@ -635,7 +595,6 @@ export function useInvoiceActions({
         emailMutation,
         markSentMutation,
         markPaidMutation,
-        retryEmailMutation,
         // Batch mutations
         generateAllMutation,
         approveAllMutation,
@@ -648,7 +607,6 @@ export function useInvoiceActions({
         setPollingInvoiceId,
         emailPollingStartedAt,
         setEmailPollingStartedAt,
-        retiringEmailId,
         // The invoice whose PDF is being rendered inline right now, if any.
         pdfGeneratingInvoiceId: pdfMutation.isPending ? pdfMutation.variables ?? null : null,
         // Stats & computed
@@ -658,6 +616,5 @@ export function useInvoiceActions({
         // Callbacks
         getPrimaryRowAction,
         getRowMenuItems,
-        handleRetryEmail,
     }
 }

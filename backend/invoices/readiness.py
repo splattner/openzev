@@ -897,6 +897,7 @@ def compute_period_list(zev, today: date | None = None) -> list[dict]:
     with current-calendar versus historical provenance. An invoice entry only
     carries the configured interval when its dates align to the current
     calendar; custom ranges stay exact-dated without a false interval."""
+    today = today or date.today()
     pairs = list_periods(zev, today)
     if not pairs:
         return []
@@ -904,7 +905,7 @@ def compute_period_list(zev, today: date | None = None) -> list[dict]:
     calendar = {
         (start, period_end(start, interval))
         for start in period_starts(
-            _history_anchor(zev), interval, today=today or date.today()
+            _history_anchor(zev), interval, today=today
         )
     }
     data = _load_bulk(zev, min(s for s, _e, _src in pairs), max(e for _s, e, _src in pairs))
@@ -916,6 +917,7 @@ def compute_period_list(zev, today: date | None = None) -> list[dict]:
             "end": end.isoformat(),
             "interval": interval if (start, end) in calendar else None,
             "source": source,
+            "ended": is_ended(end, today),
         }
         result.append(payload)
     return result
@@ -931,24 +933,26 @@ def first_run_setup(zev, today: date | None = None) -> dict:
     assignment (readings-independent, so first-run ZEVs are caught before any
     metering exists). Historical zero-billable periods are not setup gaps —
     they never reach this block. A blank IBAN stays advisory: reported via
-    ``billing_settings_complete`` without failing ``complete`` or gating
-    generation.
+    ``billing_settings_complete`` (mirrored in the legacy
+    ``settings_complete`` flag) without failing ``complete`` or gating
+    generation. The IBAN is the one billing setting that is blank-able on the
+    model yet required to issue a payable QR-Rechnung — payment terms default
+    to 30 days and VAT registration is enforced by Zev.clean().
     """
     today = today or date.today()
     meter_count = MeteringPoint.objects.filter(zev=zev).count()
     participant_count = Participant.objects.filter(zev=zev).count()
     tariff_count = Tariff.objects.filter(zev=zev).count()
-    billing_settings_complete = bool(zev.bank_iban)
+    billing_settings_complete = bool((zev.bank_iban or "").strip())
+    billing_link = "/zev-settings/billing" if not billing_settings_complete else None
     if not meter_count or not participant_count:
         return {
             "complete": False,
             "reason": "no_master_data",
-            "assignment_link": "/metering-points",
+            "assignment_link": "/metering/points",
             "billing_settings_complete": billing_settings_complete,
-            "billing_settings_link": (
-                "/zev-settings" if not billing_settings_complete else None
-            ),
-            "settings_complete": True,
+            "billing_settings_link": billing_link,
+            "settings_complete": billing_settings_complete,
             "metering_points": meter_count,
             "participants": participant_count,
             "tariffs": tariff_count,
@@ -971,12 +975,10 @@ def first_run_setup(zev, today: date | None = None) -> dict:
     return {
         "complete": complete,
         "reason": None if complete else "no_billable_assignment",
-        "assignment_link": "/metering-points" if not complete else None,
+        "assignment_link": "/metering/points" if not complete else None,
         "billing_settings_complete": billing_settings_complete,
-        "billing_settings_link": (
-            "/zev-settings" if not billing_settings_complete else None
-        ),
-        "settings_complete": True,
+        "billing_settings_link": billing_link,
+        "settings_complete": billing_settings_complete,
         "metering_points": meter_count,
         "participants": participant_count,
         "tariffs": tariff_count,

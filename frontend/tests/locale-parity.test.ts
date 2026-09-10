@@ -77,4 +77,11 @@ describe('locale parity and integrity', () => {
     expect(fr.nav.adminAccounts).toBe('Comptes')
     expect(itLocale.nav.adminAccounts).toBe('Account')
   })
+
+  it('names the manager performance page Energy balance in every locale', () => {
+    expect(en.nav.energyBalance).toBe('Energy balance')
+    expect(de.nav.energyBalance).toBe('Energiebilanz')
+    expect(fr.nav.energyBalance).toBe('Bilan énergétique')
+    expect(itLocale.nav.energyBalance).toBe('Bilancio energetico')
+  })
 })

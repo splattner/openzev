@@ -4,17 +4,29 @@ import { BILLING_INTERVAL_OPTIONS, ZEV_TYPE_OPTIONS } from '../lib/options'
 import type { ZevInput } from '../types/api'
 import { GridOperatorField } from '../features/zev/GridOperatorField'
 
+type ZevSettingsFieldGroup = 'general' | 'billing' | 'documents'
+
 type ZevGeneralSettingsFieldsProps = {
     form: ZevInput
     onChange: (patch: Partial<ZevInput>) => void
+    /** Which hub tab's sections to render (ZEV settings hub, phase 3):
+     * general = identity + grid connection, billing = invoicing + payment,
+     * documents = contract/tariff notes. */
+    group?: ZevSettingsFieldGroup
 }
 
-export function ZevGeneralSettingsFields({ form, onChange }: ZevGeneralSettingsFieldsProps) {
+/**
+ * Sections of the ZEV settings form, tagged with the settings-hub tab that
+ * renders them (phase 3). Default renders everything (legacy single-form
+ * consumers) — the hub passes `group` per tab.
+ */
+export function ZevGeneralSettingsFields({ form, onChange, group }: ZevGeneralSettingsFieldsProps) {
     const { t } = useTranslation()
 
     return (
         <div className="page-stack">
-            {/* General ZEV Settings */}
+            {/* General ZEV Settings (identity) */}
+            {(!group || group === 'general') && (
             <div className="form-section">
                 <p className="form-section-header">{t('pages.zevSettings.sections.general')}</p>
                 <div className="inline-form grid grid-2">
@@ -47,6 +59,14 @@ export function ZevGeneralSettingsFields({ form, onChange }: ZevGeneralSettingsF
                             ))}
                         </select>
                     </label>
+                </div>
+            </div>
+            )}
+            {/* Billing & payment */}
+            {(!group || group === 'billing') && (
+            <div className="form-section">
+                <p className="form-section-header">{t('pages.zevSettings.sections.billingPayment')}</p>
+                <div className="inline-form grid grid-2">
                     <label>
                         <span>{t('pages.zevSettings.fields.billingInterval')}</span>
                         <select
@@ -118,8 +138,10 @@ export function ZevGeneralSettingsFields({ form, onChange }: ZevGeneralSettingsF
                     </label>
                 </div>
             </div>
+            )}
 
             {/* Grid Connection */}
+            {(!group || group === 'general') && (
             <div className="form-section">
                 <p className="form-section-header">{t('pages.zevSettings.sections.gridConnection')}</p>
                 <div className="inline-form grid grid-2">
@@ -149,7 +171,10 @@ export function ZevGeneralSettingsFields({ form, onChange }: ZevGeneralSettingsF
                 </div>
             </div>
 
-            {/* Payment Details */}
+            )}
+
+            {/* Payment details (billing & payment tab) */}
+            {(!group || group === 'billing') && (
             <div className="form-section">
                 <p className="form-section-header">{t('pages.zevSettings.sections.paymentDetails')}</p>
                 <div className="inline-form grid grid-3">
@@ -207,7 +232,11 @@ export function ZevGeneralSettingsFields({ form, onChange }: ZevGeneralSettingsF
                 </div>
             </div>
 
-            {/* Notes */}
+            )}
+
+            {/* Notes (documents tab) */}
+            {(!group || group === 'documents') && (
+            <>
             <div className="form-section">
                 <p className="form-section-header">{t('pages.zevSettings.sections.notes')}</p>
                 <label>
@@ -244,6 +273,8 @@ export function ZevGeneralSettingsFields({ form, onChange }: ZevGeneralSettingsF
                     />
                 </label>
             </div>
+            </>
+            )}
         </div>
     )
 }

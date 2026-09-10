@@ -1,9 +1,11 @@
 import { Link } from 'react-router-dom'
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
+import { faArrowRight } from '@fortawesome/free-solid-svg-icons'
 import { useTranslation } from 'react-i18next'
-import type { TFunction } from 'i18next'
 import type { AttentionItem, ReadinessResponse, ReadinessSetupBlock, ReadinessStep } from '../types/api'
 import { formatShortDate, useAppSettings } from '../lib/appSettings'
 import { PageSkeleton } from './PageSkeleton'
+import { NEXT_ACTION_STEP_KEY, stepDetailText, attentionText } from '../features/overview/readinessPresentation'
 
 /**
  * The period cockpit (nav-regroup phase 2, spec §7): where the billing period
@@ -30,7 +32,7 @@ function SetupWarnings({ setup }: { setup: ReadinessSetupBlock | null | undefine
                 <p className="error-banner">
                     {t('pages.dashboard.cockpit.setupIncomplete')}{' '}
                     <Link to={setup.assignment_link as string}>
-                        {t('pages.dashboard.cockpit.setupAssignLink')} →
+                        {t('pages.dashboard.cockpit.setupAssignLink')}
                     </Link>
                 </p>
             ) : null}
@@ -38,7 +40,7 @@ function SetupWarnings({ setup }: { setup: ReadinessSetupBlock | null | undefine
                 <p className="warning-banner">
                     {t('pages.dashboard.cockpit.setupIban')}{' '}
                     <Link to={setup.billing_settings_link as string}>
-                        {t('pages.dashboard.cockpit.setupIbanLink')} →
+                        {t('pages.dashboard.cockpit.setupIbanLink')}
                     </Link>
                 </p>
             ) : null}
@@ -52,104 +54,6 @@ function stepBadgeClass(step: ReadinessStep): string {
     return 'badge badge-neutral'
 }
 
-/** Maps a next_action back to the step that owns it (for its open link). */
-const NEXT_ACTION_STEP_KEY: Record<string, string> = {
-    fix_metering: 'metering',
-    fix_assignments: 'assignments',
-    fix_tariffs: 'tariffs',
-    generate: 'generated',
-    review_generation_conflicts: 'generation_conflicts',
-    approve: 'approved',
-    send: 'sent',
-    track_payments: 'paid',
-}
-
-function stepDetailText(step: ReadinessStep, t: TFunction): string | null {
-    const d = (key: string, vars: Record<string, unknown> = {}) =>
-        t(`pages.dashboard.cockpit.stepDetails.${key}`, vars)
-    switch (step.key) {
-        case 'metering':
-            if (step.status !== 'warn') return null
-            return d('meteringWarn', {
-                count: step.count,
-                days: step.detail_data?.missing_days ?? 0,
-            })
-        case 'assignments':
-            if (step.status !== 'warn') return null
-            return d('assignmentsWarn', { readings: step.count })
-        case 'tariffs':
-            if (step.status === 'todo') return d('tariffsTodo')
-            if (step.status === 'warn') {
-                return d('tariffsWarn', { days: step.count, total: step.total ?? 0 })
-            }
-            return null
-        case 'generated':
-            if (step.status !== 'todo') return null
-            return d('generatedTodo', {
-                missing: step.detail_data?.missing ?? Math.max(0, (step.total ?? 0) - step.count),
-                total: step.total ?? 0,
-            })
-        case 'generation_conflicts': {
-            if (step.status !== 'warn') return null
-            const names = (step.detail_data?.conflicts ?? [])
-                .slice(0, 3)
-                .map((conflict) => conflict.participant_name)
-                .join(', ')
-            return d('conflictsWarn', {
-                count: step.detail_data?.conflict_count ?? step.count,
-                names,
-            })
-        }
-        case 'approved':
-            if (step.status !== 'todo') return null
-            return d('approvedTodo', { count: step.count })
-        case 'sent': {
-            if (step.status !== 'todo') return null
-            const parts: string[] = []
-            if (step.count > 0) parts.push(d('sentTodo', { count: step.count }))
-            if (step.failed) parts.push(d('emailFailedTodo', { failed: step.failed }))
-            return parts.length > 0 ? parts.join(' · ') : null
-        }
-        case 'paid':
-            if (step.status !== 'todo') return null
-            return d('paidTodo', {
-                unpaid: step.detail_data?.unpaid ?? (step.total ?? 0) - step.count,
-                total: step.total ?? 0,
-            })
-        default:
-            return null
-    }
-}
-
-/** Cross-period alerts only: the attention types the cockpit cannot show as
- * steps. Localized from the structured fields — the English `label` fallback
- * is never rendered. */
-function attentionText(item: AttentionItem, t: TFunction, format: (v: string) => string): string {
-    switch (item.type) {
-        case 'email_failed':
-            return t('pages.dashboard.attention.text.emailFailed', {
-                number: item.invoice_number,
-                recipient: item.recipient,
-            })
-        case 'invoice_overdue':
-            return t('pages.dashboard.attention.text.invoiceOverdue', {
-                number: item.invoice_number,
-                due: format(item.due_date ?? ''),
-            })
-        case 'participant_validity':
-            return item.expired
-                ? t('pages.dashboard.attention.text.participantExpired', {
-                      name: item.participant_name,
-                      validTo: format(item.valid_to ?? ''),
-                  })
-                : t('pages.dashboard.attention.text.participantExpiring', {
-                      name: item.participant_name,
-                      validTo: format(item.valid_to ?? ''),
-                  })
-        default:
-            return item.label
-    }
-}
 
 function periodSuffix(item: AttentionItem, format: (v: string) => string): string {
     if (!item.period) return ''
@@ -159,7 +63,9 @@ function periodSuffix(item: AttentionItem, format: (v: string) => string): strin
 export function BillingCockpit({
     readinessQuery,
     attentionQuery,
+    setupOnly = false,
   }: {
+    setupOnly?: boolean
     readinessQuery: { isLoading: boolean; isError: boolean; data?: ReadinessResponse }
     attentionQuery?: { isLoading: boolean; isError: boolean; data?: AttentionItem[] }
 }) {
@@ -168,6 +74,14 @@ export function BillingCockpit({
     const readiness = readinessQuery.data
     const attentionItems = attentionQuery?.data ?? []
     const format = (value: string) => formatShortDate(value, settings)
+
+    // Overview uses period cards for billing work; retain the independent
+    // setup query so assignment and payment-setting guidance stays visible.
+    if (setupOnly && readinessQuery.isLoading) return <PageSkeleton variant="card" />
+    if (setupOnly && (readinessQuery.isError || !readiness)) {
+        return <p className="card error-banner" role="status">{t('pages.dashboard.cockpit.failed')}</p>
+    }
+    if (setupOnly && readiness?.period) return <SetupWarnings setup={readiness.setup} />
 
     const alerts = (
         <>
@@ -186,8 +100,13 @@ export function BillingCockpit({
                                 {attentionText(item, t, format)}
                                 {periodSuffix(item, format)}
                             </span>
-                            <Link className="cockpit-alert-link" to={item.link} aria-label={attentionText(item, t, format)}>
-                                {t('pages.dashboard.cockpit.openStep')} →
+                            <Link
+                                className="button button-secondary button-compact cockpit-alert-link"
+                                to={item.link}
+                                aria-label={attentionText(item, t, format)}
+                            >
+                                <FontAwesomeIcon icon={faArrowRight} fixedWidth />
+                                {t('pages.dashboard.cockpit.openStep')}
                             </Link>
                         </li>
                     ))}
@@ -242,11 +161,15 @@ export function BillingCockpit({
                         </li>
                         <li data-complete={setup.metering_points > 0}>
                             {setup.metering_points > 0 ? '✓ ' : '○ '}
-                            <Link to="/metering-points">{t('pages.dashboard.cockpit.setupMeteringPoints')}</Link>
+                            <Link to="/metering/points">{t('pages.dashboard.cockpit.setupMeteringPoints')}</Link>
                         </li>
                         <li data-complete={setup.tariffs > 0}>
                             {setup.tariffs > 0 ? '✓ ' : '○ '}
                             <Link to="/tariffs">{t('pages.dashboard.cockpit.setupTariffs')}</Link>
+                        </li>
+                        <li data-complete={setup.settings_complete}>
+                            {setup.settings_complete ? '✓ ' : '○ '}
+                            <Link to="/zev-settings/billing">{t('pages.dashboard.cockpit.setupSettings')}</Link>
                         </li>
                     </ul>
                     {alerts}
@@ -277,6 +200,28 @@ export function BillingCockpit({
     const nextLink = actionStep?.status === 'todo' || actionStep?.status === 'warn'
         ? actionStep.link
         : undefined
+    const openSteps = readiness.steps.filter(
+        (step) => step.status === 'warn' || step.status === 'todo',
+    )
+    const completedSteps = readiness.steps.filter(
+        (step) => step.status === 'ok' || step.status === 'done',
+    )
+
+    if (openSteps.length === 0) {
+        return (
+            <section className="card cockpit-card-compact">
+                <div className="cockpit-caught-up">
+                    <strong>{t('pages.dashboard.cockpit.title')}</strong>
+                    <span className="badge badge-success">
+                        {t('pages.dashboard.cockpit.allDone')}
+                    </span>
+                    <span className="muted">{periodLabel}</span>
+                </div>
+                <SetupWarnings setup={setup} />
+                {alerts}
+            </section>
+        )
+    }
 
     return (
         <section className="card">
@@ -296,7 +241,7 @@ export function BillingCockpit({
             <SetupWarnings setup={setup} />
 
             <ol className="cockpit-steps">
-                {readiness.steps.map((step) => {
+                {openSteps.map((step) => {
                     const label = t(`pages.dashboard.cockpit.stepLabels.${step.key}`)
                     const isOpen = step.status === 'warn' || step.status === 'todo'
                     const detailText = stepDetailText(step, t)
@@ -310,8 +255,13 @@ export function BillingCockpit({
                                 <span className="cockpit-step-detail muted">{detailText}</span>
                             ) : null}
                             {isOpen && step.link ? (
-                                <Link className="cockpit-step-link" to={step.link} aria-label={label}>
-                                    {t('pages.dashboard.cockpit.openStep')} →
+                                <Link
+                                    className="button button-secondary button-compact cockpit-step-link"
+                                    to={step.link}
+                                    aria-label={label}
+                                >
+                                    <FontAwesomeIcon icon={faArrowRight} fixedWidth />
+                                    {t('pages.dashboard.cockpit.openStep')}
                                 </Link>
                             ) : null}
                         </li>
@@ -319,21 +269,38 @@ export function BillingCockpit({
                 })}
             </ol>
 
+            {completedSteps.length > 0 && (
+                <details className="cockpit-completed">
+                    <summary>
+                        {t('pages.dashboard.cockpit.completedSummary', { count: completedSteps.length })}
+                    </summary>
+                    <ol className="cockpit-steps cockpit-completed-steps">
+                        {completedSteps.map((step) => (
+                            <li key={step.key} className="cockpit-step" data-status={step.status}>
+                                <span className={`cockpit-step-badge ${stepBadgeClass(step)}`}>
+                                    {t(`pages.dashboard.cockpit.statusLabels.${step.status}`)}
+                                </span>
+                                <span className="cockpit-step-label">
+                                    {t(`pages.dashboard.cockpit.stepLabels.${step.key}`)}
+                                </span>
+                            </li>
+                        ))}
+                    </ol>
+                </details>
+            )}
+
             {alerts}
 
             <div className="cockpit-foot">
+                <span className="muted">{t('pages.dashboard.cockpit.nextUp')}</span>
                 {readiness.next_action !== 'none' && nextLink ? (
-                    <Link className="badge badge-info" to={nextLink}>
-                        {nextLabel} →
+                    <Link className="button button-primary button-compact" to={nextLink}>
+                        <FontAwesomeIcon icon={faArrowRight} fixedWidth />
+                        {nextLabel}
                     </Link>
                 ) : (
                     <span className="badge badge-info">{nextLabel}</span>
                 )}
-                <span className="muted">
-                    {readiness.next_action === 'none'
-                        ? t('pages.dashboard.cockpit.allDone')
-                        : t('pages.dashboard.cockpit.nextUp')}
-                </span>
             </div>
         </section>
     )

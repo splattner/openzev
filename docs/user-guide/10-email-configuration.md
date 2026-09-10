@@ -54,7 +54,7 @@ docker compose restart backend worker
 
 ## Email Templates
 
-**ZEV Owners** customize email templates in **ZEV Settings → Email Templates**.
+**ZEV Owners** customize email templates in **ZEV Settings → Documents & emails**.
 
 The sections below describe the **invoice** email, which is the one ZEV owners
 customize per ZEV. Three further templates are system-wide and edited by admins

@@ -124,33 +124,44 @@ async function renderLayoutAt(path: string) {
     }
 }
 
-describe('flat nav (see docs/specs/2026-09-navigation-regroup.md §5)', () => {
-    it('admin sees operate entries, Setup, Feasibility and the full Platform group', async () => {
+describe('phase-3 hub nav (see docs/specs/2026-03-community-and-access.md §9.3)', () => {
+    it('admin sees operate entries, Setup, Feasibility and the consolidated Platform group', async () => {
         mockSession('admin')
         const page = await renderLayout()
         for (const href of [
             '/',
+            '/dashboard',
             '/metering/chart',
-            '/metering/imports',
+            // Metering hub: chart/quality/imports are tabs of /metering/chart,
+            // so only the hub entry appears in the nav.
             '/billing/invoices',
             '/reports',
             '/participants',
-            '/metering-points',
+            '/metering/points',
             '/tariffs',
             '/zev-settings',
-            '/audit-logs',
             '/feasibility',
+            // Platform group consolidated to four hub entries (phase 3):
+            // Overview, Accounts (+ API keys tab), Templates, System settings.
             '/admin',
-            '/admin/zevs',
             '/admin/accounts',
+            '/admin/templates',
+            '/admin/system-settings',
+        ]) {
+            expect(page.hasHref(href)).toBe(true)
+        }
+        // Retired admin nav items no longer appear.
+        for (const href of [
+            '/admin/zevs',
             '/admin/api-keys',
             '/admin/invoices',
-            '/admin/system-settings',
             '/admin/pdf-templates',
             '/admin/email-templates',
             '/admin/audit-logs',
+            // Audit log moved into the ZEV settings hub (phase 3).
+            '/audit-logs',
         ]) {
-            expect(page.hasHref(href)).toBe(true)
+            expect(page.hasHref(href)).toBe(false)
         }
         // Scope colouring: group labels + the ZEV switcher in the sidebar.
         expect(page.html()).toContain('nav.setupGroup')
@@ -163,10 +174,14 @@ describe('flat nav (see docs/specs/2026-09-navigation-regroup.md §5)', () => {
         mockSession('zev_owner')
         const page = await renderLayout()
         expect(page.hasHref('/metering/chart')).toBe(true)
-        expect(page.hasHref('/metering/imports')).toBe(true)
+        // Imports moved into the metering hub (phase 3): no standalone link.
+        expect(page.hasHref('/metering/imports')).toBe(false)
+        expect(page.hasHref('/dashboard')).toBe(true)
         expect(page.hasHref('/billing/invoices')).toBe(true)
         expect(page.hasHref('/reports')).toBe(true)
-        expect(page.hasHref('/audit-logs')).toBe(true)
+        // Audit log is a ZEV-settings tab now (deep link only).
+        expect(page.hasHref('/audit-logs')).toBe(false)
+        expect(page.hasHref('/zev-settings/audit')).toBe(false)
         expect(page.hasHref('/admin')).toBe(false)
         expect(page.html()).not.toContain('nav.platformGroup')
         page.unmount()
@@ -176,6 +191,7 @@ describe('flat nav (see docs/specs/2026-09-navigation-regroup.md §5)', () => {
         mockSession('participant')
         const page = await renderLayout()
         expect(page.hasHref('/')).toBe(true)
+        expect(page.hasHref('/dashboard')).toBe(false)
         expect(page.hasHref('/me/invoices')).toBe(true)
         expect(page.hasHref('/me/statement')).toBe(true)
         for (const href of ['/reports', '/metering/imports', '/participants', '/tariffs', '/zev-settings', '/audit-logs', '/admin']) {
@@ -257,12 +273,30 @@ describe('active navigation state is exposed to assistive tech', () => {
 
     it('keeps class and aria-current aligned on hub sub-routes too', async () => {
         mockSession('admin')
-        const page = await renderLayoutAt('/billing/invoices/42')
+        const page = await renderLayoutAt('/billing/emails')
         const billing = page.link('/billing/invoices')
         expect(billing?.className).toContain('active')
         expect(billing?.getAttribute('aria-current')).toBe('true')
         page.unmount()
     })
+
+    it('keeps Overview inactive on the Energy balance page', async () => {
+        mockSession('zev_owner')
+        const page = await renderLayoutAt('/dashboard')
+        expect(page.link('/dashboard')?.getAttribute('aria-current')).toBe('page')
+        expect(page.link('/')?.getAttribute('aria-current')).toBe(null)
+        page.unmount()
+    })
+
+    it.each(['/admin/overview', '/admin/zevs', '/admin/invoices', '/admin/audit', '/admin/health'])(
+        'keeps Overview active at %s', async (path) => {
+            mockSession('admin')
+            const page = await renderLayoutAt(path)
+            expect(page.link('/admin')?.getAttribute('aria-current')).toBe('true')
+            expect(page.container.querySelectorAll('a[aria-current]')).toHaveLength(1)
+            page.unmount()
+        },
+    )
 
     it('exactly one nav entry is current, never the dashboard on a sub-page', async () => {
         mockSession('admin')

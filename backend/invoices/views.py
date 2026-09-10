@@ -101,15 +101,17 @@ class InvoiceViewSet(
         if getattr(self, "action", None) != "list":
             queryset = queryset.prefetch_related("items", "email_logs")
         else:
-            # last_email_status rides a subquery annotation: one extra query
-            # per list page, no per-row N+1 (EmailLog.Meta ordering is newest
-            # first, so [0] of the subquery is the latest attempt).
+            # last_email_status/log_id ride a subquery annotation inside the
+            # invoice SELECT, no per-row N+1. Both use the same deterministic
+            # ordering, including the id tie-break for simultaneous attempts.
+            latest_log = (
+                EmailLog.objects.filter(invoice=OuterRef("pk"))
+                .order_by("-created_at", "-id")
+                .values("status", "id")[:1]
+            )
             queryset = queryset.annotate(
-                last_email_status=Subquery(
-                    EmailLog.objects.filter(invoice=OuterRef("pk"))
-                    .order_by("-created_at", "-id")
-                    .values("status")[:1]
-                )
+                last_email_status=Subquery(latest_log.values("status")[:1]),
+                last_email_log_id=Subquery(latest_log.values("id")[:1]),
             )
         return self.scope_queryset(queryset)
 

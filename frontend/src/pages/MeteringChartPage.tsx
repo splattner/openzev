@@ -6,6 +6,7 @@ import { DataTable, type ColumnDef } from '../components/DataTable'
 import { EmptyState } from '../components/EmptyState'
 import { PageSkeleton } from '../components/PageSkeleton'
 import { StatCard } from '../components/StatCard'
+import { ImportsPage } from './ImportsPage'
 import { useTranslation } from 'react-i18next'
 import {
     Bar,
@@ -179,7 +180,7 @@ const ALL_METERING_POINTS_VALUE = '__zev_total__'
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
-export function MeteringChartPage({ tab }: { tab: 'chart' | 'quality' }) {
+export function MeteringChartPage({ tab }: { tab: 'chart' | 'quality' | 'imports' }) {
     const navigate = useNavigate()
     const [searchParams, setSearchParams] = useSearchParams()
     const { t } = useTranslation()
@@ -256,7 +257,7 @@ export function MeteringChartPage({ tab }: { tab: 'chart' | 'quality' }) {
             isZevTotal
                 ? fetchChartData({ zevId: selectedZevId, dateFrom: period.from, dateTo: period.to, bucket })
                 : fetchChartData({ meteringPoint: selectedMpId, dateFrom: period.from, dateTo: period.to, bucket }),
-        enabled: isZevTotal ? !!selectedZevId : !!selectedMpId,
+        enabled: tab === 'chart' && (isZevTotal ? !!selectedZevId : !!selectedMpId),
     })
 
     // The Data Quality tab has no concept of "whole ZEV total" — it already
@@ -311,7 +312,7 @@ export function MeteringChartPage({ tab }: { tab: 'chart' | 'quality' }) {
         const next = new URLSearchParams(searchParams)
         next.delete('tab')
         const qs = next.toString()
-        navigate(`/metering/${value === 'quality' ? 'quality' : 'chart'}${qs ? `?${qs}` : ''}`, { replace: true })
+        navigate(`/metering/${value === 'quality' ? 'quality' : value === 'imports' ? 'imports' : 'chart'}${qs ? `?${qs}` : ''}`, { replace: true })
     }
 
     // Jumping from a Data Quality row to that meter's chart changes both the
@@ -509,9 +510,10 @@ export function MeteringChartPage({ tab }: { tab: 'chart' | 'quality' }) {
                 <Tabs.List aria-label={t('pages.meteringData.title')}>
                     <Tabs.Tab value="chart">{t('nav.meteringData')}</Tabs.Tab>
                     {isManagedScope && <Tabs.Tab value="quality">{t('nav.meteringDataQuality')}</Tabs.Tab>}
+                    {isManagedScope && <Tabs.Tab value="imports">{t('nav.meteringImportsTab')}</Tabs.Tab>}
                 </Tabs.List>
 
-                <div
+                {tab !== 'imports' && <div
                     className="card"
                     style={{
                         display: 'grid',
@@ -611,7 +613,7 @@ export function MeteringChartPage({ tab }: { tab: 'chart' | 'quality' }) {
                             </label>
                         </div>
                     )}
-                </div>
+                </div>}
 
                 <Tabs.Panel value="chart">
                     <div className="page-stack">
@@ -865,6 +867,15 @@ export function MeteringChartPage({ tab }: { tab: 'chart' | 'quality' }) {
                         )}
                     </div>
                 </Tabs.Panel>
+
+                {/* Import history (phase 3): the existing ImportsPage body mounted
+                    as a tab of the Metering hub — it carries its own wizard,
+                    queries and guards. */}
+                {isManagedScope && (
+                    <Tabs.Panel value="imports">
+                        <ImportsPage embedded />
+                    </Tabs.Panel>
+                )}
             </Tabs>
         </div>
     )

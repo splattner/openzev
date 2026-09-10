@@ -25,10 +25,10 @@ OpenZEV supports four distinct roles:
 
 - **Account Management:** Create, edit, remove user accounts
 - **User Roles:** Assign roles and ZEV scopes to other users
-- **System Settings:** regional date formats, VAT rate configuration, PDF invoice templates, feature flags, and OAuth providers
-- **Multi-ZEV Oversight:** View and monitor all ZEVs in system
-- **Analytics:** Platform-wide KPIs and operational metrics
-- **Audit Logs:** View all user actions and system events
+- **System Settings:** regional date formats, VAT rate configuration, feature flags, and OAuth providers
+- **Overview hub:** KPIs, multi-ZEV oversight, all invoices, the platform audit log, and system health
+- **Accounts:** user management and platform-wide API keys
+- **Templates:** PDF invoice/contract/statement templates and system-wide email defaults
 
 ### Admin Dashboard
 
@@ -228,8 +228,9 @@ Security-relevant and billing-relevant user actions are logged:
 - When (timestamp)
 - What changed (old → new values)
 
-Audit logs are visible to **admins** (all events) and to **ZEV owners** for
-their own communities (scoped events).
+Audit logs are visible to **admins** (all events, **Platform → Overview →
+Audit log**) and to **ZEV owners** for their own communities (scoped events,
+**Setup → Settings → Audit log**).
 
 ## Best Practices
 

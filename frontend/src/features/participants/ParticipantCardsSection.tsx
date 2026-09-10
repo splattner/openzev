@@ -82,7 +82,7 @@ export function ParticipantCardsSection({
                         variant: 'primary',
                         icon: faPlus,
                     },
-                    { labelKey: 'pages.participants.emptyState.meteringPointsAction', to: '/metering-points', variant: 'secondary' },
+                    { labelKey: 'pages.participants.emptyState.meteringPointsAction', to: '/metering/points', variant: 'secondary' },
                 ]}
             />
         )

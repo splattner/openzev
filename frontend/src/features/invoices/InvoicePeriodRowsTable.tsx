@@ -1,5 +1,5 @@
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faEllipsis, faEnvelope, faFileInvoice, faFilePdf, faSpinner } from '@fortawesome/free-solid-svg-icons'
+import { faEllipsis, faFileInvoice, faFilePdf, faSpinner } from '@fortawesome/free-solid-svg-icons'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { ActionMenu, type ActionMenuItem } from '../../components/ActionMenu'
@@ -17,7 +17,6 @@ function emailStatusBadgeClass(status: string): string {
 type InvoicePeriodRowsTableProps = {
   rows: InvoicePeriodParticipantRow[]
   period: { period_start: string; period_end: string }
-  onOpenEmailLogs: (invoiceId: string, invoiceNumber: string) => void
   getPrimaryRowAction: (row: InvoicePeriodParticipantRow) => ActionMenuItem | null
   getRowMenuItems: (row: InvoicePeriodParticipantRow) => ActionMenuItem[]
   /** True while this row's PDF is being rendered — queued or inline. */
@@ -27,7 +26,6 @@ type InvoicePeriodRowsTableProps = {
 export function InvoicePeriodRowsTable({
   rows,
   period,
-  onOpenEmailLogs,
   getPrimaryRowAction,
   getRowMenuItems,
   isPdfPending,
@@ -108,31 +106,9 @@ export function InvoicePeriodRowsTable({
                 </td>
                 <td>
                   {invoice && latestEmailLog ? (
-                    <div className="invoice-cell-stack">
-                      <span className={emailStatusBadgeClass(latestEmailLog.status)}>{t(`email.${latestEmailLog.status}`)}</span>
-                      <div>
-                        <button
-                          className="table-inline-action"
-                          type="button"
-                          onClick={() => onOpenEmailLogs(invoice.id, invoice.invoice_number)}
-                        >
-                          <FontAwesomeIcon icon={faEnvelope} fixedWidth />
-                          {t('pages.invoices.viewLogs')} ({invoice.email_logs?.length ?? 0})
-                        </button>
-                        {(invoice.email_logs?.filter((log) => log.status === 'failed').length ?? 0) > 0 && (
-                          <span style={{ color: 'var(--danger-600)', marginLeft: '0.3rem', fontSize: '0.85rem', fontWeight: 'bold' }}>
-                            {t('pages.invoices.failedEmails', {
-                              n: invoice.email_logs?.filter((log) => log.status === 'failed').length,
-                            })}
-                          </span>
-                        )}
-                      </div>
-                      {(invoice.email_logs?.length ?? 0) > 1 && (
-                        <div className="muted" style={{ fontSize: '0.85rem' }}>
-                          {t('pages.invoices.attempts', { n: invoice.email_logs?.length })}
-                        </div>
-                      )}
-                    </div>
+                    <span className={emailStatusBadgeClass(latestEmailLog.status)}>
+                      {t(`email.${latestEmailLog.status}`)}
+                    </span>
                   ) : (
                     <span className="muted">-</span>
                   )}

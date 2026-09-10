@@ -21,6 +21,7 @@ from .views_oauth import (
     social_accounts_list,
 )
 from .views_impersonation import ImpersonateParticipantView, StopImpersonationView
+from .views_system import SystemHealthView
 
 urlpatterns = [
     path("token/", CustomTokenObtainPairView.as_view(), name="token_obtain_pair"),
@@ -47,6 +48,7 @@ urlpatterns = [
     path("me/social-accounts/", social_accounts_list, name="social-accounts-list"),
     path("me/social-accounts/<int:pk>/", social_account_delete, name="social-account-delete"),
     path("app-settings/", app_settings, name="app-settings"),
+    path("system-health/", SystemHealthView.as_view(), name="system-health"),
     path("vat-rates/", VatRateListCreateView.as_view(), name="vat-rate-list-create"),
     path("vat-rates/<int:pk>/", VatRateDetailView.as_view(), name="vat-rate-detail"),
     path("feature-flags/", feature_flags_list, name="feature-flags-list"),

@@ -3,6 +3,7 @@ import { createElement } from 'react'
 import { createRoot } from 'react-dom/client'
 import { act } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { MemoryRouter } from 'react-router-dom'
 
 vi.mock('react-i18next', () => ({
     useTranslation: () => ({ t: (k: string) => k }),
@@ -37,6 +38,7 @@ vi.mock('../src/lib/downloadBlob', () => ({
 
 import { ReportsPage } from '../src/pages/ReportsPage'
 import { AnnualStatementsExportCard } from '../src/features/reports/AnnualStatementsExportCard'
+import { BillingStatementsPage } from '../src/pages/BillingStatementsPage'
 import * as invoicesApi from '../src/lib/api/invoices'
 import * as exportsApi from '../src/lib/api/exports'
 import { downloadBlob } from '../src/lib/downloadBlob'
@@ -66,13 +68,17 @@ function makeCompletedJob(overrides: Record<string, unknown> = {}) {
     }
 }
 
-function renderReportsPage() {
+function renderReportsPage(component = ReportsPage) {
     const container = document.createElement('div')
     document.body.appendChild(container)
     const client = new QueryClient()
     const root = createRoot(container)
     act(() => {
-        root.render(createElement(QueryClientProvider, { client }, createElement(ReportsPage)))
+        root.render(createElement(
+            MemoryRouter,
+            null,
+            createElement(QueryClientProvider, { client }, createElement(component)),
+        ))
     })
     return {
         container,
@@ -125,7 +131,7 @@ describe('ReportsPage role branches', () => {
         vi.clearAllMocks()
     })
 
-    it('owner with valid ZEV renders eyebrow, shared year selector, and both cards', async () => {
+    it('owner with valid ZEV renders the tax overview and analytics roadmap', async () => {
         mockOwner({
             selectedZevId: 'zev-1',
             selectedZev: { id: 'zev-1', name: 'Demo' },
@@ -136,12 +142,21 @@ describe('ReportsPage role branches', () => {
         await flush()
         expect(container.textContent).toContain('Demo') // ZEV scope eyebrow
         expect(container.textContent).toContain('pages.reports.title')
-        expect(container.textContent).toContain('pages.reports.annualStatement.ownerDescription')
-        expect(container.textContent).toContain('pages.reports.annualStatement.prepare')
-        expect(container.textContent).toContain('pages.reports.financialSummary.description')
+        expect(container.textContent).toContain('pages.reports.financialSummary.ownerDescription')
+        expect(container.textContent).toContain('pages.reports.financialSummary.download')
+        expect(container.textContent).toContain('pages.reports.ownerComing.title')
+        expect(container.textContent).toContain('pages.reports.ownerComing.description')
+        expect(container.querySelector('a[href="/billing/statements"]')).toBeNull()
+        expect(container.textContent).not.toContain('pages.reports.annualStatement.ownerDescription')
+        expect(container.textContent).not.toContain('pages.reports.annualStatement.downloadAll')
         expect(container.textContent).not.toContain('pages.reports.selectZevTitle')
         expect(container.textContent).not.toContain('pages.reports.noZevTitle')
-        expect(container.querySelectorAll('select').length).toBe(1)
+        const button = Array.from(container.querySelectorAll('button')).find(
+            (candidate) => candidate.textContent === 'pages.reports.financialSummary.download',
+        )
+        expect(button).toBeTruthy()
+        await click(button!)
+        expect(invoicesApi.downloadFinancialSummary).toHaveBeenCalledWith({ year: new Date().getFullYear() - 1, zev_id: 'zev-1' })
         unmount()
     })
 
@@ -168,16 +183,34 @@ describe('ReportsPage role branches', () => {
 
         const { container, unmount } = renderReportsPage()
         await flush()
+        const ownerSelect = container.querySelector('select') as HTMLSelectElement
+        expect(ownerSelect.value).toBe(String(new Date().getFullYear() - 1))
+        unmount()
+    })
+
+    it('year selector defaults to last completed year for participants', async () => {
+        mockAuth.mockReturnValue({ user: { role: 'participant' } })
+        mockManagedZev.mockReturnValue({
+            selectedZevId: null,
+            selectedZev: null,
+            managedZevs: [],
+            isLoading: false,
+        })
+
+        const { container, unmount } = renderReportsPage()
+        await flush()
         const select = container.querySelector('select') as HTMLSelectElement
         expect(select.value).toBe(String(new Date().getFullYear() - 1))
         unmount()
     })
 
-    it('shared year selector feeds the ZIP prepare and the financial download', async () => {
-        mockOwner({
-            selectedZevId: 'zev-1',
-            selectedZev: { id: 'zev-1', name: 'Demo' },
-            managedZevs: [{ id: 'zev-1' }],
+    it('shared year selector feeds both participant download calls', async () => {
+        mockAuth.mockReturnValue({ user: { role: 'participant' } })
+        mockManagedZev.mockReturnValue({
+            selectedZevId: null,
+            selectedZev: null,
+            managedZevs: [],
+            isLoading: false,
         })
         const targetYear = new Date().getFullYear() - 2
         vi.mocked(exportsApi.createAnnualStatementsExport).mockResolvedValue(
@@ -189,21 +222,19 @@ describe('ReportsPage role branches', () => {
         const select = container.querySelector('select') as HTMLSelectElement
         await changeYear(select, String(targetYear))
 
-        const prepareButton = findButton(container, 'pages.reports.annualStatement.prepare')!
-        const financialButton = findButton(container, 'pages.reports.financialSummary.download')!
-        expect(prepareButton).toBeTruthy()
+        const buttons = Array.from(container.querySelectorAll('button')) as HTMLButtonElement[]
+        const pdfButton = buttons.find((b) => b.textContent === 'pages.reports.annualStatement.download')
+        const financialButton = buttons.find((b) => b.textContent === 'pages.reports.financialSummary.download')
+        expect(pdfButton).toBeTruthy()
         expect(financialButton).toBeTruthy()
 
-        await click(prepareButton)
-        await click(financialButton)
+        await click(pdfButton!)
+        await click(financialButton!)
 
-        expect(exportsApi.createAnnualStatementsExport).toHaveBeenCalledWith({
-            zev_id: 'zev-1',
-            year: targetYear,
-        })
+        expect(invoicesApi.downloadAnnualStatement).toHaveBeenCalledWith({ year: targetYear })
         const financialArg = (invoicesApi.downloadFinancialSummary as any).mock.calls.at(-1)?.[0]
         expect(financialArg.year).toBe(targetYear)
-        expect(financialArg.zev_id).toBe('zev-1')
+        expect(financialArg.zev_id).toBeUndefined()
         unmount()
     })
 
@@ -217,7 +248,7 @@ describe('ReportsPage role branches', () => {
         const job = makeCompletedJob({ id: 'job-42', params: { year } })
         vi.mocked(exportsApi.fetchAnnualStatementExports).mockResolvedValue([job])
 
-        const { container, unmount } = renderReportsPage()
+        const { container, unmount } = renderReportsPage(BillingStatementsPage)
         await flush()
         await flush()
 
@@ -277,6 +308,55 @@ describe('ReportsPage role branches', () => {
         const callArg = (invoicesApi.downloadFinancialSummary as any).mock.calls[0]?.[0]
         expect(callArg.zev_id).toBeUndefined()
         expect(callArg.year).toBeDefined()
+        unmount()
+    })
+})
+
+describe('BillingStatementsPage', () => {
+    beforeEach(() => {
+        document.body.innerHTML = ''
+        vi.clearAllMocks()
+    })
+
+    it('prepares an export for the selected year and ZEV', async () => {
+        mockOwner({
+            selectedZevId: 'zev-1',
+            selectedZev: { id: 'zev-1', name: 'Demo' },
+            managedZevs: [{ id: 'zev-1' }],
+        })
+        const targetYear = new Date().getFullYear() - 2
+        const { container, unmount } = renderReportsPage(BillingStatementsPage)
+        await flush()
+        const select = container.querySelector('select') as HTMLSelectElement
+        await changeYear(select, String(targetYear))
+
+        const prepareButton = findButton(container, 'pages.reports.annualStatement.prepare')!
+        expect(prepareButton).toBeTruthy()
+        await click(prepareButton)
+
+        expect(exportsApi.createAnnualStatementsExport).toHaveBeenCalledWith({
+            zev_id: 'zev-1',
+            year: targetYear,
+        })
+        expect(invoicesApi.downloadAnnualStatement).not.toHaveBeenCalled()
+        unmount()
+    })
+
+    it('cannot prepare for a stale ZEV selection', async () => {
+        mockOwner({ selectedZevId: 'stale', selectedZev: null, managedZevs: [{ id: 'zev-1' }] })
+        const { container, unmount } = renderReportsPage(BillingStatementsPage)
+        await flush()
+        expect(container.textContent).toContain('pages.reports.selectZevTitle')
+        expect(container.querySelector('button')).toBeNull()
+        unmount()
+    })
+
+    it('shows the empty state without a ZEV', async () => {
+        mockOwner({ selectedZevId: null, selectedZev: null, managedZevs: [] })
+        const { container, unmount } = renderReportsPage(BillingStatementsPage)
+        await flush()
+        expect(container.textContent).toContain('pages.reports.noZevTitle')
+        expect(container.textContent).not.toContain('pages.reports.annualStatement.prepare')
         unmount()
     })
 })

@@ -105,12 +105,16 @@ export function Layout() {
     const displayName = `${user?.first_name ?? ''} ${user?.last_name ?? ''}`.trim() || user?.username || ''
     const canManage = user?.role === 'admin' || user?.role === 'zev_owner'
     const isParticipant = user?.role === 'participant'
-    // Hub entries light on their sub-routes; Imports (transitional) lights only itself.
-    const meteringChartMatch = useMatch('/metering/chart')
-    const meteringQualityMatch = useMatch('/metering/quality')
-    const meteringActive = meteringChartMatch != null || meteringQualityMatch != null
-    const billingMatch = useMatch('/billing/*')
-    const billingActive = billingMatch != null
+    // Hub entries light on their sub-routes (chart/quality/imports are tabs
+    // of the metering hub since phase 3).
+    const meteringChartActive = useMatch('/metering/chart') != null
+    const meteringQualityActive = useMatch('/metering/quality') != null
+    const meteringImportsActive = useMatch('/metering/imports') != null
+    const meteringActive = meteringChartActive || meteringQualityActive || meteringImportsActive
+    const billingActive = useMatch('/billing/*') != null
+    const adminOverviewMatch = useMatch('/admin/:tab')
+    const adminOverviewActive = useMatch('/admin') != null ||
+        ['overview', 'zevs', 'invoices', 'audit', 'health'].includes(adminOverviewMatch?.params.tab ?? '')
 
     const ownerById = new Map((usersQuery.data ?? []).map((candidate) => [candidate.id, candidate]))
     const selectedZevOwner = selectedZev ? ownerById.get(selectedZev.owner) : undefined
@@ -233,15 +237,15 @@ export function Layout() {
 
                 <div className="sidebar-top">
                     <nav className="nav-list">
-                        <SidebarLink to="/" label={t('nav.dashboard')} icon={<DashboardIcon />} />
-
                         {canManage && (
                             <>
+                                <SidebarLink to="/" label={t('nav.overview')} icon={<DashboardIcon />} />
+
+                                <SidebarLink to="/dashboard" label={t('nav.energyBalance')} icon={<EnergyIcon />} />
+
                                 <SidebarLink to="/metering/chart" label={t('nav.metering')} icon={<ChartIcon />} active={meteringActive} />
 
                                 <SidebarLink to="/billing/invoices" label={t('nav.billing')} icon={<InvoiceIcon />} active={billingActive} />
-
-                                <SidebarLink to="/metering/imports" label={t('nav.imports')} icon={<ImportIcon />} />
 
                                 <SidebarLink to="/reports" label={t('nav.reports')} icon={<ReportsIcon />} />
                             </>
@@ -249,6 +253,8 @@ export function Layout() {
 
                         {isParticipant && (
                             <>
+                                <SidebarLink to="/" label={t('nav.dashboard')} icon={<DashboardIcon />} />
+
                                 <SidebarLink to="/me/invoices" label={t('nav.myInvoices')} icon={<InvoiceIcon />} />
 
                                 <SidebarLink to="/me/statement" label={t('nav.annualStatement')} icon={<ReportsIcon />} />
@@ -259,10 +265,12 @@ export function Layout() {
                             <div className="nav-section nav-section-start" role="group" aria-label={t('nav.setupGroup')}>
                                 <div className="nav-group-label" aria-hidden="true">{t('nav.setupGroup')}</div>
                                 <SidebarLink to="/participants" label={t('nav.participants')} icon={<UsersIcon />} />
-                                <SidebarLink to="/metering-points" label={t('nav.meteringPoints')} icon={<PlugIcon />} />
+                                <SidebarLink to="/metering/points" label={t('nav.meteringPoints')} icon={<PlugIcon />} />
                                 <SidebarLink to="/tariffs" label={t('nav.tariffs')} icon={<TagIcon />} />
                                 <SidebarLink to="/zev-settings" label={t('nav.zevSettings')} icon={<SettingsIcon />} />
-                                <SidebarLink to="/audit-logs" label={t('nav.auditLogs')} icon={<AuditIcon />} />
+                                {/* Audit log moved into the ZEV settings hub
+                                    (phase 3); /audit-logs stays as a deep-link
+                                    alias rendered by the hub. */}
                             </div>
                         )}
 
@@ -272,16 +280,16 @@ export function Layout() {
 
                         {user?.role === 'admin' && (
                             <div className="nav-section nav-section-end" role="group" aria-label={t('nav.platformGroup')}>
-                                <div className="nav-group-label" aria-hidden="true">{t('nav.platformGroup')}</div>
-                                <SidebarLink to="/admin" end label={t('nav.adminOverview')} icon={<OverviewIcon />} />
-                                <SidebarLink to="/admin/zevs" label={t('nav.zevs')} icon={<BuildingIcon />} />
+                                <div className="nav-group-label nav-group-label-platform" aria-hidden="true">{t('nav.platformGroup')}</div>
+                                {/* Admin console hubs (phase 3): Overview holds the
+                                    KPIs, ZEVs, all-invoices, audit-log and
+                                    system-health tabs; Accounts holds users +
+                                    API keys; Templates holds PDF + email;
+                                    System settings stays on its own route. */}
+                                <SidebarLink to="/admin" end active={adminOverviewActive} label={t('nav.adminOverview')} icon={<OverviewIcon />} />
                                 <SidebarLink to="/admin/accounts" label={t('nav.adminAccounts')} icon={<UsersIcon />} />
-                                <SidebarLink to="/admin/api-keys" label={t('nav.adminApiKeys')} icon={<KeyIcon />} />
-                                <SidebarLink to="/admin/invoices" label={t('nav.adminInvoices')} icon={<InvoiceIcon />} />
+                                <SidebarLink to="/admin/templates" label={t('nav.adminTemplates')} icon={<PdfIcon />} />
                                 <SidebarLink to="/admin/system-settings" label={t('nav.adminSystemSettings')} icon={<SettingsIcon />} />
-                                <SidebarLink to="/admin/pdf-templates" label={t('nav.adminPdfTemplates')} icon={<PdfIcon />} />
-                                <SidebarLink to="/admin/email-templates" label={t('nav.adminEmailTemplates')} icon={<MailIcon />} />
-                                <SidebarLink to="/admin/audit-logs" label={t('nav.adminAuditLogs')} icon={<AuditIcon />} />
                             </div>
                         )}
                     </nav>
@@ -394,17 +402,10 @@ function DashboardIcon() {
     return <IconSvg path="M3 12.75 12 4l9 8.75V21a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z" />
 }
 
-function BuildingIcon() {
-    return <IconSvg path="M4 21V5a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v16m-8-12h2m-2 4h2m-2 4h2m4-8h2m-2 4h2m-2 4h2M3 21h18" />
-}
-
 function UsersIcon() {
     return <IconSvg path="M16 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2m18 0v-2a4 4 0 0 0-3-3.87M14 4.13a4 4 0 0 1 0 7.75M9.5 11A4 4 0 1 0 9.5 3a4 4 0 0 0 0 8Z" />
 }
 
-function KeyIcon() {
-    return <IconSvg path="M15 7a4 4 0 1 1-3.9 5H8.5l-1.5 1.5L5.5 12H3v-2.5L8.6 4h2.5A4 4 0 0 1 15 7Z" />
-}
 
 function PlugIcon() {
     return <IconSvg path="M9 7V3m6 4V3m-7 8h8a2 2 0 0 0 2-2V7H6v2a2 2 0 0 0 2 2Zm4 0v6a4 4 0 0 1-4 4h-1" />
@@ -412,6 +413,10 @@ function PlugIcon() {
 
 function ChartIcon() {
     return <IconSvg path="M4 19V5m0 14h16M8 17v-5m4 5V8m4 9V11" />
+}
+
+function EnergyIcon() {
+    return <IconSvg path="m13 2-9 12h7l-1 8 10-13h-7z" />
 }
 
 function TagIcon() {
@@ -436,13 +441,6 @@ function CalculatorIcon() {
     )
 }
 
-function AuditIcon() {
-    return <IconSvg path="M8 6h8m-8 5h8m-8 5h8M4 6h.01M4 11h.01M4 16h.01" />
-}
-
-function ImportIcon() {
-    return <IconSvg path="M12 3v12m0 0 4-4m-4 4-4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" />
-}
 
 function SettingsIcon() {
     return <IconSvg path="M12 8.5A3.5 3.5 0 1 1 8.5 12 3.5 3.5 0 0 1 12 8.5Zm7 3.5.94-.54-1-1.73-1.07.18a6.97 6.97 0 0 0-1.2-1.2l.18-1.07-1.73-1-.54.94a6.97 6.97 0 0 0-1.55-.42L12.5 4h-2l-.53 1.16a6.97 6.97 0 0 0-1.55.42l-.54-.94-1.73 1 .18 1.07a6.97 6.97 0 0 0-1.2 1.2l-1.07-.18-1 1.73.94.54a6.97 6.97 0 0 0 0 1.84l-.94.54 1 1.73 1.07-.18c.33.45.74.86 1.2 1.2l-.18 1.07 1.73 1 .54-.94c.49.2 1.01.34 1.55.42L10.5 20h2l.53-1.16c.54-.08 1.06-.22 1.55-.42l.54.94 1.73-1-.18-1.07c.45-.33.86-.74 1.2-1.2l1.07.18 1-1.73-.94-.54a6.97 6.97 0 0 0 0-1.84Z" />
@@ -460,9 +458,6 @@ function PdfIcon() {
     return <IconSvg path="M7 3h8l4 4v14a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Zm1 14h2.5a2.5 2.5 0 0 0 0-5H8Zm1.5-3.5h1a1 1 0 1 1 0 2h-1Zm5.5-1.5h-3v5h1.5v-1.75h1.25M13.5 13.5h1.5m-1.5 2h1.25" />
 }
 
-function MailIcon() {
-    return <IconSvg path="M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Zm0 2 8 5 8-5" />
-}
 
 function ReportsIcon() {
     return <IconSvg path="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zM14 2v6h6M8 13h8M8 17h8M8 9h3" />

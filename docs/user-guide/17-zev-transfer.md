@@ -82,7 +82,7 @@ history can travel without the pricing structure and vice versa.
 Importing is **admin-only**, because it creates a ZEV and only admins create
 ZEVs on an OpenZEV instance.
 
-1. Open **Platform → ZEVs**.
+1. Open **Platform → Overview → ZEVs**.
 2. Click **Import ZEV**.
 3. Choose the `.zip` archive. OpenZEV reads its manifest and shows what is inside,
    with a row count per section.

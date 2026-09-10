@@ -1,5 +1,4 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Tabs } from '@mantine/core'
 import { useEffect, useState } from 'react'
 import { PageSkeleton } from '../components/PageSkeleton'
 import { useTranslation } from 'react-i18next'
@@ -15,11 +14,9 @@ import { EMAIL_TEMPLATE_FIELDS, type EmailField, type EmailTemplateKey } from '.
 
 function EmailTemplateEditor({
     templateKey,
-    title,
     fields,
 }: {
     templateKey: EmailTemplateKey
-    title: string
     fields: EmailField[]
 }) {
     const { t } = useTranslation()
@@ -62,12 +59,9 @@ function EmailTemplateEditor({
     return (
         <div className="content-with-aside">
             <section className="card page-stack">
-                <div className="actions-row">
-                    <h3 style={{ margin: 0 }}>{title}</h3>
-                    {query.data?.is_customized && (
-                        <span className="badge badge-info">{t('admin.customized')}</span>
-                    )}
-                </div>
+                {query.data?.is_customized && (
+                    <div><span className="badge badge-info">{t('admin.customized')}</span></div>
+                )}
                 {/* The sign-in mail is the only template shipped in all four
                     languages, and a saved override replaces it for every one of
                     them — `EmailTemplate` holds one row per key. Customising it
@@ -126,9 +120,17 @@ function EmailTemplateEditor({
     )
 }
 
-export function AdminEmailTemplatesPage() {
+/**
+ * `embedded` drops the page header and picker (mounted inside the admin Templates hub
+ * since phase 3; /admin/email-templates stays as a deep-link alias).
+ */
+export function AdminEmailTemplatesPage({ embedded = false, template }: {
+    embedded?: boolean
+    template?: EmailTemplateKey
+}) {
     const { t } = useTranslation()
-    const [activeTab, setActiveTab] = useState<EmailTemplateKey>('invoice_email')
+    const [selectedTemplate, setSelectedTemplate] = useState<EmailTemplateKey>('invoice_email')
+    const activeTab = template ?? selectedTemplate
 
     const tabs: { key: EmailTemplateKey; label: string; fields: EmailField[] }[] = [
         { key: 'invoice_email', label: t('admin.emailTemplates.invoiceEmail'), fields: EMAIL_TEMPLATE_FIELDS.invoice_email },
@@ -139,6 +141,7 @@ export function AdminEmailTemplatesPage() {
 
     return (
         <div className="page-stack">
+            {!embedded && (
             <header>
                 <p className="eyebrow">{t('nav.platformScope')}</p>
                 <h2>{t('admin.emailTemplates.title')}</h2>
@@ -146,33 +149,21 @@ export function AdminEmailTemplatesPage() {
                     {t('admin.emailTemplates.description')}
                 </p>
             </header>
+            )}
 
-            <Tabs
-                classNames={{ root: 'app-tabs', list: 'app-tabs-list', tab: 'app-tabs-tab' }}
-                value={activeTab}
-                keepMounted={false}
-                onChange={(value) => {
-                    if (value) setActiveTab(value as EmailTemplateKey)
-                }}
-            >
-                <Tabs.List aria-label={t('admin.emailTemplates.title')}>
-                    {tabs.map((tab) => (
-                        <Tabs.Tab key={tab.key} value={tab.key}>
-                            {tab.label}
-                        </Tabs.Tab>
-                    ))}
-                </Tabs.List>
-
-                {tabs.map((tab) => (
-                    <Tabs.Panel key={tab.key} value={tab.key}>
-                        <EmailTemplateEditor
-                            templateKey={tab.key}
-                            title={tab.label}
-                            fields={tab.fields}
-                        />
-                    </Tabs.Panel>
-                ))}
-            </Tabs>
+            {!embedded && (
+                <label>
+                    <span>{t('pages.adminTemplates.selectTemplate')}</span>
+                    <select value={activeTab} onChange={(event) => setSelectedTemplate(event.target.value as EmailTemplateKey)}>
+                        {tabs.map((tab) => <option key={tab.key} value={tab.key}>{tab.label}</option>)}
+                    </select>
+                </label>
+            )}
+            <EmailTemplateEditor
+                key={activeTab}
+                templateKey={activeTab}
+                fields={EMAIL_TEMPLATE_FIELDS[activeTab]}
+            />
         </div>
     )
 }

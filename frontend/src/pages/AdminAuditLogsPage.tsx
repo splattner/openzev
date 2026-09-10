@@ -62,7 +62,11 @@ function statusBadgeClass(status: AuditEventStatus): string {
     return 'badge badge-neutral'
 }
 
-export function AuditLogsPage({ scope }: AuditLogsPageProps) {
+/**
+ * `embedded` drops the page header (mounted as a ZEV-settings tab since
+ * phase 3; the platform /admin route renders it standalone).
+ */
+export function AuditLogsPage({ scope, embedded = false }: AuditLogsPageProps & { embedded?: boolean }) {
     const { t } = useTranslation()
     const { settings } = useAppSettings()
     const { user } = useAuth()
@@ -71,7 +75,7 @@ export function AuditLogsPage({ scope }: AuditLogsPageProps) {
 
     const isAdminView = scope === 'admin'
     const canUseSearch = isAdminView && user?.role === 'admin'
-    const { selectedZev, selectedZevId, isLoading: managedZevLoading } = useManagedZev()
+    const { selectedZevId, isLoading: managedZevLoading } = useManagedZev()
 
     useEffect(() => {
         if (isAdminView) return
@@ -138,13 +142,13 @@ export function AuditLogsPage({ scope }: AuditLogsPageProps) {
 
     return (
         <div className="page-stack">
-            <header>
-                {isAdminView
-                    ? <p className="eyebrow">{t('nav.platformScope')}</p>
-                    : selectedZev?.name ? <p className="eyebrow">{selectedZev.name}</p> : null}
-                <h2>{t('pages.auditLogs.title')}</h2>
-                <p className="muted">{t('pages.auditLogs.description')}</p>
-            </header>
+            {!embedded && (
+                <header>
+                    <p className="eyebrow">{t(isAdminView ? 'pages.auditLogs.eyebrowAdmin' : 'pages.auditLogs.eyebrowOwner')}</p>
+                    <h2>{t('pages.auditLogs.title')}</h2>
+                    <p className="muted">{t('pages.auditLogs.description')}</p>
+                </header>
+            )}
 
             <section className="card page-stack">
                 <div className="form-grid">

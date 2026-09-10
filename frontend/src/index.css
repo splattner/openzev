@@ -103,6 +103,16 @@ label {
   overflow-y: auto;
 }
 
+/* Keep billing workflow columns readable on narrow screens; the existing
+   table-scroll wrapper owns horizontal overflow. */
+.billing-workflow-table {
+  min-width: 48rem;
+}
+
+.billing-period-cell {
+  white-space: nowrap;
+}
+
 /* Operational table contract: sticky header, scannable rows (36–40px),
    hover feedback, right-aligned tabular quantities/money. */
 .page-stack thead th,
@@ -1116,6 +1126,7 @@ label {
 
 .page-stack {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 1.5rem;
 }
 
@@ -1321,6 +1332,15 @@ label {
   text-decoration: underline;
 }
 
+.open-invoices-foot .button {
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.open-invoices-foot .button:hover {
+  text-decoration: none;
+}
+
 /* ── Billing cockpit + attention card (nav-regroup phase 2, spec §7) ── */
 
 .cockpit-head {
@@ -1375,15 +1395,41 @@ label {
 
 .cockpit-step-link {
   margin-left: auto;
-  color: var(--interactive);
-  font-weight: 600;
-  font-size: 0.85rem;
   text-decoration: none;
   white-space: nowrap;
 }
 
 .cockpit-step-link:hover {
-  text-decoration: underline;
+  text-decoration: none;
+}
+
+.cockpit-completed {
+  margin-top: 0.75rem;
+  border-top: 1px solid var(--border-default);
+  padding-top: 0.75rem;
+}
+
+.cockpit-completed summary,
+.billing-completed-periods > summary {
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.cockpit-completed-steps {
+  margin-top: 0.5rem;
+}
+
+.cockpit-caught-up {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.cockpit-caught-up .muted {
+  margin-left: auto;
 }
 
 .cockpit-foot {
@@ -1446,15 +1492,68 @@ label {
 
 .cockpit-alert-link {
   margin-left: auto;
-  color: var(--interactive);
-  font-weight: 600;
-  font-size: 0.85rem;
   text-decoration: none;
   white-space: nowrap;
 }
 
 .cockpit-alert-link:hover {
-  text-decoration: underline;
+  text-decoration: none;
+}
+
+/* ── Overview period scopes ─────────────────────────────────────────── */
+
+.billing-periods-heading,
+.billing-periods-subheading {
+  display: flex;
+  align-items: baseline;
+  gap: 0.65rem;
+  flex-wrap: wrap;
+}
+
+.billing-periods-heading {
+  justify-content: space-between;
+}
+
+.billing-periods-heading p {
+  margin: 0;
+}
+
+.billing-periods-subheading h4 {
+  margin: 0;
+}
+
+.billing-current-period {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.billing-current-period .eyebrow,
+.billing-current-period .muted {
+  margin: 0;
+}
+
+.billing-current-period-range {
+  display: block;
+  margin: 0.25rem 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.billing-current-period-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  flex-wrap: wrap;
+}
+
+.billing-completed-periods {
+  padding: 1rem;
+}
+
+.billing-completed-periods > .table-card {
+  margin-top: 1rem;
 }
 
 /* ── PDF viewer frame + bar (spec §7.7) ── */
@@ -1550,6 +1649,44 @@ h3 {
   color: var(--warning-800);
 }
 
+/* Status dot — small filled circle for one-glance health/readiness
+   indicators (billing periods table, admin system health). Uses the same
+   status tokens as the badges; size adapts to its context's font. */
+.dot {
+  display: inline-block;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 999px;
+  flex-shrink: 0;
+  background: var(--muted);
+}
+
+.dot-success {
+  background: var(--success-600);
+}
+
+/* Filled dots use the strongest fill available in the token set (600 for
+   success/danger; the warning/info palettes stop at 300/200). */
+.dot-warning {
+  background: var(--warning-300);
+}
+
+.dot-danger {
+  background: var(--danger-600);
+}
+
+.dot-info {
+  background: var(--info-200);
+}
+
+/* Admin system-health probes: title row aligns the status dot with the
+   heading text. */
+.system-health-probe h3 {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
 .badge-draft,
 .badge-cancelled {
   background: var(--status-neutral);
@@ -1628,6 +1765,7 @@ h3 {
   font-weight: 600;
   font-size: 0.9rem;
   line-height: 1.2;
+  text-decoration: none;
   cursor: pointer;
 }
 
@@ -2553,6 +2691,49 @@ input.recurrence-chip-input {
   gap: 1rem;
 }
 
+/* Templates hub: two labelled tab rows sharing one tab strip — PDF on one
+   line, Email on the next. The fixed tag column keeps both rows left-bound. */
+.template-tabs-rows {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.template-tabs-row {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.template-tab-group {
+  flex: 0 0 4rem;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.template-tabs-row .app-tabs-list {
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  min-width: 0;
+  /* Keep the 1rem column gap from .app-tabs-list, but wrapped tab lines
+     should sit close together instead of a full gap apart. */
+  row-gap: 0.25rem;
+}
+
+@media (max-width: 540px) {
+  .template-tabs-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+  }
+
+  .template-tab-group {
+    flex: none;
+  }
+}
+
 /* Main + aside layout (e.g. admin template editor + field reference) */
 .content-with-aside {
   display: grid;
@@ -3259,6 +3440,7 @@ input.recurrence-chip-input {
    Tabs classNames prop: root app-tabs, list app-tabs-list, tab app-tabs-tab. */
 .app-tabs {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 1.5rem;
 }
 
@@ -3497,4 +3679,236 @@ input.recurrence-chip-input {
   width: 100%;
   height: auto;
   display: block;
+}
+
+/* Overview: one card per period, with independent issues kept together. */
+.overview-period-section-title {
+  margin: 0 0 1rem;
+}
+
+.overview-period-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+  align-items: start;
+}
+
+.overview-period-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  min-width: 0;
+  min-height: 19rem;
+  border-top: 3px solid var(--interactive);
+}
+
+.overview-period-card--danger {
+  border-top-color: var(--danger-700);
+}
+
+.overview-period-card--warning {
+  border-top-color: var(--warning-800);
+}
+
+.overview-period-card header {
+  width: 100%;
+  margin-bottom: 1.25rem;
+}
+
+.overview-period-card h3 {
+  margin: 0.3rem 0;
+  font-size: 1.4rem;
+  text-transform: capitalize;
+  overflow-wrap: anywhere;
+}
+
+.overview-period-card .eyebrow,
+.overview-period-range {
+  margin: 0;
+}
+
+.overview-period-range {
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.overview-period-work {
+  display: grid;
+  align-content: start;
+  gap: 0.35rem;
+  flex: 0 0 auto;
+  width: 100%;
+  /* Includes two text lines, their gap, and the vertical padding because the
+     global border-box rule counts padding inside min-height. */
+  min-height: 4.7rem;
+  padding: 0.75rem 0 1rem;
+}
+
+.overview-period-lead {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.overview-period-warning {
+  font-size: 0.8rem;
+  margin: 0;
+}
+
+.overview-period-card > .button {
+  width: 100%;
+  justify-content: center;
+  white-space: normal;
+  text-align: center;
+}
+
+.overview-period-details {
+  width: 100%;
+  margin-top: 1rem;
+  font-size: 0.8rem;
+  overflow-wrap: anywhere;
+}
+
+.overview-period-details summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 1rem;
+  cursor: pointer;
+  color: var(--text-muted);
+  list-style: none;
+}
+
+.overview-period-details summary::-webkit-details-marker {
+  display: none;
+}
+
+.overview-period-details summary::after {
+  content: '+';
+}
+
+.overview-period-details[open] summary::after {
+  content: '−';
+}
+
+.overview-period-details ul {
+  list-style: none;
+  padding: 0;
+  margin-bottom: 0;
+}
+
+.overview-period-details li {
+  display: grid;
+  gap: 0.25rem;
+  padding: 0.65rem 0;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.overview-period-history {
+  border-top: 1px solid var(--border-default);
+  margin-top: 0;
+  padding-top: 1rem;
+}
+
+.overview-step-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.overview-step-link {
+  font-weight: 700;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.18em;
+}
+
+.overview-step-action {
+  width: fit-content;
+  font-weight: 600;
+}
+
+.overview-period-pending:empty {
+  display: none;
+}
+
+.overview-period-verified {
+  margin-top: 0.75rem;
+  padding: 0.65rem 0.75rem;
+  background: var(--surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 0.5rem;
+}
+
+.overview-detail-label {
+  margin: 0 0 0.4rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.overview-period-verified ul {
+  display: grid;
+  gap: 0;
+  margin: 0;
+}
+
+.overview-period-verified li {
+  display: grid;
+  grid-template-columns: 1rem minmax(0, 1fr);
+  align-items: center;
+  gap: 0.45rem;
+  border: 0;
+  padding: 0.2rem 0;
+}
+
+.overview-step-check {
+  color: var(--success-700);
+  font-weight: 700;
+}
+
+.overview-period-history li {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.75rem;
+}
+
+.overview-history-range {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.overview-period-details summary:focus-visible {
+  outline: 2px solid var(--interactive);
+  outline-offset: 4px;
+}
+
+.overview-community-notices h3,
+.overview-caught-up h3 {
+  margin: 0.5rem 0;
+}
+
+.overview-community-notices li + li {
+  margin-top: 0.5rem;
+}
+
+@media (width <= 1150px) {
+  .overview-period-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (width <= 700px) {
+  .overview-period-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .overview-period-card {
+    min-height: 0;
+  }
 }

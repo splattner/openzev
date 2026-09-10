@@ -2,6 +2,7 @@ export const queryKeys = {
   auth: {
     me: () => ['auth', 'me'] as const,
     appSettings: () => ['auth', 'app-settings'] as const,
+    systemHealth: () => ['auth', 'system-health'] as const,
     users: () => ['auth', 'users'] as const,
     featureFlags: () => ['auth', 'feature-flags'] as const,
     registrationEnabled: () => ['auth', 'registration-enabled'] as const,

@@ -14,7 +14,11 @@ import type { AdminApiKey } from '../types/api'
 
 type StatusFilter = '' | 'active' | 'revoked'
 
-export function AdminApiKeysPage() {
+/**
+ * `embedded` drops the page header (mounted inside the admin Accounts hub
+ * since phase 3; /admin/api-keys stays as a deep-link alias).
+ */
+export function AdminApiKeysPage({ embedded = false }: { embedded?: boolean }) {
     const { t } = useTranslation()
     const { settings } = useAppSettings()
     const { pushToast } = useToast()
@@ -77,11 +81,13 @@ export function AdminApiKeysPage() {
 
     return (
         <div className="page-stack">
+            {!embedded && (
             <header>
                 <p className="eyebrow">{t('nav.platformScope')}</p>
                 <h2>{t('pages.adminApiKeys.title')}</h2>
                 <p className="muted">{t('pages.adminApiKeys.description')}</p>
             </header>
+            )}
 
             {/* Matches the inline grid the other stat rows use; there is no
                 shared `.stat-grid` class in the stylesheet. */}

@@ -86,17 +86,21 @@ Audit endpoints are served under a new `audit` app.
 
 | Route | ProtectedRoute roles |
 |---|---|
-| `/admin/audit-logs` | `['admin']` in v1 |
-| `/audit-logs` | `['admin', 'zev_owner']` in v1 |
+| `/admin/audit` (`/admin/audit-logs` redirects) | `['admin']` |
+| `/zev-settings/audit` (`/audit-logs` redirects) | `['admin', 'zev_owner']` (guard on the parent settings hub) |
 
-The same read-only audit view is rendered in two scopes:
+The same read-only audit view (`AuditLogsPage({ scope })`) is rendered in two
+hub tabs:
 
-- admin scope at `/admin/audit-logs`, with global visibility and search
+- admin scope as the Audit log tab of the admin Overview hub
+  (`AdminOverviewHubPage tab="audit"`), with global visibility and search
   enabled,
-- owner scope at `/audit-logs`, bound to the globally selected community
-  (no independent community selector; search disabled). Changing the
-  selection resets pagination and closes the open event drawer; no events
-  are requested before a valid selection exists.
+- owner scope as the Audit log tab of the ZEV settings hub
+  (`ZevSettingsPage tab="audit"`), with ZEV-scoped visibility and search
+  disabled. The component accepts `embedded` to drop its standalone page
+  header when mounted inside a tab; scopes never merge. Owner scope is locked
+  to the global ZEV selection. Switching it resets pagination and closes the
+  drawer; no event request runs while the managed selection is loading or empty.
 
 ### ZEV resolution rules
 
@@ -418,8 +422,12 @@ avoid noise.
 
 **File:** `frontend/src/pages/AdminAuditLogsPage.tsx`
 
-- Route: `/admin/audit-logs` for admin scope and `/audit-logs` for owner scope
-- ProtectedRoute roles: `['admin']` for admin scope, `['admin', 'zev_owner']` for owner scope
+- Route: admin scope at `/admin/audit` (Overview hub tab), owner scope at
+  `/zev-settings/audit` (ZEV settings hub tab); the legacy routes
+  `/admin/audit-logs` and `/audit-logs` redirect there
+- ProtectedRoute roles: `['admin']` for admin scope, `['admin', 'zev_owner']`
+  for owner scope (guard on the parent settings hub)
+- `embedded` prop: drops the page header when mounted inside a hub tab
 - Query: `useQuery({ queryKey: queryKeys.admin.auditEvents(filters), queryFn: () => fetchAuditEvents(filters) })`
 - Detail query: `useQuery({ queryKey: queryKeys.admin.auditEvent(eventId), queryFn: () => fetchAuditEvent(eventId), enabled: !!eventId })`
 - Options query: `useQuery({ queryKey: queryKeys.admin.auditFilterOptions(), queryFn: fetchAuditFilterOptions })`
@@ -547,16 +555,17 @@ export interface AuditFilterOptions {
 
 **Files:**
 
-- `frontend/src/App.tsx`
+- `frontend/src/components/AppRoutes.tsx`
 - `frontend/src/components/Layout.tsx`
+- `frontend/src/pages/AdminOverviewHubPage.tsx`
+- `frontend/src/pages/ZevSettingsPage.tsx`
 
-Required changes:
-
-1. Lazy-load the shared audit-log page component in `App.tsx`.
-2. Register `/admin/audit-logs` under admin-only routes.
-3. Register `/audit-logs` under admin or ZEV-owner routes.
-4. Add a navigation entry in the admin section of the layout.
-5. Add a navigation entry in the manage section for ZEV owners and admins.
+The admin Overview hub embeds `AuditLogsPage scope="admin"` at `/admin/audit`
+under an admin-only guard. ZEV settings embeds `AuditLogsPage scope="owner"`
+at `/zev-settings/audit` under an admin/owner guard. Both pass `embedded` to
+omit the standalone page header. Legacy `/admin/audit-logs` and `/audit-logs`
+URLs redirect to these tabs; there are no standalone audit sidebar entries.
+See `2026-03-community-and-access.md` §9 for the navigation contract.
 
 ---
 

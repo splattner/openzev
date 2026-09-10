@@ -667,28 +667,41 @@ On update:
 
 | Route | Allowed roles | Page component |
 |---|---|---|
-| `/` | any authenticated | `DashboardPage` |
+| `/` | any authenticated | `HomePage`: `OverviewPage` for `admin` / `zev_owner`; `DashboardPage` for `participant` |
+| `/dashboard` | any authenticated | `DashboardPage` (manager title/navigation: Energy balance; participant root remains `/`) |
 | `/account` | any authenticated | `AccountProfilePage` |
-| `/admin` | `admin` | `AdminDashboardPage` |
+| `/admin` | `admin` | `AdminOverviewHubPage` (tabs = routes; default tab `overview`) |
+| `/admin/overview` · `/admin/zevs` · `/admin/invoices` · `/admin/audit` · `/admin/health` | `admin` | `AdminOverviewHubPage tab=…` (KPIs · ZEVs table · all invoices · platform audit log · System health) |
+| `/admin/audit-logs` | `admin` | alias → `/admin/audit` |
 | `/admin/system-settings` | `admin` | `AdminSystemSettingsPage` |
-| `/admin/pdf-templates` | `admin` | `AdminPdfTemplatesPage` |
-| `/admin/accounts` | `admin` | `AdminAccountsPage` |
-| `/admin/zevs` | `admin` | `ZevListPage` |
+| `/admin/accounts` | `admin` | `AdminAccountsHubPage` (Users tab) |
+| `/admin/accounts/users` · `/admin/accounts/api-keys` | `admin` | `AdminAccountsHubPage tab=…` |
+| `/admin/api-keys` | `admin` | alias → `/admin/accounts/api-keys` |
+| `/admin/templates` | `admin` | `AdminTemplatesHubPage` (PDF tab) |
+| `/admin/templates/pdf` · `/admin/templates/email` | `admin` | `AdminTemplatesHubPage tab=…` |
+| `/admin/pdf-templates` | `admin` | alias → `/admin/templates/pdf` |
+| `/admin/email-templates` | `admin` | alias → `/admin/templates/email` |
 | `/participants` | `admin`, `zev_owner` | `ParticipantsPage` |
-| `/zev-settings` | `admin`, `zev_owner` | `ZevSettingsPage` |
-| `/metering-points` | any authenticated | `MeteringPointsPage` |
+| `/zev-settings` | `admin`, `zev_owner` | `ZevSettingsTabRoute` → `ZevSettingsPage` (General tab) |
+| `/zev-settings/:tab` (`general` · `billing` · `documents` · `audit` · `export`) | `admin`, `zev_owner` | `ZevSettingsTabRoute` → `ZevSettingsPage tab=…` (audit tab embeds `AuditLogsPage scope="owner"`; export tab keeps the transfer archive) |
+| `/audit-logs` | `admin`, `zev_owner` | alias → `/zev-settings/audit` (owner-scoped log in the settings hub) |
+| `/metering/points` | any authenticated | `MeteringPointsPage` (read-only for participants, no nav entry) |
+| `/metering-points` | any authenticated | alias → `/metering/points` |
 | `/metering/chart` | any authenticated | `MeteringChartPage` (`tab="chart"`, wrapped in default-allow `ProtectedRoute` so tab switches don't remount) |
 | `/metering/quality` | `admin`, `zev_owner` | `MeteringChartPage` (`tab="quality"`) — intentional participant restriction: quality shows whole-ZEV severity counts, participant names, and overlap warnings (operator view; backend role-scoping means no leak either way) |
+| `/metering/imports` | `admin`, `zev_owner` | `MeteringChartPage` (`tab="imports"`, embedding `ImportsPage embedded`) |
 | `/metering-data` | any authenticated | alias → `/metering/chart`, except `?tab=quality` → guarded `/metering/quality`; `tab` is always stripped, remaining params preserved |
-| `/metering/imports` | `admin`, `zev_owner` | `ImportsPage` |
-| `/tariffs` | `admin`, `zev_owner` | `TariffsPage` |
-| `/billing/invoices` | `admin`, `zev_owner` | `InvoicesPage` |
-| `/invoices` | `admin`, `zev_owner` | alias → `/billing/invoices` (query preserved) |
-| `/invoices/:invoiceId` | any authenticated | alias → `/billing/invoices/:invoiceId` (param + query preserved) |
-| `/billing/invoices/:invoiceId` | any authenticated | `InvoiceDetailPage` |
 | `/imports` | `admin`, `zev_owner` | alias → `/metering/imports` (query preserved) |
+| `/tariffs` | `admin`, `zev_owner` | `TariffsPage` |
+| `/billing/invoices` · `/billing/emails` · `/billing/statements` | `admin`, `zev_owner` | `BillingHubPage tab=…` (invoices · email delivery/history + retry · owner annual statements) |
+| `/billing/periods` | `admin`, `zev_owner` | compatibility alias → `/`, where period work lives on manager Overview |
+| `/billing/invoices?period_start&period_end` | `admin`, `zev_owner` | deep link from the Overview period table preselects that period |
+| `/billing` | `admin`, `zev_owner` | alias → `/billing/invoices` |
+| `/invoices` | `admin`, `zev_owner` | alias → `/billing/invoices` (query preserved) |
+| `/invoices/:invoiceId` · `/billing/invoices/:invoiceId` | any authenticated | `InvoiceDetailPage` (own invoices only for participants, backend-enforced) |
 | `/me/statement` | `participant` | `ReportsPage` (participant branch; impersonating admins carry the participant role) |
 | `/me/invoices` | `participant` | `MyInvoicesPage` (own invoices, read-only; reuses the role-scoped invoice list — no new grant, recorded exception 2) |
+| `/reports` | any authenticated | `ReportsPage` (participants: own downloads; owners/admins: ZEV-level tax overview plus planned analytics) |
 | `/login` | public | `LoginPage` |
 | `/verify-email` | public | `VerifyEmailPage` |
 
@@ -702,12 +715,15 @@ The sidebar (`Layout.tsx`) shows sections conditionally:
 
 | Section | Condition |
 |---|---|
-| Dashboard | always |
-| Metering (`/metering/chart`, active on `/metering/chart` + `/metering/quality`), Billing (`/billing/invoices`, active on `/billing/*`), Imports (transitional, phase-3 hub tab), Reports | `canManage` = `role == 'admin' \|\| role == 'zev_owner'` ("owner-only in nav" = owner AND admin; the `/reports` route itself still allows participants) |
-| My invoices (`/me/invoices`), Annual statement (`/me/statement`) | `role == 'participant'` (the transitional "My consumption" entry folded into the participant dashboard in phase 2) |
-| Setup group (participants, metering points, tariffs, ZEV settings, audit logs) | `canManage` |
+| Overview (`/`), Energy balance (`/dashboard`), Metering (`/metering/chart`, active on `/metering/chart` + `/metering/quality` + `/metering/imports`), Billing (`/billing/invoices`, active on `/billing/*`), Reports | `canManage` = `role == 'admin' \|\| role == 'zev_owner'` ("owner-only in nav" = owner AND admin; the `/reports` route itself still allows participants) |
+| Dashboard (`/`) | `role == 'participant'` |
+| My invoices (`/me/invoices`), Annual statement (`/me/statement`) | `role == 'participant'` (consumption is available on the participant dashboard) |
+| Setup group (participants, metering points `/metering/points`, tariffs, ZEV settings `/zev-settings`) | `canManage` (audit logs live in the ZEV settings hub; no standalone entry) |
 | Feasibility | `canManage` |
-| Platform group (all nine `/admin/*` pages, flat) | `role == 'admin'` |
+| Platform group (four entries: Overview `/admin`, Accounts `/admin/accounts`, Templates `/admin/templates`, System settings `/admin/system-settings`) | `role == 'admin'` (ZEVs/API keys/invoices/audit-logs/pdf+email templates live as hub tabs) |
+
+Overview stays active on `/admin` and its five tab routes, without matching
+Accounts, Templates or System settings.
 
 The ZEV switcher lives at the sidebar top for `canManage` roles (inline
 expander, full sidebar width, expands-first when collapsed, auto-closes on
@@ -739,17 +755,13 @@ how an admin enters a ZEV's working scope from platform scope.
 Active navigation state is exposed to assistive tech: the active sidebar
 entry carries `aria-current` alongside its visual class — `"page"` on the
 exact route, `"true"` on hub entries visually active on sub-routes (Metering
-on `/metering/chart` + `/metering/quality`, Billing on `/billing/*`).
+on `/metering/chart` + `/metering/quality` + `/metering/imports`, Billing on
+`/billing/*`).
 
-Phase scope: phase 1 shipped the flat nav, canonical routes + aliases, and
-the Manage entry point. Phase 2 shipped `/me/invoices`, the participant nav  fold of "My consumption" into the Dashboard, and the readiness/attention
-  cockpit on the dashboard (`BillingCockpit`, fed by
-`/api/v1/invoices/invoices/readiness/` + `…/attention/`). Deferred to phase 3:
-the metering-points rename, `/billing/periods|emails|statements`, and the
-audit-logs move. The phase plan, route/permission decisions and the
-readiness/attention contract are recorded in
-[2026-09-navigation-regroup.md](2026-09-navigation-regroup.md) (the WIP
-tag `ux-audit-handoff-v1` is archival context only).
+The manager Overview uses period cards (`BillingPeriodsPage` and
+`BillingPeriodCard`) plus `BillingCockpit` in setup-only mode. It uses
+`/api/v1/invoices/invoices/readiness/` and `…/attention/` — the contract is
+documented in `2026-03-invoice-lifecycle-and-communication.md` §5.6a.
 
 ### 9.4 ManagedZevProvider (global ZEV context)
 
@@ -783,6 +795,7 @@ tag `ux-audit-handoff-v1` is archival context only).
 | GET / PATCH / DELETE | `/users/{id}/` | IsAdmin | User detail (delete blocked if linked or last admin) |
 | POST | `/users/{user_id}/impersonate/` | IsAuthenticated (admin only) | Impersonate participant/owner |
 | GET / PATCH | `/app-settings/` | IsAuthenticated (update: admin only) | Application settings singleton |
+| GET | `/system-health/` | IsAuthenticated, IsAdmin | Platform health snapshot for the admin Overview hub's System-health tab: `{database: {status, engine, size_bytes}, celery: {status, workers_responding, queue_depth, broker_configured, detail?}, email: {status, mode, backend}, checked_at}`. Best-effort probes: DB failure and zero responding workers are `degraded`; an unavailable broker ping is `unknown`. Email reports configuration only. Broker connection and Redis socket timeouts are one second with connection retries disabled; worker replies have a one-second timeout. A dedicated Kombu mailbox publishes on that same connection without the application producer pool and with publication retries disabled. Redis depth uses passive queue declaration for the configured default queue, including its priority buckets. Optional `detail` contains only an exception class, never a raw exception message or broker credentials. |
 | GET / POST | `/vat-rates/` | IsAdmin | VAT rate management |
 | GET / PATCH / DELETE | `/vat-rates/{id}/` | IsAdmin | VAT rate detail |
 | GET | `/feature-flags/` | IsAuthenticated, IsAdmin | List all feature flags (admin-only; syncs defaults on read) |
@@ -1072,24 +1085,14 @@ lists the test classes per module (test counts are the `test_*` methods).
 - `npm run build` verifies type-safety and route correctness.
 - `ProtectedRoute` handles loading, unauthenticated, forced password change,
   and role gating.
-- `frontend/tests/layout-nav.test.ts` — flat-nav visibility per role,
+- `frontend/tests/layout-nav.test.ts` — hub-nav visibility per role,
   collapsed switcher naming, impersonation banner, `aria-current` alignment
-  (incl. `/metering/quality`), and the sidebar scope chip (platform vs ZEV;
-  there is no header chip) with page eyebrows. `frontend/tests/route-guard-matrix.test.ts` — the §9.2 route →
-  role matrix against `AppRoutes` for all three roles.
+  (incl. `/metering/quality`, `/billing/emails`), and the sidebar scope indicator (platform vs ZEV; page eyebrows carry
+  the selected community, with no duplicate header chip). `frontend/tests/route-guard-matrix.test.ts` —
+  the §9.2 route → role matrix against `AppRoutes` for all three roles
+  (42 rows; home/energy split, hub tabs, aliases, and deep links included).
   `frontend/tests/route-aliases.test.ts` — legacy alias redirects preserve
-  query and params.   `frontend/tests/community-eyebrow.test.ts` — invoice
-  detail shows the invoice's own community (not the global selection);
-  dashboard, chart, and metering points show `zev_name` only with a single
-  membership (`zev_count == 1`) and no eyebrow with several; owner
-  audit-logs shows the selected ZEV while admin audit-logs and admin
-  invoices show the platform label.
-  `frontend/tests/audit-log-scope.test.ts` — owner audit-logs request
-  scope follows the global selection (switch rescopes and resets
-  page/drawer, clear-filters keeps the scope, no request without a
-  selection); admin scope keeps its own community selector. See
-  [2026-09-navigation-regroup.md](2026-09-navigation-regroup.md) for the
-  frozen decisions.
+  query and params (the §9.2 matrix is the frozen contract).
 
 ---
 

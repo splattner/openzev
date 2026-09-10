@@ -59,7 +59,14 @@ function Badge({ label, ok }: { label: string; ok: boolean }) {
     )
 }
 
-export function ImportsPage() {
+/**
+ * Metering import wizard + history log.
+ *
+ * Phase-3 nav regroup: mounted as the "Import history" tab of the Metering
+ * hub (`/metering/imports`, `tab="imports"`). `embedded` drops the page
+ * header because the hub renders it; standalone alias renders keep it.
+ */
+export function ImportsPage({ embedded = false }: { embedded?: boolean }) {
     const queryClient = useQueryClient()
     const { pushToast } = useToast()
     const { dialog, confirm, handleConfirm, handleCancel, isLoading: dialogLoading } = useConfirmDialog()
@@ -405,7 +412,9 @@ export function ImportsPage() {
     }
 
     if (isLoading)
-        return (
+        return embedded ? (
+            <PageSkeleton variant="table" />
+        ) : (
             <div className="page-stack">
                 <header>
                     <h2>{t('pages.imports.title')}</h2>
@@ -418,11 +427,13 @@ export function ImportsPage() {
 
     return (
         <div className="page-stack">
-            <header>
-                {selectedZev?.name ? <p className="eyebrow">{selectedZev.name}</p> : null}
-                <h2>{t('pages.imports.title')}</h2>
-                <p className="muted">{t('pages.imports.description')}</p>
-            </header>
+            {!embedded && (
+                <header>
+                    {selectedZev?.name ? <p className="eyebrow">{selectedZev.name}</p> : null}
+                    <h2>{t('pages.imports.title')}</h2>
+                    <p className="muted">{t('pages.imports.description')}</p>
+                </header>
+            )}
 
             <section className="card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
                 <div>

@@ -65,17 +65,16 @@ For larger or risky changes, consult or create specs and ADRs:
   - Decisions worth revisiting during refactors
 
 - **Baseline specs** describe the current implementation at field-level detail (models, API endpoints, serializers, frontend components, TypeScript types, test counts). They should be updated when those features change:
-  - `2026-03-community-and-access.md` — users, roles, auth, JWT, permissions, ZEV scoping
+  - `2026-03-community-and-access.md` — users, roles, auth, JWT, permissions, ZEV scoping, navigation regroup, canonical routes + aliases, scope-aware shell, hubs and admin consolidation
   - `2026-03-metering-point-management.md` — participants, metering points, assignments
   - `2026-03-metering-import-and-quality.md` — SDAT/Excel/CSV import, data quality
   - `2026-03-tariffs-and-billing-engine.md` — tariffs, billing modes, invoice generation
-  - `2026-03-invoice-lifecycle-and-communication.md` — invoice workflow, email, PDF rendering
+  - `2026-03-invoice-lifecycle-and-communication.md` — invoice workflow, email, PDF rendering, readiness/attention cockpit, period overview, generation eligibility
   - `2026-03-admin-governance-and-settings.md` — AppSettings, VAT, admin dashboard, ZEV config
   - `2026-05-audit-log-and-operational-traceability.md` — audit event stream, scoped visibility, redaction
   - `2026-08-zev-transfer-archive.md` — whole-ZEV export/import archive
   - `2026-08-contract-pdf-redesign.md` — contract PDF design, context, shared PDF design base
   - `2026-08-ui-redesign-pdf-style.md` — UI design system, print parity, shared tokens, PDF previews
-  - `2026-09-navigation-regroup.md` — navigation regroup, canonical routes + aliases, scope-aware shell, readiness/attention cockpit + `/me/invoices` (phases 1–2 shipped), phase plan for phase 3 (hubs, admin consolidation)
 
 - **Reference specs** document reusable cross-cutting patterns that should guide future work even when no baseline feature spec changes directly:
   - `2026-04-frontend-management-page-design.md` — reference spec for frontend CRUD / management-page cleanup, action hierarchy, page grouping, icons, i18n discipline, and responsive layouts

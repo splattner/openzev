@@ -35,3 +35,18 @@ export function formatChf(value: number): string {
 
     return value < 0 ? `CHF \u2212${absFormatted}` : `CHF ${absFormatted}`
 }
+
+/** Human-readable byte size for the admin system-health tab (phase 3):
+ * binary prefixes (KiB…), one decimal except for exact bytes. */
+export function formatBytes(value: number): string {
+    if (!Number.isFinite(value) || value < 0) return '–'
+    if (value < 1024) return `${Math.round(value)} B`
+    const units = ['KiB', 'MiB', 'GiB', 'TiB']
+    let scaled = value
+    let unitIndex = -1
+    do {
+        scaled /= 1024
+        unitIndex += 1
+    } while (scaled >= 1024 && unitIndex < units.length - 1)
+    return `${formatNumber(scaled, { minDecimals: 1, maxDecimals: 1 })} ${units[unitIndex]}`
+}

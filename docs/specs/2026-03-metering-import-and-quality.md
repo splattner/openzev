@@ -597,6 +597,12 @@ current period. The community's earliest billable period (see the
 navigation-regroup spec §7 floor rule) disables the previous-period button at
 the boundary, so a selection can never flash a pre-start period and jump away.
 
+Import history is the third tab of the same hub —
+`/metering/imports` renders `MeteringChartPage tab="imports"`, which
+mounts `ImportsPage embedded` (header stripped, `PeriodSelector` hidden on
+that tab); `admin`/`zev_owner` only. The standalone nav entry is gone; the
+legacy `/imports` alias still redirects with its query preserved.
+
 ### 5.6 Import endpoints
 
 | Method | URL | Permission | Description |
