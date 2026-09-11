@@ -4,6 +4,7 @@ import { api } from '../src/lib/api/client'
 import {
   clearDynamicSourcePrices,
   createDynamicTariffSource,
+  deleteDynamicTariffSource,
   discoverDynamicTariffSource,
   fetchDynamicPriceHistory,
   fetchDynamicTariffSources,
@@ -156,11 +157,23 @@ describe('fetchDynamicTariffSources', () => {
       task_id: 'task-1', correlation_id: 'corr-1', backfill: true, queued_at: '2026-09-11T12:00:00Z',
     })
     apiMock.onDelete('/tariffs/dynamic-sources/src-1/prices/').reply((config) => {
-      expect(JSON.parse(config.data as string)).toEqual({ confirmation: 'Example', reason: 'Wrong feed' })
+      // The typed-back label is the whole payload: no reason is asked for.
+      expect(JSON.parse(config.data as string)).toEqual({ confirmation: 'Example' })
       return [200, { deleted_points: 10 }]
     })
 
     await expect(queueDynamicSourceFetch('src-1', true)).resolves.toMatchObject({ task_id: 'task-1' })
-    await expect(clearDynamicSourcePrices('src-1', 'Example', 'Wrong feed')).resolves.toEqual({ deleted_points: 10 })
+    await expect(clearDynamicSourcePrices('src-1', 'Example')).resolves.toEqual({ deleted_points: 10 })
+  })
+
+  it('deletes a source by id with the typed-back label', async () => {
+    // A different endpoint from clearing: /{id}/ removes the source itself,
+    // /{id}/prices/ only empties it.
+    apiMock.onDelete('/tariffs/dynamic-sources/src-1/').reply((config) => {
+      expect(JSON.parse(config.data as string)).toEqual({ confirmation: 'Example' })
+      return [204]
+    })
+
+    await expect(deleteDynamicTariffSource('src-1', 'Example')).resolves.toBeUndefined()
   })
 })

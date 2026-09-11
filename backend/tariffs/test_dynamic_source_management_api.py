@@ -218,6 +218,32 @@ class TestOperations:
         assert source.last_success_at is None
         assert AuditEvent.objects.get(action_type="tariff.dynamic_source_clear").reason
 
+    def test_clearing_needs_only_the_label_typed_back(self, admin_client):
+        # The label has to be read off the row being cleared; a reason box on
+        # top of that invites a keystroke rather than a thought.
+        source = make_source()
+        add_point(source)
+
+        response = admin_client.delete(
+            f"/api/v1/tariffs/dynamic-sources/{source.pk}/prices/",
+            {"confirmation": source.label},
+        )
+
+        assert response.status_code == 200
+        assert source.points.count() == 0
+
+    def test_clearing_still_refuses_a_mistyped_label(self, admin_client):
+        source = make_source()
+        add_point(source)
+
+        response = admin_client.delete(
+            f"/api/v1/tariffs/dynamic-sources/{source.pk}/prices/",
+            {"confirmation": "Example dynamic"},
+        )
+
+        assert response.status_code == 400
+        assert source.points.count() == 1
+
     def test_clear_is_blocked_by_an_overlapping_invoice(self, admin_client, zev):
         source = make_source()
         link_source(source, zev)
@@ -233,3 +259,126 @@ class TestOperations:
         )
 
         assert response.status_code == 409
+
+
+class TestDeletingASource:
+    """A source nobody points at any more is ordinary clutter, not evidence.
+
+    Removing it is only allowed once no tariff links to it — which also means
+    no invoice can have been derived from it, since
+    ``source_has_billing_evidence`` reasons entirely over linked tariffs.
+    """
+
+    def test_admin_can_delete_an_unused_source_and_its_points(self, admin_client):
+        source = make_source()
+        add_point(source)
+
+        response = admin_client.delete(
+            f"/api/v1/tariffs/dynamic-sources/{source.pk}/",
+            {"confirmation": source.label},
+        )
+
+        assert response.status_code == 204
+        assert not DynamicTariffSource.objects.filter(pk=source.pk).exists()
+        assert DynamicPricePoint.objects.count() == 0
+
+    def test_deleting_is_audited_with_what_it_removed(self, admin_client):
+        source = make_source()
+        add_point(source)
+        DynamicPricePoint.objects.create(
+            source=source,
+            valid_from=datetime(2026, 9, 10, 0, 15, tzinfo=UTC),
+            valid_to=datetime(2026, 9, 10, 0, 30, tzinfo=UTC),
+            price_chf_per_kwh=Decimal("0.20000"),
+        )
+
+        admin_client.delete(
+            f"/api/v1/tariffs/dynamic-sources/{source.pk}/",
+            {"confirmation": source.label},
+        )
+
+        # The row is gone, so the audit event is the only record left of how
+        # much was destroyed with it.
+        event = AuditEvent.objects.get(action_type="tariff.dynamic_source_delete")
+        assert event.target_display == "Example dynamic grid"
+        assert event.metadata_json["deleted_points"] == 2
+        assert "Example dynamic grid" in event.summary
+
+    def test_a_source_still_used_by_a_tariff_is_refused(self, admin_client, zev):
+        # PROTECT would refuse the write anyway; a 409 naming what still uses
+        # it is what tells the admin where to look.
+        source = make_source()
+        link_source(source, zev)
+
+        response = admin_client.delete(
+            f"/api/v1/tariffs/dynamic-sources/{source.pk}/",
+            {"confirmation": source.label},
+        )
+
+        assert response.status_code == 409
+        assert "1 tariff" in response.json()["detail"]
+        assert DynamicTariffSource.objects.filter(pk=source.pk).exists()
+
+    def test_deleting_refuses_a_mistyped_label(self, admin_client):
+        source = make_source()
+
+        response = admin_client.delete(
+            f"/api/v1/tariffs/dynamic-sources/{source.pk}/",
+            {"confirmation": "example dynamic grid"},  # wrong case
+        )
+
+        assert response.status_code == 400
+        assert DynamicTariffSource.objects.filter(pk=source.pk).exists()
+
+    def test_deleting_requires_a_confirmation_at_all(self, admin_client):
+        source = make_source()
+
+        response = admin_client.delete(f"/api/v1/tariffs/dynamic-sources/{source.pk}/", {})
+
+        assert response.status_code == 400
+        assert DynamicTariffSource.objects.filter(pk=source.pk).exists()
+
+    def test_an_owner_cannot_delete_a_source(self, owner_client):
+        source = make_source()
+
+        response = owner_client.delete(
+            f"/api/v1/tariffs/dynamic-sources/{source.pk}/",
+            {"confirmation": source.label},
+        )
+
+        assert response.status_code == 403
+        assert DynamicTariffSource.objects.filter(pk=source.pk).exists()
+
+    def test_deleting_is_refused_while_a_fetch_holds_the_lock(self, admin_client):
+        source = make_source()
+
+        with mock.patch("tariffs.views.dynamic_source_lock") as lock:
+            lock.return_value.__enter__ = mock.Mock(return_value=False)
+            lock.return_value.__exit__ = mock.Mock(return_value=False)
+            response = admin_client.delete(
+                f"/api/v1/tariffs/dynamic-sources/{source.pk}/",
+                {"confirmation": source.label},
+            )
+
+        assert response.status_code == 409
+        assert DynamicTariffSource.objects.filter(pk=source.pk).exists()
+
+    def test_a_tariff_linked_during_the_delete_still_refuses(self, admin_client, zev):
+        # The count check above is for the message; PROTECT is what decides.
+        # Without catching it, this race surfaces as a 500 rather than a 409.
+        source = make_source()
+
+        real_delete = DynamicTariffSource.delete
+
+        def link_then_delete(self, *args, **kwargs):
+            link_source(self, zev)
+            return real_delete(self, *args, **kwargs)
+
+        with mock.patch.object(DynamicTariffSource, "delete", link_then_delete):
+            response = admin_client.delete(
+                f"/api/v1/tariffs/dynamic-sources/{source.pk}/",
+                {"confirmation": source.label},
+            )
+
+        assert response.status_code == 409
+        assert DynamicTariffSource.objects.filter(pk=source.pk).exists()

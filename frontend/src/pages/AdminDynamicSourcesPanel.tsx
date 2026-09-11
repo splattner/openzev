@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faArrowsRotate, faChartLine, faClockRotateLeft, faEllipsis, faPen, faPlus, faTrash } from '@fortawesome/free-solid-svg-icons'
+import { faArrowsRotate, faChartLine, faClockRotateLeft, faEllipsis, faEraser, faPen, faPlus, faTrash } from '@fortawesome/free-solid-svg-icons'
 import { useTranslation } from 'react-i18next'
 import { ActionMenu } from '../components/ActionMenu'
 import { DataTable, type ColumnDef } from '../components/DataTable'
@@ -13,7 +13,12 @@ import { PageSkeleton } from '../components/PageSkeleton'
 import { DynamicPriceHistoryModal } from '../features/tariffs/DynamicPriceHistoryModal'
 import { DynamicSourceFormModal } from '../features/tariffs/DynamicSourceFormModal'
 import { fetchAuditEvents } from '../lib/api/audit'
-import { clearDynamicSourcePrices, fetchDynamicTariffSources, queueDynamicSourceFetch } from '../lib/api/tariffs'
+import {
+  clearDynamicSourcePrices,
+  deleteDynamicTariffSource,
+  fetchDynamicTariffSources,
+  queueDynamicSourceFetch,
+} from '../lib/api/tariffs'
 import { formatApiError } from '../lib/api/errors'
 import { formatDateTime, useAppSettings } from '../lib/appSettings'
 import { queryKeys } from '../lib/api/queryKeys'
@@ -34,20 +39,27 @@ export function AdminDynamicSourcesPanel() {
   const [formSource, setFormSource] = useState<DynamicTariffSource | null | undefined>(undefined)
   const [historySource, setHistorySource] = useState<DynamicTariffSource | null>(null)
   const [activitySource, setActivitySource] = useState<DynamicTariffSource | null>(null)
-  const [clearSource, setClearSource] = useState<DynamicTariffSource | null>(null)
+  // One dialog shape for both destructive actions: they differ only in what
+  // they destroy, and typing the source's own label back is the guard on
+  // either. No reason field — a free-text box in front of an irreversible
+  // action invites a keystroke, while the label has to be read off the row
+  // that is about to go.
+  const [destructive, setDestructive] = useState<
+    { mode: 'clear' | 'delete'; source: DynamicTariffSource } | null
+  >(null)
   const [confirmation, setConfirmation] = useState('')
-  const [reason, setReason] = useState('')
 
-  const openClearDialog = useCallback((source: DynamicTariffSource) => {
-    setConfirmation('')
-    setReason('')
-    setClearSource(source)
-  }, [])
+  const openDestructiveDialog = useCallback(
+    (mode: 'clear' | 'delete', source: DynamicTariffSource) => {
+      setConfirmation('')
+      setDestructive({ mode, source })
+    },
+    [],
+  )
 
-  const closeClearDialog = useCallback(() => {
-    setClearSource(null)
+  const closeDestructiveDialog = useCallback(() => {
+    setDestructive(null)
     setConfirmation('')
-    setReason('')
   }, [])
 
   const sourcesQuery = useQuery({
@@ -68,16 +80,25 @@ export function AdminDynamicSourcesPanel() {
   })
 
   const clearMutation = useMutation({
-    mutationFn: (source: DynamicTariffSource) => clearDynamicSourcePrices(
-      source.id, confirmation, reason,
-    ),
+    mutationFn: (source: DynamicTariffSource) => clearDynamicSourcePrices(source.id, confirmation),
     onSuccess: async (result) => {
       pushToast(t('pages.dynamicSources.cleared', { count: result.deleted_points }), 'success')
-      closeClearDialog()
+      closeDestructiveDialog()
       await queryClient.invalidateQueries({ queryKey: queryKeys.tariffs.dynamicSources() })
       await queryClient.invalidateQueries({ queryKey: ['admin', 'audit-events'] })
     },
     onError: (error) => pushToast(formatApiError(error, t('pages.dynamicSources.clearError')), 'error'),
+  })
+
+  const deleteMutation = useMutation({
+    mutationFn: (source: DynamicTariffSource) => deleteDynamicTariffSource(source.id, confirmation),
+    onSuccess: async () => {
+      pushToast(t('pages.dynamicSources.deleted'), 'success')
+      closeDestructiveDialog()
+      await queryClient.invalidateQueries({ queryKey: queryKeys.tariffs.dynamicSources() })
+      await queryClient.invalidateQueries({ queryKey: ['admin', 'audit-events'] })
+    },
+    onError: (error) => pushToast(formatApiError(error, t('pages.dynamicSources.deleteError')), 'error'),
   })
 
   const activityQuery = useQuery({
@@ -175,15 +196,30 @@ export function AdminDynamicSourcesPanel() {
               },
               {
                 key: 'clear', label: t('pages.dynamicSources.clearAction'), danger: true,
+                icon: <FontAwesomeIcon icon={faEraser} fixedWidth />,
+                onClick: () => openDestructiveDialog('clear', source),
+              },
+              {
+                // A source still pricing a tariff cannot be deleted — the FK
+                // is PROTECT, and the server refuses with a 409 naming what
+                // uses it. Disabling here says so before the round trip, and
+                // the label says *why*: a greyed-out item with no reason
+                // reads as broken rather than as blocked.
+                key: 'delete',
+                label: source.linked_tariff_count > 0
+                  ? t('pages.dynamicSources.deleteActionInUse')
+                  : t('pages.dynamicSources.deleteAction'),
+                danger: true,
                 icon: <FontAwesomeIcon icon={faTrash} fixedWidth />,
-                onClick: () => openClearDialog(source),
+                disabled: source.linked_tariff_count > 0,
+                onClick: () => openDestructiveDialog('delete', source),
               },
             ]}
           />
         )
       },
     },
-  ], [fetchMutation, openClearDialog, settings, t])
+  ], [fetchMutation, openDestructiveDialog, settings, t])
 
   const sources = sourcesQuery.data ?? []
   const failed = sources.filter((source) => source.last_fetch_status === 'failed').length
@@ -261,24 +297,27 @@ export function AdminDynamicSourcesPanel() {
         />
       </FormModal>
 
-      {clearSource && (
+      {destructive && (
         <ConfirmDialog
-          title={t('pages.dynamicSources.clearTitle')}
-          message={t('pages.dynamicSources.clearWarning')}
+          title={t(destructive.mode === 'delete'
+            ? 'pages.dynamicSources.deleteTitle'
+            : 'pages.dynamicSources.clearTitle')}
+          message={t(destructive.mode === 'delete'
+            ? 'pages.dynamicSources.deleteWarning'
+            : 'pages.dynamicSources.clearWarning')}
           isDangerous
-          isLoading={clearMutation.isPending}
-          confirmText={t('pages.dynamicSources.clearAction')}
-          confirmDisabled={confirmation.trim() !== clearSource.label.trim() || !reason.trim()}
-          onCancel={closeClearDialog}
-          onConfirm={() => clearMutation.mutate(clearSource)}
+          isLoading={clearMutation.isPending || deleteMutation.isPending}
+          confirmText={t(destructive.mode === 'delete'
+            ? 'pages.dynamicSources.deleteAction'
+            : 'pages.dynamicSources.clearAction')}
+          confirmDisabled={confirmation.trim() !== destructive.source.label.trim()}
+          onCancel={closeDestructiveDialog}
+          onConfirm={() => (destructive.mode === 'delete' ? deleteMutation : clearMutation)
+            .mutate(destructive.source)}
         >
           <label style={{ gridColumn: '1 / -1' }}>
-            <span>{t('pages.dynamicSources.confirmLabel', { label: clearSource.label })}</span>
+            <span>{t('pages.dynamicSources.confirmLabel', { label: destructive.source.label })}</span>
             <input value={confirmation} onChange={(event) => setConfirmation(event.target.value)} required />
-          </label>
-          <label style={{ gridColumn: '1 / -1' }}>
-            <span>{t('pages.dynamicSources.reason')}</span>
-            <textarea value={reason} onChange={(event) => setReason(event.target.value)} required />
           </label>
         </ConfirmDialog>
       )}

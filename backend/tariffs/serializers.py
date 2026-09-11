@@ -316,11 +316,17 @@ class DynamicSourceFetchSerializer(serializers.Serializer):
     backfill = serializers.BooleanField(required=False, default=False)
 
 
-class DynamicSourceClearSerializer(serializers.Serializer):
-    confirmation = serializers.CharField(max_length=200)
-    reason = serializers.CharField(max_length=500, trim_whitespace=True)
+class DynamicSourceConfirmationSerializer(serializers.Serializer):
+    """Typing the source's own label back is the guard on a destructive action.
 
-    def validate_reason(self, value):
-        if not value:
-            raise serializers.ValidationError("Give a reason for deleting billing inputs.")
-        return value
+    Deliberately the *only* required field. A free-text reason is recorded when
+    one is sent, but it is not demanded: a reason box on an irreversible action
+    invites a keystroke rather than a thought, and the label — which has to be
+    read off the row being destroyed — is what actually stops the wrong source
+    being picked.
+    """
+
+    confirmation = serializers.CharField(max_length=200)
+    reason = serializers.CharField(
+        max_length=500, required=False, allow_blank=True, default="", trim_whitespace=True,
+    )

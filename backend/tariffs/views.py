@@ -10,6 +10,7 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.db import transaction
 from django.db.models import Avg, Count, IntegerField, Max, Min, OuterRef, Q, Subquery
+from django.db.models.deletion import ProtectedError
 from django.db.models.functions import Coalesce
 from django.utils import timezone
 from django.utils.dateparse import parse_date
@@ -30,7 +31,7 @@ from .models import Tariff, TariffPeriod
 from zev.scoping import ZevScopedQuerySetMixin
 from .serializers import (
     DynamicPriceHistoryQuerySerializer,
-    DynamicSourceClearSerializer,
+    DynamicSourceConfirmationSerializer,
     DynamicSourceFetchSerializer,
     DynamicSourceDiscoverySerializer,
     DynamicTariffSourceSerializer,
@@ -606,17 +607,89 @@ class DynamicTariffSourceViewSet(viewsets.ReadOnlyModelViewSet):
             ],
         })
 
-    @prices.mapping.delete
-    def clear_prices(self, request, pk=None):
-        self._require_admin(request)
-        source = self.get_object()
-        serializer = DynamicSourceClearSerializer(data=request.data)
+    def _confirmed_payload(self, request, source):
+        """Validate a destructive request, refusing a mistyped label.
+
+        The label has to be read off the row being destroyed and typed back,
+        which is what makes picking the wrong source out of a list hard.
+        """
+        serializer = DynamicSourceConfirmationSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         expected = source.label.strip()
         if serializer.validated_data["confirmation"].strip() != expected:
             raise DRFValidationError({
                 "confirmation": [f'Type "{expected}" exactly to confirm.']
             })
+        return serializer.validated_data
+
+    def destroy(self, request, *args, **kwargs):
+        """Remove a source nothing uses any more, and the prices it fetched.
+
+        Only when no tariff links to it: ``Tariff.dynamic_source`` is PROTECT,
+        so the database would refuse anyway, but a 409 naming what still uses
+        it is more useful than an integrity error. An unlinked source cannot
+        have contributed to any invoice either — ``source_has_billing_evidence``
+        reasons entirely over linked tariffs — so this needs no second
+        evidence check beyond that one condition.
+        """
+        self._require_admin(request)
+        source = self.get_object()
+        payload = self._confirmed_payload(request, source)
+
+        in_use = Response(
+            {
+                "detail": (
+                    "This source still prices at least one tariff. Repoint or remove "
+                    "those tariffs first."
+                )
+            },
+            status=status.HTTP_409_CONFLICT,
+        )
+        linked = source.tariffs.count()
+        if linked:
+            zevs = source.tariffs.values("zev_id").distinct().count()
+            in_use.data["detail"] = (
+                f"This source still prices {linked} tariff(s) in {zevs} community/ies. "
+                "Repoint or remove those tariffs first."
+            )
+            return in_use
+
+        with dynamic_source_lock(source.pk) as acquired:
+            if not acquired:
+                return Response(
+                    {"detail": "This source is currently being fetched. Try again shortly."},
+                    status=status.HTTP_409_CONFLICT,
+                )
+            # Counted inside the lock so the number written to the audit trail
+            # is the number actually destroyed.
+            deleted_points = source.points.count()
+            source_id = str(source.pk)
+            label = source.label
+            try:
+                source.delete()
+            except ProtectedError:
+                # A tariff was linked between the count above and here. Rare,
+                # but the database — not that check — is what decides, and an
+                # unhandled integrity error would surface as a 500.
+                return in_use
+
+        _record_tariff_event(
+            request=request,
+            action_type="tariff.dynamic_source_delete",
+            target_type="tariffs.DynamicTariffSource",
+            target_id=source_id,
+            target_display=label,
+            summary=f"Deleted dynamic tariff source {label} and {deleted_points} price point(s).",
+            reason=payload["reason"],
+            metadata={"deleted_points": deleted_points},
+        )
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    @prices.mapping.delete
+    def clear_prices(self, request, pk=None):
+        self._require_admin(request)
+        source = self.get_object()
+        payload = self._confirmed_payload(request, source)
 
         with dynamic_source_lock(source.pk) as acquired:
             if not acquired:
@@ -644,7 +717,7 @@ class DynamicTariffSourceViewSet(viewsets.ReadOnlyModelViewSet):
             target_id=str(source.pk),
             target_display=source.label,
             summary=f"Cleared {deleted} price point(s) from {source.label}.",
-            reason=serializer.validated_data["reason"],
+            reason=payload["reason"],
             metadata={"deleted_points": deleted},
         )
         return Response({"deleted_points": deleted})

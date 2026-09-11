@@ -124,15 +124,26 @@ export async function queueDynamicSourceFetch(id: string, backfill = false): Pro
   return data
 }
 
+/**
+ * Delete the fetched prices but keep the source itself, so it refills on the
+ * next fetch. `confirmation` is the source's own label, typed back.
+ */
 export async function clearDynamicSourcePrices(
   id: string,
   confirmation: string,
-  reason: string,
 ): Promise<{ deleted_points: number }> {
   const { data } = await api.delete<{ deleted_points: number }>(`/tariffs/dynamic-sources/${id}/prices/`, {
-    data: { confirmation, reason },
+    data: { confirmation },
   })
   return data
+}
+
+/**
+ * Remove the source itself, and with it every price it fetched. The server
+ * refuses while any tariff still links to it.
+ */
+export async function deleteDynamicTariffSource(id: string, confirmation: string): Promise<void> {
+  await api.delete(`/tariffs/dynamic-sources/${id}/`, { data: { confirmation } })
 }
 
 /**

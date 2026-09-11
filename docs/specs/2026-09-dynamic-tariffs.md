@@ -488,11 +488,27 @@ the two never disagree.
 - **`POST /tariffs/dynamic-sources/{id}/fetch/`**: admin-only queueing of a
   normal refresh or `backfill=true`, returning a task/correlation id and writing
   a queued audit event which pairs with the Celery outcome.
-- **`DELETE /tariffs/dynamic-sources/{id}/prices/`**: admin only; requires the
-  exact source label and a non-empty reason. It returns 409 while the source is
-  fetching or when any non-cancelled invoice overlaps any linked tariff. On
-  success it deletes points, resets materialized coverage/fetch state, and
-  writes an audit event containing the reason and deleted count.
+- **`DELETE /tariffs/dynamic-sources/{id}/prices/`**: admin only; empties the
+  source but keeps it, so the next fetch refills it. It returns 409 while the
+  source is fetching or when any non-cancelled invoice overlaps any linked
+  tariff. On success it deletes points, resets materialized coverage/fetch
+  state, and writes an audit event with the deleted count.
+- **`DELETE /tariffs/dynamic-sources/{id}/`**: admin only; removes the source
+  itself and, by cascade, every price it fetched. Refused with 409 while any
+  tariff still links to it — `Tariff.dynamic_source` is PROTECT, so the
+  database would refuse anyway, but the response names how many tariffs in how
+  many communities still use it. An unlinked source cannot have contributed to
+  an invoice either, because `source_has_billing_evidence` reasons entirely
+  over linked tariffs, so that single condition is the whole guard. Returns 204
+  and writes an audit event naming the label and point count, which is the only
+  record left once the row is gone.
+
+Both destructive endpoints take the source's own **label, typed back**
+(`confirmation`), and nothing else. A `reason` is recorded when one is sent but
+is never required: a free-text box in front of an irreversible action invites a
+keystroke rather than a thought, while the label has to be read off the row
+that is about to be destroyed, which is what actually stops the wrong source
+being picked out of a list.
 - `TariffSerializer` needed no change: it already declares `fields =
   "__all__"`, so `dynamic_source` is exposed and writable exactly like
   `energy_type`, and `create`/`update` already call `full_clean()` — the
@@ -545,7 +561,10 @@ the two never disagree.
   `DataTable` with current fetch state, last error/time and reuse counts. Its
   `ActionMenu` opens history or source-filtered audit activity, queues refresh
   or supported backfill, edits configuration, and opens the guarded typed
-  clear form. The source list refreshes every 30 seconds.
+  confirmation form for either destructive action — clearing the fetched
+  prices, or deleting the source outright. Delete is disabled in the menu while
+  `linked_tariff_count > 0`, so the 409 the server would return is visible
+  before the round trip. The source list refreshes every 30 seconds.
 
 ## 11. Transfer archive
 
@@ -577,7 +596,7 @@ was charged as values, not as a live reference to the price that produced it.
 | `invoices/test_tariff_overview.py::TariffOverviewDynamicTariffTests` | 4 | Unfetched tariff prints nothing, fetched average with its footnote, percentage-tariff footnote and amount |
 | `tariffs/test_vse_import.py` (extended) | +11 | Dynamic grid candidate is importable, no-URL and `metering` blocks, the missing-product warning, `is_free` correctness, source get-or-create + probe + reuse-without-reprobing, unreachable-URL error, and post-commit initial-backfill enqueueing only after a successful new-source tariff write |
 | `tariffs/test_dynamic_source_api.py` | 6 | Authenticated role access, global list and picker fields |
-| `tariffs/test_dynamic_source_management_api.py` | 12 | Discovery, probed creation/reuse, API-version validation, admin editing, scoped history/stats/limits, queue audit, permissions, guarded clear |
+| `tariffs/test_dynamic_source_management_api.py` | 21 | Discovery, probed creation/reuse, API-version validation, admin editing, scoped history/stats/limits, queue audit, permissions, guarded clear (label only, mistyped label refused), and guarded delete (unused source removed with its points and audited, still-linked source refused with 409, mistyped/absent label refused, owner refused, refused while the fetch lock is held) |
 | `tariffs/test_dynamic_source_link_api.py` | 4 | Linking through the ordinary tariff API: create with a source, mismatched-energy-type 400, fee-tariff-cannot-link 400, `dynamic_source` on the series endpoint |
 
 ### 12.2 Fixtures
@@ -590,7 +609,7 @@ endpoint serves only the current day and keeps no history.
 
 | Module | Tests | Coverage |
 |---|---|---|
-| `tests/dynamic-sources.test.ts` | 11 | Source/energy-type helpers; discovery; paginated list; manual create; bounded history query; fetch queueing; typed clear request |
+| `tests/dynamic-sources.test.ts` | 12 | Source/energy-type helpers; discovery; paginated list; manual create; bounded history query; fetch queueing; typed clear request; typed source delete |
 | `tests/dynamic-source-form-modal.test.ts` | 1 | Two-step rendering, version-only choices, absence of provider choices, and discovered component/product selection |
 | `tests/vse-tariff-import.test.ts` (extended) | +3 | A dynamic candidate is selectable, offers no billing-mode choice, can be the pre-selected recommendation |
 | `tests/tariff-form-mapping.test.ts` (extended) | +4 | `dynamic_source` round-trips through the form, is dropped when billing mode is not energy, defaults to blank |
@@ -625,4 +644,4 @@ endpoint serves only the current day and keeps no history.
 - [x] The UI shows that a tariff is dynamic, which source it uses, and when that source's last fetch failed
 - [x] An owner can discover, create, and select a dynamic source in a two-step wizard
 - [x] Linked tariffs expose bounded interval-price history, statistics, and explicit gaps
-- [x] Admins can inspect every shared source and its fetch activity, queue refresh/backfill, and safely clear unbilled points
+- [x] Admins can inspect every shared source and its fetch activity, queue refresh/backfill, safely clear unbilled points, and delete a source once no tariff uses it
