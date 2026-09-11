@@ -223,13 +223,56 @@ class UnsupportedConstructTests(SimpleTestCase):
     """Everything the model cannot express has to say so per entry. Silently
     dropping a construct is how a tariff ends up priced at the wrong number."""
 
-    def test_a_dynamic_tariff_is_blocked_and_names_its_url(self):
+    def test_a_dynamic_grid_tariff_is_importable_and_carries_its_url(self):
         parsed = parse_document(document(entry(
             tariffForm="dynamic",
             prices={"dynamic": {"url": "https://api.example.ch/v1/tariffs"}},
         )))
 
-        self.assertIn("https://api.example.ch/v1/tariffs", parsed.candidates[0].blocked_reason)
+        candidate = parsed.candidates[0]
+        self.assertTrue(candidate.is_importable)
+        self.assertEqual(candidate.dynamic_url, "https://api.example.ch/v1/tariffs")
+        self.assertEqual(candidate.dynamic_tariff_type, "grid")
+        self.assertEqual(candidate.energy_type, EnergyType.GRID)
+        self.assertEqual(candidate.periods, [])
+
+    def test_a_dynamic_tariff_with_no_url_is_blocked(self):
+        parsed = parse_document(document(entry(tariffForm="dynamic", prices={"dynamic": {}})))
+
+        candidate = parsed.candidates[0]
+        self.assertFalse(candidate.is_importable)
+        self.assertIn("no URL", candidate.blocked_reason)
+
+    def test_a_dynamic_metering_tariff_is_blocked(self):
+        # The dynamic-tariff schema has no metering type to fetch at all —
+        # unlike the static import, which does support metering tariffs.
+        parsed = parse_document(document(entry(
+            tariffType="metering", tariffForm="dynamic",
+            prices={"dynamic": {"url": "https://api.example.ch/v1/tariffs"}},
+        )))
+
+        candidate = parsed.candidates[0]
+        self.assertFalse(candidate.is_importable)
+        self.assertIn("metering", candidate.blocked_reason)
+
+    def test_a_dynamic_tariff_warns_that_the_document_names_no_product(self):
+        parsed = parse_document(document(entry(
+            tariffForm="dynamic",
+            prices={"dynamic": {"url": "https://api.example.ch/v1/tariffs"}},
+        )))
+
+        self.assertTrue(any("product" in warning for warning in parsed.candidates[0].warnings))
+
+    def test_a_dynamic_feed_in_tariff_is_never_free(self):
+        # is_free's static formula is all(price == 0 for period in periods),
+        # which is vacuously True over an empty list — a dynamic candidate
+        # always has an empty periods list, so this must be checked directly.
+        parsed = parse_document(document(entry(
+            tariffForm="dynamic",
+            prices={"dynamic": {"url": "https://api.example.ch/v1/tariffs"}},
+        )))
+
+        self.assertFalse(parsed.candidates[0].is_free)
 
     def test_an_energy_price_in_the_wrong_unit_is_blocked(self):
         parsed = parse_document(document(entry(prices={"energy": [
@@ -684,8 +727,11 @@ class PlanningTests(TestCase):
         self.assertEqual(Tariff.objects.filter(zev=self.zev).count(), 3)
 
     def test_a_blocked_candidate_is_never_written_even_if_asked_for(self):
+        # A metering tariff going dynamic has no representable tariff type
+        # (the dynamic schema has none) and stays blocked, unlike grid.
         parsed = parse_document(document(entry(
-            tariffForm="dynamic", prices={"dynamic": {"url": "https://x.ch"}},
+            tariffType="metering", tariffForm="dynamic",
+            prices={"dynamic": {"url": "https://x.ch"}},
         )))
 
         report, created = apply_import(
@@ -694,7 +740,78 @@ class PlanningTests(TestCase):
         )
 
         self.assertEqual(created, [])
-        self.assertIn("Dynamic tariffs", report.skipped[0]["reason"])
+        self.assertIn("metering", report.skipped[0]["reason"])
+
+    def test_a_dynamic_candidate_creates_a_tariff_linked_to_a_probed_source(self):
+        from tariffs.dynamic.models import DynamicTariffSource
+
+        parsed = parse_document(document(entry(
+            tariffForm="dynamic", prices={"dynamic": {"url": "https://api.example.ch/v1/tariffs"}},
+        )))
+
+        with mock.patch("tariffs.importers.planner.fetch_window", return_value=([], [])) as probe:
+            report, created = apply_import(
+                zev=self.zev, document=parsed, selections=[Selection(parsed.candidates[0].key)],
+                source_url="https://example.ch/t.json", imported_on=date(2026, 9, 2),
+            )
+
+        probe.assert_called_once()
+        self.assertEqual(len(created), 1)
+        self.assertEqual(report.created[0]["dynamic"], True)
+        tariff = created[0]
+        self.assertIsNotNone(tariff.dynamic_source_id)
+        source = DynamicTariffSource.objects.get(pk=tariff.dynamic_source_id)
+        self.assertEqual(source.url, "https://api.example.ch/v1/tariffs")
+        self.assertEqual(source.tariff_type, "grid")
+        self.assertEqual(source.tariff_name, "")
+
+    def test_a_second_zev_on_the_same_endpoint_reuses_the_source_without_probing(self):
+        from tariffs.dynamic.models import DynamicTariffSource
+
+        parsed = parse_document(document(entry(
+            tariffForm="dynamic", prices={"dynamic": {"url": "https://api.example.ch/v1/tariffs"}},
+        )))
+        with mock.patch("tariffs.importers.planner.fetch_window", return_value=([], [])):
+            apply_import(
+                zev=self.zev, document=parsed, selections=[Selection(parsed.candidates[0].key)],
+                source_url="https://example.ch/t.json", imported_on=date(2026, 9, 2),
+            )
+        self.assertEqual(DynamicTariffSource.objects.count(), 1)
+
+        other_owner = make_user("vse_plan_other_owner", UserRole.ZEV_OWNER)
+        other_zev = Zev.objects.create(name="Other Plan ZEV", owner=other_owner, zev_type="zev")
+        other_document = parse_document(document(entry(
+            tariffForm="dynamic", prices={"dynamic": {"url": "https://api.example.ch/v1/tariffs"}},
+        )))
+        with mock.patch("tariffs.importers.planner.fetch_window") as probe:
+            report, created = apply_import(
+                zev=other_zev, document=other_document,
+                selections=[Selection(other_document.candidates[0].key)],
+                source_url="https://example.ch/t.json", imported_on=date(2026, 9, 2),
+            )
+
+        probe.assert_not_called()
+        self.assertEqual(len(created), 1)
+        self.assertEqual(DynamicTariffSource.objects.count(), 1)
+
+    def test_an_unreachable_dynamic_url_is_reported_and_creates_nothing(self):
+        from tariffs.importers.remote import TariffFetchError
+
+        parsed = parse_document(document(entry(
+            tariffForm="dynamic", prices={"dynamic": {"url": "https://api.example.ch/v1/tariffs"}},
+        )))
+
+        with mock.patch(
+            "tariffs.importers.planner.fetch_window",
+            side_effect=TariffFetchError("The operator's server answered HTTP 410."),
+        ):
+            report, created = apply_import(
+                zev=self.zev, document=parsed, selections=[Selection(parsed.candidates[0].key)],
+                source_url="https://example.ch/t.json", imported_on=date(2026, 9, 2),
+            )
+
+        self.assertEqual(created, [])
+        self.assertIn("410", report.errors[0]["error"])
 
     def test_two_versions_inside_one_document_are_chained_not_collided(self):
         """A document that publishes this year and next year under one name has

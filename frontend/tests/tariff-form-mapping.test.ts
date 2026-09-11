@@ -64,7 +64,44 @@ describe('tariff form mapping', () => {
       valid_from: defaultTariffFormValues.valid_from,
       valid_to: null,
       notes: '',
+      dynamic_source: null,
     })
+  })
+
+  it('carries a picked dynamic source through for an energy tariff', () => {
+    const payload = mapTariffFormValuesToInput(
+      { ...defaultTariffFormValues, billing_mode: 'energy', dynamic_source: 'src-1' },
+      'z-1',
+    )
+
+    expect(payload.dynamic_source).toBe('src-1')
+  })
+
+  it('drops a stale dynamic source when the billing mode is not energy', () => {
+    // Only a plain energy tariff can be dynamic (Tariff.clean() rejects
+    // anything else) — a value left over from switching billing modes must
+    // never reach the server.
+    const payload = mapTariffFormValuesToInput(
+      { ...defaultTariffFormValues, billing_mode: 'monthly_fee', fixed_price_chf: '10.00', dynamic_source: 'src-1' },
+      'z-1',
+    )
+
+    expect(payload.dynamic_source).toBeNull()
+  })
+
+  it('maps a tariff carrying a dynamic source into form values', () => {
+    const tariff = {
+      id: 't-1', zev: 'z-1', name: 'Grid (dynamic)', category: 'grid_fees',
+      billing_mode: 'energy', energy_type: 'grid', fixed_price_chf: null, percentage: null,
+      valid_from: '2026-01-01', valid_to: null, notes: '',
+      dynamic_source: 'src-1',
+    } as unknown as Tariff
+
+    expect(mapTariffToFormValues(tariff).dynamic_source).toBe('src-1')
+  })
+
+  it('defaults dynamic_source to blank when the api omits it', () => {
+    expect(defaultTariffFormValues.dynamic_source).toBe('')
   })
 
   it('preserves split_key for a shared fee, and ignores it for a non-shared one', () => {

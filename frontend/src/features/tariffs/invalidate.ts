@@ -13,9 +13,13 @@ import { queryKeys } from '../../lib/api/queryKeys'
  * A single mutation can reshape more than the row it touched: editing a
  * version's `valid_to` changes its series' gaps, and creating a version also
  * closes its predecessor — so the whole series query is refetched rather than
- * patched.
+ * patched. A VSE import can also create a *new* dynamic price source (global,
+ * not per-ZEV — ADR 0018), so the source picker's list is refetched too; an
+ * ordinary tariff edit never touches that list, but invalidating it anyway
+ * costs one cheap refetch against a query nothing else is actively changing.
  */
 export function invalidateTariffQueries(queryClient: QueryClient, selectedZevId?: string): void {
     const zevId = selectedZevId || undefined
     void queryClient.invalidateQueries({ queryKey: queryKeys.tariffs.series(zevId) })
+    void queryClient.invalidateQueries({ queryKey: queryKeys.tariffs.dynamicSources() })
 }

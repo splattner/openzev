@@ -1,7 +1,7 @@
 # Feature Spec: Dynamic tariffs
 
 - Spec ID: SPEC-2026-dynamic-tariffs
-- Status: In Progress
+- Status: Completed
 - Scope: Major
 - Type: Feature
 - Owners: Core maintainers
@@ -33,9 +33,9 @@ This spec describes the whole feature. It lands in three parts:
 |---|---|---|---|
 | 1 | Data model, parser, adapters, fetching, scheduling, transfer | 3 – 8 | Shipped |
 | 2 | Engine price resolution, refusal, readiness coverage | 9 | Shipped |
-| 3 | Importer unblock, API and frontend | 10 | Not started |
+| 3 | Importer unblock, API and frontend | 10 | Shipped |
 
-Section 10 describes intended behaviour that is **not yet implemented**.
+All three parts are shipped.
 
 ## 2. Scope
 
@@ -366,17 +366,116 @@ The participation contract (`contract_pdf.py`) shares
 automatically; it does not currently print the multiband/dynamic footnote at
 all (pre-existing — it never explained the multi-band approximation either).
 
-## 10. Import and UI (part 3 — not yet implemented)
+## 10. Import and UI
 
-The VSE importer stops blocking `tariffForm: dynamic`, creating the tariff and
-getting-or-creating its source from `prices.dynamic.url`. The URL is validated
-with one live probe first: the URL named as the example in the standard's own
-OpenAPI (`api.tariffs.groupe-e.ch/v1/tariffs`) now returns **410 Gone**, so a URL
-in a document is a starting point, not a contract.
+### 10.1 VSE importer
 
-The tariff card shows that a tariff is dynamic, which component and product it
-bills, when it was last fetched and what the series covers; choosing `integrated`
-warns about §3.3's double counting.
+`backend/tariffs/importers/vse_json.py`. A `tariffForm: dynamic` entry no
+longer returns a single blocked candidate; `_dynamic_candidate()` builds an
+*importable* one carrying `dynamic_url` and `dynamic_tariff_type` (the VSE
+`tariffType`, one of `electricity | grid | metering | regional_fees` — the
+same vocabulary `_read_header` already validates entries against). It stays
+blocked only when this importer genuinely cannot represent the entry:
+
+- **No URL** — `prices.dynamic.url` is empty.
+- **`tariffType: metering`** — the dynamic-tariff schema (§3.3) has no
+  `metering` type to fetch at all; the *static* importer supports metering
+  tariffs, but nothing published on a metering connection is ever dynamic.
+
+A dynamic candidate always warns that **the document names no product**
+(`tariff_name`) — that concept does not exist in the VSE tariff-document
+schema, only in the fetched-series API. An operator serving a single product
+is unaffected; Groupe E (`vario`/`double`/`project_1`/`project_3`, materially
+different prices) needs its source's `tariff_name` corrected after import.
+
+`is_free` (governs pre-selection, §4's `recommended`) is checked explicitly
+for a dynamic candidate rather than falling through to the static formula:
+`all(price == 0 for price in [])` is vacuously `True`, which would have
+marked every dynamic candidate "free" and never pre-selected.
+
+### 10.2 Linking the source
+
+`backend/tariffs/importers/planner.py`. `apply_import` resolves (and, for a
+new source, probes) the `DynamicTariffSource` **before** opening the
+per-candidate `transaction.atomic()` block — a slow or failing network fetch
+must not hold a database savepoint open while it happens.
+
+`_get_or_create_dynamic_source`:
+
+1. Looks up an existing source by natural key (`url`, `tariff_type`,
+   `tariff_name=""` — the document never supplies a product). Found → reused
+   without a fresh probe; it is already on the fetch schedule (§8).
+2. Not found → probes the URL once
+   (`tariffs.dynamic.fetch.fetch_window(probe, window=None)`, an unsaved
+   `DynamicTariffSource` instance) before creating anything. **A URL in a
+   document is a starting point, not a contract** — the URL named as the
+   example in the standard's own OpenAPI
+   (`api.tariffs.groupe-e.ch/v1/tariffs`) now returns **410 Gone**. A failed
+   probe reports the fetch error against that candidate (`report.errors`)
+   and creates nothing; other candidates in the same import are unaffected.
+3. Creates the source (`adapter=vse_v1`, since the document names a
+   standard-contract URL, not an operator-specific one) via `get_or_create`
+   on the same natural key, race-safe against a concurrent import of the
+   same endpoint.
+
+`_create` links the resolved source via `Tariff(..., dynamic_source=...)`
+before `.save()`, so `Tariff.clean()`'s existing energy-type check runs for
+free — `_dynamic_candidate` already computed `energy_type` from the same
+`ENERGY_TYPE_BY_DYNAMIC_TARIFF_TYPE` mapping the model checks against, so
+the two never disagree.
+
+### 10.3 API
+
+- `VseTariffCandidateSerializer` / `_candidate_payload` gain `dynamic_url`
+  (blank for a static candidate).
+- `VseTariffImportCreatedSerializer` gains `dynamic: bool`, so the apply
+  result can say which created tariffs were linked to a source.
+- **`GET /tariffs/dynamic-sources/`** (`DynamicTariffSourceViewSet`,
+  read-only, paginated): every configured source, for the tariff form's
+  picker. `IsZevOwnerOrAdmin`, **not ZEV-scoped** — a source is global
+  (ADR 0018) and carries nothing more sensitive than a public operator URL
+  and public prices. Creation happens only through §10.2's get-or-create or
+  Django admin; there is no write endpoint.
+- `TariffSerializer` needed no change: it already declares `fields =
+  "__all__"`, so `dynamic_source` is exposed and writable exactly like
+  `energy_type`, and `create`/`update` already call `full_clean()` — the
+  model's own validation (`Tariff.clean()`, added alongside the source model)
+  surfaces as an ordinary DRF 400 with no extra serializer code.
+
+### 10.4 Frontend
+
+`frontend/src/features/tariffs/`:
+
+- **`TariffFormModal`** — an energy tariff (`billing_mode = 'energy'`) gets a
+  "Dynamic price source" picker alongside its bands. Picking a source sets
+  `energy_type` to match it (`dynamicSources.impliedEnergyType`, mirroring
+  `ENERGY_TYPE_BY_DYNAMIC_TARIFF_TYPE`) for a brand-new tariff; editing an
+  existing version — whose `energy_type` is already locked — instead filters
+  the picker to sources that would still validate
+  (`dynamicSources.dynamicSourceOptions`), so nothing offered could fail on
+  save.
+- **`TariffCategorySections`** — `usesPeriods`/`priceSummary`/`pricingLabel`
+  are branched on the *shown version's* `dynamic_source`, not the series:
+  because `dynamic_source` is deliberately not a series-coherence field
+  (§3.1.2 of the billing-engine spec), one series can hold both a static and
+  a dynamic version across a static→dynamic switchover, and the two versions
+  must render differently. A "Dynamic" badge appears next to the energy-type
+  badge; it turns into a danger badge with the fetch error as its tooltip
+  when the source's `last_fetch_status` is `failed`.
+- **`VseTariffImportModal`** — a dynamic candidate's price cell shows a
+  "Dynamic" badge and its URL instead of a period list (it has no periods to
+  list); the result view shows "Dynamic" in place of a billing-mode label for
+  a tariff the apply step linked to a source.
+- **`dynamicSources.ts`** — the two pure functions above, tested directly
+  (`tests/dynamic-sources.test.ts`).
+- **`types/api.ts`** — `DynamicTariffSource`, `DynamicTariffType`,
+  `Tariff.dynamic_source` / `TariffInput.dynamic_source`,
+  `VseTariffCandidate.dynamic_url`, `VseTariffImportResult.created[].dynamic`.
+
+Not built in this iteration, deliberately: a price chart drawing the raw
+fetched series (the tariff card shows the *average* and last-fetch status,
+not a quarter-hourly chart), and a UI to create a source from scratch without
+going through an import (creation is import-only or Django admin, §10.2).
 
 ## 11. Transfer archive
 
@@ -404,12 +503,23 @@ was charged as values, not as a live reference to the price that produced it.
 | `invoices/test_readiness.py::DynamicTariffPricingCoverageTests` | 7 | Full/partial/no coverage, type-masking, percentage-tariff coupling, DST, static→dynamic series versioning |
 | `invoices/test_dynamic_tariff_pricing.py` | 9 | `dynamic_average_chf_per_kwh`, `display_grid_base_chf_per_kwh`, `grid_base_is_dynamic` vs `grid_base_is_multiband` |
 | `invoices/test_tariff_overview.py::TariffOverviewDynamicTariffTests` | 4 | Unfetched tariff prints nothing, fetched average with its footnote, percentage-tariff footnote and amount |
+| `tariffs/test_vse_import.py` (extended) | +9 | Dynamic grid candidate is importable, no-URL and `metering` blocks, the missing-product warning, `is_free` correctness, source get-or-create + probe + reuse-without-reprobing, unreachable-URL error |
+| `tariffs/test_dynamic_source_api.py` | 7 | `GET /tariffs/dynamic-sources/` access (owner/admin allowed, participant/anonymous refused), payload shape, not ZEV-scoped, read-only |
+| `tariffs/test_dynamic_source_link_api.py` | 4 | Linking through the ordinary tariff API: create with a source, mismatched-energy-type 400, fee-tariff-cannot-link 400, `dynamic_source` on the series endpoint |
 
 ### 12.2 Fixtures
 
 `backend/tariffs/dynamic/testdata/` — see its `README.md`. Two are **real
 captures** taken on 2026-09-11; the BKW one **cannot be re-taken**, because that
 endpoint serves only the current day and keeps no history.
+
+### 12.3 Frontend
+
+| Module | Tests | Coverage |
+|---|---|---|
+| `tests/dynamic-sources.test.ts` | 9 | `impliedEnergyType`, `dynamicSourceOptions` (unlocked / locked / no match), `fetchDynamicTariffSources` pagination |
+| `tests/vse-tariff-import.test.ts` (extended) | +3 | A dynamic candidate is selectable, offers no billing-mode choice, can be the pre-selected recommendation |
+| `tests/tariff-form-mapping.test.ts` (extended) | +4 | `dynamic_source` round-trips through the form, is dropped when billing mode is not energy, defaults to blank |
 
 ## 13. Risks and mitigations
 
@@ -437,5 +547,5 @@ endpoint serves only the current day and keeps no history.
 - [x] The engine prices from the series and refuses an uncovered period
 - [x] Readiness flags an uncovered day before generation is attempted
 - [x] Printed documents (tariff overview, participation contract) show a dynamic tariff's fetched average rather than skipping it or printing zero
-- [ ] The importer creates dynamic tariffs instead of blocking them (part 3)
-- [ ] The UI shows that a tariff is dynamic and how current its data is (part 3)
+- [x] The importer creates dynamic tariffs instead of blocking them, and refuses (per-candidate) rather than creating a dead tariff when the named URL cannot be fetched
+- [x] The UI shows that a tariff is dynamic, which source it uses, and when that source's last fetch failed

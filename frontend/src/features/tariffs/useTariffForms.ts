@@ -13,6 +13,8 @@ export type TariffFormValues = {
   valid_from: string
   valid_to: string
   notes: string
+  /** A `DynamicTariffSource` id, or `''` to price from bands instead. */
+  dynamic_source: string
 }
 
 export type TariffPeriodFormValues = {
@@ -47,6 +49,7 @@ export const tariffFormSchema = z
     valid_from: z.string().trim().min(1),
     valid_to: z.string(),
     notes: z.string(),
+    dynamic_source: z.string(),
   })
   .superRefine((values, ctx) => {
     const isEnergyBased = values.billing_mode === 'energy' || values.billing_mode === 'percentage_of_energy'
@@ -116,6 +119,7 @@ export const defaultTariffFormValues: TariffFormValues = {
   valid_from: todayLocalIso(),
   valid_to: '',
   notes: '',
+  dynamic_source: '',
 }
 
 export const defaultTariffPeriodFormValues: TariffPeriodFormValues = {
@@ -141,6 +145,7 @@ export function mapTariffToFormValues(tariff: Tariff): TariffFormValues {
     valid_from: tariff.valid_from,
     valid_to: tariff.valid_to || '',
     notes: tariff.notes || '',
+    dynamic_source: tariff.dynamic_source || '',
   }
 }
 
@@ -160,6 +165,10 @@ export function mapTariffFormValuesToInput(values: TariffFormValues, zevId: stri
     valid_from: values.valid_from,
     valid_to: values.valid_to || null,
     notes: values.notes,
+    // Only a plain energy tariff can be dynamic (Tariff.clean() rejects
+    // anything else) — clearing it here as well as hiding the picker means a
+    // stale value from switching billing modes can never reach the server.
+    dynamic_source: values.billing_mode === 'energy' ? (values.dynamic_source || null) : null,
   }
 }
 

@@ -37,6 +37,7 @@ function candidate(overrides: Partial<VseTariffCandidate> = {}): VseTariffCandid
         source_customer_type: 'Haushalte',
         source_voltage_level: 7,
         standard_basegroup: true,
+        dynamic_url: '',
         series_name: 'Netznutzung Basis (Arbeitspreis)',
         status: 'new',
         detail: 'Creates a new tariff.',
@@ -58,6 +59,34 @@ describe('which candidates can be imported', () => {
         expect(isSelectable(candidate({ status: 'duplicate' }))).toBe(false)
         expect(isSelectable(candidate({ status: 'conflict' }))).toBe(false)
         expect(isSelectable(candidate({ status: 'unsupported' }))).toBe(false)
+    })
+})
+
+describe('a dynamic candidate', () => {
+    // No periods and no billing_mode_options — carries a URL instead, and its
+    // billing mode is settled (must be 'energy') the same way an ordinary
+    // energy candidate's is.
+    const dynamic = (overrides = {}) => candidate({
+        name: 'Netznutzung (Arbeitspreis)',
+        periods: [],
+        dynamic_url: 'https://api.tariffs.groupe-e.ch/v2/tariffs',
+        ...overrides,
+    })
+
+    it('is selectable exactly like a static energy candidate', () => {
+        expect(isSelectable(dynamic({ status: 'new' }))).toBe(true)
+        expect(isSelectable(dynamic({ status: 'new_version' }))).toBe(true)
+        expect(isSelectable(dynamic({ status: 'unsupported' }))).toBe(false)
+    })
+
+    it('offers no billing-mode choice — a dynamic tariff is always billed per kWh', () => {
+        expect(canChooseBillingMode(dynamic({ status: 'new' }))).toBe(false)
+    })
+
+    it('can be pre-selected as the operator’s recommended product', () => {
+        const keys = recommendedKeys([dynamic({ key: 'std', recommended: true })])
+
+        expect([...keys]).toEqual(['std'])
     })
 })
 

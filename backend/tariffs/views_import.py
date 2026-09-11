@@ -121,6 +121,7 @@ def _candidate_payload(planned: PlannedCandidate) -> dict:
         "source_customer_type": candidate.source_customer_type,
         "source_voltage_level": candidate.source_voltage_level,
         "standard_basegroup": candidate.standard_basegroup,
+        "dynamic_url": candidate.dynamic_url,
         "status": planned.status,
         "detail": planned.detail,
         # Differs from ``name`` when the series was matched on provenance and

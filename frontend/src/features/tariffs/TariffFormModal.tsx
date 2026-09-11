@@ -1,13 +1,17 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faCheck, faXmark } from '@fortawesome/free-solid-svg-icons'
+import { useQuery } from '@tanstack/react-query'
 import { Controller, useForm, useWatch } from 'react-hook-form'
 import { useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { FormModal } from '../../components/FormModal'
 import { FormModalFooter } from '../../components/FormModalFooter'
 import { CivilDateInput } from '../../components/CivilDateInput'
+import { fetchDynamicTariffSources } from '../../lib/api/tariffs'
+import { queryKeys } from '../../lib/api/queryKeys'
 import type { Tariff, TariffBillingMode, TariffInput } from '../../types/api'
+import { dynamicSourceOptions, impliedEnergyType } from './dynamicSources'
 import {
   defaultTariffFormValues,
   mapTariffFormValuesToInput,
@@ -63,13 +67,42 @@ export function TariffFormModal({
     control: form.control,
     name: 'split_key',
   })
+  const dynamicSourceId = useWatch({
+    control: form.control,
+    name: 'dynamic_source',
+  })
   // An existing tariff is one version of a series; its identity fields are
   // fixed. Creating a new tariff still sets them freely.
   const isVersion = Boolean(initialTariff)
 
+  // Fetched once per modal session, not gated on billing_mode: the picker
+  // only *renders* for an energy tariff, but the list has to be ready by
+  // then rather than triggering a fetch (and a loading flash) on every
+  // billing-mode change.
+  const sourcesQuery = useQuery({
+    queryKey: queryKeys.tariffs.dynamicSources(),
+    queryFn: fetchDynamicTariffSources,
+    enabled: isOpen,
+    staleTime: 5 * 60 * 1000,
+  })
+  const sourcesData = sourcesQuery.data
+  const availableSources = dynamicSourceOptions(sourcesData ?? [], isVersion ? initialTariff?.energy_type : undefined)
+
   useEffect(() => {
     form.reset(initialTariff ? mapTariffToFormValues(initialTariff) : defaultTariffFormValues)
   }, [initialTariff, form, isOpen])
+
+  // Picking a source is what decides the energy type for a brand-new tariff
+  // (there is nothing else to derive it from); an existing version's energy
+  // type is already locked, so the picker above already only offers sources
+  // that agree with it, and nothing here needs to change it.
+  useEffect(() => {
+    if (isVersion || !dynamicSourceId || !sourcesData) return
+    const source = sourcesData.find((candidate) => candidate.id === dynamicSourceId)
+    if (source) {
+      form.setValue('energy_type', impliedEnergyType(source), { shouldValidate: true })
+    }
+  }, [dynamicSourceId, isVersion, sourcesData, form])
 
   function submit(values: TariffFormValues) {
     onSubmit(mapTariffFormValuesToInput(values, selectedZevId))
@@ -148,6 +181,25 @@ export function TariffFormModal({
               </label>
             )}
           </>
+        )}
+
+        {/* Only a plain energy tariff can be dynamic — a percentage-of-energy
+            or fixed-fee tariff has nothing a fetched series could price. */}
+        {billingMode === 'energy' && (
+          <label style={{ gridColumn: '1 / -1' }}>
+            <span>{t('pages.tariffs.form.dynamicSource')}</span>
+            <select {...form.register('dynamic_source')} disabled={sourcesQuery.isLoading}>
+              <option value="">{t('pages.tariffs.form.dynamicSourceNone')}</option>
+              {availableSources.map((source) => (
+                <option key={source.id} value={source.id}>{source.label}</option>
+              ))}
+            </select>
+            <small className="muted">
+              {dynamicSourceId
+                ? t('pages.tariffs.form.dynamicSourceHintActive')
+                : t('pages.tariffs.form.dynamicSourceHint')}
+            </small>
+          </label>
         )}
 
         {billingMode === 'percentage_of_energy' ? (

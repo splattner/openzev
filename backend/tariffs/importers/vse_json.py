@@ -24,7 +24,14 @@ from dataclasses import dataclass, field
 from datetime import date, datetime, time
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 
-from tariffs.models import BillingMode, EnergyType, PeriodType, SourceComponent, TariffCategory
+from tariffs.models import (
+    ENERGY_TYPE_BY_DYNAMIC_TARIFF_TYPE,
+    BillingMode,
+    EnergyType,
+    PeriodType,
+    SourceComponent,
+    TariffCategory,
+)
 from tariffs.periods import ALL_MONTHS, format_number_list
 
 #: A standard entry carrying both a base fee and a per-kWh price becomes *two*
@@ -137,6 +144,13 @@ class Candidate:
     source_voltage_level: int | None = None
     standard_basegroup: bool = False
 
+    #: Set only for a dynamic-tariff candidate: the URL and VSE tariff type
+    #: named in ``prices.dynamic``. The planner uses these to get-or-create the
+    #: shared ``DynamicTariffSource`` this candidate should link to — see
+    #: ``tariffs.dynamic``. Empty for every static candidate.
+    dynamic_url: str = ""
+    dynamic_tariff_type: str = ""
+
     #: Billing modes the user may choose instead of ``billing_mode``, empty
     #: when there is nothing to choose. The frontend renders exactly this list
     #: and the apply step accepts exactly this list, so the two cannot drift.
@@ -158,7 +172,15 @@ class Candidate:
         Documents are full of ``0.00`` placeholders for components the
         operator does not charge; they are worth showing but not worth
         pre-selecting.
+
+        A dynamic candidate carries no periods at all — its price lives in
+        the fetched series, not in this document — so ``all(() == 0 for ...)``
+        over an empty list would be vacuously true and mark every dynamic
+        candidate "free". It is never free: whatever the series prices, it is
+        real money, checked only once it is fetched.
         """
+        if self.dynamic_url:
+            return False
         if self.billing_mode == BillingMode.ENERGY:
             return all(period.price_chf_per_kwh == 0 for period in self.periods)
         return not self.fixed_price_chf
@@ -508,6 +530,8 @@ def _candidate(
     blocked_reason: str | None = None,
     source_component: str = "",
     source_series_name: str = "",
+    dynamic_url: str = "",
+    dynamic_tariff_type: str = "",
 ) -> Candidate:
     valid_from = header["start_date"]
     # Deduplicated: per-band rounding notices otherwise repeat once per window.
@@ -531,6 +555,8 @@ def _candidate(
         source_customer_type=header["customer_type"],
         source_voltage_level=header["voltage_level"],
         standard_basegroup=header["standard_basegroup"],
+        dynamic_url=dynamic_url,
+        dynamic_tariff_type=dynamic_tariff_type,
         warnings=unique_warnings,
         blocked_reason=blocked_reason,
     )
@@ -676,6 +702,58 @@ def _read_header(entry: dict, dso_name: str, dso_number: int | None) -> dict:
     }
 
 
+def _dynamic_candidate(prices: dict, header: dict, category: str) -> Candidate:
+    """The one candidate a ``tariffForm: dynamic`` entry produces.
+
+    The document only names *where* the price lives — ``prices.dynamic.url``
+    — not the price itself; fetching and storing that series is
+    ``tariffs.dynamic``'s job, done once the tariff is created (see
+    ``planner._create``). Blocked only when this importer genuinely cannot
+    represent the entry: no URL to fetch from, or a VSE tariff type with no
+    dynamic counterpart (``metering`` — the dynamic schema has no metering
+    tariff type at all, unlike the static one).
+    """
+    url = str((prices.get("dynamic") or {}).get("url") or "").strip()
+    tariff_type = header["tariff_type"]
+    name = _tariff_name(header["tariff_name"], ENERGY_COMPONENT_SUFFIX, [])
+
+    blocked_reason = None
+    energy_type = EnergyType.GRID
+    warnings: list[str] = []
+    if not url:
+        blocked_reason = (
+            "This dynamic tariff names no URL to fetch its price from "
+            "(prices.dynamic.url is empty)."
+        )
+    elif tariff_type not in ENERGY_TYPE_BY_DYNAMIC_TARIFF_TYPE:
+        blocked_reason = (
+            f"Dynamic {tariff_type} tariffs are not supported: the fetched-series schema has no "
+            f"{tariff_type!r} tariff type to request."
+        )
+    else:
+        energy_type = ENERGY_TYPE_BY_DYNAMIC_TARIFF_TYPE[tariff_type]
+        # The VSE tariff document names the endpoint but never the product
+        # (`tariff_name` on the fetched-series API) — that concept does not
+        # exist in this schema at all. An operator serving one product is
+        # unaffected; one serving several (Groupe E: vario/double/project_1/
+        # project_3, materially different prices) needs its source corrected
+        # after import, which this warning is here to prompt.
+        warnings.append(
+            "This document does not name which product the dynamic source should fetch. "
+            "It will use the operator's default; if this operator publishes more than one "
+            "product, review the linked price source and set the correct one."
+        )
+
+    return _candidate(
+        name=name, category=category, header=header, warnings=warnings,
+        billing_mode=BillingMode.ENERGY, energy_type=energy_type,
+        source_component=SourceComponent.ENERGY,
+        source_series_name=header["tariff_name"],
+        dynamic_url=url, dynamic_tariff_type=tariff_type,
+        blocked_reason=blocked_reason,
+    )
+
+
 def _candidates_for_entry(entry: dict, dso_name: str, dso_number: int | None) -> list[Candidate]:
     header = _read_header(entry, dso_name, dso_number)
     category = header["category"]
@@ -686,20 +764,7 @@ def _candidates_for_entry(entry: dict, dso_name: str, dso_number: int | None) ->
     candidates: list[Candidate] = []
 
     if str(entry.get("tariffForm") or "").strip().casefold() == "dynamic":
-        url = str((prices.get("dynamic") or {}).get("url") or "").strip()
-        return [
-            _candidate(
-                name=_tariff_name(header["tariff_name"], ENERGY_COMPONENT_SUFFIX, []),
-                category=category, header=header, warnings=[],
-                billing_mode=BillingMode.ENERGY, energy_type=EnergyType.GRID,
-                source_component=SourceComponent.ENERGY,
-                source_series_name=header["tariff_name"],
-                blocked_reason=(
-                    "Dynamic tariffs are not supported: the price is served by an external "
-                    "time series" + (f" at {url}" if url else "") + ", not published in this document."
-                ),
-            )
-        ]
+        return [_dynamic_candidate(prices, header, category)]
 
     if prices.get("base") is not None:
         candidates.append(

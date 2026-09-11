@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from django.core.exceptions import ValidationError as DjangoValidationError
+from .dynamic.models import DynamicTariffSource
 from .models import BillingMode, PeriodType, Tariff, TariffPeriod
 from .periods import months_of
 
@@ -184,6 +185,10 @@ class VseTariffCandidateSerializer(serializers.Serializer):
     source_voltage_level = serializers.IntegerField(allow_null=True)
     standard_basegroup = serializers.BooleanField()
 
+    #: Set only for a dynamic-tariff candidate — the URL its price would be
+    #: fetched from. Blank for every static candidate.
+    dynamic_url = serializers.CharField(allow_blank=True)
+
     #: ``new`` / ``new_version`` / ``duplicate`` / ``conflict`` / ``unsupported``
     #: Where the row actually lands: the existing series' name when it was
     #: matched on provenance and renamed since, otherwise the same as ``name``.
@@ -215,6 +220,8 @@ class VseTariffImportCreatedSerializer(serializers.Serializer):
     billing_mode = serializers.CharField()
     valid_from = serializers.DateField()
     valid_to = serializers.DateField(allow_null=True)
+    #: Whether this tariff was linked to a dynamic price source.
+    dynamic = serializers.BooleanField()
 
 
 class VseTariffImportSkippedSerializer(serializers.Serializer):
@@ -231,3 +238,19 @@ class VseTariffImportResultSerializer(serializers.Serializer):
     created = VseTariffImportCreatedSerializer(many=True)
     skipped = VseTariffImportSkippedSerializer(many=True)
     errors = VseTariffImportAppliedErrorSerializer(many=True)
+
+
+class DynamicTariffSourceSerializer(serializers.ModelSerializer):
+    """Read-only: sources are created only by the VSE importer's get-or-create
+    (planner._get_or_create_dynamic_source) or by an admin in Django admin,
+    never by this API — see the model's docstring on why sources are shared
+    globally rather than owned by one ZEV."""
+
+    class Meta:
+        model = DynamicTariffSource
+        fields = [
+            "id", "label", "url", "adapter", "tariff_type", "tariff_name",
+            "last_fetch_status", "last_fetch_at", "last_success_at", "last_fetch_error",
+            "covers_from", "covers_to",
+        ]
+        read_only_fields = fields

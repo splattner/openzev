@@ -50,8 +50,10 @@ the same series.
 
 - **File upload** of the document. Iteration 1 is URL-only; the parser takes a
   decoded payload, so adding upload is a view-layer change.
-- **Power/demand charges** (#529), **dynamic tariffs** (#530), reactive-power
-  charges and storage refunds — reported, never imported.
+- **Power/demand charges** (#529), reactive-power charges and storage
+  refunds — reported, never imported. **Dynamic tariffs** (`tariffForm:
+  dynamic`) are *not* out of scope any more — see §6 below and
+  `docs/specs/2026-09-dynamic-tariffs.md`.
 - Any scheduled or automatic refresh. The import is manual, previewed and
   user-confirmed.
 - Publishing tariffs *as* a VNB. OpenZEV is a consumer of this standard.
@@ -257,7 +259,8 @@ silently dropped.
 | Construct | Reason given | Tracked |
 |---|---|---|
 | Two month groups that overlap | Which group prices the shared months is ambiguous | — |
-| `tariffForm: dynamic` | The price lives in an external time series; the URL is named in the message | #530 |
+| `tariffForm: dynamic` with no `prices.dynamic.url` | Nothing to fetch from | #530 |
+| `tariffForm: dynamic` with `tariffType: metering` | The dynamic-tariff schema has no metering type to fetch (§3.3 of `2026-09-dynamic-tariffs.md`) | #530 |
 | Energy price not in `CHF/kWh` | Cannot be billed per kWh | — |
 | Base price not in `CHF/M` | Does not map to a monthly fee | — |
 | Negative price | The standard requires prices ≥ 0 | — |
@@ -269,6 +272,14 @@ stored), a non-zero `prices.reactivePower`, and a non-zero
 `prices.refundStorage`. Components published as `0.00` — of which real
 documents carry many — produce no warning, but a candidate whose only price is
 zero is never pre-selected.
+
+**A `tariffForm: dynamic` entry with a URL and a representable `tariffType`
+(`electricity`, `grid` or `regional_fees`) is imported, not blocked.** It
+creates a tariff linked to a `DynamicTariffSource`, which is then fetched on
+the same schedule as any other dynamic source. See
+`docs/specs/2026-09-dynamic-tariffs.md` §10 for the full mapping, the
+source-linking mechanics, and why the document's URL is probed once before
+being trusted.
 
 ## 7. Defensive parsing
 
@@ -653,9 +664,13 @@ is reported per season, naming each season's own pair; three prices become
 unnamed bands rather than being refused, carry no HT/NT guess, while two prices
 still become HT and NT.
 
-**`UnsupportedConstructTests`** (5): dynamic tariffs (with the URL in the
-message), a wrong energy unit, a wrong base unit and a negative price each
-blocked with a reason; excess precision rounded with a warning.
+**`UnsupportedConstructTests`** (9): a dynamic grid tariff is importable and
+carries its URL and tariff type; a dynamic tariff with no URL, or with
+`tariffType: metering`, is blocked with a reason; a dynamic candidate warns
+that the document names no product; a dynamic candidate is never
+pre-selectable as "free" (`is_free`); a wrong energy unit, a wrong base unit
+and a negative price each blocked with a reason; excess precision rounded
+with a warning.
 
 **`PlanningTests`** (10): a new name; re-importing the same document changes
 nothing; next year's document appends a version and closes the previous one; an
@@ -725,6 +740,9 @@ call shapes — including that apply sends only selections and a digest.
 - [x] Import is audited (who, when, source URL, what was created/skipped)
 - [x] Only admin / ZEV owner can import; URL fetch is size- and timeout-limited
 - [x] Backend tests cover the mapping table and each gap case
+- [x] A dynamic entry with a URL and a representable tariff type creates a
+      tariff linked to its fetched price source instead of being blocked
+      (§6, `2026-09-dynamic-tariffs.md` §10)
 
 ## 15. Open questions
 
@@ -738,10 +756,10 @@ call shapes — including that apply sends only selections and a digest.
    `Zev.zev_type` already knows which this is. Keying the default off it would
    save a click; it would also make the picker's initial value depend on a
    setting the user is not looking at, which is why it is not done yet.
-3. **The remaining gaps are tracked separately**, each naming the code that
-   blocks it: power/demand billing #529 and dynamic tariffs #530. Seasonal
-   prices (#527) and multi-band tariffs (#528) are now supported — see
-   `2026-03-tariffs-and-billing-engine.md` §3.2b and §3.2c. Seasonal prices (#527) are now supported — see
-   `2026-03-tariffs-and-billing-engine.md` §3.2b. #530 is blocked on something
-   outside this repo, since the standard defines `prices.dynamic` as a bare URL
-   with no response schema.
+3. **The remaining gaps are tracked separately.** Seasonal prices (#527) and
+   multi-band tariffs (#528) are supported — see
+   `2026-03-tariffs-and-billing-engine.md` §3.2b and §3.2c. **Dynamic
+   tariffs (#530) are supported too** — see §6 above and
+   `docs/specs/2026-09-dynamic-tariffs.md` — resolved once SmartGridready
+   published a VSE-compatible schema for the fetched-series response; the
+   remaining open gap is power/demand billing (#529).

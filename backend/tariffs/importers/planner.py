@@ -22,9 +22,13 @@ from django.db import transaction
 from django.db.models import Q
 from django.core.exceptions import ValidationError as DjangoValidationError
 
+from tariffs.dynamic.adapters import DynamicAdapter
+from tariffs.dynamic.fetch import fetch_window
+from tariffs.dynamic.models import DynamicTariffSource
 from tariffs.models import Tariff, TariffPeriod
 from tariffs.series import SERIES_FIELDS, plan_new_version
 
+from .remote import TariffFetchError
 from .vse_json import Candidate, ParsedDocument
 
 
@@ -245,7 +249,53 @@ def _notes_with_provenance(candidate: Candidate, source_url: str, imported_on: d
     return f"{candidate.notes}\n{origin} (imported {imported_on.isoformat()})".strip()
 
 
-def _create(zev, planned: PlannedCandidate, source_url: str, imported_on: date) -> Tariff:
+def _get_or_create_dynamic_source(candidate: Candidate) -> DynamicTariffSource:
+    """Find or create the price source a dynamic candidate names.
+
+    Sources are shared globally (ADR 0018), so another ZEV already on this
+    exact endpoint/type/product is reused rather than duplicated — matched by
+    the model's own natural key. The document names no product at all (that
+    concept does not exist in the VSE tariff schema), so ``tariff_name`` is
+    always blank here; ``_dynamic_candidate`` already warns about that.
+
+    A *new* source is probed once before being created: the URL comes from
+    the document, and a URL in a document is a starting point, not a
+    contract — the standard's own example now 410s. Creating a tariff linked
+    to a source that cannot be fetched would be worse than not creating it.
+    An already-known source is trusted without a fresh probe: it is already
+    being fetched on schedule.
+    """
+    natural_key = {
+        "url": candidate.dynamic_url,
+        "tariff_type": candidate.dynamic_tariff_type,
+        "tariff_name": "",
+    }
+    existing = DynamicTariffSource.objects.filter(**natural_key).first()
+    if existing is not None:
+        return existing
+
+    probe = DynamicTariffSource(adapter=DynamicAdapter.VSE_V1, **natural_key)
+    try:
+        fetch_window(probe, window=None)
+    except TariffFetchError as exc:
+        raise ValueError(
+            f"Could not fetch the dynamic price at {candidate.dynamic_url}: {exc}"
+        ) from exc
+
+    source, _created = DynamicTariffSource.objects.get_or_create(
+        **natural_key,
+        defaults={
+            "adapter": DynamicAdapter.VSE_V1,
+            "label": f"{candidate.source_tariff_name} — {candidate.dynamic_tariff_type}",
+        },
+    )
+    return source
+
+
+def _create(
+    zev, planned: PlannedCandidate, source_url: str, imported_on: date,
+    dynamic_source: DynamicTariffSource | None = None,
+) -> Tariff:
     candidate = planned.candidate
     # Versions of a series share a name, so a series matched on provenance
     # keeps the name it answers to rather than reverting to the document's.
@@ -277,6 +327,7 @@ def _create(zev, planned: PlannedCandidate, source_url: str, imported_on: date) 
         notes=_notes_with_provenance(candidate, source_url, imported_on),
         source_component=candidate.source_component,
         source_series_name=candidate.source_series_name,
+        dynamic_source=dynamic_source,
     )
     tariff.save()
 
@@ -357,9 +408,21 @@ def apply_import(*, zev, document: ParsedDocument, selections: list[Selection], 
         if not planned.is_applicable:
             report.skipped.append({"name": candidate.name, "reason": planned.detail})
             continue
+
+        # Resolved (and, for a new source, probed over the network) before the
+        # write transaction opens — a slow or failing fetch must not hold a
+        # database savepoint open while it happens.
+        dynamic_source = None
+        if candidate.dynamic_url:
+            try:
+                dynamic_source = _get_or_create_dynamic_source(candidate)
+            except ValueError as exc:
+                report.errors.append({"name": candidate.name, "error": str(exc)})
+                continue
+
         try:
             with transaction.atomic():
-                tariff = _create(zev, planned, source_url, imported_on)
+                tariff = _create(zev, planned, source_url, imported_on, dynamic_source=dynamic_source)
         except DjangoValidationError as exc:
             report.errors.append({
                 "name": candidate.name,
@@ -374,6 +437,7 @@ def apply_import(*, zev, document: ParsedDocument, selections: list[Selection], 
             "billing_mode": tariff.billing_mode,
             "valid_from": tariff.valid_from.isoformat(),
             "valid_to": tariff.valid_to.isoformat() if tariff.valid_to else None,
+            "dynamic": tariff.dynamic_source_id is not None,
         })
 
     return report, created

@@ -1,5 +1,6 @@
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import {
+    faBolt,
     faChevronDown,
     faChevronUp,
     faClone,
@@ -10,10 +11,13 @@ import {
     faTrash,
     faTriangleExclamation,
 } from '@fortawesome/free-solid-svg-icons'
+import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { formatShortDate } from '../../lib/appSettings'
 import { todayLocalIso } from '../../lib/dates'
+import { fetchDynamicTariffSources } from '../../lib/api/tariffs'
+import { queryKeys } from '../../lib/api/queryKeys'
 import type {
     AppSettings,
     Tariff,
@@ -83,6 +87,15 @@ export function TariffCategorySections({
     const [shownVersionBySeries, setShownVersionBySeries] = useState<Record<string, string>>({})
     const today = todayLocalIso()
 
+    // Shares its cache with TariffFormModal's picker (same query key), so
+    // having both mounted costs one request, not two.
+    const sourcesQuery = useQuery({
+        queryKey: queryKeys.tariffs.dynamicSources(),
+        queryFn: fetchDynamicTariffSources,
+        staleTime: 5 * 60 * 1000,
+    })
+    const sourceById = new Map((sourcesQuery.data ?? []).map((source) => [source.id, source]))
+
     const toggleExpanded = (key: string) => {
         setExpandedSeries((current) => {
             const next = new Set(current)
@@ -113,8 +126,19 @@ export function TariffCategorySections({
         }
     }
 
-    /** A one-line price summary for a version, whatever it is priced by. */
+    /** A one-line price summary for a version, whatever it is priced by.
+     *
+     * `dynamic_source` is checked before `billing_mode`, not alongside it: a
+     * dynamic tariff is still `billing_mode = 'energy'`, but carries no
+     * periods at all — its price lives in the fetched series, not on this
+     * version — so falling into the ordinary energy branch below would
+     * always read "no bands configured" for one.
+     */
     function priceSummary(series: TariffSeries, version: TariffVersion): string {
+        if (version.dynamic_source) {
+            const source = sourceById.get(version.dynamic_source)
+            return source ? t('pages.tariffs.dynamicPricedFrom', { label: source.label }) : t('pages.tariffs.dynamicPriced')
+        }
         if (series.billing_mode === 'energy') {
             const prices = version.periods.map((period) => `${period.price_chf_per_kwh}`)
             return prices.length
@@ -151,24 +175,40 @@ export function TariffCategorySections({
                             const shown = versions.find((version) => version.id === shownId) ?? versions[0]
                             const isShowingActive = shown.id === series.active_version_id
 
-                            const usesPeriods = series.billing_mode === 'energy'
+                            // Checked on the shown *version*, not the series: a
+                            // series can hold both a static and a dynamic
+                            // version (an operator switching to dynamic pricing
+                            // at a version boundary, ADR 0018) since
+                            // dynamic_source is deliberately not one of the
+                            // fields versions must agree on.
+                            const dynamicSource = shown.dynamic_source ? sourceById.get(shown.dynamic_source) : undefined
+                            const isDynamic = Boolean(shown.dynamic_source)
+                            const usesPeriods = series.billing_mode === 'energy' && !isDynamic
                             const shownPeriods = shown.periods
                             const energyTypeLabel = t(`pages.tariffs.energyTypes.${series.energy_type || 'local'}` as Parameters<typeof t>[0])
                             const basePrice = percentageBasePricing.get(shown.id)
-                            const pricingLabel = series.billing_mode === 'energy'
-                                ? energyTypeLabel
-                                : series.billing_mode === 'percentage_of_energy'
-                                    ? basePrice
-                                        ? `${shown.percentage ?? '0'}% · ${energyTypeLabel} · ${t('pages.tariffs.approxPrice', { price: (basePrice * Number(shown.percentage ?? 0) / 100).toFixed(3) })}`
-                                        : `${shown.percentage ?? '0'}% · ${energyTypeLabel}`
-                                    : `CHF ${shown.fixed_price_chf || '0.00'}`
-                            const pricingTooltip = series.billing_mode === 'percentage_of_energy' && basePrice
-                                ? t('pages.tariffs.approxPriceTooltip', {
-                                    percentage: shown.percentage ?? '0',
-                                    basePrice: basePrice.toFixed(3),
-                                    effectivePrice: (basePrice * Number(shown.percentage ?? 0) / 100).toFixed(3),
-                                })
-                                : undefined
+                            const pricingLabel = isDynamic
+                                ? (dynamicSource
+                                    ? t('pages.tariffs.dynamicPricedFrom', { label: dynamicSource.label })
+                                    : t('pages.tariffs.dynamicPriced'))
+                                : series.billing_mode === 'energy'
+                                    ? energyTypeLabel
+                                    : series.billing_mode === 'percentage_of_energy'
+                                        ? basePrice
+                                            ? `${shown.percentage ?? '0'}% · ${energyTypeLabel} · ${t('pages.tariffs.approxPrice', { price: (basePrice * Number(shown.percentage ?? 0) / 100).toFixed(3) })}`
+                                            : `${shown.percentage ?? '0'}% · ${energyTypeLabel}`
+                                        : `CHF ${shown.fixed_price_chf || '0.00'}`
+                            const pricingTooltip = isDynamic
+                                ? (dynamicSource?.last_fetch_status === 'failed'
+                                    ? t('pages.tariffs.dynamicFetchFailedTooltip', { error: dynamicSource.last_fetch_error })
+                                    : undefined)
+                                : series.billing_mode === 'percentage_of_energy' && basePrice
+                                    ? t('pages.tariffs.approxPriceTooltip', {
+                                        percentage: shown.percentage ?? '0',
+                                        basePrice: basePrice.toFixed(3),
+                                        effectivePrice: (basePrice * Number(shown.percentage ?? 0) / 100).toFixed(3),
+                                    })
+                                    : undefined
                             const notes = shown.notes?.trim()
                             const isExpanded = expandedSeries.has(seriesKey)
                             const badge = validityBadge(shown)
@@ -186,6 +226,21 @@ export function TariffCategorySections({
                                                     {series.energy_type && (
                                                         <span className="badge badge-success">
                                                             {t(`pages.tariffs.energyTypes.${series.energy_type}` as Parameters<typeof t>[0])}
+                                                        </span>
+                                                    )}
+                                                    {isDynamic && (
+                                                        <span
+                                                            className={
+                                                                dynamicSource?.last_fetch_status === 'failed'
+                                                                    ? 'badge badge-danger'
+                                                                    : 'badge badge-info'
+                                                            }
+                                                            title={dynamicSource?.last_fetch_status === 'failed'
+                                                                ? t('pages.tariffs.dynamicFetchFailedTooltip', { error: dynamicSource.last_fetch_error })
+                                                                : t('pages.tariffs.dynamicBadgeTooltip')}
+                                                        >
+                                                            <FontAwesomeIcon icon={faBolt} fixedWidth />{' '}
+                                                            {t('pages.tariffs.dynamicBadge')}
                                                         </span>
                                                     )}
                                                     <span className={badge.className} title={badge.tooltip}>

@@ -130,13 +130,37 @@ cannot be imported always says why:
   demand data is metered.
 - **Reactive-power charges** (CHF/kVarh).
 - **Storage grid-usage refunds.**
-- **Dynamic tariffs**, whose price lives in an external time series rather than
-  in the document.
+- A **dynamic tariff with no fetchable URL**, or one published against a
+  metering connection — the fetched-price standard has no metering tariff
+  type at all.
 - Prices in a unit that cannot be billed — an energy price not in CHF/kWh, or a
   base price not in CHF/month — and negative prices.
 
 Where a published price is more precise than OpenZEV stores, it is rounded and
 the row tells you so.
+
+### Dynamic tariffs
+
+Some operators no longer publish a fixed price at all — they publish a URL
+that serves a new price every quarter-hour. Importing one of these creates a
+tariff linked to that price source instead of to fixed bands; OpenZEV fetches
+it on a schedule and bills each reading at whatever the series says for that
+moment, negative prices included.
+
+- The import preview marks a dynamic row with a **Dynamic** badge and shows
+  the URL it will fetch from, instead of a list of prices — there is nothing
+  to list yet.
+- The document never names which *product* the source should use (an
+  operator like Groupe E publishes several, at materially different prices).
+  The import warns about this; if your operator publishes more than one
+  product, ask an administrator to set the correct one on the linked source
+  afterwards.
+- On the Tariffs page, a dynamic tariff shows a **Dynamic** badge next to its
+  energy type. The badge turns red, with the failure shown as a tooltip, if
+  the source's last scheduled fetch failed.
+- You can also link a plain energy tariff to an existing dynamic source by
+  hand, from the tariff's edit form — useful once a source has already been
+  created by an earlier import.
 
 > **Tip:** Import prices exactly as published — they are net of VAT. If your
 > community pays VAT it cannot reclaim, set the VAT treatment in

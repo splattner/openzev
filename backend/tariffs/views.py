@@ -9,9 +9,10 @@ from django.db import transaction
 from django.utils import timezone
 from django.utils.dateparse import parse_date
 from accounts.permissions import IsZevOwnerOrAdmin
+from .dynamic.models import DynamicTariffSource
 from .models import Tariff, TariffPeriod
 from zev.scoping import ZevScopedQuerySetMixin
-from .serializers import TariffSerializer, TariffPeriodSerializer
+from .serializers import DynamicTariffSourceSerializer, TariffSerializer, TariffPeriodSerializer
 from .series import active_version, find_gaps, plan_new_version, series_key, sort_versions
 from audit.models import AuditActionCategory
 from audit.mixins import AuditedUpdateMixin
@@ -391,3 +392,19 @@ class TariffPeriodViewSet(AuditedUpdateMixin, ZevScopedQuerySetMixin, viewsets.M
             target_display=period_type,
             summary=f"Deleted tariff period {period_type} for tariff {tariff_name}.",
         )
+
+
+class DynamicTariffSourceViewSet(viewsets.ReadOnlyModelViewSet):
+    """Every configured dynamic price source, for the tariff form's picker.
+
+    Not ZEV-scoped: a source is global (ADR 0018), not owned by any one
+    community, and carries nothing more sensitive than a public operator URL
+    and public prices — so any owner or admin may read the list. Creation
+    happens only through the VSE importer's get-or-create
+    (``importers.planner._get_or_create_dynamic_source``) or via Django admin;
+    this endpoint is read-only.
+    """
+
+    queryset = DynamicTariffSource.objects.all()
+    serializer_class = DynamicTariffSourceSerializer
+    permission_classes = [IsAuthenticated, IsZevOwnerOrAdmin]

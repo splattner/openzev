@@ -126,7 +126,7 @@ PVshare Cockpit is a closed, subscription-based SaaS (CHF ~30/participant/year) 
 | vZEV feasibility / profitability calculator (aggregate or per-participant, energy-flow topology, self-consumption & internal-price sensitivity, payback/ROI/NPV, prefill of a real ZEV's participants, measured self-consumption, and all-in tariffs) | `shipped` | — | [guide](user-guide/13-feasibility-calculator.md) |
 | Scheduled invoice auto-generation (cron-triggered, per-ZEV billing interval) | `idea` | `medium` | Would remove the manual "generate all" step each month |
 | Payment reference number (QRR / SCOR) on the invoice QR bill | `idea` | `medium` | Needed for automated bank reconciliation; the QR bill already ships, the structured reference does not — #536 |
-| Dynamic tariffs (`tariffForm: dynamic`) | `in-progress` | `medium` | Price served by an external time series. The VSE-compatible schema now exists (SmartGridready v1.0.5) and Groupe E and BKW both implement it — [spec](specs/2026-09-dynamic-tariffs.md), [ADR 0018](adr/0018-dynamic-tariff-price-series.md), #530 |
+| Dynamic tariffs (`tariffForm: dynamic`) — fetched quarter-hourly price series, engine resolution with a hard refusal on gaps, readiness coverage, VSE import, tariff-form source picker | `shipped` | — | [spec](specs/2026-09-dynamic-tariffs.md), [ADR 0018](adr/0018-dynamic-tariff-price-series.md), #530 |
 | Invoice data export — CSV export of invoice line items | `idea` | `low` | Useful for external accounting software |
 | Mark invoice as disputed / on-hold state | `idea` | `low` | Would require an extra lifecycle state and guard |
 | Credit note / corrective invoice generation | `idea` | `low` | Complex billing edge case; needs dedicated spec |

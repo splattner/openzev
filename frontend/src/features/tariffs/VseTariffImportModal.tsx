@@ -289,7 +289,9 @@ export function VseTariffImportModal({ isOpen, onClose, zevId, initialUrl }: Vse
                     <ResultList title={t('pages.tariffs.import.result.created')} empty={t('pages.tariffs.import.result.none')}>
                         {result.created.map((item) => (
                             <li key={`${item.name}-${item.valid_from}`}>
-                                {item.name} — {t(`pages.tariffs.billingModes.${item.billing_mode}`)} —{' '}
+                                {item.name} — {item.dynamic
+                                    ? t('pages.tariffs.import.dynamicBadge')
+                                    : t(`pages.tariffs.billingModes.${item.billing_mode}`)} —{' '}
                                 {item.valid_from} … {item.valid_to ?? t('pages.tariffs.openEnded')}
                             </li>
                         ))}
@@ -436,6 +438,17 @@ function CandidatePrice({ candidate }: { candidate: VseTariffCandidate }) {
         (key) => t(`pages.tariffs.monthsShort.${key}` as Parameters<typeof t>[0]),
     )
 
+    if (candidate.dynamic_url) {
+        // No periods to list at all — the price lives in a time series
+        // fetched from this URL after the tariff is created, not in this
+        // document. See docs/specs/2026-09-dynamic-tariffs.md.
+        return (
+            <span>
+                <span className="badge badge-info">{t('pages.tariffs.import.dynamicBadge')}</span>
+                <small className="muted" style={{ display: 'block' }}>{candidate.dynamic_url}</small>
+            </span>
+        )
+    }
     if (candidate.billing_mode !== 'energy') {
         return (
             <span>

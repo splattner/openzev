@@ -1,4 +1,5 @@
 import type {
+  DynamicTariffSource,
   Tariff,
   TariffInput,
   TariffPeriod,
@@ -10,6 +11,7 @@ import type {
   VseTariffImportSelection,
 } from '../../types/api'
 import { api } from './client'
+import { fetchAllPages } from './pagination'
 
 /**
  * Tariffs grouped into series (same name = versions of one tariff), each with
@@ -67,6 +69,15 @@ export async function updateTariffPeriod(id: string, payload: Partial<TariffPeri
 
 export async function deleteTariffPeriod(id: string): Promise<void> {
   await api.delete(`/tariffs/periods/${id}/`)
+}
+
+/**
+ * Every configured dynamic price source — global, not scoped to a ZEV, so
+ * this is what a tariff form's "use a dynamic source" picker reads from.
+ * Read-only: a source is created only by the VSE importer or by an admin.
+ */
+export async function fetchDynamicTariffSources(): Promise<DynamicTariffSource[]> {
+  return fetchAllPages<DynamicTariffSource>('/tariffs/dynamic-sources/')
 }
 
 /**

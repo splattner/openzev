@@ -432,6 +432,8 @@ export interface Tariff {
     /** Written by the Art. 7b importer; blank for tariffs entered by hand. */
     source_component?: 'base' | 'energy' | ''
     source_series_name?: string
+    /** Set when this tariff is priced from a fetched series instead of bands. */
+    dynamic_source?: string | null
 }
 
 export interface TariffInput {
@@ -446,6 +448,35 @@ export interface TariffInput {
     valid_from: string
     valid_to?: string | null
     notes?: string
+    dynamic_source?: string | null
+}
+
+/**
+ * The VSE tariff types a dynamic price source can be fetched as. `integrated`
+ * already combines `electricity` + `grid` — billing it beside a separate grid
+ * fee or levy tariff double-counts, see `docs/specs/2026-09-dynamic-tariffs.md` §3.3.
+ */
+export type DynamicTariffType = 'electricity' | 'grid' | 'integrated' | 'regional_fees' | 'feed_in'
+
+/**
+ * A shared price series, fetched from one operator endpoint. Global, not
+ * scoped to any one ZEV — two communities on the same product share one
+ * source and one fetch (ADR 0018).
+ */
+export interface DynamicTariffSource {
+    id: string
+    label: string
+    url: string
+    adapter: 'vse_v1' | 'groupe_e' | 'bkw'
+    tariff_type: DynamicTariffType
+    tariff_name: string
+    last_fetch_status: 'pending' | 'ok' | 'failed'
+    last_fetch_at: string | null
+    last_success_at: string | null
+    last_fetch_error: string
+    /** Extent of the stored series; null before anything has been fetched. */
+    covers_from: string | null
+    covers_to: string | null
 }
 
 /**
@@ -1222,6 +1253,9 @@ export interface VseTariffCandidate {
     source_customer_type: string
     source_voltage_level: number | null
     standard_basegroup: boolean
+    /** Set only for a dynamic-tariff candidate: the URL its price would be
+     *  fetched from. Blank for every static candidate. */
+    dynamic_url: string
     /** Name the created tariff takes; differs from `name` when the series was
      *  matched on provenance and has been renamed since. */
     series_name: string
@@ -1254,6 +1288,8 @@ export interface VseTariffImportResult {
         billing_mode: string
         valid_from: string
         valid_to: string | null
+        /** Whether this tariff was linked to a dynamic price source. */
+        dynamic: boolean
     }>
     skipped: Array<{ name: string; reason: string }>
     errors: Array<{ name: string; error: string }>
