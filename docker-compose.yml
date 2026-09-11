@@ -53,6 +53,12 @@ services:
     depends_on:
       - backend
       - redis
+    # On a fresh stack, migrations run inside the backend container's own
+    # startup command and this container can win the race and start before
+    # they land — django_celery_beat's scheduler tables won't exist yet and
+    # it exits. Unlike every other service here, that first failure is
+    # expected rather than a bug, so unlike them beat gets a restart policy.
+    restart: on-failure
 
   frontend:
     build:

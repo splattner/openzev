@@ -3,7 +3,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faCheck, faPlus, faXmark } from '@fortawesome/free-solid-svg-icons'
 import { useQuery } from '@tanstack/react-query'
 import { Controller, useForm, useWatch } from 'react-hook-form'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { FormModal } from '../../components/FormModal'
 import { FormModalFooter } from '../../components/FormModalFooter'
@@ -11,7 +11,7 @@ import { CivilDateInput } from '../../components/CivilDateInput'
 import { fetchDynamicTariffSources } from '../../lib/api/tariffs'
 import { queryKeys } from '../../lib/api/queryKeys'
 import type { Tariff, TariffBillingMode, TariffInput } from '../../types/api'
-import { dynamicSourceOptions, impliedEnergyType } from './dynamicSources'
+import { aggregatedTariffTypes, dynamicSourceOptions, impliedEnergyType } from './dynamicSources'
 import { DynamicSourceFormModal } from './DynamicSourceFormModal'
 import {
   defaultTariffFormValues,
@@ -89,6 +89,10 @@ export function TariffFormModal({
   })
   const sourcesData = sourcesQuery.data
   const availableSources = dynamicSourceOptions(sourcesData ?? [], isVersion ? initialTariff?.energy_type : undefined)
+  const selectedSourceAggregatedTypes = useMemo(() => {
+    const source = sourcesData?.find((candidate) => candidate.id === dynamicSourceId)
+    return source ? aggregatedTariffTypes(source.tariff_type) : []
+  }, [sourcesData, dynamicSourceId])
 
   useEffect(() => {
     form.reset(initialTariff ? mapTariffToFormValues(initialTariff) : defaultTariffFormValues)
@@ -203,6 +207,15 @@ export function TariffFormModal({
                   : t('pages.tariffs.form.dynamicSourceHint')}
               </small>
             </label>
+            {selectedSourceAggregatedTypes.length > 0 && (
+              <div className="warning-banner">
+                {t('pages.dynamicSources.form.doubleCountingWarning', {
+                  components: selectedSourceAggregatedTypes
+                    .map((type) => t(`pages.dynamicSources.types.${type}` as Parameters<typeof t>[0]))
+                    .join(', '),
+                })}
+              </div>
+            )}
             {!isVersion && (
               <div>
                 <button

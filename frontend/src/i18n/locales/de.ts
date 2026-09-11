@@ -1378,6 +1378,9 @@ export const de = {
             fetchError: 'Der Preisabruf konnte nicht eingeplant werden.',
             fetchNow: 'Jetzt abrufen',
             fetchBackfill: 'Verfügbare Historie abrufen',
+            recheckAction: 'Fähigkeiten neu prüfen',
+            recheckSuccess: 'Fähigkeiten wurden neu geprüft.',
+            recheckError: 'Fähigkeiten konnten nicht neu geprüft werden.',
             cleared: '{{count}} abgerufene Preispunkte gelöscht.',
             clearError: 'Die abgerufenen Preise konnten nicht gelöscht werden.',
             clearAction: 'Abgerufene Preise löschen',
@@ -1409,6 +1412,7 @@ export const de = {
                 v1TariffNameHint: 'Optional. Antworten der Version 1 enthalten keinen Produktkatalog; geben Sie einen Produktnamen ein, falls der Endpunkt ihn verlangt.',
                 identityReplacement: 'Endpunkt und ausgewählte Reihe sind unveränderlich. Erstellen Sie eine Ersatzquelle, um sie zu ändern.',
                 probeNotice: 'OpenZEV prüft diese Auswahl vor dem Speichern, speichert die gelieferten Preise und plant danach den Abruf der verfügbaren Historie.',
+                doubleCountingWarning: 'Diese Komponente enthält bereits {{components}}. Wird sie zusätzlich zu einem separaten Tarif für einen dieser Bestandteile verrechnet, wird derselbe Betrag doppelt belastet.',
             },
             discovery: {
                 step: 'Schritt {{current}} von {{total}}', continue: 'Verfügbare Preise laden', back: 'Zurück',

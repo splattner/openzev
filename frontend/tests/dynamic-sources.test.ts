@@ -10,7 +10,7 @@ import {
   fetchDynamicTariffSources,
   queueDynamicSourceFetch,
 } from '../src/lib/api/tariffs'
-import { dynamicSourceOptions, impliedEnergyType } from '../src/features/tariffs/dynamicSources'
+import { aggregatedTariffTypes, dynamicSourceOptions, impliedEnergyType } from '../src/features/tariffs/dynamicSources'
 import type { DynamicTariffSource } from '../src/types/api'
 
 /**
@@ -77,6 +77,28 @@ describe('dynamicSourceOptions', () => {
   it('treats a missing lock the same as none — null or undefined', () => {
     expect(dynamicSourceOptions([grid, feedIn], null)).toEqual([grid, feedIn])
     expect(dynamicSourceOptions([grid, feedIn], undefined)).toEqual([grid, feedIn])
+  })
+})
+
+describe('aggregatedTariffTypes', () => {
+  it('names electricity and grid for an integrated component', () => {
+    expect(aggregatedTariffTypes('integrated')).toEqual(['electricity', 'grid'])
+  })
+
+  it('names the v2 aggregates dso/dso_complete/integrated_complete already contain', () => {
+    expect(aggregatedTariffTypes('dso')).toEqual(['grid', 'metering', 'national_fees'])
+    expect(aggregatedTariffTypes('dso_complete')).toEqual([
+      'grid', 'metering', 'national_fees', 'regional_fees',
+    ])
+    expect(aggregatedTariffTypes('integrated_complete')).toEqual([
+      'electricity', 'grid', 'metering', 'national_fees', 'regional_fees',
+    ])
+  })
+
+  it('is empty for a component that bills only itself', () => {
+    for (const type of ['electricity', 'grid', 'metering', 'national_fees', 'regional_fees', 'feed_in', 'refund'] as const) {
+      expect(aggregatedTariffTypes(type)).toEqual([])
+    }
   })
 })
 

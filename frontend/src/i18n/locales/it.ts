@@ -1378,6 +1378,9 @@ export const it = {
             fetchError: 'Impossibile accodare il recupero dei prezzi.',
             fetchNow: 'Recupera ora',
             fetchBackfill: 'Recupera cronologia disponibile',
+            recheckAction: 'Riverifica capacità',
+            recheckSuccess: 'Capacità riverificate.',
+            recheckError: 'Non è stato possibile riverificare le capacità.',
             cleared: 'Eliminati {{count}} punti di prezzo recuperati.',
             clearError: 'Impossibile eliminare i prezzi recuperati.',
             clearAction: 'Elimina prezzi recuperati',
@@ -1409,6 +1412,7 @@ export const it = {
                 v1TariffNameHint: 'Facoltativo. Le risposte versione 1 non pubblicano un catalogo prodotti; inserisci un prodotto se l’endpoint lo richiede.',
                 identityReplacement: 'L’endpoint e la serie selezionata sono immutabili. Crea una fonte sostitutiva per modificarli.',
                 probeNotice: 'OpenZEV verifica questa selezione prima del salvataggio, memorizza i prezzi ricevuti e poi accoda il recupero della cronologia disponibile.',
+                doubleCountingWarning: 'Questo componente include già {{components}}. Fatturarlo insieme a una tariffa separata per uno di questi elementi addebita due volte lo stesso importo.',
             },
             discovery: {
                 step: 'Passaggio {{current}} di {{total}}', continue: 'Carica prezzi disponibili', back: 'Indietro',

@@ -81,10 +81,10 @@ def _dynamic_tariff(
     zev, *, energy_type=EnergyType.GRID, category=TariffCategory.ENERGY,
     valid_from=date(2026, 1, 1), tariff_type="grid", label="Dynamic grid",
 ):
-    # category=ENERGY, matching _energy_tariff() above: _load_energy_tariffs()
-    # only considers that category (a pre-existing readiness limitation, not
-    # something this dynamic-tariff work changes — grid_fees/levies tariffs
-    # are priced by the engine but not coverage-checked by readiness today).
+    # category=ENERGY by default, matching _energy_tariff() above — but a
+    # dynamic tariff's coverage check does not depend on it (see
+    # DynamicTariffPricingCoverageTests.test_a_dynamic_tariff_is_checked_regardless_of_category),
+    # so callers may pass category=GRID_FEES to exercise that.
     source = DynamicTariffSource.objects.create(
         label=label, url=f"https://api.example.ch/{label.replace(' ', '-')}",
         api_version="v1_0_5", tariff_type=tariff_type, tariff_name="",
@@ -1155,6 +1155,20 @@ class DynamicTariffPricingCoverageTests(ReadinessTestCase):
         # A dynamic tariff exists and validates, but nothing was ever fetched
         # for it — the exact state right after configuring one.
         _dynamic_tariff(self.zev)
+
+        steps = self._steps_by_key(
+            compute_readiness(self.zev, date(2026, 1, 1), date(2026, 1, 31))
+        )
+
+        self.assertEqual(steps["tariffs"]["status"], "warn")
+        self.assertEqual(steps["tariffs"]["count"], 31)
+
+    def test_a_dynamic_tariff_is_checked_regardless_of_category(self):
+        # #530's own mapping table files a dynamic grid series under
+        # grid_fees, not energy — and the engine buckets purely on
+        # billing_mode/energy_type with no category filter. Readiness must
+        # not report "ok" for a gap the engine would then refuse to bill.
+        _dynamic_tariff(self.zev, category=TariffCategory.GRID_FEES, label="Dynamic netz")
 
         steps = self._steps_by_key(
             compute_readiness(self.zev, date(2026, 1, 1), date(2026, 1, 31))

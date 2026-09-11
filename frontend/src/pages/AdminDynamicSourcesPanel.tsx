@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faArrowsRotate, faChartLine, faClockRotateLeft, faEllipsis, faEraser, faPen, faPlus, faTrash } from '@fortawesome/free-solid-svg-icons'
+import { faArrowsRotate, faChartLine, faClockRotateLeft, faEllipsis, faEraser, faMagnifyingGlass, faPen, faPlus, faTrash } from '@fortawesome/free-solid-svg-icons'
 import { useTranslation } from 'react-i18next'
 import { ActionMenu } from '../components/ActionMenu'
 import { DataTable, type ColumnDef } from '../components/DataTable'
@@ -18,6 +18,7 @@ import {
   deleteDynamicTariffSource,
   fetchDynamicTariffSources,
   queueDynamicSourceFetch,
+  recheckDynamicTariffSource,
 } from '../lib/api/tariffs'
 import { formatApiError } from '../lib/api/errors'
 import { formatDateTime, useAppSettings } from '../lib/appSettings'
@@ -77,6 +78,19 @@ export function AdminDynamicSourcesPanel() {
       await queryClient.invalidateQueries({ queryKey: ['admin', 'audit-events'] })
     },
     onError: (error) => pushToast(formatApiError(error, t('pages.dynamicSources.fetchError')), 'error'),
+  })
+
+  const recheckMutation = useMutation({
+    mutationFn: (source: DynamicTariffSource) => recheckDynamicTariffSource(source.id),
+    onSuccess: async (saved) => {
+      pushToast(t('pages.dynamicSources.recheckSuccess'), 'success')
+      for (const warning of saved.warnings) {
+        pushToast(warning, 'info')
+      }
+      await queryClient.invalidateQueries({ queryKey: queryKeys.tariffs.dynamicSources() })
+      await queryClient.invalidateQueries({ queryKey: ['admin', 'audit-events'] })
+    },
+    onError: (error) => pushToast(formatApiError(error, t('pages.dynamicSources.recheckError')), 'error'),
   })
 
   const clearMutation = useMutation({
@@ -195,6 +209,16 @@ export function AdminDynamicSourcesPanel() {
                 onClick: () => setFormSource(source),
               },
               {
+                // The initial probe can under-detect supports_range (a
+                // transient blip, or nothing published yet at that moment),
+                // and identity fields cannot be edited afterwards — this is
+                // the only way back short of deleting and recreating the
+                // source.
+                key: 'recheck', label: t('pages.dynamicSources.recheckAction'),
+                icon: <FontAwesomeIcon icon={faMagnifyingGlass} fixedWidth />,
+                onClick: () => recheckMutation.mutate(source),
+              },
+              {
                 key: 'clear', label: t('pages.dynamicSources.clearAction'), danger: true,
                 icon: <FontAwesomeIcon icon={faEraser} fixedWidth />,
                 onClick: () => openDestructiveDialog('clear', source),
@@ -219,7 +243,7 @@ export function AdminDynamicSourcesPanel() {
         )
       },
     },
-  ], [fetchMutation, openDestructiveDialog, settings, t])
+  ], [fetchMutation, openDestructiveDialog, recheckMutation, settings, t])
 
   const sources = sourcesQuery.data ?? []
   const failed = sources.filter((source) => source.last_fetch_status === 'failed').length

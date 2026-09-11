@@ -94,6 +94,55 @@ class TestCreationAndEditing:
             action_type="tariff.dynamic_source_create", target_id=str(source.pk)
         ).exists()
 
+    def test_creation_reports_units_the_source_publishes_but_cannot_bill(self, owner_client):
+        # A dropped demand or fixed-fee unit must reach the caller, not just
+        # the audit trail — the point in time it is most useful is right when
+        # the source is being configured.
+        point = PricePoint(
+            valid_from=datetime(2026, 9, 11, tzinfo=UTC),
+            valid_to=datetime(2026, 9, 11, 0, 15, tzinfo=UTC),
+            price_chf_per_kwh=Decimal("0.12345"),
+        )
+        warning = "The grid series also publishes a fixed charge (CHF/m) which is not billed here."
+        with mock.patch(
+            "tariffs.dynamic.services.probe_source_configuration",
+            return_value=SourceCapabilities(
+                api_version="v2_0_0", request_mode="standard",
+                query_tariff_type="grid", supports_range=True,
+                points=[point], warnings=[warning],
+            ),
+        ):
+            response = owner_client.post("/api/v1/tariffs/dynamic-sources/", {
+                "label": "Manual VSE grid",
+                "url": "https://tariffs.example.test/dynamic",
+                "api_version": "v2_0_0",
+                "tariff_type": "grid",
+                "tariff_name": "home",
+            })
+
+        assert response.status_code == 201
+        assert response.json()["warnings"] == [warning]
+        source = DynamicTariffSource.objects.get()
+        event = AuditEvent.objects.get(
+            action_type="tariff.dynamic_source_create", target_id=str(source.pk)
+        )
+        assert event.metadata_json["warnings"] == [warning]
+
+    def test_reusing_an_existing_source_reports_no_warnings(self, owner_client):
+        # Nothing was probed, so there is nothing new to warn about.
+        source = make_source()
+
+        response = owner_client.post("/api/v1/tariffs/dynamic-sources/", {
+            "label": "Different label",
+            "url": source.url,
+            "api_version": source.api_version,
+            "tariff_type": source.tariff_type,
+            "tariff_name": source.tariff_name,
+        })
+
+        assert response.status_code == 200
+        assert response.json()["warnings"] == []
+
     def test_creation_reuses_the_natural_key_without_refetching(self, owner_client):
         source = make_source()
         with mock.patch("tariffs.dynamic.services.probe_source_configuration") as probe:
@@ -259,6 +308,99 @@ class TestOperations:
         )
 
         assert response.status_code == 409
+
+
+class TestRecheckingCapabilities:
+    """A wrongly-negative ``supports_range`` had no way back before this:
+    identity fields (url/api_version/tariff_type/tariff_name) are immutable
+    after creation, and the initial probe can under-detect range support on
+    a transient blip or an endpoint with nothing published yet."""
+
+    def test_admin_can_correct_a_wrongly_detected_capability(self, admin_client):
+        source = make_source(supports_range=False, request_mode="exact_url")
+        point = PricePoint(
+            valid_from=datetime(2026, 9, 11, tzinfo=UTC),
+            valid_to=datetime(2026, 9, 11, 0, 15, tzinfo=UTC),
+            price_chf_per_kwh=Decimal("0.12345"),
+        )
+        with mock.patch(
+            "tariffs.dynamic.services.probe_source_configuration",
+            return_value=SourceCapabilities(
+                api_version="v1_0_5", request_mode="standard",
+                query_tariff_type="grid", supports_range=True,
+                points=[point], warnings=[],
+            ),
+        ):
+            response = admin_client.post(
+                f"/api/v1/tariffs/dynamic-sources/{source.pk}/recheck/"
+            )
+
+        assert response.status_code == 200
+        assert response.json()["supports_backfill"] is True
+        source.refresh_from_db()
+        assert source.supports_range is True
+        assert source.request_mode == "standard"
+        # Identity fields are untouched by a recheck.
+        assert source.url == "https://prices.example.test/tariffs"
+        assert source.api_version == "v1_0_5"
+        event = AuditEvent.objects.get(action_type="tariff.dynamic_source_recheck")
+        assert event.metadata_json["supports_range"] is True
+
+    def test_recheck_reports_units_it_cannot_bill(self, admin_client):
+        source = make_source()
+        warning = "The grid series also publishes a demand charge which is not billed."
+        with mock.patch(
+            "tariffs.dynamic.services.probe_source_configuration",
+            return_value=SourceCapabilities(
+                api_version="v1_0_5", request_mode="standard",
+                query_tariff_type="grid", supports_range=True,
+                points=[], warnings=[warning],
+            ),
+        ):
+            response = admin_client.post(
+                f"/api/v1/tariffs/dynamic-sources/{source.pk}/recheck/"
+            )
+
+        assert response.status_code == 200
+        assert response.json()["warnings"] == [warning]
+
+    def test_owner_cannot_recheck(self, owner_client):
+        source = make_source()
+
+        response = owner_client.post(
+            f"/api/v1/tariffs/dynamic-sources/{source.pk}/recheck/"
+        )
+
+        assert response.status_code == 403
+
+    def test_recheck_is_refused_while_a_fetch_holds_the_lock(self, admin_client):
+        source = make_source()
+
+        with mock.patch("tariffs.views.dynamic_source_lock") as lock:
+            lock.return_value.__enter__ = mock.Mock(return_value=False)
+            lock.return_value.__exit__ = mock.Mock(return_value=False)
+            response = admin_client.post(
+                f"/api/v1/tariffs/dynamic-sources/{source.pk}/recheck/"
+            )
+
+        assert response.status_code == 409
+
+    def test_a_fetch_failure_during_recheck_is_reported_clearly(self, admin_client):
+        from tariffs.importers.remote import TariffFetchError
+
+        source = make_source()
+        with mock.patch(
+            "tariffs.dynamic.services.probe_source_configuration",
+            side_effect=TariffFetchError("The endpoint could not be reached."),
+        ):
+            response = admin_client.post(
+                f"/api/v1/tariffs/dynamic-sources/{source.pk}/recheck/"
+            )
+
+        assert response.status_code == 400
+        source.refresh_from_db()
+        # An identity field is untouched by a failed probe.
+        assert source.supports_range is True
 
 
 class TestDeletingASource:

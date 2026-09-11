@@ -41,3 +41,23 @@ export function dynamicSourceOptions(
   if (!lockedEnergyType) return sources
   return sources.filter((source) => impliedEnergyType(source) === lockedEnergyType)
 }
+
+/**
+ * Which other VSE tariff types a component already contains, per the
+ * mapping table in docs/specs/2026-09-dynamic-tariffs.md §3.3. `integrated`
+ * bundles electricity with grid usage; v2's `dso`/`dso_complete`/
+ * `integrated_complete` bundle grid usage with metering and the national/
+ * regional surcharges. Billing an aggregate beside a separate tariff for one
+ * of the types it already contains charges that money twice — this is what
+ * a double-counting warning needs to name.
+ */
+const AGGREGATED_TARIFF_TYPES: Partial<Record<DynamicTariffType, DynamicTariffType[]>> = {
+  integrated: ['electricity', 'grid'],
+  dso: ['grid', 'metering', 'national_fees'],
+  dso_complete: ['grid', 'metering', 'national_fees', 'regional_fees'],
+  integrated_complete: ['electricity', 'grid', 'metering', 'national_fees', 'regional_fees'],
+}
+
+export function aggregatedTariffTypes(tariffType: DynamicTariffType): DynamicTariffType[] {
+  return AGGREGATED_TARIFF_TYPES[tariffType] ?? []
+}

@@ -1378,6 +1378,9 @@ export const fr = {
             fetchError: 'Impossible de planifier la récupération des prix.',
             fetchNow: 'Récupérer maintenant',
             fetchBackfill: 'Récupérer l’historique disponible',
+            recheckAction: 'Revérifier les capacités',
+            recheckSuccess: 'Capacités revérifiées.',
+            recheckError: 'Les capacités n’ont pas pu être revérifiées.',
             cleared: '{{count}} points de prix récupérés supprimés.',
             clearError: 'Impossible de supprimer les prix récupérés.',
             clearAction: 'Supprimer les prix récupérés',
@@ -1409,6 +1412,7 @@ export const fr = {
                 v1TariffNameHint: 'Facultatif. Les réponses version 1 ne publient pas de catalogue de produits ; indiquez un produit si le point d’accès l’exige.',
                 identityReplacement: 'Le point d’accès et la série sélectionnée sont immuables. Créez une source de remplacement pour les modifier.',
                 probeNotice: 'OpenZEV vérifie cette sélection avant l’enregistrement, stocke les prix reçus puis planifie la récupération de l’historique disponible.',
+                doubleCountingWarning: 'Cette composante inclut déjà {{components}}. La facturer en plus d’un tarif séparé pour l’un de ces éléments facture deux fois le même montant.',
             },
             discovery: {
                 step: 'Étape {{current}} sur {{total}}', continue: 'Charger les prix disponibles', back: 'Retour',

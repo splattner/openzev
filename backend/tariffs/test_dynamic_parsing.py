@@ -174,6 +174,17 @@ class EmptyAndMalformedTests(SimpleTestCase):
         series = parse_versioned_response(payload, api_version="v2_0_0", tariff_type="grid")
         self.assertEqual(series.points[0].price_chf_per_kwh, Decimal("0.11300"))
 
+    def test_v2_units_that_cannot_be_billed_are_reported_rather_than_dropped_silently(self):
+        # The fixture's grid component carries energy (CHF/kWh, billable) and
+        # base (CHF/m, a monthly fee) side by side — the same "one component,
+        # several units" shape v1's own multi-unit fixture exercises. Silently
+        # reading only `energy` would under-bill the fee with no indication.
+        series = parse_versioned_response(fixture("vse_v2_grid"), api_version="v2_0_0", tariff_type="grid")
+
+        joined = " ".join(series.warnings)
+        self.assertIn("CHF/m", joined)
+        self.assertIn("fee", joined)
+
     def test_schema_version_1_is_detected(self):
         self.assertEqual(detect_api_version(fixture("vse_v1_multi_unit")), "v1_0_5")
 

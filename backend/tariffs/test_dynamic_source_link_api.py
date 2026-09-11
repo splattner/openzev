@@ -7,6 +7,8 @@ these confirm that holds, and that the model's own validation
 surfaces as an ordinary 400 through this API rather than a 500.
 """
 
+from datetime import date
+
 import pytest
 
 from accounts.models import UserRole
@@ -92,3 +94,109 @@ class TestPickingASourceThroughTheTariffApi:
         assert response.status_code == 200
         series = next(s for s in response.data if s["name"] == "Grid (dynamic)")
         assert str(series["versions"][0]["dynamic_source"]) == str(source.pk)
+
+
+class TestPreservingTheEvidenceLink:
+    """A tariff's ``dynamic_source`` link is the only thing that ties an
+    issued invoice back to the fetched prices behind it (invoice items store
+    rendered amounts, not a tariff FK). Deleting or repointing the link is a
+    second door into the same evidence the source-level clear/delete guards
+    protect, and it must be guarded the same way."""
+
+    def _billed_dynamic_tariff(self, owner):
+        zev = factories.ZevFactory(owner=owner)
+        source = make_source()
+        tariff = Tariff.objects.create(
+            zev=zev, name="Grid (dynamic)", category=TariffCategory.GRID_FEES,
+            billing_mode=BillingMode.ENERGY, energy_type=EnergyType.GRID,
+            valid_from="2026-01-01", dynamic_source=source,
+        )
+        factories.InvoiceFactory(zev=zev, period_start="2026-01-01", period_end="2026-01-31")
+        return zev, source, tariff
+
+    def test_deleting_a_billed_dynamic_tariff_is_refused(self, api_client):
+        owner = make_user("dyn_link_owner5", UserRole.ZEV_OWNER)
+        _zev, _source, tariff = self._billed_dynamic_tariff(owner)
+        authenticate(api_client, owner)
+
+        response = api_client.delete(f"/api/v1/tariffs/tariffs/{tariff.pk}/")
+
+        assert response.status_code == 400
+        assert Tariff.objects.filter(pk=tariff.pk).exists()
+
+    def test_repointing_a_billed_dynamic_tariff_is_refused(self, api_client):
+        owner = make_user("dyn_link_owner6", UserRole.ZEV_OWNER)
+        _zev, _source, tariff = self._billed_dynamic_tariff(owner)
+        other_source = make_source(
+            url="https://api.tariffs.groupe-e.ch/v2/tariffs", tariff_name="double",
+        )
+        authenticate(api_client, owner)
+
+        response = api_client.patch(
+            f"/api/v1/tariffs/tariffs/{tariff.pk}/",
+            {"dynamic_source": str(other_source.pk)}, format="json",
+        )
+
+        assert response.status_code == 400
+        assert "dynamic_source" in response.data
+        tariff.refresh_from_db()
+        assert tariff.dynamic_source_id != other_source.pk
+
+    def test_clearing_a_billed_dynamic_tariffs_source_is_refused(self, api_client):
+        # Unsetting it entirely (e.g. converting to a static tariff) loses
+        # the link exactly as much as repointing it does.
+        owner = make_user("dyn_link_owner7", UserRole.ZEV_OWNER)
+        _zev, _source, tariff = self._billed_dynamic_tariff(owner)
+        authenticate(api_client, owner)
+
+        response = api_client.patch(
+            f"/api/v1/tariffs/tariffs/{tariff.pk}/",
+            {"dynamic_source": None}, format="json",
+        )
+
+        assert response.status_code == 400
+        assert "dynamic_source" in response.data
+
+    def test_an_unbilled_dynamic_tariff_can_still_be_deleted_and_repointed(self, api_client):
+        # No invoice overlaps this one — nothing at risk, so both mutations
+        # that are refused above must stay ordinary here.
+        owner = make_user("dyn_link_owner8", UserRole.ZEV_OWNER)
+        zev = factories.ZevFactory(owner=owner)
+        source = make_source()
+        other_source = make_source(
+            url="https://api.tariffs.groupe-e.ch/v2/tariffs", tariff_name="double",
+        )
+        tariff = Tariff.objects.create(
+            zev=zev, name="Grid (dynamic, unbilled)", category=TariffCategory.GRID_FEES,
+            billing_mode=BillingMode.ENERGY, energy_type=EnergyType.GRID,
+            valid_from="2026-01-01", dynamic_source=source,
+        )
+        authenticate(api_client, owner)
+
+        response = api_client.patch(
+            f"/api/v1/tariffs/tariffs/{tariff.pk}/",
+            {"dynamic_source": str(other_source.pk)}, format="json",
+        )
+        assert response.status_code == 200, response.data
+
+        delete_response = api_client.delete(f"/api/v1/tariffs/tariffs/{tariff.pk}/")
+        assert delete_response.status_code == 204
+
+    def test_setting_a_dynamic_source_for_the_first_time_is_unaffected(self, api_client):
+        # There is no prior link to lose, billed or not.
+        owner = make_user("dyn_link_owner9", UserRole.ZEV_OWNER)
+        zev = factories.ZevFactory(owner=owner)
+        source = make_source()
+        tariff = factories.TariffFactory(
+            zev=zev, category=TariffCategory.GRID_FEES, billing_mode=BillingMode.ENERGY,
+            energy_type=EnergyType.GRID, valid_from=date(2026, 1, 1),
+        )
+        factories.InvoiceFactory(zev=zev, period_start="2026-01-01", period_end="2026-01-31")
+        authenticate(api_client, owner)
+
+        response = api_client.patch(
+            f"/api/v1/tariffs/tariffs/{tariff.pk}/",
+            {"dynamic_source": str(source.pk)}, format="json",
+        )
+
+        assert response.status_code == 200, response.data

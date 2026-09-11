@@ -76,15 +76,24 @@ def discover_endpoint(url: str, *, api_version: str | None = None) -> EndpointDi
 def probe_source_configuration(
     url: str,
     *,
-    api_version: str,
+    api_version: str | None = None,
     tariff_type: str,
     tariff_name: str = "",
 ) -> SourceCapabilities:
-    """Validate one choice and infer request behavior without VNB-specific code."""
+    """Validate one choice and infer request behavior without VNB-specific code.
+
+    ``api_version`` may be omitted: the endpoint's own response shape decides,
+    exactly as the manual two-step wizard already lets it. Passing a version
+    pins it — ``discover_endpoint`` still refuses when the endpoint actually
+    answers a different one, so a caller that already knows its version (the
+    VSE importer, which only ever names v1.0.5 tariff types) still gets a
+    clear error instead of a misread response.
+    """
 
     discovery = discover_endpoint(url, api_version=api_version)
+    resolved_version = discovery.api_version
     matching = [item for item in discovery.components if item.tariff_type == tariff_type]
-    if api_version == DynamicApiVersion.V2_0_0 and tariff_name:
+    if resolved_version == DynamicApiVersion.V2_0_0 and tariff_name:
         matching = [item for item in matching if item.tariff_name == tariff_name]
     if not matching:
         raise DynamicTariffResponseError(
@@ -107,8 +116,8 @@ def probe_source_configuration(
                 tariff_name=tariff_name,
             )
             payload, _digest = fetch_tariff_document(candidate_url)
-            _read_version(payload, api_version)
-            series = parse_tariff_response(payload, api_version=api_version, tariff_type=tariff_type)
+            _read_version(payload, resolved_version)
+            series = parse_tariff_response(payload, api_version=resolved_version, tariff_type=tariff_type)
         except (TariffFetchError, DynamicTariffResponseError):
             continue
         selected_payload = payload
@@ -121,13 +130,13 @@ def probe_source_configuration(
                 "The endpoint does not accept the selected product name."
             )
         payload, _digest = fetch_tariff_document(url)
-        series = parse_tariff_response(payload, api_version=api_version, tariff_type=tariff_type)
+        series = parse_tariff_response(payload, api_version=resolved_version, tariff_type=tariff_type)
         if not series.points:
             raise DynamicTariffResponseError(
                 "The exact endpoint URL returned no prices for the selected component."
             )
         return SourceCapabilities(
-            api_version=api_version,
+            api_version=resolved_version,
             request_mode=DynamicRequestMode.EXACT_URL,
             query_tariff_type="",
             supports_range=False,
@@ -147,9 +156,9 @@ def probe_source_configuration(
                 window=FetchWindow(sample.valid_from, sample.valid_to),
             )
             ranged_payload, _digest = fetch_tariff_document(ranged_url)
-            _read_version(ranged_payload, api_version)
+            _read_version(ranged_payload, resolved_version)
             ranged_series = parse_tariff_response(
-                ranged_payload, api_version=api_version, tariff_type=tariff_type
+                ranged_payload, api_version=resolved_version, tariff_type=tariff_type
             )
             # A server that silently ignores range parameters is not range
             # capable. Both VSE versions permit at most the immediately
@@ -162,7 +171,7 @@ def probe_source_configuration(
             pass
 
     return SourceCapabilities(
-        api_version=api_version,
+        api_version=resolved_version,
         request_mode=DynamicRequestMode.STANDARD,
         query_tariff_type=query_tariff_type,
         supports_range=supports_range,

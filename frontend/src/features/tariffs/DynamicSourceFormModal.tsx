@@ -15,6 +15,7 @@ import type {
   DynamicSourceDiscovery,
   DynamicTariffSource,
 } from '../../types/api'
+import { aggregatedTariffTypes } from './dynamicSources'
 
 type VersionChoice = 'auto' | DynamicApiVersion
 
@@ -73,9 +74,13 @@ export function DynamicSourceFormModal({ isOpen, onClose, onSaved, source }: Pro
     () => discovery?.components.find((component) => componentKey(component) === selection),
     [discovery, selection],
   )
+  const aggregatedTypes = useMemo(
+    () => (selected ? aggregatedTariffTypes(selected.tariff_type) : []),
+    [selected],
+  )
 
   const saveMutation = useMutation({
-    mutationFn: () => source
+    mutationFn: (): Promise<DynamicTariffSource & { warnings?: string[] }> => source
       ? updateDynamicTariffSource(source.id, { label })
       : createDynamicTariffSource({
           label,
@@ -87,6 +92,11 @@ export function DynamicSourceFormModal({ isOpen, onClose, onSaved, source }: Pro
     onSuccess: async (saved) => {
       await queryClient.invalidateQueries({ queryKey: queryKeys.tariffs.dynamicSources() })
       pushToast(t(source ? 'pages.dynamicSources.updated' : 'pages.dynamicSources.created'), 'success')
+      // Units the endpoint publishes but this source cannot bill — surfaced
+      // right when the source is configured, not only in the audit trail.
+      for (const warning of saved.warnings ?? []) {
+        pushToast(warning, 'info')
+      }
       onSaved?.(saved)
       onClose()
     },
@@ -186,6 +196,15 @@ export function DynamicSourceFormModal({ isOpen, onClose, onSaved, source }: Pro
                 <input value={tariffName} onChange={(event) => setTariffName(event.target.value)} />
                 <small className="muted">{t('pages.dynamicSources.form.v1TariffNameHint')}</small>
               </label>
+            )}
+            {aggregatedTypes.length > 0 && (
+              <div className="warning-banner" style={{ gridColumn: '1 / -1' }}>
+                {t('pages.dynamicSources.form.doubleCountingWarning', {
+                  components: aggregatedTypes
+                    .map((type) => t(`pages.dynamicSources.types.${type}` as Parameters<typeof t>[0]))
+                    .join(', '),
+                })}
+              </div>
             )}
             <div className="info-banner" style={{ gridColumn: '1 / -1' }}>
               {t('pages.dynamicSources.form.probeNotice')}

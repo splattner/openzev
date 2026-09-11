@@ -37,20 +37,64 @@ def _value(raw: object, *, label: str) -> Decimal:
         raise DynamicTariffResponseError(f"{label} is not a number: {raw!r}.") from exc
 
 
-def _energy_price(component: object, *, label: str) -> tuple[Decimal | None, list[str]]:
+def _component_units(component: object, *, label: str) -> tuple[Decimal | None, set[str]]:
+    """Pick the billable price out of one v2 tariff component, and report the rest.
+
+    A v2 ``TariffTypeItem`` can carry ``base``/``energy``/``power``/
+    ``reactive_energy`` at once — the same reason a v1 component is a *list*
+    of ``{unit, value}`` rather than one price: an operator's example pairs a
+    CHF/kWh energy price with a CHF/m base fee in the same interval. Only
+    ``energy`` priced in CHF/kWh is billable here; ``base``/``power``/
+    ``reactive_energy``, and an ``energy`` in any other unit, are collected
+    rather than silently dropped — mirroring v1's ``_billable_value``, which
+    exists for exactly this reason.
+    """
     if component is None:
-        return None, []
+        return None, set()
     if not isinstance(component, dict):
         raise DynamicTariffResponseError(f"{label} is not a version 2 tariff component.")
-    energy = component.get("energy")
-    if energy is None:
-        return None, []
-    if not isinstance(energy, dict):
-        raise DynamicTariffResponseError(f"{label}.energy is not a price.")
-    unit = str(energy.get("unit") or "").strip()
-    if unit != BILLABLE_UNIT:
-        return None, [unit] if unit else []
-    return _value(energy.get("value"), label=f"{label}.energy value"), []
+    price: Decimal | None = None
+    other_units: set[str] = set()
+    for key in ("base", "energy", "power", "reactive_energy"):
+        sub = component.get(key)
+        if sub is None:
+            continue
+        if not isinstance(sub, dict):
+            raise DynamicTariffResponseError(f"{label}.{key} is not a price.")
+        unit = str(sub.get("unit") or "").strip()
+        if key == "energy" and unit == BILLABLE_UNIT:
+            price = _value(sub.get("value"), label=f"{label}.energy value")
+        elif unit:
+            other_units.add(unit)
+    return price, other_units
+
+
+def _dropped_unit_warnings(tariff_type: str, units: set[str]) -> list[str]:
+    """Say which priced units were left behind, once per response.
+
+    Categorised the same way v1's ``_dropped_unit_warnings`` is, but kept
+    separate: v2's ``TariffUnit`` enum spells its units with slashes
+    (``CHF/kW/15min``) where v1 uses underscores (``CHF_kW_15min``), so the
+    two vocabularies cannot share one function.
+    """
+    warnings = []
+    demand = sorted(u for u in units if u.startswith("CHF/kW/"))
+    if demand:
+        warnings.append(
+            f"The {tariff_type} series also publishes a demand charge ({', '.join(demand)}) "
+            "which is not billed: OpenZEV does not meter demand."
+        )
+    if "CHF/kVarh" in units:
+        warnings.append(
+            f"The {tariff_type} series also publishes a reactive-energy charge (CHF/kVarh) which is not billed."
+        )
+    fixed = sorted(u for u in units if u != "CHF/kVarh" and not u.startswith("CHF/kW/"))
+    if fixed:
+        warnings.append(
+            f"The {tariff_type} series also publishes a fixed charge ({', '.join(fixed)}) which is not "
+            "billed here: add it as a monthly or yearly fee tariff, which does not need a time series."
+        )
+    return warnings
 
 
 def parse_tariff_response(payload: object, *, tariff_type: str) -> ParsedSeries:
@@ -63,7 +107,7 @@ def parse_tariff_response(payload: object, *, tariff_type: str) -> ParsedSeries:
         raise DynamicTariffResponseError("The response's 'prices' is not a list.")
 
     series = ParsedSeries(publication_timestamp=_publication_timestamp(payload.get("publication_timestamp")))
-    unsupported_units: set[str] = set()
+    dropped_units: set[str] = set()
     for index, raw in enumerate(raw_prices):
         if not isinstance(raw, dict):
             raise DynamicTariffResponseError(f"Price entry {index} is not an object.")
@@ -71,8 +115,8 @@ def parse_tariff_response(payload: object, *, tariff_type: str) -> ParsedSeries:
         valid_to = parse_timestamp(raw.get("end_timestamp"), label=f"Price entry {index} end_timestamp")
         if valid_to <= valid_from:
             raise DynamicTariffResponseError(f"Price entry {index} ends at or before it starts.")
-        price, units = _energy_price(raw.get(tariff_type), label=f"Price entry {index} {tariff_type}")
-        unsupported_units.update(units)
+        price, units = _component_units(raw.get(tariff_type), label=f"Price entry {index} {tariff_type}")
+        dropped_units.update(units)
         if price is not None:
             series.points.append(PricePoint(valid_from=valid_from, valid_to=valid_to, price_chf_per_kwh=price))
 
@@ -80,8 +124,5 @@ def parse_tariff_response(payload: object, *, tariff_type: str) -> ParsedSeries:
     for earlier, later in zip(series.points, series.points[1:]):
         if later.valid_from < earlier.valid_to:
             raise DynamicTariffResponseError("Two price intervals overlap; which price applies is undefined.")
-    if unsupported_units:
-        series.warnings.append(
-            f"The selected energy component uses unsupported unit(s): {', '.join(sorted(unsupported_units))}."
-        )
+    series.warnings.extend(_dropped_unit_warnings(tariff_type, dropped_units))
     return series

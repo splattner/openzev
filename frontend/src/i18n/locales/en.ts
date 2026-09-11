@@ -1389,6 +1389,9 @@ export const en = {
             fetchError: 'The price fetch could not be queued.',
             fetchNow: 'Fetch now',
             fetchBackfill: 'Fetch available history',
+            recheckAction: 'Re-check capabilities',
+            recheckSuccess: 'Capabilities re-checked.',
+            recheckError: 'Capabilities could not be re-checked.',
             cleared: '{{count}} fetched price points cleared.',
             clearError: 'Fetched prices could not be cleared.',
             clearAction: 'Clear fetched prices',
@@ -1420,6 +1423,7 @@ export const en = {
                 v1TariffNameHint: 'Optional. Version 1 responses do not publish a product catalogue, so enter a product name when the endpoint requires one.',
                 identityReplacement: 'The endpoint and selected series are immutable. Create a replacement source to change them.',
                 probeNotice: 'OpenZEV verifies this selection before saving it, stores the returned prices, then queues an available-history fetch.',
+                doubleCountingWarning: 'This component already includes {{components}}. Billing it alongside a separate tariff for one of those charges bills the same money twice.',
             },
             discovery: {
                 step: 'Step {{current}} of {{total}}', continue: 'Load available prices', back: 'Back',

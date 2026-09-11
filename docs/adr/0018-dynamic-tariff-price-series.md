@@ -49,10 +49,32 @@ to stay re-derivable for as long as the invoice exists, and nothing outside
 OpenZEV can supply those numbers again.
 
 An administrator may explicitly clear one source's points to recover from a
-wrong endpoint or product configuration, but only with typed confirmation and
-an audit reason, while no fetch is running, and only when no non-cancelled
-invoice overlaps a tariff linked to that source. Drafts count as invoice
-evidence because their stored totals would otherwise outlive their inputs.
+wrong endpoint or product configuration, or delete a source nothing links to
+any more, but only after typing the source's own label back — a free-text
+reason is recorded when one is sent, but is not demanded: a reason box in
+front of an irreversible action invites a keystroke rather than a thought,
+where the label has to be read off the row being destroyed. Both are refused
+while no fetch is running, and clearing is refused when no non-cancelled
+invoice overlaps a tariff linked to that source (deleting needs no separate
+check: `on_delete=PROTECT` already means nothing links to the source at that
+point). Drafts count as invoice evidence because their stored totals would
+otherwise outlive their inputs.
+
+The same evidence check also guards the *tariff* side of the link, not only
+the source side: invoice items store rendered amounts rather than a tariff
+FK, so a tariff's `dynamic_source` field is the only thing tying an issued
+invoice back to the prices that priced it. Deleting a billed dynamic tariff,
+or repointing/clearing its `dynamic_source`, would sever that link without
+touching a single `DynamicPricePoint` — the same evidence loss through a
+different door — so both are refused under the same overlap rule.
+
+`request_mode`/`query_tariff_type`/`supports_range` are discovered once, at
+creation, from a probe that can under-detect (a transient blip, or an
+endpoint with nothing published at that exact moment). Because identity
+fields are immutable afterwards, a wrongly-negative `supports_range` had no
+way back except deleting and recreating the source; an admin-only re-probe
+action corrects the discovered fields in place without touching identity or
+stored points.
 
 **2. Sources are shared globally, not scoped per ZEV.**
 

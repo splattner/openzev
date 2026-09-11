@@ -256,11 +256,23 @@ def _tariff_active_on(tariff: Tariff, day: date) -> bool:
 
 
 def _load_energy_tariffs(zev) -> list[Tariff]:
-    """Energy-mode and percentage tariffs with their price bands."""
+    """Energy-mode and percentage tariffs with their price bands.
+
+    A dynamic tariff is included regardless of ``category``: #530's own
+    mapping table files a dynamic *grid* series under ``grid_fees`` rather
+    than ``energy``, and the engine's ``TariffResolver`` prices it there too
+    — it buckets purely on ``billing_mode``/``energy_type`` with no category
+    filter (``engine.py`` builds it from every tariff of the ZEV). Excluding
+    those tariffs here would let readiness report "ok" for a period the
+    engine then refuses to generate, because a gap in a dynamic series is a
+    hard error (``DynamicPriceGapError``), not a silent zero. A static
+    tariff keeps the existing ``category=ENERGY`` restriction — that is a
+    separate, pre-existing limitation this fix does not touch.
+    """
     return list(
         Tariff.objects.filter(
+            Q(category=TariffCategory.ENERGY) | Q(dynamic_source_id__isnull=False),
             zev=zev,
-            category=TariffCategory.ENERGY,
             billing_mode__in=[BillingMode.ENERGY, BillingMode.PERCENTAGE_OF_ENERGY],
         ).prefetch_related("periods")
     )

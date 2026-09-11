@@ -22,7 +22,9 @@ from .dynamic.models import DynamicPricePoint, DynamicTariffSource
 from .dynamic.services import (
     clear_source_points,
     create_or_reuse_source,
+    recheck_source_capabilities,
     source_has_billing_evidence,
+    tariff_has_dynamic_billing_evidence,
     utc_day_window,
 )
 from .importers.remote import TariffFetchError
@@ -133,6 +135,23 @@ class TariffViewSet(AuditedUpdateMixin, ZevScopedQuerySetMixin, viewsets.ModelVi
         )
 
     def perform_destroy(self, instance):
+        # A dynamic tariff's link is the only thing that ties an issued
+        # invoice back to the fetched prices behind it (invoice items store
+        # rendered amounts, not a tariff FK). Deleting the tariff would
+        # sever that without deleting a single DynamicPricePoint — the same
+        # evidence the source-level clear/delete guards exist to protect,
+        # lost through a different door.
+        if instance.dynamic_source_id and tariff_has_dynamic_billing_evidence(
+            zev_id=instance.zev_id, valid_from=instance.valid_from,
+            valid_to=instance.valid_to, dynamic_source_id=instance.dynamic_source_id,
+        ):
+            raise DRFValidationError({
+                "detail": (
+                    "This tariff priced a non-cancelled invoice from its dynamic source. "
+                    "Deleting it would sever the only link back to the fetched prices "
+                    "behind that invoice."
+                )
+            })
         tariff_id = str(instance.pk)
         name = instance.name
         zev_id = str(instance.zev_id)
@@ -476,7 +495,7 @@ class DynamicTariffSourceViewSet(viewsets.ReadOnlyModelViewSet):
         serializer = DynamicTariffSourceWriteSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         try:
-            source, created = create_or_reuse_source(**serializer.validated_data)
+            source, created, warnings = create_or_reuse_source(**serializer.validated_data)
         except (TariffFetchError, DynamicTariffResponseError) as exc:
             raise DRFValidationError({"url": [str(exc)]}) from exc
 
@@ -492,11 +511,19 @@ class DynamicTariffSourceViewSet(viewsets.ReadOnlyModelViewSet):
                 metadata={
                     "api_version": source.api_version,
                     "tariff_type": source.tariff_type,
+                    "warnings": warnings,
                 },
             )
         source = self.get_queryset().get(pk=source.pk)
         return Response(
-            DynamicTariffSourceSerializer(source, context={"request": request}).data,
+            {
+                **DynamicTariffSourceSerializer(source, context={"request": request}).data,
+                # Units the endpoint publishes but this source cannot bill —
+                # a demand charge, a fixed fee riding beside the requested
+                # energy component. Empty when the source was reused rather
+                # than freshly probed.
+                "warnings": warnings,
+            },
             status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
         )
 
@@ -516,6 +543,52 @@ class DynamicTariffSourceViewSet(viewsets.ReadOnlyModelViewSet):
                 {"tariff_type": item.tariff_type, "tariff_name": item.tariff_name}
                 for item in result.components
             ],
+        })
+
+    @action(detail=True, methods=["post"], url_path="recheck")
+    def recheck(self, request, pk=None):
+        """Re-probe this source's own endpoint to correct discovered capabilities.
+
+        ``supports_range`` in particular can be under-detected at creation
+        time (see ``recheck_source_capabilities``), and identity fields
+        cannot be edited afterwards — so without this, a wrongly-negative
+        detection had no way back except deleting and recreating the source.
+        """
+        self._require_admin(request)
+        source = self.get_object()
+        before_supports_range = source.supports_range
+        with dynamic_source_lock(source.pk) as acquired:
+            if not acquired:
+                return Response(
+                    {"detail": "This source is currently being fetched. Try again shortly."},
+                    status=status.HTTP_409_CONFLICT,
+                )
+            try:
+                source, warnings = recheck_source_capabilities(source)
+            except (TariffFetchError, DynamicTariffResponseError) as exc:
+                raise DRFValidationError({"url": [str(exc)]}) from exc
+
+        _record_tariff_event(
+            request=request,
+            action_type="tariff.dynamic_source_recheck",
+            target_type="tariffs.DynamicTariffSource",
+            target=source,
+            target_id=str(source.pk),
+            target_display=source.label,
+            summary=(
+                f"Re-checked capabilities for {source.label}: "
+                f"supports_range {before_supports_range} → {source.supports_range}."
+            ),
+            metadata={
+                "request_mode": source.request_mode,
+                "supports_range": source.supports_range,
+                "warnings": warnings,
+            },
+        )
+        source = self.get_queryset().get(pk=source.pk)
+        return Response({
+            **DynamicTariffSourceSerializer(source, context={"request": request}).data,
+            "warnings": warnings,
         })
 
     def partial_update(self, request, *args, **kwargs):

@@ -84,8 +84,17 @@ export async function fetchDynamicTariffSources(): Promise<DynamicTariffSource[]
   return fetchAllPages<DynamicTariffSource>('/tariffs/dynamic-sources/')
 }
 
-export async function createDynamicTariffSource(payload: DynamicTariffSourceInput): Promise<DynamicTariffSource> {
-  const { data } = await api.post<DynamicTariffSource>('/tariffs/dynamic-sources/', payload)
+/**
+ * `warnings` names units the probed endpoint publishes but cannot bill (a
+ * demand charge, a fixed fee riding beside the requested energy component) —
+ * empty when an existing source was reused rather than freshly probed.
+ */
+export async function createDynamicTariffSource(
+  payload: DynamicTariffSourceInput,
+): Promise<DynamicTariffSource & { warnings: string[] }> {
+  const { data } = await api.post<DynamicTariffSource & { warnings: string[] }>(
+    '/tariffs/dynamic-sources/', payload,
+  )
   return data
 }
 
@@ -121,6 +130,22 @@ export async function fetchDynamicPriceHistory(
 
 export async function queueDynamicSourceFetch(id: string, backfill = false): Promise<DynamicSourceFetchResult> {
   const { data } = await api.post<DynamicSourceFetchResult>(`/tariffs/dynamic-sources/${id}/fetch/`, { backfill })
+  return data
+}
+
+/**
+ * Re-probe this source's own endpoint to correct discovered capabilities
+ * (notably `supports_backfill`) without touching its identity. The initial
+ * probe can under-detect range support on a transient blip; identity fields
+ * cannot be edited afterwards, so without this a wrongly-negative detection
+ * had no way back except deleting and recreating the source.
+ */
+export async function recheckDynamicTariffSource(
+  id: string,
+): Promise<DynamicTariffSource & { warnings: string[] }> {
+  const { data } = await api.post<DynamicTariffSource & { warnings: string[] }>(
+    `/tariffs/dynamic-sources/${id}/recheck/`,
+  )
   return data
 }
 

@@ -2,6 +2,7 @@ from rest_framework import serializers
 from django.core.exceptions import ValidationError as DjangoValidationError
 from .dynamic.adapters import DynamicApiVersion
 from .dynamic.models import DynamicTariffSource
+from .dynamic.services import tariff_has_dynamic_billing_evidence
 from .models import BillingMode, PeriodType, Tariff, TariffPeriod
 from .periods import months_of
 
@@ -64,6 +65,34 @@ class TariffSerializer(serializers.ModelSerializer):
         raise serializers.ValidationError(exc.messages)
 
     def validate(self, attrs):
+        # A dynamic tariff's link is the only thing that ties an issued
+        # invoice back to the fetched prices behind it (invoice items store
+        # rendered amounts, not a tariff FK). Repointing or clearing
+        # ``dynamic_source`` on a tariff that already priced one would sever
+        # that link without deleting a single DynamicPricePoint — the same
+        # evidence the source-level clear/delete guards protect, lost
+        # through a different door. Setting it for the *first* time is fine:
+        # there was no evidence relationship to lose.
+        if self.instance is not None and "dynamic_source" in attrs:
+            new_source = attrs["dynamic_source"]
+            new_source_id = new_source.pk if new_source is not None else None
+            if (
+                self.instance.dynamic_source_id
+                and new_source_id != self.instance.dynamic_source_id
+                and tariff_has_dynamic_billing_evidence(
+                    zev_id=self.instance.zev_id, valid_from=self.instance.valid_from,
+                    valid_to=self.instance.valid_to,
+                    dynamic_source_id=self.instance.dynamic_source_id,
+                )
+            ):
+                raise serializers.ValidationError({
+                    "dynamic_source": (
+                        "This tariff priced a non-cancelled invoice from its current "
+                        "dynamic source. Repointing or clearing it would sever the only "
+                        "link back to the fetched prices behind that invoice."
+                    )
+                })
+
         billing_mode = attrs.get("billing_mode") or getattr(self.instance, "billing_mode", BillingMode.ENERGY)
         energy_type = attrs.get("energy_type") if "energy_type" in attrs else getattr(self.instance, "energy_type", None)
         fixed_price_chf = attrs.get("fixed_price_chf") if "fixed_price_chf" in attrs else getattr(self.instance, "fixed_price_chf", None)
@@ -223,6 +252,12 @@ class VseTariffImportCreatedSerializer(serializers.Serializer):
     valid_to = serializers.DateField(allow_null=True)
     #: Whether this tariff was linked to a dynamic price source.
     dynamic = serializers.BooleanField()
+    #: Units a newly probed dynamic source publishes but cannot bill (a
+    #: demand charge, a fixed fee beside the requested energy component).
+    #: Empty when not dynamic, or when the source was reused unprobed.
+    dynamic_source_warnings = serializers.ListField(
+        child=serializers.CharField(), required=False, default=list
+    )
 
 
 class VseTariffImportSkippedSerializer(serializers.Serializer):
