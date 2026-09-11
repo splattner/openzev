@@ -1,4 +1,5 @@
-import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { fetchMe, impersonateParticipant as impersonateParticipantRequest, login as loginRequest, logout as logoutRequest, stopImpersonation as stopImpersonationRequest, updateProfile } from './api/auth'
 import type { User } from '../types/api'
 
@@ -22,6 +23,7 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined)
 export function AuthProvider({ children }: { children: ReactNode }) {
     const [user, setUser] = useState<User | null>(null)
     const [isLoading, setIsLoading] = useState(true)
+    const queryClient = useQueryClient()
 
     // Serializes preference saves per user: each PATCH waits for the previous
     // one, and only the latest save for the current user merges its response.
@@ -37,6 +39,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     function invalidatePrefSaves() {
         prefSaveRef.current = { userId: null, seq: 0, tail: Promise.resolve() }
     }
+
+    // Most query keys (invoices, metering data, ...) aren't partitioned by
+    // user identity, so a response still in flight for the outgoing account
+    // can otherwise land in the cache the incoming one reads from (#573).
+    // Cancelling first makes react-query discard that late resolution
+    // instead of it repopulating the cache clear() just emptied. Call at
+    // every session boundary: login, logout, and each impersonation edge.
+    const resetQueryCache = useCallback(async () => {
+        await queryClient.cancelQueries()
+        queryClient.clear()
+    }, [queryClient])
 
     async function loadCurrentUser() {
         const me = await fetchMe()
@@ -61,6 +74,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             impersonator: user?.impersonated_by ?? null,
             async login(email: string, password: string) {
                 invalidatePrefSaves()
+                await resetQueryCache()
                 await loginRequest(email, password)
                 return loadCurrentUser()
             },
@@ -101,21 +115,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                     throw new Error('Only admins can impersonate participants.')
                 }
                 invalidatePrefSaves()
+                await resetQueryCache()
                 await impersonateParticipantRequest(participantUserId)
                 await loadCurrentUser()
             },
             async stopImpersonation() {
                 invalidatePrefSaves()
+                await resetQueryCache()
                 await stopImpersonationRequest()
                 await loadCurrentUser()
             },
             logout() {
                 invalidatePrefSaves()
-                void logoutRequest().catch(() => undefined)
                 setUser(null)
+                void resetQueryCache()
+                void logoutRequest().catch(() => undefined)
             },
         }),
-        [isLoading, user],
+        [isLoading, resetQueryCache, user],
     )
 
     return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

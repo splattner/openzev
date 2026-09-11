@@ -444,6 +444,33 @@ impersonate an admin returns 400.
 
 **Stop impersonation:** restore `ADMIN_*` cookies to main pair, clear backup cookies, re-fetch `/auth/me/`.
 
+### 5.7a Frontend query cache lifecycle
+
+Most TanStack Query keys (invoices, metering data, dashboard summaries, ...)
+are not partitioned by user identity — see `queryKeys.ts`. Without an
+explicit reset, a response still in flight for the outgoing account could
+resolve after the switch and land in the cache the incoming account reads
+from, or a component still mounted through the transition could go on
+showing the previous account's cached data (openzev#573).
+
+`AuthProvider` closes that gap with a single `resetQueryCache()` helper,
+called at every point the authenticated identity changes — `login`,
+`logout`, `startImpersonation`, and `stopImpersonation` (the same four
+boundaries `invalidatePrefSaves()` already guards, see 9.4):
+
+1. `await queryClient.cancelQueries()` — marks every in-flight query
+   cancelled, so a response that resolves after this point is discarded by
+   react-query instead of being written into the cache.
+2. `queryClient.clear()` — drops every cached query result and mutation
+   state, so nothing from the outgoing identity survives for a component
+   that stays mounted across the transition to read.
+
+`login` and the impersonation transitions await this before issuing their
+network request, so the cache is empty before the new identity's data can
+start loading. `logout` clears synchronously alongside `setUser(null)` and
+fires the reset without awaiting it, matching its existing fire-and-forget
+`logoutRequest()` call.
+
 ### 5.8 Forced password change redirect
 
 `ProtectedRoute` checks: if `user.must_change_password` is true and the user is
@@ -1121,7 +1148,11 @@ lists the test classes per module (test counts are the `test_*` methods).
   (no cross-account leakage). `frontend/tests/auth-preferred-zev.test.ts`
   (3 tests) — serialized `updatePreferredZev` saves (latest wins), logout
   invalidation of late responses, and cancellation of queued dispatches
-  across session transitions.
+  across session transitions. `frontend/tests/auth-preferred-zev.test.ts`'s
+  second suite (5 tests) — the §5.7a query cache reset on login, logout, and
+  each impersonation edge, plus a delayed-response race: a query already in
+  flight for the outgoing account must not repopulate the cache after the
+  switch.
 
 ---
 
@@ -1133,6 +1164,7 @@ lists the test classes per module (test counts are the `test_*` methods).
 | UI-only enforcement drift | High | Backend always enforces permissions; frontend guards are UX convenience only (ADR 0003) |
 | Assignment validity edge cases | Medium | Date-boundary tests; serializer + model double validation; ADR 0001 rules |
 | Impersonation abuse | High | Admin-only guard; cannot impersonate other admins; impersonation state tracked in JWT claims and `ADMIN_*` backup cookies |
+| Query cache leaking one account's data to the next in the same tab | High | §5.7a `resetQueryCache()` cancels in-flight queries and clears the cache at every login/logout/impersonation boundary (openzev#573) |
 | Self-registration spam | Medium | Email verification required; unusable password until verified |
 | Linked account deletion | Medium | Delete blocked if `participations.exists()`; `SET_NULL` FK prevents cascade |
 

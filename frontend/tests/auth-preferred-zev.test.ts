@@ -1,21 +1,25 @@
 import { createRoot } from 'react-dom/client'
 import { act, createElement, useEffect } from 'react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { AuthProvider, useAuth } from '../src/lib/auth'
 import type { User } from '../src/types/api'
 
 const apiAuth = vi.hoisted(() => ({
     fetchMe: vi.fn(),
+    impersonateParticipant: vi.fn(),
+    login: vi.fn(),
     logout: vi.fn(),
+    stopImpersonation: vi.fn(),
     updateProfile: vi.fn(),
 }))
 
 vi.mock('../src/lib/api/auth', () => ({
     fetchMe: apiAuth.fetchMe,
-    impersonateParticipant: vi.fn(),
-    login: vi.fn(),
+    impersonateParticipant: apiAuth.impersonateParticipant,
+    login: apiAuth.login,
     logout: apiAuth.logout,
-    stopImpersonation: vi.fn(),
+    stopImpersonation: apiAuth.stopImpersonation,
     updateProfile: apiAuth.updateProfile,
 }))
 
@@ -30,16 +34,33 @@ const baseUser = (preferredZev: string | null): User => ({
     preferred_zev: preferredZev,
 })
 
+const adminUser: User = {
+    id: 9,
+    username: 'admin1',
+    email: 'admin1@example.com',
+    first_name: 'Admin',
+    last_name: 'One',
+    role: 'admin',
+    must_change_password: false,
+    preferred_zev: null,
+}
+
 describe('AuthProvider.updatePreferredZev serialization', () => {
     let container: HTMLDivElement
     let root: ReturnType<typeof createRoot>
 
     beforeEach(() => {
         apiAuth.fetchMe.mockReset()
+        apiAuth.impersonateParticipant.mockReset()
+        apiAuth.login.mockReset()
         apiAuth.logout.mockReset()
+        apiAuth.stopImpersonation.mockReset()
         apiAuth.updateProfile.mockReset()
         apiAuth.fetchMe.mockResolvedValue(baseUser(null))
+        apiAuth.impersonateParticipant.mockResolvedValue(undefined)
+        apiAuth.login.mockResolvedValue(undefined)
         apiAuth.logout.mockResolvedValue(undefined)
+        apiAuth.stopImpersonation.mockResolvedValue(undefined)
         container = document.createElement('div')
         document.body.appendChild(container)
         root = createRoot(container)
@@ -52,7 +73,10 @@ describe('AuthProvider.updatePreferredZev serialization', () => {
         container.remove()
     })
 
-    function renderProvider() {
+    // AuthProvider clears the surrounding QueryClient's cache at session
+    // boundaries (see #573), so tests need a real client to assert against
+    // rather than the mocked-away `useAuth` returned by other suites.
+    function renderProvider(queryClient = new QueryClient()) {
         const latest = { current: null as ReturnType<typeof useAuth> | null }
 
         function Harness() {
@@ -64,7 +88,13 @@ describe('AuthProvider.updatePreferredZev serialization', () => {
         }
 
         act(() => {
-            root.render(createElement(AuthProvider, null, createElement(Harness)))
+            root.render(
+                createElement(
+                    QueryClientProvider,
+                    { client: queryClient },
+                    createElement(AuthProvider, null, createElement(Harness)),
+                ),
+            )
         })
 
         return latest
@@ -184,5 +214,153 @@ describe('AuthProvider.updatePreferredZev serialization', () => {
         // The queued save must never dispatch under the next session's cookies.
         expect(apiAuth.updateProfile).toHaveBeenCalledTimes(1)
         expect(latest.current?.user).toBeNull()
+    })
+})
+
+// Query keys such as ['invoices', 'list', 'all', 'all'] are not partitioned
+// by user identity (see queryKeys.ts), so the cache itself is the boundary
+// that must turn over at login, logout and each impersonation edge —
+// otherwise one account's cached invoices or metering data can render for
+// the next (#573).
+describe('AuthProvider clears the query cache at session boundaries', () => {
+    let container: HTMLDivElement
+    let root: ReturnType<typeof createRoot>
+    let queryClient: QueryClient
+
+    beforeEach(() => {
+        apiAuth.fetchMe.mockReset()
+        apiAuth.impersonateParticipant.mockReset()
+        apiAuth.login.mockReset()
+        apiAuth.logout.mockReset()
+        apiAuth.stopImpersonation.mockReset()
+        apiAuth.fetchMe.mockResolvedValue(baseUser(null))
+        apiAuth.impersonateParticipant.mockResolvedValue(undefined)
+        apiAuth.login.mockResolvedValue(undefined)
+        apiAuth.logout.mockResolvedValue(undefined)
+        apiAuth.stopImpersonation.mockResolvedValue(undefined)
+        queryClient = new QueryClient()
+        container = document.createElement('div')
+        document.body.appendChild(container)
+        root = createRoot(container)
+    })
+
+    afterEach(() => {
+        act(() => {
+            root.unmount()
+        })
+        container.remove()
+    })
+
+    function renderProvider() {
+        const latest = { current: null as ReturnType<typeof useAuth> | null }
+
+        function Harness() {
+            const context = useAuth()
+            useEffect(() => {
+                latest.current = context
+            }, [context])
+            return null
+        }
+
+        act(() => {
+            root.render(
+                createElement(
+                    QueryClientProvider,
+                    { client: queryClient },
+                    createElement(AuthProvider, null, createElement(Harness)),
+                ),
+            )
+        })
+
+        return latest
+    }
+
+    async function flush() {
+        await act(async () => {
+            await new Promise((resolve) => setTimeout(resolve, 0))
+            await new Promise((resolve) => setTimeout(resolve, 0))
+        })
+    }
+
+    it('drops cached data on logout', async () => {
+        const latest = renderProvider()
+        await flush()
+        queryClient.setQueryData(['invoices', 'list', 'all', 'all'], [{ id: 'inv-a' }])
+
+        act(() => {
+            latest.current!.logout()
+        })
+        await flush()
+
+        expect(queryClient.getQueryData(['invoices', 'list', 'all', 'all'])).toBeUndefined()
+    })
+
+    it('drops the previous session\'s cache before a new login resolves', async () => {
+        const latest = renderProvider()
+        await flush()
+        queryClient.setQueryData(['invoices', 'list', 'all', 'all'], [{ id: 'inv-a' }])
+
+        await act(async () => {
+            await latest.current!.login('owner2@example.com', 'pw')
+        })
+
+        expect(queryClient.getQueryData(['invoices', 'list', 'all', 'all'])).toBeUndefined()
+    })
+
+    it('drops the admin\'s cache when impersonation starts', async () => {
+        apiAuth.fetchMe.mockResolvedValue(adminUser)
+        const latest = renderProvider()
+        await flush()
+        expect(latest.current?.user?.role).toBe('admin')
+        queryClient.setQueryData(['invoices', 'list', 'all', 'all'], [{ id: 'admin-inv' }])
+
+        await act(async () => {
+            await latest.current!.startImpersonation(42)
+        })
+
+        expect(queryClient.getQueryData(['invoices', 'list', 'all', 'all'])).toBeUndefined()
+    })
+
+    it('drops the impersonated participant\'s cache when impersonation stops', async () => {
+        const latest = renderProvider()
+        await flush()
+        queryClient.setQueryData(['invoices', 'list', 'all', 'all'], [{ id: 'participant-inv' }])
+
+        await act(async () => {
+            await latest.current!.stopImpersonation()
+        })
+
+        expect(queryClient.getQueryData(['invoices', 'list', 'all', 'all'])).toBeUndefined()
+    })
+
+    it('cancels an in-flight request so its late response cannot repopulate the cache for the next account', async () => {
+        const latest = renderProvider()
+        await flush()
+
+        // Participant A's dashboard is mid-fetch when the account switches —
+        // this reproduces the issue's "delayed request" scenario.
+        let resolveInvoices!: (value: unknown) => void
+        const pending = queryClient.fetchQuery({
+            queryKey: ['invoices', 'list', 'all', 'all'],
+            queryFn: () => new Promise((resolve) => { resolveInvoices = resolve }),
+        })
+        // Attach a handler in this tick — cancelQueries() rejects it inside
+        // logout()'s own async work below, and Node flags a rejection as
+        // unhandled unless a .catch already exists by the time that happens.
+        const settled = pending.catch(() => undefined)
+
+        act(() => {
+            latest.current!.logout()
+        })
+        await flush()
+
+        // Participant A's response finally arrives after the switch.
+        await act(async () => {
+            resolveInvoices([{ id: 'stale-for-a' }])
+            await settled
+            await new Promise((resolve) => setTimeout(resolve, 0))
+        })
+
+        expect(queryClient.getQueryData(['invoices', 'list', 'all', 'all'])).toBeUndefined()
     })
 })
