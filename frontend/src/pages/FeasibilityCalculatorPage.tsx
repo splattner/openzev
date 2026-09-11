@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useMutation } from '@tanstack/react-query'
+import { useMutation, useQuery } from '@tanstack/react-query'
 import { useEffect } from 'react'
 import { useForm, useWatch } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
@@ -23,13 +23,54 @@ import {
     type FeasibilityFormValues,
     type InternalEnergyPriceMode,
 } from '../features/feasibility/useFeasibilityForm'
-import { calculateFeasibility } from '../lib/api/feasibility'
+import { calculateFeasibility, fetchFeasibilityCalculatorEnabled } from '../lib/api/feasibility'
 import { formatApiError } from '../lib/api/errors'
 import { formatChf, formatKwh } from '../lib/numbers'
+import { queryKeys } from '../lib/api/queryKeys'
 
 const DEBOUNCE_MS = 400
 
+/**
+ * Gates the calculator behind `FeatureFlag.FEASIBILITY_CALCULATOR_ENABLED`.
+ * Split from the calculator itself (`FeasibilityCalculator` below) rather
+ * than an early `return` inside one component: the calculator mounts several
+ * hooks (`useForm`, `useMutation`, the debounce `useEffect`) that must not
+ * run — and, worse, must not submit a request with default values — before
+ * the flag is known to be on. A conditional early return before those hooks
+ * would violate the rules of hooks the moment the query resolves; a
+ * separate child component sidesteps that by mounting cleanly instead.
+ *
+ * Fails closed: loading, disabled, and error all render the same "not
+ * available" state, matching the flag's off-by-default stance rather than
+ * assuming enabled when the check itself couldn't be confirmed.
+ */
 export function FeasibilityCalculatorPage() {
+    const { t } = useTranslation()
+    const enabledQuery = useQuery({
+        queryKey: queryKeys.feasibility.enabled(),
+        queryFn: fetchFeasibilityCalculatorEnabled,
+    })
+
+    if (enabledQuery.data !== true) {
+        return (
+            <div className="page-stack">
+                <header>
+                    <p className="eyebrow">{t('pages.feasibility.eyebrow')}</p>
+                    <h2>{t('pages.feasibility.title')}</h2>
+                </header>
+                <div className="card">
+                    <p className="muted">
+                        {enabledQuery.isLoading ? t('common.loading') : t('pages.feasibility.disabled')}
+                    </p>
+                </div>
+            </div>
+        )
+    }
+
+    return <FeasibilityCalculator />
+}
+
+function FeasibilityCalculator() {
     const { t } = useTranslation()
     const form = useForm<FeasibilityFormValues>({
         resolver: zodResolver(feasibilityFormSchema),

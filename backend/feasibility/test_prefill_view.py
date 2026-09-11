@@ -4,12 +4,22 @@ from decimal import Decimal
 import pytest
 from rest_framework.test import APIClient
 
+from accounts.models import FeatureFlag
 from tariffs.models import EnergyType, TariffCategory
 from testing import factories
 from testing.helpers import authenticate
 from zev.models import MeteringPointType
 
 pytestmark = pytest.mark.django_db
+
+
+@pytest.fixture(autouse=True)
+def _feasibility_calculator_enabled():
+    """See the identical fixture in ``test_views.py``: this module tests
+    prefill *behaviour*, not the feature gate, and the gate defaults off."""
+    FeatureFlag.objects.update_or_create(
+        name=FeatureFlag.FEASIBILITY_CALCULATOR_ENABLED, defaults={"enabled": True}
+    )
 
 
 def _url(zev_id) -> str:
@@ -68,3 +78,18 @@ class TestFeasibilityPrefillHappyPath:
         assert body["feed_in_price_chf_per_kwh"] is None
         # No readings in this ZEV yet -> self-consumption rate cannot be measured.
         assert body["self_consumption_rate"] is None
+
+
+class TestFeasibilityPrefillGate:
+    def test_blocked_when_the_calculator_is_disabled(self, owner_client, zev):
+        FeatureFlag.objects.filter(name=FeatureFlag.FEASIBILITY_CALCULATOR_ENABLED).update(enabled=False)
+        response = owner_client.get(_url(zev.id))
+        assert response.status_code == 403
+
+    def test_disabled_check_runs_before_the_zev_lookup(self, owner_client):
+        # A disabled calculator must not distinguish an accessible ZEV from a
+        # nonexistent one — both are 403, not a 403/404 split that would leak
+        # which ids exist to a caller who cannot use the feature at all.
+        FeatureFlag.objects.filter(name=FeatureFlag.FEASIBILITY_CALCULATOR_ENABLED).update(enabled=False)
+        response = owner_client.get(_url("00000000-0000-0000-0000-000000000000"))
+        assert response.status_code == 403

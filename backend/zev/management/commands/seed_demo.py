@@ -18,7 +18,7 @@ from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 from django.db.models import Sum
 
-from accounts.models import VatRate
+from accounts.models import FeatureFlag, VatRate
 from allocation.validity import active_during
 from audit.models import AuditActionCategory, AuditEvent, AuditEventStatus
 from audit.services import record_audit_event
@@ -687,6 +687,10 @@ class Command(BaseCommand):
                 f"{second.closed_end}: participants begin on {start_date}, after "
                 "that month ended."
             )
+
+        self._enable_demo_feature_flags()
+        summary.append("Feature flags: feasibility calculator enabled for this demo.")
+
         self.stdout.write(self.style.SUCCESS("\n".join(summary)))
 
     def _upsert_zev(
@@ -1686,6 +1690,22 @@ class Command(BaseCommand):
         ):
             if not active_during(VatRate.objects.all(), valid_from, valid_to or date.max).exists():
                 VatRate.objects.create(rate=rate, valid_from=valid_from, valid_to=valid_to)
+
+    def _enable_demo_feature_flags(self) -> None:
+        """Turn on features that ship off by default, so a fresh demo is
+        immediately playable rather than looking half-finished.
+
+        Off by default in production because the feature is new or
+        experimental, not because the demo shouldn't showcase it — the
+        opposite of a real deployment's stance, so this is flipped
+        explicitly rather than inherited from ``FeatureFlag.DEFAULTS``.
+        Unconditional, unlike ``_upsert_vat_rates``: an admin manually
+        disabling it during a previous demo session should not survive a
+        re-seed, since the whole point of ``seed_demo`` is a known-good,
+        immediately-playable state.
+        """
+        FeatureFlag.sync_defaults()
+        FeatureFlag.objects.filter(name=FeatureFlag.FEASIBILITY_CALCULATOR_ENABLED).update(enabled=True)
 
     def _seed_history_readings(
         self,

@@ -234,6 +234,7 @@ class FeatureFlag(models.Model):
     """Persistent feature flag with code default and env-var override."""
 
     ZEV_SELF_REGISTRATION_ENABLED = "zev_self_registration_enabled"
+    FEASIBILITY_CALCULATOR_ENABLED = "feasibility_calculator_enabled"
 
     name = models.CharField(max_length=100, unique=True)
     description = models.CharField(max_length=255, blank=True, default="")
@@ -418,4 +419,9 @@ FeatureFlag.register(
     FeatureFlag.ZEV_SELF_REGISTRATION_ENABLED,
     default=True,
     description="Allow ZEV owner self-registration from the login page.",
+)
+FeatureFlag.register(
+    FeatureFlag.FEASIBILITY_CALCULATOR_ENABLED,
+    default=False,
+    description="Show the feasibility calculator in navigation and allow its API to be used.",
 )

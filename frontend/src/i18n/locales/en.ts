@@ -729,6 +729,7 @@ export const en = {
             eyebrow: 'Planning tool',
             title: 'vZEV Feasibility Calculator',
             description: 'Estimate whether forming a vZEV is worth it, before any metering data exists — compared against selling all local production at the feed-in tariff.',
+            disabled: 'The feasibility calculator is not enabled on this instance. An administrator can turn it on under System Settings → Feature Flags.',
             form: {
                 systemTitle: 'System & energy',
                 energyInputModeAggregate: 'Aggregate',

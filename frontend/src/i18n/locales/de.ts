@@ -720,6 +720,7 @@ export const de = {
             eyebrow: 'Planungstool',
             title: 'vZEV-Wirtschaftlichkeitsrechner',
             description: 'Schätzen Sie ab, ob sich die Gründung eines vZEV lohnt — noch bevor Messdaten vorliegen, im Vergleich zur vollständigen Einspeisung ins Netz.',
+            disabled: 'Der Wirtschaftlichkeitsrechner ist auf dieser Instanz nicht aktiviert. Ein Administrator kann ihn unter Systemeinstellungen → Feature-Flags einschalten.',
             form: {
                 systemTitle: 'Anlage & Energie',
                 energyInputModeAggregate: 'Gesamt',

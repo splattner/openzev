@@ -10,7 +10,7 @@ from django.core.exceptions import ValidationError
 from django.test import override_settings
 from rest_framework.test import APIClient
 
-from accounts.models import UserRole, VatRate
+from accounts.models import FeatureFlag, UserRole, VatRate
 from audit.models import AuditActionCategory, AuditEvent
 from audit.services import record_audit_event
 from zev.management.commands.seed_demo import (
@@ -1274,6 +1274,40 @@ class SeedDemoVatRateTests(TestCase):
 		self.assertFalse(VatRate.objects.filter(valid_from=date(2024, 1, 1)).exists())
 
 
+class SeedDemoFeatureFlagTests(TestCase):
+	"""The demo enables features that ship off by default (see #691's
+	successor issue), so a fresh install is immediately playable instead of
+	looking like the feature doesn't exist. Unlike VatRate, this is not
+	"install if missing" — an admin who turned it off during a previous demo
+	session should have it turned back on by the next re-seed."""
+
+	def setUp(self):
+		self.command = SeedDemoCommand()
+
+	def test_enables_the_feasibility_calculator_flag(self):
+		self.command._enable_demo_feature_flags()
+		flag = FeatureFlag.objects.get(name=FeatureFlag.FEASIBILITY_CALCULATOR_ENABLED)
+		self.assertTrue(flag.enabled)
+
+	def test_re_enables_a_flag_an_admin_turned_off(self):
+		self.command._enable_demo_feature_flags()
+		flag = FeatureFlag.objects.get(name=FeatureFlag.FEASIBILITY_CALCULATOR_ENABLED)
+		flag.enabled = False
+		flag.save(update_fields=["enabled"])
+
+		self.command._enable_demo_feature_flags()
+
+		flag.refresh_from_db()
+		self.assertTrue(flag.enabled)
+
+	def test_is_idempotent(self):
+		self.command._enable_demo_feature_flags()
+		self.command._enable_demo_feature_flags()
+		self.assertEqual(
+			FeatureFlag.objects.filter(name=FeatureFlag.FEASIBILITY_CALCULATOR_ENABLED).count(), 1
+		)
+
+
 class SeedDemoCounterRefreshTests(TestCase):
 	"""Re-seeding must pull leftover rows back onto the canonical config —
 	including the invoice counter, which would otherwise climb (and skip
@@ -2293,6 +2327,7 @@ class SeedDemoEndToEndTests(TestCase):
 		self._run()
 		flagship = Zev.objects.get(name=DEMO_ZEV_NAME)
 		self.assertEqual(Zev.objects.count(), 2)
+		self.assertTrue(FeatureFlag.is_enabled(FeatureFlag.FEASIBILITY_CALCULATOR_ENABLED))
 		# The settled previous year feeds the reports page, which defaults to
 		# the prior calendar year and reads paid invoices only.
 		self.assertTrue(

@@ -5,6 +5,7 @@ import { act } from 'react'
 import { MemoryRouter } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Layout } from '../src/components/Layout'
+import { fetchFeasibilityCalculatorEnabled } from '../src/lib/api/feasibility'
 import type { UserRole } from '../src/types/api'
 
 vi.mock('react-i18next', () => ({
@@ -27,6 +28,15 @@ vi.mock('../src/lib/managedZev', () => ({
 
 vi.mock('../src/lib/api/auth', () => ({
     fetchUsers: vi.fn(() => Promise.resolve([])),
+}))
+
+// Feasibility nav link visibility is gated by this flag (default off) —
+// on here so the existing "admin/owner sees the link" assertions still
+// exercise the rest of the nav rather than this one gate. The gate itself
+// is covered by tests/feasibility-enabled.test.ts and the backend's
+// TestFeasibilityCalculatorGate.
+vi.mock('../src/lib/api/feasibility', () => ({
+    fetchFeasibilityCalculatorEnabled: vi.fn(() => Promise.resolve(true)),
 }))
 
 vi.mock('../src/lib/toast', () => ({
@@ -168,6 +178,19 @@ describe('phase-3 hub nav (see docs/specs/2026-03-community-and-access.md §9.3)
         expect(page.html()).toContain('nav.setupGroup')
         expect(page.html()).toContain('nav.platformGroup')
         expect(page.html()).toContain('sidebar-zev-menu')
+        page.unmount()
+    })
+
+    it('hides the Feasibility link when the feature flag is off', async () => {
+        vi.mocked(fetchFeasibilityCalculatorEnabled).mockResolvedValueOnce(false)
+        mockSession('admin')
+        const page = await renderLayout()
+
+        expect(page.hasHref('/feasibility')).toBe(false)
+        // Nothing else about the nav is affected — off by default is a
+        // narrow gate on this one link, not a broader admin capability.
+        expect(page.hasHref('/zev-settings')).toBe(true)
+        expect(page.hasHref('/admin')).toBe(true)
         page.unmount()
     })
 

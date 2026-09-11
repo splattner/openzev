@@ -720,6 +720,7 @@ export const it = {
             eyebrow: 'Strumento di pianificazione',
             title: 'Calcolatore di fattibilità CEL',
             description: 'Stima se la costituzione di un CEL ne vale la pena, ancora prima di disporre di dati di misurazione — confrontato con l’immissione totale in rete.',
+            disabled: 'Il calcolatore di fattibilità non è attivo su questa istanza. Un amministratore può attivarlo in Impostazioni di sistema → Feature Flag.',
             form: {
                 systemTitle: 'Impianto & energia',
                 energyInputModeAggregate: 'Aggregato',

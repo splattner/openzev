@@ -1,9 +1,25 @@
 """API-level tests for the stateless feasibility calculator endpoint."""
 import pytest
 
+from accounts.models import FeatureFlag
+
 pytestmark = pytest.mark.django_db
 
 URL = "/api/v1/feasibility/calculate/"
+ENABLED_URL = "/api/v1/feasibility/enabled/"
+
+
+@pytest.fixture(autouse=True)
+def _feasibility_calculator_enabled():
+    """This module tests calculator *behaviour*, not the feature gate — and
+    the gate defaults off (``FeatureFlag.FEASIBILITY_CALCULATOR_ENABLED``),
+    so every test here needs it on to reach that behaviour at all.
+    ``TestFeasibilityCalculatorGate`` below turns it off explicitly to cover
+    the gate itself.
+    """
+    FeatureFlag.objects.update_or_create(
+        name=FeatureFlag.FEASIBILITY_CALCULATOR_ENABLED, defaults={"enabled": True}
+    )
 
 TYPICAL_PAYLOAD = {
     "annual_production_kwh": "10000",
@@ -135,3 +151,57 @@ class TestFeasibilityCalculateValidation:
         response = owner_client.post(URL, payload, format="json")
         assert response.status_code == 400
         assert "horizon_years" in response.json()
+
+
+def _disable_feasibility_calculator():
+    FeatureFlag.objects.update_or_create(
+        name=FeatureFlag.FEASIBILITY_CALCULATOR_ENABLED, defaults={"enabled": False}
+    )
+
+
+class TestFeasibilityCalculatorGate:
+    """``FeatureFlag.FEASIBILITY_CALCULATOR_ENABLED`` gates the API itself, not
+    just whether the frontend shows a nav link to it — a client hiding the
+    link is not a substitute for the server enforcing the flag."""
+
+    def test_calculate_is_blocked_when_disabled(self, owner_client):
+        _disable_feasibility_calculator()
+        response = owner_client.post(URL, TYPICAL_PAYLOAD, format="json")
+        assert response.status_code == 403
+        assert "detail" in response.json()
+
+    def test_calculate_works_again_once_re_enabled(self, owner_client):
+        _disable_feasibility_calculator()
+        FeatureFlag.objects.filter(name=FeatureFlag.FEASIBILITY_CALCULATOR_ENABLED).update(enabled=True)
+        response = owner_client.post(URL, TYPICAL_PAYLOAD, format="json")
+        assert response.status_code == 200
+
+    def test_disabled_check_runs_before_payload_validation(self, owner_client):
+        # A disabled calculator should not leak validation details about a
+        # feature the caller cannot use at all.
+        _disable_feasibility_calculator()
+        response = owner_client.post(URL, {}, format="json")
+        assert response.status_code == 403
+
+
+class TestFeasibilityCalculatorEnabledEndpoint:
+    """Mirrors ``TestRegistrationEnabled`` in accounts: a minimal boolean any
+    authenticated role can read, not the admin-only flag list."""
+
+    def test_requires_authentication(self, api_client):
+        response = api_client.get(ENABLED_URL)
+        assert response.status_code == 401
+
+    def test_reflects_enabled_state(self, participant_client):
+        # Any authenticated role — the nav link and page gate apply to
+        # admins and owners, but a participant must get the same honest
+        # answer rather than a 403 that could be mistaken for "still loading".
+        response = participant_client.get(ENABLED_URL)
+        assert response.status_code == 200
+        assert response.json() == {"enabled": True}
+
+    def test_reflects_disabled_state(self, participant_client):
+        _disable_feasibility_calculator()
+        response = participant_client.get(ENABLED_URL)
+        assert response.status_code == 200
+        assert response.json() == {"enabled": False}

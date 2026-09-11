@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next'
 import { useAuth } from '../lib/auth'
 import { useManagedZev } from '../lib/managedZev'
 import { fetchUsers } from '../lib/api/auth'
+import { fetchFeasibilityCalculatorEnabled } from '../lib/api/feasibility'
 import { queryKeys } from '../lib/api/queryKeys'
 import { LanguageSelector } from './LanguageSelector'
 import { useToast } from '../lib/toast'
@@ -43,6 +44,15 @@ export function Layout() {
         queryKey: queryKeys.auth.users(),
         queryFn: fetchUsers,
         enabled: user?.role === 'admin',
+    })
+    // Only the roles the nav link would show to anyway; a participant never
+    // needs this, and the calculator's own permission scope (see
+    // FeasibilityCalculateView) is enforced server-side regardless.
+    const feasibilityEnabledQuery = useQuery({
+        queryKey: queryKeys.feasibility.enabled(),
+        queryFn: fetchFeasibilityCalculatorEnabled,
+        enabled: user?.role === 'admin' || user?.role === 'zev_owner',
+        staleTime: 5 * 60 * 1000,
     })
     const location = useLocation()
     const navigate = useNavigate()
@@ -274,7 +284,7 @@ export function Layout() {
                             </div>
                         )}
 
-                        {canManage && (
+                        {canManage && feasibilityEnabledQuery.data === true && (
                             <SidebarLink to="/feasibility" label={t('nav.feasibility')} icon={<CalculatorIcon />} className="nav-standalone" />
                         )}
 

@@ -720,6 +720,7 @@ export const fr = {
             eyebrow: 'Outil de planification',
             title: 'Calculateur de rentabilité RCP',
             description: 'Estimez si la création d’un regroupement (RCP) en vaut la peine, avant même de disposer de données de mesure — comparé à l’injection totale dans le réseau.',
+            disabled: 'Le calculateur de rentabilité n’est pas activé sur cette instance. Un administrateur peut l’activer dans Paramètres système → Fonctionnalités.',
             form: {
                 systemTitle: 'Installation & énergie',
                 energyInputModeAggregate: 'Agrégé',

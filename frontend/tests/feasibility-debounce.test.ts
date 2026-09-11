@@ -5,7 +5,13 @@ import { act, createElement } from 'react'
 import { FeasibilityCalculatorPage } from '../src/pages/FeasibilityCalculatorPage'
 
 const t = (key: string) => key
-const { calculateFeasibility } = vi.hoisted(() => ({ calculateFeasibility: vi.fn() }))
+const { calculateFeasibility, fetchFeasibilityCalculatorEnabled } = vi.hoisted(() => ({
+  calculateFeasibility: vi.fn(),
+  // The page renders the calculator only once this resolves true (see
+  // FeasibilityCalculatorPage's gate) — this suite is about the debounce
+  // effect inside the calculator itself, so the flag is on throughout.
+  fetchFeasibilityCalculatorEnabled: vi.fn().mockResolvedValue(true),
+}))
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t }),
@@ -17,6 +23,7 @@ vi.mock('../src/lib/api/zev', () => ({
 
 vi.mock('../src/lib/api/feasibility', () => ({
   calculateFeasibility,
+  fetchFeasibilityCalculatorEnabled,
 }))
 
 vi.mock('../src/features/feasibility/PrefillFromZevCard', () => ({
@@ -113,6 +120,16 @@ describe('FeasibilityCalculatorPage debounce effect', () => {
     vi.useFakeTimers()
 
     renderPage()
+
+    // Let the enabled-flag query resolve before the gate mounts the
+    // calculator. Under fake timers React's own scheduler (which falls back
+    // to setTimeout in jsdom) needs a timer tick to flush queued work, not
+    // just a microtask flush, so advance by 0 alongside each `act`.
+    for (let i = 0; i < 5; i++) {
+      await act(async () => {
+        vi.advanceTimersByTime(0)
+      })
+    }
 
     // First debounce cycle fires one submission...
     await act(async () => {
