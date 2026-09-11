@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useToast } from '../lib/toast'
 
@@ -8,6 +8,8 @@ interface ConfirmDialogOptions {
     confirmText?: string
     cancelText?: string
     isDangerous?: boolean
+    confirmDisabled?: boolean
+    children?: ReactNode
     onConfirm: () => void | Promise<void>
     onCancel?: () => void
 }
@@ -52,6 +54,8 @@ export function ConfirmDialog({
     confirmText,
     cancelText,
     isDangerous = false,
+    confirmDisabled = false,
+    children,
     isLoading = false,
     onConfirm,
     onCancel,
@@ -81,6 +85,7 @@ export function ConfirmDialog({
             >
                 <h3 style={{ marginBottom: '1rem' }}>{title}</h3>
                 <p style={{ marginBottom: '1.5rem', color: 'var(--text-body)', lineHeight: '1.5' }}>{message}</p>
+                {children ? <div className="form-grid" style={{ marginBottom: '1.5rem' }}>{children}</div> : null}
                 <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
                     <button
                         className="button button-secondary"
@@ -93,7 +98,7 @@ export function ConfirmDialog({
                     <button
                         className={`button ${isDangerous ? 'danger' : ''}`}
                         onClick={onConfirm}
-                        disabled={isLoading}
+                        disabled={isLoading || confirmDisabled}
                         type="button"
                     >
                         {isLoading ? t('common.processing') : (confirmText || t('common.confirm'))}

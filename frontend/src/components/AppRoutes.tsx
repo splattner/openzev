@@ -72,7 +72,7 @@ export function AppRoutes() {
               </ProtectedRoute>
             }
           />
-          {(['overview', 'zevs', 'invoices', 'audit', 'health'] as const).map((adminTab) => (
+          {(['overview', 'zevs', 'invoices', 'dynamic-sources', 'audit', 'health'] as const).map((adminTab) => (
             <Route
               key={adminTab}
               path={`admin/${adminTab}`}

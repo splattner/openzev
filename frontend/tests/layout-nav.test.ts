@@ -312,7 +312,7 @@ describe('active navigation state is exposed to assistive tech', () => {
         page.unmount()
     })
 
-    it.each(['/admin/overview', '/admin/zevs', '/admin/invoices', '/admin/audit', '/admin/health'])(
+    it.each(['/admin/overview', '/admin/zevs', '/admin/invoices', '/admin/dynamic-sources', '/admin/audit', '/admin/health'])(
         'keeps Overview active at %s', async (path) => {
             mockSession('admin')
             const page = await renderLayoutAt(path)

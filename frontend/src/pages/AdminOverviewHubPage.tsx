@@ -6,6 +6,7 @@ import { ZevListPage } from './ZevListPage'
 import { AdminInvoicesPage } from './AdminInvoicesPage'
 import { AuditLogsPage } from './AdminAuditLogsPage'
 import { AdminSystemHealthPanel } from './AdminSystemHealthPanel'
+import { AdminDynamicSourcesPanel } from './AdminDynamicSourcesPanel'
 
 /**
  * Admin Overview hub (nav-regroup phase 3, spec §6): the former admin landing
@@ -15,7 +16,7 @@ import { AdminSystemHealthPanel } from './AdminSystemHealthPanel'
  * as aliases.
  */
 
-export type AdminOverviewTab = 'overview' | 'zevs' | 'invoices' | 'audit' | 'health'
+export type AdminOverviewTab = 'overview' | 'zevs' | 'invoices' | 'dynamic-sources' | 'audit' | 'health'
 
 
 
@@ -45,6 +46,7 @@ export function AdminOverviewHubPage({ tab = 'overview' }: { tab?: AdminOverview
                     <Tabs.Tab value="overview">{t('pages.adminOverview.tabs.overview')}</Tabs.Tab>
                     <Tabs.Tab value="zevs">{t('nav.zevs')}</Tabs.Tab>
                     <Tabs.Tab value="invoices">{t('nav.adminInvoices')}</Tabs.Tab>
+                    <Tabs.Tab value="dynamic-sources">{t('pages.dynamicSources.tab')}</Tabs.Tab>
                     <Tabs.Tab value="audit">{t('nav.adminAuditLogs')}</Tabs.Tab>
                     <Tabs.Tab value="health">{t('pages.adminOverview.tabs.health')}</Tabs.Tab>
                 </Tabs.List>
@@ -57,6 +59,9 @@ export function AdminOverviewHubPage({ tab = 'overview' }: { tab?: AdminOverview
                 </Tabs.Panel>
                 <Tabs.Panel value="invoices">
                     <AdminInvoicesPage embedded />
+                </Tabs.Panel>
+                <Tabs.Panel value="dynamic-sources">
+                    <AdminDynamicSourcesPanel />
                 </Tabs.Panel>
                 <Tabs.Panel value="audit">
                     {/* Platform-wide audit log — the scope is locked to 'admin'

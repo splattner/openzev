@@ -1,7 +1,13 @@
 import MockAdapter from 'axios-mock-adapter'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { api } from '../src/lib/api/client'
-import { fetchDynamicTariffSources } from '../src/lib/api/tariffs'
+import {
+  clearDynamicSourcePrices,
+  createDynamicTariffSource,
+  fetchDynamicPriceHistory,
+  fetchDynamicTariffSources,
+  queueDynamicSourceFetch,
+} from '../src/lib/api/tariffs'
 import { dynamicSourceOptions, impliedEnergyType } from '../src/features/tariffs/dynamicSources'
 import type { DynamicTariffSource } from '../src/types/api'
 
@@ -24,6 +30,12 @@ function source(overrides: Partial<DynamicTariffSource> = {}): DynamicTariffSour
     last_fetch_error: '',
     covers_from: '2025-12-11T00:00:00Z',
     covers_to: '2026-09-12T00:00:00Z',
+    point_count: 100,
+    linked_tariff_count: 2,
+    linked_zev_count: 1,
+    supports_backfill: true,
+    created_at: '2026-09-01T10:00:00Z',
+    updated_at: '2026-09-11T12:00:00Z',
     ...overrides,
   }
 }
@@ -82,5 +94,52 @@ describe('fetchDynamicTariffSources', () => {
     })
 
     return expect(fetchDynamicTariffSources()).resolves.toEqual([source()])
+  })
+
+  it('creates a manually configured source', async () => {
+    apiMock.onPost('/tariffs/dynamic-sources/').reply((config) => {
+      expect(JSON.parse(config.data as string)).toEqual({
+        label: 'Example grid',
+        url: 'https://prices.example.test',
+        adapter: 'vse_v1',
+        tariff_type: 'grid',
+        tariff_name: 'standard',
+      })
+      return [201, source({ label: 'Example grid' })]
+    })
+
+    const result = await createDynamicTariffSource({
+      label: 'Example grid',
+      url: 'https://prices.example.test',
+      adapter: 'vse_v1',
+      tariff_type: 'grid',
+      tariff_name: 'standard',
+    })
+
+    expect(result.label).toBe('Example grid')
+  })
+
+  it('requests a bounded price-history window', async () => {
+    apiMock.onGet('/tariffs/dynamic-sources/src-1/prices/').reply((config) => {
+      expect(config.params).toEqual({ date_from: '2026-09-01', date_to: '2026-09-07' })
+      return [200, { source: 'src-1', points: [], gaps: [], stats: {} }]
+    })
+
+    const result = await fetchDynamicPriceHistory('src-1', '2026-09-01', '2026-09-07')
+
+    expect(result.source).toBe('src-1')
+  })
+
+  it('queues fetches and sends typed clear confirmation in the request body', async () => {
+    apiMock.onPost('/tariffs/dynamic-sources/src-1/fetch/', { backfill: true }).reply(202, {
+      task_id: 'task-1', correlation_id: 'corr-1', backfill: true, queued_at: '2026-09-11T12:00:00Z',
+    })
+    apiMock.onDelete('/tariffs/dynamic-sources/src-1/prices/').reply((config) => {
+      expect(JSON.parse(config.data as string)).toEqual({ confirmation: 'Example', reason: 'Wrong feed' })
+      return [200, { deleted_points: 10 }]
+    })
+
+    await expect(queueDynamicSourceFetch('src-1', true)).resolves.toMatchObject({ task_id: 'task-1' })
+    await expect(clearDynamicSourcePrices('src-1', 'Example', 'Wrong feed')).resolves.toEqual({ deleted_points: 10 })
   })
 })

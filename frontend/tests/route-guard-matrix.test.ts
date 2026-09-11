@@ -143,6 +143,7 @@ const MATRIX: Array<{ path: string; marker: string; allow: Record<UserRole, bool
     { path: '/admin', marker: 'admin-overview-hub', allow: { admin: true, zev_owner: false, participant: false } },
     { path: '/admin/zevs', marker: 'admin-overview-hub', allow: { admin: true, zev_owner: false, participant: false } },
     { path: '/admin/invoices', marker: 'admin-overview-hub', allow: { admin: true, zev_owner: false, participant: false } },
+    { path: '/admin/dynamic-sources', marker: 'admin-overview-hub', allow: { admin: true, zev_owner: false, participant: false } },
     { path: '/admin/audit', marker: 'admin-overview-hub', allow: { admin: true, zev_owner: false, participant: false } },
     { path: '/admin/audit-logs', marker: 'admin-overview-hub', allow: { admin: true, zev_owner: false, participant: false } },
     { path: '/admin/health', marker: 'admin-overview-hub', allow: { admin: true, zev_owner: false, participant: false } },

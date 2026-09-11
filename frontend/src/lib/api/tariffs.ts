@@ -1,5 +1,8 @@
 import type {
+  DynamicPriceHistory,
+  DynamicSourceFetchResult,
   DynamicTariffSource,
+  DynamicTariffSourceInput,
   Tariff,
   TariffInput,
   TariffPeriod,
@@ -74,10 +77,49 @@ export async function deleteTariffPeriod(id: string): Promise<void> {
 /**
  * Every configured dynamic price source — global, not scoped to a ZEV, so
  * this is what a tariff form's "use a dynamic source" picker reads from.
- * Read-only: a source is created only by the VSE importer or by an admin.
  */
 export async function fetchDynamicTariffSources(): Promise<DynamicTariffSource[]> {
   return fetchAllPages<DynamicTariffSource>('/tariffs/dynamic-sources/')
+}
+
+export async function createDynamicTariffSource(payload: DynamicTariffSourceInput): Promise<DynamicTariffSource> {
+  const { data } = await api.post<DynamicTariffSource>('/tariffs/dynamic-sources/', payload)
+  return data
+}
+
+export async function updateDynamicTariffSource(
+  id: string,
+  payload: Partial<DynamicTariffSourceInput>,
+): Promise<DynamicTariffSource> {
+  const { data } = await api.patch<DynamicTariffSource>(`/tariffs/dynamic-sources/${id}/`, payload)
+  return data
+}
+
+export async function fetchDynamicPriceHistory(
+  id: string,
+  dateFrom?: string,
+  dateTo?: string,
+): Promise<DynamicPriceHistory> {
+  const { data } = await api.get<DynamicPriceHistory>(`/tariffs/dynamic-sources/${id}/prices/`, {
+    params: { date_from: dateFrom, date_to: dateTo },
+  })
+  return data
+}
+
+export async function queueDynamicSourceFetch(id: string, backfill = false): Promise<DynamicSourceFetchResult> {
+  const { data } = await api.post<DynamicSourceFetchResult>(`/tariffs/dynamic-sources/${id}/fetch/`, { backfill })
+  return data
+}
+
+export async function clearDynamicSourcePrices(
+  id: string,
+  confirmation: string,
+  reason: string,
+): Promise<{ deleted_points: number }> {
+  const { data } = await api.delete<{ deleted_points: number }>(`/tariffs/dynamic-sources/${id}/prices/`, {
+    data: { confirmation, reason },
+  })
+  return data
 }
 
 /**

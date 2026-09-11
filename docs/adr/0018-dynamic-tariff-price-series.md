@@ -37,15 +37,21 @@ not a contract.
 
 **1. The fetched price series is billing evidence, not a cache.**
 
-Prices are stored permanently in `DynamicPricePoint`, and a source still
-referenced by a tariff cannot be deleted (`on_delete=PROTECT`). We do not treat
-the operator as the system of record and re-fetch on demand.
+Prices are retained in `DynamicPricePoint`, and a source still referenced by a
+tariff cannot be deleted (`on_delete=PROTECT`). We do not treat the operator as
+the system of record and re-fetch on demand.
 
 The reason is retention, not performance. Groupe E drops history after about
 nine months and BKW keeps none at all, so an interval nobody stored on the day is
 gone from every source including the operator. An invoice issued last March has
 to stay re-derivable for as long as the invoice exists, and nothing outside
 OpenZEV can supply those numbers again.
+
+An administrator may explicitly clear one source's points to recover from a
+wrong endpoint or product configuration, but only with typed confirmation and
+an audit reason, while no fetch is running, and only when no non-cancelled
+invoice overlaps a tariff linked to that source. Drafts count as invoice
+evidence because their stored totals would otherwise outlive their inputs.
 
 **2. Sources are shared globally, not scoped per ZEV.**
 
@@ -100,8 +106,9 @@ Negative, and accepted:
   use. The row holds a public URL and public prices, so the exposure is a
   configuration label rather than tenant data — but it is a genuine break from
   the strict per-ZEV scoping everywhere else in this codebase.
-- Storage grows by ~35 000 rows per source-year and is never pruned. At Swiss
-  ZEV scale that is small; it is still unbounded growth by design.
+- Storage grows by ~35 000 rows per source-year and is never automatically
+  pruned. At Swiss ZEV scale that is small; it is still unbounded growth by
+  default.
 - The transfer archive carries the *link* (by natural key) but not the series, so
   an imported community starts with an empty source and refills on the next
   fetch — and for an operator that serves no history, only forward from then.

@@ -124,7 +124,7 @@ export function Layout() {
     const billingActive = useMatch('/billing/*') != null
     const adminOverviewMatch = useMatch('/admin/:tab')
     const adminOverviewActive = useMatch('/admin') != null ||
-        ['overview', 'zevs', 'invoices', 'audit', 'health'].includes(adminOverviewMatch?.params.tab ?? '')
+        ['overview', 'zevs', 'invoices', 'dynamic-sources', 'audit', 'health'].includes(adminOverviewMatch?.params.tab ?? '')
 
     const ownerById = new Map((usersQuery.data ?? []).map((candidate) => [candidate.id, candidate]))
     const selectedZevOwner = selectedZev ? ownerById.get(selectedZev.owner) : undefined

@@ -7,7 +7,7 @@
 - Owners: Core maintainers
 - Created: 2026-09-11
 - Target Release: Ongoing
-- Related Issues: #530 (parent gap #507, importer #520)
+- Related Issues: #530 (parent gap #507, importer #520), #702, #703
 - Related ADRs: [0018](../adr/0018-dynamic-tariff-price-series.md)
 - Impacted Areas: backend, frontend, async jobs, docs
 
@@ -45,7 +45,8 @@ All three parts are shipped.
 - Groupe E and BKW as concrete operator adapters
 - Pricing an energy tariff from a stored series, including negative prices
 - Refusing to bill a period the series does not fully cover
-- Retaining prices for as long as the invoices derived from them
+- Retaining prices for as long as the invoices derived from them, with a
+  guarded administrator cleanup for data that has not contributed to an invoice
 
 ### Out of scope
 
@@ -267,6 +268,12 @@ Outcomes are recorded on the source (`last_fetch_*`) and as an audit event
 `source=CELERY`), written best-effort so an audit failure cannot change the
 outcome.
 
+Fetch and destructive maintenance share a cache-backed, per-source 30-minute
+lease (`dynamic/locking.py::dynamic_source_lock`). A second fetch skips an
+already-busy source; clearing returns HTTP 409 instead of racing an in-flight
+upsert. The lock token is checked before release so an expired lease cannot
+delete a successor's lock.
+
 ### 8.1 Operator command
 
 ```
@@ -444,12 +451,32 @@ the two never disagree.
   (blank for a static candidate).
 - `VseTariffImportCreatedSerializer` gains `dynamic: bool`, so the apply
   result can say which created tariffs were linked to a source.
-- **`GET /tariffs/dynamic-sources/`** (`DynamicTariffSourceViewSet`,
-  read-only, paginated): every configured source, for the tariff form's
-  picker. `IsZevOwnerOrAdmin`, **not ZEV-scoped** — a source is global
-  (ADR 0018) and carries nothing more sensitive than a public operator URL
-  and public prices. Creation happens only through §10.2's get-or-create or
-  Django admin; there is no write endpoint.
+- **`GET /tariffs/dynamic-sources/`** (`DynamicTariffSourceViewSet`, paginated):
+  every configured source, for the tariff form and admin console. It includes
+  fetch state/coverage plus annotated `point_count`, `linked_tariff_count`,
+  `linked_zev_count`, and `supports_backfill`. `IsZevOwnerOrAdmin`, **not
+  ZEV-scoped** — a source is global (ADR 0018).
+- **`POST /tariffs/dynamic-sources/`**: owner or admin creation. The server
+  validates adapter-specific constraints, probes the endpoint before writing,
+  stores the probe response, and post-commit queues an initial backfill. A
+  natural-key match returns the existing shared source with HTTP 200 without
+  probing; a new source returns 201.
+- **`PATCH /tariffs/dynamic-sources/{id}/`**: admin only. Label corrections are
+  always allowed. URL/adapter/type/product identity cannot change while points
+  exist; type cannot change while tariffs link to the source.
+- **`GET /tariffs/dynamic-sources/{id}/prices/?date_from=&date_to=`**: imported
+  point history, aggregate min/max/average/count/negative-count, and interval
+  gaps. Defaults to seven days and permits at most 31 inclusive days. Admins
+  may read any source; an owner may read it only when one of their ZEV's tariffs
+  links to it.
+- **`POST /tariffs/dynamic-sources/{id}/fetch/`**: admin-only queueing of a
+  normal refresh or `backfill=true`, returning a task/correlation id and writing
+  a queued audit event which pairs with the Celery outcome.
+- **`DELETE /tariffs/dynamic-sources/{id}/prices/`**: admin only; requires the
+  exact source label and a non-empty reason. It returns 409 while the source is
+  fetching or when any non-cancelled invoice overlaps any linked tariff. On
+  success it deletes points, resets materialized coverage/fetch state, and
+  writes an audit event containing the reason and deleted count.
 - `TariffSerializer` needed no change: it already declares `fields =
   "__all__"`, so `dynamic_source` is exposed and writable exactly like
   `energy_type`, and `create`/`update` already call `full_clean()` — the
@@ -468,6 +495,9 @@ the two never disagree.
   the picker to sources that would still validate
   (`dynamicSources.dynamicSourceOptions`), so nothing offered could fail on
   save.
+  A new tariff can open `DynamicSourceFormModal` directly from this picker;
+  after the probed source is created or reused it is selected automatically and
+  its implied energy type is applied.
 - **`TariffCategorySections`** — `usesPeriods`/`priceSummary`/`pricingLabel`
   are branched on the *shown version's* `dynamic_source`, not the series:
   because `dynamic_source` is deliberately not a series-coherence field
@@ -485,11 +515,16 @@ the two never disagree.
 - **`types/api.ts`** — `DynamicTariffSource`, `DynamicTariffType`,
   `Tariff.dynamic_source` / `TariffInput.dynamic_source`,
   `VseTariffCandidate.dynamic_url`, `VseTariffImportResult.created[].dynamic`.
-
-Not built in this iteration, deliberately: a price chart drawing the raw
-fetched series (the tariff card shows the *average* and last-fetch status,
-not a quarter-hourly chart), and a UI to create a source from scratch without
-going through an import (creation is import-only or Django admin, §10.2).
+- **`DynamicPriceHistoryModal`** — linked from the expanded dynamic tariff and
+  from the platform admin table. It exposes a seven-day default/31-day maximum
+  date window, summary statistics, a step chart, explicit coverage gaps, and a
+  paginated interval table.
+- **`AdminDynamicSourcesPanel`** — routed as `/admin/dynamic-sources` in the
+  Admin Overview hub. It displays global source/point/reuse/failure KPIs and a
+  `DataTable` with current fetch state, last error/time and reuse counts. Its
+  `ActionMenu` opens history or source-filtered audit activity, queues refresh
+  or supported backfill, edits configuration, and opens the guarded typed
+  clear form. The source list refreshes every 30 seconds.
 
 ## 11. Transfer archive
 
@@ -518,7 +553,8 @@ was charged as values, not as a live reference to the price that produced it.
 | `invoices/test_dynamic_tariff_pricing.py` | 9 | `dynamic_average_chf_per_kwh`, `display_grid_base_chf_per_kwh`, `grid_base_is_dynamic` vs `grid_base_is_multiband` |
 | `invoices/test_tariff_overview.py::TariffOverviewDynamicTariffTests` | 4 | Unfetched tariff prints nothing, fetched average with its footnote, percentage-tariff footnote and amount |
 | `tariffs/test_vse_import.py` (extended) | +11 | Dynamic grid candidate is importable, no-URL and `metering` blocks, the missing-product warning, `is_free` correctness, source get-or-create + probe + reuse-without-reprobing, unreachable-URL error, and post-commit initial-backfill enqueueing only after a successful new-source tariff write |
-| `tariffs/test_dynamic_source_api.py` | 7 | `GET /tariffs/dynamic-sources/` access (owner/admin allowed, participant/anonymous refused), payload shape, not ZEV-scoped, read-only |
+| `tariffs/test_dynamic_source_api.py` | 6 | Authenticated role access, global list and picker fields |
+| `tariffs/test_dynamic_source_management_api.py` | 11 | Probed creation/reuse, adapter validation, admin editing, scoped history/stats/limits, queue audit, permissions, guarded clear |
 | `tariffs/test_dynamic_source_link_api.py` | 4 | Linking through the ordinary tariff API: create with a source, mismatched-energy-type 400, fee-tariff-cannot-link 400, `dynamic_source` on the series endpoint |
 
 ### 12.2 Fixtures
@@ -531,7 +567,7 @@ endpoint serves only the current day and keeps no history.
 
 | Module | Tests | Coverage |
 |---|---|---|
-| `tests/dynamic-sources.test.ts` | 9 | `impliedEnergyType`, `dynamicSourceOptions` (unlocked / locked / no match), `fetchDynamicTariffSources` pagination |
+| `tests/dynamic-sources.test.ts` | 10 | Source/energy-type helpers; paginated list; manual create; bounded history query; fetch queueing; typed clear request |
 | `tests/vse-tariff-import.test.ts` (extended) | +3 | A dynamic candidate is selectable, offers no billing-mode choice, can be the pre-selected recommendation |
 | `tests/tariff-form-mapping.test.ts` (extended) | +4 | `dynamic_source` round-trips through the form, is dropped when billing mode is not energy, defaults to blank |
 
@@ -539,12 +575,12 @@ endpoint serves only the current day and keeps no history.
 
 | Risk | Impact | Mitigation |
 |---|---|---|
-| Operator drops history before we fetch it | High — the period becomes unbillable forever | Backfill on creation; 4-hourly schedule; prices stored permanently (ADR 0018) |
+| Operator drops history before we fetch it | High — the period becomes unbillable forever | Backfill on creation; 4-hourly schedule; prices retained as evidence (ADR 0018) |
 | A gap bills as zero | High — silently wrong invoice | Engine refuses (§9); readiness flags the day first |
 | Endpoint URL rots | Medium | Failures recorded per source in user-safe text; `--probe` before trusting |
 | `integrated` billed beside levy tariffs | High — double charge | §3.3 documented; §10 warns at configuration time |
 | A v2 endpoint read as v1 | High — bills nothing | Refused by name (§4.4) |
-| Shared source edited by one community affects others | Medium | Natural key is immutable in practice; only `label` is cosmetic |
+| Shared source edited by one community affects others | Medium | Owners may create/reuse but only admins may edit; identity fields remain locked while points exist |
 
 ## 14. Acceptance criteria
 
@@ -563,3 +599,6 @@ endpoint serves only the current day and keeps no history.
 - [x] Printed documents (tariff overview, participation contract) show a dynamic tariff's fetched average rather than skipping it or printing zero
 - [x] The importer creates dynamic tariffs instead of blocking them, and refuses (per-candidate) rather than creating a dead tariff when the named URL cannot be fetched
 - [x] The UI shows that a tariff is dynamic, which source it uses, and when that source's last fetch failed
+- [x] An owner can create and select a probed dynamic source while manually creating a tariff
+- [x] Linked tariffs expose bounded interval-price history, statistics, and explicit gaps
+- [x] Admins can inspect every shared source and its fetch activity, queue refresh/backfill, and safely clear unbilled points

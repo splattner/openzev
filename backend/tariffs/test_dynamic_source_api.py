@@ -1,10 +1,8 @@
-"""``GET /tariffs/dynamic-sources/`` — the read-only list a tariff form's
-source picker reads from.
+"""``GET /tariffs/dynamic-sources/`` — the list a tariff form's picker reads.
 
 Not ZEV-scoped, unlike everything else in ``tariffs/``: a source is global
 (ADR 0018), carries nothing more sensitive than a public operator URL and
-its fetched prices, and is created only by the VSE importer's get-or-create
-or by an admin — never through this endpoint.
+its fetched prices.
 """
 
 from datetime import datetime, timezone
@@ -85,10 +83,7 @@ class TestListing:
         assert row["last_fetch_status"] == "ok"
         assert row["covers_from"] is not None
         assert row["covers_to"] is not None
-
-    def test_the_endpoint_is_read_only(self, owner_client):
-        response = owner_client.post("/api/v1/tariffs/dynamic-sources/", {
-            "label": "x", "url": "https://x.example", "tariff_type": "grid",
-        })
-
-        assert response.status_code == 405
+        assert row["point_count"] == 0
+        assert row["linked_tariff_count"] == 0
+        assert row["linked_zev_count"] == 0
+        assert row["supports_backfill"] is True

@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from django.core.exceptions import ValidationError as DjangoValidationError
-from .dynamic.models import DynamicTariffSource
+from .dynamic.adapters import DynamicAdapter
+from .dynamic.models import DynamicTariffSource, DynamicTariffType
 from .models import BillingMode, PeriodType, Tariff, TariffPeriod
 from .periods import months_of
 
@@ -241,16 +242,106 @@ class VseTariffImportResultSerializer(serializers.Serializer):
 
 
 class DynamicTariffSourceSerializer(serializers.ModelSerializer):
-    """Read-only: sources are created only by the VSE importer's get-or-create
-    (planner._get_or_create_dynamic_source) or by an admin in Django admin,
-    never by this API — see the model's docstring on why sources are shared
-    globally rather than owned by one ZEV."""
+    """Public configuration and operational summary for a shared source."""
+
+    point_count = serializers.IntegerField(read_only=True, default=0)
+    linked_tariff_count = serializers.IntegerField(read_only=True, default=0)
+    linked_zev_count = serializers.IntegerField(read_only=True, default=0)
+    supports_backfill = serializers.BooleanField(read_only=True)
 
     class Meta:
         model = DynamicTariffSource
         fields = [
             "id", "label", "url", "adapter", "tariff_type", "tariff_name",
             "last_fetch_status", "last_fetch_at", "last_success_at", "last_fetch_error",
-            "covers_from", "covers_to",
+            "covers_from", "covers_to", "point_count", "linked_tariff_count", "linked_zev_count",
+            "supports_backfill", "created_at", "updated_at",
         ]
         read_only_fields = fields
+
+
+class DynamicTariffSourceWriteSerializer(serializers.ModelSerializer):
+    """Configuration accepted for manual source creation and admin correction."""
+
+    adapter = serializers.ChoiceField(
+        choices=DynamicAdapter.choices, default=DynamicAdapter.VSE_V1
+    )
+    tariff_name = serializers.CharField(
+        max_length=120, required=False, allow_blank=True, default=""
+    )
+
+    class Meta:
+        model = DynamicTariffSource
+        fields = ["label", "url", "adapter", "tariff_type", "tariff_name"]
+        # The API deliberately treats the model's natural-key collision as
+        # reuse, so let the service resolve it instead of returning a 400.
+        validators = []
+
+    def validate(self, attrs):
+        adapter = attrs.get("adapter", getattr(self.instance, "adapter", DynamicAdapter.VSE_V1))
+        tariff_type = attrs.get("tariff_type", getattr(self.instance, "tariff_type", None))
+        tariff_name = attrs.get("tariff_name", getattr(self.instance, "tariff_name", ""))
+
+        if adapter == DynamicAdapter.GROUPE_E and not tariff_name:
+            raise serializers.ValidationError({
+                "tariff_name": "Groupe E serves several products; choose the product explicitly."
+            })
+        if adapter == DynamicAdapter.BKW:
+            if tariff_type != DynamicTariffType.FEED_IN:
+                raise serializers.ValidationError({
+                    "tariff_type": "The BKW endpoint only serves feed-in remuneration."
+                })
+            if tariff_name:
+                raise serializers.ValidationError({
+                    "tariff_name": "The BKW endpoint does not accept a product name."
+                })
+
+        if self.instance is not None and self.instance.points.exists():
+            changed_identity = [
+                field for field in ("url", "adapter", "tariff_type", "tariff_name")
+                if field in attrs and attrs[field] != getattr(self.instance, field)
+            ]
+            if changed_identity:
+                raise serializers.ValidationError({
+                    field: "Clear unprotected fetched prices before changing the source identity."
+                    for field in changed_identity
+                })
+
+        if (
+            self.instance is not None
+            and "tariff_type" in attrs
+            and attrs["tariff_type"] != self.instance.tariff_type
+            and self.instance.tariffs.exists()
+        ):
+            raise serializers.ValidationError({
+                "tariff_type": "A source linked to tariffs cannot change tariff type. Create a replacement source."
+            })
+        return attrs
+
+
+class DynamicPriceHistoryQuerySerializer(serializers.Serializer):
+    date_from = serializers.DateField(required=False)
+    date_to = serializers.DateField(required=False)
+
+    def validate(self, attrs):
+        date_from = attrs.get("date_from")
+        date_to = attrs.get("date_to")
+        if date_from and date_to and date_from > date_to:
+            raise serializers.ValidationError({"date_to": "date_to must be on or after date_from."})
+        if date_from and date_to and (date_to - date_from).days >= 31:
+            raise serializers.ValidationError({"date_to": "Price history is limited to 31 days."})
+        return attrs
+
+
+class DynamicSourceFetchSerializer(serializers.Serializer):
+    backfill = serializers.BooleanField(required=False, default=False)
+
+
+class DynamicSourceClearSerializer(serializers.Serializer):
+    confirmation = serializers.CharField(max_length=200)
+    reason = serializers.CharField(max_length=500, trim_whitespace=True)
+
+    def validate_reason(self, value):
+        if not value:
+            raise serializers.ValidationError("Give a reason for deleting billing inputs.")
+        return value

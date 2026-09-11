@@ -1,6 +1,7 @@
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import {
     faBolt,
+    faChartLine,
     faChevronDown,
     faChevronUp,
     faClone,
@@ -14,12 +15,13 @@ import {
 import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { formatShortDate } from '../../lib/appSettings'
+import { formatDateTime, formatShortDate } from '../../lib/appSettings'
 import { todayLocalIso } from '../../lib/dates'
 import { fetchDynamicTariffSources } from '../../lib/api/tariffs'
 import { queryKeys } from '../../lib/api/queryKeys'
 import type {
     AppSettings,
+    DynamicTariffSource,
     Tariff,
     TariffPeriod,
     TariffSeries,
@@ -29,6 +31,7 @@ import { bandName } from './bands'
 import { MONTH_KEYS, formatSeason } from './recurrence'
 import { validityState, type ValidityState } from './validity'
 import { TariffPriceHistoryChart } from './TariffPriceHistoryChart'
+import { DynamicPriceHistoryModal } from './DynamicPriceHistoryModal'
 
 type TariffSeriesSection = {
     category: Tariff['category']
@@ -85,6 +88,7 @@ export function TariffCategorySections({
     // Which version a card is showing. Defaults to the active one, so a card
     // reads as "what this tariff costs now" until you deliberately look back.
     const [shownVersionBySeries, setShownVersionBySeries] = useState<Record<string, string>>({})
+    const [historySource, setHistorySource] = useState<DynamicTariffSource | null>(null)
     const today = todayLocalIso()
 
     // Shares its cache with TariffFormModal's picker (same query key), so
@@ -420,6 +424,34 @@ export function TariffCategorySections({
                                                 />
                                             )}
 
+                                            {dynamicSource && (
+                                                <section className="tariff-period-section">
+                                                    <div className="tariff-period-section-header">
+                                                        <div className="tariff-period-section-title-row">
+                                                            <h4>{t('pages.dynamicSources.history.sectionTitle')}</h4>
+                                                            <span className={dynamicSource.last_fetch_status === 'failed' ? 'badge badge-danger' : 'badge badge-info'}>
+                                                                {t(`pages.dynamicSources.status.${dynamicSource.last_fetch_status}` as Parameters<typeof t>[0])}
+                                                            </span>
+                                                        </div>
+                                                        <button
+                                                            className="button button-secondary button-compact"
+                                                            type="button"
+                                                            onClick={() => setHistorySource(dynamicSource)}
+                                                        >
+                                                            <FontAwesomeIcon icon={faChartLine} fixedWidth />
+                                                            {t('pages.dynamicSources.history.open')}
+                                                        </button>
+                                                    </div>
+                                                    <p className="muted tariff-period-empty">
+                                                        {t('pages.dynamicSources.history.coverage', {
+                                                            from: formatDateTime(dynamicSource.covers_from, settings),
+                                                            to: formatDateTime(dynamicSource.covers_to, settings),
+                                                            count: dynamicSource.point_count,
+                                                        })}
+                                                    </p>
+                                                </section>
+                                            )}
+
                                             {notes && (
                                                 <div className="tariff-card-details">
                                                     <div className="tariff-detail-card tariff-detail-card-wide">
@@ -506,6 +538,7 @@ export function TariffCategorySections({
                     </div>
                 </section>
             ))}
+            <DynamicPriceHistoryModal source={historySource} onClose={() => setHistorySource(null)} />
         </div>
     )
 }

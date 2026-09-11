@@ -477,6 +477,49 @@ export interface DynamicTariffSource {
     /** Extent of the stored series; null before anything has been fetched. */
     covers_from: string | null
     covers_to: string | null
+    point_count: number
+    linked_tariff_count: number
+    linked_zev_count: number
+    supports_backfill: boolean
+    created_at: string
+    updated_at: string
+}
+
+export interface DynamicTariffSourceInput {
+    label: string
+    url: string
+    adapter: DynamicTariffSource['adapter']
+    tariff_type: DynamicTariffType
+    tariff_name?: string
+}
+
+export interface DynamicPricePoint {
+    valid_from: string
+    valid_to: string
+    price_chf_per_kwh: string
+}
+
+export interface DynamicPriceHistory {
+    source: string
+    date_from: string
+    date_to: string
+    stats: {
+        point_count: number
+        minimum_chf_per_kwh: string | null
+        maximum_chf_per_kwh: string | null
+        average_chf_per_kwh: string | null
+        negative_count: number
+        gap_count: number
+    }
+    gaps: Array<{ from: string; to: string }>
+    points: DynamicPricePoint[]
+}
+
+export interface DynamicSourceFetchResult {
+    task_id: string
+    correlation_id: string
+    backfill: boolean
+    queued_at: string
 }
 
 /**
