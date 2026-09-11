@@ -39,6 +39,23 @@ services:
       - backend
       - redis
 
+  beat:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    command: celery -A config beat -l info --scheduler django_celery_beat.schedulers:DatabaseScheduler
+    env_file:
+      - backend/.env.example
+    environment:
+      DATABASE_URL: postgres://openzev:openzev@db:5432/openzev
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CACHE_URL: redis://redis:6379/1
+    volumes:
+      - ./backend:/app
+    depends_on:
+      - backend
+      - redis
+
   frontend:
     image: node:24-alpine
     working_dir: /app

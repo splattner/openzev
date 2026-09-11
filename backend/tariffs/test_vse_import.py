@@ -16,6 +16,7 @@ from unittest import mock
 
 import datetime as datetime_module
 
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.test import SimpleTestCase, TestCase
 from rest_framework.test import APIClient
 
@@ -765,6 +766,43 @@ class PlanningTests(TestCase):
         self.assertEqual(source.tariff_type, "grid")
         self.assertEqual(source.tariff_name, "")
 
+    def test_a_new_dynamic_source_queues_one_backfill_after_commit(self):
+        parsed = parse_document(document(entry(
+            tariffForm="dynamic", prices={"dynamic": {"url": "https://api.example.ch/v1/tariffs"}},
+        )))
+
+        with (
+            mock.patch("tariffs.importers.planner.fetch_window", return_value=([], [])),
+            mock.patch("tariffs.importers.planner.fetch_dynamic_prices.delay") as delay,
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            _report, created = apply_import(
+                zev=self.zev, document=parsed, selections=[Selection(parsed.candidates[0].key)],
+                source_url="https://example.ch/t.json", imported_on=date(2026, 9, 2),
+            )
+
+        delay.assert_called_once_with(str(created[0].dynamic_source_id), backfill=True)
+
+    def test_a_failed_tariff_write_does_not_queue_the_initial_backfill(self):
+        parsed = parse_document(document(entry(
+            tariffForm="dynamic", prices={"dynamic": {"url": "https://api.example.ch/v1/tariffs"}},
+        )))
+
+        with (
+            mock.patch("tariffs.importers.planner.fetch_window", return_value=([], [])),
+            mock.patch("tariffs.importers.planner._create", side_effect=DjangoValidationError("invalid")),
+            mock.patch("tariffs.importers.planner.fetch_dynamic_prices.delay") as delay,
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            report, created = apply_import(
+                zev=self.zev, document=parsed, selections=[Selection(parsed.candidates[0].key)],
+                source_url="https://example.ch/t.json", imported_on=date(2026, 9, 2),
+            )
+
+        self.assertEqual(created, [])
+        self.assertEqual(len(report.errors), 1)
+        delay.assert_not_called()
+
     def test_a_second_zev_on_the_same_endpoint_reuses_the_source_without_probing(self):
         from tariffs.dynamic.models import DynamicTariffSource
 
@@ -783,7 +821,11 @@ class PlanningTests(TestCase):
         other_document = parse_document(document(entry(
             tariffForm="dynamic", prices={"dynamic": {"url": "https://api.example.ch/v1/tariffs"}},
         )))
-        with mock.patch("tariffs.importers.planner.fetch_window") as probe:
+        with (
+            mock.patch("tariffs.importers.planner.fetch_window") as probe,
+            mock.patch("tariffs.importers.planner.fetch_dynamic_prices.delay") as delay,
+            self.captureOnCommitCallbacks(execute=True),
+        ):
             report, created = apply_import(
                 zev=other_zev, document=other_document,
                 selections=[Selection(other_document.candidates[0].key)],
@@ -793,6 +835,7 @@ class PlanningTests(TestCase):
         probe.assert_not_called()
         self.assertEqual(len(created), 1)
         self.assertEqual(DynamicTariffSource.objects.count(), 1)
+        delay.assert_not_called()
 
     def test_an_unreachable_dynamic_url_is_reported_and_creates_nothing(self):
         from tariffs.importers.remote import TariffFetchError

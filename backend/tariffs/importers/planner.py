@@ -27,6 +27,7 @@ from tariffs.dynamic.fetch import fetch_window
 from tariffs.dynamic.models import DynamicTariffSource
 from tariffs.models import Tariff, TariffPeriod
 from tariffs.series import SERIES_FIELDS, plan_new_version
+from tariffs.tasks import fetch_dynamic_prices
 
 from .remote import TariffFetchError
 from .vse_json import Candidate, ParsedDocument
@@ -249,7 +250,7 @@ def _notes_with_provenance(candidate: Candidate, source_url: str, imported_on: d
     return f"{candidate.notes}\n{origin} (imported {imported_on.isoformat()})".strip()
 
 
-def _get_or_create_dynamic_source(candidate: Candidate) -> DynamicTariffSource:
+def _get_or_create_dynamic_source(candidate: Candidate) -> tuple[DynamicTariffSource, bool]:
     """Find or create the price source a dynamic candidate names.
 
     Sources are shared globally (ADR 0018), so another ZEV already on this
@@ -272,7 +273,7 @@ def _get_or_create_dynamic_source(candidate: Candidate) -> DynamicTariffSource:
     }
     existing = DynamicTariffSource.objects.filter(**natural_key).first()
     if existing is not None:
-        return existing
+        return existing, False
 
     probe = DynamicTariffSource(adapter=DynamicAdapter.VSE_V1, **natural_key)
     try:
@@ -282,14 +283,14 @@ def _get_or_create_dynamic_source(candidate: Candidate) -> DynamicTariffSource:
             f"Could not fetch the dynamic price at {candidate.dynamic_url}: {exc}"
         ) from exc
 
-    source, _created = DynamicTariffSource.objects.get_or_create(
+    source, created = DynamicTariffSource.objects.get_or_create(
         **natural_key,
         defaults={
             "adapter": DynamicAdapter.VSE_V1,
             "label": f"{candidate.source_tariff_name} — {candidate.dynamic_tariff_type}",
         },
     )
-    return source
+    return source, created
 
 
 def _create(
@@ -413,9 +414,10 @@ def apply_import(*, zev, document: ParsedDocument, selections: list[Selection], 
         # write transaction opens — a slow or failing fetch must not hold a
         # database savepoint open while it happens.
         dynamic_source = None
+        dynamic_source_created = False
         if candidate.dynamic_url:
             try:
-                dynamic_source = _get_or_create_dynamic_source(candidate)
+                dynamic_source, dynamic_source_created = _get_or_create_dynamic_source(candidate)
             except ValueError as exc:
                 report.errors.append({"name": candidate.name, "error": str(exc)})
                 continue
@@ -429,6 +431,18 @@ def apply_import(*, zev, document: ParsedDocument, selections: list[Selection], 
                 "error": "; ".join(exc.messages),
             })
             continue
+
+        if dynamic_source_created:
+            # Queue only after the tariff write commits. In production this
+            # callback runs as the per-candidate atomic block closes; under an
+            # outer transaction (including tests) it correctly waits for that
+            # transaction too. A source reused by another ZEV already has its
+            # stored history and stays on the four-hour refresh schedule.
+            source_id = str(dynamic_source.pk)
+            transaction.on_commit(
+                lambda source_id=source_id: fetch_dynamic_prices.delay(source_id, backfill=True),
+                robust=True,
+            )
 
         created.append(tariff)
         report.created.append({

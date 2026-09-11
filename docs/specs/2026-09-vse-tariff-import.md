@@ -636,7 +636,7 @@ result, messages, errors) and `pages.zevSettings.fields.tariffSourceUrl` /
 
 ## 14. Test plan
 
-### Backend — `backend/tariffs/test_vse_import.py` (72 tests)
+### Backend — `backend/tariffs/test_vse_import.py` (93 tests)
 
 The suite leans on a **real published document** — InfraWerke Münsingen's 2027
 tariffs, fetched from the operator's own website and checked in unchanged as
@@ -672,13 +672,11 @@ pre-selectable as "free" (`is_free`); a wrong energy unit, a wrong base unit
 and a negative price each blocked with a reason; excess precision rounded
 with a warning.
 
-**`PlanningTests`** (10): a new name; re-importing the same document changes
-nothing; next year's document appends a version and closes the previous one; an
-open-ended predecessor is truncated; a name meaning something else is a
-conflict; only selected candidates are created; a blocked candidate is refused
-even when its key is sent; two versions inside one document chained rather than
-collided; a stale key is an error; the source URL is on every imported tariff's
-notes.
+**`PlanningTests`** (25): new, duplicate, version, overlap and conflict
+planning; provenance-based series matching and renames; selected, blocked and
+stale candidates; per-candidate transaction isolation; dynamic-source probing,
+reuse and failure; and post-commit initial-backfill enqueueing for a new source
+without duplicating it for reuse or a failed tariff write.
 
 **`BillingModeChoiceTests`** (7): a fee offers exactly the three monthly modes
 and defaults to the shared one; no yearly mode is ever offered (it would bill a
@@ -700,13 +698,13 @@ allowed to say: the refusal does not report what the name resolved to (while
 `log_detail` does), a TLS error's paths do not reach the response, and the
 operator's own reason phrase is not echoed back.
 
-**`ImportEndpointTests`** (13): auth; participants forbidden; an owner refused
+**`ImportEndpointTests`** (15): auth; participants forbidden; an owner refused
 another owner's ZEV; preview writes nothing; the stored URL as fallback; a ZEV
 with no URL told what is missing; a fetch failure as a 400 not a 500; apply
 creates only what was ticked and remembers the URL; the audit event and its
 metadata; a changed document refused with 409 and no write; `remember_url:
-false` honoured; the preview publishes the billing modes it may offer, and a
-mode picked there reaches the created tariff.
+false` honoured; input validation; the preview publishes the billing modes it
+may offer, and a mode picked there reaches the created tariff.
 
 Each of these was checked to fail with the production code reverted (duplicate
 detection, wrap-around splitting, the address checks, the billing-mode

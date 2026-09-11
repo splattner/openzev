@@ -1,0 +1,85 @@
+{{- if .Values.beat.enabled }}
+{{- if ne (int .Values.beat.replicaCount) 1 }}
+{{- fail "beat.replicaCount must be 1; multiple Celery Beat schedulers duplicate periodic tasks" }}
+{{- end }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "openzev.fullname" . }}-beat
+  labels:
+    {{- include "openzev.labels" . | nindent 4 }}
+    app.kubernetes.io/component: beat
+spec:
+  # Keep this at one: two schedulers would enqueue every periodic task twice.
+  replicas: {{ .Values.beat.replicaCount }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: beat
+  template:
+    metadata:
+      labels:
+        {{- include "openzev.labels" . | nindent 8 }}
+        app.kubernetes.io/component: beat
+      {{- with .Values.beat.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      {{- with .Values.beat.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: beat
+          image: "{{ .Values.beat.image.repository }}:{{ include "openzev.imageTag" (dict "tag" .Values.beat.image.tag "context" .) }}"
+          imagePullPolicy: {{ .Values.beat.image.pullPolicy }}
+          command: {{- toYaml .Values.beat.command | nindent 12 }}
+          env:
+            - name: SECRET_KEY
+              {{- if .Values.secretKey.existingSecret.name }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secretKey.existingSecret.name }}
+                  key: {{ .Values.secretKey.existingSecret.key }}
+              {{- else }}
+              value: {{ .Values.secretKey.value | quote }}
+              {{- end }}
+            - name: DATABASE_URL
+              {{- if .Values.database.existingSecret.name }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.database.existingSecret.name }}
+                  key: {{ .Values.database.existingSecret.key }}
+              {{- else }}
+              value: {{ .Values.database.url | quote }}
+              {{- end }}
+            - name: CELERY_BROKER_URL
+              value: {{ .Values.redis.url | quote }}
+            - name: CACHE_URL
+              value: {{ .Values.redis.cacheUrl | quote }}
+            {{- range $key, $value := .Values.beat.extraEnv }}
+            - name: {{ $key }}
+              value: {{ $value | quote }}
+            {{- end }}
+          {{- with .Values.beat.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.beat.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      {{- with .Values.beat.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.beat.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.beat.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}

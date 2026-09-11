@@ -251,6 +251,17 @@ not daily: Groupe E publishes day-ahead in the afternoon and BKW republishes the
 current day while it runs, so no single moment has final prices.
 `publication_timestamp` says when the operator last wrote, not what it covers.
 
+Supported deployments run exactly one Beat scheduler: the three Compose files
+declare a `beat` service, and the Helm chart declares a single-replica Beat
+deployment. More than one scheduler would enqueue every periodic task more than
+once at each tick.
+
+When the importer creates a new source, it queues
+`fetch_dynamic_prices(source_id, backfill=True)` with `transaction.on_commit()`
+after the tariff write succeeds. Reusing an existing global source does not
+queue another initial backfill; that source already has stored history and is
+included in the four-hour fan-out.
+
 Outcomes are recorded on the source (`last_fetch_*`) and as an audit event
 (`AuditActionCategory.TARIFF`, `action_type="tariff.dynamic_fetch"`,
 `source=CELERY`), written best-effort so an audit failure cannot change the
@@ -417,6 +428,9 @@ must not hold a database savepoint open while it happens.
    standard-contract URL, not an operator-specific one) via `get_or_create`
    on the same natural key, race-safe against a concurrent import of the
    same endpoint.
+4. After the tariff has been written successfully, a newly created source gets
+   one post-commit `backfill=True` task. A reused source gets no duplicate
+   initial task.
 
 `_create` links the resolved source via `Tariff(..., dynamic_source=...)`
 before `.save()`, so `Tariff.clean()`'s existing energy-type check runs for
@@ -503,7 +517,7 @@ was charged as values, not as a live reference to the price that produced it.
 | `invoices/test_readiness.py::DynamicTariffPricingCoverageTests` | 7 | Full/partial/no coverage, type-masking, percentage-tariff coupling, DST, static→dynamic series versioning |
 | `invoices/test_dynamic_tariff_pricing.py` | 9 | `dynamic_average_chf_per_kwh`, `display_grid_base_chf_per_kwh`, `grid_base_is_dynamic` vs `grid_base_is_multiband` |
 | `invoices/test_tariff_overview.py::TariffOverviewDynamicTariffTests` | 4 | Unfetched tariff prints nothing, fetched average with its footnote, percentage-tariff footnote and amount |
-| `tariffs/test_vse_import.py` (extended) | +9 | Dynamic grid candidate is importable, no-URL and `metering` blocks, the missing-product warning, `is_free` correctness, source get-or-create + probe + reuse-without-reprobing, unreachable-URL error |
+| `tariffs/test_vse_import.py` (extended) | +11 | Dynamic grid candidate is importable, no-URL and `metering` blocks, the missing-product warning, `is_free` correctness, source get-or-create + probe + reuse-without-reprobing, unreachable-URL error, and post-commit initial-backfill enqueueing only after a successful new-source tariff write |
 | `tariffs/test_dynamic_source_api.py` | 7 | `GET /tariffs/dynamic-sources/` access (owner/admin allowed, participant/anonymous refused), payload shape, not ZEV-scoped, read-only |
 | `tariffs/test_dynamic_source_link_api.py` | 4 | Linking through the ordinary tariff API: create with a source, mismatched-energy-type 400, fee-tariff-cannot-link 400, `dynamic_source` on the series endpoint |
 

@@ -97,7 +97,7 @@ Step-by-step import flow with mapping, preview, and validation feedback.
 
 - Backend: Django, Django REST Framework, SimpleJWT
 - Frontend: React, TypeScript, Vite, React Query, i18next
-- Async jobs: Celery with Redis broker
+- Async jobs and schedules: Celery worker + Beat with Redis broker
 - Database: SQLite (default), PostgreSQL, MariaDB via `DATABASE_URL`
 - Runtime/deploy: Docker and docker compose
 
@@ -169,7 +169,10 @@ See the [Getting Started guide](docs/user-guide/01-getting-started.md#fullstack-
 
 OpenZEV ships as a Helm chart in [`charts/openzev`](charts/openzev/README.md).
 
-The chart deploys the frontend, backend, and a Celery worker, plus an Ingress and a PVC for `/app/media`. It does **not** deploy PostgreSQL or Redis — you must provide reachable external database and Redis endpoints.
+The chart deploys the frontend, backend, a Celery worker, and one Celery Beat
+scheduler, plus an Ingress and a PVC for `/app/media`. It does **not** deploy
+PostgreSQL or Redis — you must provide reachable external database and Redis
+endpoints.
 
 ```bash
 helm repo add openzev https://splattner.github.io/openzev
@@ -280,12 +283,14 @@ Frontend dev URL: <http://localhost:5173>
 
 > Cookie sessions require same-origin (or same-host reverse proxy, e.g. `VITE_API_BASE_URL=/api/v1`). Same-host different-port dev (`localhost:5173` → `localhost:8001`) works with `CORS_ALLOWED_ORIGINS`/`CSRF_TRUSTED_ORIGINS`. Truly cross-hostname (`app.example.com` → `api.example.com`) cannot be fixed by those settings alone — JS cannot read a cross-origin `csrftoken` cookie — use a same-origin reverse proxy.
 
-### 3) Celery worker (required for async emails)
+### 3) Celery worker and Beat scheduler
 
 ```bash
 cd backend
 source ../.venv/bin/activate
 celery -A config worker -l info
+# In a second terminal; run exactly one scheduler per deployment.
+celery -A config beat -l info --scheduler django_celery_beat.schedulers:DatabaseScheduler
 ```
 
 ## Seed Data & Demo Accounts
@@ -329,7 +334,10 @@ Re-running `seed_demo` refreshes the demo readings, invoices, import/email logs 
 ## Development Notes
 
 - Without Docker, the backend defaults to SQLite (see `backend/.env.example`). Docker Compose uses PostgreSQL. MariaDB is also supported.
-- Async tasks (invoice emails, PDF generation, geocoding) require Redis + Celery. Docker Compose includes both; for other setups, ensure they are running.
+- Async tasks (invoice emails, PDF generation, geocoding) require Redis and a
+  Celery worker. Periodic work such as dynamic-tariff refreshes also requires
+  exactly one Celery Beat scheduler. Docker Compose includes all three; for
+  other setups, ensure they are running.
 - Use `.env.example` as baseline for environment configuration.
 - Keep migrations up to date when changing models:
 

@@ -64,6 +64,33 @@ worker:
   affinity: {}
   extraEnv: {}
 
+# Exactly one Beat scheduler must run for a release. Multiple replicas would
+# enqueue every periodic task more than once at each tick.
+beat:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: ghcr.io/splattner/openzev-backend
+    tag: ""
+    pullPolicy: IfNotPresent
+  command:
+    - celery
+    - -A
+    - config
+    - beat
+    - -l
+    - info
+    - --scheduler
+    - django_celery_beat.schedulers:DatabaseScheduler
+  podAnnotations: {}
+  podSecurityContext: {}
+  securityContext: {}
+  resources: {}
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  extraEnv: {}
+
 frontend:
   replicaCount: 1
   image:

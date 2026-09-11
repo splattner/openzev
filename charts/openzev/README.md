@@ -1,6 +1,6 @@
 # OpenZEV Helm Chart
 
-Deploys OpenZEV frontend, backend, and Celery worker on Kubernetes.
+Deploys OpenZEV frontend, backend, Celery worker, and Celery Beat scheduler on Kubernetes.
 
 This chart README is the authoritative reference for installing and configuring
 the chart. See [Example values](#example-values) for a complete production-oriented
@@ -11,6 +11,7 @@ configuration.
 - Frontend `Deployment` + `Service`
 - Backend `Deployment` + `Service`
 - Worker `Deployment`
+- Single-replica Beat `Deployment` for periodic tasks
 - Shared media `PersistentVolumeClaim` (for `/app/media`)
 - `Ingress`
 
@@ -62,6 +63,13 @@ secretKey:
 ```
 
 If `secretKey.existingSecret.name` is set, it overrides `secretKey.value`.
+
+## Celery Beat
+
+The chart enables one Beat scheduler by default (`beat.enabled: true`) using
+the `django_celery_beat` database scheduler. Keep `beat.replicaCount: 1`:
+running multiple schedulers would enqueue every periodic task more than once.
+Set `beat.enabled: false` only when the release uses an external scheduler.
 
 ## Media PVC
 
