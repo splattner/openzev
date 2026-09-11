@@ -26,6 +26,7 @@ TARIFF_OVERVIEW_TRANSLATIONS: dict[str, dict] = {
         "unit_chf_month": "CHF/Mt.",
         "unit_chf_year": "CHF/Jahr",
         "unit_percent": "%",
+        "dynamic_average_label": "Durchschnitt der abgerufenen Preisreihe",
         "fee_per_metering_point": "pro Zählpunkt",
         "fee_shared_equal": "Gemeinschaftskosten, zu gleichen Teilen aufgeteilt",
         "fee_shared_weight": "Gemeinschaftskosten, nach Gewichtung aufgeteilt",
@@ -33,6 +34,11 @@ TARIFF_OVERVIEW_TRANSLATIONS: dict[str, dict] = {
             "Der gezeigte Basispreis ist der Tarif ausserhalb der Zeitband-"
             "Einschränkungen. Der effektive Preis richtet sich nach dem im "
             "Verbrauchszeitpunkt geltenden Band."
+        ),
+        "footnote_dynamic_average": (
+            "Dieser Tarif wird über einen dynamischen Preis abgerechnet. Der "
+            "gezeigte Preis ist der Durchschnitt der aktuell abgerufenen "
+            "Preisreihe, nicht ein fester Tarif."
         ),
         "billing_modes": {
             "energy": "Nach Energie",
@@ -64,12 +70,18 @@ TARIFF_OVERVIEW_TRANSLATIONS: dict[str, dict] = {
         "unit_chf_month": "CHF/mois",
         "unit_chf_year": "CHF/an",
         "unit_percent": "%",
+        "dynamic_average_label": "Moyenne de la série de prix récupérée",
         "fee_per_metering_point": "par point de mesure",
         "fee_shared_equal": "Frais communs, répartis à parts égales",
         "fee_shared_weight": "Frais communs, répartis selon la pondération",
         "footnote_multiband_base": (
             "Le prix de base indiqué est le tarif en dehors des plages horaires. "
             "Le prix effectif suit la plage en vigueur au moment de la consommation."
+        ),
+        "footnote_dynamic_average": (
+            "Ce tarif est facturé sur la base d'un prix dynamique. Le prix "
+            "indiqué est la moyenne de la série de prix actuellement récupérée, "
+            "et non un tarif fixe."
         ),
         "billing_modes": {
             "energy": "Selon l'énergie",
@@ -101,6 +113,7 @@ TARIFF_OVERVIEW_TRANSLATIONS: dict[str, dict] = {
         "unit_chf_month": "CHF/mese",
         "unit_chf_year": "CHF/anno",
         "unit_percent": "%",
+        "dynamic_average_label": "Media della serie di prezzi recuperata",
         "fee_per_metering_point": "per punto di misura",
         "fee_shared_equal": "Costi comuni, ripartiti in parti uguali",
         "fee_shared_weight": "Costi comuni, ripartiti secondo la ponderazione",
@@ -108,6 +121,11 @@ TARIFF_OVERVIEW_TRANSLATIONS: dict[str, dict] = {
             "Il prezzo di base indicato è la tariffa al di fuori delle fasce "
             "orarie. Il prezzo effettivo segue la fascia in vigore al momento "
             "del consumo."
+        ),
+        "footnote_dynamic_average": (
+            "Questa tariffa viene fatturata in base a un prezzo dinamico. Il "
+            "prezzo indicato è la media della serie di prezzi attualmente "
+            "recuperata, non una tariffa fissa."
         ),
         "billing_modes": {
             "energy": "Per energia",
@@ -139,6 +157,7 @@ TARIFF_OVERVIEW_TRANSLATIONS: dict[str, dict] = {
         "unit_chf_month": "CHF/mo.",
         "unit_chf_year": "CHF/yr.",
         "unit_percent": "%",
+        "dynamic_average_label": "Average of the fetched price series",
         "fee_per_metering_point": "per metering point",
         "fee_shared_equal": "Community costs, split equally",
         "fee_shared_weight": "Community costs, split by weight",
@@ -146,6 +165,11 @@ TARIFF_OVERVIEW_TRANSLATIONS: dict[str, dict] = {
             "The base price shown is the tariff outside its time-band "
             "restrictions. The effective price follows whichever band applies "
             "at the time of consumption."
+        ),
+        "footnote_dynamic_average": (
+            "This tariff is billed from a dynamic price. The price shown is "
+            "the average of the currently fetched price series, not a fixed "
+            "rate."
         ),
         "billing_modes": {
             "energy": "By energy",

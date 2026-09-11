@@ -43,7 +43,7 @@ re-implement the engine from scratch.
 
 ### Out of scope
 
-- Dynamic market pricing feeds
+- Fetching and storing dynamic tariff price series — see `docs/specs/2026-09-dynamic-tariffs.md`. This spec covers only *resolving* an already-fetched series during pricing (§3.1.2, §4.4.3, §4.5.2).
 - Country-specific tariff engines beyond Swiss model
 - Invoice lifecycle transitions (see `SPEC-2026-invoice-lifecycle-comms`)
 - PDF rendering and email delivery
@@ -150,6 +150,21 @@ to signal it.
 The check covers fixed-fee modes too.  It previously applied only to
 `energy` and `percentage_of_energy`, so a duplicated monthly fee was charged
 twice unguarded.
+
+### 3.1.2 Dynamic tariffs
+
+`Tariff.dynamic_source` (nullable FK to `tariffs.dynamic.DynamicTariffSource`)
+lets a `billing_mode = energy` tariff price from a fetched time series instead
+of from `TariffPeriod` rows — see `docs/specs/2026-09-dynamic-tariffs.md` and
+[ADR 0018](../adr/0018-dynamic-tariff-price-series.md) for the full design.
+Only what this spec's own algorithm needs to know:
+
+- `dynamic_source` is **not** one of the series-coherence fields above, so a
+  tariff series may go static → dynamic at a version boundary — exactly what
+  happens when an operator switches on 1 January.
+- A dynamic tariff carries **no** `TariffPeriod` rows. §4.4's period-matching
+  (§3.2) does not apply to it at all; §4.4.3 below is the whole of its pricing
+  rule.
 
 ### 3.2 TariffPeriod (price bands within a tariff)
 
@@ -566,6 +581,32 @@ These tariffs price energy as a percentage of the **grid base price sum**.
    - Accumulate: `quantity` kWh at `quantity × effective_price` CHF.
    - Also track `base_total = quantity × grid_base_price_sum` (used for description rendering).
 
+#### 4.4.3 Dynamic tariffs (`Tariff.dynamic_source` set)
+
+A dynamic tariff still bills `billing_mode = energy`, so §4.4.1's loop reaches
+it exactly like a static tariff — the branch is entirely inside price
+resolution, not in which tariffs are selected.
+
+1. Resolve the price for `(tariff, ts)` from the tariff's `DynamicTariffSource`
+   series (`engine.TariffResolver.price_at`) instead of from `TariffPeriod`
+   period matching. The lookup is a bisect over the source's stored
+   `(valid_from, valid_to, price)` intervals, loaded once per
+   `InvoiceGenerationContext` and shared across every participant in a batch.
+2. **If no stored interval covers `ts`, raise rather than bill zero.** This is
+   the one place `generate_invoice` refuses to produce an invoice instead of
+   degrading: a static tariff's unpriced hour is a configuration choice, a gap
+   in a fetched series is missing information. The whole invoice — inside its
+   `@transaction.atomic` — rolls back; a batch run (§6, ADR 0011) reports it as
+   one participant's failure rather than aborting the run.
+3. §4.4.2's grid base price sum includes a dynamic `grid` tariff's resolved
+   price like any other — the percentage tariff needs no special case.
+4. §4.7 (item accumulation) always sees `period=None` for a dynamic line: it
+   never itemises by band, because a quarter-hourly series has no bands to
+   itemise by.
+
+Full detail, including the readiness-side completeness check that surfaces a
+gap before generation is attempted: `docs/specs/2026-09-dynamic-tariffs.md` §9.
+
 ### 4.5 Producer credit allocation (per timestamp)
 
 For **each** production (feed-in) reading:
@@ -603,6 +644,11 @@ These are accumulated in a separate **`producer_credit`** bucket so the line ite
 #### 4.5.2 Feed-in compensation
 
 For `exported_kwh > 0`: apply all `energy`-mode tariffs with `energy_type = feed_in` **as negative amounts** (credits).
+
+Both 4.5.1 and 4.5.2 resolve their price through the same `price_at` funnel as
+§4.4.1, so a dynamic `feed_in` tariff (§4.4.3, §3.1.2) credits the export at
+its fetched series price — including negative values, which pay the exporter
+*less* than zero for feeding in at a moment the grid is oversupplied.
 
 ### 4.6 Fixed-fee tariffs
 
@@ -1226,6 +1272,7 @@ The description renders as: `"Surcharge 50% (50% von CHF 0.32/kWh)"` (German).
 | Overlapping tariff validity windows | Medium | Tariff matching applies **all** active tariffs (no conflict — they accumulate) |
 | `fixed_price_chf` entered per-participant on a shared fee | Medium | Field label and form hint state "total for the community"; §3.4 and §4.6.3 call out the changed meaning |
 | Shared fee over- or under-recovering after a membership change | Medium | Denominator and charged months both evaluated per month (§4.6.3); reconciliation asserted across a full ZEV run |
+| A dynamic tariff's fetched series has a gap inside a billed period | High — would otherwise bill zero for a real reading | Engine refuses to generate rather than degrade (§4.4.3); readiness flags the gap before generation is attempted (`2026-09-dynamic-tariffs.md` §9.3) |
 
 ---
 
@@ -1394,3 +1441,4 @@ community energy to a single participant.
 - [ ] VAT is applied only when `zev.vat_number` is set (§4.8)
 - [ ] Worked examples (§8) pass as automated tests
 - [ ] Historical invoice totals remain stable across non-historical tariff changes
+- [ ] A dynamic tariff (§3.1.2) prices from its fetched series via the same `price_at` funnel as a static tariff, and generation refuses rather than bills zero when the series does not cover a billed reading (§4.4.3)

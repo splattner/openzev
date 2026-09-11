@@ -33,6 +33,7 @@ from invoices.readiness import (
 )
 from invoices.test_helpers import make_participant, make_user, make_zev
 from metering.models import MeterReading, ReadingDirection, ReadingResolution
+from tariffs.dynamic.models import DynamicPricePoint, DynamicTariffSource
 from tariffs.models import BillingMode, EnergyType, PeriodType, Tariff, TariffCategory, TariffPeriod
 from testing.helpers import authenticate as auth
 from zev.models import MeteringPoint, MeteringPointAssignment, MeteringPointType
@@ -74,6 +75,38 @@ def _energy_tariff(zev, valid_from=date(2026, 1, 1), valid_to=None, price="0.200
         price_chf_per_kwh=Decimal(price),
     )
     return tariff
+
+
+def _dynamic_tariff(
+    zev, *, energy_type=EnergyType.GRID, category=TariffCategory.ENERGY,
+    valid_from=date(2026, 1, 1), tariff_type="grid", label="Dynamic grid",
+):
+    # category=ENERGY, matching _energy_tariff() above: _load_energy_tariffs()
+    # only considers that category (a pre-existing readiness limitation, not
+    # something this dynamic-tariff work changes — grid_fees/levies tariffs
+    # are priced by the engine but not coverage-checked by readiness today).
+    source = DynamicTariffSource.objects.create(
+        label=label, url=f"https://api.example.ch/{label.replace(' ', '-')}",
+        adapter="vse_v1", tariff_type=tariff_type, tariff_name="",
+    )
+    tariff = Tariff.objects.create(
+        zev=zev, name=label, category=category, billing_mode=BillingMode.ENERGY,
+        energy_type=energy_type, valid_from=valid_from, dynamic_source=source,
+    )
+    return tariff, source
+
+
+def _store_series(source, start: datetime, end: datetime, price="0.20000"):
+    """One stored interval spanning ``[start, end)``.
+
+    A single row is enough to prove day-level coverage: ``coverage_gaps``
+    walks stored intervals, not a fixed resolution, so it does not care
+    whether the span is represented by one row or a thousand quarter-hourly
+    ones.
+    """
+    DynamicPricePoint.objects.create(
+        source=source, valid_from=start, valid_to=end, price_chf_per_kwh=Decimal(price),
+    )
 
 
 class ReadinessTestCase(TestCase):
@@ -1098,6 +1131,125 @@ class TariffPricingCoverageTests(ReadinessTestCase):
         steps = self._steps_by_key(
             compute_readiness(self.zev, date(2026, 1, 1), date(2026, 1, 31))
         )
+        self.assertEqual(steps["tariffs"]["status"], "ok")
+
+
+class DynamicTariffPricingCoverageTests(ReadinessTestCase):
+    """A dynamic tariff needs its fetched series to cover the period, not
+    just a price band — the presence of a band tells you nothing about
+    whether the series behind it was ever fetched (#530 part 2)."""
+
+    def test_a_fully_covered_dynamic_tariff_is_ok(self):
+        tariff, source = _dynamic_tariff(self.zev)
+        _store_series(
+            source, datetime(2026, 1, 1, tzinfo=timezone.utc), datetime(2026, 2, 1, tzinfo=timezone.utc),
+        )
+
+        steps = self._steps_by_key(
+            compute_readiness(self.zev, date(2026, 1, 1), date(2026, 1, 31))
+        )
+
+        self.assertEqual(steps["tariffs"]["status"], "ok")
+
+    def test_a_source_that_was_never_fetched_leaves_the_whole_period_uncovered(self):
+        # A dynamic tariff exists and validates, but nothing was ever fetched
+        # for it — the exact state right after configuring one.
+        _dynamic_tariff(self.zev)
+
+        steps = self._steps_by_key(
+            compute_readiness(self.zev, date(2026, 1, 1), date(2026, 1, 31))
+        )
+
+        self.assertEqual(steps["tariffs"]["status"], "warn")
+        self.assertEqual(steps["tariffs"]["count"], 31)
+
+    def test_a_gap_in_the_middle_of_the_series_is_reported_not_the_whole_period(self):
+        tariff, source = _dynamic_tariff(self.zev)
+        _store_series(
+            source, datetime(2026, 1, 1, tzinfo=timezone.utc), datetime(2026, 1, 10, tzinfo=timezone.utc),
+        )
+        _store_series(
+            source, datetime(2026, 1, 15, tzinfo=timezone.utc), datetime(2026, 2, 1, tzinfo=timezone.utc),
+        )
+
+        steps = self._steps_by_key(
+            compute_readiness(self.zev, date(2026, 1, 1), date(2026, 1, 31))
+        )
+
+        self.assertEqual(steps["tariffs"]["status"], "warn")
+        # Jan 10 through Jan 14, inclusive: five uncovered days.
+        self.assertEqual(steps["tariffs"]["count"], 5)
+
+    def test_a_priced_band_free_dynamic_tariff_still_masks_only_its_own_type(self):
+        # LOCAL is fully covered by the fixture tariff; GRID is dynamic and
+        # unfetched. One must not hide the other, matching the static case
+        # already covered by TariffPricingCoverageTests.
+        _dynamic_tariff(self.zev, energy_type=EnergyType.GRID)
+
+        steps = self._steps_by_key(
+            compute_readiness(self.zev, date(2026, 1, 1), date(2026, 1, 31))
+        )
+
+        self.assertEqual(steps["tariffs"]["status"], "warn")
+        self.assertEqual(steps["tariffs"]["count"], 31)
+
+    def test_a_percentage_tariff_on_a_dynamic_grid_rate_needs_the_series_covered(self):
+        # Mirrors the static percentage-tariff rule: a % tariff prices its
+        # own type through the grid rate, so an uncovered dynamic grid series
+        # leaves the percentage tariff's type unpriced too.
+        _dynamic_tariff(self.zev, energy_type=EnergyType.GRID)
+        pct = Tariff.objects.create(
+            zev=self.zev, name="Levy", category=TariffCategory.LEVIES,
+            billing_mode=BillingMode.PERCENTAGE_OF_ENERGY, energy_type=EnergyType.GRID,
+            valid_from=date(2026, 1, 1),
+        )
+        pct.percentage = Decimal("50")
+        pct.save()
+
+        steps = self._steps_by_key(
+            compute_readiness(self.zev, date(2026, 1, 1), date(2026, 1, 31))
+        )
+
+        self.assertEqual(steps["tariffs"]["status"], "warn")
+
+    def test_daylight_saving_does_not_read_as_a_gap(self):
+        # A quarter-hourly day is 92 intervals in spring and 100 in autumn —
+        # coverage here must come from the stored interval, not from a count,
+        # exactly like tariffs.dynamic.fetch.coverage_gaps.
+        tariff, source = _dynamic_tariff(self.zev, valid_from=date(2026, 3, 1))
+        _store_series(
+            source, datetime(2026, 3, 1, tzinfo=timezone.utc), datetime(2026, 4, 1, tzinfo=timezone.utc),
+        )
+
+        steps = self._steps_by_key(
+            compute_readiness(self.zev, date(2026, 3, 1), date(2026, 3, 31))
+        )
+
+        self.assertEqual(steps["tariffs"]["status"], "ok")
+
+    def test_a_static_and_a_dynamic_tariff_of_the_same_type_coexist(self):
+        # Two versions of one series, one before and one after the operator
+        # switched to dynamic pricing — exactly ADR 0018's static->dynamic
+        # scenario, this time from the readiness side. Only GRID (or FEED_IN)
+        # can be dynamic at all (§3.3's tariff-type mapping), so this uses a
+        # dedicated grid series rather than the fixture's LOCAL tariff.
+        static_grid = Tariff.objects.create(
+            zev=self.zev, name="Grid", category=TariffCategory.ENERGY,
+            billing_mode=BillingMode.ENERGY, energy_type=EnergyType.GRID,
+            valid_from=date(2026, 1, 1), valid_to=date(2026, 1, 15),
+        )
+        TariffPeriod.objects.create(
+            tariff=static_grid, period_type=PeriodType.FLAT, price_chf_per_kwh=Decimal("0.20000"),
+        )
+        _tariff, source = _dynamic_tariff(self.zev, valid_from=date(2026, 1, 16), label="Grid")
+        _store_series(
+            source, datetime(2026, 1, 16, tzinfo=timezone.utc), datetime(2026, 2, 1, tzinfo=timezone.utc),
+        )
+
+        steps = self._steps_by_key(
+            compute_readiness(self.zev, date(2026, 1, 1), date(2026, 1, 31))
+        )
+
         self.assertEqual(steps["tariffs"]["status"], "ok")
 
 

@@ -15,6 +15,8 @@ from django.db.models.functions import RowNumber
 
 from allocation.validity import period_window
 from metering.models import MeterReading
+from tariffs.dynamic.fetch import coverage_gaps
+from tariffs.dynamic.models import DynamicTariffSource
 from tariffs.models import BillingMode, EnergyType, Tariff, TariffCategory
 from zev.models import MeteringPoint, MeteringPointAssignment, Participant
 
@@ -264,19 +266,66 @@ def _load_energy_tariffs(zev) -> list[Tariff]:
     )
 
 
+def _dynamic_uncovered_days_by_source(
+    source_ids: set, start: date, end: date
+) -> dict:
+    """Days in ``[start, end]`` each dynamic source's series has a gap in.
+
+    One ``coverage_gaps`` query per source for the *whole* span — this is the
+    span-wide preload ``_load_bulk`` does once, not something recomputed per
+    period when ``compute_readiness_many`` reuses one ``BulkData`` across many.
+
+    A day counts as uncovered if the series has a gap anywhere inside it.
+    Never derived from an interval count: a quarter-hourly day is 92, 96 or
+    100 intervals depending on daylight saving, so counting would flag a
+    perfectly priced DST day as broken twice a year.
+    """
+    if not source_ids:
+        return {}
+    span_start, span_end = period_window(start, end)
+    uncovered_by_source: dict = {}
+    for source in DynamicTariffSource.objects.filter(pk__in=source_ids):
+        uncovered: set[date] = set()
+        for gap_start, gap_end in coverage_gaps(source, span_start, span_end):
+            day = gap_start.date()
+            last_day = (gap_end - timedelta(microseconds=1)).date()
+            while day <= last_day:
+                uncovered.add(day)
+                day += timedelta(days=1)
+        uncovered_by_source[source.pk] = uncovered
+    return uncovered_by_source
+
+
+def _tariff_is_priced_on(tariff: Tariff, day: date, dynamic_uncovered: dict) -> bool:
+    """Whether ``tariff`` has an actual price to bill with on ``day``.
+
+    A static tariff needs at least one price band — the engine falls back to
+    the season's first band once any band exists, so the mere presence of a
+    band (any season, any window) counts as coverage. A dynamic tariff instead
+    needs its fetched series to have no gap that day: a band existing tells
+    you nothing about whether a series was ever fetched, and the engine
+    refuses to bill a gap rather than falling back to anything (#530).
+    """
+    if tariff.dynamic_source_id:
+        return day not in dynamic_uncovered.get(tariff.dynamic_source_id, ())
+    return len(tariff.periods.all()) > 0
+
+
 def _uncovered_tariff_days(
-    energy_tariffs: list[Tariff], pct_tariffs: list[Tariff], start: date, end: date
+    energy_tariffs: list[Tariff],
+    pct_tariffs: list[Tariff],
+    start: date,
+    end: date,
+    dynamic_uncovered: dict | None = None,
 ) -> list[date]:
     """Days the billing engine cannot price end-to-end.
 
     Every configured energy type — direct or percentage — must be priced every
-    day: a priced tariff of one type must not mask a missing one of another,
-    and a tariff without any price band prices nothing (the engine falls back
-    to the season's first band once at least one exists, so the presence of a
-    band — any season, any window — counts as day coverage). A percentage
-    tariff prices its own energy type through the grid rate, so it needs a
-    priced grid tariff on the days it applies.
+    day: a priced tariff of one type must not mask a missing one of another.
+    A percentage tariff prices its own energy type through the grid rate, so
+    it needs a priced grid tariff on the days it applies.
     """
+    dynamic_uncovered = dynamic_uncovered or {}
     needed_types = {t.energy_type for t in energy_tariffs} | {
         t.energy_type for t in pct_tariffs
     }
@@ -288,7 +337,7 @@ def _uncovered_tariff_days(
         covered = {
             t.energy_type
             for t in energy_tariffs
-            if _tariff_active_on(t, day) and len(t.periods.all()) > 0
+            if _tariff_active_on(t, day) and _tariff_is_priced_on(t, day, dynamic_uncovered)
         }
         pct_active = [
             t
@@ -310,7 +359,11 @@ def _uncovered_tariff_days(
 
 
 def _tariffs_step_from_list(
-    energy: list[Tariff], pct: list[Tariff], period_start: date, period_end: date
+    energy: list[Tariff],
+    pct: list[Tariff],
+    period_start: date,
+    period_end: date,
+    dynamic_uncovered: dict | None = None,
 ) -> StepResult:
     tariffs_link = "/tariffs"
     if not energy and not pct:
@@ -323,7 +376,7 @@ def _tariffs_step_from_list(
             link=tariffs_link,
         )
 
-    uncovered_days = _uncovered_tariff_days(energy, pct, period_start, period_end)
+    uncovered_days = _uncovered_tariff_days(energy, pct, period_start, period_end, dynamic_uncovered)
     if not uncovered_days:
         return StepResult("tariffs", "ok", 0)
     ranges: list[dict] = []
@@ -414,6 +467,7 @@ class BulkData:
     readings: dict[int, dict[date, int]]  # meter -> {day: reading count}
     energy: list[Tariff]
     pct: list[Tariff]
+    dynamic_uncovered: dict  # dynamic source id -> {uncovered day, ...}, span-wide
     invoice_rows: list[tuple[int, int, date, date, str, str]]  # (id, pid, ps, pe, status, number)
     latest_email_status: dict[int, str]  # per invoice id
 
@@ -466,6 +520,8 @@ def _load_bulk(zev, span_start: date, span_end: date) -> BulkData:
     tariffs = _load_energy_tariffs(zev)
     energy = [t for t in tariffs if t.billing_mode == BillingMode.ENERGY]
     pct = [t for t in tariffs if t.billing_mode == BillingMode.PERCENTAGE_OF_ENERGY]
+    dynamic_source_ids = {t.dynamic_source_id for t in tariffs if t.dynamic_source_id}
+    dynamic_uncovered = _dynamic_uncovered_days_by_source(dynamic_source_ids, span_start, span_end)
     # Newest first per participant so `_bulk_invoice_steps` picks the same
     # invoice as the single-period path when duplicates exist. Bounded to the
     # requested span so old ZEVs don't load their entire invoice history.
@@ -488,6 +544,7 @@ def _load_bulk(zev, span_start: date, span_end: date) -> BulkData:
         readings=readings,
         energy=energy,
         pct=pct,
+        dynamic_uncovered=dynamic_uncovered,
         invoice_rows=invoices,
         latest_email_status=latest_email_status,
     )
@@ -823,7 +880,7 @@ def _bulk_period_readiness(
     steps = [
         _bulk_metering(data, period_start, period_end),
         _bulk_assignments(data, period_start, period_end),
-        _tariffs_step_from_list(data.energy, data.pct, period_start, period_end),
+        _tariffs_step_from_list(data.energy, data.pct, period_start, period_end, data.dynamic_uncovered),
         _bulk_generation_conflicts(data, period_start, period_end),
         *invoice_steps,
     ]

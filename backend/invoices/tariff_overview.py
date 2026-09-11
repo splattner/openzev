@@ -28,7 +28,12 @@ from .dates import format_date_value
 from .pdf_render import render_pdf
 from .pdf_translations import INVOICE_TRANSLATIONS
 from .tariff_overview_translations import TARIFF_OVERVIEW_TRANSLATIONS
-from .tariff_pricing import display_grid_base_chf_per_kwh, grid_base_is_multiband
+from .tariff_pricing import (
+    display_grid_base_chf_per_kwh,
+    dynamic_average_chf_per_kwh,
+    grid_base_is_dynamic,
+    grid_base_is_multiband,
+)
 
 TARIFF_OVERVIEW_TEMPLATE = "invoices/tariff_overview_pdf.html"
 
@@ -82,6 +87,22 @@ def _validity_display(tariff, tr: dict, date_pattern: str) -> str:
 
 
 def _price_rows_for_energy_tariff(tariff, tr: dict, band_tr: dict) -> list[dict]:
+    if tariff.dynamic_source_id:
+        # No bands to enumerate at all — the price lives in a fetched series,
+        # not on the tariff. One row, the series average, flagged so the
+        # reader knows it is not a fixed rate. Empty (not an empty-but-zero
+        # row) when nothing has been fetched yet: the caller treats "no rows"
+        # as "nothing to print", same as a static tariff with no bands.
+        average = dynamic_average_chf_per_kwh(tariff)
+        if average is None:
+            return []
+        return [{
+            "label": tr["dynamic_average_label"],
+            "recurrence": "",
+            "amount": f"{float(average) * 100:.2f}",
+            "unit": tr["unit_rp"],
+            "footnote": "dynamic_average",
+        }]
     # One row per band, never an average — this is the same principle #546
     # established for the invoice: a participant must be able to look up the
     # exact figure they were quoted, not a blend of several. Band wording goes
@@ -101,8 +122,14 @@ def _price_rows_for_energy_tariff(tariff, tr: dict, band_tr: dict) -> list[dict]
 
 
 def _price_row_for_percentage_tariff(
-    tariff, tr: dict, grid_sum_chf: Decimal, multiband_base: bool
+    tariff, tr: dict, grid_sum_chf: Decimal, multiband_base: bool, dynamic_base: bool = False,
 ) -> dict:
+    # A base can be approximate for two different reasons — the underlying
+    # grid tariff has several time bands, or it is a fluctuating dynamic
+    # price — and they need different footnote text. A base is rarely both at
+    # once in practice; when it is, "dynamic" is the more surprising fact for
+    # the reader, so it wins.
+    footnote = "dynamic_average" if dynamic_base else ("multiband_base" if multiband_base else None)
     pct = Decimal(str(tariff.percentage or 0))
     if grid_sum_chf > 0:
         effective_rp = grid_sum_chf * (pct / Decimal("100")) * Decimal("100")
@@ -112,14 +139,14 @@ def _price_row_for_percentage_tariff(
             "recurrence": "",
             "amount": f"{float(effective_rp):.2f}",
             "unit": tr["unit_rp"],
-            "footnote": "multiband_base" if multiband_base else None,
+            "footnote": footnote,
         }
     return {
         "label": f"{float(pct):.2f} {tr['unit_percent']}",
         "recurrence": "",
         "amount": f"{float(pct):.2f}",
         "unit": tr["unit_percent"],
-        "footnote": "multiband_base" if multiband_base else None,
+        "footnote": footnote,
     }
 
 
@@ -165,16 +192,20 @@ def _label_is_redundant(tariff, price_row: dict, band_tr: dict) -> bool:
 
 def _build_tariff_row(
     tariff, tr: dict, band_tr: dict, date_pattern: str, as_of: date,
-    grid_sum_chf: Decimal, multiband_base: bool,
+    grid_sum_chf: Decimal, multiband_base: bool, dynamic_base: bool = False,
 ) -> dict | None:
     if tariff.billing_mode == BillingMode.ENERGY:
         price_rows = _price_rows_for_energy_tariff(tariff, tr, band_tr)
         if not price_rows:
             # A tariff with no bands has nothing to print — skip it rather
-            # than emit a header with an empty table underneath.
+            # than emit a header with an empty table underneath. Also what a
+            # dynamic tariff whose series has never been fetched hits: no
+            # average to show yet, same "nothing to print" outcome.
             return None
     elif tariff.billing_mode == BillingMode.PERCENTAGE_OF_ENERGY:
-        price_rows = [_price_row_for_percentage_tariff(tariff, tr, grid_sum_chf, multiband_base)]
+        price_rows = [
+            _price_row_for_percentage_tariff(tariff, tr, grid_sum_chf, multiband_base, dynamic_base)
+        ]
     else:
         price_rows = [_price_row_for_fee_tariff(tariff, tr)]
 
@@ -199,9 +230,9 @@ def _build_tariff_row(
     }
 
 
-def _grid_base(tariffs: list, as_of: date) -> tuple[Decimal, bool]:
-    """The static display base for percentage-of-energy tariffs, and whether
-    it approximates a multi-band grid tariff (see ``tariff_pricing``).
+def _grid_base(tariffs: list, as_of: date) -> tuple[Decimal, bool, bool]:
+    """The display base for percentage-of-energy tariffs, and whether it
+    approximates a multi-band or a dynamic grid tariff (see ``tariff_pricing``).
 
     Computed once against ``as_of`` — not per row — so a superseded
     percentage-of-energy version shown under ``scope=all`` reads against the
@@ -224,7 +255,11 @@ def _grid_base(tariffs: list, as_of: date) -> tuple[Decimal, bool]:
         and t.billing_mode == BillingMode.ENERGY
         and _is_active(t, as_of)
     ]
-    return display_grid_base_chf_per_kwh(grid_tariffs), grid_base_is_multiband(grid_tariffs)
+    return (
+        display_grid_base_chf_per_kwh(grid_tariffs),
+        grid_base_is_multiband(grid_tariffs),
+        grid_base_is_dynamic(grid_tariffs),
+    )
 
 
 def _vat_display(zev, tr: dict) -> tuple[str, str | None]:
@@ -255,7 +290,7 @@ def _build_template_context(zev, as_of: date, scope: str) -> dict:
 
     date_pattern = AppSettings.load().date_format_short
     tariffs = _select_tariffs(zev, as_of, scope)
-    grid_sum_chf, multiband_base = _grid_base(tariffs, as_of)
+    grid_sum_chf, multiband_base, dynamic_base = _grid_base(tariffs, as_of)
 
     ordered = sorted(
         tariffs,
@@ -270,7 +305,9 @@ def _build_template_context(zev, as_of: date, scope: str) -> dict:
     for category in _CATEGORY_ORDER:
         rows = [
             row for row in (
-                _build_tariff_row(t, tr, band_tr, date_pattern, as_of, grid_sum_chf, multiband_base)
+                _build_tariff_row(
+                    t, tr, band_tr, date_pattern, as_of, grid_sum_chf, multiband_base, dynamic_base,
+                )
                 for t in ordered
                 if t.category == category
             )

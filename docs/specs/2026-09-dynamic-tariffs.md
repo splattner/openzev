@@ -29,13 +29,13 @@ series refuses to bill rather than silently billing zero.
 
 This spec describes the whole feature. It lands in three parts:
 
-| Part | Covers | Sections |
-|---|---|---|
-| 1 | Data model, parser, adapters, fetching, scheduling, transfer | 3 – 8 |
-| 2 | Engine price resolution, refusal, readiness coverage | 9 |
-| 3 | Importer unblock, API and frontend | 10 |
+| Part | Covers | Sections | Status |
+|---|---|---|---|
+| 1 | Data model, parser, adapters, fetching, scheduling, transfer | 3 – 8 | Shipped |
+| 2 | Engine price resolution, refusal, readiness coverage | 9 | Shipped |
+| 3 | Importer unblock, API and frontend | 10 | Not started |
 
-Sections 9 and 10 describe intended behaviour that is **not yet implemented**.
+Section 10 describes intended behaviour that is **not yet implemented**.
 
 ## 2. Scope
 
@@ -267,21 +267,104 @@ python manage.py fetch_dynamic_prices --probe <url> --adapter groupe_e --tariff-
 `--probe` fetches and parses **without storing**, which is how a URL from a
 published document is checked before it is trusted.
 
-## 9. Billing (part 2 — not yet implemented)
+## 9. Billing
 
-Price resolution funnels through `TariffResolver.price_at(tariff, ts)`, which
-returns `(price, period)`; a dynamic tariff resolves from the series and returns
-`period=None`. All four engine resolution points use it: energy pricing, the
-percentage-tariff grid base, and both feed-in credit blocks. The series is
-loaded once per `InvoiceGenerationContext`, not per participant.
+### 9.1 Engine price resolution
 
-A dynamic tariff with **no price at a reading's timestamp raises** rather than
-billing `Decimal("0")`, which is what a missing static band does today. The check
-is against reading timestamps, not a synthetic grid, so DST needs no case.
+`backend/invoices/engine.py`. Price resolution funnels through
+`TariffResolver.price_at(tariff, ts) -> (price, period)`, the *only* place a
+tariff's price is read — static or dynamic. A dynamic tariff resolves via
+`_DynamicSeries` (a sorted, bisected view of one source's stored points) and
+always returns `period=None`: a 15-minute series must never itemise per
+reading, or a month's invoice would run to thousands of lines.
 
-Readiness treats a dynamic tariff as priceable on a day iff its source covers
-that day, replacing the `len(t.periods.all()) > 0` predicate. Reported through
-the existing `tariffs` step — no new step key.
+All four of the engine's price-resolution points read from `price_at`:
+
+| Site | What it prices |
+|---|---|
+| `_price_energy`'s energy loop | Direct consumption/production at a reading |
+| `_price_energy`'s percentage base | `sum(price_at(t, ts) for t in grid tariffs)` — a levy charged as a % of a dynamic grid rate follows the series automatically |
+| Personal feed-in credit | Export compensation |
+| Community feed-in credit | Export compensation, shared allocation |
+
+`_DynamicSeries` is loaded once per `DynamicTariffSource` and cached on
+`InvoiceGenerationContext` (`dynamic_series(source_id)`), not on
+`TariffResolver` — the resolver itself is rebuilt per participant even inside
+one batch, while the context is shared across the whole ZEV-period run. This is
+what makes a 20-participant batch load a series once instead of twenty times.
+
+### 9.2 The refusal
+
+`price_at` raises `DynamicPriceGapError` (a `ValueError` subclass) when a
+dynamic tariff has no stored point covering a reading's timestamp. This is
+deliberately different from a static tariff, which bills `Decimal("0")` for an
+unpriced hour — existing, unrelated behaviour, left untouched. The two cases
+mean different things: a static tariff's bands are configured by a human and
+may legitimately leave an hour unpriced; a gap in a fetched series is missing
+information, not a choice.
+
+The check is against each reading's real timestamp, never a synthetic
+quarter-hour grid, so DST needs no special case — there simply are no readings
+in an hour that does not exist.
+
+`generate_invoice` runs inside `@transaction.atomic`, so a raised gap rolls the
+whole invoice back — nothing partial is written. `generate_invoices_for_zev`
+(ADR 0011) already catches per-participant exceptions into `failures`, so a
+gap surfaces as one failure entry with the gap's tariff name and timestamp in
+`error`, not a crashed batch.
+
+### 9.3 Readiness coverage
+
+`backend/invoices/readiness.py`. The predicate that decides whether a tariff
+is "priced" on a given day now branches on `tariff.dynamic_source_id`:
+
+- **Static** (unchanged): `len(tariff.periods.all()) > 0`.
+- **Dynamic**: the day is not inside a gap returned by
+  `tariffs.dynamic.fetch.coverage_gaps` for that tariff's source.
+
+`_dynamic_uncovered_days_by_source` computes this **once per source for the
+whole span** inside `_load_bulk` (one `coverage_gaps` query per source, not
+per day and not per period), stored on `BulkData.dynamic_uncovered` so
+`compute_readiness_many` — which reuses one `BulkData` across many periods —
+does not recompute it. Reported through the existing `tariffs` step
+(`_tariffs_step_from_list`); no new `ReadinessStepKey`, so no frontend or
+locale changes were needed for this part.
+
+Coverage is measured over stored intervals, exactly like `coverage_gaps`
+itself — never by counting, so a DST day with 92 or 100 intervals reads as
+fully covered rather than "broken."
+
+`_load_energy_tariffs` (unchanged, pre-existing) only considers
+`category=TariffCategory.ENERGY` tariffs — a grid-fee or levy tariff, static or
+dynamic, is priced by the engine but not coverage-checked by readiness today.
+This is an existing limitation this work did not extend the scope of.
+
+### 9.4 Printed documents (tariff overview PDF, participation contract)
+
+`backend/invoices/tariff_pricing.py` and `tariff_overview.py`. Neither
+document has a reading timestamp to resolve a live price against (see
+`tariff_pricing.py`'s module docstring), so a dynamic tariff prints the
+**average of its fetched series** instead of a per-band figure:
+
+- `dynamic_average_chf_per_kwh(tariff)` — `Avg("price_chf_per_kwh")` over the
+  tariff's source, or `None` if nothing has been fetched yet.
+- An energy tariff's own row: one row, the average, footnoted
+  `dynamic_average`. `None` (nothing fetched) means no row at all — the same
+  "nothing to print" outcome a static tariff with zero bands already gets,
+  not a misleading zero.
+- The percentage-tariff grid base (`display_grid_base_chf_per_kwh`,
+  `grid_base_is_dynamic`/`grid_base_is_multiband`): a dynamic grid tariff
+  contributes its average to the sum. `grid_base_is_multiband` and
+  `grid_base_is_dynamic` are two distinct flags — a fluctuating fetched price
+  and a static multi-band tariff are both "approximate," but for different
+  reasons, worded differently in `footnote_dynamic_average` vs
+  `footnote_multiband_base` (all four locales). When a base is both, dynamic
+  wins the footnote, as the more surprising fact for the reader.
+
+The participation contract (`contract_pdf.py`) shares
+`display_grid_base_chf_per_kwh` and so picks up a dynamic tariff's average
+automatically; it does not currently print the multiband/dynamic footnote at
+all (pre-existing — it never explained the multi-band approximation either).
 
 ## 10. Import and UI (part 3 — not yet implemented)
 
@@ -317,6 +400,10 @@ was charged as values, not as a live reference to the price that produced it.
 | `tariffs/test_dynamic_fetch.py` | 24 | Chunking, UTC storage, upsert idempotency, negative prices, coverage gaps, windows, failure recording, tasks, source identity |
 | `tariffs/test_dynamic_tariff_link.py` | 9 | `Tariff.clean()` rules, static→dynamic series versioning, PROTECT retention |
 | `zev/test_transfer.py::DynamicTariffTransferTests` | 3 | Natural-key match, recreation on a fresh instance, static tariffs unaffected |
+| `invoices/test_dynamic_pricing.py` | 17 | `_DynamicSeries` bisection, `TariffResolver.price_at` (static and dynamic), the gap refusal, end-to-end `generate_invoice` (consumption, negative prices, percentage base, feed-in) |
+| `invoices/test_readiness.py::DynamicTariffPricingCoverageTests` | 7 | Full/partial/no coverage, type-masking, percentage-tariff coupling, DST, static→dynamic series versioning |
+| `invoices/test_dynamic_tariff_pricing.py` | 9 | `dynamic_average_chf_per_kwh`, `display_grid_base_chf_per_kwh`, `grid_base_is_dynamic` vs `grid_base_is_multiband` |
+| `invoices/test_tariff_overview.py::TariffOverviewDynamicTariffTests` | 4 | Unfetched tariff prints nothing, fetched average with its footnote, percentage-tariff footnote and amount |
 
 ### 12.2 Fixtures
 
@@ -347,7 +434,8 @@ endpoint serves only the current day and keeps no history.
 - [x] Prices are retained for as long as the tariff referencing them exists
 - [x] A v2 payload is refused by name
 - [x] The transfer archive carries the source link by natural key
-- [ ] The engine prices from the series and refuses an uncovered period (part 2)
-- [ ] Readiness flags an uncovered day before generation (part 2)
+- [x] The engine prices from the series and refuses an uncovered period
+- [x] Readiness flags an uncovered day before generation is attempted
+- [x] Printed documents (tariff overview, participation contract) show a dynamic tariff's fetched average rather than skipping it or printing zero
 - [ ] The importer creates dynamic tariffs instead of blocking them (part 3)
 - [ ] The UI shows that a tariff is dynamic and how current its data is (part 3)

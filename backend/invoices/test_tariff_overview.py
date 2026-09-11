@@ -10,7 +10,7 @@ end-to-end renders (empty state, PDF/A) cover the template itself.
 """
 
 import io
-from datetime import date
+from datetime import date, datetime, timezone
 from decimal import Decimal
 
 from pypdf import PdfReader
@@ -443,6 +443,92 @@ class TariffOverviewContentTests(TariffOverviewTestCase):
         self.assertEqual(overview_row["footnote"], "multiband_base")
         self.assertEqual(len(ctx["footnotes"]), 1)
         self.assertEqual(ctx["footnotes"][0][1], TARIFF_OVERVIEW_TRANSLATIONS["de"]["footnote_multiband_base"])
+
+
+class TariffOverviewDynamicTariffTests(TariffOverviewTestCase):
+    """A dynamic tariff has no bands at all — its price lives in a fetched
+    series — so it needs its own path through every place this document
+    would otherwise print "nothing" or silently sum it as zero."""
+
+    def _dynamic_grid_tariff(self, *, name="Grid (dynamic)"):
+        from tariffs.dynamic.models import DynamicTariffSource
+
+        source = DynamicTariffSource.objects.create(
+            label=name, url=f"https://api.example.ch/{name}", adapter="vse_v1",
+            tariff_type="grid", tariff_name="",
+        )
+        return self._energy_tariff(name=name, energy_type=EnergyType.GRID, dynamic_source=source), source
+
+    def _store(self, source, price="0.20000"):
+        from tariffs.dynamic.models import DynamicPricePoint
+
+        DynamicPricePoint.objects.create(
+            source=source,
+            valid_from=datetime(2026, 6, 1, 10, tzinfo=timezone.utc),
+            valid_to=datetime(2026, 6, 1, 10, 15, tzinfo=timezone.utc),
+            price_chf_per_kwh=Decimal(price),
+        )
+
+    def _local_pct(self, percentage="65.00"):
+        return Tariff.objects.create(
+            zev=self.zev, name="Local pct", category=TariffCategory.ENERGY,
+            billing_mode=BillingMode.PERCENTAGE_OF_ENERGY, energy_type=EnergyType.LOCAL,
+            percentage=Decimal(percentage), valid_from=date(2026, 1, 1),
+        )
+
+    def _pct_row(self, as_of=date(2026, 6, 1)):
+        ctx = _build_template_context(self.zev, as_of, "valid")
+        return next(
+            row for group in ctx["groups"] for tariff in group["tariffs"]
+            for row in tariff["price_rows"] if tariff["name"] == "Local pct"
+        )
+
+    def test_an_unfetched_dynamic_tariff_is_not_shown_at_all(self):
+        # No average to print yet — the same "nothing to print" outcome a
+        # static tariff with no bands gets, not a misleading zero.
+        self._dynamic_grid_tariff()
+
+        ctx = _build_template_context(self.zev, date(2026, 6, 1), "valid")
+
+        names = [t["name"] for group in ctx["groups"] for t in group["tariffs"]]
+        self.assertNotIn("Grid (dynamic)", names)
+
+    def test_a_fetched_dynamic_tariff_shows_its_average_with_a_footnote(self):
+        tariff, source = self._dynamic_grid_tariff()
+        self._store(source, "0.20000")
+
+        ctx = _build_template_context(self.zev, date(2026, 6, 1), "valid")
+
+        row = next(
+            row for group in ctx["groups"] for t in group["tariffs"]
+            for row in t["price_rows"] if t["name"] == "Grid (dynamic)"
+        )
+        self.assertEqual(row["amount"], "20.00")
+        self.assertEqual(row["footnote"], "dynamic_average")
+        self.assertIn(
+            TARIFF_OVERVIEW_TRANSLATIONS["de"]["footnote_dynamic_average"],
+            [text for _index, text in ctx["footnotes"]],
+        )
+
+    def test_a_percentage_tariff_on_a_dynamic_base_gets_the_dynamic_footnote(self):
+        _tariff, source = self._dynamic_grid_tariff()
+        self._store(source, "0.20000")
+        self._local_pct("50.00")
+
+        row = self._pct_row()
+
+        self.assertEqual(row["footnote"], "dynamic_average")
+        self.assertNotEqual(row["footnote"], "multiband_base")
+
+    def test_a_dynamic_base_prices_the_percentage_tariff_correctly(self):
+        _tariff, source = self._dynamic_grid_tariff()
+        self._store(source, "0.20000")
+        self._local_pct("50.00")
+
+        row = self._pct_row()
+
+        # 50% of the 0.20000 CHF/kWh average = 10.00 Rp./kWh.
+        self.assertEqual(row["amount"], "10.00")
 
 
 class TariffOverviewVatTests(TariffOverviewTestCase):
