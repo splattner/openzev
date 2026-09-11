@@ -1,25 +1,22 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { FormModal } from '../../components/FormModal'
-import { FormModalFooter } from '../../components/FormModalFooter'
-import { createDynamicTariffSource, updateDynamicTariffSource } from '../../lib/api/tariffs'
+import {
+  createDynamicTariffSource,
+  discoverDynamicTariffSource,
+  updateDynamicTariffSource,
+} from '../../lib/api/tariffs'
 import { formatApiError } from '../../lib/api/errors'
 import { queryKeys } from '../../lib/api/queryKeys'
 import { useToast } from '../../lib/toast'
-import type { DynamicTariffSource, DynamicTariffSourceInput, DynamicTariffType } from '../../types/api'
+import type {
+  DynamicApiVersion,
+  DynamicSourceDiscovery,
+  DynamicTariffSource,
+} from '../../types/api'
 
-const EMPTY_SOURCE: DynamicTariffSourceInput = {
-  label: '',
-  url: '',
-  adapter: 'vse_v1',
-  tariff_type: 'grid',
-  tariff_name: '',
-}
-
-const TARIFF_TYPES: DynamicTariffType[] = [
-  'electricity', 'grid', 'integrated', 'regional_fees', 'feed_in',
-]
+type VersionChoice = 'auto' | DynamicApiVersion
 
 type Props = {
   isOpen: boolean
@@ -28,26 +25,65 @@ type Props = {
   source?: DynamicTariffSource | null
 }
 
+function componentKey(component: DynamicSourceDiscovery['components'][number]): string {
+  return `${component.tariff_type}\u0000${component.tariff_name}`
+}
+
 export function DynamicSourceFormModal({ isOpen, onClose, onSaved, source }: Props) {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
   const { pushToast } = useToast()
-  const [values, setValues] = useState<DynamicTariffSourceInput>(EMPTY_SOURCE)
+  const [step, setStep] = useState<1 | 2>(1)
+  const [label, setLabel] = useState('')
+  const [url, setUrl] = useState('')
+  const [versionChoice, setVersionChoice] = useState<VersionChoice>('auto')
+  const [discovery, setDiscovery] = useState<DynamicSourceDiscovery | null>(null)
+  const [selection, setSelection] = useState('')
+  const [tariffName, setTariffName] = useState('')
 
   useEffect(() => {
-    setValues(source ? {
-      label: source.label,
-      url: source.url,
-      adapter: source.adapter,
-      tariff_type: source.tariff_type,
-      tariff_name: source.tariff_name,
-    } : EMPTY_SOURCE)
+    setStep(1)
+    setLabel(source?.label ?? '')
+    setUrl(source?.url ?? '')
+    setVersionChoice(source?.api_version ?? 'auto')
+    setDiscovery(null)
+    setSelection('')
+    setTariffName(source?.tariff_name ?? '')
   }, [source, isOpen])
 
-  const mutation = useMutation({
-    mutationFn: (payload: DynamicTariffSourceInput) => source
-      ? updateDynamicTariffSource(source.id, payload)
-      : createDynamicTariffSource(payload),
+  const discoverMutation = useMutation({
+    mutationFn: () => discoverDynamicTariffSource(
+      url,
+      versionChoice === 'auto' ? undefined : versionChoice,
+    ),
+    onSuccess: (result) => {
+      setDiscovery(result)
+      const first = result.components[0]
+      setSelection(componentKey(first))
+      setTariffName(first.tariff_name)
+      setStep(2)
+    },
+    onError: (error) => pushToast(
+      formatApiError(error, t('pages.dynamicSources.discovery.error')),
+      'error',
+    ),
+  })
+
+  const selected = useMemo(
+    () => discovery?.components.find((component) => componentKey(component) === selection),
+    [discovery, selection],
+  )
+
+  const saveMutation = useMutation({
+    mutationFn: () => source
+      ? updateDynamicTariffSource(source.id, { label })
+      : createDynamicTariffSource({
+          label,
+          url,
+          api_version: discovery!.api_version,
+          tariff_type: selected!.tariff_type,
+          tariff_name: selected!.tariff_name || tariffName,
+        }),
     onSuccess: async (saved) => {
       await queryClient.invalidateQueries({ queryKey: queryKeys.tariffs.dynamicSources() })
       pushToast(t(source ? 'pages.dynamicSources.updated' : 'pages.dynamicSources.created'), 'success')
@@ -60,14 +96,14 @@ export function DynamicSourceFormModal({ isOpen, onClose, onSaved, source }: Pro
     ),
   })
 
-  function set<K extends keyof DynamicTariffSourceInput>(key: K, value: DynamicTariffSourceInput[K]) {
-    setValues((current) => ({ ...current, [key]: value }))
-  }
-
   function submit(event: React.FormEvent) {
     event.preventDefault()
-    mutation.mutate(values)
+    if (source) saveMutation.mutate()
+    else if (step === 1) discoverMutation.mutate()
+    else if (selected) saveMutation.mutate()
   }
+
+  const pending = discoverMutation.isPending || saveMutation.isPending
 
   return (
     <FormModal
@@ -76,80 +112,104 @@ export function DynamicSourceFormModal({ isOpen, onClose, onSaved, source }: Pro
       onClose={onClose}
     >
       <form className="form-grid" onSubmit={submit}>
+        {!source && (
+          <div className="muted" style={{ gridColumn: '1 / -1' }}>
+            {t('pages.dynamicSources.discovery.step', { current: step, total: 2 })}
+          </div>
+        )}
+
         <label style={{ gridColumn: '1 / -1' }}>
           <span>{t('pages.dynamicSources.form.label')}</span>
-          <input value={values.label} onChange={(event) => set('label', event.target.value)} required />
+          <input value={label} onChange={(event) => setLabel(event.target.value)} required />
         </label>
-        <label style={{ gridColumn: '1 / -1' }}>
-          <span>{t('pages.dynamicSources.form.url')}</span>
-          <input type="url" value={values.url} onChange={(event) => set('url', event.target.value)} required disabled={Boolean(source?.point_count)} />
-          <small className="muted">{t('pages.dynamicSources.form.urlHint')}</small>
-        </label>
-        <label>
-          <span>{t('pages.dynamicSources.form.adapter')}</span>
-          <select
-            value={values.adapter}
-            disabled={Boolean(source?.point_count)}
-            onChange={(event) => {
-              const adapter = event.target.value as DynamicTariffSource['adapter']
-              setValues((current) => ({
-                ...current,
-                adapter,
-                tariff_type: adapter === 'bkw' ? 'feed_in' : current.tariff_type,
-                tariff_name: adapter === 'bkw' ? '' : current.tariff_name,
-              }))
-            }}
-          >
-            <option value="vse_v1">{t('pages.dynamicSources.adapters.vse_v1')}</option>
-            <option value="groupe_e">{t('pages.dynamicSources.adapters.groupe_e')}</option>
-            <option value="bkw">{t('pages.dynamicSources.adapters.bkw')}</option>
-          </select>
-        </label>
-        <label>
-          <span>{t('pages.dynamicSources.form.tariffType')}</span>
-          <select
-            value={values.tariff_type}
-            disabled={Boolean(source?.point_count || values.adapter === 'bkw')}
-            onChange={(event) => set('tariff_type', event.target.value as DynamicTariffType)}
-          >
-            {TARIFF_TYPES.map((type) => (
-              <option key={type} value={type}>
-                {t(`pages.dynamicSources.types.${type}` as Parameters<typeof t>[0])}
-              </option>
-            ))}
-          </select>
-        </label>
-        {values.adapter !== 'bkw' && (
-          <label style={{ gridColumn: '1 / -1' }}>
-            <span>{t('pages.dynamicSources.form.tariffName')}</span>
-            <input
-              value={values.tariff_name ?? ''}
-              onChange={(event) => set('tariff_name', event.target.value)}
-              required={values.adapter === 'groupe_e'}
-              disabled={Boolean(source?.point_count)}
-            />
-            <small className="muted">
-              {values.adapter === 'groupe_e'
-                ? t('pages.dynamicSources.form.tariffNameRequired')
-                : t('pages.dynamicSources.form.tariffNameHint')}
-            </small>
-          </label>
-        )}
-        {source?.point_count ? (
+
+        {source ? (
           <div className="info-banner" style={{ gridColumn: '1 / -1' }}>
-            {t('pages.dynamicSources.form.identityLocked')}
+            <strong>{source.url}</strong>
+            <div>
+              {t(`pages.dynamicSources.versions.${source.api_version}` as Parameters<typeof t>[0])}
+              {' · '}
+              {t(`pages.dynamicSources.types.${source.tariff_type}` as Parameters<typeof t>[0])}
+              {source.tariff_name ? ` · ${source.tariff_name}` : ''}
+            </div>
+            <small>{t('pages.dynamicSources.form.identityReplacement')}</small>
           </div>
-        ) : null}
-        {!source && (
-          <div className="info-banner" style={{ gridColumn: '1 / -1' }}>
-            {t('pages.dynamicSources.form.probeNotice')}
-          </div>
+        ) : step === 1 ? (
+          <>
+            <label style={{ gridColumn: '1 / -1' }}>
+              <span>{t('pages.dynamicSources.form.url')}</span>
+              <input type="url" value={url} onChange={(event) => setUrl(event.target.value)} required />
+              <small className="muted">{t('pages.dynamicSources.form.urlHint')}</small>
+            </label>
+            <label style={{ gridColumn: '1 / -1' }}>
+              <span>{t('pages.dynamicSources.form.apiVersion')}</span>
+              <select value={versionChoice} onChange={(event) => setVersionChoice(event.target.value as VersionChoice)}>
+                <option value="auto">{t('pages.dynamicSources.versions.auto')}</option>
+                <option value="v1_0_5">{t('pages.dynamicSources.versions.v1_0_5')}</option>
+                <option value="v2_0_0">{t('pages.dynamicSources.versions.v2_0_0')}</option>
+              </select>
+              <small className="muted">{t('pages.dynamicSources.form.apiVersionHint')}</small>
+            </label>
+          </>
+        ) : (
+          <>
+            <div className="info-banner" style={{ gridColumn: '1 / -1' }}>
+              {t(
+                discovery!.components_discovered
+                  ? 'pages.dynamicSources.discovery.detected'
+                  : 'pages.dynamicSources.discovery.emptyFallback',
+                { version: t(`pages.dynamicSources.versions.${discovery!.api_version}` as Parameters<typeof t>[0]) },
+              )}
+            </div>
+            <label style={{ gridColumn: '1 / -1' }}>
+              <span>{t('pages.dynamicSources.form.tariffType')}</span>
+              <select
+                value={selection}
+                onChange={(event) => {
+                  const value = event.target.value
+                  setSelection(value)
+                  const component = discovery!.components.find((item) => componentKey(item) === value)
+                  setTariffName(component?.tariff_name ?? '')
+                }}
+              >
+                {discovery!.components.map((component) => (
+                  <option key={componentKey(component)} value={componentKey(component)}>
+                    {t(`pages.dynamicSources.types.${component.tariff_type}` as Parameters<typeof t>[0])}
+                    {component.tariff_name ? ` — ${component.tariff_name}` : ''}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {(discovery!.api_version === 'v1_0_5' || !selected?.tariff_name) && (
+              <label style={{ gridColumn: '1 / -1' }}>
+                <span>{t('pages.dynamicSources.form.tariffName')}</span>
+                <input value={tariffName} onChange={(event) => setTariffName(event.target.value)} />
+                <small className="muted">{t('pages.dynamicSources.form.v1TariffNameHint')}</small>
+              </label>
+            )}
+            <div className="info-banner" style={{ gridColumn: '1 / -1' }}>
+              {t('pages.dynamicSources.form.probeNotice')}
+            </div>
+          </>
         )}
-        <FormModalFooter
-          onCancel={onClose}
-          isPending={mutation.isPending}
-          submitLabel={t(source ? 'common.save' : 'pages.dynamicSources.createAction')}
-        />
+
+        <div style={{ gridColumn: '1 / -1', display: 'flex', gap: '1rem', justifyContent: 'flex-end', marginTop: '1rem' }}>
+          {!source && step === 2 && (
+            <button className="button button-secondary" type="button" onClick={() => setStep(1)} disabled={pending}>
+              {t('pages.dynamicSources.discovery.back')}
+            </button>
+          )}
+          <button className="button button-secondary" type="button" onClick={onClose} disabled={pending}>
+            {t('common.cancel')}
+          </button>
+          <button className="button button-primary" type="submit" disabled={pending || (!source && step === 2 && !selected)}>
+            {source
+              ? t('common.save')
+              : step === 1
+                ? t('pages.dynamicSources.discovery.continue')
+                : t('pages.dynamicSources.createAction')}
+          </button>
+        </div>
       </form>
     </FormModal>
   )

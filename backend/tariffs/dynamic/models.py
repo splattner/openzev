@@ -4,11 +4,10 @@ Two models. :class:`DynamicTariffSource` is the configuration of one operator
 series; :class:`DynamicPricePoint` is the series itself, one row per priced
 interval.
 
-Sources are **global, not ZEV-scoped**. The price of Groupe E's ``vario`` grid
-product at 14:15 on a given day is one fact, not one fact per community, so two
-ZEVs on the same product share one source and one fetch. That also means the
-series is captured once for everyone — which matters because BKW keeps no
-history at all, so an interval nobody fetched on the day is gone for good.
+Sources are **global, not ZEV-scoped**. A product's grid price at 14:15 on a
+given day is one fact, not one fact per community, so two ZEVs on the same
+product share one source and one fetch. That also means a current-day-only
+series is captured once for everyone before unavailable history is lost.
 
 The points are billing evidence, not a cache: an invoice issued last March must
 stay re-derivable, and neither operator can supply those prices any more. See
@@ -21,8 +20,9 @@ import uuid
 
 from django.db import models
 
-from .adapters import DynamicAdapter
-from .vse_v1 import TARIFF_TYPES
+from .adapters import DynamicApiVersion, DynamicRequestMode
+from .vse_v1 import TARIFF_TYPES as V1_TARIFF_TYPES
+from .vse_v2 import TARIFF_TYPES as V2_TARIFF_TYPES
 
 
 class DynamicTariffType(models.TextChoices):
@@ -36,15 +36,21 @@ class DynamicTariffType(models.TextChoices):
 
     ELECTRICITY = "electricity", "Electricity supply"
     GRID = "grid", "Grid usage"
+    METERING = "metering", "Metering"
+    NATIONAL_FEES = "national_fees", "National fees"
     INTEGRATED = "integrated", "Integrated (electricity + grid)"
+    DSO = "dso", "DSO total"
+    DSO_COMPLETE = "dso_complete", "Complete DSO total"
+    INTEGRATED_COMPLETE = "integrated_complete", "Complete integrated total"
     REGIONAL_FEES = "regional_fees", "Regional fees"
     FEED_IN = "feed_in", "Feed-in remuneration"
+    REFUND = "refund", "Storage refund"
 
 
 # The model's choices and the parser's vocabulary have to stay the same set:
 # a type the model can store but the parser cannot read would be a source that
 # never fetches anything.
-assert {choice.value for choice in DynamicTariffType} == set(TARIFF_TYPES)
+assert {choice.value for choice in DynamicTariffType} == set(V1_TARIFF_TYPES) | set(V2_TARIFF_TYPES)
 
 
 class FetchStatus(models.TextChoices):
@@ -57,14 +63,24 @@ class DynamicTariffSource(models.Model):
     """One operator price series, identified by endpoint, component and product."""
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    label = models.CharField(max_length=200, help_text="Shown when picking a source, e.g. 'Groupe E vario — grid'")
+    label = models.CharField(max_length=200, help_text="Shown when picking a source, e.g. 'Dynamic grid price'")
     url = models.URLField(max_length=500)
-    adapter = models.CharField(max_length=20, choices=DynamicAdapter.choices, default=DynamicAdapter.VSE_V1)
+    api_version = models.CharField(
+        max_length=20, choices=DynamicApiVersion.choices, default=DynamicApiVersion.V1_0_5
+    )
+    request_mode = models.CharField(
+        max_length=20, choices=DynamicRequestMode.choices, default=DynamicRequestMode.STANDARD
+    )
+    query_tariff_type = models.CharField(
+        max_length=20, blank=True, default="",
+        help_text="Tariff-type query value discovered for this endpoint.",
+    )
+    supports_range = models.BooleanField(default=True)
     tariff_type = models.CharField(max_length=20, choices=DynamicTariffType.choices)
     # The operator's own product name. Blank means "whatever the endpoint
     # defaults to", which is only safe for an endpoint that serves one product:
-    # Groupe E quoted 0.1398 for `vario` and 0.1267 for `double` at the same
-    # instant, so a silent default there would bill the wrong tariff.
+    # Two products can quote different values at the same instant, so a silent
+    # default on a multi-product endpoint would bill the wrong tariff.
     tariff_name = models.CharField(max_length=120, blank=True, default="")
 
     last_fetch_status = models.CharField(max_length=10, choices=FetchStatus.choices, default=FetchStatus.PENDING)
@@ -97,14 +113,8 @@ class DynamicTariffSource(models.Model):
 
     @property
     def supports_backfill(self) -> bool:
-        """Whether history can still be recovered for this source.
-
-        False for BKW, whose endpoint takes no time range: for that one, only
-        what was fetched on the day exists, ever.
-        """
-        from .adapters import adapter_for
-
-        return adapter_for(self.adapter).supports_range
+        """Whether discovery found support for historical range queries."""
+        return self.supports_range
 
 
 class DynamicPricePoint(models.Model):
@@ -123,7 +133,7 @@ class DynamicPricePoint(models.Model):
     valid_to = models.DateTimeField(help_text="End of the priced interval, exclusive (UTC)")
     # Signed on purpose: a dynamic grid tariff goes negative when the grid is
     # long on solar, which is the whole mechanism. 22 of 96 intervals were
-    # negative on the Groupe E day recorded in testdata.
+    # negative in a recorded production response.
     price_chf_per_kwh = models.DecimalField(max_digits=8, decimal_places=5)
 
     class Meta:

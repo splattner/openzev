@@ -31,7 +31,7 @@ This spec describes the whole feature. It lands in three parts:
 
 | Part | Covers | Sections | Status |
 |---|---|---|---|
-| 1 | Data model, parser, adapters, fetching, scheduling, transfer | 3 – 8 | Shipped |
+| 1 | Data model, versioned protocol, fetching, scheduling, transfer | 3 – 8 | Shipped |
 | 2 | Engine price resolution, refusal, readiness coverage | 9 | Shipped |
 | 3 | Importer unblock, API and frontend | 10 | Shipped |
 
@@ -41,8 +41,8 @@ All three parts are shipped.
 
 ### In scope
 
-- Fetching and storing a VSE-compatible dynamic price series (schema v1)
-- Groupe E and BKW as concrete operator adapters
+- Fetching and storing VSE-compatible dynamic price series (v1.0.5 and v2.0.0)
+- Provider-neutral endpoint discovery and capability probing
 - Pricing an energy tariff from a stored series, including negative prices
 - Refusing to bill a period the series does not fully cover
 - Retaining prices for as long as the invoices derived from them, with a
@@ -50,8 +50,6 @@ All three parts are shipped.
 
 ### Out of scope
 
-- Schema **v2** (final 2026-09-01, targeting 2027). Detected and refused by name,
-  not parsed — see §4.4.
 - Demand (`CHF_kW_*`) and reactive-energy (`CHF_kVarh`) charges — #529.
 - Per-customer authenticated endpoints (v2's `/customerTariffs`, OIDC, EMS link).
 - Forecasting or optimisation against future prices.
@@ -63,8 +61,8 @@ derived from the VSE document
 [*Dynamische Netznutzungstarife im Verteilnetz (HDN-CH 2025)*](https://www.strom.ch/de/shop/dynamische-netznutzungstarife-im-verteilnetz-hdn-ch-2025):
 
 - Repository: <https://github.com/SmartGridready/SGrSpecifications/tree/master/DynamicTariff>
-- **v1.0.5** (2026-05-28) — what is live in the field, and what OpenZEV reads
-- **v2.0.0** (2026-09-01) — targets 2027, structurally breaking
+- **v1.0.5** (2026-05-28) — array-based price components using `CHF_kWh`
+- **v2.0.0** (2026-09-01) — object-based tariff types using `CHF/kWh`
 
 > Note for anyone reading older documents: the VSE/AES *tariff document* OpenAPI
 > models `prices.dynamic` as a bare URL with no response schema, and OpenZEV's
@@ -103,8 +101,8 @@ A tariff type holds an **array** because it can carry several units at once — 
 energy price and a monthly base fee in the same interval. The billable value is
 selected **by unit**, never by position.
 
-`publication_timestamp` may be the empty string: the schema declares
-`anyOf: [date-time, empty]`, and Groupe E returns `""` when it has no data.
+`publication_timestamp` may be the empty string: the v1 schema declares
+`anyOf: [date-time, empty]` for a response with no published data.
 
 ### 3.3 Tariff types
 
@@ -115,6 +113,13 @@ selected **by unit**, never by position.
 | `integrated` | **`electricity` + `grid` combined** | `grid` |
 | `regional_fees` | Local/regional surcharges (concession fees) | `grid` |
 | `feed_in` | Compensation for export (positive = paid to the customer) | `feed_in` |
+
+v2 additionally defines `metering`, `national_fees`, `dso`, `dso_complete`,
+`integrated_complete`, and `refund`. OpenZEV offers any returned type carrying
+an `energy` value in `CHF/kWh`; the first five consumption-oriented types map to
+`grid`, while `refund` maps to `feed_in`. Components containing only base,
+power, or reactive-energy prices are not offered because the billing engine
+cannot apply them per metered kWh.
 
 ⚠️ **Double counting.** `integrated` already contains `electricity` and `grid`.
 Billing it beside a community's existing grid-fee or levy tariffs charges the
@@ -138,7 +143,10 @@ Global, **not** ZEV-scoped — see ADR 0018.
 | `id` | UUID pk | |
 | `label` | `CharField(200)` | Shown when picking a source |
 | `url` | `URLField(500)` | |
-| `adapter` | `CharField(20)` | `vse_v1` \| `groupe_e` \| `bkw` |
+| `api_version` | `CharField(20)` | `v1_0_5` \| `v2_0_0` |
+| `request_mode` | `CharField(20)` | discovered `standard` \| `exact_url` |
+| `query_tariff_type` | `CharField(20)` | discovered wire spelling, not user-entered |
+| `supports_range` | `BooleanField` | discovered endpoint capability |
 | `tariff_type` | `CharField(20)` | §3.3 |
 | `tariff_name` | `CharField(120)`, blank | Operator product |
 | `last_fetch_status` | `CharField(10)` | `pending` \| `ok` \| `failed` |
@@ -172,32 +180,38 @@ boundary.
 `Tariff.clean()` rejects a source on a tariff that is not billed by energy, and
 a source whose `tariff_type` disagrees with `energy_type` per §3.3.
 
-### 4.4 Version detection
+### 4.4 Version detection and parsing
 
 v1 holds `prices[].grid` as a **list**; v2 holds an **object** with
-`base`/`energy`/`power`/`reactive_energy` sub-components plus metadata. A `dict`
-where a list is expected raises, naming v2. Read as v1, a v2 payload would look
-like an absent component and bill nothing at all.
+`base`/`energy`/`power`/`reactive_energy` sub-components plus metadata. This
+shape detects the version from any non-empty response. An empty response cannot
+be detected, so the creation wizard lets the operator select v1.0.5 or v2.0.0
+and then choose the expected component/product explicitly. Each version has its
+own parser; both normalize the
+billable energy value to signed CHF/kWh points.
 
-## 5. Operator adapters
+## 5. Generic protocol and endpoint discovery
 
-`backend/tariffs/dynamic/adapters.py`. All deviations below were measured
-against the live endpoints on 2026-09-11.
+No provider/VNB is a format choice. `backend/tariffs/dynamic/protocol.py`
+detects `v1_0_5` versus `v2_0_0` from the response shape and discovers every
+component that carries a billable CHF/kWh energy value. For v2, the response's
+embedded `tariff_name` is included in the choice. V1 responses contain no
+product catalogue, so the wizard offers an optional manual product-name field.
 
-| | `vse_v1` | `groupe_e` | `bkw` |
-|---|---|---|---|
-| Components | as configured | `grid`, `integrated`, `feed-in` | `feed_in` |
-| Range queries | yes | yes | **no — any parameter is a 400** |
-| History | — | ~9 months | **none** |
-| Timestamps | ISO-8601 | local + offset | UTC |
-| Empty answer | — | `200 {"publication_timestamp": "", "prices": []}` | `404` problem+json |
-| Products | — | `vario` (default), `double`, `project_1`, `project_3` | — |
+`backend/tariffs/dynamic/discovery.py` then probes the selected series to learn
+request capabilities rather than matching the hostname:
 
-Groupe E spells the query value **`feed-in`**, where the standard and its own
-response keys use `feed_in`.
+1. Try the standard `tariff_type`/optional `tariff_name` query.
+2. For underscore names, also tolerate a hyphenated query enum when that is the
+   spelling the endpoint accepts; the response key remains canonical.
+3. If query parameters are rejected but the bare URL carries the selected
+   component, persist `request_mode=exact_url` and disable history backfill.
+4. If standard filtering works, probe a returned interval using
+   `start_timestamp`/`end_timestamp` and persist whether ranges are supported.
 
-A URL may arrive from `prices.dynamic.url` with a query already on it; existing
-parameters are preserved, ours win.
+These are stored capabilities, not visible provider adapters. A URL may already
+contain a query; standard request construction preserves unrelated parameters
+and lets the selected source identity win.
 
 ## 6. Coverage and gaps
 
@@ -209,8 +223,8 @@ on most days, **92** when the clocks go forward and **100** when they go back;
 counting to 96 would call a complete day incomplete twice a year. Walking
 intervals also handles an operator publishing hourly.
 
-Holes are ordinary: BKW's own documentation says an interval is omitted entirely
-when its source has no value for it.
+Holes are ordinary: an endpoint may omit an interval when its upstream source
+has no value for it.
 
 ## 7. Fetching
 
@@ -219,9 +233,9 @@ when its source has no value for it.
 per-hop redirect revalidation, 5 MB cap and the user-safe/log-only error split
 all apply, because the URL is operator-supplied.
 
-**Chunking is mandatory.** One Groupe E request for its full retained history
-returned **5 016 921 bytes — 95.7 % of `MAX_DOCUMENT_BYTES`** and strained the
-20-second timeout. Backfill walks ≤31 days per request (~590 KB).
+**Chunking is mandatory.** A measured full-history response reached
+**5 016 921 bytes — 95.7 % of `MAX_DOCUMENT_BYTES`** and strained the
+20-second timeout. Backfill therefore walks at most 31 days per request.
 
 | Mode | Window |
 |---|---|
@@ -233,9 +247,8 @@ The window starts *yesterday* because it is expressed in UTC while operators
 publish in local time; starting at UTC midnight clips the first hours of the
 Swiss day. Re-asking is free: writes are upserts on `(source, valid_from)`.
 
-An empty response is a **successful fetch of nothing**, not a failure — Groupe E
-answers that way for any range it holds nothing for, including tomorrow before
-the day-ahead auction publishes.
+An empty response is a **successful fetch of nothing**, not a failure: the
+standard permits an empty publication timestamp/list when nothing is published.
 
 ## 8. Scheduling
 
@@ -248,8 +261,8 @@ the day-ahead auction publishes.
 | `fetch_dynamic_prices_impl` | The logic, callable directly from tests |
 
 `CELERY_BEAT_SCHEDULE["refresh-dynamic-tariff-sources"]` runs every **4 hours**,
-not daily: Groupe E publishes day-ahead in the afternoon and BKW republishes the
-current day while it runs, so no single moment has final prices.
+not daily: endpoints can publish day-ahead data or republish the current day at
+different times, so no single moment has final prices.
 `publication_timestamp` says when the operator last wrote, not what it covers.
 
 Supported deployments run exactly one Beat scheduler: the three Compose files
@@ -279,7 +292,7 @@ delete a successor's lock.
 ```
 python manage.py fetch_dynamic_prices --list
 python manage.py fetch_dynamic_prices <source-id> [--backfill]
-python manage.py fetch_dynamic_prices --probe <url> --adapter groupe_e --tariff-type grid --tariff-name vario
+python manage.py fetch_dynamic_prices --probe <url> --api-version v1_0_5 --tariff-type grid [--tariff-name <name>]
 ```
 
 `--probe` fetches and parses **without storing**, which is how a URL from a
@@ -402,9 +415,9 @@ blocked only when this importer genuinely cannot represent the entry:
 
 A dynamic candidate always warns that **the document names no product**
 (`tariff_name`) — that concept does not exist in the VSE tariff-document
-schema, only in the fetched-series API. An operator serving a single product
-is unaffected; Groupe E (`vario`/`double`/`project_1`/`project_3`, materially
-different prices) needs its source's `tariff_name` corrected after import.
+schema, only in the fetched-series API. An endpoint serving a single product
+is unaffected; an endpoint serving multiple products needs its source's
+`tariff_name` selected explicitly.
 
 `is_free` (governs pre-selection, §4's `recommended`) is checked explicitly
 for a dynamic candidate rather than falling through to the static formula:
@@ -423,18 +436,16 @@ must not hold a database savepoint open while it happens.
 1. Looks up an existing source by natural key (`url`, `tariff_type`,
    `tariff_name=""` — the document never supplies a product). Found → reused
    without a fresh probe; it is already on the fetch schedule (§8).
-2. Not found → probes the URL once
-   (`tariffs.dynamic.fetch.fetch_window(probe, window=None)`, an unsaved
-   `DynamicTariffSource` instance) before creating anything. **A URL in a
+2. Not found → discovers and probes the URL as v1.0.5 before creating
+   anything. **A URL in a
    document is a starting point, not a contract** — the URL named as the
    example in the standard's own OpenAPI
    (`api.tariffs.groupe-e.ch/v1/tariffs`) now returns **410 Gone**. A failed
    probe reports the fetch error against that candidate (`report.errors`)
    and creates nothing; other candidates in the same import are unaffected.
-3. Creates the source (`adapter=vse_v1`, since the document names a
-   standard-contract URL, not an operator-specific one) via `get_or_create`
-   on the same natural key, race-safe against a concurrent import of the
-   same endpoint.
+3. Creates the source with the discovered generic request capabilities via
+   `get_or_create` on the same natural key, race-safe against a concurrent
+   import of the same endpoint.
 4. After the tariff has been written successfully, a newly created source gets
    one post-commit `backfill=True` task. A reused source gets no duplicate
    initial task.
@@ -456,14 +467,19 @@ the two never disagree.
   fetch state/coverage plus annotated `point_count`, `linked_tariff_count`,
   `linked_zev_count`, and `supports_backfill`. `IsZevOwnerOrAdmin`, **not
   ZEV-scoped** — a source is global (ADR 0018).
+- **`POST /tariffs/dynamic-sources/discover/`**: owner/admin wizard endpoint.
+  It fetches through the SSRF-safe client, auto-detects v1.0.5/v2.0.0 unless a
+  fallback version was supplied, returns the billable component/product pairs,
+  and writes nothing.
 - **`POST /tariffs/dynamic-sources/`**: owner or admin creation. The server
-  validates adapter-specific constraints, probes the endpoint before writing,
-  stores the probe response, and post-commit queues an initial backfill. A
+  re-probes the chosen version/component/product, discovers generic request and
+  range capabilities, stores the probe response, and post-commit queues an
+  initial backfill. A
   natural-key match returns the existing shared source with HTTP 200 without
   probing; a new source returns 201.
 - **`PATCH /tariffs/dynamic-sources/{id}/`**: admin only. Label corrections are
-  always allowed. URL/adapter/type/product identity cannot change while points
-  exist; type cannot change while tariffs link to the source.
+  always allowed. Identity changes remain guarded; the UI directs operators to
+  create a replacement source rather than mixing two series.
 - **`GET /tariffs/dynamic-sources/{id}/prices/?date_from=&date_to=`**: imported
   point history, aggregate min/max/average/count/negative-count, and interval
   gaps. Defaults to seven days and permits at most 31 inclusive days. Admins
@@ -498,6 +514,11 @@ the two never disagree.
   A new tariff can open `DynamicSourceFormModal` directly from this picker;
   after the probed source is created or reused it is selected automatically and
   its implied energy type is applied.
+- **`DynamicSourceFormModal`** — creation is a two-step discovery flow. Step 1
+  asks for a display name and URL, with API version set to automatic by default
+  and v1.0.5/v2.0.0 as fallbacks. Step 2 shows only billable series returned by
+  the endpoint. V2 product names are shown directly; v1 offers an optional
+  product-name input because the v1 response cannot enumerate products.
 - **`TariffCategorySections`** — `usesPeriods`/`priceSummary`/`pricingLabel`
   are branched on the *shown version's* `dynamic_source`, not the series:
   because `dynamic_source` is deliberately not a series-coherence field
@@ -529,7 +550,8 @@ the two never disagree.
 ## 11. Transfer archive
 
 `Tariff.dynamic_source` travels as a nested **natural key**
-(`DYNAMIC_SOURCE_FIELDS`: label, url, adapter, tariff_type, tariff_name), not as
+(`DYNAMIC_SOURCE_FIELDS`: label, url, api_version, request_mode,
+query_tariff_type, supports_range, tariff_type, tariff_name), not as
 its surrogate id, which means nothing on another instance. The importer
 get-or-creates the matching global source.
 
@@ -544,7 +566,8 @@ was charged as values, not as a live reference to the price that produced it.
 
 | Module | Tests | Coverage |
 |---|---|---|
-| `tariffs/test_dynamic_parsing.py` | 21 | v1 parsing against both real captures; unit selection; empty/malformed/v2 refusal; DST; adapter deviations |
+| `tariffs/test_dynamic_parsing.py` | 21 | v1/v2 detection and parsing; unit selection; empty/malformed responses; DST; generic request construction |
+| `tariffs/test_dynamic_discovery.py` | 6 | Version/product discovery; override and empty-response fallback; standard, exact-URL, range, and query-spelling capability detection |
 | `tariffs/test_dynamic_fetch.py` | 24 | Chunking, UTC storage, upsert idempotency, negative prices, coverage gaps, windows, failure recording, tasks, source identity |
 | `tariffs/test_dynamic_tariff_link.py` | 9 | `Tariff.clean()` rules, static→dynamic series versioning, PROTECT retention |
 | `zev/test_transfer.py::DynamicTariffTransferTests` | 3 | Natural-key match, recreation on a fresh instance, static tariffs unaffected |
@@ -554,7 +577,7 @@ was charged as values, not as a live reference to the price that produced it.
 | `invoices/test_tariff_overview.py::TariffOverviewDynamicTariffTests` | 4 | Unfetched tariff prints nothing, fetched average with its footnote, percentage-tariff footnote and amount |
 | `tariffs/test_vse_import.py` (extended) | +11 | Dynamic grid candidate is importable, no-URL and `metering` blocks, the missing-product warning, `is_free` correctness, source get-or-create + probe + reuse-without-reprobing, unreachable-URL error, and post-commit initial-backfill enqueueing only after a successful new-source tariff write |
 | `tariffs/test_dynamic_source_api.py` | 6 | Authenticated role access, global list and picker fields |
-| `tariffs/test_dynamic_source_management_api.py` | 11 | Probed creation/reuse, adapter validation, admin editing, scoped history/stats/limits, queue audit, permissions, guarded clear |
+| `tariffs/test_dynamic_source_management_api.py` | 12 | Discovery, probed creation/reuse, API-version validation, admin editing, scoped history/stats/limits, queue audit, permissions, guarded clear |
 | `tariffs/test_dynamic_source_link_api.py` | 4 | Linking through the ordinary tariff API: create with a source, mismatched-energy-type 400, fee-tariff-cannot-link 400, `dynamic_source` on the series endpoint |
 
 ### 12.2 Fixtures
@@ -567,7 +590,8 @@ endpoint serves only the current day and keeps no history.
 
 | Module | Tests | Coverage |
 |---|---|---|
-| `tests/dynamic-sources.test.ts` | 10 | Source/energy-type helpers; paginated list; manual create; bounded history query; fetch queueing; typed clear request |
+| `tests/dynamic-sources.test.ts` | 11 | Source/energy-type helpers; discovery; paginated list; manual create; bounded history query; fetch queueing; typed clear request |
+| `tests/dynamic-source-form-modal.test.ts` | 1 | Two-step rendering, version-only choices, absence of provider choices, and discovered component/product selection |
 | `tests/vse-tariff-import.test.ts` (extended) | +3 | A dynamic candidate is selectable, offers no billing-mode choice, can be the pre-selected recommendation |
 | `tests/tariff-form-mapping.test.ts` (extended) | +4 | `dynamic_source` round-trips through the form, is dropped when billing mode is not energy, defaults to blank |
 
@@ -579,26 +603,26 @@ endpoint serves only the current day and keeps no history.
 | A gap bills as zero | High — silently wrong invoice | Engine refuses (§9); readiness flags the day first |
 | Endpoint URL rots | Medium | Failures recorded per source in user-safe text; `--probe` before trusting |
 | `integrated` billed beside levy tariffs | High — double charge | §3.3 documented; §10 warns at configuration time |
-| A v2 endpoint read as v1 | High — bills nothing | Refused by name (§4.4) |
+| A response parsed as the wrong version | High — bills nothing or the wrong component | Shape detection plus explicit version validation (§4.4) |
 | Shared source edited by one community affects others | Medium | Owners may create/reuse but only admins may edit; identity fields remain locked while points exist |
 
 ## 14. Acceptance criteria
 
 - [x] A VSE v1 response is parsed by unit, not by array position
 - [x] Unbillable units are reported rather than silently ignored
-- [x] Groupe E and BKW adapters, each with a recorded fixture
+- [x] Provider-neutral request capability discovery, verified against recorded fixtures
 - [x] Component and product are explicit configuration, never an implicit default
 - [x] Fetching is scheduled, chunked below the fetch cap, and reuses the SSRF guards
 - [x] `200`-with-empty, `404` and `410` are each handled distinctly
 - [x] Coverage is computed on intervals, correct across both DST transitions
 - [x] Prices are retained for as long as the tariff referencing them exists
-- [x] A v2 payload is refused by name
+- [x] V1.0.5 and v2.0.0 payloads are detected and parsed by their versioned contracts
 - [x] The transfer archive carries the source link by natural key
 - [x] The engine prices from the series and refuses an uncovered period
 - [x] Readiness flags an uncovered day before generation is attempted
 - [x] Printed documents (tariff overview, participation contract) show a dynamic tariff's fetched average rather than skipping it or printing zero
 - [x] The importer creates dynamic tariffs instead of blocking them, and refuses (per-candidate) rather than creating a dead tariff when the named URL cannot be fetched
 - [x] The UI shows that a tariff is dynamic, which source it uses, and when that source's last fetch failed
-- [x] An owner can create and select a probed dynamic source while manually creating a tariff
+- [x] An owner can discover, create, and select a dynamic source in a two-step wizard
 - [x] Linked tariffs expose bounded interval-price history, statistics, and explicit gaps
 - [x] Admins can inspect every shared source and its fetch activity, queue refresh/backfill, and safely clear unbilled points

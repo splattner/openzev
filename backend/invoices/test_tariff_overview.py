@@ -454,7 +454,7 @@ class TariffOverviewDynamicTariffTests(TariffOverviewTestCase):
         from tariffs.dynamic.models import DynamicTariffSource
 
         source = DynamicTariffSource.objects.create(
-            label=name, url=f"https://api.example.ch/{name}", adapter="vse_v1",
+            label=name, url=f"https://api.example.ch/{name}", api_version="v1_0_5",
             tariff_type="grid", tariff_name="",
         )
         return self._energy_tariff(name=name, energy_type=EnergyType.GRID, dynamic_source=source), source

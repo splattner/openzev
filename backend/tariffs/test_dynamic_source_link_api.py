@@ -21,7 +21,7 @@ pytestmark = pytest.mark.django_db
 def make_source(**overrides) -> DynamicTariffSource:
     defaults = {
         "label": "Groupe E vario — grid", "url": "https://api.tariffs.groupe-e.ch/v2/tariffs",
-        "adapter": "groupe_e", "tariff_type": "grid", "tariff_name": "vario",
+        "api_version": "v1_0_5", "tariff_type": "grid", "tariff_name": "vario",
     }
     return DynamicTariffSource.objects.create(**{**defaults, **overrides})
 

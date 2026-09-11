@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from django.core.exceptions import ValidationError as DjangoValidationError
-from .dynamic.adapters import DynamicAdapter
-from .dynamic.models import DynamicTariffSource, DynamicTariffType
+from .dynamic.adapters import DynamicApiVersion
+from .dynamic.models import DynamicTariffSource
 from .models import BillingMode, PeriodType, Tariff, TariffPeriod
 from .periods import months_of
 
@@ -252,7 +252,7 @@ class DynamicTariffSourceSerializer(serializers.ModelSerializer):
     class Meta:
         model = DynamicTariffSource
         fields = [
-            "id", "label", "url", "adapter", "tariff_type", "tariff_name",
+            "id", "label", "url", "api_version", "tariff_type", "tariff_name",
             "last_fetch_status", "last_fetch_at", "last_success_at", "last_fetch_error",
             "covers_from", "covers_to", "point_count", "linked_tariff_count", "linked_zev_count",
             "supports_backfill", "created_at", "updated_at",
@@ -263,8 +263,8 @@ class DynamicTariffSourceSerializer(serializers.ModelSerializer):
 class DynamicTariffSourceWriteSerializer(serializers.ModelSerializer):
     """Configuration accepted for manual source creation and admin correction."""
 
-    adapter = serializers.ChoiceField(
-        choices=DynamicAdapter.choices, default=DynamicAdapter.VSE_V1
+    api_version = serializers.ChoiceField(
+        choices=DynamicApiVersion.choices
     )
     tariff_name = serializers.CharField(
         max_length=120, required=False, allow_blank=True, default=""
@@ -272,51 +272,30 @@ class DynamicTariffSourceWriteSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = DynamicTariffSource
-        fields = ["label", "url", "adapter", "tariff_type", "tariff_name"]
+        fields = ["label", "url", "api_version", "tariff_type", "tariff_name"]
         # The API deliberately treats the model's natural-key collision as
         # reuse, so let the service resolve it instead of returning a 400.
         validators = []
 
     def validate(self, attrs):
-        adapter = attrs.get("adapter", getattr(self.instance, "adapter", DynamicAdapter.VSE_V1))
-        tariff_type = attrs.get("tariff_type", getattr(self.instance, "tariff_type", None))
-        tariff_name = attrs.get("tariff_name", getattr(self.instance, "tariff_name", ""))
-
-        if adapter == DynamicAdapter.GROUPE_E and not tariff_name:
-            raise serializers.ValidationError({
-                "tariff_name": "Groupe E serves several products; choose the product explicitly."
-            })
-        if adapter == DynamicAdapter.BKW:
-            if tariff_type != DynamicTariffType.FEED_IN:
-                raise serializers.ValidationError({
-                    "tariff_type": "The BKW endpoint only serves feed-in remuneration."
-                })
-            if tariff_name:
-                raise serializers.ValidationError({
-                    "tariff_name": "The BKW endpoint does not accept a product name."
-                })
-
-        if self.instance is not None and self.instance.points.exists():
+        if self.instance is not None:
             changed_identity = [
-                field for field in ("url", "adapter", "tariff_type", "tariff_name")
+                field for field in ("url", "api_version", "tariff_type", "tariff_name")
                 if field in attrs and attrs[field] != getattr(self.instance, field)
             ]
             if changed_identity:
                 raise serializers.ValidationError({
-                    field: "Clear unprotected fetched prices before changing the source identity."
+                    field: "Create a replacement source instead of changing a price-series identity."
                     for field in changed_identity
                 })
-
-        if (
-            self.instance is not None
-            and "tariff_type" in attrs
-            and attrs["tariff_type"] != self.instance.tariff_type
-            and self.instance.tariffs.exists()
-        ):
-            raise serializers.ValidationError({
-                "tariff_type": "A source linked to tariffs cannot change tariff type. Create a replacement source."
-            })
         return attrs
+
+
+class DynamicSourceDiscoverySerializer(serializers.Serializer):
+    url = serializers.URLField(max_length=500)
+    api_version = serializers.ChoiceField(
+        choices=DynamicApiVersion.choices, required=False, allow_null=True
+    )
 
 
 class DynamicPriceHistoryQuerySerializer(serializers.Serializer):

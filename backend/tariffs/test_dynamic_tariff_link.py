@@ -27,7 +27,7 @@ def make_source(**overrides) -> DynamicTariffSource:
     defaults = {
         "label": "Groupe E vario — grid",
         "url": "https://api.tariffs.groupe-e.ch/v2/tariffs",
-        "adapter": "groupe_e",
+        "api_version": "v1_0_5",
         "tariff_type": "grid",
         "tariff_name": "vario",
     }
@@ -72,7 +72,8 @@ class TestValidation:
         # Getting this backwards would credit a consumer or bill a producer.
         zev = factories.ZevFactory()
         source = make_source(tariff_type="feed_in", tariff_name="", label="BKW feed-in",
-                             url="https://api.bkw.ch/api/dyntariffs/v1/Tariffs/energyreturn", adapter="bkw")
+                             url="https://prices.example.test/current", api_version="v1_0_5",
+                             request_mode="exact_url", supports_range=False)
 
         with pytest.raises(ValidationError) as caught:
             make_tariff(zev, source, energy_type=EnergyType.GRID)
@@ -82,7 +83,8 @@ class TestValidation:
     def test_a_feed_in_series_prices_a_feed_in_tariff(self):
         zev = factories.ZevFactory()
         source = make_source(tariff_type="feed_in", tariff_name="", label="BKW feed-in",
-                             url="https://api.bkw.ch/api/dyntariffs/v1/Tariffs/energyreturn", adapter="bkw")
+                             url="https://prices.example.test/current", api_version="v1_0_5",
+                             request_mode="exact_url", supports_range=False)
 
         tariff = make_tariff(
             zev, source, name="Feed-in (dynamic)",

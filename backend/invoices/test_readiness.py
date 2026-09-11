@@ -87,7 +87,7 @@ def _dynamic_tariff(
     # are priced by the engine but not coverage-checked by readiness today).
     source = DynamicTariffSource.objects.create(
         label=label, url=f"https://api.example.ch/{label.replace(' ', '-')}",
-        adapter="vse_v1", tariff_type=tariff_type, tariff_name="",
+        api_version="v1_0_5", tariff_type=tariff_type, tariff_name="",
     )
     tariff = Tariff.objects.create(
         zev=zev, name=label, category=category, billing_mode=BillingMode.ENERGY,

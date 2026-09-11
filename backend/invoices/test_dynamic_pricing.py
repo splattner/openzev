@@ -42,7 +42,7 @@ def make_source(**overrides) -> DynamicTariffSource:
     defaults = {
         "label": "Groupe E vario — grid",
         "url": "https://api.tariffs.groupe-e.ch/v2/tariffs",
-        "adapter": "groupe_e",
+        "api_version": "v1_0_5",
         "tariff_type": "grid",
         "tariff_name": "vario",
     }
@@ -320,7 +320,8 @@ class TestDynamicInvoiceGeneration:
             metering_point=production_mp, participant=participant, valid_from=date(2026, 1, 1),
         )
         source = make_source(
-            tariff_type="feed_in", tariff_name="", label="BKW feed-in", adapter="bkw",
+            tariff_type="feed_in", tariff_name="", label="Example feed-in", api_version="v1_0_5",
+            request_mode="exact_url", supports_range=False,
             url="https://api.bkw.ch/api/dyntariffs/v1/Tariffs/energyreturn",
         )
         store(source, datetime(2026, 1, 15, 12, 0, tzinfo=UTC), "0.17700")

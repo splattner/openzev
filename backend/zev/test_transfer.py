@@ -807,7 +807,7 @@ class DynamicTariffTransferTests(TestCase):
         zev = build_populated_zev(self.owner, meter_prefix="DYN")
         source = DynamicTariffSource.objects.create(
             label="Groupe E vario — grid", url="https://api.tariffs.groupe-e.ch/v2/tariffs",
-            adapter="groupe_e", tariff_type="grid", tariff_name="vario",
+            api_version="v1_0_5", tariff_type="grid", tariff_name="vario",
         )
         Tariff.objects.create(
             zev=zev, name="Grid usage (dynamic)", category=TariffCategory.GRID_FEES,

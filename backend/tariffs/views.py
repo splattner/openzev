@@ -15,6 +15,7 @@ from django.utils import timezone
 from django.utils.dateparse import parse_date
 from accounts.permissions import IsZevOwnerOrAdmin
 from .dynamic.fetch import coverage_gaps
+from .dynamic.discovery import discover_endpoint
 from .dynamic.locking import dynamic_source_lock
 from .dynamic.models import DynamicPricePoint, DynamicTariffSource
 from .dynamic.services import (
@@ -24,12 +25,14 @@ from .dynamic.services import (
     utc_day_window,
 )
 from .importers.remote import TariffFetchError
+from .dynamic.vse_v1 import DynamicTariffResponseError
 from .models import Tariff, TariffPeriod
 from zev.scoping import ZevScopedQuerySetMixin
 from .serializers import (
     DynamicPriceHistoryQuerySerializer,
     DynamicSourceClearSerializer,
     DynamicSourceFetchSerializer,
+    DynamicSourceDiscoverySerializer,
     DynamicTariffSourceSerializer,
     DynamicTariffSourceWriteSerializer,
     TariffPeriodSerializer,
@@ -473,7 +476,7 @@ class DynamicTariffSourceViewSet(viewsets.ReadOnlyModelViewSet):
         serializer.is_valid(raise_exception=True)
         try:
             source, created = create_or_reuse_source(**serializer.validated_data)
-        except TariffFetchError as exc:
+        except (TariffFetchError, DynamicTariffResponseError) as exc:
             raise DRFValidationError({"url": [str(exc)]}) from exc
 
         if created:
@@ -486,7 +489,7 @@ class DynamicTariffSourceViewSet(viewsets.ReadOnlyModelViewSet):
                 target_display=source.label,
                 summary=f"Created dynamic tariff source {source.label}.",
                 metadata={
-                    "adapter": source.adapter,
+                    "api_version": source.api_version,
                     "tariff_type": source.tariff_type,
                 },
             )
@@ -496,12 +499,30 @@ class DynamicTariffSourceViewSet(viewsets.ReadOnlyModelViewSet):
             status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
         )
 
+    @action(detail=False, methods=["post"], url_path="discover")
+    def discover(self, request):
+        serializer = DynamicSourceDiscoverySerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            result = discover_endpoint(**serializer.validated_data)
+        except (TariffFetchError, DynamicTariffResponseError) as exc:
+            raise DRFValidationError({"url": [str(exc)]}) from exc
+        return Response({
+            "api_version": result.api_version,
+            "version_detected": result.version_detected,
+            "components_discovered": result.components_discovered,
+            "components": [
+                {"tariff_type": item.tariff_type, "tariff_name": item.tariff_name}
+                for item in result.components
+            ],
+        })
+
     def partial_update(self, request, *args, **kwargs):
         self._require_admin(request)
         source = self.get_object()
         before = {
             field: getattr(source, field)
-            for field in ("label", "url", "adapter", "tariff_type", "tariff_name")
+            for field in ("label", "url", "api_version", "tariff_type", "tariff_name")
         }
         serializer = DynamicTariffSourceWriteSerializer(
             source, data=request.data, partial=True

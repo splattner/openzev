@@ -9,11 +9,12 @@ from django.utils import timezone as djtimezone
 
 from invoices.models import Invoice, InvoiceStatus
 
-from .fetch import fetch_window, store_points
+from .discovery import probe_source_configuration
+from .fetch import store_points
 from .models import DynamicTariffSource, FetchStatus
 
 
-def create_or_reuse_source(*, label, url, adapter, tariff_type, tariff_name):
+def create_or_reuse_source(*, label, url, api_version, tariff_type, tariff_name):
     """Probe and create a source, or return the existing natural-key match."""
 
     natural_key = {
@@ -25,24 +26,30 @@ def create_or_reuse_source(*, label, url, adapter, tariff_type, tariff_name):
     if existing is not None:
         return existing, False
 
-    probe = DynamicTariffSource(
-        label=label,
-        adapter=adapter,
-        **natural_key,
+    capabilities = probe_source_configuration(
+        url,
+        api_version=api_version,
+        tariff_type=tariff_type,
+        tariff_name=tariff_name,
     )
-    points, _warnings = fetch_window(probe, window=None)
     now = djtimezone.now()
 
     with transaction.atomic():
         source, created = DynamicTariffSource.objects.get_or_create(
             **natural_key,
-            defaults={"label": label, "adapter": adapter},
+            defaults={
+                "label": label,
+                "api_version": capabilities.api_version,
+                "request_mode": capabilities.request_mode,
+                "query_tariff_type": capabilities.query_tariff_type,
+                "supports_range": capabilities.supports_range,
+            },
         )
         if created:
             # Local import avoids a service/task import cycle.
             from ..tasks import fetch_dynamic_prices
 
-            store_points(source, points)
+            store_points(source, capabilities.points)
             DynamicTariffSource.objects.filter(pk=source.pk).update(
                 last_fetch_status=FetchStatus.OK,
                 last_fetch_at=now,

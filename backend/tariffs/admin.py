@@ -24,10 +24,10 @@ class TariffPeriodAdmin(admin.ModelAdmin):
 @admin.register(DynamicTariffSource)
 class DynamicTariffSourceAdmin(admin.ModelAdmin):
     list_display = (
-        "label", "tariff_type", "tariff_name", "adapter",
+        "label", "tariff_type", "tariff_name", "api_version",
         "last_fetch_status", "last_success_at", "covers_from", "covers_to",
     )
-    list_filter = ("adapter", "tariff_type", "last_fetch_status")
+    list_filter = ("api_version", "tariff_type", "last_fetch_status")
     search_fields = ("label", "url", "tariff_name")
     readonly_fields = (
         "last_fetch_status", "last_fetch_at", "last_success_at", "last_fetch_error",

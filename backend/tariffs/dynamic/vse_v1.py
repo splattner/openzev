@@ -100,7 +100,7 @@ def _publication_timestamp(raw: object) -> datetime | None:
     """The publication stamp, which is allowed to be absent.
 
     The v1 schema declares ``TimeStamp`` as ``anyOf: [date-time, empty]`` and
-    Groupe E returns ``""`` for a range it holds no data for, so an empty string
+    An endpoint may return ``""`` for a range with no data, so an empty string
     is conformant rather than broken. v2 allows ``null`` for the same reason.
     """
     if raw is None or (isinstance(raw, str) and not raw.strip()):
@@ -112,7 +112,7 @@ def _price(raw: object, *, label: str) -> Decimal:
     """One price value, which may legitimately be negative.
 
     Negative grid-usage prices are the point of a dynamic tariff, not an error:
-    22 of 96 intervals were negative on the Groupe E day recorded in testdata.
+    Production captures include negative grid prices around the solar peak.
     """
     if isinstance(raw, bool) or not isinstance(raw, (int, float, str)):
         raise DynamicTariffResponseError(f"{label} is not a number: {raw!r}.")
@@ -197,8 +197,8 @@ def parse_tariff_response(payload: object, *, tariff_type: str) -> ParsedSeries:
     """Read one response into price points for ``tariff_type``.
 
     An interval that does not carry the requested tariff type at all is skipped
-    rather than refused: the standard says a type may simply be absent, and BKW
-    documents omitting an interval entirely when its own source has no value.
+    rather than refused: the standard says a type may simply be absent, and an
+    endpoint may omit an interval entirely when its own source has no value.
     Detecting those holes is the caller's job — see ``fetch.coverage_gaps`` —
     because only the caller knows which window was asked for.
     """

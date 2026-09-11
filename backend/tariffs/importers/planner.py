@@ -22,8 +22,8 @@ from django.db import transaction
 from django.db.models import Q
 from django.core.exceptions import ValidationError as DjangoValidationError
 
-from tariffs.dynamic.adapters import DynamicAdapter
-from tariffs.dynamic.fetch import fetch_window
+from tariffs.dynamic.adapters import DynamicApiVersion
+from tariffs.dynamic.discovery import probe_source_configuration
 from tariffs.dynamic.models import DynamicTariffSource
 from tariffs.models import Tariff, TariffPeriod
 from tariffs.series import SERIES_FIELDS, plan_new_version
@@ -275,10 +275,13 @@ def _get_or_create_dynamic_source(candidate: Candidate) -> tuple[DynamicTariffSo
     if existing is not None:
         return existing, False
 
-    probe = DynamicTariffSource(adapter=DynamicAdapter.VSE_V1, **natural_key)
     try:
-        fetch_window(probe, window=None)
-    except TariffFetchError as exc:
+        capabilities = probe_source_configuration(
+            candidate.dynamic_url,
+            api_version=DynamicApiVersion.V1_0_5,
+            tariff_type=candidate.dynamic_tariff_type,
+        )
+    except (TariffFetchError, ValueError) as exc:
         raise ValueError(
             f"Could not fetch the dynamic price at {candidate.dynamic_url}: {exc}"
         ) from exc
@@ -286,7 +289,10 @@ def _get_or_create_dynamic_source(candidate: Candidate) -> tuple[DynamicTariffSo
     source, created = DynamicTariffSource.objects.get_or_create(
         **natural_key,
         defaults={
-            "adapter": DynamicAdapter.VSE_V1,
+            "api_version": capabilities.api_version,
+            "request_mode": capabilities.request_mode,
+            "query_tariff_type": capabilities.query_tariff_type,
+            "supports_range": capabilities.supports_range,
             "label": f"{candidate.source_tariff_name} — {candidate.dynamic_tariff_type}",
         },
     )

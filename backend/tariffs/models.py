@@ -114,9 +114,15 @@ class SourceComponent(models.TextChoices):
 ENERGY_TYPE_BY_DYNAMIC_TARIFF_TYPE = {
     "electricity": EnergyType.GRID,
     "grid": EnergyType.GRID,
+    "metering": EnergyType.GRID,
+    "national_fees": EnergyType.GRID,
     "integrated": EnergyType.GRID,
+    "dso": EnergyType.GRID,
+    "dso_complete": EnergyType.GRID,
+    "integrated_complete": EnergyType.GRID,
     "regional_fees": EnergyType.GRID,
     "feed_in": EnergyType.FEED_IN,
+    "refund": EnergyType.FEED_IN,
 }
 
 

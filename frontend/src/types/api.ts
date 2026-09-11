@@ -456,7 +456,11 @@ export interface TariffInput {
  * already combines `electricity` + `grid` — billing it beside a separate grid
  * fee or levy tariff double-counts, see `docs/specs/2026-09-dynamic-tariffs.md` §3.3.
  */
-export type DynamicTariffType = 'electricity' | 'grid' | 'integrated' | 'regional_fees' | 'feed_in'
+export type DynamicTariffType =
+    | 'electricity' | 'grid' | 'metering' | 'national_fees' | 'regional_fees'
+    | 'dso' | 'dso_complete' | 'integrated' | 'integrated_complete' | 'feed_in' | 'refund'
+
+export type DynamicApiVersion = 'v1_0_5' | 'v2_0_0'
 
 /**
  * A shared price series, fetched from one operator endpoint. Global, not
@@ -467,7 +471,7 @@ export interface DynamicTariffSource {
     id: string
     label: string
     url: string
-    adapter: 'vse_v1' | 'groupe_e' | 'bkw'
+    api_version: DynamicApiVersion
     tariff_type: DynamicTariffType
     tariff_name: string
     last_fetch_status: 'pending' | 'ok' | 'failed'
@@ -488,9 +492,19 @@ export interface DynamicTariffSource {
 export interface DynamicTariffSourceInput {
     label: string
     url: string
-    adapter: DynamicTariffSource['adapter']
+    api_version: DynamicApiVersion
     tariff_type: DynamicTariffType
     tariff_name?: string
+}
+
+export interface DynamicSourceDiscovery {
+    api_version: DynamicApiVersion
+    version_detected: boolean
+    components_discovered: boolean
+    components: Array<{
+        tariff_type: DynamicTariffType
+        tariff_name: string
+    }>
 }
 
 export interface DynamicPricePoint {

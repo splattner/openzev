@@ -14,7 +14,8 @@ When #530 was first written the blocker was that the standard defined the dynami
 price as a bare URL with no response schema. That is no longer true:
 SmartGridready publishes a VSE-compatible JSON Schema and OpenAPI template
 (v1.0.5, 2026-05-28; v2.0.0 final 2026-09-01 for 2027) derived from the VSE
-document *HDN-CH 2025*, and both operators we probed implement the v1 envelope.
+document *HDN-CH 2025*. V1.0.5 and v2.0.0 are structurally different and both
+are supported through versioned parsers.
 
 Two facts measured against those live endpoints on 2026-09-11 shaped this
 decision more than the schema did:
@@ -87,6 +88,19 @@ gap detection walks the stored intervals. A quarter-hourly day is 96 intervals o
 most days, 92 when the clocks go forward and 100 when they go back; anything that
 counted to 96 would declare a complete day incomplete twice a year and refuse to
 bill it.
+
+**5. Configuration names protocol versions, not VNB implementations.**
+
+`DynamicTariffSource.api_version` is either VSE v1.0.5 or v2.0.0. Creation
+fetches the URL first, detects the response version and available billable
+components, then probes whether standard filtering and time ranges are
+supported. Exact-URL endpoints and small query-enum deviations are represented
+as discovered capabilities, not as provider-specific adapters. This keeps the
+model and UI open to any conforming VNB without a code release per provider.
+
+V2 embeds `tariff_name` in its response, so the wizard can present it. V1 has
+no product catalogue in the response contract; its product name remains an
+optional manual input when an endpoint requires one.
 
 ## Consequences
 

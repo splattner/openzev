@@ -439,6 +439,18 @@ def _dynamic_source_for(raw):
     if not descriptor:
         return None
     fields = {key: descriptor.get(key) for key in DYNAMIC_SOURCE_FIELDS if key in descriptor}
+    # Archives written before protocol discovery stored a provider adapter.
+    # Preserve import compatibility while all newly exported archives remain
+    # provider-neutral.
+    legacy_adapter = descriptor.get("adapter")
+    if legacy_adapter and "api_version" not in fields:
+        fields["api_version"] = "v1_0_5"
+        fields["request_mode"] = "exact_url" if legacy_adapter == "bkw" else "standard"
+        fields["supports_range"] = legacy_adapter != "bkw"
+        fields["query_tariff_type"] = (
+            "feed-in" if legacy_adapter == "groupe_e" and fields.get("tariff_type") == "feed_in"
+            else fields.get("tariff_type", "")
+        )
     natural_key = {key: fields.pop(key) for key in ("url", "tariff_type", "tariff_name") if key in fields}
     if len(natural_key) != 3:
         raise ValueError("A dynamic tariff source needs a url, a tariff type and a tariff name.")

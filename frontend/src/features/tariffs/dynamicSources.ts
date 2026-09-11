@@ -4,14 +4,20 @@ import type { DynamicTariffSource, DynamicTariffType } from '../../types/api'
  * The `energy_type` a tariff must carry to link to a source of this VSE
  * tariff type — mirrors `tariffs.models.ENERGY_TYPE_BY_DYNAMIC_TARIFF_TYPE`
  * on the backend, which is what `Tariff.clean()` actually enforces. Every
- * type prices grid consumption except `feed_in`, which pays for export.
+ * type prices grid consumption except reimbursement types, which pay export.
  */
 const ENERGY_TYPE_BY_DYNAMIC_TARIFF_TYPE: Record<DynamicTariffType, 'grid' | 'feed_in'> = {
   electricity: 'grid',
   grid: 'grid',
+  metering: 'grid',
+  national_fees: 'grid',
+  dso: 'grid',
+  dso_complete: 'grid',
   integrated: 'grid',
+  integrated_complete: 'grid',
   regional_fees: 'grid',
   feed_in: 'feed_in',
+  refund: 'feed_in',
 }
 
 export function impliedEnergyType(source: DynamicTariffSource): 'grid' | 'feed_in' {

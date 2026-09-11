@@ -1,24 +1,22 @@
 """Fetch one dynamic tariff source and report what the series now covers.
 
 Mostly an operator tool: it is how you check a newly configured endpoint
-without waiting for the beat schedule, and how you verify against a live
-operator that the adapter still speaks its dialect.
+without waiting for the beat schedule.
 
     python manage.py fetch_dynamic_prices --list
     python manage.py fetch_dynamic_prices <source-id> --backfill
-    python manage.py fetch_dynamic_prices --probe https://api.tariffs.groupe-e.ch/v2/tariffs \
-        --adapter groupe_e --tariff-type grid --tariff-name vario
+    python manage.py fetch_dynamic_prices --probe https://example.test/tariffs \
+        --api-version v1_0_5 --tariff-type grid
 
 ``--probe`` fetches and parses without writing anything, which is the safe way
 to try a URL that arrived in a published tariff document.
 """
 
-from datetime import datetime, timedelta, timezone
-
 from django.core.management.base import BaseCommand, CommandError
 
-from tariffs.dynamic.adapters import DynamicAdapter, FetchWindow, adapter_for
-from tariffs.dynamic.fetch import coverage_gaps, fetch_window, refresh_source
+from tariffs.dynamic.adapters import DynamicApiVersion
+from tariffs.dynamic.discovery import probe_source_configuration
+from tariffs.dynamic.fetch import coverage_gaps, refresh_source
 from tariffs.dynamic.models import DynamicTariffSource, DynamicTariffType
 from tariffs.importers.remote import TariffFetchError
 
@@ -31,10 +29,9 @@ class Command(BaseCommand):
         parser.add_argument("--list", action="store_true", help="List configured sources and exit.")
         parser.add_argument("--backfill", action="store_true", help="Also pull whatever history the operator still has.")
         parser.add_argument("--probe", metavar="URL", help="Fetch and parse a URL without storing anything.")
-        parser.add_argument("--adapter", default=DynamicAdapter.VSE_V1, choices=[a.value for a in DynamicAdapter])
+        parser.add_argument("--api-version", default=DynamicApiVersion.V1_0_5, choices=[v.value for v in DynamicApiVersion])
         parser.add_argument("--tariff-type", default=DynamicTariffType.GRID, choices=[t.value for t in DynamicTariffType])
         parser.add_argument("--tariff-name", default="")
-        parser.add_argument("--days", type=int, default=1, help="Window size for --probe.")
 
     def handle(self, *args, **options):
         if options["list"]:
@@ -57,7 +54,7 @@ class Command(BaseCommand):
             )
             self.stdout.write(
                 f"{source.pk}  {source.label}\n"
-                f"    {source.adapter} {source.tariff_type}"
+                f"    {source.api_version} {source.tariff_type}"
                 f"{'/' + source.tariff_name if source.tariff_name else ''}  "
                 f"[{source.last_fetch_status}]  covers {covers}"
             )
@@ -66,19 +63,16 @@ class Command(BaseCommand):
 
     def _probe(self, options):
         """Read an endpoint without touching the database."""
-        source = DynamicTariffSource(
-            url=options["probe"], adapter=options["adapter"],
-            tariff_type=options["tariff_type"], tariff_name=options["tariff_name"],
-        )
-        adapter = adapter_for(source.adapter)
-        window = None
-        if adapter.supports_range:
-            start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
-            window = FetchWindow(start=start, end=start + timedelta(days=options["days"]))
         try:
-            points, warnings = fetch_window(source, window)
-        except TariffFetchError as exc:
+            capabilities = probe_source_configuration(
+                options["probe"],
+                api_version=options["api_version"],
+                tariff_type=options["tariff_type"],
+                tariff_name=options["tariff_name"],
+            )
+        except (TariffFetchError, ValueError) as exc:
             raise CommandError(str(exc)) from exc
+        points, warnings = capabilities.points, capabilities.warnings
 
         if not points:
             self.stdout.write(self.style.WARNING(
@@ -90,6 +84,10 @@ class Command(BaseCommand):
         self.stdout.write(self.style.SUCCESS(
             f"{len(points)} interval(s) {points[0].valid_from.isoformat()} .. {points[-1].valid_to.isoformat()}"
         ))
+        self.stdout.write(
+            f"    {capabilities.api_version}; request mode {capabilities.request_mode}; "
+            f"range queries {'supported' if capabilities.supports_range else 'not supported'}"
+        )
         self.stdout.write(f"    min {min(prices)}  max {max(prices)}  negative {sum(1 for p in prices if p < 0)}")
         for warning in warnings:
             self.stdout.write(self.style.WARNING(f"    {warning}"))

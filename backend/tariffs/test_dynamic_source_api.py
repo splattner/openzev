@@ -20,7 +20,7 @@ def make_source(**overrides) -> DynamicTariffSource:
     defaults = {
         "label": "Groupe E vario — grid",
         "url": "https://api.tariffs.groupe-e.ch/v2/tariffs",
-        "adapter": "groupe_e",
+        "api_version": "v1_0_5",
         "tariff_type": "grid",
         "tariff_name": "vario",
     }
@@ -77,7 +77,7 @@ class TestListing:
 
         assert row["label"] == "Groupe E vario — grid"
         assert row["url"] == "https://api.tariffs.groupe-e.ch/v2/tariffs"
-        assert row["adapter"] == "groupe_e"
+        assert row["api_version"] == "v1_0_5"
         assert row["tariff_type"] == "grid"
         assert row["tariff_name"] == "vario"
         assert row["last_fetch_status"] == "ok"

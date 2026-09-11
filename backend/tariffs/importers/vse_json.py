@@ -32,6 +32,7 @@ from tariffs.models import (
     SourceComponent,
     TariffCategory,
 )
+from tariffs.dynamic.vse_v1 import TARIFF_TYPES as V1_DYNAMIC_TARIFF_TYPES
 from tariffs.periods import ALL_MONTHS, format_number_list
 
 #: A standard entry carrying both a base fee and a per-kWh price becomes *two*
@@ -725,7 +726,7 @@ def _dynamic_candidate(prices: dict, header: dict, category: str) -> Candidate:
             "This dynamic tariff names no URL to fetch its price from "
             "(prices.dynamic.url is empty)."
         )
-    elif tariff_type not in ENERGY_TYPE_BY_DYNAMIC_TARIFF_TYPE:
+    elif tariff_type not in V1_DYNAMIC_TARIFF_TYPES:
         blocked_reason = (
             f"Dynamic {tariff_type} tariffs are not supported: the fetched-series schema has no "
             f"{tariff_type!r} tariff type to request."
@@ -735,8 +736,7 @@ def _dynamic_candidate(prices: dict, header: dict, category: str) -> Candidate:
         # The VSE tariff document names the endpoint but never the product
         # (`tariff_name` on the fetched-series API) — that concept does not
         # exist in this schema at all. An operator serving one product is
-        # unaffected; one serving several (Groupe E: vario/double/project_1/
-        # project_3, materially different prices) needs its source corrected
+        # unaffected; one serving several products needs its source corrected
         # after import, which this warning is here to prompt.
         warnings.append(
             "This document does not name which product the dynamic source should fetch. "

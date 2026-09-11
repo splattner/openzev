@@ -1,4 +1,4 @@
-"""The VSE v1 response parser and the per-operator request adapters.
+"""The versioned VSE response parsers and generic request construction.
 
 No database and no network here: the parser takes a decoded payload and the
 adapters build a URL string, which is the whole point of keeping them pure.
@@ -14,7 +14,12 @@ from pathlib import Path
 
 from django.test import SimpleTestCase
 
-from .dynamic.adapters import FetchWindow, adapter_for
+from .dynamic.adapters import DynamicRequestMode, FetchWindow, request_url
+from .dynamic.protocol import (
+    detect_api_version,
+    discover_components,
+    parse_tariff_response as parse_versioned_response,
+)
 from .dynamic.vse_v1 import (
     DynamicTariffResponseError,
     parse_tariff_response,
@@ -158,15 +163,19 @@ class EmptyAndMalformedTests(SimpleTestCase):
 
         self.assertIn("overlap", str(caught.exception))
 
-    def test_a_schema_version_2_response_is_refused_by_name(self):
-        # v2 went final on 2026-09-01 for 2027, and moves the tariff type from a
-        # list of {unit, value} to an object of sub-components. Read as v1 it
-        # would look like an absent component and bill nothing at all, so it has
-        # to be named rather than skipped.
-        with self.assertRaises(DynamicTariffResponseError) as caught:
-            parse_tariff_response(fixture("vse_v2_grid"), tariff_type="grid")
+    def test_schema_version_2_is_detected_and_parsed(self):
+        payload = fixture("vse_v2_grid")
 
-        self.assertIn("version 2", str(caught.exception))
+        self.assertEqual(detect_api_version(payload), "v2_0_0")
+        self.assertEqual(
+            discover_components(payload, "v2_0_0")[0].tariff_name,
+            "standard",
+        )
+        series = parse_versioned_response(payload, api_version="v2_0_0", tariff_type="grid")
+        self.assertEqual(series.points[0].price_chf_per_kwh, Decimal("0.11300"))
+
+    def test_schema_version_1_is_detected(self):
+        self.assertEqual(detect_api_version(fixture("vse_v1_multi_unit")), "v1_0_5")
 
 
 class DaylightSavingTests(SimpleTestCase):
@@ -191,63 +200,65 @@ class DaylightSavingTests(SimpleTestCase):
         self.assertEqual(len(series.points), 100)
 
 
-class AdapterTests(SimpleTestCase):
-    """Each operator's deviations, as measured against the live endpoint."""
+class RequestConstructionTests(SimpleTestCase):
+    """Request behavior is driven by discovered capabilities, not VNB names."""
 
     window = FetchWindow(
         start=datetime(2026, 8, 1, tzinfo=timezone.utc),
         end=datetime(2026, 9, 1, tzinfo=timezone.utc),
     )
 
-    def test_groupe_e_spells_feed_in_with_a_hyphen(self):
-        # Measured: `tariff_type=feed_in` is a 400 there, naming
-        # `feed-in, grid, integrated` as the allowed values. The standard and
-        # Groupe E's own response keys both use the underscore.
-        url = adapter_for("groupe_e").request_url(
-            "https://api.tariffs.groupe-e.ch/v2/tariffs", tariff_type="feed_in",
+    def test_a_discovered_query_spelling_is_used(self):
+        url = request_url(
+            "https://x.example/tariffs", request_mode=DynamicRequestMode.STANDARD,
+            query_tariff_type="feed-in",
         )
 
         self.assertIn("tariff_type=feed-in", url)
 
-    def test_the_standard_adapter_uses_the_underscore(self):
-        url = adapter_for("vse_v1").request_url("https://x.example/tariffs", tariff_type="feed_in")
+    def test_the_standard_query_value_is_used_unchanged(self):
+        url = request_url(
+            "https://x.example/tariffs", request_mode=DynamicRequestMode.STANDARD,
+            query_tariff_type="feed_in",
+        )
 
         self.assertIn("tariff_type=feed_in", url)
 
     def test_a_query_already_on_the_url_is_preserved(self):
         # The URL can arrive from `prices.dynamic.url` in a published document,
         # where an operator may already have pinned something.
-        url = adapter_for("vse_v1").request_url(
-            "https://x.example/tariffs?region=west", tariff_type="grid", tariff_name="vario",
+        url = request_url(
+            "https://x.example/tariffs?region=west", request_mode=DynamicRequestMode.STANDARD,
+            query_tariff_type="grid", tariff_name="example",
         )
 
         self.assertIn("region=west", url)
-        self.assertIn("tariff_name=vario", url)
+        self.assertIn("tariff_name=example", url)
 
-    def test_bkw_is_asked_for_exactly_its_own_url(self):
-        # It rejects every query parameter with a 400, so there is nothing to
-        # add — not even the tariff type it is already serving.
-        url = adapter_for("bkw").request_url(
-            "https://api.bkw.ch/api/dyntariffs/v1/Tariffs/energyreturn", tariff_type="feed_in",
+    def test_exact_url_mode_adds_no_query(self):
+        url = request_url(
+            "https://x.example/current", request_mode=DynamicRequestMode.EXACT_URL,
+            query_tariff_type="feed_in",
         )
 
-        self.assertEqual(url, "https://api.bkw.ch/api/dyntariffs/v1/Tariffs/energyreturn")
+        self.assertEqual(url, "https://x.example/current")
 
-    def test_bkw_cannot_be_asked_for_a_range(self):
-        # Which is why its history is unrecoverable, and why the series we store
-        # is evidence rather than a cache.
-        self.assertFalse(adapter_for("bkw").supports_range)
+    def test_exact_url_mode_cannot_be_asked_for_a_range(self):
         with self.assertRaises(ValueError):
-            adapter_for("bkw").request_url("https://api.bkw.ch/x", tariff_type="feed_in", window=self.window)
+            request_url(
+                "https://x.example/current", request_mode=DynamicRequestMode.EXACT_URL,
+                query_tariff_type="feed_in", window=self.window,
+            )
 
     def test_a_range_becomes_iso_timestamps(self):
-        url = adapter_for("groupe_e").request_url(
-            "https://api.tariffs.groupe-e.ch/v2/tariffs", tariff_type="grid", window=self.window,
+        url = request_url(
+            "https://x.example/tariffs", request_mode=DynamicRequestMode.STANDARD,
+            query_tariff_type="grid", window=self.window,
         )
 
         self.assertIn("start_timestamp=2026-08-01T00%3A00%3A00%2B00%3A00", url)
         self.assertIn("end_timestamp=2026-09-01T00%3A00%3A00%2B00%3A00", url)
 
-    def test_an_unknown_adapter_is_refused(self):
+    def test_an_unknown_request_mode_is_refused(self):
         with self.assertRaises(ValueError):
-            adapter_for("nope")
+            request_url("https://x.example/tariffs", request_mode="nope", query_tariff_type="grid")

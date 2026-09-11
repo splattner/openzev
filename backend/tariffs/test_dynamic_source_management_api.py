@@ -7,7 +7,9 @@ from unittest import mock
 import pytest
 
 from audit.models import AuditEvent
+from tariffs.dynamic.discovery import EndpointDiscovery, SourceCapabilities
 from tariffs.dynamic.models import DynamicPricePoint, DynamicTariffSource
+from tariffs.dynamic.protocol import DiscoveredComponent
 from tariffs.dynamic.vse_v1 import PricePoint
 from tariffs.models import EnergyType
 from testing import factories
@@ -18,9 +20,9 @@ UTC = timezone.utc
 
 def make_source(**overrides):
     defaults = {
-        "label": "Groupe E vario — grid",
-        "url": "https://api.tariffs.groupe-e.ch/v2/tariffs",
-        "adapter": "groupe_e",
+        "label": "Example dynamic grid",
+        "url": "https://prices.example.test/tariffs",
+        "api_version": "v1_0_5",
         "tariff_type": "grid",
         "tariff_name": "vario",
     }
@@ -43,6 +45,25 @@ def add_point(source, price="0.10000"):
 
 
 class TestCreationAndEditing:
+    def test_owner_can_discover_version_and_components(self, owner_client):
+        discovery = EndpointDiscovery(
+            api_version="v2_0_0",
+            components=[DiscoveredComponent("grid", "standard")],
+        )
+        with mock.patch("tariffs.views.discover_endpoint", return_value=discovery):
+            response = owner_client.post(
+                "/api/v1/tariffs/dynamic-sources/discover/",
+                {"url": "https://prices.example.test/tariffs"},
+            )
+
+        assert response.status_code == 200
+        assert response.json() == {
+            "api_version": "v2_0_0",
+            "version_detected": True,
+            "components_discovered": True,
+            "components": [{"tariff_type": "grid", "tariff_name": "standard"}],
+        }
+
     def test_owner_can_probe_and_create_a_source(self, owner_client):
         point = PricePoint(
             valid_from=datetime(2026, 9, 11, tzinfo=UTC),
@@ -50,12 +71,17 @@ class TestCreationAndEditing:
             price_chf_per_kwh=Decimal("0.12345"),
         )
         with mock.patch(
-            "tariffs.dynamic.services.fetch_window", return_value=([point], [])
+            "tariffs.dynamic.services.probe_source_configuration",
+            return_value=SourceCapabilities(
+                api_version="v1_0_5", request_mode="standard",
+                query_tariff_type="grid", supports_range=True,
+                points=[point], warnings=[],
+            ),
         ):
             response = owner_client.post("/api/v1/tariffs/dynamic-sources/", {
                 "label": "Manual VSE grid",
                 "url": "https://tariffs.example.test/dynamic",
-                "adapter": "vse_v1",
+                "api_version": "v1_0_5",
                 "tariff_type": "grid",
                 "tariff_name": "home",
             })
@@ -70,29 +96,27 @@ class TestCreationAndEditing:
 
     def test_creation_reuses_the_natural_key_without_refetching(self, owner_client):
         source = make_source()
-        with mock.patch("tariffs.dynamic.services.fetch_window") as fetch:
+        with mock.patch("tariffs.dynamic.services.probe_source_configuration") as probe:
             response = owner_client.post("/api/v1/tariffs/dynamic-sources/", {
                 "label": "Different label",
                 "url": source.url,
-                "adapter": source.adapter,
+                "api_version": source.api_version,
                 "tariff_type": source.tariff_type,
                 "tariff_name": source.tariff_name,
             })
 
         assert response.status_code == 200
         assert response.json()["id"] == str(source.pk)
-        fetch.assert_not_called()
+        probe.assert_not_called()
 
-    def test_bkw_configuration_is_constrained(self, owner_client):
+    def test_provider_adapter_names_are_not_accepted_as_versions(self, owner_client):
         response = owner_client.post("/api/v1/tariffs/dynamic-sources/", {
-            "label": "BKW grid",
-            "url": "https://api.example.test/bkw",
-            "adapter": "bkw",
-            "tariff_type": "grid",
+            "label": "Example", "url": "https://prices.example.test/tariffs",
+            "api_version": "provider_name", "tariff_type": "grid",
         })
 
         assert response.status_code == 400
-        assert "tariff_type" in response.json()
+        assert "api_version" in response.json()
 
     def test_only_admin_can_edit_a_source(self, owner_client, admin_client):
         source = make_source()

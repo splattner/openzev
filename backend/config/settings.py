@@ -257,9 +257,9 @@ CELERY_BEAT_SCHEDULE = {
         "task": "exports.tasks.sweep_export_jobs",
         "schedule": 3600.0,
     },
-    # Every four hours, not daily: Groupe E publishes the day-ahead prices in
-    # the afternoon and BKW republishes the current day during it, so there is
-    # no one moment at which a day's prices are final. Re-fetching a window
+    # Every four hours, not daily: endpoints may publish day-ahead prices or
+    # republish the current day at different times, so there is no one moment
+    # at which a day's prices are final. Re-fetching a window
     # already stored is an idempotent upsert, so extra ticks cost only a
     # request.
     "refresh-dynamic-tariff-sources": {

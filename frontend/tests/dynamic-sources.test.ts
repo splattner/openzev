@@ -4,6 +4,7 @@ import { api } from '../src/lib/api/client'
 import {
   clearDynamicSourcePrices,
   createDynamicTariffSource,
+  discoverDynamicTariffSource,
   fetchDynamicPriceHistory,
   fetchDynamicTariffSources,
   queueDynamicSourceFetch,
@@ -19,9 +20,9 @@ import type { DynamicTariffSource } from '../src/types/api'
 function source(overrides: Partial<DynamicTariffSource> = {}): DynamicTariffSource {
   return {
     id: 'src-1',
-    label: 'Groupe E vario — grid',
-    url: 'https://api.tariffs.groupe-e.ch/v2/tariffs',
-    adapter: 'groupe_e',
+    label: 'Example dynamic grid',
+    url: 'https://prices.example.test/tariffs',
+    api_version: 'v1_0_5',
     tariff_type: 'grid',
     tariff_name: 'vario',
     last_fetch_status: 'ok',
@@ -42,13 +43,14 @@ function source(overrides: Partial<DynamicTariffSource> = {}): DynamicTariffSour
 
 describe('impliedEnergyType', () => {
   it('is grid for every VSE type except feed_in', () => {
-    for (const type of ['electricity', 'grid', 'integrated', 'regional_fees'] as const) {
+    for (const type of ['electricity', 'grid', 'metering', 'national_fees', 'dso', 'dso_complete', 'integrated', 'integrated_complete', 'regional_fees'] as const) {
       expect(impliedEnergyType(source({ tariff_type: type }))).toBe('grid')
     }
   })
 
   it('is feed_in for a feed-in remuneration source', () => {
     expect(impliedEnergyType(source({ tariff_type: 'feed_in' }))).toBe('feed_in')
+    expect(impliedEnergyType(source({ tariff_type: 'refund' }))).toBe('feed_in')
   })
 })
 
@@ -101,7 +103,7 @@ describe('fetchDynamicTariffSources', () => {
       expect(JSON.parse(config.data as string)).toEqual({
         label: 'Example grid',
         url: 'https://prices.example.test',
-        adapter: 'vse_v1',
+        api_version: 'v1_0_5',
         tariff_type: 'grid',
         tariff_name: 'standard',
       })
@@ -111,12 +113,31 @@ describe('fetchDynamicTariffSources', () => {
     const result = await createDynamicTariffSource({
       label: 'Example grid',
       url: 'https://prices.example.test',
-      adapter: 'vse_v1',
+      api_version: 'v1_0_5',
       tariff_type: 'grid',
       tariff_name: 'standard',
     })
 
     expect(result.label).toBe('Example grid')
+  })
+
+  it('discovers an endpoint before source creation', async () => {
+    apiMock.onPost('/tariffs/dynamic-sources/discover/').reply((config) => {
+      expect(JSON.parse(config.data as string)).toEqual({ url: 'https://prices.example.test' })
+      return [200, {
+        api_version: 'v2_0_0',
+        version_detected: true,
+        components_discovered: true,
+        components: [{ tariff_type: 'grid', tariff_name: 'standard' }],
+      }]
+    })
+
+    await expect(discoverDynamicTariffSource('https://prices.example.test')).resolves.toEqual({
+      api_version: 'v2_0_0',
+      version_detected: true,
+      components_discovered: true,
+      components: [{ tariff_type: 'grid', tariff_name: 'standard' }],
+    })
   })
 
   it('requests a bounded price-history window', async () => {

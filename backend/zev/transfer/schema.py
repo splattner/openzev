@@ -167,7 +167,10 @@ TARIFF_FIELDS = (
 DYNAMIC_SOURCE_FIELDS = (
     "label",
     "url",
-    "adapter",
+    "api_version",
+    "request_mode",
+    "query_tariff_type",
+    "supports_range",
     "tariff_type",
     "tariff_name",
 )

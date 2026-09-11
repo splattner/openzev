@@ -97,6 +97,12 @@ export function AdminDynamicSourcesPanel() {
         <div>
           <strong>{row.original.label}</strong>
           <div className="muted">{row.original.url}</div>
+          <div className="muted">
+            {t(`pages.dynamicSources.versions.${row.original.api_version}` as Parameters<typeof t>[0])}
+            {' · '}
+            {t(`pages.dynamicSources.types.${row.original.tariff_type}` as Parameters<typeof t>[0])}
+            {row.original.tariff_name ? ` · ${row.original.tariff_name}` : ''}
+          </div>
         </div>
       ),
     },

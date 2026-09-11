@@ -42,9 +42,12 @@ def fixture(name: str) -> dict:
 
 def make_source(**overrides) -> DynamicTariffSource:
     defaults = {
-        "label": "Groupe E vario — grid",
-        "url": "https://api.tariffs.groupe-e.ch/v2/tariffs",
-        "adapter": "groupe_e",
+        "label": "Example dynamic grid",
+        "url": "https://prices.example.test/tariffs",
+        "api_version": "v1_0_5",
+        "request_mode": "standard",
+        "query_tariff_type": "grid",
+        "supports_range": True,
         "tariff_type": "grid",
         "tariff_name": "vario",
     }
@@ -154,7 +157,7 @@ class TestCoverageGaps:
         # The spring-forward day has 92 quarter-hours rather than 96. Anything
         # that checked a count would call a complete day incomplete, twice a
         # year, and refuse to bill it.
-        source = make_source(adapter="vse_v1", tariff_name="")
+        source = make_source(tariff_name="")
         with served(fixture("vse_v1_dst_spring")):
             refresh_source(source, now=datetime(2026, 3, 29, 12, tzinfo=UTC))
 
@@ -193,22 +196,24 @@ class TestRefreshSource:
         assert len(seen) > 10
 
     def test_an_endpoint_without_range_support_is_asked_once_and_bare(self):
-        source = make_source(adapter="bkw", tariff_type="feed_in", tariff_name="",
-                             url="https://api.bkw.ch/api/dyntariffs/v1/Tariffs/energyreturn")
+        source = make_source(
+            request_mode="exact_url", supports_range=False, query_tariff_type="",
+            tariff_type="feed_in", tariff_name="", url="https://prices.example.test/current",
+        )
         seen = []
 
         with mock.patch(
             "tariffs.dynamic.fetch.fetch_tariff_document",
             side_effect=lambda url: (seen.append(url), (fixture("bkw_energyreturn_day"), "d"))[1],
         ):
-            # Even a backfill cannot ask BKW for history — it has none to give.
+            # Even a backfill cannot ask an exact-URL endpoint for history.
             refresh_source(source, backfill=True, now=datetime(2026, 9, 11, 12, tzinfo=UTC))
 
-        assert seen == ["https://api.bkw.ch/api/dyntariffs/v1/Tariffs/energyreturn"]
+        assert seen == ["https://prices.example.test/current"]
         assert DynamicPricePoint.objects.filter(source=source).count() == 96
 
     def test_success_is_recorded_on_the_source(self):
-        source = make_source(adapter="vse_v1", tariff_name="")
+        source = make_source(tariff_name="")
         with served(fixture("vse_v1_gap")):
             refresh_source(source, now=datetime(2026, 2, 1, 12, tzinfo=UTC))
 
@@ -248,7 +253,7 @@ class TestRefreshSource:
     def test_a_failed_refresh_leaves_the_previous_success_intact(self):
         # A blip must not look like "we never had prices": the stored series is
         # still the evidence behind any invoice already issued from it.
-        source = make_source(adapter="vse_v1", tariff_name="")
+        source = make_source(tariff_name="")
         with served(fixture("vse_v1_gap")):
             refresh_source(source, now=datetime(2026, 2, 1, 12, tzinfo=UTC))
         stored = DynamicPricePoint.objects.count()
@@ -264,7 +269,7 @@ class TestRefreshSource:
 
 class TestTasks:
     def test_the_task_returns_what_it_wrote(self):
-        source = make_source(adapter="vse_v1", tariff_name="")
+        source = make_source(tariff_name="")
         with served(fixture("vse_v1_gap")):
             result = fetch_dynamic_prices_impl(source.pk)
 
@@ -283,8 +288,11 @@ class TestTasks:
         # Fanned out rather than looped so one unreachable operator cannot
         # delay or fail the refresh of the others.
         make_source()
-        make_source(url="https://api.bkw.ch/api/dyntariffs/v1/Tariffs/energyreturn",
-                    adapter="bkw", tariff_type="feed_in", tariff_name="", label="BKW feed-in")
+        make_source(
+            url="https://prices.example.test/current", request_mode="exact_url",
+            supports_range=False, query_tariff_type="", tariff_type="feed_in",
+            tariff_name="", label="Example feed-in",
+        )
 
         with mock.patch("tariffs.tasks.fetch_dynamic_prices.delay") as delay:
             result = refresh_dynamic_tariff_sources()
@@ -313,7 +321,10 @@ class TestSourceIdentity:
         assert other.pk is not None
 
     def test_an_endpoint_that_takes_no_range_reports_that_it_cannot_backfill(self):
-        source = make_source(adapter="bkw", tariff_type="feed_in", tariff_name="")
+        source = make_source(
+            request_mode="exact_url", supports_range=False,
+            query_tariff_type="", tariff_type="feed_in", tariff_name="",
+        )
 
         assert source.supports_backfill is False
         assert make_source(tariff_name="vario2").supports_backfill is True

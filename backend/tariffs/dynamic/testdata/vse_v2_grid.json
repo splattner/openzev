@@ -9,11 +9,11 @@
         "standard_basegroup": true,
         "municipality_number": 351,
         "energy": {
-          "unit": "CHF_kWh",
+          "unit": "CHF/kWh",
           "value": 0.113
         },
         "base": {
-          "unit": "CHF_m",
+          "unit": "CHF/m",
           "value": 5
         }
       }

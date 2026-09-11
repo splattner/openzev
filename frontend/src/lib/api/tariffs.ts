@@ -1,6 +1,8 @@
 import type {
   DynamicPriceHistory,
   DynamicSourceFetchResult,
+  DynamicSourceDiscovery,
+  DynamicApiVersion,
   DynamicTariffSource,
   DynamicTariffSourceInput,
   Tariff,
@@ -84,6 +86,17 @@ export async function fetchDynamicTariffSources(): Promise<DynamicTariffSource[]
 
 export async function createDynamicTariffSource(payload: DynamicTariffSourceInput): Promise<DynamicTariffSource> {
   const { data } = await api.post<DynamicTariffSource>('/tariffs/dynamic-sources/', payload)
+  return data
+}
+
+export async function discoverDynamicTariffSource(
+  url: string,
+  apiVersion?: DynamicApiVersion,
+): Promise<DynamicSourceDiscovery> {
+  const { data } = await api.post<DynamicSourceDiscovery>('/tariffs/dynamic-sources/discover/', {
+    url,
+    ...(apiVersion ? { api_version: apiVersion } : {}),
+  })
   return data
 }
 

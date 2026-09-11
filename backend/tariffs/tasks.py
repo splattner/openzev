@@ -5,11 +5,11 @@
 enqueued directly when a source is created, with ``backfill=True``, to pull
 whatever history the operator still has.
 
-It is scheduled several times a day rather than once, for two measured reasons:
-Groupe E publishes the day-ahead prices in the afternoon, and BKW republishes
-*today's* series during the day out of a cache. There is no single moment at
-which a day's prices are final, and ``publication_timestamp`` only says when the
-operator last wrote — not what it covers.
+It is scheduled several times a day rather than once because endpoints can
+publish day-ahead prices or republish today's series at different times. There
+is no single moment at which a day's prices are final, and
+``publication_timestamp`` only says when the operator last wrote — not what it
+covers.
 """
 
 import logging
