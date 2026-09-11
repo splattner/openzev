@@ -37,4 +37,10 @@ describe('zev form mapping', () => {
     expect(mapZevToForm(zev()).itemize_tariff_bands).toBe(false)
     expect(getDefaultZevForm().itemize_tariff_bands).toBe(false)
   })
+
+  it('carries the grid connection postal code through, defaulting to blank', () => {
+    expect(mapZevToForm(zev({ postal_code: '3110' })).postal_code).toBe('3110')
+    expect(mapZevToForm(zev()).postal_code).toBe('')
+    expect(getDefaultZevForm().postal_code).toBe('')
+  })
 })

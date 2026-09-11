@@ -56,6 +56,8 @@ New ZEV owners can register themselves and create their ZEV without admin involv
    - **Start Date** — When the ZEV begins operation (defaults to today)
    - **ZEV Type** — `ZEV` or `vZEV`
    - **Billing Interval** — Monthly, quarterly, semi-annual, or annual
+   - **Postal Code** — Postal code of the grid connection (optional); suggests
+     the grid operator below from ElCom's official register
    - **Grid Operator** — Your VNB name (optional)
 2. Click **Create ZEV**
 3. You are redirected to the dashboard as the owner of your new ZEV
@@ -101,9 +103,19 @@ The General and Billing & payment tabs hold the settings form sections:
 
 | Setting | Purpose | Required |
 | --- | --- | --- |
+| **Postal Code** | Postal code of the grid connection. Used only to suggest a grid operator and its tariff document URL from the official ElCom register — see below | No |
 | **Grid Operator** | VNB name (Verteilnetzbetreiber) | No |
 | **Tariff document URL** | Where this operator publishes its machine-readable tariffs (Art. 7b StromVV). Used by the [tariff import](07-tariff-configuration.md#importing-tariffs-from-your-grid-operator) | No |
 | **Grid Connection Point** | Verknüpfungspunkt / EAN identifier | No |
+
+> **Tip:** Enter a **Postal Code** and OpenZEV suggests the grid operator that
+> serves it, sourced from ElCom's official register. Click the suggestion to
+> fill in **Grid Operator**. If that operator has a registered tariff
+> document URL, a second suggestion offers to fill in **Tariff document
+> URL** too — but only after **Test this URL** confirms the address actually
+> serves a tariff document. Operators sometimes move the file without
+> ElCom's copy being updated, so an untested suggestion is never saved
+> automatically, and an address you already entered is never overwritten.
 
 #### Billing & Payment
 

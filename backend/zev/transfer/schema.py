@@ -86,6 +86,7 @@ ZEV_FIELDS = (
     "name",
     "start_date",
     "zev_type",
+    "postal_code",
     "grid_operator",
     "grid_operator_elcom_id",
     "tariff_source_url",

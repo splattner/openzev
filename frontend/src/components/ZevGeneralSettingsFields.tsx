@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { BILLING_INTERVAL_OPTIONS, ZEV_TYPE_OPTIONS } from '../lib/options'
 import type { ZevInput } from '../types/api'
 import { GridOperatorField } from '../features/zev/GridOperatorField'
+import { GridOperatorSuggestion } from '../features/zev/GridOperatorSuggestion'
 
 type ZevSettingsFieldGroup = 'general' | 'billing' | 'documents'
 
@@ -13,6 +14,10 @@ type ZevGeneralSettingsFieldsProps = {
      * general = identity + grid connection, billing = invoicing + payment,
      * documents = contract/tariff notes. */
     group?: ZevSettingsFieldGroup
+    /** The ZEV being edited, when there is one — enables the grid-operator
+     * suggestion's "test this URL" step, which needs an id to fetch against.
+     * Undefined for the create-ZEV form, which has none yet. */
+    zevId?: string
 }
 
 /**
@@ -20,7 +25,7 @@ type ZevGeneralSettingsFieldsProps = {
  * renders them (phase 3). Default renders everything (legacy single-form
  * consumers) — the hub passes `group` per tab.
  */
-export function ZevGeneralSettingsFields({ form, onChange, group }: ZevGeneralSettingsFieldsProps) {
+export function ZevGeneralSettingsFields({ form, onChange, group, zevId }: ZevGeneralSettingsFieldsProps) {
     const { t } = useTranslation()
 
     return (
@@ -145,12 +150,34 @@ export function ZevGeneralSettingsFields({ form, onChange, group }: ZevGeneralSe
             <div className="form-section">
                 <p className="form-section-header">{t('pages.zevSettings.sections.gridConnection')}</p>
                 <div className="inline-form grid grid-2">
+                    <label>
+                        <span>{t('pages.zevSettings.fields.postalCode')}</span>
+                        <input
+                            value={form.postal_code ?? ''}
+                            onChange={(event) => onChange({ postal_code: event.target.value })}
+                        />
+                        <small className="muted">{t('pages.zevSettings.fields.postalCodeHint')}</small>
+                    </label>
                     <GridOperatorField
                         label={t('pages.zevSettings.fields.gridOperator')}
                         value={form.grid_operator ?? ''}
                         elcomId={form.grid_operator_elcom_id ?? null}
                         onChange={onChange}
                     />
+                    {(form.postal_code ?? '').trim() && (
+                        <div className="grid-span-full">
+                            <GridOperatorSuggestion
+                                postalCode={form.postal_code ?? ''}
+                                currentElcomId={form.grid_operator_elcom_id}
+                                currentTariffUrl={form.tariff_source_url}
+                                zevId={zevId}
+                                onApplyOperator={(operator) =>
+                                    onChange({ grid_operator: operator.name, grid_operator_elcom_id: operator.id })
+                                }
+                                onApplyTariffUrl={(url) => onChange({ tariff_source_url: url })}
+                            />
+                        </div>
+                    )}
                     <label className="grid-span-full">
                         <span>{t('pages.zevSettings.fields.tariffSourceUrl')}</span>
                         <input

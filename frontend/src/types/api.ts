@@ -106,6 +106,8 @@ export interface Zev {
     start_date: string
     owner: number
     zev_type: 'zev' | 'vzev'
+    /** Postal code of the grid connection — used only to suggest a grid operator, not an address. */
+    postal_code?: string
     grid_operator: string
     grid_operator_elcom_id?: number | null
     tariff_source_url?: string
@@ -132,6 +134,7 @@ export interface ZevInput {
     start_date: string
     owner?: number
     zev_type: 'zev' | 'vzev'
+    postal_code?: string
     grid_operator?: string
     grid_operator_elcom_id?: number | null
     tariff_source_url?: string
@@ -263,6 +266,7 @@ export interface SelfSetupZevInput {
     start_date: string
     zev_type: 'zev' | 'vzev'
     billing_interval: 'monthly' | 'quarterly' | 'semi_annual' | 'annual'
+    postal_code?: string
     grid_operator?: string
     grid_operator_elcom_id?: number | null
 }
@@ -519,6 +523,10 @@ export interface GridOperator {
     name: string
     uid: string
     website: string
+    /** ElCom's registered address for this operator's machine-readable tariffs. A suggestion — fetch it before saving it as tariff_source_url. */
+    tariff_url: string
+    /** Whether tariff_url looks like the tariff file itself rather than a page about it. */
+    tariff_url_is_direct: boolean
 }
 
 export interface GridOperatorList {
@@ -527,6 +535,10 @@ export interface GridOperatorList {
     licence: string
     period: string
     fetched_on: string
+    operators: GridOperator[]
+}
+
+export interface GridOperatorSuggestion {
     operators: GridOperator[]
 }
 

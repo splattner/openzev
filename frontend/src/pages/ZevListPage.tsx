@@ -36,6 +36,7 @@ import { BILLING_INTERVAL_OPTIONS, METER_TYPE_OPTIONS, ZEV_TYPE_OPTIONS } from '
 import { TITLE_KEYS } from '../lib/participantTitle'
 import type { OwnerMeteringPointInput, Zev, ZevInput, ZevWizardInput, ZevWizardResult } from '../types/api'
 import { GridOperatorField } from '../features/zev/GridOperatorField'
+import { GridOperatorSuggestion } from '../features/zev/GridOperatorSuggestion'
 
 const defaultCreateForm = (): ZevWizardInput => ({
     name: '',
@@ -476,6 +477,14 @@ export function ZevListPage({ embedded = false }: { embedded?: boolean }) {
                                     ))}
                                 </select>
                             </label>
+                            <label>
+                                <span>{t('pages.zevs.form.zevPostalCode')}</span>
+                                <input
+                                    value={createForm.postal_code ?? ''}
+                                    onChange={(event) => setCreateForm((previous) => ({ ...previous, postal_code: event.target.value }))}
+                                />
+                                <small className="muted">{t('pages.zevs.form.zevPostalCodeHint')}</small>
+                            </label>
                             <div className="grid-span-full">
                                 <GridOperatorField
                                     label={t('pages.zevs.form.gridOperator')}
@@ -484,6 +493,25 @@ export function ZevListPage({ embedded = false }: { embedded?: boolean }) {
                                     onChange={(next) => setCreateForm((previous) => ({ ...previous, ...next }))}
                                 />
                             </div>
+                            {(createForm.postal_code ?? '').trim() && (
+                                <div className="grid-span-full">
+                                    <GridOperatorSuggestion
+                                        postalCode={createForm.postal_code ?? ''}
+                                        currentElcomId={createForm.grid_operator_elcom_id}
+                                        currentTariffUrl={createForm.tariff_source_url}
+                                        onApplyOperator={(operator) =>
+                                            setCreateForm((previous) => ({
+                                                ...previous,
+                                                grid_operator: operator.name,
+                                                grid_operator_elcom_id: operator.id,
+                                            }))
+                                        }
+                                        onApplyTariffUrl={(url) =>
+                                            setCreateForm((previous) => ({ ...previous, tariff_source_url: url }))
+                                        }
+                                    />
+                                </div>
+                            )}
                         </>
                     )}
 
@@ -740,6 +768,7 @@ export function ZevListPage({ embedded = false }: { embedded?: boolean }) {
                     <section className="card page-stack">
                         <ZevGeneralSettingsFields
                             form={editForm}
+                            zevId={editingId ?? undefined}
                             onChange={(patch) => setEditForm((previous) => ({ ...previous, ...patch }))}
                         />
                     </section>

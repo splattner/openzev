@@ -2,6 +2,7 @@ from django.urls import path
 from rest_framework.routers import DefaultRouter
 from .views import (
     GridOperatorListView,
+    GridOperatorSuggestionView,
     ZevViewSet,
     ParticipantViewSet,
     MeteringPointViewSet,
@@ -16,4 +17,5 @@ router.register("metering-point-assignments", MeteringPointAssignmentViewSet, ba
 
 urlpatterns = [
     path("grid-operators/", GridOperatorListView.as_view(), name="grid-operator-list"),
+    path("grid-operators/suggest/", GridOperatorSuggestionView.as_view(), name="grid-operator-suggest"),
 ] + router.urls

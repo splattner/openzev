@@ -8,6 +8,7 @@ import { formatApiError } from '../lib/api/errors'
 import { todayLocalIso } from '../lib/dates'
 import type { SelfSetupZevInput } from '../types/api'
 import { GridOperatorField } from '../features/zev/GridOperatorField'
+import { GridOperatorSuggestion } from '../features/zev/GridOperatorSuggestion'
 
 type Step = 'verifying' | 'error' | 'set-password' | 'create-zev' | 'done'
 
@@ -222,12 +223,36 @@ export function VerifyEmailPage() {
                         </select>
                     </label>
 
+                    <label>
+                        <span>{t('auth.verify.zevPostalCode')}</span>
+                        <input
+                            value={zevForm.postal_code ?? ''}
+                            onChange={(e) => setZevForm((f) => ({ ...f, postal_code: e.target.value }))}
+                        />
+                        <small className="muted">{t('auth.verify.zevPostalCodeHint')}</small>
+                    </label>
+
                     <GridOperatorField
                         label={t('auth.verify.zevGridOperator')}
                         value={zevForm.grid_operator ?? ''}
                         elcomId={zevForm.grid_operator_elcom_id ?? null}
                         onChange={(next) => setZevForm((f) => ({ ...f, ...next }))}
                     />
+
+                    {(zevForm.postal_code ?? '').trim() && (
+                        <GridOperatorSuggestion
+                            postalCode={zevForm.postal_code ?? ''}
+                            currentElcomId={zevForm.grid_operator_elcom_id}
+                            onApplyOperator={(operator) =>
+                                setZevForm((f) => ({ ...f, grid_operator: operator.name, grid_operator_elcom_id: operator.id }))
+                            }
+                            onApplyTariffUrl={() => {
+                                // No zev id exists yet during self-setup, so
+                                // GridOperatorSuggestion never offers the URL
+                                // step here — nothing to wire up.
+                            }}
+                        />
+                    )}
 
                     {zevError ? <div className="error-banner">{zevError}</div> : null}
 

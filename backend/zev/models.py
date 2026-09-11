@@ -73,6 +73,12 @@ class Zev(models.Model):
         on_delete=models.PROTECT,
         related_name="owned_zevs",
     )
+    # Postal code of the grid connection (not a participant's address — a ZEV
+    # has one ``grid_connection_point``, so one site postal code). Used only to
+    # look up a grid-operator suggestion from the ElCom register
+    # (``zev.grid_operators.grid_operators_for_postal_code``); never
+    # validated, since a ZEV with no resolvable operator must stay enterable.
+    postal_code = models.CharField(max_length=10, blank=True)
     grid_operator = models.CharField(max_length=200, blank=True, help_text="Name of the VNB (Verteilnetzbetreiber)")
     # Set when the name was chosen from the official ElCom list, null when it
     # was typed. Deliberately not a foreign key: the list is a suggestion
@@ -82,9 +88,12 @@ class Zev(models.Model):
         null=True, blank=True,
         help_text="ElCom operator id, when the grid operator was picked from the official list",
     )
-    # Where this operator publishes its machine-readable tariffs (Art. 7b
-    # StromVV). There is no central registry — every operator hosts its own
-    # address — so it is stored per ZEV and reused for next year's refresh.
+    # Every operator hosts its own address rather than publishing through a
+    # central portal, so this is stored per ZEV and reused for next year's
+    # refresh. ElCom's register catalogues where to find it (see
+    # ``grid_operators_for_postal_code``), but that catalogue entry is a
+    # suggestion only — see the long comment in ``zev.grid_operators`` on why
+    # it is never trusted enough to write here without a validating fetch.
     tariff_source_url = models.URLField(
         max_length=500, blank=True,
         help_text="URL of the grid operator's machine-readable tariff publication (VSE/AES standard)",

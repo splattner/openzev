@@ -23,6 +23,7 @@ from .models import Zev, Participant, MeteringPoint, MeteringPointAssignment
 from .scoping import ZevScopedQuerySetMixin
 from .serializers import (
     GridOperatorListSerializer,
+    GridOperatorSuggestionSerializer,
     ZevSerializer,
     ZevDetailSerializer,
     ZevCreateWithOwnerSerializer,
@@ -37,7 +38,7 @@ from .permissions import (
     MeteringPointPermission,
     ZevManagementPermission,
 )
-from .grid_operators import load_grid_operators
+from .grid_operators import load_grid_operators, grid_operators_for_postal_code
 from .services import send_participant_invitation, create_zev_for_existing_owner
 from .transfer import (
     SECTION_DEPENDENCIES,
@@ -797,3 +798,25 @@ class GridOperatorListView(APIView):
     @extend_schema(responses=GridOperatorListSerializer)
     def get(self, request):
         return Response(load_grid_operators())
+
+
+class GridOperatorSuggestionView(APIView):
+    """Operator suggestion(s) for a postal code, from the same checked-in fixture.
+
+    A separate, lightweight endpoint rather than a query param on the list
+    above: the picker needs the whole 553-entry list once and caches it
+    forever, while this is looked up fresh whenever the postal-code field
+    changes and returns only what matched — usually zero or one entry.
+
+    An empty or unrecognised postal code returns ``{"operators": []}``, not
+    an error — the caller falls back to the free-text picker, which is the
+    correct outcome for a postal code the register does not cover.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(responses=GridOperatorSuggestionSerializer)
+    def get(self, request):
+        postal_code = request.query_params.get("postal_code", "")
+        operators = grid_operators_for_postal_code(postal_code)
+        return Response(GridOperatorSuggestionSerializer({"operators": operators}).data)

@@ -1,5 +1,6 @@
 import type {
   GridOperatorList,
+  GridOperatorSuggestion,
   MeteringPoint,
   MeteringPointAssignment,
   MeteringPointAssignmentInput,
@@ -90,6 +91,19 @@ export async function downloadParticipantContractPdf(participantId: string, file
 
 export async function fetchGridOperators(): Promise<GridOperatorList> {
   const { data } = await api.get<GridOperatorList>('/zev/grid-operators/')
+  return data
+}
+
+/**
+ * Operator suggestion(s) for a postal code — zero, one, or a short list.
+ * Looked up server-side against the same checked-in fixture as
+ * `fetchGridOperators`, so an unrecognised or foreign postal code simply
+ * resolves to `{ operators: [] }` rather than an error.
+ */
+export async function fetchGridOperatorSuggestions(postalCode: string): Promise<GridOperatorSuggestion> {
+  const { data } = await api.get<GridOperatorSuggestion>('/zev/grid-operators/suggest/', {
+    params: { postal_code: postalCode },
+  })
   return data
 }
 

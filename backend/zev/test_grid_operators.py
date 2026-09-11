@@ -12,10 +12,11 @@ from rest_framework.test import APIClient
 
 from accounts.models import UserRole
 from testing.helpers import make_user
-from zev.grid_operators import grid_operator_ids, load_grid_operators
+from zev.grid_operators import grid_operator_ids, grid_operators_for_postal_code, load_grid_operators
 from zev.models import Zev
 
 URL = "/api/v1/zev/grid-operators/"
+SUGGEST_URL = "/api/v1/zev/grid-operators/suggest/"
 
 
 class GridOperatorFixtureTests(TestCase):
@@ -52,6 +53,38 @@ class GridOperatorFixtureTests(TestCase):
         names = [operator["name"] for operator in load_grid_operators()["operators"]]
 
         self.assertEqual(names, sorted(names, key=str.casefold))
+
+    def test_every_operator_carries_a_tariff_url_field(self):
+        """Present even when empty, so the frontend never has to distinguish
+        "not fetched yet" from "this operator publishes nothing" (see #691)."""
+        operators = load_grid_operators()["operators"]
+
+        for operator in operators:
+            self.assertIn("tariff_url", operator)
+            self.assertIn("tariff_url_is_direct", operator)
+            self.assertIsInstance(operator["tariff_url_is_direct"], bool)
+            if not operator["tariff_url"]:
+                self.assertFalse(operator["tariff_url_is_direct"])
+
+    def test_a_majority_of_operators_publish_a_tariff_url(self):
+        """Not a hard requirement (see fetch_grid_operators --min-tariff-urls),
+        but a fixture where almost nobody has one would mean the command's
+        urltr handling broke silently rather than the real world changing."""
+        operators = load_grid_operators()["operators"]
+
+        with_url = sum(1 for operator in operators if operator["tariff_url"])
+        self.assertGreater(with_url, len(operators) / 2)
+
+    def test_postal_codes_map_only_to_known_operators(self):
+        data = load_grid_operators()
+        known_ids = {operator["id"] for operator in data["operators"]}
+
+        self.assertGreater(len(data["postal_codes"]), 1000, "postal code map looks truncated")
+        for postal_code, operator_ids in data["postal_codes"].items():
+            self.assertTrue(postal_code.strip())
+            self.assertTrue(operator_ids, f"{postal_code} maps to no operator")
+            for operator_id in operator_ids:
+                self.assertIn(operator_id, known_ids)
 
 
 class GridOperatorEndpointTests(TestCase):
@@ -134,3 +167,141 @@ class ZevGridOperatorIdTests(TestCase):
         )
 
         self.assertIsNone(zev.grid_operator_elcom_id)
+
+
+class ZevPostalCodeTests(TestCase):
+    """``Zev.postal_code`` itself: free text, like ``grid_operator``, because a
+    ZEV with an address the register does not resolve must stay enterable."""
+
+    def setUp(self):
+        self.admin = make_user("postal_code_admin", UserRole.ADMIN)
+        self.client = APIClient()
+        self.client.force_authenticate(self.admin)
+
+    def test_postal_code_round_trips_through_the_api(self):
+        response = self.client.post(
+            "/api/v1/zev/zevs/",
+            {
+                "name": "Postal Code ZEV", "start_date": "2026-01-01",
+                "zev_type": "vzev", "owner": self.admin.id, "postal_code": "3110",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertEqual(Zev.objects.get(pk=response.data["id"]).postal_code, "3110")
+
+    def test_postal_code_defaults_to_blank(self):
+        zev = Zev.objects.create(
+            name="No Postal Code ZEV", owner=self.admin, zev_type="vzev", invoice_prefix="N",
+        )
+
+        self.assertEqual(zev.postal_code, "")
+
+    def test_an_unresolvable_postal_code_is_still_accepted(self):
+        """Nothing validates this against the ElCom register — it is a
+        suggestion source, not a constraint (same rule as grid_operator)."""
+        response = self.client.post(
+            "/api/v1/zev/zevs/",
+            {
+                "name": "Foreign ZEV", "start_date": "2026-01-01",
+                "zev_type": "vzev", "owner": self.admin.id, "postal_code": "00000",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 201, response.data)
+
+
+class GridOperatorsForPostalCodeTests(TestCase):
+    """The lookup behind the suggestion endpoint, exercised against whatever
+    postal code the shipped fixture actually resolves to a single operator —
+    Münsingen (3110 -> InfraWerkeMünsingen) at the time of writing, per #691."""
+
+    def test_a_known_single_operator_postal_code_resolves(self):
+        data = load_grid_operators()
+        single_operator_code = next(
+            code for code, ids in data["postal_codes"].items() if len(ids) == 1
+        )
+
+        result = grid_operators_for_postal_code(single_operator_code)
+
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]["id"], data["postal_codes"][single_operator_code][0])
+
+    def test_a_postal_code_with_several_operators_returns_all_of_them(self):
+        data = load_grid_operators()
+        multi_operator_code = next(
+            (code for code, ids in data["postal_codes"].items() if len(ids) > 1), None
+        )
+        if multi_operator_code is None:
+            self.skipTest("fixture has no postal code with several operators right now")
+
+        result = grid_operators_for_postal_code(multi_operator_code)
+
+        self.assertEqual(
+            {operator["id"] for operator in result},
+            set(data["postal_codes"][multi_operator_code]),
+        )
+
+    def test_an_unknown_postal_code_resolves_to_nothing(self):
+        """The caller falls back to the free-text picker — this is not an
+        error case."""
+        self.assertEqual(grid_operators_for_postal_code("0000"), [])
+
+    def test_blank_postal_code_resolves_to_nothing(self):
+        self.assertEqual(grid_operators_for_postal_code(""), [])
+        self.assertEqual(grid_operators_for_postal_code("   "), [])
+
+    def test_surrounding_whitespace_is_tolerated(self):
+        data = load_grid_operators()
+        single_operator_code = next(
+            code for code, ids in data["postal_codes"].items() if len(ids) == 1
+        )
+
+        self.assertEqual(
+            grid_operators_for_postal_code(f"  {single_operator_code}  "),
+            grid_operators_for_postal_code(single_operator_code),
+        )
+
+
+class GridOperatorSuggestionEndpointTests(TestCase):
+    def setUp(self):
+        self.user = make_user("grid_operator_suggestion_reader", UserRole.PARTICIPANT)
+        self.client = APIClient()
+        self.client.force_authenticate(self.user)
+
+    def test_requires_authentication(self):
+        response = APIClient().get(SUGGEST_URL, {"postal_code": "3110"})
+
+        self.assertEqual(response.status_code, 401)
+
+    def test_a_resolvable_postal_code_returns_its_operator(self):
+        data = load_grid_operators()
+        single_operator_code = next(
+            code for code, ids in data["postal_codes"].items() if len(ids) == 1
+        )
+        expected_id = data["postal_codes"][single_operator_code][0]
+
+        response = self.client.get(SUGGEST_URL, {"postal_code": single_operator_code})
+
+        self.assertEqual(response.status_code, 200)
+        operators = response.json()["operators"]
+        self.assertEqual(len(operators), 1)
+        self.assertEqual(operators[0]["id"], expected_id)
+        self.assertIn("tariff_url", operators[0])
+        self.assertIn("tariff_url_is_direct", operators[0])
+
+    def test_an_unresolvable_postal_code_returns_an_empty_list(self):
+        """Not a 404: an address the register does not cover is an expected,
+        silent outcome, not an error the frontend needs to handle specially."""
+        response = self.client.get(SUGGEST_URL, {"postal_code": "0000"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {"operators": []})
+
+    def test_missing_postal_code_param_returns_an_empty_list(self):
+        response = self.client.get(SUGGEST_URL)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {"operators": []})

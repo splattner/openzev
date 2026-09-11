@@ -123,6 +123,7 @@ export function ZevSettingsPage({ tab = 'general' }: { tab?: ZevSettingsTab }) {
                             <ZevGeneralSettingsFields
                                 form={form}
                                 group="general"
+                                zevId={selectedZevId}
                                 onChange={(patch) => setForm((previous) => ({ ...previous, ...patch }))}
                             />
 
@@ -143,6 +144,7 @@ export function ZevSettingsPage({ tab = 'general' }: { tab?: ZevSettingsTab }) {
                             <ZevGeneralSettingsFields
                                 form={form}
                                 group="billing"
+                                zevId={selectedZevId}
                                 onChange={(patch) => setForm((previous) => ({ ...previous, ...patch }))}
                             />
 
@@ -174,6 +176,7 @@ export function ZevSettingsPage({ tab = 'general' }: { tab?: ZevSettingsTab }) {
                             <ZevGeneralSettingsFields
                                 form={form}
                                 group="documents"
+                                zevId={selectedZevId}
                                 onChange={(patch) => setForm((previous) => ({ ...previous, ...patch }))}
                             />
 

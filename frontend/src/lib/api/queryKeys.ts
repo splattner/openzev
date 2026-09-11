@@ -19,6 +19,7 @@ export const queryKeys = {
     participants: (zevId?: string) => ['zev', 'participants', zevId ?? 'all'] as const,
     transferSections: () => ['zev', 'transfer-sections'] as const,
     gridOperators: () => ['zev', 'grid-operators'] as const,
+    gridOperatorSuggestions: (postalCode: string) => ['zev', 'grid-operators', 'suggest', postalCode] as const,
   },
   tariffs: {
     series: (zevId?: string) => ['tariffs', 'series', zevId ?? 'all'] as const,

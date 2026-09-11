@@ -310,6 +310,39 @@ class ZevCreationWizardTests(TestCase):
 		assignments = MeteringPointAssignment.objects.filter(participant=owner_participant)
 		self.assertEqual(assignments.count(), 2)
 
+	@mock.patch("zev.tasks.warm_participant_geocode_cache_task.delay")
+	def test_the_zevs_own_postal_code_is_kept_apart_from_the_owners(self, mock_geocode_delay):
+		"""The grid connection's postal code (top-level) and the owner's own
+		address (nested under owner) travel through the same request without
+		being confused for one another — different meaning, different field."""
+		auth(self.client, self.admin)
+		resp = self.client.post(
+			"/api/v1/zev/zevs/create-with-owner/",
+			{
+				"name": "Postal Code Wizard ZEV",
+				"start_date": "2026-03-01",
+				"zev_type": "vzev",
+				"billing_interval": "monthly",
+				"postal_code": "3110",
+				"owner": {
+					"first_name": "Oscar",
+					"last_name": "Owner",
+					"email": "oscar.postalcode@example.com",
+					"postal_code": "8000",
+				},
+				"metering_points": [
+					{"meter_id": "CH0000000000000000000000000000003", "meter_type": "consumption"},
+				],
+			},
+			format="json",
+		)
+
+		self.assertEqual(resp.status_code, 201, resp.data)
+		created_zev = Zev.objects.get(name="Postal Code Wizard ZEV")
+		self.assertEqual(created_zev.postal_code, "3110")
+		owner_participant = Participant.objects.get(zev=created_zev, user=created_zev.owner)
+		self.assertEqual(owner_participant.postal_code, "8000")
+
 
 @override_settings(EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend")
 class ParticipantAccountLifecycleTests(TestCase):

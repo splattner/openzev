@@ -199,6 +199,15 @@ class GridOperatorSerializer(serializers.Serializer):
     name = serializers.CharField()
     uid = serializers.CharField(allow_blank=True, help_text="Swiss company UID (CHE-...)")
     website = serializers.CharField(allow_blank=True)
+    tariff_url = serializers.CharField(
+        allow_blank=True,
+        help_text="ElCom's registered address for this operator's machine-readable tariffs "
+                  "(Art. 7b StromVV). A suggestion only — fetch it before saving it as "
+                  "tariff_source_url; see zev.grid_operators.",
+    )
+    tariff_url_is_direct = serializers.BooleanField(
+        help_text="Whether tariff_url looks like the tariff file itself rather than a page about it.",
+    )
 
 
 class GridOperatorListSerializer(serializers.Serializer):
@@ -209,6 +218,12 @@ class GridOperatorListSerializer(serializers.Serializer):
     licence = serializers.CharField()
     period = serializers.CharField()
     fetched_on = serializers.DateField()
+    operators = GridOperatorSerializer(many=True)
+
+
+class GridOperatorSuggestionSerializer(serializers.Serializer):
+    """Operator suggestion(s) for a postal code: zero, one, or a short list."""
+
     operators = GridOperatorSerializer(many=True)
 
 
@@ -330,6 +345,7 @@ class ZevCreateWithOwnerSerializer(serializers.Serializer):
     start_date = serializers.DateField()
     zev_type = serializers.ChoiceField(choices=Zev._meta.get_field('zev_type').choices)
     billing_interval = serializers.ChoiceField(choices=Zev._meta.get_field('billing_interval').choices)
+    postal_code = serializers.CharField(required=False, allow_blank=True, max_length=10)
     grid_operator = serializers.CharField(required=False, allow_blank=True, max_length=200)
     grid_connection_point = serializers.CharField(required=False, allow_blank=True, max_length=200)
     invoice_prefix = serializers.CharField(required=False, allow_blank=True, max_length=10)
