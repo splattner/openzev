@@ -788,6 +788,75 @@ class RejectedArchiveTests(TestCase):
         self.assertFalse(Zev.objects.filter(owner=self.importer).exists())
 
 
+class DynamicTariffTransferTests(TestCase):
+    """A dynamic tariff's price source has to survive the move.
+
+    Its link is a foreign key to a globally shared row, so the surrogate id
+    cannot travel — and dropping the link silently would import a tariff that
+    looks configured and prices nothing at all.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.owner = make_user("dyn_owner", UserRole.ZEV_OWNER)
+        cls.importer = make_user("dyn_importer", UserRole.ADMIN)
+
+    def _zev_with_dynamic_tariff(self):
+        from tariffs.dynamic.models import DynamicTariffSource
+
+        zev = build_populated_zev(self.owner, meter_prefix="DYN")
+        source = DynamicTariffSource.objects.create(
+            label="Groupe E vario — grid", url="https://api.tariffs.groupe-e.ch/v2/tariffs",
+            adapter="groupe_e", tariff_type="grid", tariff_name="vario",
+        )
+        Tariff.objects.create(
+            zev=zev, name="Grid usage (dynamic)", category=TariffCategory.GRID_FEES,
+            billing_mode=BillingMode.ENERGY, energy_type=EnergyType.GRID,
+            valid_from=date(2026, 1, 1), dynamic_source=source,
+        )
+        return zev, source
+
+    def test_the_source_is_matched_by_its_natural_key_not_its_id(self):
+        zev, source = self._zev_with_dynamic_tariff()
+        raw = export_and_clear(zev)
+
+        result = import_archive(io.BytesIO(raw), owner=self.importer)
+
+        imported = Zev.objects.get(pk=result["zev_id"])
+        dynamic = imported.tariffs.get(name="Grid usage (dynamic)")
+        # The very same shared row, because this instance already had it.
+        self.assertEqual(dynamic.dynamic_source_id, source.pk)
+
+    def test_a_source_the_importing_instance_does_not_have_is_recreated(self):
+        from tariffs.dynamic.models import DynamicTariffSource
+
+        zev, _source = self._zev_with_dynamic_tariff()
+        raw = export_and_clear(zev)
+        # Nothing references the source any more, so this instance can forget
+        # it entirely — which is the state a fresh instance starts in.
+        DynamicTariffSource.objects.all().delete()
+
+        result = import_archive(io.BytesIO(raw), owner=self.importer)
+
+        imported = Zev.objects.get(pk=result["zev_id"])
+        dynamic = imported.tariffs.get(name="Grid usage (dynamic)")
+        self.assertEqual(dynamic.dynamic_source.url, "https://api.tariffs.groupe-e.ch/v2/tariffs")
+        self.assertEqual(dynamic.dynamic_source.tariff_name, "vario")
+        # Recreated empty: the archive carries the link, never the series.
+        self.assertIsNone(dynamic.dynamic_source.covers_from)
+
+    def test_a_static_tariff_still_arrives_without_a_source(self):
+        zev, _source = self._zev_with_dynamic_tariff()
+        raw = export_and_clear(zev)
+
+        result = import_archive(io.BytesIO(raw), owner=self.importer)
+
+        imported = Zev.objects.get(pk=result["zev_id"])
+        static = imported.tariffs.exclude(name="Grid usage (dynamic)").first()
+        self.assertIsNotNone(static)
+        self.assertIsNone(static.dynamic_source_id)
+
+
 class SchemaParityTests(TestCase):
     """The archive's hand-written field lists are a file format, not a mirror
     of the serializers — but they must stay true to the models. A field renamed
@@ -820,7 +889,9 @@ class SchemaParityTests(TestCase):
         "PARTICIPANT_FIELDS": {"id", "zev", "user", "created_at", "updated_at"},
         "METERING_POINT_FIELDS": {"id", "zev", "created_at", "updated_at"},
         "ASSIGNMENT_FIELDS": {"id", "metering_point", "participant", "created_at", "updated_at"},
-        "TARIFF_FIELDS": {"id", "zev", "created_at", "updated_at"},
+        # dynamic_source travels as a nested natural key, not as its FK id,
+        # because the source row is shared across communities and instances.
+        "TARIFF_FIELDS": {"id", "zev", "created_at", "updated_at", "dynamic_source"},
         "TARIFF_PERIOD_FIELDS": {"id", "tariff"},
         # ``pdf_status`` rides with ``pdf_file``: the document does not travel, so
         # an imported invoice has none, and carrying the exporter's "ready"

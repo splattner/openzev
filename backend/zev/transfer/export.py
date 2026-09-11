@@ -28,6 +28,7 @@ from zev.models import MeteringPoint, MeteringPointAssignment, Participant
 
 from .schema import (
     ASSIGNMENT_FIELDS,
+    DYNAMIC_SOURCE_FIELDS,
     FORMAT_VERSION,
     INVOICE_FIELDS,
     INVOICE_ITEM_FIELDS,
@@ -126,13 +127,19 @@ def _export_tariffs(zev):
     # The Prefetch pins the period ordering, so ``periods.all()`` below serves
     # from the prefetch cache instead of re-querying per tariff (a plain
     # prefetch_related("periods") is defeated by the order_by).
-    tariffs = Tariff.objects.filter(zev=zev).prefetch_related(
+    tariffs = Tariff.objects.filter(zev=zev).select_related("dynamic_source").prefetch_related(
         Prefetch("periods", queryset=TariffPeriod.objects.order_by("period_type", "id"))
     ).order_by("name", "valid_from")
     return [
         {
             "id": str(tariff.id),
             **_fields(tariff, TARIFF_FIELDS),
+            # By natural key, not by id: the source is shared across communities
+            # and its surrogate id is meaningless on another instance.
+            "dynamic_source": (
+                _fields(tariff.dynamic_source, DYNAMIC_SOURCE_FIELDS)
+                if tariff.dynamic_source_id else None
+            ),
             "periods": [
                 {"id": str(period.id), **_fields(period, TARIFF_PERIOD_FIELDS)}
                 for period in tariff.periods.all()

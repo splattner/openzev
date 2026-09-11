@@ -1,0 +1,65 @@
+{
+  "publication_timestamp": "2026-01-31T18:00:00+01:00",
+  "prices": [
+    {
+      "start_timestamp": "2026-02-01T00:00:00+01:00",
+      "end_timestamp": "2026-02-01T00:15:00+01:00",
+      "grid": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.113
+        },
+        {
+          "unit": "CHF_m",
+          "value": 5
+        }
+      ],
+      "electricity": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.121
+        }
+      ],
+      "integrated": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.234
+        },
+        {
+          "unit": "CHF_m",
+          "value": 5
+        }
+      ]
+    },
+    {
+      "start_timestamp": "2026-02-01T00:15:00+01:00",
+      "end_timestamp": "2026-02-01T00:30:00+01:00",
+      "grid": [
+        {
+          "unit": "CHF_kW_m",
+          "value": 12
+        },
+        {
+          "unit": "CHF_kWh",
+          "value": 0.102
+        }
+      ],
+      "electricity": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.123
+        }
+      ],
+      "integrated": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.225
+        },
+        {
+          "unit": "CHF_m",
+          "value": 5
+        }
+      ]
+    }
+  ]
+}

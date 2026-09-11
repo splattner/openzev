@@ -6,6 +6,7 @@ from zev.models import Zev
 
 from allocation.validity import active_during
 
+from .dynamic.models import DynamicPricePoint, DynamicTariffSource  # noqa: F401
 from .periods import hhmm, parse_number_list
 from .series import SERIES_FIELDS
 
@@ -102,6 +103,23 @@ class SourceComponent(models.TextChoices):
     ENERGY = "energy", "Energy price (Arbeitspreis)"
 
 
+# Which energy a dynamic series prices, per VSE tariff type. Only ``feed_in``
+# runs the other way — it pays the community for what it exported — and getting
+# that backwards would credit a consumer or bill a producer, so it is checked
+# rather than trusted. The category is deliberately *not* constrained the same
+# way: whether an operator's grid series is filed under grid fees or levies is
+# a presentation choice that changes no number, and ``docs/specs/
+# 2026-09-vse-tariff-import.md`` §5.1 already documents the conventional
+# mapping for people who want to follow it.
+ENERGY_TYPE_BY_DYNAMIC_TARIFF_TYPE = {
+    "electricity": EnergyType.GRID,
+    "grid": EnergyType.GRID,
+    "integrated": EnergyType.GRID,
+    "regional_fees": EnergyType.GRID,
+    "feed_in": EnergyType.FEED_IN,
+}
+
+
 class Tariff(models.Model):
     """Tariff definition for a ZEV with a validity period."""
 
@@ -135,6 +153,16 @@ class Tariff(models.Model):
         help_text="The operator's own name for this component, before the name suffix.",
     )
 
+    # Set when the price comes from an operator's time series instead of from
+    # ``periods``. Deliberately *not* one of ``SERIES_FIELDS``: a series has to
+    # be able to go static -> dynamic at a version boundary, which is exactly
+    # what happens when an operator switches on 1 January. PROTECT because the
+    # points behind an issued invoice are its audit trail.
+    dynamic_source = models.ForeignKey(
+        DynamicTariffSource, on_delete=models.PROTECT, null=True, blank=True,
+        related_name="tariffs", help_text="Price series this tariff is billed from.",
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -149,6 +177,8 @@ class Tariff(models.Model):
 
         if self.billing_mode in {BillingMode.ENERGY, BillingMode.PERCENTAGE_OF_ENERGY} and not self.energy_type:
             errors["energy_type"] = "Energy-based tariffs require an energy type."
+
+        errors.update(self._dynamic_source_errors())
 
         # A ZEV legitimately carries several simultaneous per-kWh components in
         # one category — grid fees are Netznutzung *and* SDL, levies are the
@@ -191,6 +221,35 @@ class Tariff(models.Model):
 
         if errors:
             raise ValidationError(errors)
+
+    def _dynamic_source_errors(self) -> dict:
+        """Check that a fetched series can actually price this tariff.
+
+        The series carries a price per kWh and nothing else, and it carries one
+        specific component of the operator's tariff. So the tariff has to be
+        billed per kWh, and what it says it *is* has to match what the endpoint
+        serves — a source of feed-in remuneration cannot price grid consumption
+        no matter how the tariff is labelled.
+        """
+        if self.dynamic_source_id is None:
+            return {}
+        if self.billing_mode != BillingMode.ENERGY:
+            return {
+                "dynamic_source": (
+                    "A price series bills per kWh, so it can only be used by a tariff billed "
+                    f"by energy — not by {self.get_billing_mode_display().lower()}."
+                )
+            }
+        expected = ENERGY_TYPE_BY_DYNAMIC_TARIFF_TYPE.get(self.dynamic_source.tariff_type)
+        if expected is not None and self.energy_type != expected:
+            return {
+                "energy_type": (
+                    f"This price series serves {self.dynamic_source.get_tariff_type_display().lower()}, "
+                    f"which prices {EnergyType(expected).label.lower()} energy, not "
+                    f"{EnergyType(self.energy_type).label.lower() if self.energy_type else 'nothing'}."
+                )
+            }
+        return {}
 
     def save(self, *args, **kwargs):
         self.full_clean()

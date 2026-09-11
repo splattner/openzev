@@ -1,0 +1,1541 @@
+{
+  "publication_timestamp": "2026-09-10T14:48:46+02:00",
+  "prices": [
+    {
+      "start_timestamp": "2026-09-11T00:00:00+02:00",
+      "end_timestamp": "2026-09-11T00:15:00+02:00",
+      "grid": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.1128
+        }
+      ],
+      "integrated": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.2323
+        }
+      ]
+    },
+    {
+      "start_timestamp": "2026-09-11T00:15:00+02:00",
+      "end_timestamp": "2026-09-11T00:30:00+02:00",
+      "grid": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.1113
+        }
+      ],
+      "integrated": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.2308
+        }
+      ]
+    },
+    {
+      "start_timestamp": "2026-09-11T00:30:00+02:00",
+      "end_timestamp": "2026-09-11T00:45:00+02:00",
+      "grid": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.1061
+        }
+      ],
+      "integrated": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.2256
+        }
+      ]
+    },
+    {
+      "start_timestamp": "2026-09-11T00:45:00+02:00",
+      "end_timestamp": "2026-09-11T01:00:00+02:00",
+      "grid": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.1016
+        }
+      ],
+      "integrated": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.2211
+        }
+      ]
+    },
+    {
+      "start_timestamp": "2026-09-11T01:00:00+02:00",
+      "end_timestamp": "2026-09-11T01:15:00+02:00",
+      "grid": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.1126
+        }
+      ],
+      "integrated": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.2321
+        }
+      ]
+    },
+    {
+      "start_timestamp": "2026-09-11T01:15:00+02:00",
+      "end_timestamp": "2026-09-11T01:30:00+02:00",
+      "grid": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.1057
+        }
+      ],
+      "integrated": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.2252
+        }
+      ]
+    },
+    {
+      "start_timestamp": "2026-09-11T01:30:00+02:00",
+      "end_timestamp": "2026-09-11T01:45:00+02:00",
+      "grid": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.0991
+        }
+      ],
+      "integrated": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.2186
+        }
+      ]
+    },
+    {
+      "start_timestamp": "2026-09-11T01:45:00+02:00",
+      "end_timestamp": "2026-09-11T02:00:00+02:00",
+      "grid": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.0911
+        }
+      ],
+      "integrated": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.2106
+        }
+      ]
+    },
+    {
+      "start_timestamp": "2026-09-11T02:00:00+02:00",
+      "end_timestamp": "2026-09-11T02:15:00+02:00",
+      "grid": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.0875
+        }
+      ],
+      "integrated": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.207
+        }
+      ]
+    },
+    {
+      "start_timestamp": "2026-09-11T02:15:00+02:00",
+      "end_timestamp": "2026-09-11T02:30:00+02:00",
+      "grid": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.0841
+        }
+      ],
+      "integrated": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.2036
+        }
+      ]
+    },
+    {
+      "start_timestamp": "2026-09-11T02:30:00+02:00",
+      "end_timestamp": "2026-09-11T02:45:00+02:00",
+      "grid": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.0812
+        }
+      ],
+      "integrated": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.2007
+        }
+      ]
+    },
+    {
+      "start_timestamp": "2026-09-11T02:45:00+02:00",
+      "end_timestamp": "2026-09-11T03:00:00+02:00",
+      "grid": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.0798
+        }
+      ],
+      "integrated": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.1993
+        }
+      ]
+    },
+    {
+      "start_timestamp": "2026-09-11T03:00:00+02:00",
+      "end_timestamp": "2026-09-11T03:15:00+02:00",
+      "grid": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.0796
+        }
+      ],
+      "integrated": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.1991
+        }
+      ]
+    },
+    {
+      "start_timestamp": "2026-09-11T03:15:00+02:00",
+      "end_timestamp": "2026-09-11T03:30:00+02:00",
+      "grid": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.0781
+        }
+      ],
+      "integrated": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.1976
+        }
+      ]
+    },
+    {
+      "start_timestamp": "2026-09-11T03:30:00+02:00",
+      "end_timestamp": "2026-09-11T03:45:00+02:00",
+      "grid": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.0781
+        }
+      ],
+      "integrated": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.1976
+        }
+      ]
+    },
+    {
+      "start_timestamp": "2026-09-11T03:45:00+02:00",
+      "end_timestamp": "2026-09-11T04:00:00+02:00",
+      "grid": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.0777
+        }
+      ],
+      "integrated": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.1972
+        }
+      ]
+    },
+    {
+      "start_timestamp": "2026-09-11T04:00:00+02:00",
+      "end_timestamp": "2026-09-11T04:15:00+02:00",
+      "grid": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.0807
+        }
+      ],
+      "integrated": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.2002
+        }
+      ]
+    },
+    {
+      "start_timestamp": "2026-09-11T04:15:00+02:00",
+      "end_timestamp": "2026-09-11T04:30:00+02:00",
+      "grid": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.0811
+        }
+      ],
+      "integrated": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.2006
+        }
+      ]
+    },
+    {
+      "start_timestamp": "2026-09-11T04:30:00+02:00",
+      "end_timestamp": "2026-09-11T04:45:00+02:00",
+      "grid": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.0824
+        }
+      ],
+      "integrated": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.2019
+        }
+      ]
+    },
+    {
+      "start_timestamp": "2026-09-11T04:45:00+02:00",
+      "end_timestamp": "2026-09-11T05:00:00+02:00",
+      "grid": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.0846
+        }
+      ],
+      "integrated": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.2041
+        }
+      ]
+    },
+    {
+      "start_timestamp": "2026-09-11T05:00:00+02:00",
+      "end_timestamp": "2026-09-11T05:15:00+02:00",
+      "grid": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.0912
+        }
+      ],
+      "integrated": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.2107
+        }
+      ]
+    },
+    {
+      "start_timestamp": "2026-09-11T05:15:00+02:00",
+      "end_timestamp": "2026-09-11T05:30:00+02:00",
+      "grid": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.0946
+        }
+      ],
+      "integrated": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.2141
+        }
+      ]
+    },
+    {
+      "start_timestamp": "2026-09-11T05:30:00+02:00",
+      "end_timestamp": "2026-09-11T05:45:00+02:00",
+      "grid": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.0999
+        }
+      ],
+      "integrated": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.2194
+        }
+      ]
+    },
+    {
+      "start_timestamp": "2026-09-11T05:45:00+02:00",
+      "end_timestamp": "2026-09-11T06:00:00+02:00",
+      "grid": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.1059
+        }
+      ],
+      "integrated": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.2254
+        }
+      ]
+    },
+    {
+      "start_timestamp": "2026-09-11T06:00:00+02:00",
+      "end_timestamp": "2026-09-11T06:15:00+02:00",
+      "grid": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.1154
+        }
+      ],
+      "integrated": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.2349
+        }
+      ]
+    },
+    {
+      "start_timestamp": "2026-09-11T06:15:00+02:00",
+      "end_timestamp": "2026-09-11T06:30:00+02:00",
+      "grid": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.1214
+        }
+      ],
+      "integrated": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.2409
+        }
+      ]
+    },
+    {
+      "start_timestamp": "2026-09-11T06:30:00+02:00",
+      "end_timestamp": "2026-09-11T06:45:00+02:00",
+      "grid": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.1278
+        }
+      ],
+      "integrated": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.2473
+        }
+      ]
+    },
+    {
+      "start_timestamp": "2026-09-11T06:45:00+02:00",
+      "end_timestamp": "2026-09-11T07:00:00+02:00",
+      "grid": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.133
+        }
+      ],
+      "integrated": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.2525
+        }
+      ]
+    },
+    {
+      "start_timestamp": "2026-09-11T07:00:00+02:00",
+      "end_timestamp": "2026-09-11T07:15:00+02:00",
+      "grid": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.1377
+        }
+      ],
+      "integrated": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.3042
+        }
+      ]
+    },
+    {
+      "start_timestamp": "2026-09-11T07:15:00+02:00",
+      "end_timestamp": "2026-09-11T07:30:00+02:00",
+      "grid": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.1426
+        }
+      ],
+      "integrated": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.3091
+        }
+      ]
+    },
+    {
+      "start_timestamp": "2026-09-11T07:30:00+02:00",
+      "end_timestamp": "2026-09-11T07:45:00+02:00",
+      "grid": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.1441
+        }
+      ],
+      "integrated": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.3106
+        }
+      ]
+    },
+    {
+      "start_timestamp": "2026-09-11T07:45:00+02:00",
+      "end_timestamp": "2026-09-11T08:00:00+02:00",
+      "grid": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.1443
+        }
+      ],
+      "integrated": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.3108
+        }
+      ]
+    },
+    {
+      "start_timestamp": "2026-09-11T08:00:00+02:00",
+      "end_timestamp": "2026-09-11T08:15:00+02:00",
+      "grid": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.1398
+        }
+      ],
+      "integrated": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.3063
+        }
+      ]
+    },
+    {
+      "start_timestamp": "2026-09-11T08:15:00+02:00",
+      "end_timestamp": "2026-09-11T08:30:00+02:00",
+      "grid": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.1351
+        }
+      ],
+      "integrated": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.3016
+        }
+      ]
+    },
+    {
+      "start_timestamp": "2026-09-11T08:30:00+02:00",
+      "end_timestamp": "2026-09-11T08:45:00+02:00",
+      "grid": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.1261
+        }
+      ],
+      "integrated": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.2926
+        }
+      ]
+    },
+    {
+      "start_timestamp": "2026-09-11T08:45:00+02:00",
+      "end_timestamp": "2026-09-11T09:00:00+02:00",
+      "grid": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.1212
+        }
+      ],
+      "integrated": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.2877
+        }
+      ]
+    },
+    {
+      "start_timestamp": "2026-09-11T09:00:00+02:00",
+      "end_timestamp": "2026-09-11T09:15:00+02:00",
+      "grid": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.1075
+        }
+      ],
+      "integrated": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.274
+        }
+      ]
+    },
+    {
+      "start_timestamp": "2026-09-11T09:15:00+02:00",
+      "end_timestamp": "2026-09-11T09:30:00+02:00",
+      "grid": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.0933
+        }
+      ],
+      "integrated": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.2598
+        }
+      ]
+    },
+    {
+      "start_timestamp": "2026-09-11T09:30:00+02:00",
+      "end_timestamp": "2026-09-11T09:45:00+02:00",
+      "grid": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.0879
+        }
+      ],
+      "integrated": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.2544
+        }
+      ]
+    },
+    {
+      "start_timestamp": "2026-09-11T09:45:00+02:00",
+      "end_timestamp": "2026-09-11T10:00:00+02:00",
+      "grid": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.0745
+        }
+      ],
+      "integrated": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.241
+        }
+      ]
+    },
+    {
+      "start_timestamp": "2026-09-11T10:00:00+02:00",
+      "end_timestamp": "2026-09-11T10:15:00+02:00",
+      "grid": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.0622
+        }
+      ],
+      "integrated": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.2287
+        }
+      ]
+    },
+    {
+      "start_timestamp": "2026-09-11T10:15:00+02:00",
+      "end_timestamp": "2026-09-11T10:30:00+02:00",
+      "grid": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.047
+        }
+      ],
+      "integrated": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.2135
+        }
+      ]
+    },
+    {
+      "start_timestamp": "2026-09-11T10:30:00+02:00",
+      "end_timestamp": "2026-09-11T10:45:00+02:00",
+      "grid": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.0378
+        }
+      ],
+      "integrated": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.2043
+        }
+      ]
+    },
+    {
+      "start_timestamp": "2026-09-11T10:45:00+02:00",
+      "end_timestamp": "2026-09-11T11:00:00+02:00",
+      "grid": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.023
+        }
+      ],
+      "integrated": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.1895
+        }
+      ]
+    },
+    {
+      "start_timestamp": "2026-09-11T11:00:00+02:00",
+      "end_timestamp": "2026-09-11T11:15:00+02:00",
+      "grid": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.0132
+        }
+      ],
+      "integrated": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.1797
+        }
+      ]
+    },
+    {
+      "start_timestamp": "2026-09-11T11:15:00+02:00",
+      "end_timestamp": "2026-09-11T11:30:00+02:00",
+      "grid": [
+        {
+          "unit": "CHF_kWh",
+          "value": -0.0008
+        }
+      ],
+      "integrated": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.1657
+        }
+      ]
+    },
+    {
+      "start_timestamp": "2026-09-11T11:30:00+02:00",
+      "end_timestamp": "2026-09-11T11:45:00+02:00",
+      "grid": [
+        {
+          "unit": "CHF_kWh",
+          "value": -0.0122
+        }
+      ],
+      "integrated": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.1543
+        }
+      ]
+    },
+    {
+      "start_timestamp": "2026-09-11T11:45:00+02:00",
+      "end_timestamp": "2026-09-11T12:00:00+02:00",
+      "grid": [
+        {
+          "unit": "CHF_kWh",
+          "value": -0.0186
+        }
+      ],
+      "integrated": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.1479
+        }
+      ]
+    },
+    {
+      "start_timestamp": "2026-09-11T12:00:00+02:00",
+      "end_timestamp": "2026-09-11T12:15:00+02:00",
+      "grid": [
+        {
+          "unit": "CHF_kWh",
+          "value": -0.0275
+        }
+      ],
+      "integrated": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.092
+        }
+      ]
+    },
+    {
+      "start_timestamp": "2026-09-11T12:15:00+02:00",
+      "end_timestamp": "2026-09-11T12:30:00+02:00",
+      "grid": [
+        {
+          "unit": "CHF_kWh",
+          "value": -0.0433
+        }
+      ],
+      "integrated": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.0762
+        }
+      ]
+    },
+    {
+      "start_timestamp": "2026-09-11T12:30:00+02:00",
+      "end_timestamp": "2026-09-11T12:45:00+02:00",
+      "grid": [
+        {
+          "unit": "CHF_kWh",
+          "value": -0.0511
+        }
+      ],
+      "integrated": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.0684
+        }
+      ]
+    },
+    {
+      "start_timestamp": "2026-09-11T12:45:00+02:00",
+      "end_timestamp": "2026-09-11T13:00:00+02:00",
+      "grid": [
+        {
+          "unit": "CHF_kWh",
+          "value": -0.0543
+        }
+      ],
+      "integrated": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.0652
+        }
+      ]
+    },
+    {
+      "start_timestamp": "2026-09-11T13:00:00+02:00",
+      "end_timestamp": "2026-09-11T13:15:00+02:00",
+      "grid": [
+        {
+          "unit": "CHF_kWh",
+          "value": -0.0532
+        }
+      ],
+      "integrated": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.0663
+        }
+      ]
+    },
+    {
+      "start_timestamp": "2026-09-11T13:15:00+02:00",
+      "end_timestamp": "2026-09-11T13:30:00+02:00",
+      "grid": [
+        {
+          "unit": "CHF_kWh",
+          "value": -0.0543
+        }
+      ],
+      "integrated": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.0652
+        }
+      ]
+    },
+    {
+      "start_timestamp": "2026-09-11T13:30:00+02:00",
+      "end_timestamp": "2026-09-11T13:45:00+02:00",
+      "grid": [
+        {
+          "unit": "CHF_kWh",
+          "value": -0.0543
+        }
+      ],
+      "integrated": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.0652
+        }
+      ]
+    },
+    {
+      "start_timestamp": "2026-09-11T13:45:00+02:00",
+      "end_timestamp": "2026-09-11T14:00:00+02:00",
+      "grid": [
+        {
+          "unit": "CHF_kWh",
+          "value": -0.0543
+        }
+      ],
+      "integrated": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.0652
+        }
+      ]
+    },
+    {
+      "start_timestamp": "2026-09-11T14:00:00+02:00",
+      "end_timestamp": "2026-09-11T14:15:00+02:00",
+      "grid": [
+        {
+          "unit": "CHF_kWh",
+          "value": -0.0543
+        }
+      ],
+      "integrated": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.0652
+        }
+      ]
+    },
+    {
+      "start_timestamp": "2026-09-11T14:15:00+02:00",
+      "end_timestamp": "2026-09-11T14:30:00+02:00",
+      "grid": [
+        {
+          "unit": "CHF_kWh",
+          "value": -0.0543
+        }
+      ],
+      "integrated": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.0652
+        }
+      ]
+    },
+    {
+      "start_timestamp": "2026-09-11T14:30:00+02:00",
+      "end_timestamp": "2026-09-11T14:45:00+02:00",
+      "grid": [
+        {
+          "unit": "CHF_kWh",
+          "value": -0.0543
+        }
+      ],
+      "integrated": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.0652
+        }
+      ]
+    },
+    {
+      "start_timestamp": "2026-09-11T14:45:00+02:00",
+      "end_timestamp": "2026-09-11T15:00:00+02:00",
+      "grid": [
+        {
+          "unit": "CHF_kWh",
+          "value": -0.0543
+        }
+      ],
+      "integrated": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.0652
+        }
+      ]
+    },
+    {
+      "start_timestamp": "2026-09-11T15:00:00+02:00",
+      "end_timestamp": "2026-09-11T15:15:00+02:00",
+      "grid": [
+        {
+          "unit": "CHF_kWh",
+          "value": -0.0511
+        }
+      ],
+      "integrated": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.0684
+        }
+      ]
+    },
+    {
+      "start_timestamp": "2026-09-11T15:15:00+02:00",
+      "end_timestamp": "2026-09-11T15:30:00+02:00",
+      "grid": [
+        {
+          "unit": "CHF_kWh",
+          "value": -0.0495
+        }
+      ],
+      "integrated": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.07
+        }
+      ]
+    },
+    {
+      "start_timestamp": "2026-09-11T15:30:00+02:00",
+      "end_timestamp": "2026-09-11T15:45:00+02:00",
+      "grid": [
+        {
+          "unit": "CHF_kWh",
+          "value": -0.0477
+        }
+      ],
+      "integrated": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.0718
+        }
+      ]
+    },
+    {
+      "start_timestamp": "2026-09-11T15:45:00+02:00",
+      "end_timestamp": "2026-09-11T16:00:00+02:00",
+      "grid": [
+        {
+          "unit": "CHF_kWh",
+          "value": -0.0399
+        }
+      ],
+      "integrated": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.0796
+        }
+      ]
+    },
+    {
+      "start_timestamp": "2026-09-11T16:00:00+02:00",
+      "end_timestamp": "2026-09-11T16:15:00+02:00",
+      "grid": [
+        {
+          "unit": "CHF_kWh",
+          "value": -0.0294
+        }
+      ],
+      "integrated": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.0901
+        }
+      ]
+    },
+    {
+      "start_timestamp": "2026-09-11T16:15:00+02:00",
+      "end_timestamp": "2026-09-11T16:30:00+02:00",
+      "grid": [
+        {
+          "unit": "CHF_kWh",
+          "value": -0.0206
+        }
+      ],
+      "integrated": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.0989
+        }
+      ]
+    },
+    {
+      "start_timestamp": "2026-09-11T16:30:00+02:00",
+      "end_timestamp": "2026-09-11T16:45:00+02:00",
+      "grid": [
+        {
+          "unit": "CHF_kWh",
+          "value": -0.0091
+        }
+      ],
+      "integrated": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.1104
+        }
+      ]
+    },
+    {
+      "start_timestamp": "2026-09-11T16:45:00+02:00",
+      "end_timestamp": "2026-09-11T17:00:00+02:00",
+      "grid": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.0004
+        }
+      ],
+      "integrated": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.1199
+        }
+      ]
+    },
+    {
+      "start_timestamp": "2026-09-11T17:00:00+02:00",
+      "end_timestamp": "2026-09-11T17:15:00+02:00",
+      "grid": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.0164
+        }
+      ],
+      "integrated": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.1829
+        }
+      ]
+    },
+    {
+      "start_timestamp": "2026-09-11T17:15:00+02:00",
+      "end_timestamp": "2026-09-11T17:30:00+02:00",
+      "grid": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.0324
+        }
+      ],
+      "integrated": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.1989
+        }
+      ]
+    },
+    {
+      "start_timestamp": "2026-09-11T17:30:00+02:00",
+      "end_timestamp": "2026-09-11T17:45:00+02:00",
+      "grid": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.043
+        }
+      ],
+      "integrated": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.2095
+        }
+      ]
+    },
+    {
+      "start_timestamp": "2026-09-11T17:45:00+02:00",
+      "end_timestamp": "2026-09-11T18:00:00+02:00",
+      "grid": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.063
+        }
+      ],
+      "integrated": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.2295
+        }
+      ]
+    },
+    {
+      "start_timestamp": "2026-09-11T18:00:00+02:00",
+      "end_timestamp": "2026-09-11T18:15:00+02:00",
+      "grid": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.0744
+        }
+      ],
+      "integrated": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.2409
+        }
+      ]
+    },
+    {
+      "start_timestamp": "2026-09-11T18:15:00+02:00",
+      "end_timestamp": "2026-09-11T18:30:00+02:00",
+      "grid": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.0848
+        }
+      ],
+      "integrated": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.2513
+        }
+      ]
+    },
+    {
+      "start_timestamp": "2026-09-11T18:30:00+02:00",
+      "end_timestamp": "2026-09-11T18:45:00+02:00",
+      "grid": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.0939
+        }
+      ],
+      "integrated": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.2604
+        }
+      ]
+    },
+    {
+      "start_timestamp": "2026-09-11T18:45:00+02:00",
+      "end_timestamp": "2026-09-11T19:00:00+02:00",
+      "grid": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.102
+        }
+      ],
+      "integrated": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.2685
+        }
+      ]
+    },
+    {
+      "start_timestamp": "2026-09-11T19:00:00+02:00",
+      "end_timestamp": "2026-09-11T19:15:00+02:00",
+      "grid": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.113
+        }
+      ],
+      "integrated": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.2795
+        }
+      ]
+    },
+    {
+      "start_timestamp": "2026-09-11T19:15:00+02:00",
+      "end_timestamp": "2026-09-11T19:30:00+02:00",
+      "grid": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.1199
+        }
+      ],
+      "integrated": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.2864
+        }
+      ]
+    },
+    {
+      "start_timestamp": "2026-09-11T19:30:00+02:00",
+      "end_timestamp": "2026-09-11T19:45:00+02:00",
+      "grid": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.1284
+        }
+      ],
+      "integrated": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.2949
+        }
+      ]
+    },
+    {
+      "start_timestamp": "2026-09-11T19:45:00+02:00",
+      "end_timestamp": "2026-09-11T20:00:00+02:00",
+      "grid": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.1338
+        }
+      ],
+      "integrated": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.3003
+        }
+      ]
+    },
+    {
+      "start_timestamp": "2026-09-11T20:00:00+02:00",
+      "end_timestamp": "2026-09-11T20:15:00+02:00",
+      "grid": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.1324
+        }
+      ],
+      "integrated": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.2989
+        }
+      ]
+    },
+    {
+      "start_timestamp": "2026-09-11T20:15:00+02:00",
+      "end_timestamp": "2026-09-11T20:30:00+02:00",
+      "grid": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.1292
+        }
+      ],
+      "integrated": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.2957
+        }
+      ]
+    },
+    {
+      "start_timestamp": "2026-09-11T20:30:00+02:00",
+      "end_timestamp": "2026-09-11T20:45:00+02:00",
+      "grid": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.129
+        }
+      ],
+      "integrated": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.2955
+        }
+      ]
+    },
+    {
+      "start_timestamp": "2026-09-11T20:45:00+02:00",
+      "end_timestamp": "2026-09-11T21:00:00+02:00",
+      "grid": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.1243
+        }
+      ],
+      "integrated": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.2908
+        }
+      ]
+    },
+    {
+      "start_timestamp": "2026-09-11T21:00:00+02:00",
+      "end_timestamp": "2026-09-11T21:15:00+02:00",
+      "grid": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.123
+        }
+      ],
+      "integrated": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.2895
+        }
+      ]
+    },
+    {
+      "start_timestamp": "2026-09-11T21:15:00+02:00",
+      "end_timestamp": "2026-09-11T21:30:00+02:00",
+      "grid": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.1201
+        }
+      ],
+      "integrated": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.2866
+        }
+      ]
+    },
+    {
+      "start_timestamp": "2026-09-11T21:30:00+02:00",
+      "end_timestamp": "2026-09-11T21:45:00+02:00",
+      "grid": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.1148
+        }
+      ],
+      "integrated": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.2813
+        }
+      ]
+    },
+    {
+      "start_timestamp": "2026-09-11T21:45:00+02:00",
+      "end_timestamp": "2026-09-11T22:00:00+02:00",
+      "grid": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.1095
+        }
+      ],
+      "integrated": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.276
+        }
+      ]
+    },
+    {
+      "start_timestamp": "2026-09-11T22:00:00+02:00",
+      "end_timestamp": "2026-09-11T22:15:00+02:00",
+      "grid": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.1085
+        }
+      ],
+      "integrated": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.275
+        }
+      ]
+    },
+    {
+      "start_timestamp": "2026-09-11T22:15:00+02:00",
+      "end_timestamp": "2026-09-11T22:30:00+02:00",
+      "grid": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.1025
+        }
+      ],
+      "integrated": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.269
+        }
+      ]
+    },
+    {
+      "start_timestamp": "2026-09-11T22:30:00+02:00",
+      "end_timestamp": "2026-09-11T22:45:00+02:00",
+      "grid": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.0988
+        }
+      ],
+      "integrated": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.2653
+        }
+      ]
+    },
+    {
+      "start_timestamp": "2026-09-11T22:45:00+02:00",
+      "end_timestamp": "2026-09-11T23:00:00+02:00",
+      "grid": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.0941
+        }
+      ],
+      "integrated": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.2606
+        }
+      ]
+    },
+    {
+      "start_timestamp": "2026-09-11T23:00:00+02:00",
+      "end_timestamp": "2026-09-11T23:15:00+02:00",
+      "grid": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.104
+        }
+      ],
+      "integrated": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.2235
+        }
+      ]
+    },
+    {
+      "start_timestamp": "2026-09-11T23:15:00+02:00",
+      "end_timestamp": "2026-09-11T23:30:00+02:00",
+      "grid": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.1093
+        }
+      ],
+      "integrated": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.2288
+        }
+      ]
+    },
+    {
+      "start_timestamp": "2026-09-11T23:30:00+02:00",
+      "end_timestamp": "2026-09-11T23:45:00+02:00",
+      "grid": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.108
+        }
+      ],
+      "integrated": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.2275
+        }
+      ]
+    },
+    {
+      "start_timestamp": "2026-09-11T23:45:00+02:00",
+      "end_timestamp": "2026-09-12T00:00:00+02:00",
+      "grid": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.1068
+        }
+      ],
+      "integrated": [
+        {
+          "unit": "CHF_kWh",
+          "value": 0.2263
+        }
+      ]
+    }
+  ]
+}

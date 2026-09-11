@@ -1,0 +1,22 @@
+{
+  "publication_timestamp": "2026-12-31T18:00:00+01:00",
+  "prices": [
+    {
+      "start_timestamp": "2027-01-01T00:00:00+01:00",
+      "end_timestamp": "2027-01-01T00:15:00+01:00",
+      "grid": {
+        "tariff_name": "standard",
+        "standard_basegroup": true,
+        "municipality_number": 351,
+        "energy": {
+          "unit": "CHF_kWh",
+          "value": 0.113
+        },
+        "base": {
+          "unit": "CHF_m",
+          "value": 5
+        }
+      }
+    }
+  ]
+}

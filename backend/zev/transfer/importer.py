@@ -39,6 +39,7 @@ from metering.importers.limits import (
     validate_zip,
 )
 from metering.models import ImportLog, ImportSource, MeterReading, ReadingDirection, ReadingResolution
+from tariffs.dynamic.models import DynamicTariffSource
 from tariffs.models import Tariff, TariffPeriod
 from zev.models import MeteringPoint, MeteringPointAssignment, Participant, VatMode, Zev
 
@@ -46,6 +47,7 @@ logger = logging.getLogger(__name__)
 
 from .schema import (
     ASSIGNMENT_FIELDS,
+    DYNAMIC_SOURCE_FIELDS,
     INVOICE_FIELDS,
     INVOICE_ITEM_FIELDS,
     MANIFEST_NAME,
@@ -422,6 +424,28 @@ def _import_assignment(point, raw, participants_by_archive_id, collector, *, lab
     return True
 
 
+def _dynamic_source_for(raw):
+    """Find or create the shared price source a dynamic tariff names.
+
+    Matched on the endpoint, component and product rather than on an id: the
+    source is global, so the importing instance may well already have the same
+    one configured for another community, and reusing it is the point.
+
+    The recreated source starts with no prices — the archive does not carry the
+    series. It will fill on the next scheduled fetch, except for an operator
+    that serves no history, where only time can fill it.
+    """
+    descriptor = raw.get("dynamic_source")
+    if not descriptor:
+        return None
+    fields = {key: descriptor.get(key) for key in DYNAMIC_SOURCE_FIELDS if key in descriptor}
+    natural_key = {key: fields.pop(key) for key in ("url", "tariff_type", "tariff_name") if key in fields}
+    if len(natural_key) != 3:
+        raise ValueError("A dynamic tariff source needs a url, a tariff type and a tariff name.")
+    source, _created = DynamicTariffSource.objects.get_or_create(**natural_key, defaults=fields)
+    return source
+
+
 def _import_tariffs(archive, zev, collector):
     count = 0
     for position, raw in enumerate(_load_json(archive, SECTION_FILES[SECTION_TARIFFS]), start=1):
@@ -431,7 +455,9 @@ def _import_tariffs(archive, zev, collector):
             with transaction.atomic():
                 # Tariff.save() calls full_clean() itself, so the overlap and
                 # series-coherence rules run without asking for them.
-                tariff = Tariff.objects.create(zev=zev, **fields)
+                tariff = Tariff.objects.create(
+                    zev=zev, dynamic_source=_dynamic_source_for(raw), **fields
+                )
                 for raw_period in raw.get("periods") or []:
                     period_fields = _pick(raw_period, TARIFF_PERIOD_FIELDS, position, SECTION_TARIFFS)
                     period = TariffPeriod(tariff=tariff, **period_fields)

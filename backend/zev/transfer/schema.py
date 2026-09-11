@@ -153,6 +153,25 @@ TARIFF_FIELDS = (
     "source_series_name",
 )
 
+# A dynamic tariff's price comes from a globally shared source row rather than
+# from its own periods, so the link cannot travel as the FK's surrogate id: that
+# id means nothing on the instance importing it. What travels instead is the
+# source's natural key — the endpoint, component and product — which is enough
+# for the importer to find or recreate the same source there.
+#
+# The price *points* deliberately do not travel. They are a global series
+# measured in tens of thousands of rows per year, not part of one community's
+# data, and the importing instance can fetch them itself. Invoices already
+# issued are unaffected: an ``InvoiceItem`` records what was charged as values,
+# not as a live reference to the price that produced it.
+DYNAMIC_SOURCE_FIELDS = (
+    "label",
+    "url",
+    "adapter",
+    "tariff_type",
+    "tariff_name",
+)
+
 TARIFF_PERIOD_FIELDS = (
     "period_type",
     "price_chf_per_kwh",
