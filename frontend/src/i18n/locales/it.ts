@@ -2207,7 +2207,7 @@ export const it = {
             noEmailYet: 'Non ancora inviata',
         },
         adminOverview: {
-            description: 'Indicatori della piattaforma, gestione dei RCP, tutte le fatture, il log di audit della piattaforma e lo stato del sistema.',
+            description: 'Indicatori della piattaforma, gestione dei RCP, tutte le fatture, le fonti di prezzo dinamiche, il log di audit della piattaforma e lo stato del sistema.',
             tabs: {
                 overview: 'Panoramica',
                 health: 'Stato del sistema',

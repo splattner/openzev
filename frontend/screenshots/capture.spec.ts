@@ -378,6 +378,17 @@ test.describe('User Guide Screenshots', () => {
     await screenshotFull(page, '17-admin-invoices')
   })
 
+  // 17b — Admin Dynamic Price Sources
+  // Note: seed_demo does not configure a dynamic tariff source, so this
+  // captures the empty-state console (still the accurate first-run view for
+  // a fresh deployment). Re-capture after configuring a demo source for a
+  // screenshot showing a populated table.
+  test('17b-admin-dynamic-sources', async ({ page }) => {
+    await navigateTo(page, '/admin/dynamic-sources')
+    await page.waitForSelector('.data-table, .card', { timeout: 10_000 })
+    await screenshotFull(page, '17b-admin-dynamic-sources')
+  })
+
   // 23 — Reports (owner view on the demo ZEV)
   test('23-reports', async ({ page }) => {
     await navigateTo(page, '/reports')

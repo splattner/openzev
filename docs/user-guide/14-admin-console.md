@@ -7,7 +7,7 @@ This guide covers all administration features available to users with the **Admi
 
 The Platform group has four entries (hubs with tabs-as-routes):
 
-- **Overview** (`/admin`) — KPIs · ZEVs · All invoices · Platform audit log · System health
+- **Overview** (`/admin`) — KPIs · ZEVs · All invoices · Dynamic price sources · Platform audit log · System health
 - **Accounts** (`/admin/accounts`) — Users · API keys
 - **Templates** (`/admin/templates`) — PDF templates · Email templates
 - **System Settings** (`/admin/system-settings`) — Regional · Features · OAuth · VAT
@@ -43,6 +43,57 @@ The system creates the ZEV, the owner account (with a temporary password), and o
 Admins can also create a bare ZEV (without the wizard) via the standard CRUD interface, assigning an existing user as owner.
 
 ![Admin ZEV management](screenshots/15-admin-zevs.png)
+
+## Dynamic Price Sources
+
+**Platform → Overview → Dynamic prices** (`/admin/dynamic-sources`) is the
+operational console for dynamic tariff sources — the fetched, quarter-hourly
+price series described in [Tariff Configuration](07-tariff-configuration.md#dynamic-tariffs).
+A source is **global**: it is not owned by any one ZEV, and any number of
+communities on the same operator product share one fetch, so this console is
+the only place to see and manage all of them at once.
+
+KPIs at the top show how many sources are configured, how many price points
+are stored across all of them, how many sources are reused by more than one
+ZEV, and how many currently have a failed fetch. The table lists every
+source with its protocol version, billed component/product, current fetch
+status, last fetch time, stored point count, and how many tariffs/ZEVs
+reuse it.
+
+Each row's menu offers:
+
+- **View prices** — the fetched interval history: a date-range chart,
+  interval table, min/max/average statistics, negative-price count, and any
+  coverage gaps.
+- **View fetch log** — audit events for this source only (fetch outcomes,
+  edits, and destructive actions).
+- **Fetch now** / **Fetch available history** — queue an immediate refresh,
+  or a backfill of everything the endpoint still has. Backfill is disabled
+  when the endpoint does not support ranged history requests.
+- **Re-check capabilities** — re-probes the endpoint to correct how OpenZEV
+  talks to it (in particular, whether it supports ranged/history requests)
+  without changing the source's URL, protocol version, or billed component.
+  Useful if backfill looked unsupported at creation but the endpoint was
+  simply empty at that moment.
+- **Edit** — change the source's display label. The endpoint, protocol
+  version, and billed component/product cannot be changed in place; create a
+  new source instead so two price series are never mixed under one label.
+- **Clear fetched prices** — deletes the stored prices but keeps the source,
+  which refills on the next scheduled fetch. Use this to recover from a
+  wrong endpoint or product configuration.
+- **Delete source** — removes the source entirely. Disabled, and labeled
+  accordingly, while any tariff still uses it.
+
+Both destructive actions ask you to type the source's own display label back
+before confirming — no separate reason field, since the label has to be read
+off the row you are about to affect, which is what actually prevents picking
+the wrong one. Both are refused while a fetch for that source is already
+running, and clearing is refused while a non-cancelled invoice was billed
+from a tariff linked to that source — the fetched prices are that invoice's
+supporting evidence and OpenZEV does not let you remove it out from under
+one.
+
+![Admin dynamic price sources](screenshots/17b-admin-dynamic-sources.png)
 
 ## System Settings
 
