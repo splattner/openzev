@@ -24,6 +24,7 @@ const MeteringChartPage = lazy(async () => ({ default: (await import('../pages/M
 const MeteringPointsPage = lazy(async () => ({ default: (await import('../pages/MeteringPointsPage')).MeteringPointsPage }))
 const NotFoundPage = lazy(async () => ({ default: (await import('../pages/NotFoundPage')).NotFoundPage }))
 const MagicSignInPage = lazy(async () => ({ default: (await import('../pages/MagicSignInPage')).MagicSignInPage }))
+const ParticipantOnboardingPage = lazy(async () => ({ default: (await import('../pages/ParticipantOnboardingPage')).ParticipantOnboardingPage }))
 const PublicInvoicePage = lazy(async () => ({ default: (await import('../pages/PublicInvoicePage')).PublicInvoicePage }))
 const ParticipantsPage = lazy(async () => ({ default: (await import('../pages/ParticipantsPage')).ParticipantsPage }))
 const TariffsPage = lazy(async () => ({ default: (await import('../pages/TariffsPage')).TariffsPage }))
@@ -46,6 +47,8 @@ export function AppRoutes() {
         {/* Public (QR on invoice): no session, no app chrome. */}
         <Route path="/i/:prefix" element={<PublicInvoicePage />} />
         <Route path="/signin/:token" element={<MagicSignInPage />} />
+        {/* Onboarding link emailed to a participant: no session yet either. */}
+        <Route path="/join/:prefix" element={<ParticipantOnboardingPage />} />
         <Route
           path="/"
           element={
