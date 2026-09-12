@@ -29,26 +29,16 @@ def account_for_participant(participant):
     caller still answers 202, because saying "no account here" would answer a
     question the requester is not entitled to ask.
 
-    A freshly created account gets **no usable password**: nothing is
-    transmitted, so there is nothing to rotate, and ``must_change_password``
-    would strand the user in a form asking them to change a password they were
-    never given.
+    ``ensure_participant_account`` never mints or leaves a usable password —
+    nothing is transmitted, so there is nothing to rotate — so there is
+    nothing left to neutralize here.
     """
     from zev.services import ensure_participant_account
 
     if not participant.email:
         return None
 
-    user, _created_password = ensure_participant_account(participant)
-
-    # ensure_participant_account mints a temporary password for the invitation
-    # flow. Nothing here transmits it, so leaving it usable would keep a
-    # credential alive that nobody has and nobody can rotate.
-    if user.must_change_password or not user.has_usable_password():
-        user.set_unusable_password()
-        user.must_change_password = False
-        user.save(update_fields=["password", "must_change_password"])
-    return user
+    return ensure_participant_account(participant)
 
 
 @transaction.atomic

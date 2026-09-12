@@ -3,9 +3,7 @@ from __future__ import annotations
 import secrets
 import string
 
-from django.conf import settings
 from django.contrib.auth import get_user_model
-from django.core.mail import EmailMessage
 from django.db import transaction
 from django.utils.text import slugify
 
@@ -68,20 +66,44 @@ def sync_participant_user_fields(participant, user) -> None:
 
 @transaction.atomic
 def ensure_participant_account(participant):
+    """The user account linked to ``participant``, creating one if needed.
+
+    Never mints a usable password for a **participant-role** account. A
+    freshly created account gets ``set_unusable_password()``: nothing is
+    transmitted, so there is nothing to rotate, and ``must_change_password``
+    would strand the participant in a form asking them to change a password
+    they were never given. An already-linked participant account carrying a
+    password from before this behaviour existed is neutralized the same way
+    the moment it is touched here — the same safety net
+    ``accounts.magic_links.account_for_participant`` relied on before this
+    became the one place that logic lives.
+
+    Signing in happens only through an onboarding or magic-sign-in link (see
+    ``zev.onboarding``, ``accounts.magic_links``), or a password the
+    participant chooses themselves through ``set_initial_password`` once they
+    are in.
+
+    **Deliberately does not touch the password of an owner or admin account**
+    that also happens to be linked as a participant (``sync_participant_user_fields``
+    already carves this case out for role, for the same reason). That is their
+    real login, used for everything else they manage — nuking it because one
+    of their own participant rows was saved or invited would lock them out of
+    their own instance.
+    """
     if participant.user_id:
         user = participant.user
         sync_participant_user_fields(participant, user)
-        user.save(
-            update_fields=[
-                'role',
-                'email',
-                'first_name',
-                'last_name',
-            ]
-        )
-        return user, None
+        update_fields = ['role', 'email', 'first_name', 'last_name']
+        if user.role == UserRole.PARTICIPANT:
+            if user.has_usable_password():
+                user.set_unusable_password()
+                update_fields.append('password')
+            if user.must_change_password:
+                user.must_change_password = False
+                update_fields.append('must_change_password')
+        user.save(update_fields=update_fields)
+        return user
 
-    password = generate_temporary_password()
     username = build_unique_participant_username(
         first_name=participant.first_name,
         last_name=participant.last_name,
@@ -89,61 +111,54 @@ def ensure_participant_account(participant):
     )
     user = User.objects.create_user(
         username=username,
-        password=password,
         role=UserRole.PARTICIPANT,
         email=participant.email,
         first_name=participant.first_name,
         last_name=participant.last_name,
-        must_change_password=True,
     )
     participant.user = user
     participant.save(update_fields=['user', 'updated_at'])
-    return user, password
+    return user
 
 
 @transaction.atomic
-def send_participant_invitation(participant, invited_by) -> tuple[str, str]:
-    user, _ = ensure_participant_account(participant)
-    recipient = participant.email or user.email
-    if not recipient:
-        raise ValueError("Participant email is required to send an invitation.")
+def send_participant_onboarding_link(participant, invited_by) -> str:
+    """Ensure an account and onboarding link exist, and email the link.
 
-    temporary_password = generate_temporary_password()
-    user.set_password(temporary_password)
-    user.must_change_password = True
-    user.save(update_fields=['password', 'must_change_password'])
+    Returns the URL, so the caller can also show or copy it — useful as a
+    fallback if the mail never arrives. Raises ``ValueError`` when the
+    participant has no address to send to, same guard the flow it replaced
+    used.
+    """
+    from . import onboarding
+    from .emails import send_onboarding_email
 
-    from invoices.models import EmailTemplate, EMAIL_TEMPLATE_DEFAULTS
+    if not participant.email:
+        raise ValueError("Participant email is required to send an onboarding link.")
 
-    defaults = EMAIL_TEMPLATE_DEFAULTS["participant_invitation"]
-    override = EmailTemplate.objects.filter(template_key="participant_invitation").first()
-    subject_tpl = override.subject if override else defaults["subject"]
-    body_tpl = override.body if override else defaults["body"]
+    ensure_participant_account(participant)
+    token = onboarding.get_or_create_for_participant(participant)
+    link_url = onboarding.public_url(token)
 
     inviter_name = invited_by.get_full_name() or invited_by.username
-    template_ctx = {
-        "participant_name": participant.full_name,
-        "inviter_name": inviter_name,
-        "zev_name": participant.zev.name,
-        "username": user.username,
-        "temporary_password": temporary_password,
-    }
+    send_onboarding_email(participant, inviter_name, link_url)
+    return link_url
 
-    try:
-        subject = subject_tpl.format_map(template_ctx)
-        body = body_tpl.format_map(template_ctx)
-    except (KeyError, ValueError):
-        subject = defaults["subject"].format_map(template_ctx)
-        body = defaults["body"].format_map(template_ctx)
 
-    email = EmailMessage(
-        subject=subject,
-        body=body,
-        from_email=settings.DEFAULT_FROM_EMAIL,
-        to=[recipient],
-    )
-    email.send(fail_silently=False)
-    return user.username, temporary_password
+@transaction.atomic
+def get_participant_onboarding_link(participant) -> str:
+    """Ensure an account and onboarding link exist, without emailing it.
+
+    Used by the "copy onboarding link" action: an operator handing the link
+    over in person or by some channel other than email, and by the admin
+    console's account-linking action, which historically did not require an
+    email address either.
+    """
+    from . import onboarding
+
+    ensure_participant_account(participant)
+    token = onboarding.get_or_create_for_participant(participant)
+    return onboarding.public_url(token)
 
 
 @transaction.atomic
