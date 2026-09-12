@@ -66,7 +66,7 @@ PVshare Cockpit is a closed, subscription-based SaaS (CHF ~30/participant/year) 
 |---|---|---|
 | LEG (Lokale Elektrizitätsgemeinschaft) support | Planned — billing-model spec exists | Invoicing & Billing — LEG billing model (high) |
 | Demand tariff (Leistungstarif) | Not supported | Metering & Data Quality — demand tariff (high), #529 |
-| Participant self-service onboarding via email auto-link | Partial — QR/magic-link access shipped | Participants & Community — email auto-link (medium) |
+| Participant self-service onboarding via email auto-link | Partial — QR/magic-link access shipped; operator-sent onboarding link in progress (#712) | Participants & Community — email auto-link (medium) |
 | Invoice run reject + auto-recalculate workflow | Approve/cancel only | Invoicing & Billing (medium) |
 | Vacant unit auto-billing to ZEV responsible | Not explicit | Invoicing & Billing (medium) |
 | Proactive status-check page for ZEV owners | Partial — readiness/attention cockpit shipped | Participant Self-Service — status-check page (medium) |
@@ -172,9 +172,9 @@ PVshare Cockpit is a closed, subscription-based SaaS (CHF ~30/participant/year) 
 | Self-setup for self-registered ZEV owners | `shipped` | — | — |
 | Grid operator (VNB) picked from the official ElCom list instead of typed | `shipped` | — | PR #519 |
 | Participant CRUD with validity window | `shipped` | — | [spec](specs/2026-03-metering-point-management.md) |
-| Participant invitation (reset password + email with temporary credentials) | `shipped` | — | — |
+| Participant invitation (reset password + email with temporary credentials) | `removed` | — | Replaced by the onboarding link (#712) — no path mints a participant password any more |
 | Participant account linking / unlinking | `shipped` | — | [spec](specs/2026-03-metering-point-management.md) |
-| Auto-create user account on participant creation | `shipped` | — | — |
+| Auto-create user account on participant creation | `shipped` | — | Passwordless since #712 — activated only via an onboarding link |
 | Participant contract PDF (metering points, tariffs, billing interval, notes) | `shipped` | — | Versioned contract snapshots on download (PR #443); [spec](specs/2026-08-contract-pdf-redesign.md) |
 | Participant status indicator | `shipped` | — | — |
 | Participant location map (OpenStreetMap building outlines, geocoded from address) | `shipped` | — | [ADR 0012](adr/0012-participant-geocoding-via-nominatim.md) |
@@ -185,7 +185,7 @@ PVshare Cockpit is a closed, subscription-based SaaS (CHF ~30/participant/year) 
 | Bulk participant import from CSV | `idea` | `medium` | Useful when onboarding large ZEVs; reduces manual data entry |
 | Participant move between ZEVs | `idea` | `low` | Complex; requires data migration of assignments and readings |
 | ZEV merge (combine two ZEVs into one) | `idea` | `low` | Rare edge case; needs dedicated spec |
-| Participant self-service onboarding via email auto-link | `idea` | `medium` | PVshare model: ZEV owner records participant email; participant visits onboarding URL and creates account → auto-linked without admin invite flow |
+| Participant self-service onboarding via email auto-link | `in progress` | `medium` | Phase 1 (operator-sent onboarding link, no password ever issued) implemented, pending review — [spec](specs/2026-09-participant-onboarding-link.md), #712. Phase 2 (self-service `/join` with an email field, PVshare's literal model) not started |
 | Guided ZEV founding wizard with grid-operator document templates | `idea` | `medium` | Step-by-step process for new ZEV setup including document templates for VNB correspondence; PVshare key differentiator |
 | Partner / third-party billing access model | `idea` | `low` | Allow a solar installer or billing service partner to manage a ZEV on behalf of the responsible party; requires scoped delegation role |
 
