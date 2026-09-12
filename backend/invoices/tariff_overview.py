@@ -29,11 +29,11 @@ from .pdf_render import render_pdf
 from .pdf_translations import INVOICE_TRANSLATIONS
 from .tariff_overview_translations import TARIFF_OVERVIEW_TRANSLATIONS
 from .tariff_pricing import (
-    display_grid_base_chf_per_kwh,
-    dynamic_average_chf_per_kwh,
-    grid_base_is_dynamic,
+    GridBaseSummary,
+    display_grid_base_summary,
     grid_base_is_multiband,
 )
+from tariffs.dynamic.pricing import summarize_dynamic_tariff
 
 TARIFF_OVERVIEW_TEMPLATE = "invoices/tariff_overview_pdf.html"
 
@@ -63,6 +63,13 @@ _PER_METERING_POINT_MODES = {
 }
 
 
+DYNAMIC_FOOTNOTE = {
+    "complete": "dynamic_average",
+    "partial": "dynamic_partial",
+    "unavailable": "dynamic_unavailable",
+}
+
+
 def _is_active(tariff, as_of: date) -> bool:
     if tariff.valid_from > as_of:
         return False
@@ -86,22 +93,30 @@ def _validity_display(tariff, tr: dict, date_pattern: str) -> str:
     return tr["valid_open"].format(date=valid_from)
 
 
-def _price_rows_for_energy_tariff(tariff, tr: dict, band_tr: dict) -> list[dict]:
+def _price_rows_for_energy_tariff(
+    tariff, tr: dict, band_tr: dict, as_of: date, date_pattern: str
+) -> list[dict]:
     if tariff.dynamic_source_id:
-        # No bands to enumerate at all — the price lives in a fetched series,
-        # not on the tariff. One row, the series average, flagged so the
-        # reader knows it is not a fixed rate. Empty (not an empty-but-zero
-        # row) when nothing has been fetched yet: the caller treats "no rows"
-        # as "nothing to print", same as a static tariff with no bands.
-        average = dynamic_average_chf_per_kwh(tariff)
-        if average is None:
-            return []
+        # Always show one row, including an explicit unavailable state.
+        summary = summarize_dynamic_tariff(tariff, as_of=as_of)
+        dates = ""
+        if summary.reference_from and summary.reference_to:
+            dates = tr["dynamic_reference_dates"].format(
+                start=format_date_value(summary.reference_from, date_pattern),
+                end=format_date_value(summary.reference_to, date_pattern),
+            )
+        footnote = DYNAMIC_FOOTNOTE[summary.status]
+        label_key = f"{footnote}_label"
         return [{
-            "label": tr["dynamic_average_label"],
+            "label": f"{tr[label_key]}{dates}",
             "recurrence": "",
-            "amount": f"{float(average) * 100:.2f}",
-            "unit": tr["unit_rp"],
-            "footnote": "dynamic_average",
+            "amount": (
+                f"{float(summary.average_chf_per_kwh) * 100:.2f}"
+                if summary.average_chf_per_kwh is not None
+                else tr["tariff_none"]
+            ),
+            "unit": tr["unit_rp"] if summary.average_chf_per_kwh is not None else "",
+            "footnote": footnote,
         }]
     # One row per band, never an average — this is the same principle #546
     # established for the invoice: a participant must be able to look up the
@@ -122,16 +137,20 @@ def _price_rows_for_energy_tariff(tariff, tr: dict, band_tr: dict) -> list[dict]
 
 
 def _price_row_for_percentage_tariff(
-    tariff, tr: dict, grid_sum_chf: Decimal, multiband_base: bool, dynamic_base: bool = False,
+    tariff, tr: dict, grid_base: GridBaseSummary, multiband_base: bool,
 ) -> dict:
     # A base can be approximate for two different reasons — the underlying
     # grid tariff has several time bands, or it is a fluctuating dynamic
     # price — and they need different footnote text. A base is rarely both at
     # once in practice; when it is, "dynamic" is the more surprising fact for
     # the reader, so it wins.
-    footnote = "dynamic_average" if dynamic_base else ("multiband_base" if multiband_base else None)
+    footnote = DYNAMIC_FOOTNOTE.get(
+        grid_base.dynamic_status, "multiband_base" if multiband_base else None
+    )
     pct = Decimal(str(tariff.percentage or 0))
-    if grid_sum_chf > 0:
+    grid_sum_chf = grid_base.price_chf_per_kwh
+    has_effective_price = grid_base.has_effective_price
+    if has_effective_price:
         effective_rp = grid_sum_chf * (pct / Decimal("100")) * Decimal("100")
         grid_rp = grid_sum_chf * Decimal("100")
         return {
@@ -139,6 +158,14 @@ def _price_row_for_percentage_tariff(
             "recurrence": "",
             "amount": f"{float(effective_rp):.2f}",
             "unit": tr["unit_rp"],
+            "footnote": footnote,
+        }
+    if grid_sum_chf is None:
+        return {
+            "label": f"{float(pct):.2f} {tr['unit_percent']}",
+            "recurrence": "",
+            "amount": tr["tariff_none"],
+            "unit": "",
             "footnote": footnote,
         }
     return {
@@ -192,19 +219,19 @@ def _label_is_redundant(tariff, price_row: dict, band_tr: dict) -> bool:
 
 def _build_tariff_row(
     tariff, tr: dict, band_tr: dict, date_pattern: str, as_of: date,
-    grid_sum_chf: Decimal, multiband_base: bool, dynamic_base: bool = False,
+    grid_base: GridBaseSummary, multiband_base: bool,
 ) -> dict | None:
     if tariff.billing_mode == BillingMode.ENERGY:
-        price_rows = _price_rows_for_energy_tariff(tariff, tr, band_tr)
+        price_rows = _price_rows_for_energy_tariff(
+            tariff, tr, band_tr, as_of, date_pattern
+        )
         if not price_rows:
             # A tariff with no bands has nothing to print — skip it rather
-            # than emit a header with an empty table underneath. Also what a
-            # dynamic tariff whose series has never been fetched hits: no
-            # average to show yet, same "nothing to print" outcome.
+            # than emit a header with an empty table underneath.
             return None
     elif tariff.billing_mode == BillingMode.PERCENTAGE_OF_ENERGY:
         price_rows = [
-            _price_row_for_percentage_tariff(tariff, tr, grid_sum_chf, multiband_base, dynamic_base)
+            _price_row_for_percentage_tariff(tariff, tr, grid_base, multiband_base)
         ]
     else:
         price_rows = [_price_row_for_fee_tariff(tariff, tr)]
@@ -230,9 +257,9 @@ def _build_tariff_row(
     }
 
 
-def _grid_base(tariffs: list, as_of: date) -> tuple[Decimal, bool, bool]:
+def _grid_base(tariffs: list, as_of: date) -> tuple[GridBaseSummary, bool]:
     """The display base for percentage-of-energy tariffs, and whether it
-    approximates a multi-band or a dynamic grid tariff (see ``tariff_pricing``).
+    approximates a static multi-band grid tariff (see ``tariff_pricing``).
 
     Computed once against ``as_of`` — not per row — so a superseded
     percentage-of-energy version shown under ``scope=all`` reads against the
@@ -256,9 +283,8 @@ def _grid_base(tariffs: list, as_of: date) -> tuple[Decimal, bool, bool]:
         and _is_active(t, as_of)
     ]
     return (
-        display_grid_base_chf_per_kwh(grid_tariffs),
+        display_grid_base_summary(grid_tariffs, as_of=as_of),
         grid_base_is_multiband(grid_tariffs),
-        grid_base_is_dynamic(grid_tariffs),
     )
 
 
@@ -276,6 +302,7 @@ def _vat_display(zev, tr: dict) -> tuple[str, str | None]:
 def _build_template_context(zev, as_of: date, scope: str) -> dict:
     lang = zev.invoice_language or "de"
     tr = dict(TARIFF_OVERVIEW_TRANSLATIONS.get(lang, TARIFF_OVERVIEW_TRANSLATIONS["de"]))
+    tr["tariff_none"] = translations_for(lang)["tariff_none"]
     # Category labels are read from the invoice's own translations rather than
     # duplicated here, so the overview and the invoice cannot describe the
     # same category with two different words.
@@ -290,7 +317,7 @@ def _build_template_context(zev, as_of: date, scope: str) -> dict:
 
     date_pattern = AppSettings.load().date_format_short
     tariffs = _select_tariffs(zev, as_of, scope)
-    grid_sum_chf, multiband_base, dynamic_base = _grid_base(tariffs, as_of)
+    grid_base, multiband_base = _grid_base(tariffs, as_of)
 
     ordered = sorted(
         tariffs,
@@ -306,7 +333,7 @@ def _build_template_context(zev, as_of: date, scope: str) -> dict:
         rows = [
             row for row in (
                 _build_tariff_row(
-                    t, tr, band_tr, date_pattern, as_of, grid_sum_chf, multiband_base, dynamic_base,
+                    t, tr, band_tr, date_pattern, as_of, grid_base, multiband_base,
                 )
                 for t in ordered
                 if t.category == category

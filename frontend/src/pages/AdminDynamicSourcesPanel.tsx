@@ -146,10 +146,15 @@ export function AdminDynamicSourcesPanel() {
       header: t('pages.dynamicSources.columns.status'),
       cell: ({ row }) => (
         <div>
-          <span className={statusClass(row.original.last_fetch_status)}>
-            {t(`pages.dynamicSources.status.${row.original.last_fetch_status}` as Parameters<typeof t>[0])}
+          <span className={row.original.enabled ? statusClass(row.original.last_fetch_status) : 'badge badge-neutral'}>
+            {row.original.enabled
+              ? t(`pages.dynamicSources.status.${row.original.last_fetch_status}` as Parameters<typeof t>[0])
+              : t('pages.dynamicSources.status.disabled')}
           </span>
           {row.original.last_fetch_error && <div className="text-danger">{row.original.last_fetch_error}</div>}
+          {row.original.recovery_from && (
+            <div className="muted">{t('pages.dynamicSources.recoveryFrom', { date: formatDateTime(row.original.recovery_from, settings) })}</div>
+          )}
         </div>
       ),
     },

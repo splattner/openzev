@@ -87,6 +87,18 @@ CONTRACT_TRANSLATIONS: dict[str, dict] = {
         "tariff_months_short": ["Jan.", "Feb.", "März", "Apr.", "Mai", "Juni", "Juli", "Aug.", "Sept.", "Okt.", "Nov.", "Dez."],
         "tariff_season": "{label} ({season})",
         "tariff_pct_prefix": "% des Netzpreises",
+        "tariff_dynamic_average_note": (
+            "Die Netzpreis-Basis enthält einen nach Intervalldauer gewichteten "
+            "dynamischen Durchschnitt aus bis zu 30 Tagen vor dem Ausstellungsdatum."
+        ),
+        "tariff_dynamic_partial_note": (
+            "Die dynamische Preisreihe ist in diesem Referenzzeitraum unvollständig; "
+            "der Durchschnitt berücksichtigt nur vorhandene Intervalle."
+        ),
+        "tariff_dynamic_unavailable_note": (
+            "Für den Referenzzeitraum ist kein dynamischer Netzpreis verfügbar; "
+            "deshalb wird kein Ersatzpreis ausgewiesen."
+        ),
         "tariff_rp_unit": "Rp./kWh",
         # Monday-first, matching weekdays_of()'s 0=Monday convention. Used by
         # band_recurrence() to name which weekdays a band applies on.
@@ -447,6 +459,18 @@ CONTRACT_TRANSLATIONS: dict[str, dict] = {
         "tariff_months_short": ["janv.", "févr.", "mars", "avr.", "mai", "juin", "juil.", "août", "sept.", "oct.", "nov.", "déc."],
         "tariff_season": "{label} ({season})",
         "tariff_pct_prefix": "% du tarif réseau",
+        "tariff_dynamic_average_note": (
+            "La base du prix réseau comprend une moyenne dynamique pondérée par "
+            "la durée des intervalles sur 30 jours au plus avant la date d'émission."
+        ),
+        "tariff_dynamic_partial_note": (
+            "La série dynamique est incomplète pour cette période de référence; "
+            "la moyenne ne tient compte que des intervalles disponibles."
+        ),
+        "tariff_dynamic_unavailable_note": (
+            "Aucun prix réseau dynamique n'est disponible pour la période de "
+            "référence; aucun prix de remplacement n'est indiqué."
+        ),
         "tariff_rp_unit": "cts/kWh",
         "tariff_weekdays_short": ["Lu", "Ma", "Me", "Je", "Ve", "Sa", "Di"],
         "tariff_weekday_range": "{first}–{last}",
@@ -803,6 +827,18 @@ CONTRACT_TRANSLATIONS: dict[str, dict] = {
         "tariff_months_short": ["genn.", "febbr.", "mar.", "apr.", "magg.", "giugno", "luglio", "ag.", "sett.", "ott.", "nov.", "dic."],
         "tariff_season": "{label} ({season})",
         "tariff_pct_prefix": "% della tariffa di rete",
+        "tariff_dynamic_average_note": (
+            "La base del prezzo di rete include una media dinamica ponderata per "
+            "la durata degli intervalli di un massimo di 30 giorni prima dell'emissione."
+        ),
+        "tariff_dynamic_partial_note": (
+            "La serie dinamica è incompleta nel periodo di riferimento; la media "
+            "considera soltanto gli intervalli disponibili."
+        ),
+        "tariff_dynamic_unavailable_note": (
+            "Nel periodo di riferimento non è disponibile alcun prezzo dinamico "
+            "di rete; non viene indicato un prezzo sostitutivo."
+        ),
         "tariff_rp_unit": "ct/kWh",
         "tariff_weekdays_short": ["Lu", "Ma", "Me", "Gi", "Ve", "Sa", "Do"],
         "tariff_weekday_range": "{first}–{last}",
@@ -1158,6 +1194,18 @@ CONTRACT_TRANSLATIONS: dict[str, dict] = {
         "tariff_months_short": ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
         "tariff_season": "{label} ({season})",
         "tariff_pct_prefix": "% of grid tariff",
+        "tariff_dynamic_average_note": (
+            "The grid-price base includes a duration-weighted dynamic average over "
+            "up to 30 days before the issue date."
+        ),
+        "tariff_dynamic_partial_note": (
+            "The dynamic series is incomplete in this reference period; the average "
+            "uses only the intervals that are available."
+        ),
+        "tariff_dynamic_unavailable_note": (
+            "No dynamic grid price is available for the reference period, so no "
+            "substitute price is shown."
+        ),
         "tariff_rp_unit": "Rp./kWh",
         "tariff_weekdays_short": ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
         "tariff_weekday_range": "{first}–{last}",

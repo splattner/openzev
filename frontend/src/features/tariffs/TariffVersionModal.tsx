@@ -83,9 +83,10 @@ export function TariffVersionModal({
   if (!dialog) return null
 
   const { kind, series, source } = dialog
-  const usesPeriods = series.billing_mode === 'energy'
+  const isDynamic = Boolean(source.dynamic_source)
+  const usesPeriods = series.billing_mode === 'energy' && !isDynamic
   const usesPercentage = series.billing_mode === 'percentage_of_energy'
-  const usesFixedPrice = !usesPeriods && !usesPercentage
+  const usesFixedPrice = !usesPeriods && !usesPercentage && !isDynamic
 
   const title = kind === 'new-version'
     ? t('pages.tariffs.versions.newVersionTitle', { name: series.name })

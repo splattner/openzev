@@ -88,6 +88,30 @@ class Invoice(models.Model):
         return f"Invoice {self.invoice_number} - {self.participant.full_name} ({self.period_start} – {self.period_end})"
 
 
+class InvoiceDynamicSourceEvidence(models.Model):
+    """Frozen source/window provenance, independent of later tariff edits."""
+
+    invoice = models.ForeignKey(Invoice, on_delete=models.CASCADE, related_name="dynamic_evidence")
+    source = models.ForeignKey(
+        "tariffs.DynamicTariffSource", on_delete=models.PROTECT, related_name="invoice_evidence"
+    )
+    tariff_id_snapshot = models.UUIDField()
+    evidence_from = models.DateTimeField()
+    evidence_to = models.DateTimeField()
+
+    class Meta:
+        ordering = ["invoice_id", "source_id", "id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["invoice", "tariff_id_snapshot"], name="unique_invoice_dynamic_tariff_evidence"
+            ),
+            models.CheckConstraint(
+                condition=models.Q(evidence_to__gt=models.F("evidence_from")),
+                name="invoice_dynamic_evidence_valid_range",
+            ),
+        ]
+
+
 class InvoiceItem(models.Model):
     """A line item on an invoice."""
 

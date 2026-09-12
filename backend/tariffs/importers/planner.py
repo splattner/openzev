@@ -18,12 +18,17 @@ from __future__ import annotations
 from dataclasses import dataclass, field, replace
 from datetime import date
 
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.db.models import Q
 from django.core.exceptions import ValidationError as DjangoValidationError
 
-from tariffs.dynamic.discovery import probe_source_configuration
-from tariffs.dynamic.models import DynamicTariffSource
+from tariffs.dynamic.discovery import SourceCapabilities, probe_source_configuration
+from tariffs.dynamic.adapters import DynamicApiVersion
+from tariffs.dynamic.components import aggregated_tariff_types
+from tariffs.dynamic.fetch import PriceSeriesConflict
+from tariffs.dynamic.models import DynamicTariffSource, FetchStatus
+from tariffs.dynamic.services import initialise_source_from_probe
+from tariffs.dynamic.vse_v1 import DynamicTariffResponseError
 from tariffs.models import Tariff, TariffPeriod
 from tariffs.series import SERIES_FIELDS, plan_new_version
 from tariffs.tasks import fetch_dynamic_prices
@@ -56,6 +61,7 @@ class Selection:
 
     key: str
     billing_mode: str | None = None
+    dynamic_tariff_name: str | None = None
 
 
 @dataclass
@@ -249,63 +255,84 @@ def _notes_with_provenance(candidate: Candidate, source_url: str, imported_on: d
     return f"{candidate.notes}\n{origin} (imported {imported_on.isoformat()})".strip()
 
 
-def _get_or_create_dynamic_source(candidate: Candidate) -> tuple[DynamicTariffSource, bool, list[str]]:
-    """Find or create the price source a dynamic candidate names.
+@dataclass(frozen=True)
+class _DynamicSourcePlan:
+    natural_key: dict
+    capabilities: SourceCapabilities
+    warnings: list[str]
 
-    Sources are shared globally (ADR 0018), so another ZEV already on this
-    exact endpoint/type/product is reused rather than duplicated — matched by
-    the model's own natural key. The document names no product at all (that
-    concept does not exist in the VSE tariff schema), so ``tariff_name`` is
-    always blank here; ``_dynamic_candidate`` already warns about that.
 
-    A *new* source is probed once before being created: the URL comes from
-    the document, and a URL in a document is a starting point, not a
-    contract — the standard's own example now 410s. Creating a tariff linked
-    to a source that cannot be fetched would be worse than not creating it.
-    An already-known source is trusted without a fresh probe: it is already
-    being fetched on schedule.
+def _reused_source_warnings(source: DynamicTariffSource) -> list[str]:
+    if not source.enabled:
+        return [
+            "The reused dynamic price source is disabled and will not refresh on schedule."
+        ]
+    if source.last_fetch_status == FetchStatus.FAILED:
+        detail = f": {source.last_fetch_error}" if source.last_fetch_error else "."
+        return [f"The reused dynamic price source is currently failing{detail}"]
+    if source.last_success_at is None:
+        return ["The reused dynamic price source has not completed a successful fetch yet."]
+    return []
 
-    The probe does not pin an API version: the VSE tariff document names a
-    ``tariffType`` (electricity/grid/regional_fees), never a protocol
-    version, and both v1.0.5 and v2.0.0 define that vocabulary. Auto-detecting
-    lets a document point at either generation of endpoint, the same way the
-    manual two-step wizard does; ``discover_endpoint`` still fails clearly if
-    the response cannot be read as either.
 
-    Returns the resolved source, whether it was newly created, and any
-    "priced but unbillable unit" warnings the probe found for it — empty for
-    a reused source, since nothing was probed.
-    """
-    natural_key = {
-        "url": candidate.dynamic_url,
-        "tariff_type": candidate.dynamic_tariff_type,
-        "tariff_name": "",
-    }
-    existing = DynamicTariffSource.objects.filter(**natural_key).first()
-    if existing is not None:
-        return existing, False, []
-
+def _prepare_dynamic_source(candidate: Candidate, tariff_name: str | None) -> _DynamicSourcePlan:
+    """Probe the explicit product choice before matching a versioned source identity."""
+    if tariff_name is None:
+        raise ValueError("Choose a dynamic product, or explicitly confirm the endpoint default with an empty product name.")
     try:
         capabilities = probe_source_configuration(
             candidate.dynamic_url,
             tariff_type=candidate.dynamic_tariff_type,
+            tariff_name=tariff_name,
         )
     except (TariffFetchError, ValueError) as exc:
         raise ValueError(
             f"Could not fetch the dynamic price at {candidate.dynamic_url}: {exc}"
         ) from exc
 
+    natural_key = {
+        "url": candidate.dynamic_url, "api_version": capabilities.api_version,
+        "tariff_type": candidate.dynamic_tariff_type,
+        "tariff_name": capabilities.tariff_name or tariff_name,
+    }
+    warnings = list(capabilities.warnings)
+    exact = aggregated_tariff_types(capabilities.api_version, candidate.dynamic_tariff_type)
+    if exact:
+        # The preview could only warn about the version-independent
+        # intersection; the probe pinned the version, so upgrade to exact.
+        version_label = DynamicApiVersion(capabilities.api_version).label
+        warnings.append(
+            f"The dynamic {candidate.dynamic_tariff_type} component already "
+            f"includes {', '.join(exact)} on this endpoint ({version_label}). "
+            "Do not bill those components again as separate tariffs."
+        )
+
+    return _DynamicSourcePlan(natural_key, capabilities, warnings)
+
+
+def _write_dynamic_source(
+    candidate: Candidate, plan: _DynamicSourcePlan
+) -> tuple[DynamicTariffSource, bool, list[str]]:
+    """Write a prepared source inside the caller's tariff transaction."""
+    capabilities = plan.capabilities
+    label = f"{candidate.source_tariff_name} — {candidate.dynamic_tariff_type}"
     source, created = DynamicTariffSource.objects.get_or_create(
-        **natural_key,
+        **plan.natural_key,
         defaults={
-            "api_version": capabilities.api_version,
             "request_mode": capabilities.request_mode,
             "query_tariff_type": capabilities.query_tariff_type,
             "supports_range": capabilities.supports_range,
-            "label": f"{candidate.source_tariff_name} — {candidate.dynamic_tariff_type}",
+            "enabled": True,
+            "label": label[:199] + "…" if len(label) > 200 else label,
         },
     )
-    return source, created, (capabilities.warnings if created else [])
+    if created:
+        initialise_source_from_probe(source, capabilities)
+        warnings = list(plan.warnings)
+        if len(label) > 200:
+            warnings.append("The source label was too long and has been shortened.")
+        return source, True, warnings
+    return source, False, [*plan.warnings, *_reused_source_warnings(source)]
 
 
 def _create(
@@ -347,19 +374,20 @@ def _create(
     )
     tariff.save()
 
-    TariffPeriod.objects.bulk_create([
-        TariffPeriod(
-            tariff=tariff,
-            period_type=period.period_type,
-            label=period.label,
-            price_chf_per_kwh=period.price_chf_per_kwh,
-            time_from=period.time_from,
-            time_to=period.time_to,
-            weekdays=period.weekdays,
-            months=period.months,
-        )
-        for period in candidate.periods
-    ])
+    if dynamic_source is None:
+        TariffPeriod.objects.bulk_create([
+            TariffPeriod(
+                tariff=tariff,
+                period_type=period.period_type,
+                label=period.label,
+                price_chf_per_kwh=period.price_chf_per_kwh,
+                time_from=period.time_from,
+                time_to=period.time_to,
+                weekdays=period.weekdays,
+                months=period.months,
+            )
+            for period in candidate.periods
+        ])
     return tariff
 
 
@@ -425,29 +453,45 @@ def apply_import(*, zev, document: ParsedDocument, selections: list[Selection], 
             report.skipped.append({"name": candidate.name, "reason": planned.detail})
             continue
 
-        # Resolved (and, for a new source, probed over the network) before the
-        # write transaction opens — a slow or failing fetch must not hold a
-        # database savepoint open while it happens.
-        dynamic_source = None
-        dynamic_source_created = False
-        dynamic_source_warnings: list[str] = []
+        # Probe before the write transaction; source reuse is resolved inside it.
+        dynamic_plan = None
         if candidate.dynamic_url:
             try:
-                dynamic_source, dynamic_source_created, dynamic_source_warnings = (
-                    _get_or_create_dynamic_source(candidate)
-                )
+                dynamic_plan = _prepare_dynamic_source(candidate, selection.dynamic_tariff_name)
             except ValueError as exc:
                 report.errors.append({"name": candidate.name, "error": str(exc)})
                 continue
 
         try:
             with transaction.atomic():
+                dynamic_source = None
+                dynamic_source_created = False
+                dynamic_source_warnings: list[str] = []
+                if dynamic_plan is not None:
+                    (
+                        dynamic_source,
+                        dynamic_source_created,
+                        dynamic_source_warnings,
+                    ) = _write_dynamic_source(candidate, dynamic_plan)
                 tariff = _create(zev, planned, source_url, imported_on, dynamic_source=dynamic_source)
         except DjangoValidationError as exc:
             report.errors.append({
                 "name": candidate.name,
                 "error": "; ".join(exc.messages),
             })
+            continue
+        except IntegrityError:
+            # No .messages here (ValidationError only); args hold raw
+            # constraint detail, so never show them to the operator.
+            report.errors.append({
+                "name": candidate.name,
+                "error": "This tariff could not be stored (a database constraint was violated). Run the preview again.",
+            })
+            continue
+        except (PriceSeriesConflict, DynamicTariffResponseError) as exc:
+            # Probe points that cannot be stored (duplicate starts,
+            # overlaps). The transaction rolled tariff and source back.
+            report.errors.append({"name": candidate.name, "error": str(exc)})
             continue
 
         if dynamic_source_created:

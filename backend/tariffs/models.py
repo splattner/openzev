@@ -6,7 +6,7 @@ from zev.models import Zev
 
 from allocation.validity import active_during
 
-from .dynamic.models import DynamicPricePoint, DynamicTariffSource  # noqa: F401
+from .dynamic.models import DynamicTariffSource
 from .periods import hhmm, parse_number_list
 from .series import SERIES_FIELDS
 
@@ -122,7 +122,6 @@ ENERGY_TYPE_BY_DYNAMIC_TARIFF_TYPE = {
     "integrated_complete": EnergyType.GRID,
     "regional_fees": EnergyType.GRID,
     "feed_in": EnergyType.FEED_IN,
-    "refund": EnergyType.FEED_IN,
 }
 
 
@@ -184,7 +183,14 @@ class Tariff(models.Model):
         if self.billing_mode in {BillingMode.ENERGY, BillingMode.PERCENTAGE_OF_ENERGY} and not self.energy_type:
             errors["energy_type"] = "Energy-based tariffs require an energy type."
 
-        errors.update(self._dynamic_source_errors())
+        for field, message in self._dynamic_source_errors().items():
+            errors.setdefault(field, message)
+
+        if self.dynamic_source_id and not self._state.adding and self.periods.exists():
+            errors.setdefault(
+                "dynamic_source",
+                "A tariff priced from a fetched series cannot carry price bands.",
+            )
 
         # A ZEV legitimately carries several simultaneous per-kWh components in
         # one category — grid fees are Netznutzung *and* SDL, levies are the
@@ -246,11 +252,17 @@ class Tariff(models.Model):
                     f"by energy — not by {self.get_billing_mode_display().lower()}."
                 )
             }
-        expected = ENERGY_TYPE_BY_DYNAMIC_TARIFF_TYPE.get(self.dynamic_source.tariff_type)
+        try:
+            source = self.dynamic_source
+        except DynamicTariffSource.DoesNotExist:
+            return {"dynamic_source": "This price series no longer exists."}
+        expected = ENERGY_TYPE_BY_DYNAMIC_TARIFF_TYPE.get(source.tariff_type)
+        if expected is None:
+            return {"dynamic_source": "Storage refunds require storage-qualified metering and cannot be billed as exported energy."}
         if expected is not None and self.energy_type != expected:
             return {
                 "energy_type": (
-                    f"This price series serves {self.dynamic_source.get_tariff_type_display().lower()}, "
+                    f"This price series serves {source.get_tariff_type_display().lower()}, "
                     f"which prices {EnergyType(expected).label.lower()} energy, not "
                     f"{EnergyType(self.energy_type).label.lower() if self.energy_type else 'nothing'}."
                 )
@@ -311,6 +323,11 @@ class TariffPeriod(models.Model):
         ordering = ["period_type", models.F("time_from").asc(nulls_first=True), "id"]
 
     def clean(self):
+        # Enforce this at model level because admin writes bypass the serializer.
+        if self.tariff_id and self.tariff.dynamic_source_id:
+            raise ValidationError({
+                "tariff": "This tariff is priced from a fetched series; price bands do not apply."
+            })
         # A band that prices no month at all is simply unreachable.
         if self.months and not parse_number_list(self.months):
             raise ValidationError({"months": "Leave months blank to apply in every month."})

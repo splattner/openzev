@@ -32,6 +32,7 @@ class SourceCapabilities:
     supports_range: bool
     points: list
     warnings: list[str]
+    tariff_name: str = ""
 
 
 def _read_version(payload: object, requested_version: str | None) -> tuple[str, bool]:
@@ -82,17 +83,18 @@ def probe_source_configuration(
 ) -> SourceCapabilities:
     """Validate one choice and infer request behavior without VNB-specific code.
 
-    ``api_version`` may be omitted: the endpoint's own response shape decides,
-    exactly as the manual two-step wizard already lets it. Passing a version
-    pins it — ``discover_endpoint`` still refuses when the endpoint actually
-    answers a different one, so a caller that already knows its version (the
-    VSE importer, which only ever names v1.0.5 tariff types) still gets a
-    clear error instead of a misread response.
+    Omit ``api_version`` to detect the response shape; an explicit version
+    must match it. V2's selected product is also verified in every response.
     """
 
     discovery = discover_endpoint(url, api_version=api_version)
     resolved_version = discovery.api_version
     matching = [item for item in discovery.components if item.tariff_type == tariff_type]
+    resolved_name = tariff_name
+    if resolved_version == DynamicApiVersion.V2_0_0 and not tariff_name and len(matching) == 1:
+        resolved_name = matching[0].tariff_name
+    if resolved_version == DynamicApiVersion.V2_0_0 and not tariff_name and len(matching) > 1:
+        raise DynamicTariffResponseError("The endpoint returned multiple products. Select a tariff name explicitly.")
     if resolved_version == DynamicApiVersion.V2_0_0 and tariff_name:
         matching = [item for item in matching if item.tariff_name == tariff_name]
     if not matching:
@@ -113,11 +115,11 @@ def probe_source_configuration(
                 url,
                 request_mode=DynamicRequestMode.STANDARD,
                 query_tariff_type=spelling,
-                tariff_name=tariff_name,
+                tariff_name=resolved_name,
             )
             payload, _digest = fetch_tariff_document(candidate_url)
             _read_version(payload, resolved_version)
-            series = parse_tariff_response(payload, api_version=resolved_version, tariff_type=tariff_type)
+            series = parse_tariff_response(payload, api_version=resolved_version, tariff_type=tariff_type, tariff_name=resolved_name)
         except (TariffFetchError, DynamicTariffResponseError):
             continue
         selected_payload = payload
@@ -125,12 +127,14 @@ def probe_source_configuration(
         break
 
     if selected_payload is None:
-        if tariff_name:
+        if tariff_name and resolved_version == DynamicApiVersion.V1_0_5:
             raise DynamicTariffResponseError(
                 "The endpoint does not accept the selected product name."
             )
         payload, _digest = fetch_tariff_document(url)
-        series = parse_tariff_response(payload, api_version=resolved_version, tariff_type=tariff_type)
+        series = parse_tariff_response(
+            payload, api_version=resolved_version, tariff_type=tariff_type, tariff_name=resolved_name
+        )
         if not series.points:
             raise DynamicTariffResponseError(
                 "The exact endpoint URL returned no prices for the selected component."
@@ -142,6 +146,7 @@ def probe_source_configuration(
             supports_range=False,
             points=series.points,
             warnings=series.warnings,
+            tariff_name=resolved_name,
         )
 
     supports_range = False
@@ -152,13 +157,13 @@ def probe_source_configuration(
                 url,
                 request_mode=DynamicRequestMode.STANDARD,
                 query_tariff_type=query_tariff_type,
-                tariff_name=tariff_name,
+                tariff_name=resolved_name,
                 window=FetchWindow(sample.valid_from, sample.valid_to),
             )
             ranged_payload, _digest = fetch_tariff_document(ranged_url)
             _read_version(ranged_payload, resolved_version)
             ranged_series = parse_tariff_response(
-                ranged_payload, api_version=resolved_version, tariff_type=tariff_type
+                ranged_payload, api_version=resolved_version, tariff_type=tariff_type, tariff_name=resolved_name
             )
             # A server that silently ignores range parameters is not range
             # capable. Both VSE versions permit at most the immediately
@@ -177,4 +182,5 @@ def probe_source_configuration(
         supports_range=supports_range,
         points=series.points,
         warnings=series.warnings,
+        tariff_name=resolved_name,
     )

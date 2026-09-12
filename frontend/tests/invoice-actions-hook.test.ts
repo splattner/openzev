@@ -25,6 +25,11 @@ vi.mock('../src/lib/toast', () => ({
   useToast: () => ({ pushToast }),
 }))
 
+vi.mock('../src/lib/appSettings', async (importOriginal) => ({
+  ...await importOriginal<typeof import('../src/lib/appSettings')>(),
+  useAppSettings: () => ({ settings: { date_time_format: 'dd.MM.yyyy HH:mm' } }),
+}))
+
 const mockNavigate = vi.fn()
 
 vi.mock('react-router-dom', () => ({

@@ -123,6 +123,20 @@ class TestDynamicSeries:
 
         assert series.price_at(datetime(2026, 2, 1, 12, 0, tzinfo=UTC)) == Decimal("-0.05430")
 
+    def test_a_bounded_load_ignores_history_outside_the_invoice_period(self):
+        source = make_source()
+        store(source, datetime(2025, 1, 1, 10, tzinfo=UTC), "9.00000")
+        store(source, datetime(2026, 2, 1, 10, tzinfo=UTC), "0.20000")
+
+        series = _DynamicSeries.load(
+            source.pk,
+            start=datetime(2026, 2, 1, tzinfo=UTC),
+            end=datetime(2026, 3, 1, tzinfo=UTC),
+        )
+
+        assert series.price_at(datetime(2025, 1, 1, 10, tzinfo=UTC)) is None
+        assert series.price_at(datetime(2026, 2, 1, 10, tzinfo=UTC)) == Decimal("0.20000")
+
 
 # ---------------------------------------------------------------------------
 # TariffResolver.price_at
@@ -247,6 +261,9 @@ class TestDynamicInvoiceGeneration:
         # 10 * 0.30 + 10 * 0.10 = 4.00 CHF — same arithmetic as the HT/NT test,
         # with a fetched price standing in for a band.
         assert invoice.subtotal_chf == Decimal("4.00")
+        item = invoice.items.get()
+        assert item.unit_price_chf == Decimal("0.20000")
+        assert "verbrauchsgewichteter dynamischer Durchschnittspreis" in item.description
 
     def test_a_negative_fetched_price_credits_the_participant(self):
         participant, mp, _source = self._billed_participant([

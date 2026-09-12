@@ -26,7 +26,10 @@ TARIFF_OVERVIEW_TRANSLATIONS: dict[str, dict] = {
         "unit_chf_month": "CHF/Mt.",
         "unit_chf_year": "CHF/Jahr",
         "unit_percent": "%",
-        "dynamic_average_label": "Durchschnitt der abgerufenen Preisreihe",
+        "dynamic_average_label": "Zeitgewichteter dynamischer Durchschnitt",
+        "dynamic_partial_label": "Unvollständiger dynamischer Durchschnitt",
+        "dynamic_unavailable_label": "Dynamischer Preis nicht verfügbar",
+        "dynamic_reference_dates": " ({start} – {end})",
         "fee_per_metering_point": "pro Zählpunkt",
         "fee_shared_equal": "Gemeinschaftskosten, zu gleichen Teilen aufgeteilt",
         "fee_shared_weight": "Gemeinschaftskosten, nach Gewichtung aufgeteilt",
@@ -37,8 +40,16 @@ TARIFF_OVERVIEW_TRANSLATIONS: dict[str, dict] = {
         ),
         "footnote_dynamic_average": (
             "Dieser Tarif wird über einen dynamischen Preis abgerechnet. Der "
-            "gezeigte Preis ist der Durchschnitt der aktuell abgerufenen "
-            "Preisreihe, nicht ein fester Tarif."
+            "gezeigte Preis ist der nach Intervalldauer gewichtete Durchschnitt "
+            "aus bis zu 30 Tagen innerhalb der Tarifgültigkeit, kein fester Tarif."
+        ),
+        "footnote_dynamic_partial": (
+            "Die dynamische Preisreihe ist im gezeigten Zeitraum unvollständig. "
+            "Der Durchschnitt berücksichtigt nur die vorhandenen Intervalle."
+        ),
+        "footnote_dynamic_unavailable": (
+            "Für den gezeigten Zeitraum wurde kein dynamischer Preis abgerufen. "
+            "Deshalb wird kein Ersatzpreis angezeigt."
         ),
         "billing_modes": {
             "energy": "Nach Energie",
@@ -70,7 +81,10 @@ TARIFF_OVERVIEW_TRANSLATIONS: dict[str, dict] = {
         "unit_chf_month": "CHF/mois",
         "unit_chf_year": "CHF/an",
         "unit_percent": "%",
-        "dynamic_average_label": "Moyenne de la série de prix récupérée",
+        "dynamic_average_label": "Moyenne dynamique pondérée dans le temps",
+        "dynamic_partial_label": "Moyenne dynamique incomplète",
+        "dynamic_unavailable_label": "Prix dynamique indisponible",
+        "dynamic_reference_dates": " ({start} – {end})",
         "fee_per_metering_point": "par point de mesure",
         "fee_shared_equal": "Frais communs, répartis à parts égales",
         "fee_shared_weight": "Frais communs, répartis selon la pondération",
@@ -80,8 +94,16 @@ TARIFF_OVERVIEW_TRANSLATIONS: dict[str, dict] = {
         ),
         "footnote_dynamic_average": (
             "Ce tarif est facturé sur la base d'un prix dynamique. Le prix "
-            "indiqué est la moyenne de la série de prix actuellement récupérée, "
-            "et non un tarif fixe."
+            "indiqué est la moyenne pondérée par la durée des intervalles sur "
+            "30 jours au plus pendant la validité du tarif, et non un tarif fixe."
+        ),
+        "footnote_dynamic_partial": (
+            "La série de prix dynamique est incomplète pour la période indiquée. "
+            "La moyenne ne tient compte que des intervalles disponibles."
+        ),
+        "footnote_dynamic_unavailable": (
+            "Aucun prix dynamique n'a été récupéré pour la période indiquée. "
+            "Aucun prix de remplacement n'est donc affiché."
         ),
         "billing_modes": {
             "energy": "Selon l'énergie",
@@ -113,7 +135,10 @@ TARIFF_OVERVIEW_TRANSLATIONS: dict[str, dict] = {
         "unit_chf_month": "CHF/mese",
         "unit_chf_year": "CHF/anno",
         "unit_percent": "%",
-        "dynamic_average_label": "Media della serie di prezzi recuperata",
+        "dynamic_average_label": "Media dinamica ponderata nel tempo",
+        "dynamic_partial_label": "Media dinamica incompleta",
+        "dynamic_unavailable_label": "Prezzo dinamico non disponibile",
+        "dynamic_reference_dates": " ({start} – {end})",
         "fee_per_metering_point": "per punto di misura",
         "fee_shared_equal": "Costi comuni, ripartiti in parti uguali",
         "fee_shared_weight": "Costi comuni, ripartiti secondo la ponderazione",
@@ -124,8 +149,16 @@ TARIFF_OVERVIEW_TRANSLATIONS: dict[str, dict] = {
         ),
         "footnote_dynamic_average": (
             "Questa tariffa viene fatturata in base a un prezzo dinamico. Il "
-            "prezzo indicato è la media della serie di prezzi attualmente "
-            "recuperata, non una tariffa fissa."
+            "prezzo indicato è la media ponderata per la durata degli intervalli "
+            "di un massimo di 30 giorni nella validità tariffaria, non una tariffa fissa."
+        ),
+        "footnote_dynamic_partial": (
+            "La serie di prezzi dinamica è incompleta per il periodo indicato. "
+            "La media considera soltanto gli intervalli disponibili."
+        ),
+        "footnote_dynamic_unavailable": (
+            "Non è stato recuperato alcun prezzo dinamico per il periodo indicato. "
+            "Non viene quindi mostrato un prezzo sostitutivo."
         ),
         "billing_modes": {
             "energy": "Per energia",
@@ -157,7 +190,10 @@ TARIFF_OVERVIEW_TRANSLATIONS: dict[str, dict] = {
         "unit_chf_month": "CHF/mo.",
         "unit_chf_year": "CHF/yr.",
         "unit_percent": "%",
-        "dynamic_average_label": "Average of the fetched price series",
+        "dynamic_average_label": "Time-weighted dynamic average",
+        "dynamic_partial_label": "Incomplete dynamic average",
+        "dynamic_unavailable_label": "Dynamic price unavailable",
+        "dynamic_reference_dates": " ({start} – {end})",
         "fee_per_metering_point": "per metering point",
         "fee_shared_equal": "Community costs, split equally",
         "fee_shared_weight": "Community costs, split by weight",
@@ -168,8 +204,16 @@ TARIFF_OVERVIEW_TRANSLATIONS: dict[str, dict] = {
         ),
         "footnote_dynamic_average": (
             "This tariff is billed from a dynamic price. The price shown is "
-            "the average of the currently fetched price series, not a fixed "
-            "rate."
+            "weighted by interval duration over up to 30 days within the tariff's "
+            "validity; it is not a fixed rate."
+        ),
+        "footnote_dynamic_partial": (
+            "The dynamic price series is incomplete for the period shown. The "
+            "average uses only the intervals that are available."
+        ),
+        "footnote_dynamic_unavailable": (
+            "No dynamic price was fetched for the period shown, so no substitute "
+            "price is displayed."
         ),
         "billing_modes": {
             "energy": "By energy",

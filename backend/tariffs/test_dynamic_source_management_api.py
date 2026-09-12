@@ -61,8 +61,20 @@ class TestCreationAndEditing:
             "api_version": "v2_0_0",
             "version_detected": True,
             "components_discovered": True,
-            "components": [{"tariff_type": "grid", "tariff_name": "standard"}],
+            "components": [{
+                "tariff_type": "grid",
+                "tariff_name": "standard",
+                "aggregated_tariff_types": [],
+            }],
         }
+
+    def test_source_payload_serves_the_versioned_component_expansion(self, owner_client):
+        make_source(api_version="v2_0_0", tariff_type="dso", tariff_name="")
+        response = owner_client.get("/api/v1/tariffs/dynamic-sources/")
+
+        assert response.status_code == 200
+        row = response.json()["results"][0]
+        assert row["aggregated_tariff_types"] == ["grid", "metering", "national_fees"]
 
     def test_owner_can_probe_and_create_a_source(self, owner_client):
         point = PricePoint(
@@ -177,6 +189,23 @@ class TestCreationAndEditing:
         assert response.status_code == 200
         source.refresh_from_db()
         assert source.label == "Admin edit"
+
+    def test_admin_can_disable_scheduled_fetches(self, admin_client):
+        source = make_source()
+
+        response = admin_client.patch(
+            f"/api/v1/tariffs/dynamic-sources/{source.pk}/",
+            {"enabled": False},
+        )
+
+        assert response.status_code == 200
+        assert response.json()["enabled"] is False
+        source.refresh_from_db()
+        assert source.enabled is False
+        event = AuditEvent.objects.get(
+            action_type="tariff.dynamic_source_update", target_id=str(source.pk)
+        )
+        assert event.changes_json["enabled"] == {"before": True, "after": False}
 
 
 class TestPriceHistory:
@@ -328,11 +357,30 @@ class TestOperations:
             zev=zev,
             period_start=date(2026, 1, 1),
             period_end=date(2026, 1, 31),
+            status="approved",
         )
 
         response = admin_client.delete(
             f"/api/v1/tariffs/dynamic-sources/{source.pk}/prices/",
             {"confirmation": source.label, "reason": "cleanup"},
+        )
+
+        assert response.status_code == 409
+
+    def test_a_draft_invoice_freezes_the_source(self, admin_client, zev):
+        source = make_source()
+        link_source(source, zev)
+        add_point(source)
+        factories.InvoiceFactory(
+            zev=zev,
+            period_start=date(2026, 1, 1),
+            period_end=date(2026, 1, 31),
+            status="draft",
+        )
+
+        response = admin_client.delete(
+            f"/api/v1/tariffs/dynamic-sources/{source.pk}/prices/",
+            {"confirmation": source.label},
         )
 
         assert response.status_code == 409

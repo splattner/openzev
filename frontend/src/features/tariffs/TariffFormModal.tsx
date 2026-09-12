@@ -11,7 +11,7 @@ import { CivilDateInput } from '../../components/CivilDateInput'
 import { fetchDynamicTariffSources } from '../../lib/api/tariffs'
 import { queryKeys } from '../../lib/api/queryKeys'
 import type { Tariff, TariffBillingMode, TariffInput } from '../../types/api'
-import { aggregatedTariffTypes, dynamicSourceOptions, impliedEnergyType } from './dynamicSources'
+import { dynamicSourceOptions, impliedEnergyType } from './dynamicSources'
 import { DynamicSourceFormModal } from './DynamicSourceFormModal'
 import {
   defaultTariffFormValues,
@@ -91,7 +91,7 @@ export function TariffFormModal({
   const availableSources = dynamicSourceOptions(sourcesData ?? [], isVersion ? initialTariff?.energy_type : undefined)
   const selectedSourceAggregatedTypes = useMemo(() => {
     const source = sourcesData?.find((candidate) => candidate.id === dynamicSourceId)
-    return source ? aggregatedTariffTypes(source.tariff_type) : []
+    return source?.aggregated_tariff_types ?? []
   }, [sourcesData, dynamicSourceId])
 
   useEffect(() => {
@@ -106,7 +106,8 @@ export function TariffFormModal({
     if (isVersion || !dynamicSourceId || !sourcesData) return
     const source = sourcesData.find((candidate) => candidate.id === dynamicSourceId)
     if (source) {
-      form.setValue('energy_type', impliedEnergyType(source), { shouldValidate: true })
+      const energyType = impliedEnergyType(source)
+      if (energyType) form.setValue('energy_type', energyType, { shouldValidate: true })
     }
   }, [dynamicSourceId, isVersion, sourcesData, form])
 
@@ -312,7 +313,8 @@ export function TariffFormModal({
         onClose={() => setShowSourceModal(false)}
         onSaved={(source) => {
           form.setValue('dynamic_source', source.id, { shouldValidate: true })
-          form.setValue('energy_type', impliedEnergyType(source), { shouldValidate: true })
+          const energyType = impliedEnergyType(source)
+          if (energyType) form.setValue('energy_type', energyType, { shouldValidate: true })
         }}
       />
     </FormModal>

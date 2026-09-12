@@ -93,13 +93,22 @@ class Command(BaseCommand):
             self.stdout.write(self.style.WARNING(f"    {warning}"))
 
     def _refresh(self, options):
+        from tariffs.dynamic.locking import dynamic_source_lock
+
         source = DynamicTariffSource.objects.filter(pk=options["source_id"]).first()
         if source is None:
             raise CommandError(f"No dynamic tariff source with id {options['source_id']}.")
-        try:
-            result = refresh_source(source, backfill=options["backfill"])
-        except TariffFetchError as exc:
-            raise CommandError(str(exc)) from exc
+        if options["backfill"] and not source.supports_range:
+            self.stdout.write(self.style.WARNING("This source serves no history; backfill fetches whatever it serves."))
+        with dynamic_source_lock(source.pk) as acquired:
+            if not acquired:
+                raise CommandError("This source is currently being fetched. Try again shortly.")
+            try:
+                result = refresh_source(source, backfill=options["backfill"])
+            except TariffFetchError as exc:
+                raise CommandError(str(exc)) from exc
+            except Exception as exc:
+                raise CommandError(f"{type(exc).__name__}: {exc}") from exc
 
         source.refresh_from_db()
         self.stdout.write(self.style.SUCCESS(

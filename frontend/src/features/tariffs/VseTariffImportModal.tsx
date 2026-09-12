@@ -60,6 +60,7 @@ export function VseTariffImportModal({ isOpen, onClose, zevId, initialUrl }: Vse
     // Kept apart from `selected` so clearing and re-ticking rows does not throw
     // away a decision the user already made about how a fee is billed.
     const [modeByKey, setModeByKey] = useState<Record<string, string>>({})
+    const [productByKey, setProductByKey] = useState<Record<string, string>>({})
     const [rememberUrl, setRememberUrl] = useState(true)
 
     const previewMutation = useMutation({
@@ -68,6 +69,7 @@ export function VseTariffImportModal({ isOpen, onClose, zevId, initialUrl }: Vse
             setPreview(data)
             setSelected(recommendedKeys(data.candidates))
             setModeByKey(defaultBillingModes(data.candidates))
+            setProductByKey({})
         },
         onError: (error) =>
             pushToast(errorDetail(error, t('pages.tariffs.import.errors.previewFailed')), 'error'),
@@ -129,7 +131,10 @@ export function VseTariffImportModal({ isOpen, onClose, zevId, initialUrl }: Vse
             url: preview.source_url,
             selections: preview.candidates
                 .filter((candidate) => selected.has(candidate.key))
-                .map((candidate) => selectionFor(candidate, modeByKey[candidate.key])),
+                .map((candidate) => ({
+                    ...selectionFor(candidate, modeByKey[candidate.key]),
+                    ...(candidate.dynamic_url ? { dynamic_tariff_name: productByKey[candidate.key]?.trim() ?? '' } : {}),
+                })),
             document_digest: preview.document_digest,
             remember_url: rememberUrl,
         })
@@ -245,6 +250,8 @@ export function VseTariffImportModal({ isOpen, onClose, zevId, initialUrl }: Vse
                                                 checked={selected.has(candidate.key)}
                                                 onToggle={() => toggle(candidate.key)}
                                                 billingMode={modeByKey[candidate.key] ?? candidate.billing_mode}
+                                                product={productByKey[candidate.key] ?? ''}
+                                                onProductChange={(product) => setProductByKey((current) => ({ ...current, [candidate.key]: product }))}
                                                 onBillingModeChange={(mode) =>
                                                     setModeByKey((current) => ({ ...current, [candidate.key]: mode }))
                                                 }
@@ -345,12 +352,16 @@ function CandidateRow({
     onToggle,
     billingMode,
     onBillingModeChange,
+    product,
+    onProductChange,
 }: {
     candidate: VseTariffCandidate
     checked: boolean
     onToggle: () => void
     billingMode: string
     onBillingModeChange: (mode: string) => void
+    product: string
+    onProductChange: (product: string) => void
 }) {
     const { t } = useTranslation()
     const selectable = isSelectable(candidate)
@@ -391,6 +402,13 @@ function CandidateRow({
             </td>
             <td>
                 <CandidatePrice candidate={candidate} />
+                {candidate.dynamic_url && selectable && (
+                    <label>
+                        <span>{t('pages.tariffs.dynamicProduct')}</span>
+                        <input value={product} maxLength={120} onChange={(event) => onProductChange(event.target.value)} />
+                        <small className="muted">{t('pages.tariffs.dynamicProductHint')}</small>
+                    </label>
+                )}
             </td>
             <td>
                 {canChooseBillingMode(candidate) ? (

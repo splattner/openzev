@@ -152,24 +152,29 @@ invoice PDF uses, so both documents print identical date formats.
 
 ### 4.2 Local tariff display rows
 
-`_build_local_tariff_display(zev, tr, date_pattern)` returns one dict per
+`_build_local_tariff_display(zev, tr, date_pattern, as_of)` returns display rows for
 active local tariff (`billing_mode` `ENERGY` or `PERCENTAGE_OF_ENERGY`,
-`energy_type` `LOCAL`, `valid_from <= today <= valid_to`):
+`energy_type` `LOCAL`, active on the document's `as_of` date):
 
 | Key | Type | Meaning |
 |---|---|---|
 | `name` | `str` | Tariff name |
-| `rate_rp` | `str` | Effective price in Rp/kWh (`f"{rp:.2f}"`), or `f"{pct:.2f}%"` when no grid base price exists |
+| `rate_rp` | `str` | Effective price in Rp/kWh (`f"{rp:.2f}"`), `f"{pct:.2f}%"` when no static grid base exists, or `tr["tariff_none"]` when a dynamic base is unavailable |
 | `rate_description` | `str` | `tariff_flat`, `tariff_ht`, `tariff_nt`, or a percentage formula like `80.00% × 22.50 Rp./kWh (% des Netzpreises)` |
 | `pct` | `str \| None` | Rendered percentage (`f"{pct:.2f}"`) for percentage tariffs, else `None` — drives the green-box rule line and the clause-5 rule |
 | `unit` | `str` | `tr["tariff_rp_unit"]`; empty when a percentage tariff has no active grid base price, so the green box renders the bare percentage without a unit |
 | `valid_from` / `valid_to` | `str \| None` | Validity dates formatted with `date_pattern`; `valid_to` is `None` when the tariff is open-ended |
 | `validity` | `str` | `"01.01.2026 – 31.12.2026"`, or `tr["tariff_valid_open"]` (`"ab {date}"`) for open-ended tariffs |
 | `notes` | `str` | `Tariff.notes` (blank when unset) — forwarded so a configured reference product renders in clause 5 |
+| `rate_note` | `str` | Translated dynamic average, partial-coverage, or unavailable note for percentage bases; blank for static prices |
 
-For percentage tariffs the base is the sum of the flat (or HT) prices of all
-active GRID `ENERGY` tariffs of the ZEV; HT and NT rows of a flat-absent tariff
-are emitted as separate rows.
+For percentage tariffs, `display_grid_base_summary` sums all active GRID
+`ENERGY` tariffs regardless of category. Static components prefer flat → HT →
+NT → first remaining band. Dynamic components use a duration-weighted average
+over at most 30 days within tariff validity, ending on `as_of`; an unavailable
+component makes the entire base unavailable, and partial coverage is labelled.
+Zero or negative dynamic bases remain valid displayed prices. Local static
+tariffs emit every flat band, or every non-flat band when no flat band exists.
 
 ## 5. Shared PDF design base
 

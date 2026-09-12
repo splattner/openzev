@@ -1,7 +1,7 @@
 """Tests for HT/NT (peak/off-peak) and weekday-aware tariff pricing.
 
 The existing ``test_engine.py`` only exercises ``PeriodType.FLAT``. This module
-covers ``_get_tariff_price`` directly (the time-of-day / weekday matching logic)
+covers ``_resolve_tariff_band`` directly (the time-of-day / weekday matching logic)
 and an end-to-end ``generate_invoice`` run that splits consumption across a
 high-tariff and low-tariff window.
 """
@@ -22,7 +22,7 @@ from tariffs.models import (
 )
 from testing import factories
 
-from .engine import _get_tariff_price, generate_invoice
+from .engine import _resolve_tariff_band, generate_invoice
 
 pytestmark = pytest.mark.django_db
 
@@ -55,8 +55,13 @@ def _ht_nt_tariff(zev, *, energy_type=EnergyType.GRID, category=TariffCategory.E
 
 
 # ---------------------------------------------------------------------------
-# _get_tariff_price — unit-level
+# _resolve_tariff_band — unit-level
 # ---------------------------------------------------------------------------
+
+
+def _resolved_price(tariff, ts):
+    period = _resolve_tariff_band(tariff, ts)
+    return period.price_chf_per_kwh if period is not None else None
 
 class TestGetTariffPriceHtNt:
     def test_high_tariff_window_returns_ht_price(self):
@@ -64,24 +69,24 @@ class TestGetTariffPriceHtNt:
         tariff = _ht_nt_tariff(zev)
         # 2026-01-05 is a Monday, 10:00 → inside 06:00-22:00 HT window.
         ts = datetime(2026, 1, 5, 10, 0, tzinfo=timezone.utc)
-        assert _get_tariff_price(tariff, ts) == Decimal("0.30000")
+        assert _resolved_price(tariff, ts) == Decimal("0.30000")
 
     def test_low_tariff_window_returns_nt_price(self):
         zev = factories.ZevFactory()
         tariff = _ht_nt_tariff(zev)
         # 22:30 → inside the NT window.
         ts = datetime(2026, 1, 5, 22, 30, tzinfo=timezone.utc)
-        assert _get_tariff_price(tariff, ts) == Decimal("0.10000")
+        assert _resolved_price(tariff, ts) == Decimal("0.10000")
 
     def test_boundary_is_exclusive_on_time_to(self):
         zev = factories.ZevFactory()
         tariff = _ht_nt_tariff(zev)
         # Exactly 22:00 is NOT in HT (time_to is exclusive); it falls into NT.
         ts = datetime(2026, 1, 5, 22, 0, tzinfo=timezone.utc)
-        assert _get_tariff_price(tariff, ts) == Decimal("0.10000")
+        assert _resolved_price(tariff, ts) == Decimal("0.10000")
         # Exactly 06:00 IS in HT (time_from is inclusive).
         ts_start = datetime(2026, 1, 5, 6, 0, tzinfo=timezone.utc)
-        assert _get_tariff_price(tariff, ts_start) == Decimal("0.30000")
+        assert _resolved_price(tariff, ts_start) == Decimal("0.30000")
 
     def test_weekday_restriction_excludes_weekend(self):
         zev = factories.ZevFactory()
@@ -112,10 +117,10 @@ class TestGetTariffPriceHtNt:
         )
         # 2026-01-05 Monday → weekday HT applies.
         monday = datetime(2026, 1, 5, 12, 0, tzinfo=timezone.utc)
-        assert _get_tariff_price(tariff, monday) == Decimal("0.40000")
+        assert _resolved_price(tariff, monday) == Decimal("0.40000")
         # 2026-01-10 Saturday → weekend NT applies.
         saturday = datetime(2026, 1, 10, 12, 0, tzinfo=timezone.utc)
-        assert _get_tariff_price(tariff, saturday) == Decimal("0.12000")
+        assert _resolved_price(tariff, saturday) == Decimal("0.12000")
 
     def test_no_periods_returns_none(self):
         zev = factories.ZevFactory()
@@ -128,7 +133,7 @@ class TestGetTariffPriceHtNt:
             valid_from=date(2026, 1, 1),
         )
         ts = datetime(2026, 1, 5, 12, 0, tzinfo=timezone.utc)
-        assert _get_tariff_price(tariff, ts) is None
+        assert _resolved_price(tariff, ts) is None
 
     def test_falls_back_to_first_period_when_no_window_matches(self):
         zev = factories.ZevFactory()
@@ -149,13 +154,13 @@ class TestGetTariffPriceHtNt:
             time_to=time(7, 0),
         )
         ts = datetime(2026, 1, 5, 18, 0, tzinfo=timezone.utc)  # outside the window
-        assert _get_tariff_price(tariff, ts) == Decimal("0.50000")
+        assert _resolved_price(tariff, ts) == Decimal("0.50000")
 
     def test_flat_period_short_circuits(self):
         zev = factories.ZevFactory()
         tariff = factories.flat_tariff(zev, energy_type=EnergyType.GRID, price="0.22000")
         ts = datetime(2026, 1, 5, 3, 0, tzinfo=timezone.utc)
-        assert _get_tariff_price(tariff, ts) == Decimal("0.22000")
+        assert _resolved_price(tariff, ts) == Decimal("0.22000")
 
 
 # ---------------------------------------------------------------------------

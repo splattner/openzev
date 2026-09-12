@@ -56,3 +56,26 @@ export function formatApiError(error: unknown, fallbackMessage = 'Request failed
 
   return cleaned.join(' | ')
 }
+
+export function apiErrorPayload(error: unknown): Record<string, unknown> | null {
+  if (!axios.isAxiosError(error)) {
+    return null
+  }
+  const data = error.response?.data
+  return typeof data === 'object' && data !== null
+    ? data as Record<string, unknown>
+    : null
+}
+
+export interface DynamicPriceGapPayload {
+  code: 'dynamic_price_gap'
+  tariff_name: string
+  missing_at: string
+}
+
+export function dynamicPriceGapPayload(error: unknown): DynamicPriceGapPayload | null {
+  const payload = apiErrorPayload(error)
+  if (payload?.code !== 'dynamic_price_gap') return null
+  if (typeof payload.tariff_name !== 'string' || typeof payload.missing_at !== 'string') return null
+  return { code: 'dynamic_price_gap', tariff_name: payload.tariff_name, missing_at: payload.missing_at }
+}

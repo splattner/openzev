@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import uuid
 
+from django.core.exceptions import ValidationError
 from django.db import models
 
 from .adapters import DynamicApiVersion, DynamicRequestMode
@@ -28,17 +29,18 @@ from .vse_v2 import TARIFF_TYPES as V2_TARIFF_TYPES
 class DynamicTariffType(models.TextChoices):
     """The tariff types the VSE standard defines, as served by an endpoint.
 
-    ``integrated`` is a *combination* of ``electricity`` and ``grid``, so
-    billing it beside separate grid-fee or levy tariffs charges the same money
-    twice. Which one a community should use depends on what it actually buys
-    from the operator.
+    ``integrated`` is a *combination* whose contents depend on the endpoint's
+    API version (v1: electricity + grid; v2: electricity + dso — see
+    ``tariffs.dynamic.components``), so billing it beside separate grid-fee
+    or levy tariffs charges the same money twice. Which one a community
+    should use depends on what it actually buys from the operator.
     """
 
     ELECTRICITY = "electricity", "Electricity supply"
     GRID = "grid", "Grid usage"
     METERING = "metering", "Metering"
     NATIONAL_FEES = "national_fees", "National fees"
-    INTEGRATED = "integrated", "Integrated (electricity + grid)"
+    INTEGRATED = "integrated", "Integrated supply and network"
     DSO = "dso", "DSO total"
     DSO_COMPLETE = "dso_complete", "Complete DSO total"
     INTEGRATED_COMPLETE = "integrated_complete", "Complete integrated total"
@@ -50,7 +52,14 @@ class DynamicTariffType(models.TextChoices):
 # The model's choices and the parser's vocabulary have to stay the same set:
 # a type the model can store but the parser cannot read would be a source that
 # never fetches anything.
-assert {choice.value for choice in DynamicTariffType} == set(V1_TARIFF_TYPES) | set(V2_TARIFF_TYPES)
+_MODEL_TARIFF_TYPES = {choice.value for choice in DynamicTariffType}
+_PARSER_TARIFF_TYPES = set(V1_TARIFF_TYPES) | set(V2_TARIFF_TYPES)
+if _MODEL_TARIFF_TYPES != _PARSER_TARIFF_TYPES:
+    raise RuntimeError(
+        "DynamicTariffType choices do not match the dynamic tariff parsers: "
+        f"model-only={sorted(_MODEL_TARIFF_TYPES - _PARSER_TARIFF_TYPES)} "
+        f"parser-only={sorted(_PARSER_TARIFF_TYPES - _MODEL_TARIFF_TYPES)}"
+    )
 
 
 class FetchStatus(models.TextChoices):
@@ -76,12 +85,20 @@ class DynamicTariffSource(models.Model):
         help_text="Tariff-type query value discovered for this endpoint.",
     )
     supports_range = models.BooleanField(default=True)
+    empty_on_not_found = models.BooleanField(
+        default=False,
+        help_text="Treat HTTP 404 as a successful empty publication for this endpoint.",
+    )
     tariff_type = models.CharField(max_length=20, choices=DynamicTariffType.choices)
     # The operator's own product name. Blank means "whatever the endpoint
     # defaults to", which is only safe for an endpoint that serves one product:
     # Two products can quote different values at the same instant, so a silent
     # default on a multi-product endpoint would bill the wrong tariff.
     tariff_name = models.CharField(max_length=120, blank=True, default="")
+    enabled = models.BooleanField(
+        default=True,
+        help_text="Disabled sources remain as billing evidence but are skipped by scheduled refreshes.",
+    )
 
     last_fetch_status = models.CharField(max_length=10, choices=FetchStatus.choices, default=FetchStatus.PENDING)
     last_fetch_at = models.DateTimeField(null=True, blank=True)
@@ -95,6 +112,9 @@ class DynamicTariffSource(models.Model):
     # check can say what is covered without aggregating 35 000 rows per year.
     covers_from = models.DateTimeField(null=True, blank=True)
     covers_to = models.DateTimeField(null=True, blank=True)
+    # Earliest window still needing retry; separate from covers_to so later
+    # success does not erase an earlier failure.
+    recovery_from = models.DateTimeField(null=True, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -103,13 +123,33 @@ class DynamicTariffSource(models.Model):
         ordering = ["label", "id"]
         constraints = [
             models.UniqueConstraint(
-                fields=["url", "tariff_type", "tariff_name"],
+                fields=["url", "api_version", "tariff_type", "tariff_name"],
                 name="unique_dynamic_tariff_source",
-            )
+            ),
+            models.CheckConstraint(
+                condition=~models.Q(request_mode=DynamicRequestMode.EXACT_URL, supports_range=True),
+                name="dynamic_exact_url_no_range",
+            ),
         ]
+
+    def clean(self):
+        errors = {}
+        if not self._state.adding:
+            original = type(self).objects.get(pk=self.pk)
+            for field in ("url", "api_version", "tariff_type", "tariff_name"):
+                if getattr(self, field) != getattr(original, field):
+                    errors[field] = "Source identity is immutable; create a replacement source."
+        if self.request_mode == DynamicRequestMode.EXACT_URL and self.supports_range:
+            errors["supports_range"] = "An exact-URL source cannot support range queries."
+        if errors:
+            raise ValidationError(errors)
 
     def __str__(self) -> str:
         return self.label or f"{self.url} ({self.get_tariff_type_display()})"
+
+    def save(self, *args, **kwargs):
+        self.clean()
+        super().save(*args, **kwargs)
 
     @property
     def supports_backfill(self) -> bool:
@@ -140,8 +180,8 @@ class DynamicPricePoint(models.Model):
         ordering = ["source", "valid_from", "id"]
         constraints = [
             models.UniqueConstraint(fields=["source", "valid_from"], name="unique_dynamic_price_point"),
+            models.CheckConstraint(condition=models.Q(valid_to__gt=models.F("valid_from")), name="dynamic_price_point_valid_range"),
         ]
-        indexes = [models.Index(fields=["source", "valid_from"], name="dyn_price_source_from_idx")]
 
     def __str__(self) -> str:
         return f"{self.valid_from.isoformat()} {self.price_chf_per_kwh}"

@@ -110,6 +110,18 @@ class UnitSelectionTests(SimpleTestCase):
         self.assertIn("demand", joined)
         self.assertIn("CHF_m", joined)
 
+    def test_a_price_without_a_unit_gets_a_specific_warning(self):
+        payload = response(interval(
+            "2026-02-01T00:00:00+01:00", "2026-02-01T00:15:00+01:00",
+            grid=[{"value": 5}, {"unit": "CHF_kWh", "value": 0.1}],
+        ))
+
+        series = parse_tariff_response(payload, tariff_type="grid")
+
+        joined = " ".join(series.warnings)
+        self.assertIn("no unit", joined)
+        self.assertNotIn("fixed charge (<missing unit>)", joined)
+
     def test_two_kwh_prices_in_one_interval_are_refused(self):
         # Not a guess we get to make: if an operator publishes two per-kWh
         # prices for one interval, which one bills is undefined.
@@ -133,6 +145,18 @@ class EmptyAndMalformedTests(SimpleTestCase):
 
         self.assertEqual(series.points, [])
         self.assertIsNone(series.publication_timestamp)
+
+    def test_an_empty_component_placeholder_is_not_reported_as_a_price(self):
+        payload = response(interval(
+            "2026-02-01T00:00:00+01:00",
+            "2026-02-01T00:15:00+01:00",
+            grid=[{}],
+        ))
+
+        series = parse_tariff_response(payload, tariff_type="grid")
+
+        self.assertEqual(series.points, [])
+        self.assertEqual(series.warnings, [])
 
     def test_a_timestamp_without_an_offset_is_refused(self):
         payload = response(interval(
@@ -171,8 +195,14 @@ class EmptyAndMalformedTests(SimpleTestCase):
             discover_components(payload, "v2_0_0")[0].tariff_name,
             "standard",
         )
-        series = parse_versioned_response(payload, api_version="v2_0_0", tariff_type="grid")
+        series = parse_versioned_response(
+            payload, api_version="v2_0_0", tariff_type="grid", tariff_name="standard"
+        )
         self.assertEqual(series.points[0].price_chf_per_kwh, Decimal("0.11300"))
+        with self.assertRaisesMessage(DynamicTariffResponseError, "different product"):
+            parse_versioned_response(
+                payload, api_version="v2_0_0", tariff_type="grid", tariff_name="other"
+            )
 
     def test_v2_units_that_cannot_be_billed_are_reported_rather_than_dropped_silently(self):
         # The fixture's grid component carries energy (CHF/kWh, billable) and
@@ -273,3 +303,15 @@ class RequestConstructionTests(SimpleTestCase):
     def test_an_unknown_request_mode_is_refused(self):
         with self.assertRaises(ValueError):
             request_url("https://x.example/tariffs", request_mode="nope", query_tariff_type="grid")
+
+
+class ModelParserVocabularyTests(SimpleTestCase):
+    def test_model_choices_match_the_parser_vocabulary(self):
+        from .dynamic.models import DynamicTariffType
+        from .dynamic.vse_v1 import TARIFF_TYPES as V1_TYPES
+        from .dynamic.vse_v2 import TARIFF_TYPES as V2_TYPES
+
+        self.assertEqual(
+            {choice.value for choice in DynamicTariffType},
+            set(V1_TYPES) | set(V2_TYPES),
+        )

@@ -827,6 +827,20 @@ class DynamicTariffTransferTests(TestCase):
         # The very same shared row, because this instance already had it.
         self.assertEqual(dynamic.dynamic_source_id, source.pk)
 
+    def test_invoice_provenance_survives_without_the_tariff_section(self):
+        from tariffs.dynamic.evidence import record_invoice_evidence
+
+        zev, source = self._zev_with_dynamic_tariff()
+        invoice = zev.invoices.first()
+        record_invoice_evidence(invoice, list(zev.tariffs.all()))
+        raw = export_to_bytes(zev, sections=["participants", "invoices"])
+        result = import_archive(io.BytesIO(raw), owner=self.importer)
+        imported = Zev.objects.get(pk=result["zev_id"])
+        evidence = imported.invoices.get(invoice_number=invoice.invoice_number).dynamic_evidence.get()
+        self.assertEqual(evidence.source_id, source.pk)
+        self.assertEqual(evidence.evidence_from, invoice.dynamic_evidence.get().evidence_from)
+        self.assertFalse(imported.tariffs.exists())
+
     def test_a_source_the_importing_instance_does_not_have_is_recreated(self):
         from tariffs.dynamic.models import DynamicTariffSource
 
@@ -855,6 +869,80 @@ class DynamicTariffTransferTests(TestCase):
         static = imported.tariffs.exclude(name="Grid usage (dynamic)").first()
         self.assertIsNotNone(static)
         self.assertIsNone(static.dynamic_source_id)
+
+
+class DynamicSourceImportTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.owner = make_user("dynval_owner", UserRole.ZEV_OWNER)
+
+    def test_an_invalid_dynamic_source_is_rejected(self):
+        from zev.transfer.importer import _dynamic_source_for
+
+        with self.assertRaises(ValueError):
+            _dynamic_source_for({
+                "dynamic_source": {
+                    "label": "bad", "url": "https://example.test/prices",
+                    "tariff_type": "grid", "tariff_name": "",
+                    "request_mode": "invalid",
+                }
+            })
+
+    def test_a_format_version_2_archive_imports(self):
+        zev = build_populated_zev(self.owner, meter_prefix="V2OK")
+        raw = export_and_clear(zev)
+        result = import_archive(io.BytesIO(raw), owner=self.owner)
+        self.assertIn("zev_id", result)
+
+    def test_a_format_version_1_static_archive_still_imports(self):
+        zev = build_populated_zev(self.owner, meter_prefix="V1STATIC")
+        raw = export_and_clear(zev)
+        manifest = json.loads(zipfile.ZipFile(io.BytesIO(raw)).read(MANIFEST_NAME))
+        manifest["format_version"] = 1
+        raw = rewrite_archive(raw, replace={MANIFEST_NAME: manifest})
+
+        result = import_archive(io.BytesIO(raw), owner=self.owner)
+
+        imported = Zev.objects.get(pk=result["zev_id"])
+        self.assertEqual(imported.tariffs.count(), 1)
+
+    def test_a_format_version_1_legacy_adapter_dynamic_descriptor_imports(self):
+        from tariffs.dynamic.models import DynamicTariffSource
+
+        zev = build_populated_zev(self.owner, meter_prefix="V1DYNAMIC")
+        source = DynamicTariffSource.objects.create(
+            label="Legacy grid", url="https://prices.example.test/v1",
+            api_version="v1_0_5", tariff_type="grid", tariff_name="",
+        )
+        Tariff.objects.create(
+            zev=zev, name="Legacy dynamic", category=TariffCategory.GRID_FEES,
+            billing_mode=BillingMode.ENERGY, energy_type=EnergyType.GRID,
+            valid_from=date(2026, 1, 1), dynamic_source=source,
+        )
+        raw = export_and_clear(zev)
+        DynamicTariffSource.objects.all().delete()
+
+        with zipfile.ZipFile(io.BytesIO(raw)) as archive:
+            manifest = json.loads(archive.read(MANIFEST_NAME))
+            tariffs = json.loads(archive.read("tariffs.json"))
+        manifest["format_version"] = 1
+        descriptor = next(item["dynamic_source"] for item in tariffs if item["dynamic_source"])
+        for field in ("api_version", "request_mode", "query_tariff_type", "supports_range"):
+            descriptor.pop(field, None)
+        descriptor["adapter"] = "vse_v1"
+        raw = rewrite_archive(
+            raw,
+            replace={MANIFEST_NAME: manifest, "tariffs.json": tariffs},
+        )
+
+        result = import_archive(io.BytesIO(raw), owner=self.owner)
+
+        imported = Zev.objects.get(pk=result["zev_id"])
+        dynamic = imported.tariffs.get(name="Legacy dynamic")
+        self.assertEqual(dynamic.dynamic_source.api_version, "v1_0_5")
+        self.assertEqual(dynamic.dynamic_source.request_mode, "standard")
+        self.assertEqual(dynamic.dynamic_source.query_tariff_type, "grid")
+        self.assertTrue(dynamic.dynamic_source.supports_range)
 
 
 class SchemaParityTests(TestCase):

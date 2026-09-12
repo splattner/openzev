@@ -2,6 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-09-11
+- Evidence lookup, locking, source identity and 404 handling superseded by [ADR 0019](0019-frozen-dynamic-price-evidence.md).
 
 ## Context
 
@@ -54,7 +55,7 @@ any more, but only after typing the source's own label back — a free-text
 reason is recorded when one is sent, but is not demanded: a reason box in
 front of an irreversible action invites a keystroke rather than a thought,
 where the label has to be read off the row being destroyed. Both are refused
-while no fetch is running, and clearing is refused when no non-cancelled
+while a fetch is running, and clearing is refused when any non-cancelled
 invoice overlaps a tariff linked to that source (deleting needs no separate
 check: `on_delete=PROTECT` already means nothing links to the source at that
 point). Drafts count as invoice evidence because their stored totals would
@@ -75,6 +76,12 @@ fields are immutable afterwards, a wrongly-negative `supports_range` had no
 way back except deleting and recreating the source; an admin-only re-probe
 action corrects the discovered fields in place without touching identity or
 stored points.
+
+An administrator can disable scheduled refreshes for a dead or intentionally
+retired endpoint without deleting its stored evidence. Manual fetch remains an
+explicit operation. Endpoints discovered to express an ordinary empty current
+publication as HTTP 404 record that capability; 404 is successful-empty only
+for those sources, while 410 remains a failed endpoint.
 
 **2. Sources are shared globally, not scoped per ZEV.**
 
@@ -145,9 +152,9 @@ Negative, and accepted:
 - Storage grows by ~35 000 rows per source-year and is never automatically
   pruned. At Swiss ZEV scale that is small; it is still unbounded growth by
   default.
-- The transfer archive carries the *link* (by natural key) but not the series, so
-  an imported community starts with an empty source and refills on the next
-  fetch — and for an operator that serves no history, only forward from then.
+- The transfer archive carries the *link* (by natural key) but not the series,
+  so a newly created imported source immediately queues a backfill — and for an
+  operator that serves no history, can capture only forward from then.
 
 ## Alternatives considered
 

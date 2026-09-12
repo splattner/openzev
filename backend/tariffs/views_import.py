@@ -195,7 +195,8 @@ class VseTariffImportApplyView(APIView):
             )
 
         selections = [
-            Selection(key=item["key"], billing_mode=item.get("billing_mode") or None)
+            Selection(key=item["key"], billing_mode=item.get("billing_mode") or None,
+                      dynamic_tariff_name=item.get("dynamic_tariff_name"))
             for item in data["selections"]
         ]
         report, created = apply_import(

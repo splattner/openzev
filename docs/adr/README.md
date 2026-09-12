@@ -22,6 +22,7 @@ This directory captures key architectural decisions for OpenZEV.
 - [0016: Explicit VAT mode, with an "inclusive" treatment for non-registered ZEVs](0016-vat-mode-inclusive.md)
 - [0017: Async export jobs for whole-ZEV annual statements](0017-async-export-jobs.md) (supersedes the unmerged subprocess-pool experiment, recorded in its alternatives)
 - [0018: Dynamic tariff prices are stored evidence, in globally shared series](0018-dynamic-tariff-price-series.md)
+- [0019: Frozen invoice source provenance and serialized price mutations](0019-frozen-dynamic-price-evidence.md)
 
 ## Conventions
 

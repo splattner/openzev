@@ -50,7 +50,6 @@ type TariffCategorySectionsProps = {
     tariffSections: TariffSeriesSection[]
     /** Every series in scope — percentage tariffs derive their price from the grid ones. */
     allSeries: TariffSeries[]
-    percentageBasePricing: Map<string, number>
     settings: AppSettings
     deleteTariffDisabled: boolean
     deletePeriodDisabled: boolean
@@ -67,7 +66,6 @@ type TariffCategorySectionsProps = {
 export function TariffCategorySections({
     tariffSections,
     allSeries,
-    percentageBasePricing,
     settings,
     deleteTariffDisabled,
     deletePeriodDisabled,
@@ -141,7 +139,19 @@ export function TariffCategorySections({
     function priceSummary(series: TariffSeries, version: TariffVersion): string {
         if (version.dynamic_source) {
             const source = sourceById.get(version.dynamic_source)
-            return source ? t('pages.tariffs.dynamicPricedFrom', { label: source.label }) : t('pages.tariffs.dynamicPriced')
+            const summary = version.dynamic_price_summary
+            const sourceLabel = source
+                ? t('pages.tariffs.dynamicPricedFrom', { label: source.label })
+                : t('pages.tariffs.dynamicPriced')
+            if (summary?.average_chf_per_kwh) {
+                return `${sourceLabel} · ${t(
+                    summary.status === 'partial'
+                        ? 'pages.tariffs.dynamicAveragePartial'
+                        : 'pages.tariffs.dynamicAverage',
+                    { price: Number(summary.average_chf_per_kwh).toFixed(3) },
+                )}`
+            }
+            return `${sourceLabel} · ${t('pages.tariffs.dynamicPriceUnavailable')}`
         }
         if (series.billing_mode === 'energy') {
             const prices = version.periods.map((period) => `${period.price_chf_per_kwh}`)
@@ -153,6 +163,46 @@ export function TariffCategorySections({
             return `${version.percentage ?? '0'}%`
         }
         return `CHF ${version.fixed_price_chf || '0.00'}`
+    }
+
+    function pricingLabelFor(series: TariffSeries, version: TariffVersion) {
+        if (version.dynamic_source) return priceSummary(series, version)
+        const energy = t(`pages.tariffs.energyTypes.${series.energy_type || 'local'}`)
+        if (series.billing_mode === 'energy') return energy
+        if (series.billing_mode !== 'percentage_of_energy') return `CHF ${version.fixed_price_chf || '0.00'}`
+        const label = `${version.percentage ?? '0'}% · ${energy}`
+        const base = version.percentage_base_summary
+        if (base?.price_chf_per_kwh != null) {
+            const price = (Number(base.price_chf_per_kwh) * Number(version.percentage ?? 0) / 100).toFixed(3)
+            return `${label} · ${t('pages.tariffs.approxPrice', { price })}`
+        }
+        if (base?.dynamic_status === 'unavailable') return `${label} · ${t('pages.tariffs.dynamicBaseUnavailable')}`
+        return label
+    }
+
+    function pricingTooltipFor(series: TariffSeries, version: TariffVersion, source?: DynamicTariffSource) {
+        if (version.dynamic_source) {
+            if (source?.last_fetch_status === 'failed') {
+                return t('pages.tariffs.dynamicFetchFailedTooltip', { error: source.last_fetch_error })
+            }
+            if (version.dynamic_price_summary?.status === 'partial') return t('pages.tariffs.dynamicAveragePartialTooltip')
+            if (version.dynamic_price_summary?.status === 'complete') return t('pages.tariffs.dynamicAverageTooltip')
+            return t('pages.tariffs.dynamicPriceUnavailableTooltip')
+        }
+        if (series.billing_mode !== 'percentage_of_energy') return undefined
+        const base = version.percentage_base_summary
+        if (base?.dynamic_status === 'unavailable') return t('pages.tariffs.dynamicBaseUnavailableTooltip')
+        if (base?.price_chf_per_kwh != null) {
+            const basePrice = Number(base.price_chf_per_kwh)
+            const explanation = t('pages.tariffs.approxPriceTooltip', {
+                percentage: version.percentage ?? '0', basePrice: basePrice.toFixed(3),
+                effectivePrice: (basePrice * Number(version.percentage ?? 0) / 100).toFixed(3),
+            })
+            if (base.dynamic_status === 'partial') return `${explanation} ${t('pages.tariffs.dynamicAveragePartialTooltip')}`
+            if (base.dynamic_status === 'complete') return `${explanation} ${t('pages.tariffs.dynamicAverageTooltip')}`
+            return explanation
+        }
+        return undefined
     }
 
     return (
@@ -189,30 +239,8 @@ export function TariffCategorySections({
                             const isDynamic = Boolean(shown.dynamic_source)
                             const usesPeriods = series.billing_mode === 'energy' && !isDynamic
                             const shownPeriods = shown.periods
-                            const energyTypeLabel = t(`pages.tariffs.energyTypes.${series.energy_type || 'local'}` as Parameters<typeof t>[0])
-                            const basePrice = percentageBasePricing.get(shown.id)
-                            const pricingLabel = isDynamic
-                                ? (dynamicSource
-                                    ? t('pages.tariffs.dynamicPricedFrom', { label: dynamicSource.label })
-                                    : t('pages.tariffs.dynamicPriced'))
-                                : series.billing_mode === 'energy'
-                                    ? energyTypeLabel
-                                    : series.billing_mode === 'percentage_of_energy'
-                                        ? basePrice
-                                            ? `${shown.percentage ?? '0'}% · ${energyTypeLabel} · ${t('pages.tariffs.approxPrice', { price: (basePrice * Number(shown.percentage ?? 0) / 100).toFixed(3) })}`
-                                            : `${shown.percentage ?? '0'}% · ${energyTypeLabel}`
-                                        : `CHF ${shown.fixed_price_chf || '0.00'}`
-                            const pricingTooltip = isDynamic
-                                ? (dynamicSource?.last_fetch_status === 'failed'
-                                    ? t('pages.tariffs.dynamicFetchFailedTooltip', { error: dynamicSource.last_fetch_error })
-                                    : undefined)
-                                : series.billing_mode === 'percentage_of_energy' && basePrice
-                                    ? t('pages.tariffs.approxPriceTooltip', {
-                                        percentage: shown.percentage ?? '0',
-                                        basePrice: basePrice.toFixed(3),
-                                        effectivePrice: (basePrice * Number(shown.percentage ?? 0) / 100).toFixed(3),
-                                    })
-                                    : undefined
+                            const pricingLabel = pricingLabelFor(series, shown)
+                            const pricingTooltip = pricingTooltipFor(series, shown, dynamicSource)
                             const notes = shown.notes?.trim()
                             const isExpanded = expandedSeries.has(seriesKey)
                             const badge = validityBadge(shown)

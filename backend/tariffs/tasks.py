@@ -20,7 +20,7 @@ from django.utils import timezone as djtimezone
 from audit.models import AuditActionCategory, AuditEventSource, AuditEventStatus
 from audit.services import record_audit_event
 
-from .dynamic.fetch import refresh_source
+from .dynamic.fetch import PriceSeriesConflict, refresh_source
 from .dynamic.locking import dynamic_source_lock
 from .dynamic.models import DynamicTariffSource
 from .importers.remote import TariffFetchError
@@ -78,6 +78,24 @@ def fetch_dynamic_prices_impl(
                 correlation_id=correlation_id,
             )
             raise
+        except PriceSeriesConflict as exc:
+            _audit_best_effort(
+                source, summary=f"Dynamic tariff prices were refused: {exc}",
+                status=AuditEventStatus.FAILED, metadata={"source_id": str(source.pk)},
+                correlation_id=correlation_id,
+            )
+            raise
+        except Exception as exc:
+            _audit_best_effort(
+                source,
+                summary=(
+                    f"Dynamic tariff fetch failed with unexpected {type(exc).__name__}; "
+                    "see the server log."
+                ),
+                status=AuditEventStatus.FAILED, metadata={"source_id": str(source.pk)},
+                correlation_id=correlation_id,
+            )
+            raise
 
         _audit_best_effort(
             source,
@@ -114,7 +132,9 @@ def refresh_dynamic_tariff_sources() -> dict:
     Fans out instead of looping so that one unreachable operator cannot delay
     or fail the refresh of the others.
     """
-    source_ids = list(DynamicTariffSource.objects.values_list("pk", flat=True))
+    source_ids = list(
+        DynamicTariffSource.objects.filter(enabled=True).values_list("pk", flat=True)
+    )
     for source_id in source_ids:
         fetch_dynamic_prices.delay(str(source_id))
     return {"queued": len(source_ids), "at": djtimezone.now().isoformat()}

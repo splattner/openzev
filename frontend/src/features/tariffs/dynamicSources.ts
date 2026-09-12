@@ -4,9 +4,9 @@ import type { DynamicTariffSource, DynamicTariffType } from '../../types/api'
  * The `energy_type` a tariff must carry to link to a source of this VSE
  * tariff type — mirrors `tariffs.models.ENERGY_TYPE_BY_DYNAMIC_TARIFF_TYPE`
  * on the backend, which is what `Tariff.clean()` actually enforces. Every
- * type prices grid consumption except reimbursement types, which pay export.
+ * Billable types price grid consumption or ordinary feed-in compensation.
  */
-const ENERGY_TYPE_BY_DYNAMIC_TARIFF_TYPE: Record<DynamicTariffType, 'grid' | 'feed_in'> = {
+const ENERGY_TYPE_BY_DYNAMIC_TARIFF_TYPE: Record<DynamicTariffType, 'grid' | 'feed_in' | null> = {
   electricity: 'grid',
   grid: 'grid',
   metering: 'grid',
@@ -17,10 +17,10 @@ const ENERGY_TYPE_BY_DYNAMIC_TARIFF_TYPE: Record<DynamicTariffType, 'grid' | 'fe
   integrated_complete: 'grid',
   regional_fees: 'grid',
   feed_in: 'feed_in',
-  refund: 'feed_in',
+  refund: null,
 }
 
-export function impliedEnergyType(source: DynamicTariffSource): 'grid' | 'feed_in' {
+export function impliedEnergyType(source: DynamicTariffSource): 'grid' | 'feed_in' | null {
   return ENERGY_TYPE_BY_DYNAMIC_TARIFF_TYPE[source.tariff_type]
 }
 
@@ -38,26 +38,8 @@ export function dynamicSourceOptions(
   sources: DynamicTariffSource[],
   lockedEnergyType?: string | null,
 ): DynamicTariffSource[] {
-  if (!lockedEnergyType) return sources
-  return sources.filter((source) => impliedEnergyType(source) === lockedEnergyType)
-}
-
-/**
- * Which other VSE tariff types a component already contains, per the
- * mapping table in docs/specs/2026-09-dynamic-tariffs.md §3.3. `integrated`
- * bundles electricity with grid usage; v2's `dso`/`dso_complete`/
- * `integrated_complete` bundle grid usage with metering and the national/
- * regional surcharges. Billing an aggregate beside a separate tariff for one
- * of the types it already contains charges that money twice — this is what
- * a double-counting warning needs to name.
- */
-const AGGREGATED_TARIFF_TYPES: Partial<Record<DynamicTariffType, DynamicTariffType[]>> = {
-  integrated: ['electricity', 'grid'],
-  dso: ['grid', 'metering', 'national_fees'],
-  dso_complete: ['grid', 'metering', 'national_fees', 'regional_fees'],
-  integrated_complete: ['electricity', 'grid', 'metering', 'national_fees', 'regional_fees'],
-}
-
-export function aggregatedTariffTypes(tariffType: DynamicTariffType): DynamicTariffType[] {
-  return AGGREGATED_TARIFF_TYPES[tariffType] ?? []
+  return sources.filter((source) => {
+    const energyType = impliedEnergyType(source)
+    return energyType !== null && (!lockedEnergyType || energyType === lockedEnergyType)
+  })
 }
