@@ -1,5 +1,25 @@
 # Changelog
 
+## [1.13.0](https://github.com/splattner/openzev/compare/v1.12.0...v1.13.0) (2026-09-12)
+
+
+### Features
+
+* **accounts:** remember the preferred community per user ([#689](https://github.com/splattner/openzev/issues/689)) ([d881ffb](https://github.com/splattner/openzev/commit/d881ffb68c1fa9ad4e72e73c41a497197744db2a))
+* **dynamic tariffs:** add source management and price history ([#705](https://github.com/splattner/openzev/issues/705)) ([d54c8ac](https://github.com/splattner/openzev/commit/d54c8ac10e08d04273a1d2bc868a262a72b47487))
+* **feasibility:** add a feature toggle for the calculator, off by default ([#697](https://github.com/splattner/openzev/issues/697)) ([c14f439](https://github.com/splattner/openzev/commit/c14f439b20c85297a16bb2706c7808c0e296b14c))
+* **invoices:** price dynamic tariffs, refuse gaps, flag coverage in readiness ([#700](https://github.com/splattner/openzev/issues/700)) ([0d9d760](https://github.com/splattner/openzev/commit/0d9d760d44d3363bf313f99de8de6c45e43c868b))
+* **tariffs:** fetch and store dynamic tariff price series ([#699](https://github.com/splattner/openzev/issues/699)) ([90f6ef6](https://github.com/splattner/openzev/commit/90f6ef6c42324cfbd3fda43a95219b8eb668bf12))
+* **tariffs:** import dynamic tariffs and add a source picker ([#701](https://github.com/splattner/openzev/issues/701)) ([09c25d4](https://github.com/splattner/openzev/commit/09c25d46daece06ac4df71ca59d13032918a281b))
+* **zev:** suggest grid operator and tariff URL from postal code ([#691](https://github.com/splattner/openzev/issues/691)) ([#695](https://github.com/splattner/openzev/issues/695)) ([1785334](https://github.com/splattner/openzev/commit/17853348b056c23d74f73b48501e91d408438ff3))
+
+
+### Bug Fixes
+
+* **auth:** clear the query cache at every session boundary ([#698](https://github.com/splattner/openzev/issues/698)) ([d3360fb](https://github.com/splattner/openzev/commit/d3360fbc7d368c2064d93906ff7d8454252d1aed))
+* **tariffs:** resolve dynamic price history windows in local time ([#710](https://github.com/splattner/openzev/issues/710)) ([d361292](https://github.com/splattner/openzev/commit/d36129219926ab259ec778d5adfd246cf4bf6560))
+* **tariffs:** schedule dynamic price refreshes ([#704](https://github.com/splattner/openzev/issues/704)) ([c6b3cf7](https://github.com/splattner/openzev/commit/c6b3cf7cb4fc8d8084cc287c17bff3e5c65229ea))
+
 ## [1.12.0](https://github.com/splattner/openzev/compare/v1.11.0...v1.12.0) (2026-09-10)
 
 
