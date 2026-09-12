@@ -358,7 +358,7 @@ class ParticipantAccountLifecycleTests(TestCase):
 		auth(self.client, self.owner)
 
 	@mock.patch("zev.tasks.warm_participant_geocode_cache_task.delay")
-	def test_create_participant_creates_account_and_initial_password(self, mock_geocode_delay):
+	def test_create_participant_creates_a_passwordless_account(self, mock_geocode_delay):
 		resp = self.client.post(
 			"/api/v1/zev/participants/",
 			{
@@ -381,9 +381,10 @@ class ParticipantAccountLifecycleTests(TestCase):
 		self.assertIsNotNone(participant.user)
 		self.assertEqual(participant.user.role, UserRole.PARTICIPANT)
 		self.assertEqual(resp.data["account_username"], participant.user.username)
-		self.assertTrue(resp.data["initial_password"])
-		self.assertTrue(participant.user.check_password(resp.data["initial_password"]))
-		self.assertTrue(participant.user.must_change_password)
+		self.assertNotIn("initial_password", resp.data)
+		self.assertFalse(participant.user.has_usable_password())
+		self.assertFalse(participant.user.must_change_password)
+		self.assertEqual(resp.data["onboarding_status"], "not_sent")
 		self.assertEqual(resp.data["title"], "ms")
 
 	@mock.patch("zev.tasks.warm_participant_geocode_cache_task.delay")
@@ -416,7 +417,7 @@ class ParticipantAccountLifecycleTests(TestCase):
 		self.assertEqual(participant.city, "Bern")
 		self.assertEqual(participant.user.role, UserRole.PARTICIPANT)
 
-	def test_send_invitation_mail_resets_temporary_password(self):
+	def test_send_onboarding_link_emails_a_link_and_stays_passwordless(self):
 		resp_create = self.client.post(
 			"/api/v1/zev/participants/",
 			{
@@ -431,15 +432,15 @@ class ParticipantAccountLifecycleTests(TestCase):
 		self.assertEqual(resp_create.status_code, 201)
 		created_id = resp_create.data["id"]
 
-		resp = self.client.post(f"/api/v1/zev/participants/{created_id}/send-invitation/")
+		resp = self.client.post(f"/api/v1/zev/participants/{created_id}/send-onboarding-link/")
 
 		self.assertEqual(resp.status_code, 200)
 		created = Participant.objects.get(pk=created_id)
+		self.assertFalse(created.user.has_usable_password())
+		self.assertIn("onboarding_url", resp.data)
+		self.assertIn(resp.data["onboarding_url"], mail.outbox[-1].body)
 		self.assertEqual(len(mail.outbox), 1)
-		self.assertIn(created.user.username, mail.outbox[0].body)
-		self.assertIn(resp.data["temporary_password"], mail.outbox[0].body)
-		self.assertTrue(created.user.check_password(resp.data["temporary_password"]))
-		self.assertTrue(created.user.must_change_password)
+		self.assertFalse(created.user.must_change_password)
 
 
 class AdminCanEditOwnerParticipantTests(TestCase):
@@ -512,7 +513,7 @@ class AdminCanEditOwnerParticipantTests(TestCase):
 				auth(self.client, self.owner)
 				self.assertEqual(self.client.get(f"/api/v1/zev/zevs/{self.zev.id}/").status_code, 200)
 
-	def test_invitation_preserves_privileged_roles_and_promotes_guests(self):
+	def test_onboarding_link_preserves_privileged_roles_and_promotes_guests(self):
 		admin = make_user("admin_invite_privileged", UserRole.ADMIN)
 		auth(self.client, admin)
 		for role in (UserRole.ZEV_OWNER, UserRole.ADMIN, UserRole.PARTICIPANT, UserRole.GUEST):
@@ -522,15 +523,20 @@ class AdminCanEditOwnerParticipantTests(TestCase):
 					zev=self.zev, user=account, first_name="Invited", last_name="Person",
 					email=account.email, valid_from=date(2026, 1, 1),
 				)
-				resp = self.client.post(f"/api/v1/zev/participants/{participant.id}/send-invitation/")
+				resp = self.client.post(f"/api/v1/zev/participants/{participant.id}/send-onboarding-link/")
 				self.assertEqual(resp.status_code, 200)
 				account.refresh_from_db()
 				expected_role = UserRole.PARTICIPANT if role == UserRole.GUEST else role
 				self.assertEqual(account.role, expected_role)
-				self.assertTrue(account.check_password(resp.data["temporary_password"]))
-				self.assertTrue(account.must_change_password)
+				# An owner or admin's own login must survive being invited as
+				# a participant of one of their own ZEVs — only a genuine
+				# participant account is neutralized.
+				if expected_role == UserRole.PARTICIPANT:
+					self.assertFalse(account.has_usable_password())
+				else:
+					self.assertTrue(account.has_usable_password())
 				self.assertEqual(mail.outbox[-1].to, [participant.email])
-				self.assertIn(resp.data["temporary_password"], mail.outbox[-1].body)
+				self.assertIn(resp.data["onboarding_url"], mail.outbox[-1].body)
 
 	def test_zev_owner_cannot_edit_their_own_owner_participant_record(self):
 		auth(self.client, self.owner)
@@ -610,21 +616,49 @@ class ParticipantAccountLinkingTests(TestCase):
 		self.assertIsNone(self.participant_with_account.user_id)
 		self.assertEqual(self.linked_account.role, UserRole.GUEST)
 
-	def test_admin_can_create_and_link_participant_account(self):
+	def test_admin_can_create_and_link_a_passwordless_account_via_onboarding_link(self):
 		resp = self.client.post(
-			f"/api/v1/zev/participants/{self.participant_no_account.id}/create-account/",
-			{"username": "created.from.participant"},
+			f"/api/v1/zev/participants/{self.participant_no_account.id}/onboarding-link/",
 			format="json",
 		)
 
-		self.assertEqual(resp.status_code, 201)
-		self.assertIn("temporary_password", resp.data)
+		self.assertEqual(resp.status_code, 200)
+		self.assertIn("onboarding_url", resp.data)
+		self.assertNotIn("temporary_password", resp.data)
 		self.participant_no_account.refresh_from_db()
 		self.assertIsNotNone(self.participant_no_account.user)
-		self.assertEqual(self.participant_no_account.user.username, "created.from.participant")
-		self.assertTrue(self.participant_no_account.user.must_change_password)
+		self.assertFalse(self.participant_no_account.user.has_usable_password())
 
-	def test_non_admin_cannot_link_or_create_accounts(self):
+	def test_onboarding_link_requires_no_email(self):
+		"""Unlike send-onboarding-link, this never emails anything, so it
+		must work for a participant with no address on file — replacing the
+		one thing the old admin-only create-account action could do that
+		the invitation flow could not."""
+		self.participant_no_account.email = ""
+		self.participant_no_account.save(update_fields=["email"])
+
+		resp = self.client.post(
+			f"/api/v1/zev/participants/{self.participant_no_account.id}/onboarding-link/",
+			format="json",
+		)
+
+		self.assertEqual(resp.status_code, 200)
+		self.assertIn("onboarding_url", resp.data)
+
+	def test_owner_can_get_an_onboarding_link_for_their_own_participant(self):
+		"""onboarding-link is not admin-gated: creating a harmless,
+		passwordless link is not the sensitive operation link-account is."""
+		owner_client = APIClient()
+		auth(owner_client, self.zev_owner)
+
+		resp = owner_client.post(
+			f"/api/v1/zev/participants/{self.participant_no_account.id}/onboarding-link/",
+			format="json",
+		)
+
+		self.assertEqual(resp.status_code, 200)
+
+	def test_non_admin_cannot_link_accounts(self):
 		owner_client = APIClient()
 		auth(owner_client, self.zev_owner)
 
@@ -633,14 +667,8 @@ class ParticipantAccountLinkingTests(TestCase):
 			{"user_id": self.linkable_account.id},
 			format="json",
 		)
-		create_resp = owner_client.post(
-			f"/api/v1/zev/participants/{self.participant_no_account.id}/create-account/",
-			{"username": "owner.should.fail"},
-			format="json",
-		)
 
 		self.assertEqual(link_resp.status_code, 403)
-		self.assertEqual(create_resp.status_code, 403)
 class ZevOwnerRoleSyncTests(TestCase):
 	def setUp(self):
 		self.client = APIClient()

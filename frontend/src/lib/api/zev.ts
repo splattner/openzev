@@ -6,8 +6,8 @@ import type {
   MeteringPointAssignmentInput,
   MeteringPointInput,
   Participant,
-  ParticipantAccountCreateResult,
   ParticipantInput,
+  ParticipantOnboardingLinkResult,
   SelfSetupZevInput,
   Zev,
   ZevInput,
@@ -61,8 +61,26 @@ export async function deleteParticipant(id: string): Promise<void> {
   await api.delete(`/zev/participants/${id}/`)
 }
 
-export async function sendParticipantInvitation(id: string): Promise<{ detail: string; username: string; temporary_password: string }> {
-  const { data } = await api.post<{ detail: string; username: string; temporary_password: string }>(`/zev/participants/${id}/send-invitation/`)
+/** Email the onboarding link to the address on the participant's record. */
+export async function sendOnboardingLink(id: string): Promise<{ detail: string; onboarding_url: string }> {
+  const { data } = await api.post<{ detail: string; onboarding_url: string }>(`/zev/participants/${id}/send-onboarding-link/`)
+  return data
+}
+
+/**
+ * Ensure an account and onboarding link exist, without emailing it.
+ *
+ * Backs "copy onboarding link" — no address required, since nothing is sent —
+ * and also the admin console's account-linking action, which never required
+ * one either.
+ */
+export async function getOnboardingLink(id: string): Promise<ParticipantOnboardingLinkResult> {
+  const { data } = await api.post<ParticipantOnboardingLinkResult>(`/zev/participants/${id}/onboarding-link/`)
+  return data
+}
+
+export async function revokeOnboardingLink(id: string): Promise<Participant> {
+  const { data } = await api.post<Participant>(`/zev/participants/${id}/revoke-onboarding-link/`)
   return data
 }
 
@@ -76,10 +94,6 @@ export async function unlinkParticipantAccount(participantId: string): Promise<P
   return data
 }
 
-export async function createParticipantAccount(participantId: string, payload: { username?: string; email?: string }): Promise<ParticipantAccountCreateResult> {
-  const { data } = await api.post<ParticipantAccountCreateResult>(`/zev/participants/${participantId}/create-account/`, payload)
-  return data
-}
 
 // POST, not GET: this issues the contract (mints a document number, writes a
 // ContractIssue and an audit event). The backend keeps GET as a pure read of

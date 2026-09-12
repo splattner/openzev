@@ -297,12 +297,14 @@ export interface ParticipantBuildingFootprint {
     coordinates: number[][][] | number[][][][]
 }
 
+export type ParticipantOnboardingStatus = 'not_sent' | 'sent' | 'active' | 'revoked'
+
 export interface Participant {
     id: string
     zev: string
     user: number | null
     account_username?: string | null
-    initial_password?: string | null
+    onboarding_status?: ParticipantOnboardingStatus
     title?: 'mr' | 'mrs' | 'ms' | 'dr' | 'prof' | ''
     first_name: string
     last_name: string
@@ -321,10 +323,9 @@ export interface Participant {
     allocation_weight: string
 }
 
-export interface ParticipantAccountCreateResult {
+export interface ParticipantOnboardingLinkResult {
+    onboarding_url: string
     participant: Participant
-    account: User
-    temporary_password: string
 }
 
 export interface ParticipantInput {

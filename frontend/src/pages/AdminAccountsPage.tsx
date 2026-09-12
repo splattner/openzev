@@ -1,15 +1,19 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faCheck, faCopy, faEllipsis, faLink, faPen, faPlus, faTrash, faUser, faXmark } from '@fortawesome/free-solid-svg-icons'
+import { faCheck, faEllipsis, faLink, faPen, faPlus, faTrash, faUser, faXmark } from '@fortawesome/free-solid-svg-icons'
 import { useMemo, useState, type FormEvent } from 'react'
 import { ActionMenu } from '../components/ActionMenu'
 import { ConfirmDialog, useConfirmDialog } from '../components/ConfirmDialog'
 import { StatCard } from '../components/StatCard'
 import { FormModal } from '../components/FormModal'
 import {
-    createParticipantAccount,
+    ParticipantOnboardingNotice,
+    type ParticipantOnboardingNoticeData,
+} from '../features/participants/ParticipantOnboardingNotice'
+import {
     fetchParticipants,
     fetchZevs,
+    getOnboardingLink,
     linkParticipantAccount,
     unlinkParticipantAccount,
 } from '../lib/api/zev'
@@ -19,7 +23,6 @@ import { queryKeys } from '../lib/api/queryKeys'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '../lib/auth'
 import { useToast } from '../lib/toast'
-import { copyToClipboard } from '../lib/clipboard'
 import { formatParticipantName } from '../lib/participantFormat'
 import { getTitleLabelMap } from '../lib/participantTitle'
 import type { Participant, User, UserInput } from '../types/api'
@@ -55,18 +58,12 @@ export function AdminAccountsPage({ embedded = false }: { embedded?: boolean }) 
     const [selectedUserToLink, setSelectedUserToLink] = useState<string>('')
     const [linkError, setLinkError] = useState<string | null>(null)
 
-    const [showCreateAccountModal, setShowCreateAccountModal] = useState(false)
-    const [createAccountParticipant, setCreateAccountParticipant] = useState<Participant | null>(null)
-    const [newAccountUsername, setNewAccountUsername] = useState('')
-    const [newAccountEmail, setNewAccountEmail] = useState('')
-    const [createAccountError, setCreateAccountError] = useState<string | null>(null)
-
     const [showEditUserModal, setShowEditUserModal] = useState(false)
     const [editingUserId, setEditingUserId] = useState<number | null>(null)
     const [editUserForm, setEditUserForm] = useState<UserInput>(defaultEditUserForm)
     const [editUserError, setEditUserError] = useState<string | null>(null)
 
-    const [credentialsNotice, setCredentialsNotice] = useState<{ username: string; password: string; participantName: string } | null>(null)
+    const [onboardingNotice, setOnboardingNotice] = useState<ParticipantOnboardingNoticeData | null>(null)
 
     const linkMutation = useMutation({
         mutationFn: ({ participantId, userId }: { participantId: string; userId: number }) => linkParticipantAccount(participantId, userId),
@@ -92,24 +89,19 @@ export function AdminAccountsPage({ embedded = false }: { embedded?: boolean }) 
         onError: (error) => pushToast(formatApiError(error, t('pages.accounts.feedback.unlinkFailed')), 'error'),
     })
 
-    const createAccountMutation = useMutation({
-        mutationFn: ({ participantId, username, email }: { participantId: string; username?: string; email?: string }) => createParticipantAccount(participantId, { username, email }),
+    const onboardingLinkMutation = useMutation({
+        mutationFn: (participantId: string) => getOnboardingLink(participantId),
         onSuccess: (result) => {
-            setShowCreateAccountModal(false)
-            setCreateAccountParticipant(null)
-            setNewAccountUsername('')
-            setNewAccountEmail('')
-            setCreateAccountError(null)
-            setCredentialsNotice({
-                username: result.account.username,
-                password: result.temporary_password,
+            setOnboardingNotice({
                 participantName: `${result.participant.first_name} ${result.participant.last_name}`,
+                onboardingUrl: result.onboarding_url,
+                message: t('pages.accounts.feedback.onboardingLinkDetail'),
             })
             pushToast(t('pages.accounts.feedback.createSuccess'), 'success')
             void queryClient.invalidateQueries({ queryKey: queryKeys.zev.participants() })
             void queryClient.invalidateQueries({ queryKey: queryKeys.auth.users() })
         },
-        onError: (error) => setCreateAccountError(formatApiError(error, t('pages.accounts.feedback.createFailed'))),
+        onError: (error) => pushToast(formatApiError(error, t('pages.accounts.feedback.createFailed')), 'error'),
     })
 
     const updateUserMutation = useMutation({
@@ -158,24 +150,11 @@ export function AdminAccountsPage({ embedded = false }: { embedded?: boolean }) 
         return formatParticipantName(participant, titleLabel)
     }
 
-    async function copyValue(value: string, successMessage: string) {
-        const ok = await copyToClipboard(value)
-        pushToast(ok ? successMessage : t('pages.accounts.feedback.copyFailed'), ok ? 'success' : 'error')
-    }
-
     function openLinkModal(participant: Participant) {
         setLinkParticipant(participant)
         setSelectedUserToLink('')
         setLinkError(null)
         setShowLinkModal(true)
-    }
-
-    function openCreateAccountModal(participant: Participant) {
-        setCreateAccountParticipant(participant)
-        setNewAccountUsername('')
-        setNewAccountEmail(participant.email || '')
-        setCreateAccountError(null)
-        setShowCreateAccountModal(true)
     }
 
     function openEditUserModal(user: User) {
@@ -199,19 +178,6 @@ export function AdminAccountsPage({ embedded = false }: { embedded?: boolean }) 
             return
         }
         linkMutation.mutate({ participantId: linkParticipant.id, userId: Number(selectedUserToLink) })
-    }
-
-    function submitCreateAccount(event: FormEvent<HTMLFormElement>) {
-        event.preventDefault()
-        if (!createAccountParticipant) {
-            setCreateAccountError(t('pages.accounts.validation.noParticipantSelected'))
-            return
-        }
-        createAccountMutation.mutate({
-            participantId: createAccountParticipant.id,
-            username: newAccountUsername.trim() || undefined,
-            email: newAccountEmail.trim() || undefined,
-        })
     }
 
     function submitEditUser(event: FormEvent<HTMLFormElement>) {
@@ -273,39 +239,8 @@ export function AdminAccountsPage({ embedded = false }: { embedded?: boolean }) 
                 <StatCard label={t('pages.accounts.stats.standaloneAccounts')} value={standaloneAccountsCount} />
             </section>
 
-            {credentialsNotice && (
-                <section className="card">
-                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', alignItems: 'flex-start', flexWrap: 'wrap' }}>
-                        <div>
-                            <h3 style={{ marginTop: 0, marginBottom: '0.5rem' }}>{t('pages.accounts.credentialsTitle')}</h3>
-                            <p style={{ marginBottom: '0.35rem' }}><strong>{credentialsNotice.participantName}</strong></p>
-                            <p style={{ margin: '0.2rem 0' }}>{t('pages.accounts.usernameLabel')} <strong>{credentialsNotice.username}</strong></p>
-                            <p style={{ margin: '0.2rem 0' }}>{t('pages.accounts.passwordLabel')} <strong>{credentialsNotice.password}</strong></p>
-                        </div>
-                        <div className="actions-row actions-row-wrap actions-row-end">
-                            <button
-                                className="button button-secondary button-compact"
-                                type="button"
-                                onClick={() => void copyValue(credentialsNotice.username, t('pages.accounts.feedback.copyUsernameSuccess'))}
-                            >
-                                <FontAwesomeIcon icon={faCopy} fixedWidth />
-                                {t('pages.accounts.copyUsername')}
-                            </button>
-                            <button
-                                className="button button-secondary button-compact"
-                                type="button"
-                                onClick={() => void copyValue(credentialsNotice.password, t('pages.accounts.feedback.copyPasswordSuccess'))}
-                            >
-                                <FontAwesomeIcon icon={faCopy} fixedWidth />
-                                {t('pages.accounts.copyPassword')}
-                            </button>
-                            <button className="button button-secondary button-compact" type="button" onClick={() => setCredentialsNotice(null)}>
-                                <FontAwesomeIcon icon={faXmark} fixedWidth />
-                                {t('pages.accounts.dismiss')}
-                            </button>
-                        </div>
-                    </div>
-                </section>
+            {onboardingNotice && (
+                <ParticipantOnboardingNotice notice={onboardingNotice} onDismiss={() => setOnboardingNotice(null)} />
             )}
 
             <div className="table-card">
@@ -415,7 +350,12 @@ export function AdminAccountsPage({ embedded = false }: { embedded?: boolean }) 
                                                             {t('pages.accounts.linkExisting')}
                                                         </button>
                                                     )}
-                                                    <button className="button button-primary button-compact" type="button" onClick={() => openCreateAccountModal(participant)}>
+                                                    <button
+                                                        className="button button-primary button-compact"
+                                                        type="button"
+                                                        disabled={onboardingLinkMutation.isPending}
+                                                        onClick={() => onboardingLinkMutation.mutate(participant.id)}
+                                                    >
                                                         <FontAwesomeIcon icon={faPlus} fixedWidth />
                                                         {t('pages.accounts.createAccount')}
                                                     </button>
@@ -515,35 +455,6 @@ export function AdminAccountsPage({ embedded = false }: { embedded?: boolean }) 
                 </form>
             </FormModal>
 
-            <FormModal isOpen={showCreateAccountModal} title={t('pages.accounts.createModal.title')} onClose={() => setShowCreateAccountModal(false)} maxWidth="560px">
-                <form onSubmit={submitCreateAccount} style={{ display: 'grid', gap: '1rem' }}>
-                    <p style={{ margin: 0 }}>
-                        {t('pages.accounts.createModal.participant')} <strong>{createAccountParticipant ? participantName(createAccountParticipant) : '-'}</strong>
-                    </p>
-
-                    <label>
-                        <span>{t('pages.accounts.createModal.username')}</span>
-                        <input value={newAccountUsername} onChange={(event) => setNewAccountUsername(event.target.value)} placeholder={t('pages.accounts.createModal.autoGenerated')} />
-                    </label>
-                    <label>
-                        <span>{t('pages.accounts.createModal.email')}</span>
-                        <input type="email" value={newAccountEmail} onChange={(event) => setNewAccountEmail(event.target.value)} />
-                    </label>
-
-                    {createAccountError && <div className="error-banner">{createAccountError}</div>}
-
-                    <div className="actions-row actions-row-end actions-row-wrap">
-                        <button className="button button-secondary" type="button" onClick={() => setShowCreateAccountModal(false)}>
-                            <FontAwesomeIcon icon={faXmark} fixedWidth />
-                            {t('common.cancel')}
-                        </button>
-                        <button className="button button-primary" type="submit" disabled={createAccountMutation.isPending}>
-                            <FontAwesomeIcon icon={faPlus} fixedWidth />
-                            {t('pages.accounts.createModal.createButton')}
-                        </button>
-                    </div>
-                </form>
-            </FormModal>
 
             <FormModal isOpen={showEditUserModal} title={t('pages.accounts.editModal.title')} onClose={() => setShowEditUserModal(false)} maxWidth="760px">
                 <form onSubmit={submitEditUser} className="form-grid">

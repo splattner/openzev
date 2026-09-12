@@ -97,14 +97,28 @@ class MeteringPointAssignmentSerializer(serializers.ModelSerializer):
 
 class ParticipantSerializer(serializers.ModelSerializer):
     account_username = serializers.CharField(source="user.username", read_only=True)
-    initial_password = serializers.SerializerMethodField()
     full_name = serializers.ReadOnlyField()
     metering_points = serializers.SerializerMethodField()
     has_metering_point_assignment = serializers.SerializerMethodField()
     building_footprint = serializers.SerializerMethodField()
+    onboarding_status = serializers.SerializerMethodField()
 
-    def get_initial_password(self, obj):
-        return getattr(obj, "_initial_password", None)
+    def get_onboarding_status(self, obj):
+        """One of ``not_sent`` / ``sent`` / ``active`` / ``revoked``.
+
+        Read from the participant's most recent onboarding link, not from
+        whether an account exists — an account is created eagerly (see
+        ``ensure_participant_account``) whether or not anyone has actually
+        been invited yet, so its mere existence says nothing about progress.
+        """
+        token = obj.onboarding_tokens.order_by("-created_at").first()
+        if token is None:
+            return "not_sent"
+        if token.revoked_at is not None:
+            return "revoked"
+        if token.last_used_at is not None:
+            return "active"
+        return "sent"
 
     def get_building_footprint(self, obj):
         return get_cached_building_footprint(obj.address_line1, obj.postal_code, obj.city)
@@ -138,15 +152,13 @@ class ParticipantSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         participant = super().create(validated_data)
-        _, initial_password = ensure_participant_account(participant)
-        participant._initial_password = initial_password
+        ensure_participant_account(participant)
         trigger_geocode_if_address_present(participant)
         return participant
 
     def update(self, instance, validated_data):
         participant = super().update(instance, validated_data)
-        _, initial_password = ensure_participant_account(participant)
-        participant._initial_password = initial_password
+        ensure_participant_account(participant)
         trigger_geocode_if_address_present(participant)
         return participant
 
@@ -157,7 +169,7 @@ class ParticipantSerializer(serializers.ModelSerializer):
             "zev",
             "user",
             "account_username",
-            "initial_password",
+            "onboarding_status",
             "full_name",
             "title",
             "first_name",
@@ -182,7 +194,7 @@ class ParticipantSerializer(serializers.ModelSerializer):
             "id",
             "user",
             "account_username",
-            "initial_password",
+            "onboarding_status",
             "full_name",
             "metering_points",
             "has_metering_point_assignment",

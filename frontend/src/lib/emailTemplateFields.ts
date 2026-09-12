@@ -8,7 +8,7 @@
  */
 export type EmailTemplateKey =
     | 'invoice_email'
-    | 'participant_invitation'
+    | 'participant_onboarding'
     | 'email_verification'
     | 'participant_magic_link'
 
@@ -27,12 +27,11 @@ export const EMAIL_TEMPLATE_FIELDS: Record<EmailTemplateKey, EmailField[]> = {
         { variable: '{due_date}', descriptionKey: 'admin.emailTemplates.fields.dueDate' },
         { variable: '{total_chf}', descriptionKey: 'admin.emailTemplates.fields.totalChf' },
     ],
-    participant_invitation: [
+    participant_onboarding: [
         { variable: '{participant_name}', descriptionKey: 'admin.emailTemplates.fields.participantName' },
         { variable: '{inviter_name}', descriptionKey: 'admin.emailTemplates.fields.inviterName' },
         { variable: '{zev_name}', descriptionKey: 'admin.emailTemplates.fields.zevName' },
-        { variable: '{username}', descriptionKey: 'admin.emailTemplates.fields.username' },
-        { variable: '{temporary_password}', descriptionKey: 'admin.emailTemplates.fields.temporaryPassword' },
+        { variable: '{link_url}', descriptionKey: 'admin.emailTemplates.fields.onboardingLinkUrl' },
     ],
     email_verification: [
         { variable: '{verify_url}', descriptionKey: 'admin.emailTemplates.fields.verifyUrl' },

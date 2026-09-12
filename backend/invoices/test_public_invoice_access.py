@@ -434,19 +434,36 @@ class MagicLinkTests(PublicInvoiceTestCase):
         self.assertFalse(self.participant.user.must_change_password)
         self.assertFalse(self.participant.user.has_usable_password())
 
-    def test_consuming_kills_an_outstanding_invitation_password(self):
-        """An emailed temporary password must not outlive its purpose."""
-        from zev.services import send_participant_invitation
+    def test_consuming_kills_a_leftover_password_from_before_this_behaviour(self):
+        """A usable password from an account created before passwordless
+        participant accounts existed must not survive a sign-in link.
 
-        send_participant_invitation(self.participant, self.owner)
-        self.participant.refresh_from_db()
-        self.assertTrue(self.participant.user.must_change_password)
+        Nothing mints a real password for a participant any more
+        (``zev.services.ensure_participant_account``), but an instance
+        upgrading from an older release can still have one sitting on a row
+        from back when it did. Isolated below the HTTP layer and below
+        ``account_for_participant`` (which would neutralize it a step
+        earlier, on request) so this exercises ``consume()``'s own
+        defensive branch specifically.
+        """
+        from accounts import magic_links
+        from accounts.models import User, UserRole
 
-        self._request()
-        self.client.post(self.CONSUME_URL, {"token": self._link_token().token}, format="json")
+        user = User.objects.create_user(
+            username="legacy.participant",
+            password="still-here-from-before",
+            role=UserRole.PARTICIPANT,
+            must_change_password=True,
+        )
+        self.participant.user = user
+        self.participant.save(update_fields=["user"])
 
-        self.participant.user.refresh_from_db()
-        self.assertFalse(self.participant.user.has_usable_password())
+        link = magic_links.issue(user)
+        magic_links.consume(link.token)
+
+        user.refresh_from_db()
+        self.assertFalse(user.has_usable_password())
+        self.assertFalse(user.must_change_password)
 
 
 class MagicLinkTemplateTests(PublicInvoiceTestCase):

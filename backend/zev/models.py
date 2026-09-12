@@ -286,6 +286,46 @@ class Participant(models.Model):
         return f"{self.full_name} ({self.zev.name})"
 
 
+class ParticipantOnboardingToken(models.Model):
+    """A bearer link that signs a participant into their own account.
+
+    Shaped after ``invoices.InvoiceAccessToken`` rather than
+    ``accounts.MagicLinkToken``: it is per-participant, reusable, and has no
+    expiry. A one-shot token would solve "get them in once" and reopen "get
+    them in the second time" a step later — the participant would have no
+    password and no invoice to scan yet, exactly where they started. Letting
+    the same link keep working (or fail loudly once revoked) means the mail
+    the operator sent can double as the participant's way back in until they
+    choose to set a password of their own.
+
+    Prefix and secret are stored in clear for the same reason
+    ``InvoiceAccessToken.secret`` is: an operator or a database backup that can
+    already read this row can already read the participant's name, address and
+    every invoice attached to them, so hashing the secret would not shrink
+    that blast radius. Revocation, not secrecy of storage, is the control.
+    """
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    participant = models.ForeignKey(
+        Participant, on_delete=models.CASCADE, related_name="onboarding_tokens",
+    )
+    prefix = models.CharField(max_length=32, unique=True, db_index=True)
+    secret = models.CharField(max_length=64)
+    created_at = models.DateTimeField(auto_now_add=True)
+    revoked_at = models.DateTimeField(null=True, blank=True)
+    last_used_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-created_at", "id"]
+
+    def __str__(self):
+        return f"{self.prefix} ({self.participant.full_name})"
+
+    @property
+    def is_active(self) -> bool:
+        return self.revoked_at is None
+
+
 class MeteringPointType(models.TextChoices):
     CONSUMPTION = "consumption", "Consumption"
     PRODUCTION = "production", "Production"

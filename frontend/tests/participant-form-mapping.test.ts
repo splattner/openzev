@@ -27,7 +27,7 @@ describe('participant form mapping', () => {
       valid_to: null,
       has_metering_point_assignment: false,
       account_username: null,
-      initial_password: null,
+      onboarding_status: 'not_sent',
       created_at: '2026-01-01T00:00:00Z',
       updated_at: '2026-01-01T00:00:00Z',
     } as unknown as Participant
