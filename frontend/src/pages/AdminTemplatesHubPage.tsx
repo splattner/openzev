@@ -11,7 +11,7 @@ type TemplateKey = PdfTemplateTab | EmailTemplateKey
 
 const pdfTemplates: PdfTemplateTab[] = ['invoice', 'contract', 'annual_statement']
 const emailTemplates: EmailTemplateKey[] = [
-    'invoice_email', 'participant_invitation', 'email_verification', 'participant_magic_link',
+    'invoice_email', 'participant_onboarding', 'email_verification', 'participant_magic_link',
 ]
 
 /**
