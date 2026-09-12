@@ -5,7 +5,6 @@ from django.conf import settings as django_settings
 from django.db.models import Count, Max, Min
 from django.http import FileResponse, HttpResponse
 from django.utils import timezone as dj_timezone
-from django.utils.crypto import get_random_string
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.parsers import FormParser, MultiPartParser
@@ -16,9 +15,9 @@ from drf_spectacular.utils import extend_schema
 from accounts.permissions import IsAdmin
 from accounts.throttling import ApiKeyRateThrottle, TransferArchiveThrottle
 from accounts.models import User, UserRole
-from accounts.serializers import UserSerializer
 from allocation.validity import period_window
 from metering.models import MeterReading
+from . import onboarding
 from .models import Zev, Participant, MeteringPoint, MeteringPointAssignment
 from .scoping import ZevScopedQuerySetMixin
 from .serializers import (
@@ -39,7 +38,11 @@ from .permissions import (
     ZevManagementPermission,
 )
 from .grid_operators import load_grid_operators, grid_operators_for_postal_code
-from .services import send_participant_invitation, create_zev_for_existing_owner
+from .services import (
+    create_zev_for_existing_owner,
+    get_participant_onboarding_link,
+    send_participant_onboarding_link,
+)
 from .transfer import (
     SECTION_DEPENDENCIES,
     SECTIONS,
@@ -327,7 +330,9 @@ class ParticipantViewSet(AuditedCreateDestroyMixin, AuditedUpdateMixin, ZevScope
         return instance.full_name
 
     def get_queryset(self):
-        return self.scope_queryset(Participant.objects.prefetch_related("metering_point_assignments"))
+        return self.scope_queryset(
+            Participant.objects.prefetch_related("metering_point_assignments", "onboarding_tokens")
+        )
 
     def get_audit_create_summary(self, instance):
         return f"Created participant {instance.full_name}."
@@ -513,6 +518,11 @@ class ParticipantViewSet(AuditedCreateDestroyMixin, AuditedUpdateMixin, ZevScope
 
         participant.user = None
         participant.save(update_fields=["user", "updated_at"])
+        # Detaching the account must also kill any outstanding onboarding
+        # link — otherwise whoever holds it can simply click it again and be
+        # handed a freshly recreated account, and this action would not have
+        # cut anything.
+        onboarding.revoke_active_for_participant(participant)
         record_audit_event(
             request=request,
             action_category=AuditActionCategory.PARTICIPANT,
@@ -527,101 +537,45 @@ class ParticipantViewSet(AuditedCreateDestroyMixin, AuditedUpdateMixin, ZevScope
         serializer = self.get_serializer(participant)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
-    @action(detail=True, methods=["post"], url_path="create-account")
-    def create_account(self, request, pk=None):
-        if not request.user.is_admin:
-            return self._deny_non_admin(
-                request, pk,
-                action_suffix="create_account",
-                summary="Denied participant account creation by non-admin.",
-                detail="Only admins can create participant accounts.",
-            )
+    @action(detail=True, methods=["post"], url_path="onboarding-link")
+    def onboarding_link(self, request, pk=None):
+        """Ensure an account and onboarding link exist, without emailing it.
 
+        Backs the "copy onboarding link" action on the participants page, and
+        the admin console's account-linking action, which never required an
+        email address either — an operator handing the link over in person or
+        by some other channel needs no address on file.
+        """
         participant = self.get_object()
-        if participant.user is not None:
-            return Response({"detail": "Participant already has a linked account."}, status=status.HTTP_400_BAD_REQUEST)
-
-        requested_username = (request.data.get("username") or "").strip()
-        if requested_username and User.objects.filter(username=requested_username).exists():
-            return Response({"detail": "Username is already taken."}, status=status.HTTP_400_BAD_REQUEST)
-
-        base_username = requested_username or self._build_username_candidate(participant)
-        username = self._find_available_username(base_username)
-        temporary_password = get_random_string(14)
-
-        account = User.objects.create_user(
-            username=username,
-            password=temporary_password,
-            role=UserRole.PARTICIPANT,
-            first_name=participant.first_name,
-            last_name=participant.last_name,
-            email=(request.data.get("email") or participant.email or "").strip(),
-        )
-        account.must_change_password = True
-        account.save(
-            update_fields=[
-                "must_change_password",
-            ]
-        )
-
-        participant.user = account
-        participant.save(update_fields=["user", "updated_at"])
+        onboarding_url = get_participant_onboarding_link(participant)
         record_audit_event(
             request=request,
             action_category=AuditActionCategory.PARTICIPANT,
-            action_type="participant.create_account",
+            action_type="participant.onboarding_link_created",
             target_type="zev.Participant",
             target=participant,
             target_id=str(participant.pk),
             target_display=participant.full_name,
-            summary=f"Created and linked account {account.username} for participant {participant.full_name}.",
-            changes={"user": {"before": None, "after": str(account.id)}},
+            summary=f"Created an onboarding link for participant {participant.full_name}.",
         )
-
         serializer = self.get_serializer(participant)
-        return Response(
-            {
-                "participant": serializer.data,
-                "account": UserSerializer(account).data,
-                "temporary_password": temporary_password,
-            },
-            status=status.HTTP_201_CREATED,
-        )
+        return Response({"onboarding_url": onboarding_url, "participant": serializer.data})
 
-    def _build_username_candidate(self, participant: Participant) -> str:
-        parts = [participant.first_name.strip().lower(), participant.last_name.strip().lower()]
-        candidate = ".".join([part for part in parts if part])
-        return candidate or "participant"
-
-    def _find_available_username(self, candidate: str) -> str:
-        normalized = candidate[:150] or "participant"
-        if not User.objects.filter(username=normalized).exists():
-            return normalized
-
-        for suffix in range(1, 10000):
-            suffix_text = str(suffix)
-            base = normalized[: 150 - len(suffix_text)]
-            value = f"{base}{suffix_text}"
-            if not User.objects.filter(username=value).exists():
-                return value
-
-        return f"participant{get_random_string(6).lower()}"
-
-    @action(detail=True, methods=["post"], url_path="send-invitation")
-    def send_invitation(self, request, pk=None):
+    @action(detail=True, methods=["post"], url_path="send-onboarding-link")
+    def send_onboarding_link(self, request, pk=None):
         participant = self.get_object()
         try:
-            username, temporary_password = send_participant_invitation(participant, request.user)
+            onboarding_url = send_participant_onboarding_link(participant, request.user)
         except ValueError as exc:
             record_audit_event(
                 request=request,
                 action_category=AuditActionCategory.PARTICIPANT,
-                action_type="participant.send_invitation",
+                action_type="participant.send_onboarding_link",
                 target_type="zev.Participant",
                 target=participant,
                 target_id=str(participant.pk),
                 target_display=participant.full_name,
-                summary=f"Failed invitation email for participant {participant.full_name}.",
+                summary=f"Failed onboarding email for participant {participant.full_name}.",
                 status=AuditEventStatus.FAILED,
                 metadata={"error": str(exc)},
             )
@@ -629,22 +583,43 @@ class ParticipantViewSet(AuditedCreateDestroyMixin, AuditedUpdateMixin, ZevScope
         record_audit_event(
             request=request,
             action_category=AuditActionCategory.PARTICIPANT,
-            action_type="participant.send_invitation",
+            action_type="participant.send_onboarding_link",
             target_type="zev.Participant",
             target=participant,
             target_id=str(participant.pk),
             target_display=participant.full_name,
-            summary=f"Sent participant invitation to {participant.email}.",
-            metadata={"username": username},
+            summary=f"Sent onboarding link to {participant.email}.",
         )
         return Response(
             {
-                "detail": f"Invitation email sent to {participant.email}.",
-                "username": username,
-                "temporary_password": temporary_password,
+                "detail": f"Onboarding email sent to {participant.email}.",
+                "onboarding_url": onboarding_url,
             },
             status=status.HTTP_200_OK,
         )
+
+    @action(detail=True, methods=["post"], url_path="revoke-onboarding-link")
+    def revoke_onboarding_link(self, request, pk=None):
+        """Kill the active link without touching the linked account.
+
+        Distinct from ``unlink-account``: a participant may already have set
+        their own password and still want an old, possibly leaked link
+        invalidated.
+        """
+        participant = self.get_object()
+        onboarding.revoke_active_for_participant(participant)
+        record_audit_event(
+            request=request,
+            action_category=AuditActionCategory.PARTICIPANT,
+            action_type="participant.revoke_onboarding_link",
+            target_type="zev.Participant",
+            target=participant,
+            target_id=str(participant.pk),
+            target_display=participant.full_name,
+            summary=f"Revoked the onboarding link for participant {participant.full_name}.",
+        )
+        serializer = self.get_serializer(participant)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
 
 class MeteringPointViewSet(AuditedCreateDestroyMixin, AuditedUpdateMixin, ZevScopedQuerySetMixin, viewsets.ModelViewSet):

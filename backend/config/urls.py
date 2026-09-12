@@ -14,6 +14,8 @@ urlpatterns = [
     path("api/v1/invoices/", include("invoices.urls")),
     # Unauthenticated by design — see invoices/urls_public.py.
     path("api/v1/public/", include("invoices.urls_public")),
+    # Unauthenticated by design — see zev/urls_public.py.
+    path("api/v1/public/", include("zev.urls_public")),
     path("api/v1/audit/", include("audit.urls")),
     path("api/v1/exports/", include("exports.urls")),
     path("api/v1/feasibility/", include("feasibility.urls")),
