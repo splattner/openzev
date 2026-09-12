@@ -39,6 +39,24 @@ export async function consumeMagicLink(token: string): Promise<void> {
     await api.post('/public/magic-link/consume/', { token })
 }
 
+export interface OnboardingConsumeResult {
+    zev_name: string
+    participant_name: string
+}
+
+/**
+ * Sign in as the participant an onboarding link was sent to.
+ *
+ * One step, unlike the invoice magic link: the credential is the link
+ * itself, so there is nothing left to prove by requesting a second one.
+ * Unlike a magic link, this can be called again later — the link is not
+ * spent by using it, only by being revoked.
+ */
+export async function consumeOnboardingLink(prefix: string, secret: string): Promise<OnboardingConsumeResult> {
+    const { data } = await api.post<OnboardingConsumeResult>('/public/onboarding/consume/', { prefix, s: secret })
+    return data
+}
+
 export interface PublicInvoiceChart {
     key: 'energy' | 'hourly' | 'flow'
     title: string
