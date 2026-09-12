@@ -108,3 +108,20 @@ class MagicLinkRequestThrottle(SimpleRateThrottle):
         if not prefix:
             return None
         return self.cache_format % {"scope": self.scope, "ident": prefix}
+
+
+class OnboardingLinkThrottle(SimpleRateThrottle):
+    """Rate-limit the unauthenticated onboarding-consume endpoint, by IP.
+
+    Same reasoning as ``InvoiceLinkThrottle``: the prefix guards a 256-bit
+    secret, so this is not defending against a guessed token, only against
+    hammering the endpoint with whatever token was leaked.
+    """
+
+    scope = "onboarding_link"
+
+    def get_cache_key(self, request, view):
+        return self.cache_format % {
+            "scope": self.scope,
+            "ident": self.get_ident(request),
+        }

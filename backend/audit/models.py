@@ -34,6 +34,10 @@ class AuditEventSource(models.TextChoices):
     # same reason ``API_KEY`` is: the actor is a printed credential, not a
     # session, and the log has to say so.
     INVOICE_LINK = "invoice_link", "Invoice link"
+    # A request carrying a participant onboarding token — the credential
+    # emailed to a participant who has no password yet. Same reasoning as
+    # ``INVOICE_LINK``: it identifies a bearer link, not a session.
+    ONBOARDING_LINK = "onboarding_link", "Onboarding link"
     CELERY = "celery", "Celery"
     SYSTEM = "system", "System"
     MANAGEMENT_COMMAND = "management_command", "Management command"

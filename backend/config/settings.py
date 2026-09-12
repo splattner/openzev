@@ -172,6 +172,8 @@ REST_FRAMEWORK = {
         # Per invoice link, so one leaked invoice cannot be used to bombard a
         # participant's mailbox regardless of where the requests originate.
         "magic_link_request": env("MAGIC_LINK_THROTTLE_RATE", default="5/hour"),
+        # Per-IP budget for the unauthenticated onboarding-consume endpoint.
+        "onboarding_link": env("ONBOARDING_LINK_THROTTLE_RATE", default="60/hour"),
         # Per-user budgets bounding bulk uploads (worker-exhaustion guard).
         "import": env("IMPORT_THROTTLE_RATE", default="60/hour"),
         "transfer_import": env("TRANSFER_IMPORT_THROTTLE_RATE", default="20/hour"),
