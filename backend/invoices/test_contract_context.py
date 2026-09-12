@@ -503,7 +503,7 @@ class ContractIssuanceTests(TestCase):
 
         self.assertFalse(created)
         self.assertEqual(second.pk, first.pk)
-        self.assertEqual(second.pdf, first.pdf)
+        self.assertEqual(bytes(second.pdf), bytes(first.pdf))
         self.assertEqual(ContractIssue.objects.count(), 1)
 
     @pytest.mark.slow
@@ -518,7 +518,7 @@ class ContractIssuanceTests(TestCase):
 
         self.assertFalse(created)
         self.assertEqual(second.pk, first.pk)
-        self.assertEqual(second.pdf, first.pdf)
+        self.assertEqual(bytes(second.pdf), bytes(first.pdf))
         self.assertEqual(ContractIssue.objects.count(), 1)
 
     def test_concurrent_identical_issuances_mint_a_single_version(self):
@@ -580,7 +580,7 @@ class ContractIssuanceTests(TestCase):
         self.assertIsNone(archived.zev_id)
         self.assertEqual(archived.version, 1)
         self.assertEqual(archived.document_number, "CTR-2026-0001")
-        self.assertTrue(archived.pdf.startswith(b"%PDF"))
+        self.assertTrue(bytes(archived.pdf).startswith(b"%PDF"))
 
     @pytest.mark.slow
     def test_data_change_bumps_version_and_number(self):

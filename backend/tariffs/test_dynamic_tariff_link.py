@@ -16,7 +16,7 @@ from django.db.models import ProtectedError
 from testing import factories
 
 from tariffs.dynamic.models import DynamicPricePoint, DynamicTariffSource
-from tariffs.models import BillingMode, EnergyType, Tariff, TariffCategory
+from tariffs.models import BillingMode, EnergyType, Tariff, TariffCategory, TariffPeriod
 
 pytestmark = pytest.mark.django_db
 
@@ -131,7 +131,41 @@ class TestSeriesVersioning:
         assert Tariff.objects.filter(zev=zev, name="Grid usage").count() == 2
 
 
+class TestDynamicPeriods:
+    def test_the_model_refuses_price_bands_on_a_dynamic_tariff(self):
+        zev = factories.ZevFactory()
+        tariff = make_tariff(zev, make_source())
+        period = TariffPeriod(tariff=tariff, period_type="flat", price_chf_per_kwh="0.99")
+
+        with pytest.raises(ValidationError):
+            period.full_clean(exclude=["tariff"])
+
+    def test_price_bands_are_rejected_on_a_dynamic_tariff(self):
+        from tariffs.serializers import TariffPeriodSerializer
+
+        zev = factories.ZevFactory()
+        tariff = make_tariff(zev, make_source())
+        serializer = TariffPeriodSerializer(
+            data={"tariff": str(tariff.pk), "period_type": "flat", "price_chf_per_kwh": "0.99"}
+        )
+        assert not serializer.is_valid()
+
+    def test_source_capabilities_cannot_claim_ranges_for_an_exact_url(self):
+        with pytest.raises(ValidationError) as caught:
+            make_source(request_mode="exact_url", supports_range=True)
+
+        assert "supports_range" in caught.value.message_dict
+
+
 class TestRetention:
+    def test_api_version_is_part_of_source_identity(self):
+        v1 = make_source(api_version="v1_0_5")
+        v2 = make_source(api_version="v2_0_0")
+        assert v1.pk != v2.pk
+        v1.api_version = "v2_0_0"
+        with pytest.raises(ValidationError, match="immutable"):
+            v1.save()
+
     def test_a_source_still_referenced_by_a_tariff_cannot_be_deleted(self):
         # The points behind an issued invoice are its audit trail, and neither
         # operator can re-supply them: Groupe E drops history after ~9 months

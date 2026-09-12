@@ -1,104 +1,102 @@
-"""Shared tariff-pricing helpers used by more than one printed document.
-
-Extracted from ``contract_pdf`` so a second document — the tariff overview —
-does not have to invent a second answer to "what does a percentage-of-energy
-tariff effectively cost right now?"
-
-This is deliberately *not* what the billing engine uses. ``engine._price_energy``
-resolves a grid price per reading timestamp, because it has real consumption to
-price and a multi-band grid tariff genuinely charges different rates at
-different times. A printed document with no consumption to resolve a timestamp
-against needs a single static figure instead, and the two must not silently
-drift into disagreeing about it — see
-``docs/specs/2026-09-tariff-overview-pdf.md`` §6.1.
-
-A dynamic tariff (``Tariff.dynamic_source``) has no periods to fall back to at
-all — its price lives in a fetched time series, not on the tariff. It prints
-the average of whatever has been fetched instead, which is exactly as much of
-an approximation as the multi-band fallback below is, and is flagged to the
-reader the same way (``footnote_dynamic_average``, mirroring
-``footnote_multiband_base``).
-"""
+"""Representative display prices shared by contracts and tariff overviews."""
+from dataclasses import dataclass
+from datetime import date
 from decimal import Decimal
 
-from django.db.models import Avg
+from django.utils import timezone
 
-from tariffs.dynamic.models import DynamicPricePoint
-from tariffs.models import PeriodType
-
-
-def dynamic_average_chf_per_kwh(tariff) -> Decimal | None:
-    """The mean fetched price for a dynamic tariff's series.
-
-    None when nothing has been fetched yet — a source just configured, or one
-    still waiting on its first scheduled run — so the caller can decide how to
-    print "no price yet" rather than silently printing zero.
-    """
-    result = DynamicPricePoint.objects.filter(
-        source_id=tariff.dynamic_source_id
-    ).aggregate(avg=Avg("price_chf_per_kwh"))["avg"]
-    return Decimal(str(result)) if result is not None else None
+from tariffs.dynamic.pricing import summarize_dynamic_tariff, summarize_requests
+from tariffs.models import BillingMode, EnergyType, PeriodType
 
 
-def display_grid_base_chf_per_kwh(grid_tariffs) -> Decimal:
-    """Sum of the display price of each ``grid_tariffs`` entry.
+@dataclass(frozen=True)
+class GridBaseSummary:
+    price_chf_per_kwh: Decimal | None
+    dynamic_status: str | None
 
-    Per static tariff: its flat price if it has one, else its HT price, else
-    its first period — the same fallback a reader would reach for if handed
-    the tariff sheet and asked "what's the headline rate?". Multi-band grid
-    tariffs are approximated this way on purpose; pair with
-    :func:`grid_base_is_multiband` to decide whether that approximation needs
-    flagging to the reader.
+    @property
+    def has_effective_price(self) -> bool:
+        return self.price_chf_per_kwh is not None and (
+            self.price_chf_per_kwh > 0 or self.dynamic_status is not None
+        )
 
-    Per dynamic tariff: the average of its fetched series
-    (:func:`dynamic_average_chf_per_kwh`), or nothing if it has none yet — a
-    document is printed at some moment, and an untouched sum understates the
-    base rather than guessing at a number nobody fetched.
-    """
+
+def display_grid_base_summary(
+    grid_tariffs, *, as_of: date | None = None, dynamic_summaries=None
+) -> GridBaseSummary:
+    """Sum representative prices; an unavailable component makes the base unavailable."""
+    as_of = as_of or timezone.localdate()
     total = Decimal("0")
+    dynamic_status = None
     for tariff in grid_tariffs:
         if tariff.dynamic_source_id:
-            average = dynamic_average_chf_per_kwh(tariff)
-            if average is not None:
-                total += average
+            summary = (
+                dynamic_summaries[tariff.pk] if dynamic_summaries is not None
+                else summarize_dynamic_tariff(tariff, as_of=as_of)
+            )
+            if summary.average_chf_per_kwh is None:
+                return GridBaseSummary(None, "unavailable")
+            total += summary.average_chf_per_kwh
+            if summary.status == "partial":
+                dynamic_status = "partial"
+            elif dynamic_status is None:
+                dynamic_status = "complete"
             continue
         periods = list(tariff.periods.all())
-        flat = next((p for p in periods if p.period_type == PeriodType.FLAT), None)
-        if flat:
-            total += Decimal(str(flat.price_chf_per_kwh))
+        representative = next(
+            (period for kind in (PeriodType.FLAT, PeriodType.HIGH, PeriodType.LOW)
+             for period in periods if period.period_type == kind),
+            periods[0] if periods else None,
+        )
+        if representative:
+            total += Decimal(str(representative.price_chf_per_kwh))
+    return GridBaseSummary(total, dynamic_status)
+
+
+def prepare_tariff_display_summaries(tariffs, *, as_of: date):
+    """Cache API display prices, including percentage bases at their own date.
+
+    Call with prefetched periods and all grid versions in the requested ZEVs.
+    All dynamic windows share one bounded query per source.
+    """
+    requests, grids_by_zev, bases = {}, {}, {}
+    for tariff in tariffs:
+        if tariff.dynamic_source_id:
+            requests[tariff.pk, as_of] = (tariff, as_of)
+        if tariff.billing_mode == BillingMode.ENERGY and tariff.energy_type == EnergyType.GRID:
+            grids_by_zev.setdefault(tariff.zev_id, []).append(tariff)
+    for tariff in tariffs:
+        if tariff.billing_mode != BillingMode.PERCENTAGE_OF_ENERGY:
             continue
-        high = next((p for p in periods if p.period_type == PeriodType.HIGH), None)
-        if high:
-            total += Decimal(str(high.price_chf_per_kwh))
-        elif periods:
-            total += Decimal(str(periods[0].price_chf_per_kwh))
-    return total
+        reference = max(tariff.valid_from, min(as_of, tariff.valid_to or as_of))
+        grids = [grid for grid in grids_by_zev.get(tariff.zev_id, [])
+                 if grid.valid_from <= reference and (grid.valid_to is None or reference <= grid.valid_to)]
+        bases[tariff.pk] = (reference, grids)
+        for grid in grids:
+            if grid.dynamic_source_id:
+                requests[grid.pk, reference] = (grid, reference)
+    summaries = summarize_requests(requests)
+    for tariff in tariffs:
+        if tariff.dynamic_source_id:
+            tariff._prefetched_dynamic_summary = summaries[tariff.pk, as_of]
+        if tariff.pk in bases:
+            reference, grids = bases[tariff.pk]
+            base = display_grid_base_summary(grids, as_of=reference, dynamic_summaries={
+                grid.pk: summaries[grid.pk, reference] for grid in grids if grid.dynamic_source_id
+            })
+            tariff._prefetched_percentage_base = {
+                "price_chf_per_kwh": str(base.price_chf_per_kwh) if base.price_chf_per_kwh is not None else None,
+                "dynamic_status": base.dynamic_status,
+                "reference_date": reference.isoformat(),
+            }
 
 
 def grid_base_is_multiband(grid_tariffs) -> bool:
-    """True when any *static* tariff contributing to the base has more than
-    one band. A dynamic tariff is never counted here — it needs its own
-    footnote (:func:`grid_base_is_dynamic`), because "the price depends on
-    the time band" and "the price is a fluctuating fetched series" are
-    different things to tell the reader, worded differently in
-    ``footnote_multiband_base`` vs ``footnote_dynamic_average``.
+    """Static multi-band bases need an approximation footnote.
 
-    ``len(list(...))`` rather than ``.count()``: callers already hold
-    ``periods`` prefetched, and ``.count()`` would issue a fresh query instead
-    of using that cache.
+    Dynamic tariffs carry their own status. Use prefetched periods in memory.
     """
     return any(
         not tariff.dynamic_source_id and len(list(tariff.periods.all())) > 1
         for tariff in grid_tariffs
     )
-
-
-def grid_base_is_dynamic(grid_tariffs) -> bool:
-    """True when any tariff contributing to the base is dynamic.
-
-    A fluctuating fetched price printed as one static number is an
-    approximation by construction, same as the multi-band case, but the
-    reader needs a different explanation for why — see
-    :func:`grid_base_is_multiband`.
-    """
-    return any(tariff.dynamic_source_id for tariff in grid_tariffs)

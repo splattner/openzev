@@ -44,6 +44,8 @@ class TariffPeriodSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         tariff = attrs.get("tariff") or getattr(self.instance, "tariff", None)
+        if tariff is not None and getattr(tariff, "dynamic_source_id", None):
+            raise serializers.ValidationError("This tariff is priced from a fetched series; price bands do not apply.")
         if tariff and tariff.billing_mode != BillingMode.ENERGY:
             raise serializers.ValidationError("Tariff periods are only supported for energy-based tariffs.")
         if tariff:
@@ -58,6 +60,39 @@ class TariffPeriodSerializer(serializers.ModelSerializer):
 
 class TariffSerializer(serializers.ModelSerializer):
     periods = TariffPeriodSerializer(many=True, read_only=True)
+    dynamic_price_summary = serializers.SerializerMethodField()
+    percentage_base_summary = serializers.SerializerMethodField()
+
+    def get_percentage_base_summary(self, obj):
+        if obj.billing_mode != BillingMode.PERCENTAGE_OF_ENERGY:
+            return None
+        if not hasattr(obj, "_prefetched_percentage_base"):
+            from django.utils import timezone
+            from invoices.tariff_pricing import prepare_tariff_display_summaries
+            from .models import EnergyType
+
+            grids = list(Tariff.objects.filter(
+                zev_id=obj.zev_id, billing_mode=BillingMode.ENERGY, energy_type=EnergyType.GRID,
+            ).prefetch_related("periods"))
+            prepare_tariff_display_summaries([*grids, obj], as_of=timezone.localdate())
+        return obj._prefetched_percentage_base
+
+    def get_dynamic_price_summary(self, obj):
+        if not obj.dynamic_source_id:
+            return None
+        # list_series precomputes one query per shared source via
+        # prepare_tariff_display_summaries; detail routes fall through
+        # to the single-tariff query.
+        precomputed = getattr(obj, "_prefetched_dynamic_summary", None)
+        if precomputed is not None:
+            return precomputed.as_dict()
+        from django.utils import timezone
+
+        from .dynamic.pricing import summarize_dynamic_tariff
+
+        return summarize_dynamic_tariff(
+            obj, as_of=timezone.localdate()
+        ).as_dict()
 
     def _raise_validation_error_from_model(self, exc: DjangoValidationError):
         if hasattr(exc, "message_dict"):
@@ -65,17 +100,17 @@ class TariffSerializer(serializers.ModelSerializer):
         raise serializers.ValidationError(exc.messages)
 
     def validate(self, attrs):
-        # A dynamic tariff's link is the only thing that ties an issued
-        # invoice back to the fetched prices behind it (invoice items store
-        # rendered amounts, not a tariff FK). Repointing or clearing
-        # ``dynamic_source`` on a tariff that already priced one would sever
-        # that link without deleting a single DynamicPricePoint — the same
-        # evidence the source-level clear/delete guards protect, lost
-        # through a different door. Setting it for the *first* time is fine:
-        # there was no evidence relationship to lose.
+        # Keep the existing billed-tariff workflow guard. Frozen invoice
+        # provenance independently protects prices if tariff metadata changes.
         if self.instance is not None and "dynamic_source" in attrs:
             new_source = attrs["dynamic_source"]
             new_source_id = new_source.pk if new_source is not None else None
+            if new_source_id and self.instance.periods.exists():
+                raise serializers.ValidationError({
+                    "dynamic_source": (
+                        "Remove this tariff's price bands before linking a fetched series."
+                    )
+                })
             if (
                 self.instance.dynamic_source_id
                 and new_source_id != self.instance.dynamic_source_id
@@ -88,8 +123,7 @@ class TariffSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError({
                     "dynamic_source": (
                         "This tariff priced a non-cancelled invoice from its current "
-                        "dynamic source. Repointing or clearing it would sever the only "
-                        "link back to the fetched prices behind that invoice."
+                        "dynamic source. Create a new tariff version to change its price source."
                     )
                 })
 
@@ -172,6 +206,7 @@ class VseTariffImportSelectionSerializer(serializers.Serializer):
     #: than against ``BillingMode`` at large, so the preview and the write path
     #: allow exactly the same set. Omitted means the proposed mode.
     billing_mode = serializers.CharField(max_length=40, required=False, allow_null=True)
+    dynamic_tariff_name = serializers.CharField(max_length=120, required=False, allow_blank=True)
 
 
 class VseTariffImportApplyRequestSerializer(serializers.Serializer):
@@ -283,14 +318,20 @@ class DynamicTariffSourceSerializer(serializers.ModelSerializer):
     linked_tariff_count = serializers.IntegerField(read_only=True, default=0)
     linked_zev_count = serializers.IntegerField(read_only=True, default=0)
     supports_backfill = serializers.BooleanField(read_only=True)
+    aggregated_tariff_types = serializers.SerializerMethodField()
+
+    def get_aggregated_tariff_types(self, obj):
+        from .dynamic.components import aggregated_tariff_types
+
+        return list(aggregated_tariff_types(obj.api_version, obj.tariff_type))
 
     class Meta:
         model = DynamicTariffSource
         fields = [
-            "id", "label", "url", "api_version", "tariff_type", "tariff_name",
+            "id", "label", "url", "api_version", "tariff_type", "tariff_name", "enabled",
             "last_fetch_status", "last_fetch_at", "last_success_at", "last_fetch_error",
-            "covers_from", "covers_to", "point_count", "linked_tariff_count", "linked_zev_count",
-            "supports_backfill", "created_at", "updated_at",
+            "covers_from", "covers_to", "recovery_from", "point_count", "linked_tariff_count", "linked_zev_count",
+            "supports_backfill", "empty_on_not_found", "aggregated_tariff_types", "created_at", "updated_at",
         ]
         read_only_fields = fields
 
@@ -307,7 +348,7 @@ class DynamicTariffSourceWriteSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = DynamicTariffSource
-        fields = ["label", "url", "api_version", "tariff_type", "tariff_name"]
+        fields = ["label", "url", "api_version", "tariff_type", "tariff_name", "enabled"]
         # The API deliberately treats the model's natural-key collision as
         # reuse, so let the service resolve it instead of returning a 400.
         validators = []
@@ -352,14 +393,7 @@ class DynamicSourceFetchSerializer(serializers.Serializer):
 
 
 class DynamicSourceConfirmationSerializer(serializers.Serializer):
-    """Typing the source's own label back is the guard on a destructive action.
-
-    Deliberately the *only* required field. A free-text reason is recorded when
-    one is sent, but it is not demanded: a reason box on an irreversible action
-    invites a keystroke rather than a thought, and the label — which has to be
-    read off the row being destroyed — is what actually stops the wrong source
-    being picked.
-    """
+    """Exact source-label confirmation, with an optional audited reason."""
 
     confirmation = serializers.CharField(max_length=200)
     reason = serializers.CharField(

@@ -30,6 +30,35 @@ def feed_in_payload():
 
 class DiscoveryTests(SimpleTestCase):
     @mock.patch("tariffs.dynamic.discovery.fetch_tariff_document")
+    def test_an_exact_v2_url_can_verify_its_named_product_without_query_support(self, fetch):
+        def answer(url):
+            if "?" in url:
+                raise TariffFetchError("Query parameters are not accepted.")
+            return fixture("vse_v2_grid"), "digest"
+
+        fetch.side_effect = answer
+        result = probe_source_configuration(
+            "https://prices.example.test/current", tariff_type="grid", tariff_name="standard"
+        )
+        self.assertEqual(result.request_mode, "exact_url")
+        self.assertEqual(result.tariff_name, "standard")
+
+    @mock.patch("tariffs.dynamic.discovery.fetch_tariff_document")
+    def test_the_probed_v2_product_is_retained(self, fetch):
+        fetch.return_value = (fixture("vse_v2_grid"), "digest")
+        result = probe_source_configuration("https://prices.example.test/tariffs", tariff_type="grid")
+        self.assertEqual(result.tariff_name, "standard")
+
+    @mock.patch("tariffs.dynamic.discovery.fetch_tariff_document")
+    def test_storage_refunds_are_not_offered_for_billing(self, fetch):
+        payload = fixture("vse_v2_grid")
+        for row in payload["prices"]:
+            row["refund"] = row["grid"]
+        fetch.return_value = (payload, "digest")
+        result = discover_endpoint("https://prices.example.test/tariffs")
+        self.assertNotIn("refund", [component.tariff_type for component in result.components])
+
+    @mock.patch("tariffs.dynamic.discovery.fetch_tariff_document")
     def test_version_and_v2_product_are_discovered(self, fetch):
         fetch.return_value = (fixture("vse_v2_grid"), "digest")
 

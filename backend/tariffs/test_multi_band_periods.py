@@ -19,7 +19,7 @@ from django.test import TestCase
 from rest_framework.test import APIClient
 
 from accounts.models import UserRole
-from invoices.engine import _get_tariff_price
+from invoices.engine import _resolve_tariff_band
 from tariffs.models import (
     BillingMode,
     EnergyType,
@@ -62,7 +62,8 @@ class MultiBandPricingTests(BandFixture):
         self.band("0.15", "17:00", "23:59")   # shoulder
 
     def _price_at(self, hour, minute=0):
-        return _get_tariff_price(self.tariff, datetime(2026, 3, 15, hour, minute))
+        period = _resolve_tariff_band(self.tariff, datetime(2026, 3, 15, hour, minute))
+        return period.price_chf_per_kwh if period is not None else None
 
     def test_each_band_prices_its_own_window(self):
         self.assertEqual(self._price_at(3), Decimal("0.09000"))

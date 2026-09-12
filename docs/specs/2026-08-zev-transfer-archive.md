@@ -108,8 +108,15 @@ commit — a failed audit must not cause a duplicate import on client retry).
 
 ## 6. Archive format (`backend/zev/transfer/schema.py`)
 
-`FORMAT_VERSION = 1`, `SUPPORTED_FORMAT_VERSIONS = {1}` — a version this instance
-does not read is refused outright (`ArchiveError`, a `ValueError` subclass).
+`FORMAT_VERSION = 2`, `SUPPORTED_FORMAT_VERSIONS = {1, 2}`. Version 2 adds
+`enabled` and the explicit `empty_on_not_found` setting to source descriptors,
+plus frozen invoice-to-source evidence. The earlier provider-neutral fields
+(`api_version`, `request_mode`, `query_tariff_type`, `supports_range`) already
+existed in version 1. Older importers must reject version 2 rather than lose
+configuration or provenance.
+The current importer continues to accept version 1 static archives and legacy
+adapter-based dynamic descriptors. A version this instance does not read is
+refused outright (`ArchiveError`, a `ValueError` subclass).
 
 Sections (order = write and import order, a correctness constraint):
 
@@ -135,9 +142,12 @@ openzev-export-<community>-<date>.zip
   metering_points.json   [{"id", <METERING_POINT_FIELDS>,
                            "assignments": [{"id", "participant_id", <ASSIGNMENT_FIELDS>}]}]
   tariffs.json           [{"id", <TARIFF_FIELDS>,
+                           "dynamic_source": {<DYNAMIC_SOURCE_FIELDS>} | null,
                            "periods": [{"id", <TARIFF_PERIOD_FIELDS>}]}]
   invoices.json          [{"id", "participant_id", <INVOICE_FIELDS>,
-                           "items": [{"id", <INVOICE_ITEM_FIELDS>}]}]
+                           "items": [{"id", <INVOICE_ITEM_FIELDS>}],
+                           "dynamic_evidence": [{"dynamic_source": {<DYNAMIC_SOURCE_FIELDS>},
+                             "tariff_id_snapshot", "evidence_from", "evidence_to"}]}]
   readings/<meter>.csv   one file per meter
 ```
 
@@ -150,6 +160,16 @@ from `INVOICE_FIELDS`. `READING_CSV_COLUMNS = ("meter_id", "timestamp",
 "energy_kwh", "direction", "resolution", "import_source")` — the same layout the
 normal CSV metering import reads, plus `resolution`/`import_source` so nothing is
 lost in a round trip.
+
+Dynamic sources match on `(url, api_version, tariff_type, tariff_name)`.
+Existing sources retain their settings; descriptor mismatches are logged.
+An imported disabled source queues no backfill. Invoice evidence is validated
+and stored with source-row locks, even when tariffs were not selected. Evidence
+bounds are offset-bearing timestamps and the tariff UUID is a value snapshot,
+not a foreign key to a tariff on the new instance. Legacy invoices without the
+field infer evidence once from imported tariffs when available. Price points
+and recovery cursors still do not travel; a database backup is required to
+retain the original fetched series, regardless of invoice totals/provenance.
 
 **Reading member names**: `readings/<sanitised>-<digest>.csv` where `<sanitised>`
 is the meter id with anything outside `[A-Za-z0-9_.-]` replaced by `_`, and
@@ -310,6 +330,11 @@ pushed past imported numbering; readings are recorded as an import log;
 importing twice collides on meter ids; a structure-only archive can be imported
 twice; a subset can be imported from a full archive; a name override renames the
 imported ZEV; a structure-only archive still names the ZEV.
+
+**Dynamic source compatibility**: current version-2 exports retain the
+provider-neutral source descriptor; version-1 static archives remain importable,
+and a version-1 legacy adapter descriptor is translated into the current source
+capabilities.
 
 **`RejectedArchiveTests`**: non-zip refused; missing manifest refused;
 unknown format version fails loudly; manifest promising a missing file refused;

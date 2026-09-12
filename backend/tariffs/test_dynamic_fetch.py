@@ -90,6 +90,45 @@ class TestChunkWindows:
 
 
 class TestStorePoints:
+    def test_rejected_replacements_cannot_hide_the_old_interval_from_other_candidates(self):
+        from tariffs.dynamic.fetch import PriceSeriesConflict
+
+        source = make_source()
+        start = datetime(2026, 2, 1, tzinfo=UTC)
+        def interval(begin, end):
+            return PricePoint(start + timedelta(hours=begin), start + timedelta(hours=end), Decimal("0.1"))
+        store_points(source, [interval(0, 10)])
+        with pytest.raises(PriceSeriesConflict):
+            store_points(source, [interval(0, 3), interval(2, 4), interval(8, 9), interval(12, 13)])
+        assert list(source.points.values_list("valid_from", "valid_to")) == [
+            (start, start + timedelta(hours=10)),
+            (start + timedelta(hours=12), start + timedelta(hours=13)),
+        ]
+
+    def test_unbilled_resolution_changes_preserve_billed_history(self):
+        from testing import factories
+
+        source = make_source()
+        tariff = factories.TariffFactory(dynamic_source=source, energy_type="grid")
+        factories.InvoiceFactory(zev=tariff.zev, period_start="2026-01-01", period_end="2026-01-31")
+        history = PricePoint(datetime(2026, 1, 15, tzinfo=UTC), datetime(2026, 1, 16, tzinfo=UTC), Decimal("0.1"))
+        store_points(source, [history, point(10, "0.1", minutes=30), point(11, "0.1", minutes=30)])
+        store_points(source, [point(10, "0.2", minutes=90)])
+        assert source.points.count() == 2
+        assert source.points.get(valid_from=history.valid_from).price_chf_per_kwh == Decimal("0.1")
+
+    def test_schema_failures_are_failed_without_celery_retry(self):
+        from tariffs.dynamic.fetch import PriceSeriesConflict
+        from tariffs.tasks import fetch_dynamic_prices
+
+        source = make_source()
+        with served({"publication_timestamp": "", "prices": "invalid"}), mock.patch.object(fetch_dynamic_prices, "retry") as retry:
+            with pytest.raises(PriceSeriesConflict):
+                fetch_dynamic_prices(str(source.pk))
+        retry.assert_not_called()
+        source.refresh_from_db()
+        assert source.last_fetch_status == FetchStatus.FAILED
+
     def test_points_are_stored_in_utc_whatever_offset_they_arrived_in(self):
         source = make_source()
         local = datetime(2026, 2, 1, 12, tzinfo=timezone(timedelta(hours=2)))
@@ -122,6 +161,306 @@ class TestStorePoints:
         source.refresh_from_db()
         assert source.covers_from == datetime(2026, 2, 1, 10, tzinfo=UTC)
         assert source.covers_to == datetime(2026, 2, 1, 14, 15, tzinfo=UTC)
+
+
+class TestEvidenceProtection:
+    def test_overwriting_a_billed_interval_is_refused(self):
+        from tariffs.dynamic.fetch import BilledPriceChanged
+        from testing import factories
+        from tariffs.models import EnergyType
+
+        source = make_source()
+        tariff = factories.TariffFactory(dynamic_source=source, energy_type=EnergyType.GRID)
+        factories.InvoiceFactory(zev=tariff.zev, period_start="2026-02-01", period_end="2026-02-28", status="sent")
+        store_points(source, [point(10, "0.10000")])
+        with pytest.raises(BilledPriceChanged):
+            store_points(source, [point(10, "0.20000")])
+        assert DynamicPricePoint.objects.get().price_chf_per_kwh == Decimal("0.10000")
+
+    def test_a_draft_invoice_freezes_a_republished_price(self):
+        from tariffs.dynamic.fetch import BilledPriceChanged
+        from tariffs.models import EnergyType
+        from testing import factories
+
+        source = make_source()
+        tariff = factories.TariffFactory(
+            dynamic_source=source, energy_type=EnergyType.GRID
+        )
+        factories.InvoiceFactory(
+            zev=tariff.zev,
+            period_start="2026-02-01",
+            period_end="2026-02-28",
+            status="draft",
+        )
+        store_points(source, [point(10, "0.10000")])
+
+        with pytest.raises(BilledPriceChanged):
+            store_points(source, [point(10, "0.20000")])
+        assert DynamicPricePoint.objects.get().price_chf_per_kwh == Decimal("0.10000")
+
+    def test_shortening_an_interval_cannot_remove_billed_coverage(self):
+        from tariffs.dynamic.fetch import BilledPriceChanged
+        from tariffs.models import EnergyType
+        from testing import factories
+
+        source = make_source()
+        tariff = factories.TariffFactory(
+            dynamic_source=source, energy_type=EnergyType.GRID,
+            valid_from="2026-01-01", valid_to="2026-02-28",
+        )
+        factories.InvoiceFactory(
+            zev=tariff.zev, period_start="2026-02-01", period_end="2026-02-28", status="sent",
+        )
+        start = datetime(2026, 1, 31, 23, 45, tzinfo=UTC)
+        store_points(source, [PricePoint(start, datetime(2026, 2, 1, 0, 15, tzinfo=UTC), Decimal("0.1"))])
+
+        with pytest.raises(BilledPriceChanged):
+            store_points(source, [PricePoint(start, datetime(2026, 1, 31, 23, 59, tzinfo=UTC), Decimal("0.1"))])
+
+    def test_an_interval_ending_at_invoice_start_is_not_frozen(self):
+        from tariffs.models import EnergyType
+        from testing import factories
+
+        source = make_source()
+        tariff = factories.TariffFactory(dynamic_source=source, energy_type=EnergyType.GRID)
+        factories.InvoiceFactory(
+            zev=tariff.zev, period_start="2026-02-01", period_end="2026-02-28", status="sent",
+        )
+        start = datetime(2026, 1, 31, 23, 45, tzinfo=UTC)
+        end = datetime(2026, 2, 1, 0, 0, tzinfo=UTC)
+        store_points(source, [PricePoint(start, end, Decimal("0.1"))])
+
+        assert store_points(source, [PricePoint(start, end, Decimal("0.2"))]) == 1
+
+    def test_invoice_evidence_is_intersected_with_tariff_validity(self):
+        from tariffs.models import EnergyType
+        from testing import factories
+
+        source = make_source()
+        tariff = factories.TariffFactory(
+            dynamic_source=source, energy_type=EnergyType.GRID,
+            valid_from="2026-02-01", valid_to="2026-02-28",
+        )
+        factories.InvoiceFactory(
+            zev=tariff.zev, period_start="2026-01-01", period_end="2026-01-31", status="sent",
+        )
+        start = datetime(2026, 1, 31, 23, 45, tzinfo=UTC)
+
+        store_points(source, [PricePoint(start, datetime(2026, 2, 1, 0, 15, tzinfo=UTC), Decimal("0.1"))])
+        assert store_points(source, [PricePoint(start, datetime(2026, 2, 1, 0, 15, tzinfo=UTC), Decimal("0.2"))]) == 1
+
+    def test_one_billed_conflict_does_not_discard_an_unrelated_new_point(self):
+        from tariffs.dynamic.fetch import PriceSeriesConflict
+        from tariffs.models import EnergyType
+        from testing import factories
+
+        source = make_source()
+        tariff = factories.TariffFactory(dynamic_source=source, energy_type=EnergyType.GRID)
+        factories.InvoiceFactory(
+            zev=tariff.zev, period_start="2026-02-01", period_end="2026-02-28", status="sent",
+        )
+        stored = point(10, "0.10000")
+        store_points(source, [stored])
+
+        with pytest.raises(PriceSeriesConflict):
+            store_points(source, [point(10, "0.20000"), point(11, "0.30000")])
+
+        assert DynamicPricePoint.objects.get(valid_from=stored.valid_from).price_chf_per_kwh == Decimal("0.10000")
+        assert DynamicPricePoint.objects.get(valid_from=point(11, "0.30000").valid_from).price_chf_per_kwh == Decimal("0.30000")
+
+    def test_replacing_an_interval_with_adjacent_intervals_checks_the_result(self):
+        source = make_source()
+        start = datetime(2026, 2, 1, 10, tzinfo=UTC)
+        store_points(source, [PricePoint(start, start + timedelta(hours=1), Decimal("0.1"))])
+
+        assert store_points(source, [
+            PricePoint(start, start + timedelta(minutes=30), Decimal("0.2")),
+            PricePoint(start + timedelta(minutes=30), start + timedelta(hours=1), Decimal("0.3")),
+        ]) == 2
+        assert DynamicPricePoint.objects.filter(source=source).count() == 2
+
+    def test_overlapping_a_stored_interval_is_refused(self):
+        from tariffs.dynamic.vse_v1 import DynamicTariffResponseError
+
+        source = make_source()
+        start = datetime(2026, 2, 1, 10, tzinfo=UTC)
+        store_points(source, [PricePoint(start, start + timedelta(minutes=30), Decimal("0.1"))])
+        with pytest.raises(DynamicTariffResponseError):
+            store_points(source, [PricePoint(
+                start + timedelta(minutes=15), start + timedelta(minutes=45), Decimal("0.2"),
+            )])
+
+    def test_repeated_upserts_report_no_new_writes(self):
+        source = make_source()
+        assert store_points(source, [point(10, "0.1", day=3)]) == 1
+        assert store_points(source, [point(10, "0.1", day=3)]) == 0
+
+    def test_refresh_recovers_from_the_stored_extent(self):
+        source = make_source()
+        source.covers_to = datetime(2026, 1, 1, tzinfo=UTC)
+        source.save()
+        with mock.patch("tariffs.dynamic.fetch.fetch_window", return_value=([], [])) as fetch:
+            refresh_source(source, now=datetime(2026, 2, 1, 12, tzinfo=UTC))
+
+        assert fetch.call_args_list[0].args[1].start == datetime(2026, 1, 1, tzinfo=UTC)
+
+    def test_a_current_series_asks_for_yesterday_instead_of_its_whole_history(self):
+        source = make_source()
+        source.covers_to = datetime(2026, 2, 3, tzinfo=UTC)
+        source.save()
+        with mock.patch("tariffs.dynamic.fetch.fetch_window", return_value=([], [])) as fetch:
+            refresh_source(source, now=datetime(2026, 2, 1, 12, tzinfo=UTC))
+
+        assert fetch.call_count == 1
+        assert fetch.call_args.args[1].start == datetime(2026, 1, 31, tzinfo=UTC)
+
+    def test_nothing_stored_falls_back_to_the_last_successful_fetch(self):
+        source = make_source()
+        source.last_success_at = datetime(2026, 1, 20, tzinfo=UTC)
+        source.save()
+        with mock.patch("tariffs.dynamic.fetch.fetch_window", return_value=([], [])) as fetch:
+            refresh_source(source, now=datetime(2026, 2, 1, 12, tzinfo=UTC))
+
+        assert fetch.call_args_list[0].args[1].start == datetime(2026, 1, 20, tzinfo=UTC)
+
+    def test_a_refused_price_fails_the_refresh_instead_of_vanishing(self):
+        from tariffs.dynamic.fetch import PriceSeriesConflict
+        from tariffs.models import EnergyType
+        from testing import factories
+
+        source = make_source()
+        tariff = factories.TariffFactory(dynamic_source=source, energy_type=EnergyType.GRID)
+        factories.InvoiceFactory(
+            zev=tariff.zev, period_start="2026-02-01", period_end="2026-02-28", status="sent",
+        )
+        store_points(source, [point(10, "0.10000")])
+
+        with mock.patch(
+            "tariffs.dynamic.fetch.fetch_window", return_value=([point(10, "0.20000")], [])
+        ):
+            with pytest.raises(PriceSeriesConflict):
+                refresh_source(source, now=datetime(2026, 2, 1, 12, tzinfo=UTC))
+
+        source.refresh_from_db()
+        assert source.last_fetch_status == FetchStatus.FAILED
+        assert "already priced an invoice" in source.last_fetch_error
+        assert DynamicPricePoint.objects.get().price_chf_per_kwh == Decimal("0.10000")
+
+    def test_a_window_that_could_not_be_fetched_is_reported_not_dropped(self):
+        source = make_source()
+        source.covers_to = datetime(2026, 1, 1, tzinfo=UTC)
+        source.save()
+        with mock.patch(
+            "tariffs.dynamic.fetch.fetch_window",
+            side_effect=[([], []), TariffFetchError("The endpoint refused the request.")],
+        ):
+            result = refresh_source(source, now=datetime(2026, 2, 1, 12, tzinfo=UTC))
+
+        assert result.requests == 1
+        assert any("could not be fetched" in warning for warning in result.warnings)
+        source.refresh_from_db()
+        assert source.last_fetch_status == FetchStatus.OK
+        assert source.recovery_from == datetime(2026, 2, 1, tzinfo=UTC)
+
+        with mock.patch("tariffs.dynamic.fetch.fetch_window", return_value=([], [])) as retry:
+            refresh_source(source, now=datetime(2026, 2, 2, 12, tzinfo=UTC))
+        assert retry.call_args.args[1].start == datetime(2026, 2, 1, tzinfo=UTC)
+        source.refresh_from_db()
+        assert source.recovery_from is None
+
+    def test_an_unexpected_error_is_recorded_and_audited(self):
+        source = make_source()
+        with mock.patch("tariffs.dynamic.fetch.fetch_window", side_effect=RuntimeError("boom")),                 mock.patch("tariffs.tasks._audit_best_effort") as audit:
+            with pytest.raises(RuntimeError):
+                fetch_dynamic_prices_impl(str(source.pk))
+        source.refresh_from_db()
+        assert source.last_fetch_status == FetchStatus.FAILED
+        assert "RuntimeError" in source.last_fetch_error
+        audit.assert_called_once()
+
+    @pytest.mark.parametrize("backfill,previous_days,fail_first", [
+        (False, 100, False),
+        (False, 100, True),
+        (True, None, True),
+        (True, 500, False),
+    ])
+    def test_recovery_retains_failed_and_unattempted_history(self, backfill, previous_days, fail_first):
+        today = datetime(2026, 9, 12, tzinfo=UTC)
+        previous = today - timedelta(days=previous_days) if previous_days else None
+        source = make_source(recovery_from=previous)
+        attempted = []
+
+        def fetch(_source, window):
+            attempted.append(window)
+            if fail_first and len(attempted) == 1:
+                raise TariffFetchError("The endpoint is unavailable.")
+            return [], []
+
+        with mock.patch("tariffs.dynamic.fetch.fetch_window", side_effect=fetch):
+            if fail_first and not backfill:
+                with pytest.raises(TariffFetchError):
+                    refresh_source(source, backfill=backfill, now=today)
+            else:
+                refresh_source(source, backfill=backfill, now=today)
+
+        assert attempted[0].start == today - timedelta(days=400 if backfill else 14)
+        source.refresh_from_db()
+        assert source.recovery_from == (previous or attempted[0].start)
+
+    def test_an_unexpected_error_does_not_write_its_message_to_the_operator_field(self):
+        # Confirm the operator field excludes server-only error details.
+        source = make_source()
+        with mock.patch(
+            "tariffs.dynamic.fetch.fetch_window",
+            side_effect=RuntimeError("could not connect to db.internal:5432"),
+        ):
+            with pytest.raises(RuntimeError):
+                refresh_source(source, now=datetime(2026, 2, 1, 12, tzinfo=UTC))
+
+        source.refresh_from_db()
+        assert "db.internal" not in source.last_fetch_error
+        assert "RuntimeError" in source.last_fetch_error
+
+
+class TestAdminCreation:
+    def test_creating_a_source_in_the_admin_queues_one_backfill(self):
+        from django.contrib import admin as django_admin
+
+        from tariffs.admin import DynamicTariffSourceAdmin
+
+        model_admin = DynamicTariffSourceAdmin(DynamicTariffSource, django_admin.site)
+        source = make_source()
+        with (
+            mock.patch("tariffs.admin.transaction.on_commit") as on_commit,
+            mock.patch("tariffs.tasks.fetch_dynamic_prices.delay") as delay,
+        ):
+            model_admin.save_model(request=None, obj=source, form=None, change=False)
+            on_commit.assert_called_once()
+            on_commit.call_args.args[0]()
+
+        delay.assert_called_once_with(str(source.pk), backfill=True)
+
+    def test_editing_a_source_in_the_admin_does_not_queue_a_backfill(self):
+        from django.contrib import admin as django_admin
+
+        from tariffs.admin import DynamicTariffSourceAdmin
+
+        model_admin = DynamicTariffSourceAdmin(DynamicTariffSource, django_admin.site)
+        source = make_source()
+        with mock.patch("tariffs.admin.transaction.on_commit") as on_commit:
+            model_admin.save_model(request=None, obj=source, form=None, change=True)
+
+        on_commit.assert_not_called()
+
+    def test_price_points_are_read_only_in_the_admin(self):
+        from django.contrib import admin as django_admin
+        from tariffs.admin import DynamicPricePointAdmin
+
+        model_admin = DynamicPricePointAdmin(DynamicPricePoint, django_admin.site)
+
+        assert model_admin.has_add_permission(None) is False
+        assert model_admin.has_change_permission(None) is False
+        assert model_admin.has_delete_permission(None) is False
 
 
 class TestCoverageGaps:
@@ -234,6 +573,51 @@ class TestRefreshSource:
         assert source.last_fetch_status == FetchStatus.OK
         assert DynamicPricePoint.objects.count() == 0
 
+    def test_an_expected_exact_url_404_is_an_empty_success(self):
+        source = make_source(
+            request_mode="exact_url",
+            supports_range=False,
+            query_tariff_type="",
+            tariff_type="feed_in",
+            tariff_name="",
+            empty_on_not_found=True,
+        )
+        missing = TariffFetchError(
+            "The operator's server answered HTTP 404.", status_code=404
+        )
+
+        with mock.patch(
+            "tariffs.dynamic.fetch.fetch_tariff_document", side_effect=missing
+        ):
+            result = refresh_source(source, now=datetime(2026, 6, 15, 9, tzinfo=UTC))
+
+        source.refresh_from_db()
+        assert result.requests == 1
+        assert result.points_written == 0
+        assert source.last_fetch_status == FetchStatus.OK
+
+    def test_a_410_remains_a_failure_for_an_exact_url_source(self):
+        source = make_source(
+            request_mode="exact_url",
+            supports_range=False,
+            query_tariff_type="",
+            tariff_type="feed_in",
+            tariff_name="",
+            empty_on_not_found=True,
+        )
+        gone = TariffFetchError(
+            "The operator's server answered HTTP 410.", status_code=410
+        )
+
+        with mock.patch(
+            "tariffs.dynamic.fetch.fetch_tariff_document", side_effect=gone
+        ):
+            with pytest.raises(TariffFetchError):
+                refresh_source(source, now=datetime(2026, 6, 15, 9, tzinfo=UTC))
+
+        source.refresh_from_db()
+        assert source.last_fetch_status == FetchStatus.FAILED
+
     def test_a_failure_is_recorded_in_user_safe_text_and_re_raised(self):
         source = make_source()
         failure = TariffFetchError(
@@ -299,6 +683,20 @@ class TestTasks:
 
         assert result["queued"] == 2
         assert delay.call_count == 2
+
+    def test_the_beat_job_skips_disabled_sources(self):
+        enabled = make_source()
+        make_source(
+            url="https://prices.example.test/disabled",
+            tariff_name="disabled",
+            enabled=False,
+        )
+
+        with mock.patch("tariffs.tasks.fetch_dynamic_prices.delay") as delay:
+            result = refresh_dynamic_tariff_sources()
+
+        assert result["queued"] == 1
+        delay.assert_called_once_with(str(enabled.pk))
 
 
 class TestSourceIdentity:

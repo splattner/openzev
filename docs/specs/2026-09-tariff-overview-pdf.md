@@ -41,7 +41,7 @@ name it, and the ZEV's VAT treatment stated on the face of the document.
 | Backend — wording | `invoices/tariff_overview_translations.py`: de/fr/it/en |
 | Backend — template | `templates/invoices/tariff_overview_pdf.html`, on `pdf/shared_pdf_base.html` |
 | Backend — API | `GET /api/v1/invoices/invoices/tariff-overview/` |
-| Backend — shared helper | `band_recurrence()` in `invoices/band_labels.py`; `display_grid_base_chf_per_kwh()` in `invoices/tariff_pricing.py`, adopted by the contract |
+| Backend — shared helper | `band_recurrence()` in `invoices/band_labels.py`; `display_grid_base_summary()` in `invoices/tariff_pricing.py`, shared with the contract |
 | Frontend | Download button in `TariffToolbar`, wired to the page's existing validity filter |
 | Docs | `docs/user-guide/07-tariff-configuration.md` |
 
@@ -96,7 +96,7 @@ Built by `invoices/tariff_overview.py`; never serialised over the API.
 | `billing_mode_label` | `str` | Localised `BillingMode` label, from this document's own translations |
 | `is_current` | `bool` | In force on `as_of`. Always `True` when `scope="valid"` |
 | `notes` | `str` | `Tariff.notes`, printed as a muted line when non-empty |
-| `price_rows` | `list[PriceRow]` | At least one; a tariff that would produce none is skipped |
+| `price_rows` | `list[PriceRow]` | At least one; a static tariff with no configured price is skipped, while a dynamic tariff with no fetched price gets an explicit unavailable row |
 
 **`PriceRow`** — one printed price line under a tariff.
 
@@ -161,20 +161,17 @@ wrong by the size of the ZEV.
 
 ### 6.1 Percentage-of-energy tariffs
 
-The contract derives its grid base as flat → HT → `periods[0]`
-(`backend/invoices/contract_pdf.py:62-71`).
+The contract and overview derive static grid display prices as flat → HT → NT
+→ first remaining band, through `invoices/tariff_pricing.py`.
 The engine's `_price_energy` instead sums `_get_tariff_price(t, ts)` over the
 active grid tariffs, resolved per reading timestamp. On a single-band grid
 tariff the two agree; on a multi-band one they do not.
 
-The overview must not add a third answer:
-
-1. Extract `display_grid_base_chf_per_kwh(grid_tariffs)` into
-   `invoices/tariff_pricing.py`, lifted verbatim from `contract_pdf`.
-2. `contract_pdf._build_local_tariff_display` calls it instead of computing
-   inline. Behaviour unchanged — this is a move, and the existing contract
-   tests are the regression net.
-3. The overview calls the same function, **on the same set of tariffs**.
+Both documents call `display_grid_base_summary` on the same set of grid
+tariffs. Its `GridBaseSummary` contains `price_chf_per_kwh` and `dynamic_status`;
+`has_effective_price` keeps their unavailable/zero/negative handling aligned.
+Dynamic status selects the translated footnote, and unavailable amounts use
+the contract vocabulary's `tariff_none` placeholder in both documents.
 
 **Which tariffs make up the base:** `energy_type == GRID` and
 `billing_mode == ENERGY`, active on the reference date. **Category is not part
@@ -208,6 +205,21 @@ Row wording, matching the contract:
 
 With no active grid tariff the amount degrades to `18.00` with unit `%`, as
 the contract already does.
+
+### 6.2 Dynamic display prices
+
+A document cannot choose one live interval without a consumption timestamp.
+`tariffs.dynamic.pricing.summarize_dynamic_tariff` therefore intersects the
+tariff validity with the trailing 30 days ending on `as_of`, computes a
+duration-weighted average, and returns its coverage as `complete`, `partial`,
+or `unavailable`. The reference dates appear in the row label.
+
+Complete and partial results use distinct localized footnotes. An unavailable
+series remains visible with an em dash and an explanation. If any dynamic
+component of a percentage tariff's grid base is unavailable, the effective
+amount is also unavailable; summing only the remaining static components would
+understate the base. The participation contract calls the same grid-base helper
+and prints the corresponding dynamic coverage note.
 
 ## 7. VAT
 
@@ -458,6 +470,7 @@ enforces them across all four locales.
 | Net prices printed without a VAT note under `inclusive` mode | High — participants compare against a bill and conclude they were overcharged | The note is unconditional, and `test_inclusive_net_note_reaches_the_rendered_page` extracts the text of a rendered PDF and asserts both that the string is present and that it precedes the first price. The other VAT tests read the context, which cannot see the note dropped from or moved within the template |
 | Overview, contract and invoice name the same band differently | Medium — three documents describing one tariff in three vocabularies | All three go through `band_description()`; a test renders a contract and an overview for the same tariff and compares the labels |
 | Percentage base disagrees with the contract | Medium | One extracted helper, called by both; the engine's per-timestamp resolution is documented as deliberate and footnoted |
+| A missing or partial dynamic series is mistaken for a complete static rate | High | Bounded duration-weighted summary with explicit coverage status; unavailable tariffs and bases remain visible without a numeric claim |
 | A ZEV with many tariffs produces an unreadably long table | Low | `break-inside: avoid` per tariff group and a repeating `thead`; no page cap |
 | Shared fee read as a per-participant amount | Medium — off by the size of the ZEV | Row label states the split and names the `split_key` |
 | Lifting the grid-base helper changes contract output | Low | Verbatim move; existing contract tests are the net |

@@ -8,7 +8,7 @@
 - Created: 2026-09-11
 - Target Release: Ongoing
 - Related Issues: #530 (parent gap #507, importer #520), #702, #703
-- Related ADRs: [0018](../adr/0018-dynamic-tariff-price-series.md)
+- Related ADRs: [0018](../adr/0018-dynamic-tariff-price-series.md), [0019](../adr/0019-frozen-dynamic-price-evidence.md)
 - Impacted Areas: backend, frontend, async jobs, docs
 
 ---
@@ -24,18 +24,6 @@ there is no way to enter a quarter-hourly price by hand.
 **Outcome:** a tariff can be priced from a fetched time series instead of from
 recurring bands; the series is retained as billing evidence; and an incomplete
 series refuses to bill rather than silently billing zero.
-
-### Delivery status
-
-This spec describes the whole feature. It lands in three parts:
-
-| Part | Covers | Sections | Status |
-|---|---|---|---|
-| 1 | Data model, versioned protocol, fetching, scheduling, transfer | 3 – 8 | Shipped |
-| 2 | Engine price resolution, refusal, readiness coverage | 9 | Shipped |
-| 3 | Importer unblock, API and frontend | 10 | Shipped |
-
-All three parts are shipped.
 
 ## 2. Scope
 
@@ -63,11 +51,6 @@ derived from the VSE document
 - Repository: <https://github.com/SmartGridready/SGrSpecifications/tree/master/DynamicTariff>
 - **v1.0.5** (2026-05-28) — array-based price components using `CHF_kWh`
 - **v2.0.0** (2026-09-01) — object-based tariff types using `CHF/kWh`
-
-> Note for anyone reading older documents: the VSE/AES *tariff document* OpenAPI
-> models `prices.dynamic` as a bare URL with no response schema, and OpenZEV's
-> own notes said this feature was therefore blocked on something outside the
-> repo. That has not been true since the SmartGridready schema was published.
 
 ### 3.1 Request contract (v1)
 
@@ -116,21 +99,40 @@ selected **by unit**, never by position.
 
 v2 additionally defines `metering`, `national_fees`, `dso`, `dso_complete`,
 `integrated_complete`, and `refund`. OpenZEV offers any returned type carrying
-an `energy` value in `CHF/kWh`; the first five consumption-oriented types map to
-`grid`, while `refund` maps to `feed_in`. Components containing only base,
+an `energy` value in `CHF/kWh`, except `refund`; consumption-oriented types map to
+`grid`. Storage refunds require storage-qualified metering and are excluded from
+billable discovery, tariff linking, and import. Only `feed_in` prices ordinary exports. Components containing only base,
 power, or reactive-energy prices are not offered because the billing engine
 cannot apply them per metered kWh.
 
-⚠️ **Double counting.** `integrated` already contains `electricity` and `grid`;
-v2's `dso`/`dso_complete`/`integrated_complete` additionally bundle in
-`metering`, `national_fees`, and (for the `_complete`/`integrated_complete`
-variants) `regional_fees`. Billing one of these beside a community's existing
-tariff for a type it already contains charges the same money twice. OpenZEV
-does not block the combination — a community's tariffs are configured
-independently and nothing enumerates "what else prices this ZEV" — but §10
-warns at both configuration points (picking the component, and linking a
-tariff to it) naming exactly which types the choice already contains
-(`dynamicSources.aggregatedTariffTypes`).
+⚠️ **Double counting.** What an aggregate bundles depends on the endpoint's
+API version (sources: `SGrSpecifications/DynamicTariff/OpenAPI/`
+`dynamic_tariff_vse_openapi_v1.yaml`, valid 2026, and
+`..._v2.yaml`, in effect 2027-01-01):
+
+| Aggregate | v1 | v2 |
+|---|---|---|
+| `integrated` | `electricity` + `grid` | `electricity` + `dso` (i.e. electricity, grid, metering, national_fees) |
+| `dso` | n/a (v2 only) | `grid` + `metering` + `national_fees` |
+| `dso_complete` | n/a (v2 only) | `dso` + `regional_fees` |
+| `integrated_complete` | n/a (v2 only) | `electricity` + `dso_complete` |
+
+(v2 moves the Art. 35 surcharge/reserve/socialised costs out of `grid` into
+`national_fees`, which is why `dso` adds it back. A DSO does not sell energy,
+so `dso` never contains `electricity`.)
+
+Billing one of these beside a community's existing tariff for a type it
+already contains charges the same money twice. OpenZEV does not block the
+combination — a community's tariffs are configured independently and nothing
+enumerates "what else prices this ZEV" — but §10 warns at both configuration
+points (picking the component, and linking a tariff to it) naming exactly
+which types the choice already contains. The warning is version-aware:
+the import preview (no version known yet) names the components bundled on
+*every* version plus the possible extras; the pickers read the exact
+expansion (`aggregated_tariff_types`) off the source/discovery object, and
+the applied import upgrades to the probed version's exact list. The
+canonical composition lives in `tariffs/dynamic/components.py`; there is no
+frontend copy.
 
 The mapping above is enforced for `energy_type` (a `feed_in` series must not
 price consumption). `category` is deliberately *not* constrained: whether an
@@ -138,7 +140,8 @@ operator's grid series is filed under grid fees or levies changes no number.
 
 ## 4. Data model
 
-`backend/tariffs/dynamic/models.py`, migration `tariffs/0012_dynamic_tariff_source`.
+`backend/tariffs/dynamic/models.py`, migrations `tariffs/0012`–`0015`;
+invoice provenance in `invoices/models.py`, migration `invoices/0017`.
 
 ### 4.1 `DynamicTariffSource`
 
@@ -153,15 +156,20 @@ Global, **not** ZEV-scoped — see ADR 0018.
 | `request_mode` | `CharField(20)` | discovered `standard` \| `exact_url` |
 | `query_tariff_type` | `CharField(20)` | discovered wire spelling, not user-entered |
 | `supports_range` | `BooleanField` | discovered endpoint capability |
+| `empty_on_not_found` | `BooleanField` | administrator-configured opt-in for successful empty HTTP 404; default false |
 | `tariff_type` | `CharField(20)` | §3.3 |
 | `tariff_name` | `CharField(120)`, blank | Operator product |
+| `enabled` | `BooleanField` | disabled sources retain evidence but are skipped by scheduled refreshes |
 | `last_fetch_status` | `CharField(10)` | `pending` \| `ok` \| `failed` |
 | `last_fetch_at` / `last_success_at` | `DateTimeField`, null | |
 | `last_fetch_error` | `CharField(500)`, blank | **User-safe text only** |
 | `covers_from` / `covers_to` | `DateTimeField`, null | Denormalised series extent |
+| `recovery_from` | `DateTimeField`, null | Earliest unresolved fetch window; retained until a successful refresh attempts it |
 
-`UniqueConstraint(url, tariff_type, tariff_name)` — all three change the number,
-so all three are the identity.
+`UniqueConstraint(url, api_version, tariff_type, tariff_name)` defines immutable
+identity. Model saves and the API refuse identity edits; Django admin makes
+those fields read-only after creation. `CheckConstraint(dynamic_exact_url_no_range)`
+rejects `request_mode=exact_url` with `supports_range=true`.
 
 ### 4.2 `DynamicPricePoint`
 
@@ -171,7 +179,8 @@ so all three are the identity.
 | `valid_from` / `valid_to` | `DateTimeField` | UTC, half-open interval |
 | `price_chf_per_kwh` | `DecimalField(8, 5)` | **Signed** |
 
-`UniqueConstraint(source, valid_from)` + `Index(source, valid_from)`.
+`UniqueConstraint(source, valid_from)` (whose backing index also serves ordered
+source lookups) plus `CheckConstraint(valid_to > valid_from)`.
 `ordering = ["source", "valid_from", "id"]` (total, for paginated walks).
 
 `valid_to` is stored rather than derived from a resolution setting — see §6.
@@ -186,7 +195,30 @@ boundary.
 `Tariff.clean()` rejects a source on a tariff that is not billed by energy, and
 a source whose `tariff_type` disagrees with `energy_type` per §3.3.
 
-### 4.4 Version detection and parsing
+A dynamic tariff has no `TariffPeriod` price bands. This is enforced by the
+model, API serializers, tariff version and duplication paths, the VSE importer,
+and the admin forms. Linking a source to an existing static tariff therefore
+requires its existing bands to be removed first; copied dynamic versions keep
+the source link and receive no bands.
+
+### 4.4 InvoiceDynamicSourceEvidence
+
+| Field | Type | Constraint |
+|---|---|---|
+| `id` | BigAutoField PK | |
+| `invoice` | FK → Invoice, CASCADE | related_name `dynamic_evidence` |
+| `source` | FK → DynamicTariffSource, PROTECT | related_name `invoice_evidence` |
+| `tariff_id_snapshot` | UUIDField | copied value, not a mutable tariff FK |
+| `evidence_from` / `evidence_to` | DateTimeField | half-open UTC interval; end strictly after start |
+
+Unique on `(invoice, tariff_id_snapshot)`; ordered by invoice_id, source_id, id.
+Generation records each applicable dynamic tariff's intersection with the invoice
+period, conservatively including tariffs with no priced quantity. Drafts protect
+points. Cancelled invoices cease protecting points but retain source provenance
+until the invoice is deleted. Migration 0017 snapshots existing relationships;
+relationships removed before migration cannot be recovered from current rows.
+
+### 4.5 Version detection and parsing
 
 v1 holds `prices[].grid` as a **list**; v2 holds an **object** with
 `base`/`energy`/`power`/`reactive_energy` sub-components plus metadata. This
@@ -221,13 +253,15 @@ and lets the selected source identity win.
 
 ## 6. Coverage and gaps
 
-`fetch.coverage_gaps(source, start, end)` walks stored intervals and returns the
-uncovered spans.
+`fetch.coverage_gaps(source, start, end)` returns the uncovered spans. A SQL
+window computes only boundaries that begin after every preceding interval has
+ended, so readiness does not transfer an entire year of quarter-hour points
+into Python merely to locate a few gaps.
 
-Coverage is **never** derived from a count. A quarter-hourly day is 96 intervals
-on most days, **92** when the clocks go forward and **100** when they go back;
-counting to 96 would call a complete day incomplete twice a year. Walking
-intervals also handles an operator publishing hourly.
+Coverage is **never** derived from a count. An operator-local quarter-hour day
+can contain 92, 96, or 100 intervals around DST transitions. Billing and
+readiness use UTC civil-day windows under ADR 0007. Interval coverage handles
+both publication offsets and hourly prices without a resolution assumption.
 
 Holes are ordinary: an endpoint may omit an interval when its upstream source
 has no value for it.
@@ -235,26 +269,49 @@ has no value for it.
 ## 7. Fetching
 
 `backend/tariffs/dynamic/fetch.py`, reusing
-`tariffs/importers/remote.py::fetch_tariff_document` unchanged — the SSRF guard,
+`tariffs/importers/remote.py::fetch_tariff_document` (extended with HTTP status codes) — the SSRF guard,
 per-hop redirect revalidation, 5 MB cap and the user-safe/log-only error split
 all apply, because the URL is operator-supplied.
 
-**Chunking is mandatory.** A measured full-history response reached
-**5 016 921 bytes — 95.7 % of `MAX_DOCUMENT_BYTES`** and strained the
-20-second timeout. Backfill therefore walks at most 31 days per request.
+Backfills use 31-day chunks to remain below the HTTP size and timeout limits.
 
 | Mode | Window |
 |---|---|
-| Scheduled | yesterday → day after tomorrow |
-| Backfill | 400 days back → day after tomorrow, chunked |
-| No range support | one bare request |
+| Scheduled | Resume `recovery_from`, clamped to the last 14 days; otherwise resume stored extent/last success, no later than yesterday; end at UTC today + 2 days |
+| Backfill | UTC today − 400 days → UTC today + 2 days, chunked |
+| No range support | One request, without a requested time window |
 
-The window starts *yesterday* because it is expressed in UTC while operators
-publish in local time; starting at UTC midnight clips the first hours of the
-Swiss day. Re-asking is free: writes are upserts on `(source, valid_from)`.
+Starting no later than yesterday retains the first hours of operator-local days
+that begin before UTC midnight. Failed/refused windows retain the earliest
+recovery cursor, including failures in old backfill chunks. Only requests are
+clamped: a later success or failure cannot erase an older, unattempted cursor,
+even when that cursor predates the 400-day backfill window.
 
-An empty response is a **successful fetch of nothing**, not a failure: the
-standard permits an empty publication timestamp/list when nothing is published.
+`dynamic/storage.py::store_points` acquires a source row lock before reading
+prices or invoice evidence. It sorts old and incoming intervals into connected
+overlap groups. Each group's proposed replacement must be non-overlapping and
+cover every displaced old interval in full. Complete unbilled resolution changes
+are accepted atomically; partial replacements and overlapping incoming intervals
+are refused without clipping. An old interval overlapping non-cancelled frozen
+invoice evidence cannot change price or extent, and a replacement cannot extend
+into protected evidence. Identical intervals are idempotent. Independent valid
+groups commit before `PriceSeriesConflict` is raised, unless an enclosing
+transaction (such as import) rolls the whole operation back.
+
+`BilledPriceChanged` identifies protected replacements;
+`PriceIntervalConflict` identifies ambiguous/incomplete interval replacements.
+Refusals mark the source failed and are not retried by Celery. See the
+[user-guide recovery procedure](../user-guide/07-tariff-configuration.md#recovering-a-refused-price-series).
+Migration 0014 refuses invalid or overlapping existing intervals and names the
+rows to reconcile before continuing; it does not repair billing evidence.
+
+An empty response is successful but adds no coverage. HTTP 404 remains a failure
+unless an administrator explicitly enables `empty_on_not_found` in Django admin
+after verifying the endpoint's convention. Discovery and migrations never infer
+that flag from `feed_in` or `exact_url`; rechecking capabilities preserves it.
+An opted-in source treats every 404 as empty; it cannot distinguish a removed
+product from no publication. HTTP 410 remains a failure. Schema/version/product
+errors are deterministic refusals and do not consume Celery's transport retries.
 
 ## 8. Scheduling
 
@@ -262,8 +319,8 @@ standard permits an empty publication timestamp/list when nothing is published.
 
 | Task | Role |
 |---|---|
-| `refresh_dynamic_tariff_sources` | Beat entry; fans out one task per source so one unreachable operator cannot delay the others |
-| `fetch_dynamic_prices(source_id, backfill=False)` | Refreshes one source; retries twice on a transport error |
+| `refresh_dynamic_tariff_sources` | Beat entry; fans out one task per enabled source so one unreachable operator cannot delay the others |
+| `fetch_dynamic_prices(source_id, backfill=False)` | Refreshes one source; retries twice only on transport failures, never schema/version/product errors, price conflicts, or unexpected program/database errors |
 | `fetch_dynamic_prices_impl` | The logic, callable directly from tests |
 
 `CELERY_BEAT_SCHEDULE["refresh-dynamic-tariff-sources"]` runs every **4 hours**,
@@ -271,18 +328,13 @@ not daily: endpoints can publish day-ahead data or republish the current day at
 different times, so no single moment has final prices.
 `publication_timestamp` says when the operator last wrote, not what it covers.
 
-Supported deployments run exactly one Beat scheduler: the three Compose files
-declare a `beat` service, and the Helm chart declares a single-replica Beat
-deployment. More than one scheduler would enqueue every periodic task more than
-once at each tick.
-
 When the importer creates a new source, it queues
 `fetch_dynamic_prices(source_id, backfill=True)` with `transaction.on_commit()`
 after the tariff write succeeds. Reusing an existing global source does not
 queue another initial backfill; that source already has stored history and is
 included in the four-hour fan-out.
 
-Outcomes are recorded on the source (`last_fetch_*`) and as an audit event
+Outcomes are recorded on the source (`last_fetch_*` and `recovery_from`) and as an audit event
 (`AuditActionCategory.TARIFF`, `action_type="tariff.dynamic_fetch"`,
 `source=CELERY`), written best-effort so an audit failure cannot change the
 outcome.
@@ -324,11 +376,13 @@ All four of the engine's price-resolution points read from `price_at`:
 | Personal feed-in credit | Export compensation |
 | Community feed-in credit | Export compensation, shared allocation |
 
-`_DynamicSeries` is loaded once per `DynamicTariffSource` and cached on
-`InvoiceGenerationContext` (`dynamic_series(source_id)`), not on
-`TariffResolver` — the resolver itself is rebuilt per participant even inside
-one batch, while the context is shared across the whole ZEV-period run. This is
-what makes a 20-participant batch load a series once instead of twenty times.
+`_DynamicSeries` loads only intervals overlapping the invoice period, once per
+source per participant transaction. Before pricing, `generate_invoice` locks
+all applicable dynamic source rows in primary-key order. Storage, clearing, and
+deletion use the same row locks; the cache lease remains fetch/maintenance
+coordination only. Frozen evidence is written before the invoice commits.
+`InvoiceGenerationContext` retains shared allocation denominators across the
+batch but clears its price cache after acquiring each invoice's source locks.
 
 ### 9.2 The refusal
 
@@ -347,8 +401,10 @@ in an hour that does not exist.
 `generate_invoice` runs inside `@transaction.atomic`, so a raised gap rolls the
 whole invoice back — nothing partial is written. `generate_invoices_for_zev`
 (ADR 0011) already catches per-participant exceptions into `failures`, so a
-gap surfaces as one failure entry with the gap's tariff name and timestamp in
-`error`, not a crashed batch.
+gap surfaces as one failure entry carrying stable `code=dynamic_price_gap`, the
+tariff/source ids, and the first missing timestamp. The single-invoice API
+returns the same structured 409 response, allowing the frontend to direct the
+operator to refresh the named source instead of claiming an invoice collision.
 
 ### 9.3 Readiness coverage
 
@@ -360,16 +416,16 @@ is "priced" on a given day now branches on `tariff.dynamic_source_id`:
   `tariffs.dynamic.fetch.coverage_gaps` for that tariff's source.
 
 `_dynamic_uncovered_days_by_source` computes this **once per source for the
-whole span** inside `_load_bulk` (one `coverage_gaps` query per source, not
+whole span** inside `_load_bulk` (one bounded gap calculation per source, not
 per day and not per period), stored on `BulkData.dynamic_uncovered` so
 `compute_readiness_many` — which reuses one `BulkData` across many periods —
 does not recompute it. Reported through the existing `tariffs` step
 (`_tariffs_step_from_list`); no new `ReadinessStepKey`, so no frontend or
 locale changes were needed for this part.
 
-Coverage is measured over stored intervals, exactly like `coverage_gaps`
-itself — never by counting, so a DST day with 92 or 100 intervals reads as
-fully covered rather than "broken."
+Coverage uses stored intervals over UTC civil-day windows, never a fixed
+number of readings. The existing continuous-interval test demonstrates coverage
+across a DST date; parser fixtures separately verify offset normalization.
 
 `_load_energy_tariffs` still restricts a **static** tariff to
 `category=TariffCategory.ENERGY` — a static grid-fee or levy tariff is priced
@@ -386,30 +442,47 @@ the pre-existing static gap it deliberately leaves alone.
 
 ### 9.4 Printed documents (tariff overview PDF, participation contract)
 
-`backend/invoices/tariff_pricing.py` and `tariff_overview.py`. Neither
-document has a reading timestamp to resolve a live price against (see
-`tariff_pricing.py`'s module docstring), so a dynamic tariff prints the
-**average of its fetched series** instead of a per-band figure:
+`backend/tariffs/dynamic/pricing.py`, `invoices/tariff_pricing.py`, and
+`tariff_overview.py`. Documents and management screens have no consumption
+profile from which to select a live price, so they share one display policy:
 
-- `dynamic_average_chf_per_kwh(tariff)` — `Avg("price_chf_per_kwh")` over the
-  tariff's source, or `None` if nothing has been fetched yet.
-- An energy tariff's own row: one row, the average, footnoted
-  `dynamic_average`. `None` (nothing fetched) means no row at all — the same
-  "nothing to print" outcome a static tariff with zero bands already gets,
-  not a misleading zero.
-- The percentage-tariff grid base (`display_grid_base_chf_per_kwh`,
-  `grid_base_is_dynamic`/`grid_base_is_multiband`): a dynamic grid tariff
-  contributes its average to the sum. `grid_base_is_multiband` and
-  `grid_base_is_dynamic` are two distinct flags — a fluctuating fetched price
-  and a static multi-band tariff are both "approximate," but for different
-  reasons, worded differently in `footnote_dynamic_average` vs
-  `footnote_multiband_base` (all four locales). When a base is both, dynamic
-  wins the footnote, as the more surprising fact for the reader.
+- intersect the tariff's validity with the trailing `DYNAMIC_DISPLAY_DAYS = 30` window ending on
+  the document/reference date;
+- compute a duration-weighted average of the stored intervals in that bounded
+  window, so hourly and quarter-hour intervals carry their actual time weight;
+- return `complete`, `partial`, or `unavailable` coverage alongside the number
+  and reference dates.
 
-The participation contract (`contract_pdf.py`) shares
-`display_grid_base_chf_per_kwh` and so picks up a dynamic tariff's average
-automatically; it does not currently print the multiband/dynamic footnote at
-all (pre-existing — it never explained the multi-band approximation either).
+The tariff overview always prints the dynamic tariff. Complete and partial
+averages carry distinct localized explanations; an unfetched source prints an
+explicit unavailable placeholder instead of silently dropping the tariff. A
+percentage tariff gets no numeric effective price when any dynamic grid-base
+component is unavailable, because summing only the static remainder would
+understate its base. The participation contract shares the same grid-base
+summary and prints the matching dynamic-average/partial/unavailable note. The
+tariff API exposes direct source averages as `dynamic_price_summary`.
+Static display fallback is flat → HT → NT → first band.
+
+Percentage tariffs additionally expose `percentage_base_summary`: decimal-string
+or null `price_chf_per_kwh`, `dynamic_status` (complete/partial/unavailable or
+null for an entirely static base), and ISO `reference_date`; other tariff modes
+return null. Today is clamped to the percentage version's validity. Both grid
+version selection and every component's average use that date, matching the
+document helper's calculation. No grid tariffs yields a zero static base;
+unavailable dynamic input yields null. The frontend consumes this result
+directly from each tariff version, without an additional client-side map,
+recalculating temporal selection, or adding differently dated averages.
+
+`prepare_tariff_display_summaries` batches direct summaries and percentage bases.
+`summarize_requests` uses stable caller keys, here `(tariff id, reference date)`.
+Disjoint windows are merged per
+source and sliced by bisection, with one source query even for multiple
+percentage reference dates; intervening years are not loaded.
+
+Invoices still use exact interval prices. A month's dynamic readings accumulate
+into one line, whose derived `unit_price_chf` is the consumption-weighted
+effective rate; its localized description identifies it as such rather than as
+a published static tariff rate.
 
 ## 10. Import and UI
 
@@ -417,21 +490,23 @@ all (pre-existing — it never explained the multi-band approximation either).
 
 `backend/tariffs/importers/vse_json.py`. A `tariffForm: dynamic` entry no
 longer returns a single blocked candidate; `_dynamic_candidate()` builds an
-*importable* one carrying `dynamic_url` and `dynamic_tariff_type` (the VSE
-`tariffType`, one of `electricity | grid | metering | regional_fees` — the
-same vocabulary `_read_header` already validates entries against). It stays
-blocked only when this importer genuinely cannot represent the entry:
+*importable* one carrying `dynamic_url` and `dynamic_tariff_type`. Dynamic
+headers use the combined v1/v2 parser vocabulary from §3.3 rather than the
+smaller static tariff-document category table, so `feed_in` and the
+aggregate forms reach the dynamic branch. `refund` is blocked because its
+storage-qualified quantity cannot be represented. It stays blocked only when this
+importer genuinely cannot represent the entry:
 
 - **No URL** — `prices.dynamic.url` is empty.
-- **`tariffType: metering`** — the dynamic-tariff schema (§3.3) has no
-  `metering` type to fetch at all; the *static* importer supports metering
-  tariffs, but nothing published on a metering connection is ever dynamic.
+- **No billable energy component at the fetched endpoint** — discovery refuses
+  a component whose response contains no CHF/kWh energy value.
 
-A dynamic candidate always warns that **the document names no product**
-(`tariff_name`) — that concept does not exist in the VSE tariff-document
-schema, only in the fetched-series API. An endpoint serving a single product
-is unaffected; an endpoint serving multiple products needs its source's
-`tariff_name` selected explicitly.
+A dynamic candidate warns that the document names no product. Each selected
+dynamic row must supply `dynamic_tariff_name`: a product string or an explicit
+empty string confirming the endpoint default. Omission yields a per-candidate
+error. The UI shows a product input and the default's meaning before import.
+V2's discovered product name is persisted when present, and later responses for
+a different product are refused.
 
 `is_free` (governs pre-selection, §4's `recommended`) is checked explicitly
 for a dynamic candidate rather than falling through to the static formula:
@@ -440,33 +515,23 @@ marked every dynamic candidate "free" and never pre-selected.
 
 ### 10.2 Linking the source
 
-`backend/tariffs/importers/planner.py`. `apply_import` resolves (and, for a
-new source, probes) the `DynamicTariffSource` **before** opening the
-per-candidate `transaction.atomic()` block — a slow or failing network fetch
-must not hold a database savepoint open while it happens.
+`backend/tariffs/importers/planner.py`. `apply_import` probes every selected
+dynamic component **before** opening its per-candidate `transaction.atomic()`
+block. Source reuse/creation and tariff writes happen inside that transaction;
+a slow or failing network fetch holds no database savepoint open.
 
-`_get_or_create_dynamic_source`:
+The prepare/write source path:
 
-1. Looks up an existing source by natural key (`url`, `tariff_type`,
-   `tariff_name=""` — the document never supplies a product). Found → reused
-   without a fresh probe; it is already on the fetch schedule (§8).
-2. Not found → discovers and probes the URL before creating anything. The
-   probe does not pin an API version: the VSE tariff document names a
-   `tariffType` (`electricity`/`grid`/`regional_fees`), never a protocol
-   version, and both v1.0.5 and v2.0.0 define that vocabulary, so
-   auto-detection lets a document link to either generation of endpoint —
-   the same way the manual two-step wizard already does. **A URL in a
-   document is a starting point, not a contract** — the URL named as the
-   example in the standard's own OpenAPI
-   (`api.tariffs.groupe-e.ch/v1/tariffs`) now returns **410 Gone**. A failed
-   probe reports the fetch error against that candidate (`report.errors`)
-   and creates nothing; other candidates in the same import are unaffected.
-3. Creates the source with the discovered generic request capabilities via
-   `get_or_create` on the same natural key, race-safe against a concurrent
-   import of the same endpoint.
-4. After the tariff has been written successfully, a newly created source gets
-   one post-commit `backfill=True` task. A reused source gets no duplicate
-   initial task.
+1. Require an explicit product choice, then probe before opening a transaction
+   to determine the protocol version and capabilities.
+2. Match `(url, api_version, tariff_type, tariff_name)`; a matching source is
+   reused after probing. Keep the probe's dropped-unit and aggregate-component
+   warnings, adding warnings for disabled/failed/unfetched state.
+3. Create a new source and tariff in the same per-candidate transaction. Store
+   probe prices, mark the source successful, and queue one post-commit backfill.
+   Reused sources receive no duplicate initial backfill.
+4. Report transport, validation, integrity, and price conflicts per candidate.
+   A failed candidate rolls back its source and predecessor-version edits.
 
 Units the probe found but cannot bill (a demand charge, a fixed fee riding
 beside the requested energy component — the same vocabulary the parsers
@@ -481,7 +546,7 @@ when the source is being configured, not after an invoice already used it.
 before `.save()`, so `Tariff.clean()`'s existing energy-type check runs for
 free — `_dynamic_candidate` already computed `energy_type` from the same
 `ENERGY_TYPE_BY_DYNAMIC_TARIFF_TYPE` mapping the model checks against, so
-the two never disagree.
+the two never disagree. It does not create price bands for a dynamic candidate.
 
 ### 10.3 API
 
@@ -505,9 +570,11 @@ the two never disagree.
   natural-key match returns the existing shared source with HTTP 200 without
   probing; a new source returns 201. The response carries `warnings`: units
   the probe found but cannot bill, empty when an existing source was reused.
-- **`PATCH /tariffs/dynamic-sources/{id}/`**: admin only. Label corrections are
-  always allowed. Identity changes remain guarded; the UI directs operators to
-  create a replacement source rather than mixing two series.
+- **`PATCH /tariffs/dynamic-sources/{id}/`**: admin only. Label and `enabled`
+  changes are allowed and audited. A disabled source retains every stored point
+  but leaves the four-hour refresh fan-out. Identity changes remain guarded;
+  the UI directs operators to create a replacement source rather than mixing
+  two series.
 - **`POST /tariffs/dynamic-sources/{id}/recheck/`**: admin only; re-probes the
   source's own endpoint with its existing identity to correct
   `request_mode`/`query_tariff_type`/`supports_range`, without touching
@@ -526,62 +593,24 @@ the two never disagree.
 - **`POST /tariffs/dynamic-sources/{id}/fetch/`**: admin-only queueing of a
   normal refresh or `backfill=true`, returning a task/correlation id and writing
   a queued audit event which pairs with the Celery outcome.
-- **`DELETE /tariffs/dynamic-sources/{id}/prices/`**: admin only; empties the
-  source but keeps it, so the next fetch refills it. It returns 409 while the
-  source is fetching or when any non-cancelled invoice overlaps any linked
-  tariff. On success it deletes points, resets materialized coverage/fetch
-  state, and writes an audit event with the deleted count.
-- **`DELETE /tariffs/dynamic-sources/{id}/`**: admin only; removes the source
-  itself and, by cascade, every price it fetched. Refused with 409 while any
-  tariff still links to it — the count is read first so the response can name
-  how many tariffs in how many communities still use it, and `Tariff.
-  dynamic_source` being `on_delete=PROTECT` is what a `ProtectedError` raised
-  by the delete itself falls back to the same 409 for, closing the window
-  where a tariff gets linked between that count and the delete. An unlinked
-  source cannot have *currently* contributed to an invoice, since
-  `source_has_billing_evidence` reasons entirely over currently-linked
-  tariffs — but a tariff could have been billed and then unlinked or deleted
-  a moment before, which is exactly the case the tariff-side guard below
-  closes, so it is what actually makes "unlinked" imply "no evidence" here.
-  Returns 204 and writes an audit event naming the label and point count,
-  which is the only record left once the row is gone.
+- Tariff responses include `dynamic_price_summary` (`complete`/`partial`/
+  `unavailable`, average, and reference dates) for a linked dynamic source.
+  Percentage tariffs carry the shared `percentage_base_summary` described in §9.4.
+- **`DELETE /tariffs/dynamic-sources/{id}/prices/`**: admin only; requires exact
+  source-label confirmation. Under the cache lease and database source lock,
+  refuse with 409 when any non-cancelled invoice retains source evidence.
+  Otherwise delete points, reset coverage/fetch state, and audit the count.
+- **`DELETE /tariffs/dynamic-sources/{id}/`**: admin only; same confirmation
+  and locks. Tariff and invoice-evidence PROTECT relations refuse deletion
+  with 409, including sources whose tariffs have since moved or disappeared.
+  Return 204 and audit the source label and deleted point count on success.
 
-Both destructive source endpoints take the source's own **label, typed back**
-(`confirmation`), and nothing else. A `reason` is recorded when one is sent but
-is never required: a free-text box in front of an irreversible action invites a
-keystroke rather than a thought, while the label has to be read off the row
-that is about to be destroyed, which is what actually stops the wrong source
-being picked out of a list.
-
-- `TariffSerializer.validate` gains one check: a tariff's `dynamic_source` is
-  the only thing tying an issued invoice back to the fetched prices behind it
-  (invoice items store rendered amounts, not a tariff FK), so repointing or
-  clearing it on a tariff that already priced a non-cancelled invoice is
-  refused the same way clearing a source's points is — the same evidence,
-  lost through the tariff side of the link instead of the source side.
-  Setting `dynamic_source` for the *first* time is unaffected: there was no
-  link to lose. `TariffViewSet.perform_destroy` applies the identical check
-  before deleting a tariff outright, for the same reason.
-
-### 10.3a Both sides of the evidence link
-
-Two independent things can each sever the tie between an issued invoice and
-the `DynamicPricePoint` rows behind it, and both are guarded the same way —
-by the source's own `source_has_billing_evidence` and the tariff's own
-`tariff_has_dynamic_billing_evidence` (`tariffs/dynamic/services.py`), which
-share one overlap check:
-
-| Action | What it would sever | Guard |
-|---|---|---|
-| Clear/delete a source's points | Every tariff's link at once | `source_has_billing_evidence` — over every currently-linked tariff |
-| Delete a billed dynamic tariff | That one tariff's link | `TariffViewSet.perform_destroy` |
-| Repoint/clear a billed tariff's `dynamic_source` | That one tariff's link | `TariffSerializer.validate` |
-
-Without the last two, a tariff could be deleted or repointed after billing —
-nothing in the codebase prevented that generally, since invoices are
-deliberately decoupled from tariffs (`Invoice` carries no tariff FK at all) —
-dropping `linked_tariff_count` to zero and letting the source-level check
-pass despite the source having priced an invoice moments before.
+Destructive actions require exact source-label confirmation; an optional reason
+is audited. Existing API guards on billed tariff deletion/repointing remain
+conservative workflow checks. Retention itself uses frozen invoice evidence,
+so validity/ZEV changes, importer predecessor truncation, and Django admin
+cannot remove that provenance. Django admin cannot delete sources or edit
+price points; source identity fields are read-only after creation.
 
 ### 10.4 Frontend
 
@@ -600,7 +629,8 @@ pass despite the source having priced an invoice moments before.
   its implied energy type is applied. Selecting a source whose `tariff_type`
   is an aggregate (`integrated` and v2's `dso`/`dso_complete`/
   `integrated_complete`) shows a warning naming exactly which other types it
-  already contains (`dynamicSources.aggregatedTariffTypes`) — the
+  already contains (the `aggregated_tariff_types` field served per API
+  version) — the
   double-counting trap from §3.3, surfaced at the point a community decides
   whether to keep its separate grid-fee/levy tariffs beside it.
 - **`DynamicSourceFormModal`** — creation is a two-step discovery flow. Step 1
@@ -621,9 +651,13 @@ pass despite the source having priced an invoice moments before.
   must render differently. A "Dynamic" badge appears next to the energy-type
   badge; it turns into a danger badge with the fetch error as its tooltip
   when the source's `last_fetch_status` is `failed`.
+  Its representative number and percentage-of-grid display use the API's
+  bounded summary; partial and unavailable data are labelled instead of shown
+  as complete or zero.
+  `TariffVersionModal` also hides both the band editor and the fixed-price editor
+  for a dynamic energy version; the dynamic source is the complete price input.
 - **`VseTariffImportModal`** — a dynamic candidate's price cell shows a
-  "Dynamic" badge and its URL instead of a period list (it has no periods to
-  list); the result view shows "Dynamic" in place of a billing-mode label for
+  "Dynamic" badge, URL and explicit product input instead of a period list; the result view shows "Dynamic" in place of a billing-mode label for
   a tariff the apply step linked to a source.
 - **`dynamicSources.ts`** — the two pure functions above, tested directly
   (`tests/dynamic-sources.test.ts`).
@@ -640,7 +674,8 @@ pass despite the source having priced an invoice moments before.
   `ActionMenu` opens history or source-filtered audit activity, queues refresh
   or supported backfill, re-checks discovered capabilities (§10.3's
   `recheck`, for correcting a wrongly-negative `supports_backfill`), edits
-  configuration, and opens the guarded typed confirmation form for either
+  configuration (including enabling/disabling scheduled refreshes), and opens
+  the guarded typed confirmation form for either
   destructive action — clearing the fetched prices, or deleting the source
   outright. Delete is disabled in the menu while `linked_tariff_count > 0`,
   so the 409 the server would return is visible before the round trip. The
@@ -650,14 +685,23 @@ pass despite the source having priced an invoice moments before.
 
 `Tariff.dynamic_source` travels as a nested **natural key**
 (`DYNAMIC_SOURCE_FIELDS`: label, url, api_version, request_mode,
-query_tariff_type, supports_range, tariff_type, tariff_name), not as
+query_tariff_type, supports_range, empty_on_not_found, enabled, tariff_type,
+tariff_name), not as
 its surrogate id, which means nothing on another instance. The importer
-get-or-creates the matching global source.
+get-or-creates the matching global source. A disabled source stays disabled
+on import (no backfill is queued for it); price points and the
+`recovery_from` retry cursor never travel.
 
 The price **points do not travel**: they are a global series of tens of thousands
 of rows per year, not one community's data, and the importing instance fetches
 its own. Invoices already issued are unaffected — an `InvoiceItem` records what
 was charged as values, not as a live reference to the price that produced it.
+Each invoice also carries `dynamic_evidence` entries with embedded source
+descriptors, tariff UUID snapshots, and evidence bounds, independently of tariff
+selection. Older archives infer provenance once from imported tariffs when
+available. Version 2 adds `enabled`, `empty_on_not_found`, and this invoice
+provenance to the archive contract; current code still
+accepts version 1 static archives and legacy adapter-based dynamic descriptors.
 
 ## 12. Test plan
 
@@ -665,19 +709,21 @@ was charged as values, not as a live reference to the price that produced it.
 
 | Module | Tests | Coverage |
 |---|---|---|
-| `tariffs/test_dynamic_parsing.py` | 23 | v1/v2 detection and parsing; unit selection (both versions report a fixed fee riding beside the requested energy component); empty/malformed responses; DST; generic request construction |
-| `tariffs/test_dynamic_discovery.py` | 6 | Version/product discovery; override and empty-response fallback; standard, exact-URL, range, and query-spelling capability detection |
-| `tariffs/test_dynamic_fetch.py` | 24 | Chunking, UTC storage, upsert idempotency, negative prices, coverage gaps, windows, failure recording, tasks, source identity |
-| `tariffs/test_dynamic_tariff_link.py` | 9 | `Tariff.clean()` rules, static→dynamic series versioning, PROTECT retention |
-| `zev/test_transfer.py::DynamicTariffTransferTests` | 3 | Natural-key match, recreation on a fresh instance, static tariffs unaffected |
-| `invoices/test_dynamic_pricing.py` | 17 | `_DynamicSeries` bisection, `TariffResolver.price_at` (static and dynamic), the gap refusal, end-to-end `generate_invoice` (consumption, negative prices, percentage base, feed-in) |
+| `tariffs/test_dynamic_parsing.py` | 26 | v1/v2 detection and parsing; unit selection (including a missing-unit warning); empty/malformed responses; DST; generic request construction |
+| `tariffs/test_dynamic_discovery.py` | 9 | Version/product discovery; named exact-v2 verification; override and empty-response fallback; standard, exact-URL, range, and query-spelling capability detection |
+| `tariffs/test_dynamic_fetch.py` | 53 | Chunking, UTC storage, upsert idempotency, half-open invoice evidence, partial conflict writes, resulting-set overlap checks, recovery cursors including old failed/unattempted windows, coverage gaps, windows, failure recording, tasks, source identity |
+| `tariffs/test_dynamic_tariff_link.py` | 13 | `Tariff.clean()` rules, capability validation, static→dynamic series versioning, PROTECT retention, no dynamic price bands |
+| `zev/test_transfer.py::DynamicTariffTransferTests` | 4 | Natural-key match, recreation on a fresh instance, static tariffs unaffected |
+| `invoices/test_dynamic_evidence.py` | 6 | Frozen provenance after tariff mutation/deletion; legacy-refund refusal; migration backfill and overlap preflight; PostgreSQL barriers verify concurrent clear/overwrite waits for invoice evidence |
+| `invoices/test_dynamic_pricing.py` | 18 | `_DynamicSeries` bisection, `TariffResolver.price_at` (static and dynamic), the gap refusal, end-to-end `generate_invoice` (consumption, negative prices, percentage base, feed-in) |
 | `invoices/test_readiness.py::DynamicTariffPricingCoverageTests` | 8 | Full/partial/no coverage, type-masking, percentage-tariff coupling, DST, static→dynamic series versioning, and coverage checked regardless of category (a dynamic tariff filed under `grid_fees`) |
-| `invoices/test_dynamic_tariff_pricing.py` | 9 | `dynamic_average_chf_per_kwh`, `display_grid_base_chf_per_kwh`, `grid_base_is_dynamic` vs `grid_base_is_multiband` |
-| `invoices/test_tariff_overview.py::TariffOverviewDynamicTariffTests` | 4 | Unfetched tariff prints nothing, fetched average with its footnote, percentage-tariff footnote and amount |
-| `tariffs/test_vse_import.py` (extended) | +13 | Dynamic grid candidate is importable, no-URL and `metering` blocks, the missing-product warning, `is_free` correctness, source get-or-create + probe + reuse-without-reprobing, unreachable-URL error, post-commit initial-backfill enqueueing only after a successful new-source tariff write, auto-detection of the probed API version (not hardcoded v1.0.5), and a new source's dropped-unit warnings reaching the apply result |
+| `invoices/test_dynamic_tariff_pricing.py` | 19 | Duration weighting, bounded/persistent-key batch summaries, historical percentage dates with one source query, flat/HT/NT/band fallback, unavailable-wins ordering, and static multi-band flags |
+| `invoices/test_tariff_overview.py::TariffOverviewDynamicTariffTests` | 4 | Unfetched tariff prints an unavailable row, fetched average with its footnote, percentage-tariff footnote and amount |
+| `tariffs/test_dynamic_components.py` | 6 | Per-version aggregate composition, recursive v2 expansion, `dso` excludes electricity, `integrated` certain/possible split, plain/unknown types empty |
+| `tariffs/test_vse_import.py` | 102 | Dynamic grid candidate is importable, no-URL and storage-refund blocks, the missing-product warning, version-aware aggregate warnings (preview names certain + possible-extra, apply upgrades to the probed version's exact list), `is_free` correctness, source get-or-create + probe + version-aware reuse after probing, real probe-point initialization with successful status/timestamps, unreachable-URL error, post-commit initial-backfill enqueueing only after a successful new-source tariff write, auto-detection of the probed API version (not hardcoded v1.0.5), and a new source's dropped-unit warnings reaching the apply result |
 | `tariffs/test_dynamic_source_api.py` | 6 | Authenticated role access, global list and picker fields |
-| `tariffs/test_dynamic_source_management_api.py` | 29 | Discovery, probed creation/reuse (and the probe's dropped-unit warnings reaching the response and audit metadata), API-version validation, admin editing, scoped history/stats/limits, queue audit, permissions, guarded clear (label only, mistyped label refused), guarded delete (unused source removed with its points and audited, still-linked source refused with 409, mistyped/absent label refused, owner refused, refused while the fetch lock is held), and capability re-checking (corrects a wrongly-detected `supports_range`, reports dropped units, admin-only, refused while the fetch lock is held, a fetch failure leaves identity untouched) |
-| `tariffs/test_dynamic_source_link_api.py` | 9 | Linking through the ordinary tariff API: create with a source, mismatched-energy-type 400, fee-tariff-cannot-link 400, `dynamic_source` on the series endpoint, and the evidence-preservation guard (deleting/repointing/clearing a billed dynamic tariff's source refused; unbilled ones unaffected; setting a source for the first time unaffected) |
+| `tariffs/test_dynamic_source_management_api.py` | 32 | Discovery (components carry the versioned expansion), served `aggregated_tariff_types` on the source list, probed creation/reuse (and the probe's dropped-unit warnings reaching the response and audit metadata), API-version validation, admin editing, scoped history/stats/limits, queue audit, permissions, guarded clear (label only, mistyped label refused), guarded delete (unused source removed with its points and audited, still-linked source refused with 409, mistyped/absent label refused, owner refused, refused while the fetch lock is held), and capability re-checking (corrects a wrongly-detected `supports_range`, reports dropped units, admin-only, refused while the fetch lock is held, a fetch failure leaves identity untouched) |
+| `tariffs/test_dynamic_source_link_api.py` | 12 | Historical percentage-base parity on detail/series; linking through the ordinary tariff API: create with a source, mismatched-energy-type 400, fee-tariff-cannot-link 400, existing-band refusal, dynamic source on duplicated/new versions, `dynamic_source` on the series endpoint, and the evidence-preservation guard (deleting/repointing/clearing a billed dynamic tariff's source refused; unbilled ones unaffected; setting a source for the first time unaffected) |
 
 ### 12.2 Fixtures
 
@@ -689,7 +735,7 @@ endpoint serves only the current day and keeps no history.
 
 | Module | Tests | Coverage |
 |---|---|---|
-| `tests/dynamic-sources.test.ts` | 15 | Source/energy-type helpers; discovery; paginated list; manual create; bounded history query; fetch queueing; typed clear request; typed source delete; `aggregatedTariffTypes` for every aggregate and non-aggregate component |
+| `tests/dynamic-sources.test.ts` | 12 | Source/energy-type helpers; discovery; paginated list; manual create; bounded history query; fetch queueing; typed clear request; typed source delete (the aggregate expansion is served by the backend — see `test_dynamic_components.py`) |
 | `tests/dynamic-source-form-modal.test.ts` | 1 | Two-step rendering, version-only choices, absence of provider choices, and discovered component/product selection |
 | `tests/vse-tariff-import.test.ts` (extended) | +3 | A dynamic candidate is selectable, offers no billing-mode choice, can be the pre-selected recommendation |
 | `tests/tariff-form-mapping.test.ts` (extended) | +4 | `dynamic_source` round-trips through the form, is dropped when billing mode is not energy, defaults to blank |
@@ -701,11 +747,11 @@ endpoint serves only the current day and keeps no history.
 | Operator drops history before we fetch it | High — the period becomes unbillable forever | Backfill on creation; 4-hourly schedule; prices retained as evidence (ADR 0018) |
 | A gap bills as zero | High — silently wrong invoice | Engine refuses (§9); readiness flags the day first |
 | Endpoint URL rots | Medium | Failures recorded per source in user-safe text; `--probe` before trusting |
-| An aggregate component (`integrated`, `dso*`) billed beside a tariff for a type it contains | High — double charge | §3.3 documented; §10 warns by name at both configuration points (picking the component, linking a tariff to it), not blocked |
-| A billed dynamic tariff deleted or repointed away from its source | High — the invoice's only link to its evidence disappears | §10.3a: `TariffViewSet.perform_destroy` and `TariffSerializer.validate` refuse it, mirroring the source-side clear/delete guard |
+| An aggregate component (`integrated`, `dso*`) billed beside a tariff for a type it contains | High — double charge | §3.3 documented; version-aware warning by name at both configuration points (preview names certain + possible-extra, pickers and apply result name the exact versioned expansion), not blocked |
+| A billed dynamic tariff changes or disappears | High — provenance loss | Frozen invoice/source/window rows survive tariff changes; shared source locks serialize billing and maintenance |
 | A wrongly-detected `supports_range` traps a source with no way back | Low — history stays unfetchable, not a correctness bug | §10.3's `recheck` re-probes the endpoint without touching identity or stored points |
-| A response parsed as the wrong version | High — bills nothing or the wrong component | Shape detection plus explicit version validation (§4.4) |
-| Shared source edited by one community affects others | Medium | Owners may create/reuse but only admins may edit; identity fields remain locked while points exist |
+| A response parsed as the wrong version | High — bills nothing or the wrong component | Shape detection plus explicit version validation (§4.5) |
+| Shared source edited by one community affects others | Medium | Owners may create/reuse but only admins may edit; identity fields remain locked after creation |
 
 ## 14. Acceptance criteria
 
@@ -714,9 +760,9 @@ endpoint serves only the current day and keeps no history.
 - [x] Provider-neutral request capability discovery, verified against recorded fixtures
 - [x] Component and product are explicit configuration, never an implicit default
 - [x] Fetching is scheduled, chunked below the fetch cap, and reuses the SSRF guards
-- [x] `200`-with-empty, `404` and `410` are each handled distinctly
+- [x] Empty 200 responses are successful; 404 needs explicit administrator opt-in; 410 fails
 - [x] Coverage is computed on intervals, correct across both DST transitions
-- [x] Prices are retained for as long as the tariff referencing them exists
+- [x] Billed prices remain protected independently of later tariff edits
 - [x] V1.0.5 and v2.0.0 payloads are detected and parsed by their versioned contracts
 - [x] The transfer archive carries the source link by natural key
 - [x] The engine prices from the series and refuses an uncovered period

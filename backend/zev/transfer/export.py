@@ -159,12 +159,21 @@ def _export_invoices(zev):
                 {"id": str(item.id), **_fields(item, INVOICE_ITEM_FIELDS)}
                 for item in invoice.items.all()
             ],
+            "dynamic_evidence": [
+                {
+                    "dynamic_source": _fields(evidence.source, DYNAMIC_SOURCE_FIELDS),
+                    "tariff_id_snapshot": str(evidence.tariff_id_snapshot),
+                    "evidence_from": evidence.evidence_from.isoformat(),
+                    "evidence_to": evidence.evidence_to.isoformat(),
+                }
+                for evidence in invoice.dynamic_evidence.all()
+            ],
         }
         # ``pdf_file`` is absent from INVOICE_FIELDS: PDFs are regenerable from
         # the data and would dominate the archive size. See the issue's note —
         # a regenerated PDF uses today's template, so this is not the right
         # answer if original documents have to be retained.
-        for invoice in Invoice.objects.filter(zev=zev).prefetch_related("items").order_by("period_start", "invoice_number")
+        for invoice in Invoice.objects.filter(zev=zev).prefetch_related("items", "dynamic_evidence__source").order_by("period_start", "invoice_number")
     ]
 
 
@@ -223,13 +232,17 @@ def build_archive(zev, sections, fileobj, *, instance_name=""):
         raise ValueError("Select at least one section to export.")
     check_dependencies(sections)
 
+    # durable=True rejects application nesting and handles Django's TestCase
+    # exception itself. Set isolation only when we open a new transaction.
+    starts_transaction = not connection.in_atomic_block
+
     # One transaction so the whole archive is a snapshot: sections are read at
     # different moments (readings alone can stream for minutes on a large
     # community), and without a repeatable-read snapshot a concurrent edit can
     # leave an archive that never existed as a state, with manifest counts that
     # disagree with the CSV contents.
     with transaction.atomic(durable=True):
-        if connection.vendor == "postgresql":
+        if connection.vendor == "postgresql" and starts_transaction:
             # transaction.atomic() alone only buys READ COMMITTED on
             # PostgreSQL; the export needs every statement to see the same
             # committed state, so pin the transaction to REPEATABLE READ.

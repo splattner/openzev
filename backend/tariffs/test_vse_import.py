@@ -9,7 +9,7 @@ mapping is asserted through to what the billing engine actually reads back.
 """
 import json
 import urllib.error
-from datetime import date, time
+from datetime import date, datetime, time, timezone, timedelta
 from decimal import Decimal
 from pathlib import Path
 from unittest import mock
@@ -17,12 +17,16 @@ from unittest import mock
 import datetime as datetime_module
 
 from django.core.exceptions import ValidationError as DjangoValidationError
+from django.db import IntegrityError
 from django.test import SimpleTestCase, TestCase
 from rest_framework.test import APIClient
 
 from accounts.models import UserRole
 from audit.models import AuditEvent
-from invoices.engine import _get_tariff_price
+from tariffs.dynamic.discovery import SourceCapabilities
+from tariffs.dynamic.models import DynamicTariffSource
+from tariffs.dynamic.vse_v1 import PricePoint
+from invoices.engine import _resolve_tariff_band
 from tariffs.importers.planner import CandidateStatus, Selection, apply_import, plan_import
 from tariffs.importers.remote import TariffFetchError, fetch_tariff_document
 from tariffs.importers.vse_json import (
@@ -68,6 +72,18 @@ def entry(**overrides) -> dict:
 
 def by_name(parsed, name):
     return next(candidate for candidate in parsed.candidates if candidate.name == name)
+
+
+def probe_capabilities(*, api_version="v1_0_5", supports_range=True, warnings=None):
+    start = datetime(2027, 1, 1, tzinfo=timezone.utc)
+    return SourceCapabilities(
+        api_version=api_version,
+        request_mode="standard",
+        query_tariff_type="grid",
+        supports_range=supports_range,
+        points=[PricePoint(start, start + timedelta(minutes=15), Decimal("0.12345"))],
+        warnings=warnings or [],
+    )
 
 
 class RealDocumentTests(SimpleTestCase):
@@ -244,17 +260,48 @@ class UnsupportedConstructTests(SimpleTestCase):
         self.assertFalse(candidate.is_importable)
         self.assertIn("no URL", candidate.blocked_reason)
 
-    def test_a_dynamic_metering_tariff_is_blocked(self):
-        # The dynamic-tariff schema has no metering type to fetch at all —
-        # unlike the static import, which does support metering tariffs.
+    def test_a_v2_dynamic_metering_tariff_is_reachable(self):
         parsed = parse_document(document(entry(
             tariffType="metering", tariffForm="dynamic",
             prices={"dynamic": {"url": "https://api.example.ch/v1/tariffs"}},
         )))
 
         candidate = parsed.candidates[0]
-        self.assertFalse(candidate.is_importable)
-        self.assertIn("metering", candidate.blocked_reason)
+        self.assertTrue(candidate.is_importable)
+        self.assertEqual(candidate.category, TariffCategory.METERING)
+        self.assertEqual(candidate.energy_type, EnergyType.GRID)
+
+    def test_only_dynamic_feed_in_maps_to_export_credits(self):
+        for tariff_type, category in (
+            ("feed_in", TariffCategory.ENERGY),
+            ("refund", TariffCategory.GRID_FEES),
+        ):
+            parsed = parse_document(document(entry(
+                tariffType=tariff_type,
+                tariffForm="dynamic",
+                prices={"dynamic": {"url": "https://api.example.ch/tariffs"}},
+            )))
+
+            candidate = parsed.candidates[0]
+            if tariff_type == "refund":
+                self.assertFalse(candidate.is_importable)
+                self.assertIn("storage-qualified", candidate.blocked_reason)
+                continue
+            self.assertTrue(candidate.is_importable)
+            self.assertEqual(candidate.category, category)
+            self.assertEqual(candidate.energy_type, EnergyType.FEED_IN)
+
+    def test_an_aggregate_dynamic_type_warns_about_double_billing(self):
+        parsed = parse_document(document(entry(
+            tariffType="integrated",
+            tariffForm="dynamic",
+            prices={"dynamic": {"url": "https://api.example.ch/tariffs"}},
+        )))
+
+        self.assertTrue(any(
+            "already includes electricity, grid" in warning
+            for warning in parsed.candidates[0].warnings
+        ))
 
     def test_a_dynamic_tariff_warns_that_the_document_names_no_product(self):
         parsed = parse_document(document(entry(
@@ -728,20 +775,18 @@ class PlanningTests(TestCase):
         self.assertEqual(Tariff.objects.filter(zev=self.zev).count(), 3)
 
     def test_a_blocked_candidate_is_never_written_even_if_asked_for(self):
-        # A metering tariff going dynamic has no representable tariff type
-        # (the dynamic schema has none) and stays blocked, unlike grid.
         parsed = parse_document(document(entry(
-            tariffType="metering", tariffForm="dynamic",
-            prices={"dynamic": {"url": "https://x.ch"}},
+            tariffType="grid", tariffForm="dynamic",
+            prices={"dynamic": {"url": ""}},
         )))
 
         report, created = apply_import(
-            zev=self.zev, document=parsed, selections=[Selection(parsed.candidates[0].key)],
+            zev=self.zev, document=parsed, selections=[Selection(parsed.candidates[0].key, dynamic_tariff_name="")],
             source_url="https://example.ch/t.json", imported_on=date(2026, 9, 2),
         )
 
         self.assertEqual(created, [])
-        self.assertIn("metering", report.skipped[0]["reason"])
+        self.assertIn("no URL", report.skipped[0]["reason"])
 
     def test_a_dynamic_candidate_creates_a_tariff_linked_to_a_probed_source(self):
         from tariffs.dynamic.models import DynamicTariffSource
@@ -752,13 +797,10 @@ class PlanningTests(TestCase):
 
         with mock.patch(
             "tariffs.importers.planner.probe_source_configuration",
-            return_value=mock.Mock(
-                api_version="v1_0_5", request_mode="standard",
-                query_tariff_type="grid", supports_range=True, warnings=[],
-            ),
+            return_value=probe_capabilities(),
         ) as probe:
             report, created = apply_import(
-                zev=self.zev, document=parsed, selections=[Selection(parsed.candidates[0].key)],
+                zev=self.zev, document=parsed, selections=[Selection(parsed.candidates[0].key, dynamic_tariff_name="")],
                 source_url="https://example.ch/t.json", imported_on=date(2026, 9, 2),
             )
 
@@ -771,6 +813,10 @@ class PlanningTests(TestCase):
         self.assertEqual(source.url, "https://api.example.ch/v1/tariffs")
         self.assertEqual(source.tariff_type, "grid")
         self.assertEqual(source.tariff_name, "")
+        self.assertEqual(source.last_fetch_status, "ok")
+        self.assertIsNotNone(source.last_fetch_at)
+        self.assertIsNotNone(source.last_success_at)
+        self.assertEqual(source.points.count(), 1)
 
     def test_the_probe_auto_detects_the_api_version_rather_than_assuming_v1(self):
         # The VSE tariff document names a tariffType (electricity/grid/
@@ -785,13 +831,10 @@ class PlanningTests(TestCase):
 
         with mock.patch(
             "tariffs.importers.planner.probe_source_configuration",
-            return_value=mock.Mock(
-                api_version="v2_0_0", request_mode="standard",
-                query_tariff_type="grid", supports_range=True, warnings=[],
-            ),
+            return_value=probe_capabilities(api_version="v2_0_0"),
         ) as probe:
             _report, created = apply_import(
-                zev=self.zev, document=parsed, selections=[Selection(parsed.candidates[0].key)],
+                zev=self.zev, document=parsed, selections=[Selection(parsed.candidates[0].key, dynamic_tariff_name="")],
                 source_url="https://example.ch/t.json", imported_on=date(2026, 9, 2),
             )
 
@@ -807,18 +850,39 @@ class PlanningTests(TestCase):
 
         with mock.patch(
             "tariffs.importers.planner.probe_source_configuration",
-            return_value=mock.Mock(
-                api_version="v1_0_5", request_mode="standard",
-                query_tariff_type="grid", supports_range=True, warnings=[warning],
-            ),
+            return_value=probe_capabilities(warnings=[warning]),
         ):
             report, created = apply_import(
-                zev=self.zev, document=parsed, selections=[Selection(parsed.candidates[0].key)],
+                zev=self.zev, document=parsed, selections=[Selection(parsed.candidates[0].key, dynamic_tariff_name="")],
                 source_url="https://example.ch/t.json", imported_on=date(2026, 9, 2),
             )
 
         self.assertEqual(len(created), 1)
         self.assertEqual(report.created[0]["dynamic_source_warnings"], [warning])
+
+    def test_an_integrated_import_upgrades_the_warning_to_the_probed_version(self):
+        parsed = parse_document(document(entry(
+            tariffType="integrated",
+            tariffForm="dynamic", prices={"dynamic": {"url": "https://api.example.ch/v1/tariffs"}},
+        )))
+        preview_warning = " ".join(parsed.candidates[0].warnings)
+        self.assertIn("already includes electricity, grid", preview_warning)
+        self.assertIn("also includes metering, national_fees", preview_warning)
+
+        with mock.patch(
+            "tariffs.importers.planner.probe_source_configuration",
+            return_value=probe_capabilities(api_version="v2_0_0"),
+        ):
+            report, created = apply_import(
+                zev=self.zev, document=parsed, selections=[Selection(parsed.candidates[0].key, dynamic_tariff_name="")],
+                source_url="https://example.ch/t.json", imported_on=date(2026, 9, 2),
+            )
+
+        self.assertEqual(len(created), 1)
+        self.assertTrue(any(
+            "already includes electricity, grid, metering, national_fees" in warning
+            for warning in report.created[0]["dynamic_source_warnings"]
+        ))
 
     def test_a_new_dynamic_source_queues_one_backfill_after_commit(self):
         parsed = parse_document(document(entry(
@@ -828,16 +892,13 @@ class PlanningTests(TestCase):
         with (
             mock.patch(
                 "tariffs.importers.planner.probe_source_configuration",
-                return_value=mock.Mock(
-                    api_version="v1_0_5", request_mode="standard",
-                    query_tariff_type="grid", supports_range=True,
-                ),
+                return_value=probe_capabilities(),
             ),
             mock.patch("tariffs.importers.planner.fetch_dynamic_prices.delay") as delay,
             self.captureOnCommitCallbacks(execute=True),
         ):
             _report, created = apply_import(
-                zev=self.zev, document=parsed, selections=[Selection(parsed.candidates[0].key)],
+                zev=self.zev, document=parsed, selections=[Selection(parsed.candidates[0].key, dynamic_tariff_name="")],
                 source_url="https://example.ch/t.json", imported_on=date(2026, 9, 2),
             )
 
@@ -851,25 +912,98 @@ class PlanningTests(TestCase):
         with (
             mock.patch(
                 "tariffs.importers.planner.probe_source_configuration",
-                return_value=mock.Mock(
-                    api_version="v1_0_5", request_mode="standard",
-                    query_tariff_type="grid", supports_range=True,
-                ),
+                return_value=probe_capabilities(),
             ),
             mock.patch("tariffs.importers.planner._create", side_effect=DjangoValidationError("invalid")),
             mock.patch("tariffs.importers.planner.fetch_dynamic_prices.delay") as delay,
             self.captureOnCommitCallbacks(execute=True),
         ):
             report, created = apply_import(
-                zev=self.zev, document=parsed, selections=[Selection(parsed.candidates[0].key)],
+                zev=self.zev, document=parsed, selections=[Selection(parsed.candidates[0].key, dynamic_tariff_name="")],
                 source_url="https://example.ch/t.json", imported_on=date(2026, 9, 2),
             )
 
         self.assertEqual(created, [])
         self.assertEqual(len(report.errors), 1)
         delay.assert_not_called()
+        self.assertFalse(DynamicTariffSource.objects.exists())
 
-    def test_a_second_zev_on_the_same_endpoint_reuses_the_source_without_probing(self):
+    def test_a_constraint_violation_is_a_per_candidate_row_not_a_crash(self):
+        """IntegrityError has no .messages — it must not escape as a 500."""
+        parsed = parse_document(document(entry(
+            tariffForm="dynamic", prices={"dynamic": {"url": "https://api.example.ch/v1/tariffs"}},
+        )))
+
+        with (
+            mock.patch(
+                "tariffs.importers.planner.probe_source_configuration",
+                return_value=probe_capabilities(),
+            ),
+            mock.patch(
+                "tariffs.importers.planner._create",
+                side_effect=IntegrityError('duplicate key value violates unique constraint "x"'),
+            ),
+            mock.patch("tariffs.importers.planner.fetch_dynamic_prices.delay") as delay,
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            report, created = apply_import(
+                zev=self.zev, document=parsed, selections=[Selection(parsed.candidates[0].key, dynamic_tariff_name="")],
+                source_url="https://example.ch/t.json", imported_on=date(2026, 9, 2),
+            )
+
+        self.assertEqual(created, [])
+        self.assertEqual(len(report.errors), 1)
+        self.assertIn("constraint", report.errors[0]["error"])
+        delay.assert_not_called()
+        self.assertFalse(DynamicTariffSource.objects.exists())
+
+    def test_conflicting_probe_points_are_a_per_candidate_row(self):
+        from tariffs.dynamic.fetch import PriceIntervalConflict
+
+        parsed = parse_document(document(entry(
+            tariffForm="dynamic", prices={"dynamic": {"url": "https://api.example.ch/v1/tariffs"}},
+        )))
+
+        with (
+            mock.patch(
+                "tariffs.importers.planner.probe_source_configuration",
+                return_value=probe_capabilities(),
+            ),
+            mock.patch(
+                "tariffs.importers.planner.initialise_source_from_probe",
+                side_effect=PriceIntervalConflict(
+                    "Price interval 2027-01-01T00:00:00+00:00 overlaps stored or incoming evidence."
+                ),
+            ),
+            mock.patch("tariffs.importers.planner.fetch_dynamic_prices.delay") as delay,
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            report, created = apply_import(
+                zev=self.zev, document=parsed, selections=[Selection(parsed.candidates[0].key, dynamic_tariff_name="")],
+                source_url="https://example.ch/t.json", imported_on=date(2026, 9, 2),
+            )
+
+        self.assertEqual(created, [])
+        self.assertEqual(len(report.errors), 1)
+        self.assertIn("overlaps", report.errors[0]["error"])
+        delay.assert_not_called()
+        self.assertFalse(DynamicTariffSource.objects.exists())
+        self.assertFalse(Tariff.objects.filter(zev=self.zev).exists())
+
+    def test_dynamic_import_requires_an_explicit_product_choice(self):
+        parsed = parse_document(document(entry(
+            tariffForm="dynamic", prices={"dynamic": {"url": "https://api.example.ch/tariffs"}},
+        )))
+        with mock.patch("tariffs.importers.planner.probe_source_configuration") as probe:
+            report, created = apply_import(
+                zev=self.zev, document=parsed, selections=[Selection(parsed.candidates[0].key)],
+                source_url="https://example.ch/t.json", imported_on=date(2026, 9, 2),
+            )
+        self.assertFalse(created)
+        self.assertIn("Choose a dynamic product", report.errors[0]["error"])
+        probe.assert_not_called()
+
+    def test_a_second_zev_reuses_the_source_after_confirming_its_version(self):
         from tariffs.dynamic.models import DynamicTariffSource
 
         parsed = parse_document(document(entry(
@@ -877,13 +1011,10 @@ class PlanningTests(TestCase):
         )))
         with mock.patch(
             "tariffs.importers.planner.probe_source_configuration",
-            return_value=mock.Mock(
-                api_version="v1_0_5", request_mode="standard",
-                query_tariff_type="grid", supports_range=True,
-            ),
+            return_value=probe_capabilities(),
         ):
             apply_import(
-                zev=self.zev, document=parsed, selections=[Selection(parsed.candidates[0].key)],
+                zev=self.zev, document=parsed, selections=[Selection(parsed.candidates[0].key, dynamic_tariff_name="")],
                 source_url="https://example.ch/t.json", imported_on=date(2026, 9, 2),
             )
         self.assertEqual(DynamicTariffSource.objects.count(), 1)
@@ -894,20 +1025,52 @@ class PlanningTests(TestCase):
             tariffForm="dynamic", prices={"dynamic": {"url": "https://api.example.ch/v1/tariffs"}},
         )))
         with (
-            mock.patch("tariffs.importers.planner.probe_source_configuration") as probe,
+            mock.patch("tariffs.importers.planner.probe_source_configuration", return_value=probe_capabilities()) as probe,
             mock.patch("tariffs.importers.planner.fetch_dynamic_prices.delay") as delay,
             self.captureOnCommitCallbacks(execute=True),
         ):
             report, created = apply_import(
                 zev=other_zev, document=other_document,
-                selections=[Selection(other_document.candidates[0].key)],
+                selections=[Selection(other_document.candidates[0].key, dynamic_tariff_name="")],
                 source_url="https://example.ch/t.json", imported_on=date(2026, 9, 2),
             )
 
-        probe.assert_not_called()
+        probe.assert_called_once()
         self.assertEqual(len(created), 1)
         self.assertEqual(DynamicTariffSource.objects.count(), 1)
         delay.assert_not_called()
+
+    @mock.patch("tariffs.importers.planner.probe_source_configuration")
+    def test_reusing_a_failed_source_reports_its_operational_state(self, probe):
+        from tariffs.dynamic.models import DynamicTariffSource
+
+        warning = "The grid series also publishes a fixed charge (CHF_m) which is not billed here."
+        probe.return_value = probe_capabilities(warnings=[warning])
+        parsed = parse_document(document(entry(
+            tariffForm="dynamic", prices={"dynamic": {"url": "https://api.example.ch/v1/tariffs"}},
+        )))
+        DynamicTariffSource.objects.create(
+            label="Known broken source",
+            url="https://api.example.ch/v1/tariffs",
+            api_version="v1_0_5",
+            tariff_type="grid",
+            tariff_name="",
+            last_fetch_status="failed",
+            last_fetch_error="The operator endpoint is unavailable.",
+        )
+
+        report, created = apply_import(
+            zev=self.zev,
+            document=parsed,
+            selections=[Selection(parsed.candidates[0].key, dynamic_tariff_name="")],
+            source_url="https://example.ch/t.json",
+            imported_on=date(2026, 9, 2),
+        )
+
+        self.assertEqual(len(created), 1)
+        warnings = report.created[0]["dynamic_source_warnings"]
+        self.assertIn(warning, warnings)
+        self.assertTrue(any("currently failing" in message for message in warnings))
 
     def test_an_unreachable_dynamic_url_is_reported_and_creates_nothing(self):
         from tariffs.importers.remote import TariffFetchError
@@ -921,7 +1084,7 @@ class PlanningTests(TestCase):
             side_effect=TariffFetchError("The operator's server answered HTTP 410."),
         ):
             report, created = apply_import(
-                zev=self.zev, document=parsed, selections=[Selection(parsed.candidates[0].key)],
+                zev=self.zev, document=parsed, selections=[Selection(parsed.candidates[0].key, dynamic_tariff_name="")],
                 source_url="https://example.ch/t.json", imported_on=date(2026, 9, 2),
             )
 
@@ -1084,7 +1247,8 @@ class EnginePricingTests(TestCase):
 
     def _price_at(self, hour, minute=0):
         stamp = datetime_module.datetime(2027, 3, 15, hour, minute)
-        return _get_tariff_price(self.tariff, stamp)
+        period = _resolve_tariff_band(self.tariff, stamp)
+        return period.price_chf_per_kwh if period is not None else None
 
     def test_daytime_consumption_is_priced_at_the_high_band(self):
         self.assertEqual(self._price_at(12), Decimal("0.07300"))

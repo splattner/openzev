@@ -30,9 +30,10 @@ import {
     sendAllInvoices,
     sendInvoiceEmail,
 } from '../../lib/api/invoices'
-import { formatApiError } from '../../lib/api/errors'
+import { dynamicPriceGapPayload, formatApiError } from '../../lib/api/errors'
 import { queryKeys } from '../../lib/api/queryKeys'
 import { downloadBlob } from '../../lib/downloadBlob'
+import { formatDateTime, useAppSettings } from '../../lib/appSettings'
 import { useToast } from '../../lib/toast'
 import { getLatestEmailLog } from './emailLogs'
 import type { ActionMenuItem } from '../../components/ActionMenu'
@@ -72,6 +73,7 @@ export function useInvoiceActions({
     const navigate = useNavigate()
     const queryClient = useQueryClient()
     const { pushToast } = useToast()
+    const { settings } = useAppSettings()
 
     // ── Email polling state ──────────────────────────────────────────────
     const [pollingInvoiceId, setPollingInvoiceId] = useState<string | null>(null)
@@ -116,7 +118,17 @@ export function useInvoiceActions({
             onPdfQueued()
             invalidateCockpit()
         },
-        onError: (error) => pushToast(formatApiError(error, t('pages.invoices.messages.generateFailed')), 'error'),
+        onError: (error) => {
+            const gap = dynamicPriceGapPayload(error)
+            if (gap) {
+                pushToast(t('pages.invoices.messages.dynamicPriceGap', {
+                    tariff: gap.tariff_name,
+                    timestamp: formatDateTime(gap.missing_at, settings),
+                }), 'error')
+                return
+            }
+            pushToast(formatApiError(error, t('pages.invoices.messages.generateFailed')), 'error')
+        },
     })
 
     const pdfMutation = useMutation({

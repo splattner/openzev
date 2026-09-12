@@ -20,7 +20,7 @@ from .serializers import (
     GenerateZevInvoicesSerializer
 )
 from . import access_tokens
-from .engine import generate_invoice
+from .engine import DynamicPriceGapError, generate_invoice
 from .pdf import save_invoice_pdf
 from .tasks import (
     generate_invoice_pdf_task,
@@ -235,6 +235,8 @@ class InvoiceViewSet(
                     {"error": f"Allocation error during invoice generation: {exc}"},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
+            if isinstance(exc, DynamicPriceGapError):
+                return Response(exc.as_dict(), status=status.HTTP_409_CONFLICT)
             return Response(
                 {"error": "Invoice generation failed. The invoice may already exist in a non-regenerable state."},
                 status=status.HTTP_409_CONFLICT,

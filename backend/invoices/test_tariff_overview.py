@@ -483,15 +483,17 @@ class TariffOverviewDynamicTariffTests(TariffOverviewTestCase):
             for row in tariff["price_rows"] if tariff["name"] == "Local pct"
         )
 
-    def test_an_unfetched_dynamic_tariff_is_not_shown_at_all(self):
-        # No average to print yet — the same "nothing to print" outcome a
-        # static tariff with no bands gets, not a misleading zero.
+    def test_an_unfetched_dynamic_tariff_is_shown_as_unavailable(self):
         self._dynamic_grid_tariff()
 
         ctx = _build_template_context(self.zev, date(2026, 6, 1), "valid")
 
-        names = [t["name"] for group in ctx["groups"] for t in group["tariffs"]]
-        self.assertNotIn("Grid (dynamic)", names)
+        tariff = next(
+            t for group in ctx["groups"] for t in group["tariffs"]
+            if t["name"] == "Grid (dynamic)"
+        )
+        self.assertEqual(tariff["price_rows"][0]["amount"], "—")
+        self.assertEqual(tariff["price_rows"][0]["footnote"], "dynamic_unavailable")
 
     def test_a_fetched_dynamic_tariff_shows_its_average_with_a_footnote(self):
         tariff, source = self._dynamic_grid_tariff()
@@ -504,9 +506,9 @@ class TariffOverviewDynamicTariffTests(TariffOverviewTestCase):
             for row in t["price_rows"] if t["name"] == "Grid (dynamic)"
         )
         self.assertEqual(row["amount"], "20.00")
-        self.assertEqual(row["footnote"], "dynamic_average")
+        self.assertEqual(row["footnote"], "dynamic_partial")
         self.assertIn(
-            TARIFF_OVERVIEW_TRANSLATIONS["de"]["footnote_dynamic_average"],
+            TARIFF_OVERVIEW_TRANSLATIONS["de"]["footnote_dynamic_partial"],
             [text for _index, text in ctx["footnotes"]],
         )
 
@@ -517,7 +519,7 @@ class TariffOverviewDynamicTariffTests(TariffOverviewTestCase):
 
         row = self._pct_row()
 
-        self.assertEqual(row["footnote"], "dynamic_average")
+        self.assertEqual(row["footnote"], "dynamic_partial")
         self.assertNotEqual(row["footnote"], "multiband_base")
 
     def test_a_dynamic_base_prices_the_percentage_tariff_correctly(self):

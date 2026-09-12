@@ -7,13 +7,15 @@ these confirm that holds, and that the model's own validation
 surfaces as an ordinary 400 through this API rather than a 500.
 """
 
-from datetime import date
+from datetime import date, datetime, timedelta, timezone
+from decimal import Decimal
+from unittest.mock import patch
 
 import pytest
 
 from accounts.models import UserRole
-from tariffs.dynamic.models import DynamicTariffSource
-from tariffs.models import BillingMode, EnergyType, Tariff, TariffCategory
+from tariffs.dynamic.models import DynamicPricePoint, DynamicTariffSource
+from tariffs.models import BillingMode, EnergyType, Tariff, TariffCategory, TariffPeriod
 from testing import factories
 from testing.helpers import authenticate, make_user
 
@@ -29,6 +31,28 @@ def make_source(**overrides) -> DynamicTariffSource:
 
 
 class TestPickingASourceThroughTheTariffApi:
+    def test_series_and_detail_return_the_same_historical_percentage_base(self, api_client):
+        owner = make_user("percentage_owner", UserRole.ZEV_OWNER)
+        zev = factories.ZevFactory(owner=owner)
+        source = make_source()
+        factories.TariffFactory(zev=zev, dynamic_source=source, energy_type="grid", valid_from=date(2026, 1, 1))
+        percentage = factories.TariffFactory(
+            zev=zev, name="Local", billing_mode="percentage_of_energy", energy_type="local",
+            percentage=50, valid_from=date(2026, 1, 1), valid_to=date(2026, 6, 30),
+        )
+        for month, day, price in [(6, 30, "0.1"), (9, 12, "0.9")]:
+            start = datetime(2026, month, day, tzinfo=timezone.utc)
+            source.points.create(valid_from=start, valid_to=start + timedelta(minutes=15), price_chf_per_kwh=price)
+        authenticate(api_client, owner)
+        with patch("django.utils.timezone.localdate", return_value=date(2026, 9, 12)):
+            series = api_client.get(f"/api/v1/tariffs/tariffs/series/?zev_id={zev.pk}")
+            detail = api_client.get(f"/api/v1/tariffs/tariffs/{percentage.pk}/")
+        assert series.status_code == detail.status_code == 200
+        version = next(item for item in series.data if item["name"] == "Local")["versions"][0]
+        assert version["percentage_base_summary"] == detail.data["percentage_base_summary"] == {
+            "price_chf_per_kwh": "0.10000", "dynamic_status": "partial", "reference_date": "2026-06-30",
+        }
+
     def test_an_owner_can_create_a_tariff_linked_to_an_existing_source(self, api_client):
         owner = make_user("dyn_link_owner", UserRole.ZEV_OWNER)
         zev = factories.ZevFactory(owner=owner)
@@ -78,14 +102,49 @@ class TestPickingASourceThroughTheTariffApi:
         assert response.status_code == 400
         assert "dynamic_source" in response.data
 
+    def test_linking_a_source_to_a_banded_tariff_is_refused(self, api_client):
+        owner = make_user("dyn_link_owner_bands", UserRole.ZEV_OWNER)
+        zev = factories.ZevFactory(owner=owner)
+        source = make_source()
+        tariff = factories.TariffFactory(
+            zev=zev, category=TariffCategory.GRID_FEES,
+            billing_mode=BillingMode.ENERGY, energy_type=EnergyType.GRID,
+            valid_from=date(2026, 1, 1),
+        )
+        TariffPeriod.objects.create(
+            tariff=tariff, period_type="flat", price_chf_per_kwh="0.10000",
+        )
+        authenticate(api_client, owner)
+
+        response = api_client.patch(
+            f"/api/v1/tariffs/tariffs/{tariff.pk}/",
+            {"dynamic_source": str(source.pk)}, format="json",
+        )
+
+        assert response.status_code == 400
+        assert "dynamic_source" in response.data
+        tariff.refresh_from_db()
+        assert tariff.dynamic_source_id is None
+        assert tariff.periods.count() == 1
+
     def test_the_series_endpoint_carries_dynamic_source_on_each_version(self, api_client):
         owner = make_user("dyn_link_owner4", UserRole.ZEV_OWNER)
         zev = factories.ZevFactory(owner=owner)
         source = make_source()
-        Tariff.objects.create(
+        tariff = Tariff.objects.create(
             zev=zev, name="Grid (dynamic)", category=TariffCategory.GRID_FEES,
             billing_mode=BillingMode.ENERGY, energy_type=EnergyType.GRID,
             valid_from="2026-01-01", dynamic_source=source,
+        )
+        today = date.today()
+        tariff.valid_from = today
+        tariff.save(update_fields=["valid_from"])
+        point_start = datetime(today.year, today.month, today.day, tzinfo=timezone.utc)
+        DynamicPricePoint.objects.create(
+            source=source,
+            valid_from=point_start,
+            valid_to=point_start + timedelta(hours=1),
+            price_chf_per_kwh=Decimal("0.20000"),
         )
         authenticate(api_client, owner)
 
@@ -94,14 +153,16 @@ class TestPickingASourceThroughTheTariffApi:
         assert response.status_code == 200
         series = next(s for s in response.data if s["name"] == "Grid (dynamic)")
         assert str(series["versions"][0]["dynamic_source"]) == str(source.pk)
+        assert series["versions"][0]["dynamic_price_summary"] == {
+            "status": "partial",
+            "average_chf_per_kwh": "0.20000",
+            "reference_from": today.isoformat(),
+            "reference_to": today.isoformat(),
+        }
 
 
 class TestPreservingTheEvidenceLink:
-    """A tariff's ``dynamic_source`` link is the only thing that ties an
-    issued invoice back to the fetched prices behind it (invoice items store
-    rendered amounts, not a tariff FK). Deleting or repointing the link is a
-    second door into the same evidence the source-level clear/delete guards
-    protect, and it must be guarded the same way."""
+    """Conservative API workflow guards alongside frozen invoice provenance."""
 
     def _billed_dynamic_tariff(self, owner):
         zev = factories.ZevFactory(owner=owner)
@@ -111,7 +172,12 @@ class TestPreservingTheEvidenceLink:
             billing_mode=BillingMode.ENERGY, energy_type=EnergyType.GRID,
             valid_from="2026-01-01", dynamic_source=source,
         )
-        factories.InvoiceFactory(zev=zev, period_start="2026-01-01", period_end="2026-01-31")
+        factories.InvoiceFactory(
+            zev=zev,
+            period_start="2026-01-01",
+            period_end="2026-01-31",
+            status="approved",
+        )
         return zev, source, tariff
 
     def test_deleting_a_billed_dynamic_tariff_is_refused(self, api_client):
@@ -200,3 +266,34 @@ class TestPreservingTheEvidenceLink:
         )
 
         assert response.status_code == 200, response.data
+
+
+class TestDynamicTariffVersioning:
+    def test_duplicate_and_new_version_keep_dynamic_pricing_without_bands(self, api_client):
+        owner = make_user("dyn_version_owner", UserRole.ZEV_OWNER)
+        zev = factories.ZevFactory(owner=owner)
+        source = make_source()
+        tariff = Tariff.objects.create(
+            zev=zev, name="Grid (dynamic)", category=TariffCategory.GRID_FEES,
+            billing_mode=BillingMode.ENERGY, energy_type=EnergyType.GRID,
+            valid_from=date(2026, 1, 1), dynamic_source=source,
+        )
+        authenticate(api_client, owner)
+
+        duplicate = api_client.post(
+            f"/api/v1/tariffs/tariffs/{tariff.pk}/duplicate/",
+            {"name": "Grid copy", "valid_from": "2026-01-01"}, format="json",
+        )
+        assert duplicate.status_code == 201, duplicate.data
+        duplicate_tariff = Tariff.objects.get(pk=duplicate.data["id"])
+        assert duplicate_tariff.dynamic_source_id == source.pk
+        assert duplicate_tariff.periods.count() == 0
+
+        version = api_client.post(
+            f"/api/v1/tariffs/tariffs/{tariff.pk}/new-version/",
+            {"valid_from": "2027-01-01"}, format="json",
+        )
+        assert version.status_code == 201, version.data
+        new_version = Tariff.objects.get(pk=version.data["id"])
+        assert new_version.dynamic_source_id == source.pk
+        assert new_version.periods.count() == 0

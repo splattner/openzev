@@ -10,7 +10,7 @@ import {
   fetchDynamicTariffSources,
   queueDynamicSourceFetch,
 } from '../src/lib/api/tariffs'
-import { aggregatedTariffTypes, dynamicSourceOptions, impliedEnergyType } from '../src/features/tariffs/dynamicSources'
+import { dynamicSourceOptions, impliedEnergyType } from '../src/features/tariffs/dynamicSources'
 import type { DynamicTariffSource } from '../src/types/api'
 
 /**
@@ -36,6 +36,7 @@ function source(overrides: Partial<DynamicTariffSource> = {}): DynamicTariffSour
     linked_tariff_count: 2,
     linked_zev_count: 1,
     supports_backfill: true,
+    aggregated_tariff_types: [],
     created_at: '2026-09-01T10:00:00Z',
     updated_at: '2026-09-11T12:00:00Z',
     ...overrides,
@@ -43,15 +44,16 @@ function source(overrides: Partial<DynamicTariffSource> = {}): DynamicTariffSour
 }
 
 describe('impliedEnergyType', () => {
-  it('is grid for every VSE type except feed_in', () => {
+  it('is grid for consumption-oriented VSE types', () => {
     for (const type of ['electricity', 'grid', 'metering', 'national_fees', 'dso', 'dso_complete', 'integrated', 'integrated_complete', 'regional_fees'] as const) {
       expect(impliedEnergyType(source({ tariff_type: type }))).toBe('grid')
     }
   })
 
-  it('is feed_in for a feed-in remuneration source', () => {
+  it('offers feed-in remuneration but excludes storage-qualified refunds', () => {
     expect(impliedEnergyType(source({ tariff_type: 'feed_in' }))).toBe('feed_in')
-    expect(impliedEnergyType(source({ tariff_type: 'refund' }))).toBe('feed_in')
+    expect(impliedEnergyType(source({ tariff_type: 'refund' }))).toBeNull()
+    expect(dynamicSourceOptions([source({ tariff_type: 'refund' })])).toEqual([])
   })
 })
 
@@ -77,28 +79,6 @@ describe('dynamicSourceOptions', () => {
   it('treats a missing lock the same as none — null or undefined', () => {
     expect(dynamicSourceOptions([grid, feedIn], null)).toEqual([grid, feedIn])
     expect(dynamicSourceOptions([grid, feedIn], undefined)).toEqual([grid, feedIn])
-  })
-})
-
-describe('aggregatedTariffTypes', () => {
-  it('names electricity and grid for an integrated component', () => {
-    expect(aggregatedTariffTypes('integrated')).toEqual(['electricity', 'grid'])
-  })
-
-  it('names the v2 aggregates dso/dso_complete/integrated_complete already contain', () => {
-    expect(aggregatedTariffTypes('dso')).toEqual(['grid', 'metering', 'national_fees'])
-    expect(aggregatedTariffTypes('dso_complete')).toEqual([
-      'grid', 'metering', 'national_fees', 'regional_fees',
-    ])
-    expect(aggregatedTariffTypes('integrated_complete')).toEqual([
-      'electricity', 'grid', 'metering', 'national_fees', 'regional_fees',
-    ])
-  })
-
-  it('is empty for a component that bills only itself', () => {
-    for (const type of ['electricity', 'grid', 'metering', 'national_fees', 'regional_fees', 'feed_in', 'refund'] as const) {
-      expect(aggregatedTariffTypes(type)).toEqual([])
-    }
   })
 })
 
@@ -151,7 +131,7 @@ describe('fetchDynamicTariffSources', () => {
         api_version: 'v2_0_0',
         version_detected: true,
         components_discovered: true,
-        components: [{ tariff_type: 'grid', tariff_name: 'standard' }],
+        components: [{ tariff_type: 'grid', tariff_name: 'standard', aggregated_tariff_types: [] }],
       }]
     })
 
@@ -159,7 +139,7 @@ describe('fetchDynamicTariffSources', () => {
       api_version: 'v2_0_0',
       version_detected: true,
       components_discovered: true,
-      components: [{ tariff_type: 'grid', tariff_name: 'standard' }],
+      components: [{ tariff_type: 'grid', tariff_name: 'standard', aggregated_tariff_types: [] }],
     })
   })
 

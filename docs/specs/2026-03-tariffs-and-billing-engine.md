@@ -165,6 +165,18 @@ Only what this spec's own algorithm needs to know:
 - A dynamic tariff carries **no** `TariffPeriod` rows. §4.4's period-matching
   (§3.2) does not apply to it at all; §4.4.3 below is the whole of its pricing
   rule.
+- Tariff API responses include `dynamic_price_summary` for a linked source:
+  a bounded, duration-weighted display average with `complete`, `partial`, or
+  `unavailable` coverage and its reference dates. It is display metadata; the
+  engine always resolves exact intervals.
+- Percentage tariff responses include `percentage_base_summary` (null for
+  other billing modes): `price_chf_per_kwh` (decimal string or null),
+  `dynamic_status` (`complete`, `partial`, `unavailable`, or null for static
+  bases), and `reference_date` (ISO date). Today is clamped to that version's
+  validity; both grid-version selection and dynamic averages use that date.
+  The frontend consumes this shared backend calculation, without rebuilding
+  the base from differently dated grid summaries. Series responses batch all
+  requested windows into one bounded query per source.
 
 ### 3.2 TariffPeriod (price bands within a tariff)
 
@@ -587,17 +599,29 @@ A dynamic tariff still bills `billing_mode = energy`, so §4.4.1's loop reaches
 it exactly like a static tariff — the branch is entirely inside price
 resolution, not in which tariffs are selected.
 
+Generation records `InvoiceDynamicSourceEvidence` for every applicable dynamic
+tariff before committing. Each row freezes the source, tariff UUID and the UTC
+intersection of invoice and tariff validity. These rows survive tariff edits
+and use `PROTECT` on the source. Storage and clearing take the same source-row
+locks before checking retained evidence. Drafts protect prices; cancelled
+invoices no longer protect points. See ADR 0019 and the dynamic tariff spec §4.4.
+
 1. Resolve the price for `(tariff, ts)` from the tariff's `DynamicTariffSource`
    series (`engine.TariffResolver.price_at`) instead of from `TariffPeriod`
    period matching. The lookup is a bisect over the source's stored
-   `(valid_from, valid_to, price)` intervals, loaded once per
-   `InvoiceGenerationContext` and shared across every participant in a batch.
+   `(valid_from, valid_to, price)` intervals overlapping the invoice period,
+   loaded once per source per invoice transaction. `generate_invoice` first
+   locks all applicable source rows in primary-key order, then clears the
+   context's price cache; a separately committed participant never reuses
+   previously unlocked prices.
 2. **If no stored interval covers `ts`, raise rather than bill zero.** This is
    the one place `generate_invoice` refuses to produce an invoice instead of
    degrading: a static tariff's unpriced hour is a configuration choice, a gap
    in a fetched series is missing information. The whole invoice — inside its
    `@transaction.atomic` — rolls back; a batch run (§6, ADR 0011) reports it as
-   one participant's failure rather than aborting the run.
+   one participant's failure rather than aborting the run. The exception and
+   API response carry stable `code=dynamic_price_gap`, tariff/source ids, and
+   the first missing timestamp so the client can offer a source refresh.
 3. §4.4.2's grid base price sum includes a dynamic `grid` tariff's resolved
    price like any other — the percentage tariff needs no special case.
 4. §4.7 (item accumulation) always sees `period=None` for a dynamic line: it
@@ -1026,7 +1050,7 @@ Descriptions are **localized** using the ZEV's `invoice_language` (de/fr/it/en).
 
 | Billing mode | Description format |
 |---|---|
-| `energy` | `"{tariff.name}"`, or `"{tariff.name} – {band}"` when the line is band-itemised (§4.7a) |
+| `energy` | `"{tariff.name}"`, or `"{tariff.name} – {band}"` when the line is band-itemised (§4.7a); a dynamic line appends a localized consumption-weighted effective-rate explanation |
 | `percentage_of_energy` | `"{tariff.name} ({pct}%)"` or `"{tariff.name} ({pct}% of CHF {base_rate}/kWh)"` when base rate is known |
 | `monthly_fee` | `"{tariff.name} ({n} Monat/Monate)"` |
 | `yearly_fee` | `"{tariff.name} ({n} monatliche Rate(n) der Jahresgebühr)"` |
@@ -1248,6 +1272,9 @@ The description renders as: `"Surcharge 50% (50% von CHF 0.32/kWh)"` (German).
 
 - Calculation provenance is inspectable through invoice line items: each item links to a tariff category, quantity, unit price, and total.
 - The grid base price used for percentage-of-energy items is preserved in the item's description (e.g. `"50% von CHF 0.32/kWh"`).
+- A dynamic line's derived `unit_price_chf` is identified in its description as
+  the consumption-weighted effective rate; it is not presented as one
+  published interval price.
 - Role/scoped access ensures only authorized actors can view billing artifacts.
 - Engine logs invoice number, participant name, and total CHF on successful generation.
 

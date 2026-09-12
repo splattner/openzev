@@ -153,6 +153,7 @@ class TariffPeriodFactory(DjangoModelFactory):
 class InvoiceFactory(DjangoModelFactory):
     class Meta:
         model = Invoice
+        skip_postgeneration_save = True
 
     invoice_number = factory.Sequence(lambda n: f"INV-{n:05d}")
     zev = factory.SubFactory(ZevFactory)
@@ -164,6 +165,15 @@ class InvoiceFactory(DjangoModelFactory):
     period_end = date(2026, 1, 31)
     status = InvoiceStatus.DRAFT
     total_chf = Decimal("0.00")
+
+    @factory.post_generation
+    def dynamic_evidence(self, create, extracted, **kwargs):
+        if create:
+            from tariffs.dynamic.evidence import record_invoice_evidence
+
+            # Match generated invoices; reload dates supplied as strings.
+            self.refresh_from_db()
+            record_invoice_evidence(self, Tariff.objects.filter(zev_id=self.zev_id))
 
 
 class InvoiceItemFactory(DjangoModelFactory):

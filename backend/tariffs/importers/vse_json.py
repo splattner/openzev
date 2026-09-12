@@ -33,6 +33,8 @@ from tariffs.models import (
     TariffCategory,
 )
 from tariffs.dynamic.vse_v1 import TARIFF_TYPES as V1_DYNAMIC_TARIFF_TYPES
+from tariffs.dynamic.vse_v2 import TARIFF_TYPES as V2_DYNAMIC_TARIFF_TYPES
+from tariffs.dynamic.components import certain_components, possible_extra_components
 from tariffs.periods import ALL_MONTHS, format_number_list
 
 #: A standard entry carrying both a base fee and a per-kWh price becomes *two*
@@ -54,6 +56,24 @@ CATEGORY_BY_TARIFF_TYPE = {
     "metering": TariffCategory.METERING,
     "regional_fees": TariffCategory.LEVIES,
 }
+
+DYNAMIC_CATEGORY_BY_TARIFF_TYPE = {
+    "electricity": TariffCategory.ENERGY,
+    "grid": TariffCategory.GRID_FEES,
+    "integrated": TariffCategory.GRID_FEES,
+    "metering": TariffCategory.METERING,
+    "national_fees": TariffCategory.LEVIES,
+    "regional_fees": TariffCategory.LEVIES,
+    "dso": TariffCategory.GRID_FEES,
+    "dso_complete": TariffCategory.GRID_FEES,
+    "integrated_complete": TariffCategory.GRID_FEES,
+    "feed_in": TariffCategory.ENERGY,
+    "refund": TariffCategory.GRID_FEES,
+}
+
+DYNAMIC_TARIFF_TYPES = frozenset(V1_DYNAMIC_TARIFF_TYPES) | frozenset(
+    V2_DYNAMIC_TARIFF_TYPES
+)
 
 #: What a ``CHF/M`` base price may be billed as. All three are *monthly*: the
 #: published price is an amount per month, so the yearly modes — which read
@@ -665,7 +685,11 @@ def _read_header(entry: dict, dso_name: str, dso_number: int | None) -> dict:
         raise ValueError("The entry has no tariffName.")
 
     tariff_type = str(entry.get("tariffType") or "").strip().casefold()
-    if tariff_type not in CATEGORY_BY_TARIFF_TYPE:
+    is_dynamic = str(entry.get("tariffForm") or "").strip().casefold() == "dynamic"
+    category_by_type = (
+        DYNAMIC_CATEGORY_BY_TARIFF_TYPE if is_dynamic else CATEGORY_BY_TARIFF_TYPE
+    )
+    if tariff_type not in category_by_type:
         raise ValueError(f"Unknown tariffType {entry.get('tariffType')!r} for {tariff_name!r}.")
 
     start_date = _parse_iso_or_swiss_date(entry.get("startDate"), "startDate")
@@ -693,7 +717,7 @@ def _read_header(entry: dict, dso_name: str, dso_number: int | None) -> dict:
     return {
         "tariff_name": tariff_name,
         "tariff_type": tariff_type,
-        "category": CATEGORY_BY_TARIFF_TYPE[tariff_type],
+        "category": category_by_type[tariff_type],
         "start_date": start_date,
         "end_date": end_date,
         "customer_type": customer_type,
@@ -726,24 +750,36 @@ def _dynamic_candidate(prices: dict, header: dict, category: str) -> Candidate:
             "This dynamic tariff names no URL to fetch its price from "
             "(prices.dynamic.url is empty)."
         )
-    elif tariff_type not in V1_DYNAMIC_TARIFF_TYPES:
+    elif tariff_type == "refund":
+        blocked_reason = "Storage refunds require storage-qualified metering and cannot be imported as feed-in compensation."
+    elif tariff_type not in DYNAMIC_TARIFF_TYPES:
         blocked_reason = (
             f"Dynamic {tariff_type} tariffs are not supported: the fetched-series schema has no "
             f"{tariff_type!r} tariff type to request."
         )
     else:
         energy_type = ENERGY_TYPE_BY_DYNAMIC_TARIFF_TYPE[tariff_type]
-        # The VSE tariff document names the endpoint but never the product
-        # (`tariff_name` on the fetched-series API) — that concept does not
-        # exist in this schema at all. An operator serving one product is
-        # unaffected; one serving several products needs its source corrected
-        # after import, which this warning is here to prompt.
         warnings.append(
             "This document does not name which product the dynamic source should fetch. "
-            "It will use the operator's default; if this operator publishes more than one "
-            "product, review the linked price source and set the correct one."
+            "Choose the product name or explicitly confirm the endpoint default before importing."
         )
-
+        certain = certain_components(tariff_type)
+        if certain:
+            extra = possible_extra_components(tariff_type)
+            if extra:
+                warnings.append(
+                    f"The dynamic {tariff_type} component already includes "
+                    f"{', '.join(certain)}; on a version 2.0.0 endpoint it also "
+                    f"includes {', '.join(extra)}. The endpoint's version is "
+                    "detected when you import. Do not bill those components "
+                    "again as separate tariffs."
+                )
+            else:
+                warnings.append(
+                    f"The dynamic {tariff_type} component already includes "
+                    f"{', '.join(certain)}. Do not bill those components again "
+                    "as separate tariffs."
+                )
     return _candidate(
         name=name, category=category, header=header, warnings=warnings,
         billing_mode=BillingMode.ENERGY, energy_type=energy_type,

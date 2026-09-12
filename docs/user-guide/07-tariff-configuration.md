@@ -130,103 +130,108 @@ cannot be imported always says why:
   demand data is metered.
 - **Reactive-power charges** (CHF/kVarh).
 - **Storage grid-usage refunds.**
-- A **dynamic tariff with no fetchable URL**, or one published against a
-  metering connection — the fetched-price standard has no metering tariff
-  type at all.
+- A **dynamic tariff with no fetchable URL**, or a component with no billable
+  energy value in CHF/kWh. V2 metering components are supported when they
+  publish an energy price.
 - Prices in a unit that cannot be billed — an energy price not in CHF/kWh, or a
   base price not in CHF/month — and negative prices.
 
 Where a published price is more precise than OpenZEV stores, it is rounded and
 the row tells you so.
 
-### Dynamic tariffs in an import
+### Dynamic tariffs
 
 Some operators no longer publish a fixed price at all — they publish a URL
 that serves a new price every quarter-hour. Importing one of these creates a
-tariff linked to that price source instead of to fixed bands. See
-[Dynamic Tariffs](#dynamic-tariffs) below for how the source itself is
-configured and inspected; the import-specific behavior is:
+tariff linked to that price source instead of to fixed bands; OpenZEV fetches
+it on a schedule and bills each reading at whatever the series says for that
+moment, negative prices included.
 
 - The import preview marks a dynamic row with a **Dynamic** badge and shows
   the URL it will fetch from, instead of a list of prices — there is nothing
   to list yet.
 - The document never names which *product* the source should use (an
   operator like Groupe E publishes several, at materially different prices).
-  The import warns about this; if your operator publishes more than one
-  product, ask an administrator to set the correct one on the linked source
-  afterwards.
+  Enter the correct product name in the preview before importing. Leaving the
+  visible product field blank explicitly confirms the endpoint default. V2
+  product names returned by discovery are retained with the source.
+- On the Tariffs page, a dynamic tariff shows a **Dynamic** badge next to its
+  energy type. The badge turns red, with the failure shown as a tooltip, if
+  the source's last scheduled fetch failed.
+- You can also link a plain energy tariff to an existing dynamic source by
+  hand, from the tariff's edit form — useful once a source has already been
+  created by an earlier import.
+
+### Reading a dynamic tariff's price
+
+A fetched price changes every quarter-hour, so the Tariffs page shows a
+**representative average** instead of a rate: `Avg CHF 0.123/kWh`, with a
+tooltip explaining the reference window. It is weighted by interval duration over
+the trailing 30 days within the tariff's validity — not a fixed rate, and
+the contract and tariff overview say so in a footnote.
+
+For a percentage tariff, the base uses grid tariffs and prices at today, clamped
+to the displayed version's validity. A historical percentage version therefore
+uses its historical base, not the latest average of an ongoing grid tariff.
+
+- **Partial** means the window has gaps; the average covers only what was
+  fetched.
+- **Price unavailable** (or **base price unavailable** on a percentage
+  tariff) means nothing was fetched for the window. No substitute number is
+  shown, and a percentage tariff built on it has no base either — printing a
+  partial sum would understate the rate.
+
+### Operating a price source (administrators)
+
+Sources live under **Admin → Dynamic prices** and are shared across
+communities: two ZEVs on the same operator product fetch once, together.
+
+- **Status** is `Healthy`, `Failed` (with the user-safe error), `Not
+  fetched`, or `Disabled`. A source with an unresolved older window shows
+  `Retry from <date>` — the earliest range a refresh still needs to fill.
+- **Disable** a dead endpoint with the **Enable scheduled fetches** toggle
+  instead of deleting it: stored prices stay as billing evidence, the
+  schedule skips it, and the tariff keeps billing from history.
+- Refreshes run **every 4 hours** over yesterday → two days ahead (operators
+  republish during the day; day-ahead prices arrive in the afternoon). A new
+  source additionally fetches up to 400 days of history once, right after
+  import.
+- **404 is a failure by default.** If the operator documents that this URL
+  uses 404 for an empty publication, an administrator can enable
+  **empty_on_not_found** on the source in Django admin. This opt-in treats
+  every 404 as empty, including a removed product; verify the URL when gaps
+  persist. Rechecking capabilities preserves this setting. **410** always fails.
+
+### Recovering a refused price series
+
+- **BilledPriceChanged:** an operator changed a price or interval already
+  retained for an invoice. The original remains stored. Check the operator's
+  publication and affected invoices before correcting or cancelling invoices;
+  retries cannot reconcile conflicting billing evidence.
+- **PriceIntervalConflict:** a replacement is overlapping or incomplete.
+  Backfill the complete unbilled range. A complete replacement can change
+  interval resolution atomically while preserving billed historical intervals.
+  A partial replacement is refused without clipping either boundary. If the
+  endpoint no longer serves the complete interval, keep the old series and
+  create a replacement source/version for future pricing.
+- **PriceSeriesConflict:** the run reports one or more such refusals. Independent
+  valid intervals may have been stored, but the source remains failed. Examine
+  the price history and first reported conflict, then retry manually once the
+  cause is resolved. Deterministic schema/product errors also need configuration
+  or upstream correction; Celery does not retry them as outages.
+- **Clear fetched prices** is available only when no non-cancelled invoice
+  retains the source. Drafts count too. Editing or deleting a tariff cannot
+  release its invoice's stored provenance. Clearing waits for any invoice
+  generation transaction using the source before rechecking protection.
+
+Transfers preserve invoice totals and source provenance, but do not include
+the original price points. Keep a database backup when retaining the fetched
+billing inputs is required; an operator may no longer publish that history.
 
 > **Tip:** Import prices exactly as published — they are net of VAT. If your
 > community pays VAT it cannot reclaim, set the VAT treatment in
 > [ZEV settings](02-zev-setup.md#vat-configuration) rather than adjusting
 > tariff prices by hand; a re-import would undo that.
-
-## Dynamic Tariffs
-
-A dynamic tariff is priced from a time series an operator publishes over
-HTTP, instead of from the fixed price bands described elsewhere in this
-guide. OpenZEV fetches the series several times a day and bills each meter
-reading at whatever the series says for that exact moment — negative prices
-included, since a dynamic grid tariff can legitimately go negative when the
-grid has more solar than it needs.
-
-There are two ways a tariff becomes dynamic: **imported** from your grid
-operator's published tariff document (see [above](#dynamic-tariffs-in-an-import)), or
-**created directly** from the tariff form, without an import.
-
-On the Tariffs page, a dynamic tariff shows a **Dynamic** badge next to its
-energy type. The badge turns red, with the failure shown as a tooltip, if
-the source's last scheduled fetch failed.
-
-![Tariff card for a dynamic grid-usage tariff, expanded](screenshots/07d-tariff-dynamic-source.png)
-
-### Creating a source by hand
-
-1. On an energy tariff's edit form, click **Create a new dynamic source**
-   (or start from **Platform → Overview → Dynamic prices** if you are an
-   admin — see [Platform Administration](14-admin-console.md#dynamic-price-sources)).
-2. **Step 1** — give the source a display name and its public dynamic-price
-   URL. Leave the protocol version on **Detect automatically**; only set it explicitly
-   if the endpoint's response is empty and cannot be auto-detected.
-3. **Step 2** — OpenZEV fetches the endpoint and lists the billable price
-   components it actually returns (for example grid usage or feed-in). Pick
-   the one this tariff should bill. Newer endpoints publish their product
-   name automatically; older ones don't — enter it by hand if the endpoint
-   needs one.
-4. Save. OpenZEV verifies the selection, stores the prices already
-   returned, and fetches the available history in the background.
-
-A tariff can also be linked to an **existing** source from its edit form —
-useful once a source has already been created by an earlier import or by
-another tariff. Two sources with the same URL, price component, and product
-are the same OpenZEV row: creating one that matches reuses the existing
-source and its fetch rather than duplicating it, and every ZEV on that
-product shares it.
-
-⚠️ **Some price components already include others.** A component named
-*Integrated total* (or, on newer endpoints, *DSO total*) bundles several
-charges into one price — for example electricity supply *and* grid usage together.
-Billing that component alongside a separate tariff for one of the charges it
-already contains bills the same money twice. OpenZEV warns you by name, both
-when creating the source and when linking a tariff to it, listing exactly
-which other components the one you picked already contains — read it before
-deciding whether to keep your other tariffs for the same ZEV.
-
-### Fetched-price history
-
-Every dynamic tariff card links to its source's fetched-price history: a
-date-range chart of the CHF/kWh values, a table of the underlying intervals,
-summary statistics (minimum/maximum/average, how many intervals were
-negative), and any coverage gaps — stretches of time nothing was ever
-fetched for. This is separate from the ordinary
-[tariff price history](#price-history), which shows *tariff-version*
-changes over time rather than the fetched series itself.
-
-A ZEV owner can inspect the history of any source a tariff in their
-community uses; admins can inspect every source, from the console described
-in [Platform Administration](14-admin-console.md#dynamic-price-sources).
-
-![Fetched-price history: chart, statistics, and coverage gaps](screenshots/07e-dynamic-price-history.png)
 
 ## Energy Tariff Types
 

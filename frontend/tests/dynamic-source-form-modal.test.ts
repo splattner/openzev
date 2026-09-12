@@ -66,8 +66,8 @@ describe('DynamicSourceFormModal discovery wizard', () => {
       version_detected: true,
       components_discovered: true,
       components: [
-        { tariff_type: 'grid', tariff_name: 'standard' },
-        { tariff_type: 'feed_in', tariff_name: 'solar' },
+        { tariff_type: 'grid', tariff_name: 'standard', aggregated_tariff_types: [] },
+        { tariff_type: 'feed_in', tariff_name: 'solar', aggregated_tariff_types: [] },
       ],
     })
     const inputs = container.querySelectorAll<HTMLInputElement>('input')

@@ -11,10 +11,12 @@ break every archive already sitting on someone's disk.
 """
 
 # Bumped whenever the archive layout changes in a way an older importer cannot
-# read. An archive naming a version that is not listed here is rejected outright
-# rather than imported half-understood.
-FORMAT_VERSION = 1
-SUPPORTED_FORMAT_VERSIONS = frozenset({1})
+# read. Version 2 adds enabled/empty_on_not_found source settings and frozen
+# invoice-to-source provenance. Version 1 remains readable for static exports and legacy
+# adapter-based dynamic descriptors. An archive naming a version that is not
+# listed here is rejected outright rather than imported half-understood.
+FORMAT_VERSION = 2
+SUPPORTED_FORMAT_VERSIONS = frozenset({1, 2})
 
 MANIFEST_NAME = "manifest.json"
 READINGS_DIR = "readings"
@@ -156,7 +158,7 @@ TARIFF_FIELDS = (
 # A dynamic tariff's price comes from a globally shared source row rather than
 # from its own periods, so the link cannot travel as the FK's surrogate id: that
 # id means nothing on the instance importing it. What travels instead is the
-# source's natural key — the endpoint, component and product — which is enough
+# source's natural key — endpoint, API version, component and product — enough
 # for the importer to find or recreate the same source there.
 #
 # The price *points* deliberately do not travel. They are a global series
@@ -171,6 +173,8 @@ DYNAMIC_SOURCE_FIELDS = (
     "request_mode",
     "query_tariff_type",
     "supports_range",
+    "empty_on_not_found",
+    "enabled",
     "tariff_type",
     "tariff_name",
 )

@@ -47,9 +47,12 @@ class TariffFetchError(Exception):
     they can act on about the URL *they* supplied.
     """
 
-    def __init__(self, message: str, *, log_detail: str = ""):
+    def __init__(
+        self, message: str, *, log_detail: str = "", status_code: int | None = None
+    ):
         super().__init__(message)
         self.log_detail = log_detail or message
+        self.status_code = status_code
 
 
 def _check_public_host(url: str) -> None:
@@ -138,6 +141,7 @@ def fetch_tariff_document(url: str) -> tuple[dict, str]:
         raise TariffFetchError(
             f"The operator's server answered HTTP {exc.code}.",
             log_detail=f"HTTP {exc.code} {exc.reason} from {url}",
+            status_code=exc.code,
         ) from exc
     except (urllib.error.URLError, TimeoutError, socket.timeout, OSError) as exc:
         raise TariffFetchError(

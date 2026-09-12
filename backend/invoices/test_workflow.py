@@ -1,12 +1,18 @@
 """Invoice lifecycle workflow and regeneration guard tests."""
 
+from datetime import datetime, timezone
+from unittest import mock
+
 from django.test import TestCase
 from rest_framework.test import APIClient
 
 from accounts.models import UserRole
+from invoices.engine import DynamicPriceGapError
 from invoices.models import InvoiceStatus
 from invoices.test_helpers import make_invoice, make_participant, make_user, make_zev
 from testing.helpers import authenticate as auth
+from tariffs.dynamic.models import DynamicTariffSource
+from tariffs.models import BillingMode, EnergyType, Tariff, TariffCategory
 
 
 class InvoiceWorkflowTests(TestCase):
@@ -124,3 +130,33 @@ class InvoiceEngineGuardTests(TestCase):
         make_invoice(self.zev, self.participant, InvoiceStatus.CANCELLED)
         resp = self._generate(self.participant.pk)
         self.assertNotEqual(resp.status_code, 409)
+
+    def test_dynamic_price_gap_returns_actionable_structured_error(self):
+        source = DynamicTariffSource.objects.create(
+            label="Grid dynamic",
+            url="https://api.example.ch/grid",
+            api_version="v1_0_5",
+            tariff_type="grid",
+            tariff_name="vario",
+        )
+        tariff = Tariff.objects.create(
+            zev=self.zev,
+            name="Grid dynamic",
+            category=TariffCategory.GRID_FEES,
+            billing_mode=BillingMode.ENERGY,
+            energy_type=EnergyType.GRID,
+            valid_from="2026-01-01",
+            dynamic_source=source,
+        )
+        missing_at = datetime(2026, 1, 5, 10, tzinfo=timezone.utc)
+
+        with mock.patch(
+            "invoices.views.generate_invoice",
+            side_effect=DynamicPriceGapError(tariff=tariff, missing_at=missing_at),
+        ):
+            response = self._generate(self.participant.pk)
+
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(response.data["code"], "dynamic_price_gap")
+        self.assertEqual(response.data["source_id"], str(source.pk))
+        self.assertEqual(response.data["missing_at"], missing_at.isoformat())

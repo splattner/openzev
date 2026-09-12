@@ -260,7 +260,6 @@ silently dropped.
 |---|---|---|
 | Two month groups that overlap | Which group prices the shared months is ambiguous | — |
 | `tariffForm: dynamic` with no `prices.dynamic.url` | Nothing to fetch from | #530 |
-| `tariffForm: dynamic` with `tariffType: metering` | The dynamic-tariff schema has no metering type to fetch (§3.3 of `2026-09-dynamic-tariffs.md`) | #530 |
 | Energy price not in `CHF/kWh` | Cannot be billed per kWh | — |
 | Base price not in `CHF/M` | Does not map to a monthly fee | — |
 | Negative price | The standard requires prices ≥ 0 | — |
@@ -273,8 +272,11 @@ stored), a non-zero `prices.reactivePower`, and a non-zero
 documents carry many — produce no warning, but a candidate whose only price is
 zero is never pre-selected.
 
-**A `tariffForm: dynamic` entry with a URL and a representable `tariffType`
-(`electricity`, `grid` or `regional_fees`) is imported, not blocked.** It
+**A `tariffForm: dynamic` entry with a URL and a parser-supported `tariffType`
+is imported, not blocked.** Dynamic headers use the v1/v2 dynamic-protocol
+vocabulary rather than this document's smaller static category table, so
+feed-in and aggregate dynamic components reach discovery. Storage refunds are
+blocked because OpenZEV cannot identify storage-qualified energy. It
 creates a tariff linked to a `DynamicTariffSource`, which is then fetched on
 the same schedule as any other dynamic source. See
 `docs/specs/2026-09-dynamic-tariffs.md` §10 for the full mapping, the
@@ -371,7 +373,21 @@ predecessor is truncated rather than colliding.
 
 Each candidate is written inside its own `transaction.atomic()` savepoint, so a
 document that fails on one customer group still delivers the tariffs the ZEV
-actually uses.
+actually uses. Every selected dynamic component is probed before that savepoint
+to determine its API version before the source natural-key lookup, then the
+source, returned probe points, and tariff are written inside it together. A
+tariff validation failure therefore cannot leave an orphaned global source.
+Reused sources retain the fresh probe's dropped-unit and aggregate-component
+warnings. Reusing a disabled, failed, or never-successful source adds an
+operational warning to the candidate result.
+
+Dynamic selections include `dynamic_tariff_name` (max 120 characters). A named
+product is passed to discovery; an explicit empty string confirms the endpoint
+default; omission is a per-candidate error. The wizard exposes the choice in
+the price cell. V2's discovered product name is persisted when available.
+Sources match on `(url, api_version, tariff_type, tariff_name)`. Invoice evidence
+uses frozen source/window records, so predecessor truncation cannot release
+protection of previously billed points.
 
 Every created tariff's `notes` carry the operator name and number, the
 published tariff name and type, the customer group, the operator's own comment,
@@ -409,8 +425,9 @@ a ZEV with neither gets a 400 saying so.
   "document_digest": "<sha256 hex>", "remember_url": true }
 ```
 
-Only keys and the billing mode chosen for each travel back — never tariff
-data. The server re-fetches and re-parses the document, so nothing a client
+Only keys, billing-mode choices, and dynamic product selections travel back —
+never prices. Dynamic rows require `dynamic_tariff_name`, with an empty string
+explicitly confirming the endpoint default. The server re-fetches and re-parses the document, so nothing a client
 sends can become a price. `billing_mode` is optional; omitted, the candidate's
 proposed mode is used, and the frontend omits it whenever the user left the
 row alone. `document_digest` is what ties the confirmation to the version the
@@ -664,19 +681,21 @@ is reported per season, naming each season's own pair; three prices become
 unnamed bands rather than being refused, carry no HT/NT guess, while two prices
 still become HT and NT.
 
-**`UnsupportedConstructTests`** (9): a dynamic grid tariff is importable and
-carries its URL and tariff type; a dynamic tariff with no URL, or with
-`tariffType: metering`, is blocked with a reason; a dynamic candidate warns
+**`UnsupportedConstructTests`**: dynamic grid, metering, feed-in, and
+aggregate tariff types reach the dynamic branch and carry their URL/type; a
+dynamic tariff with no URL or a storage-refund component is blocked with a reason; a dynamic candidate warns
 that the document names no product; a dynamic candidate is never
 pre-selectable as "free" (`is_free`); a wrong energy unit, a wrong base unit
 and a negative price each blocked with a reason; excess precision rounded
 with a warning.
 
-**`PlanningTests`** (25): new, duplicate, version, overlap and conflict
+**`PlanningTests`** (32): new, duplicate, version, overlap and conflict
 planning; provenance-based series matching and renames; selected, blocked and
 stale candidates; per-candidate transaction isolation; dynamic-source probing,
-reuse and failure; and post-commit initial-backfill enqueueing for a new source
-without duplicating it for reuse or a failed tariff write.
+reuse (including unhealthy-source warnings) and failure; atomic source/tariff
+creation with probe-point initialization; and post-commit initial-backfill
+enqueueing for a new source without duplicating it for reuse or a failed tariff
+write.
 
 **`BillingModeChoiceTests`** (7): a fee offers exactly the three monthly modes
 and defaults to the shared one; no yearly mode is ever offered (it would bill a
@@ -686,7 +705,7 @@ gets wrong; a mode that was never offered is refused; an override on an energy
 candidate is refused rather than ignored.
 
 **`EnginePricingTests`** (3): the imported multilevel tariff is read back by
-`invoices.engine._get_tariff_price` — daytime at HT, night and evening at NT,
+`invoices.engine._resolve_tariff_band` — daytime at HT, night and evening at NT,
 and the boundaries at 06:59/07:00 and 20:59/21:00.
 
 **`RemoteFetchTests`** (10): a literal private address and `localhost` both
@@ -710,7 +729,7 @@ Each of these was checked to fail with the production code reverted (duplicate
 detection, wrap-around splitting, the address checks, the billing-mode
 allowlist, and the message/log split were each disabled in turn).
 
-### Frontend — `frontend/tests/vse-tariff-import.test.ts` (12 tests)
+### Frontend — `frontend/tests/vse-tariff-import.test.ts` (19 tests)
 
 Selection rules (`isSelectable` for all five statuses, `recommendedKeys`
 skipping a recommended-but-inapplicable candidate, `toggleKey`), billing-mode

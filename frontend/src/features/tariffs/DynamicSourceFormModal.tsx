@@ -15,7 +15,6 @@ import type {
   DynamicSourceDiscovery,
   DynamicTariffSource,
 } from '../../types/api'
-import { aggregatedTariffTypes } from './dynamicSources'
 
 type VersionChoice = 'auto' | DynamicApiVersion
 
@@ -41,6 +40,7 @@ export function DynamicSourceFormModal({ isOpen, onClose, onSaved, source }: Pro
   const [discovery, setDiscovery] = useState<DynamicSourceDiscovery | null>(null)
   const [selection, setSelection] = useState('')
   const [tariffName, setTariffName] = useState('')
+  const [enabled, setEnabled] = useState(true)
 
   useEffect(() => {
     setStep(1)
@@ -50,6 +50,7 @@ export function DynamicSourceFormModal({ isOpen, onClose, onSaved, source }: Pro
     setDiscovery(null)
     setSelection('')
     setTariffName(source?.tariff_name ?? '')
+    setEnabled(source?.enabled ?? true)
   }, [source, isOpen])
 
   const discoverMutation = useMutation({
@@ -75,13 +76,13 @@ export function DynamicSourceFormModal({ isOpen, onClose, onSaved, source }: Pro
     [discovery, selection],
   )
   const aggregatedTypes = useMemo(
-    () => (selected ? aggregatedTariffTypes(selected.tariff_type) : []),
+    () => selected?.aggregated_tariff_types ?? [],
     [selected],
   )
 
   const saveMutation = useMutation({
     mutationFn: (): Promise<DynamicTariffSource & { warnings?: string[] }> => source
-      ? updateDynamicTariffSource(source.id, { label })
+      ? updateDynamicTariffSource(source.id, { label, enabled })
       : createDynamicTariffSource({
           label,
           url,
@@ -134,16 +135,29 @@ export function DynamicSourceFormModal({ isOpen, onClose, onSaved, source }: Pro
         </label>
 
         {source ? (
-          <div className="info-banner" style={{ gridColumn: '1 / -1' }}>
-            <strong>{source.url}</strong>
-            <div>
-              {t(`pages.dynamicSources.versions.${source.api_version}` as Parameters<typeof t>[0])}
-              {' · '}
-              {t(`pages.dynamicSources.types.${source.tariff_type}` as Parameters<typeof t>[0])}
-              {source.tariff_name ? ` · ${source.tariff_name}` : ''}
+          <>
+            <div className="info-banner" style={{ gridColumn: '1 / -1' }}>
+              <strong>{source.url}</strong>
+              <div>
+                {t(`pages.dynamicSources.versions.${source.api_version}` as Parameters<typeof t>[0])}
+                {' · '}
+                {t(`pages.dynamicSources.types.${source.tariff_type}` as Parameters<typeof t>[0])}
+                {source.tariff_name ? ` · ${source.tariff_name}` : ''}
+              </div>
+              <small>{t('pages.dynamicSources.form.identityReplacement')}</small>
             </div>
-            <small>{t('pages.dynamicSources.form.identityReplacement')}</small>
-          </div>
+            <label className="checkbox-label" style={{ gridColumn: '1 / -1' }}>
+              <input
+                type="checkbox"
+                checked={enabled}
+                onChange={(event) => setEnabled(event.target.checked)}
+              />
+              <span>{t('pages.dynamicSources.form.enabled')}</span>
+            </label>
+            <small className="muted" style={{ gridColumn: '1 / -1' }}>
+              {t('pages.dynamicSources.form.enabledHint')}
+            </small>
+          </>
         ) : step === 1 ? (
           <>
             <label style={{ gridColumn: '1 / -1' }}>

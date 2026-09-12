@@ -416,6 +416,13 @@ export interface DataQualityStatusResponse {
 
 export type TariffBillingMode = 'energy' | 'percentage_of_energy' | 'monthly_fee' | 'yearly_fee' | 'per_metering_point_monthly_fee' | 'per_metering_point_yearly_fee' | 'shared_monthly_fee' | 'shared_yearly_fee'
 
+export interface DynamicPriceSummary {
+    status: 'complete' | 'partial' | 'unavailable'
+    average_chf_per_kwh: string | null
+    reference_from: string | null
+    reference_to: string | null
+}
+
 export interface Tariff {
     id: string
     zev: string
@@ -434,6 +441,14 @@ export interface Tariff {
     source_series_name?: string
     /** Set when this tariff is priced from a fetched series instead of bands. */
     dynamic_source?: string | null
+    /** Bounded, duration-weighted display summary for the fetched series. */
+    dynamic_price_summary?: DynamicPriceSummary | null
+    /** Shared document/display grid base at today clamped to this version's validity. */
+    percentage_base_summary?: {
+        price_chf_per_kwh: string | null
+        dynamic_status: 'complete' | 'partial' | 'unavailable' | null
+        reference_date: string
+    } | null
 }
 
 export interface TariffInput {
@@ -474,6 +489,7 @@ export interface DynamicTariffSource {
     api_version: DynamicApiVersion
     tariff_type: DynamicTariffType
     tariff_name: string
+    enabled: boolean
     last_fetch_status: 'pending' | 'ok' | 'failed'
     last_fetch_at: string | null
     last_success_at: string | null
@@ -481,10 +497,15 @@ export interface DynamicTariffSource {
     /** Extent of the stored series; null before anything has been fetched. */
     covers_from: string | null
     covers_to: string | null
+    /** Earliest range that a prior refresh could not fetch or store. */
+    recovery_from?: string | null
     point_count: number
     linked_tariff_count: number
     linked_zev_count: number
     supports_backfill: boolean
+    empty_on_not_found: boolean
+    /** Leaf components this source's type already bundles (server-computed per API version). */
+    aggregated_tariff_types: DynamicTariffType[]
     created_at: string
     updated_at: string
 }
@@ -495,6 +516,7 @@ export interface DynamicTariffSourceInput {
     api_version: DynamicApiVersion
     tariff_type: DynamicTariffType
     tariff_name?: string
+    enabled?: boolean
 }
 
 export interface DynamicSourceDiscovery {
@@ -504,6 +526,7 @@ export interface DynamicSourceDiscovery {
     components: Array<{
         tariff_type: DynamicTariffType
         tariff_name: string
+        aggregated_tariff_types: DynamicTariffType[]
     }>
 }
 
@@ -1336,6 +1359,7 @@ export interface VseTariffImportPreview {
 export interface VseTariffImportSelection {
     key: string
     billing_mode?: string
+    dynamic_tariff_name?: string
 }
 
 export interface VseTariffImportResult {

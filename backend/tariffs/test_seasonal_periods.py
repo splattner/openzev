@@ -15,7 +15,7 @@ from django.test import SimpleTestCase, TestCase
 from rest_framework.test import APIClient
 
 from accounts.models import UserRole
-from invoices.engine import _get_tariff_price
+from invoices.engine import _resolve_tariff_band
 from tariffs.models import BillingMode, EnergyType, Tariff, TariffCategory, TariffPeriod
 from tariffs.periods import ALL_MONTHS, month_ranges, months_of, weekdays_of
 from testing.helpers import authenticate, make_user
@@ -65,7 +65,7 @@ class PeriodRecurrenceTests(SimpleTestCase):
 
 
 class SeasonalPricingTests(TestCase):
-    """What the engine actually charges. `_get_tariff_price` is the single
+    """What the engine actually charges. `_resolve_tariff_band` is the single
     place a season can change a number on an invoice."""
 
     def setUp(self):
@@ -83,7 +83,8 @@ class SeasonalPricingTests(TestCase):
         return tariff
 
     def _price(self, tariff, month, hour=12, day=15):
-        return _get_tariff_price(tariff, datetime(2026, month, day, hour))
+        period = _resolve_tariff_band(tariff, datetime(2026, month, day, hour))
+        return period.price_chf_per_kwh if period is not None else None
 
     def test_a_winter_flat_band_does_not_price_july(self):
         """The regression this whole change turns on. The engine short-circuits

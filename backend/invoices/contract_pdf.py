@@ -15,7 +15,7 @@ from .band_labels import band_description
 from .contract_translations import CONTRACT_TRANSLATIONS
 from .dates import format_date_value
 from .pdf_render import render_pdf
-from .tariff_pricing import display_grid_base_chf_per_kwh
+from .tariff_pricing import display_grid_base_summary
 
 from tariffs.models import BillingMode, EnergyType, PeriodType
 from zev.models import MeteringPointType
@@ -27,10 +27,11 @@ def _build_local_tariff_display(zev, tr: dict, date_pattern: str, as_of: date) -
     """Return a list of display rows for all active local energy tariffs of the ZEV.
 
     Each row: {"name", "rate_rp", "rate_description", "pct", "unit",
-    "valid_from", "valid_to", "validity", "notes"}. For percentage-of-energy
+    "valid_from", "valid_to", "validity", "notes", "rate_note"}. For percentage-of-energy
     tariffs the effective price is computed from the active GRID energy tariffs
     and the calculation formula is included; unit is empty when no grid base
-    price exists (the rate then displays as a bare percentage). validity is the
+    price exists (a bare percentage for no static base, or a dash for unavailable
+    dynamic prices). rate_note describes the dynamic summary's coverage. validity is the
     formatted validity span (open-ended tariffs render via tr["tariff_valid_open"]);
     notes forwards Tariff.notes so a configured reference product can be
     printed in clause 5. Tariffs are filtered against ``as_of`` so a re-download
@@ -62,7 +63,8 @@ def _build_local_tariff_display(zev, tr: dict, date_pattern: str, as_of: date) -
     # price every percentage-of-grid-tariff local tariff is computed from.
     # Shared with the tariff overview PDF via tariff_pricing, so the two
     # documents cannot print two different answers for the same tariff.
-    grid_sum_chf = display_grid_base_chf_per_kwh(grid_tariffs)
+    grid_base = display_grid_base_summary(grid_tariffs, as_of=as_of)
+    grid_sum_chf = grid_base.price_chf_per_kwh
 
     rp_unit = tr.get("tariff_rp_unit", "Rp./kWh")
 
@@ -86,12 +88,11 @@ def _build_local_tariff_display(zev, tr: dict, date_pattern: str, as_of: date) -
 
         if tariff.billing_mode == BillingMode.PERCENTAGE_OF_ENERGY:
             pct = Decimal(str(tariff.percentage or 0))
-
-            effective_chf = grid_sum_chf * (pct / Decimal("100"))
-            effective_rp = effective_chf * Decimal("100")
-            grid_rp = grid_sum_chf * Decimal("100")
-
-            if grid_sum_chf > 0:
+            has_effective_price = grid_base.has_effective_price
+            if has_effective_price:
+                effective_chf = grid_sum_chf * (pct / Decimal("100"))
+                effective_rp = effective_chf * Decimal("100")
+                grid_rp = grid_sum_chf * Decimal("100")
                 description = (
                     f"{float(pct):.2f}% × {float(grid_rp):.2f} {rp_unit}"
                     f" ({tr['tariff_pct_prefix'].strip('% ')})"
@@ -99,12 +100,26 @@ def _build_local_tariff_display(zev, tr: dict, date_pattern: str, as_of: date) -
             else:
                 description = f"{float(pct):.2f}% {tr['tariff_pct_prefix']}"
 
+            if has_effective_price:
+                rate_rp = f"{float(effective_rp):.2f}"
+            elif grid_sum_chf is None:
+                rate_rp = tr["tariff_none"]
+            else:
+                rate_rp = f"{float(pct):.2f}%"
+
+            note_key = {
+                "complete": "tariff_dynamic_average_note",
+                "partial": "tariff_dynamic_partial_note",
+                "unavailable": "tariff_dynamic_unavailable_note",
+            }.get(grid_base.dynamic_status)
+
             rows.append({
                 **base_row,
-                "rate_rp": f"{float(effective_rp):.2f}" if grid_sum_chf > 0 else f"{float(pct):.2f}%",
+                "rate_rp": rate_rp,
                 "rate_description": description,
                 "pct": f"{float(pct):.2f}",
-                "unit": tr["tariff_rp_unit"] if grid_sum_chf > 0 else "",
+                "unit": tr["tariff_rp_unit"] if has_effective_price else "",
+                "rate_note": tr[note_key] if note_key else "",
             })
             continue
 
@@ -128,6 +143,7 @@ def _build_local_tariff_display(zev, tr: dict, date_pattern: str, as_of: date) -
                 "rate_rp": f"{float(period.price_chf_per_kwh) * 100:.2f}",
                 "rate_description": band_description(period, tr),
                 "pct": None,
+                "rate_note": "",
             })
 
     return rows

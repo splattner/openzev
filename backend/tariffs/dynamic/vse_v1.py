@@ -85,7 +85,10 @@ def parse_timestamp(raw: object, *, label: str) -> datetime:
     if not isinstance(raw, str) or not raw.strip():
         raise DynamicTariffResponseError(f"{label} is missing.")
     try:
-        parsed = datetime.fromisoformat(raw.strip().replace("Z", "+00:00"))
+        text = raw.strip()
+        if text.endswith(("Z", "z")):
+            text = text[:-1] + "+00:00"
+        parsed = datetime.fromisoformat(text)
     except ValueError as exc:
         raise DynamicTariffResponseError(f"{label} is not an ISO-8601 timestamp: {raw!r}.") from exc
     if parsed.tzinfo is None:
@@ -168,6 +171,8 @@ def _billable_value(component: object, *, tariff_type: str, label: str) -> tuple
             price = _price(entry.get("value"), label=f"{label} value")
         elif unit:
             dropped.append(unit)
+        elif "value" in entry:
+            dropped.append("<missing unit>")
     return price, dropped
 
 
@@ -184,7 +189,14 @@ def _dropped_unit_warnings(tariff_type: str, units: set[str]) -> list[str]:
         warnings.append(
             f"The {tariff_type} series also publishes a reactive-energy charge (CHF_kVarh) which is not billed."
         )
-    fixed = sorted(u for u in units if u != "CHF_kVarh" and not u.startswith("CHF_kW_"))
+    if "<missing unit>" in units:
+        warnings.append(
+            f"The {tariff_type} series contains a price with no unit; it was not billed."
+        )
+    fixed = sorted(
+        u for u in units
+        if u not in {"CHF_kVarh", "<missing unit>"} and not u.startswith("CHF_kW_")
+    )
     if fixed:
         warnings.append(
             f"The {tariff_type} series also publishes a fixed charge ({', '.join(fixed)}) which is not "
