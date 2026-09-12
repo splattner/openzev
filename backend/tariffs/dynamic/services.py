@@ -162,10 +162,23 @@ def clear_source_points(source: DynamicTariffSource) -> int:
 
 
 def utc_day_window(date_from, date_to):
-    """Inclusive civil dates as a half-open UTC datetime window."""
+    """Inclusive civil dates, read in the app's local timezone, as a
+    half-open UTC datetime window.
 
-    start = datetime.combine(date_from, datetime.min.time(), tzinfo=timezone.utc)
-    end = datetime.combine(
-        date_to + timedelta(days=1), datetime.min.time(), tzinfo=timezone.utc
+    The civil dates come from the UI's local calendar (``TIME_ZONE``,
+    Europe/Zurich), so "today" has to resolve to local midnight-to-midnight,
+    not UTC midnight — the two differ by one or two hours whenever
+    Switzerland is off UTC, which is most of the year. Anchoring on UTC
+    midnight instead made the price history report the local day's last
+    hour or two as a gap even though a stored point covers it, and the same
+    slip would under-report a real gap sitting right at a day boundary.
+    """
+
+    local_tz = djtimezone.get_current_timezone()
+    start = djtimezone.make_aware(
+        datetime.combine(date_from, datetime.min.time()), local_tz
     )
-    return start, end
+    end = djtimezone.make_aware(
+        datetime.combine(date_to + timedelta(days=1), datetime.min.time()), local_tz
+    )
+    return start.astimezone(timezone.utc), end.astimezone(timezone.utc)

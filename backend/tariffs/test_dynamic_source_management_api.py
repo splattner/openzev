@@ -196,7 +196,10 @@ class TestPriceHistory:
         payload = response.json()
         assert payload["stats"]["point_count"] == 1
         assert payload["stats"]["negative_count"] == 1
-        assert payload["stats"]["gap_count"] == 1
+        # The queried day is the local (Europe/Zurich) civil day, which in
+        # September starts two hours before UTC midnight. The one point sits
+        # at UTC midnight, so it leaves a gap on both sides of it.
+        assert payload["stats"]["gap_count"] == 2
         assert payload["points"][0]["price_chf_per_kwh"] == "-0.01000"
 
     def test_owner_cannot_read_an_unlinked_source(self, owner_client):
@@ -207,6 +210,31 @@ class TestPriceHistory:
         )
 
         assert response.status_code == 403
+
+    def test_the_search_window_is_the_local_civil_day_not_the_utc_day(
+        self, admin_client
+    ):
+        """Europe/Zurich is UTC+2 in September, so local 2026-09-10 runs
+        from 2026-09-09T22:00Z to 2026-09-10T22:00Z. Anchoring the window on
+        UTC midnight instead reported the day's last two hours as a gap even
+        though this point covers them."""
+        source = make_source()
+        DynamicPricePoint.objects.create(
+            source=source,
+            valid_from=datetime(2026, 9, 9, 22, 0, tzinfo=UTC),
+            valid_to=datetime(2026, 9, 10, 22, 0, tzinfo=UTC),
+            price_chf_per_kwh=Decimal("0.10000"),
+        )
+
+        response = admin_client.get(
+            f"/api/v1/tariffs/dynamic-sources/{source.pk}/prices/",
+            {"date_from": "2026-09-10", "date_to": "2026-09-10"},
+        )
+
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["stats"]["point_count"] == 1
+        assert payload["stats"]["gap_count"] == 0
 
     def test_history_is_limited_to_31_days(self, admin_client):
         source = make_source()
