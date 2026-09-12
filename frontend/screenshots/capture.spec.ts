@@ -246,6 +246,40 @@ test.describe('User Guide Screenshots', () => {
     await screenshotFull(page, '07b-tariff-versions')
   })
 
+  // 07d — A dynamic tariff's card, expanded to show its Dynamic badge and
+  // fetched-price section. Requires a tariff named "Netznutzung dynamisch"
+  // linked to a real dynamic source — seed_demo does not create this on its
+  // own; the checked-in screenshot was captured against a source manually
+  // configured for Groupe E's public vario grid endpoint
+  // (https://api.tariffs.groupe-e.ch/v2/tariffs, tariff_type=grid), created
+  // through the ordinary two-step wizard / POST .../dynamic-sources/ and
+  // linked to a tariff on the demo ZEV. Re-running this against a stack
+  // without that fixture will time out on the card lookup below.
+  test('07d-tariff-dynamic-source', async ({ page }) => {
+    await navigateTo(page, '/tariffs')
+    const card = page.locator('article.tariff-card').filter({ hasText: 'Netznutzung dynamisch' }).first()
+    await card.waitFor({ timeout: 10_000 })
+    await card.getByRole('button', { expanded: false }).click()
+    await card.locator('.tariff-period-section').filter({ hasText: /price|preis/i }).waitFor({ timeout: 10_000 })
+    await page.waitForTimeout(500)
+    await screenshotFull(page, '07d-tariff-dynamic-source')
+  })
+
+  // 07e — The fetched-price history modal opened from that same card: chart,
+  // stats, and coverage. Same fixture requirement as 07d above.
+  test('07e-dynamic-price-history', async ({ page }) => {
+    await navigateTo(page, '/tariffs')
+    const card = page.locator('article.tariff-card').filter({ hasText: 'Netznutzung dynamisch' }).first()
+    await card.waitFor({ timeout: 10_000 })
+    await card.getByRole('button', { expanded: false }).click()
+    const openHistory = card.getByRole('button', { name: /view prices|preise anzeigen|voir les prix|visualizza prezzi/i })
+    await openHistory.waitFor({ timeout: 10_000 })
+    await openHistory.click()
+    await page.waitForSelector('.kpi-row', { timeout: 10_000 })
+    await page.waitForTimeout(1000)  // let Recharts finish laying out
+    await screenshotFull(page, '07e-dynamic-price-history')
+  })
+
   // 08 — Invoices (period overview)
   test('08-invoices', async ({ page }) => {
     await navigateTo(page, '/billing/invoices')
@@ -379,10 +413,10 @@ test.describe('User Guide Screenshots', () => {
   })
 
   // 17b — Admin Dynamic Price Sources
-  // Note: seed_demo does not configure a dynamic tariff source, so this
-  // captures the empty-state console (still the accurate first-run view for
-  // a fresh deployment). Re-capture after configuring a demo source for a
-  // screenshot showing a populated table.
+  // Note: seed_demo does not configure a dynamic tariff source on its own —
+  // this captures whatever is configured, populated or empty. The
+  // checked-in screenshot shows the source set up for 07d/07e above; without
+  // that fixture this instead captures the accurate empty-state console.
   test('17b-admin-dynamic-sources', async ({ page }) => {
     await navigateTo(page, '/admin/dynamic-sources')
     await page.waitForSelector('.data-table, .card', { timeout: 10_000 })

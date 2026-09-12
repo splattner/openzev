@@ -178,6 +178,8 @@ On the Tariffs page, a dynamic tariff shows a **Dynamic** badge next to its
 energy type. The badge turns red, with the failure shown as a tooltip, if
 the source's last scheduled fetch failed.
 
+![Tariff card for a dynamic grid-usage tariff, expanded](screenshots/07d-tariff-dynamic-source.png)
+
 ### Creating a source by hand
 
 1. On an energy tariff's edit form, click **Create a new dynamic source**
@@ -223,6 +225,8 @@ changes over time rather than the fetched series itself.
 A ZEV owner can inspect the history of any source a tariff in their
 community uses; admins can inspect every source, from the console described
 in [Platform Administration](14-admin-console.md#dynamic-price-sources).
+
+![Fetched-price history: chart, statistics, and coverage gaps](screenshots/07e-dynamic-price-history.png)
 
 ## Energy Tariff Types
 
