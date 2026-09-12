@@ -2207,7 +2207,7 @@ export const de = {
             noEmailYet: 'Noch nicht gesendet',
         },
         adminOverview: {
-            description: 'Plattform-KPIs, (v)ZEV-Verwaltung, alle Rechnungen, das Plattform-Audit-Log und die Systemintegrität.',
+            description: 'Plattform-KPIs, (v)ZEV-Verwaltung, alle Rechnungen, dynamische Preisquellen, das Plattform-Audit-Log und die Systemintegrität.',
             tabs: {
                 overview: 'Übersicht',
                 health: 'Systemintegrität',

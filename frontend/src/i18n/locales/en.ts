@@ -2218,7 +2218,7 @@ export const en = {
             noEmailYet: 'Not sent yet',
         },
         adminOverview: {
-            description: 'Platform KPIs, (v)ZEV management, all invoices, the platform audit log, and system health.',
+            description: 'Platform KPIs, (v)ZEV management, all invoices, dynamic price sources, the platform audit log, and system health.',
             tabs: {
                 overview: 'Overview',
                 health: 'System health',
