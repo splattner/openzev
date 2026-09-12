@@ -1,5 +1,7 @@
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import {
+    faBan,
+    faCopy,
     faDownload,
     faEllipsis,
     faEnvelope,
@@ -32,9 +34,11 @@ type ParticipantCardsSectionProps = {
     onClearFilters: () => void
     onStartEdit: (participant: Participant) => void
     onDownloadContract: (participant: Participant) => void
-    onInvite: (participantId: string) => void
+    onSendOnboardingLink: (participantId: string) => void
+    onCopyOnboardingLink: (participantId: string) => void
+    onRevokeOnboardingLink: (participantId: string) => void
     onConfirmDelete: (participant: Participant, displayName: string) => void
-    invitationPending: boolean
+    onboardingLinkPending: boolean
     deletePendingOrDialogLoading: boolean
     /** Participant id to highlight (deep link `?focus=`), if still visible. */
     focusParticipantId?: string | null
@@ -46,6 +50,13 @@ function participantValidityBadgeClass(state: ParticipantValidityState): string 
     return 'badge badge-neutral'
 }
 
+function onboardingStatusBadgeClass(status: Participant['onboarding_status']): string {
+    if (status === 'active') return 'badge badge-success'
+    if (status === 'sent') return 'badge badge-info'
+    if (status === 'revoked') return 'badge badge-warning'
+    return 'badge badge-neutral'
+}
+
 export function ParticipantCardsSection({
     participantCards,
     filteredParticipants,
@@ -54,9 +65,11 @@ export function ParticipantCardsSection({
     onClearFilters,
     onStartEdit,
     onDownloadContract,
-    onInvite,
+    onSendOnboardingLink,
+    onCopyOnboardingLink,
+    onRevokeOnboardingLink,
     onConfirmDelete,
-    invitationPending,
+    onboardingLinkPending,
     deletePendingOrDialogLoading,
     focusParticipantId,
 }: ParticipantCardsSectionProps) {
@@ -106,12 +119,28 @@ export function ParticipantCardsSection({
                 const menuItems: ActionMenuItem[] = []
 
                 menuItems.push({
-                    key: 'invitation',
-                    label: t('pages.participants.sendInvitation'),
+                    key: 'send-onboarding-link',
+                    label: t('pages.participants.sendOnboardingLink'),
                     icon: <FontAwesomeIcon icon={faEnvelope} fixedWidth />,
-                    disabled: invitationPending || !participant.email,
-                    onClick: () => onInvite(participant.id),
+                    disabled: onboardingLinkPending || !participant.email,
+                    onClick: () => onSendOnboardingLink(participant.id),
                 })
+                menuItems.push({
+                    key: 'copy-onboarding-link',
+                    label: t('pages.participants.copyOnboardingLink'),
+                    icon: <FontAwesomeIcon icon={faCopy} fixedWidth />,
+                    disabled: onboardingLinkPending,
+                    onClick: () => onCopyOnboardingLink(participant.id),
+                })
+                if (participant.onboarding_status === 'sent' || participant.onboarding_status === 'active') {
+                    menuItems.push({
+                        key: 'revoke-onboarding-link',
+                        label: t('pages.participants.revokeOnboardingLink'),
+                        icon: <FontAwesomeIcon icon={faBan} fixedWidth />,
+                        disabled: onboardingLinkPending,
+                        onClick: () => onRevokeOnboardingLink(participant.id),
+                    })
+                }
 
                 if (!ownerRow) {
                     menuItems.push({
@@ -136,6 +165,9 @@ export function ParticipantCardsSection({
                                     {ownerRow && <span className="badge badge-info">{t('pages.participants.owner')}</span>}
                                     <span className={participantValidityBadgeClass(validityState)}>
                                         {t(`pages.participants.validity.${validityState}`)}
+                                    </span>
+                                    <span className={onboardingStatusBadgeClass(participant.onboarding_status)}>
+                                        {t(`pages.participants.onboardingStatus.${participant.onboarding_status ?? 'not_sent'}`)}
                                     </span>
                                     {warnings.length > 0 && (
                                         <span className="badge badge-warning">

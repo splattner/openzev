@@ -5,9 +5,9 @@ import { ConfirmDialog, useConfirmDialog } from '../components/ConfirmDialog'
 import { ParticipantCardsSection } from '../features/participants/ParticipantCardsSection'
 import type { ParticipantValidityState } from '../features/participants/types'
 import {
-    ParticipantCredentialsNotice,
-    type ParticipantCredentialsNoticeData,
-} from '../features/participants/ParticipantCredentialsNotice'
+    ParticipantOnboardingNotice,
+    type ParticipantOnboardingNoticeData,
+} from '../features/participants/ParticipantOnboardingNotice'
 import { ParticipantFormModal } from '../features/participants/ParticipantFormModal'
 import { ParticipantsMap } from '../features/participants/ParticipantsMap'
 import { ParticipantToolbar, type ParticipantReadinessFilter } from '../features/participants/ParticipantToolbar'
@@ -17,7 +17,9 @@ import {
     downloadParticipantContractPdf,
     fetchParticipants,
     fetchZevs,
-    sendParticipantInvitation,
+    getOnboardingLink,
+    revokeOnboardingLink,
+    sendOnboardingLink,
     updateParticipant,
 } from '../lib/api/zev'
 import { formatApiError } from '../lib/api/errors'
@@ -61,24 +63,16 @@ export function ParticipantsPage() {
     const [showModal, setShowModal] = useState(false)
     const [searchTerm, setSearchTerm] = useState('')
     const [readinessFilter, setReadinessFilter] = useState<ParticipantReadinessFilter>('all')
-    const [credentialsNotice, setCredentialsNotice] = useState<ParticipantCredentialsNoticeData | null>(null)
+    const [onboardingNotice, setOnboardingNotice] = useState<ParticipantOnboardingNoticeData | null>(null)
     const [modalFocusField, setModalFocusField] = useState<'valid_to' | null>(null)
 
     const titleLabelByValue = useMemo(() => getTitleLabelMap(t), [t])
 
     const createMutation = useMutation({
         mutationFn: createParticipant,
-        onSuccess: (participant) => {
+        onSuccess: () => {
             setShowModal(false)
             pushToast(t('pages.participants.messages.created'), 'success')
-            if (participant.account_username && participant.initial_password) {
-                setCredentialsNotice({
-                    participantName: `${participant.first_name} ${participant.last_name}`,
-                    username: participant.account_username,
-                    password: participant.initial_password,
-                    message: t('pages.participants.messages.credentialsGenerated'),
-                })
-            }
             void queryClient.invalidateQueries({ queryKey: queryKeys.zev.participants(selectedZevId || undefined) })
         },
         onError: (error) => pushToast(formatApiError(error, t('pages.participants.messages.createFailed')), 'error'),
@@ -103,25 +97,52 @@ export function ParticipantsPage() {
         },
     })
 
-    const invitationMutation = useMutation({
-        mutationFn: sendParticipantInvitation,
+    function participantDisplayName(participantId: string): string {
+        const participant = data?.find((entry) => entry.id === participantId)
+        return participant ? `${participant.first_name} ${participant.last_name}` : t('pages.participants.fallbackName')
+    }
+
+    const sendLinkMutation = useMutation({
+        mutationFn: sendOnboardingLink,
         onSuccess: (result, participantId) => {
             const participant = data?.find((entry) => entry.id === participantId)
             pushToast(
-                t('pages.participants.messages.invitationSent', {
-                    email: participant?.email || '',
-                }),
+                t('pages.participants.messages.onboardingLinkSent', { email: participant?.email || '' }),
                 'success',
             )
-            setCredentialsNotice({
-                participantName: participant ? `${participant.first_name} ${participant.last_name}` : t('pages.participants.fallbackName'),
-                username: result.username,
-                password: result.temporary_password,
-                message: t('pages.participants.messages.invitationReset'),
+            setOnboardingNotice({
+                participantName: participantDisplayName(participantId),
+                onboardingUrl: result.onboarding_url,
+                message: t('pages.participants.messages.onboardingLinkSentDetail'),
             })
+            void queryClient.invalidateQueries({ queryKey: queryKeys.zev.participants(selectedZevId || undefined) })
         },
-        onError: (error) => pushToast(formatApiError(error, t('pages.participants.messages.invitationFailed')), 'error'),
+        onError: (error) => pushToast(formatApiError(error, t('pages.participants.messages.onboardingLinkFailed')), 'error'),
     })
+
+    const copyLinkMutation = useMutation({
+        mutationFn: getOnboardingLink,
+        onSuccess: (result, participantId) => {
+            setOnboardingNotice({
+                participantName: participantDisplayName(participantId),
+                onboardingUrl: result.onboarding_url,
+                message: t('pages.participants.messages.onboardingLinkCopiedDetail'),
+            })
+            void queryClient.invalidateQueries({ queryKey: queryKeys.zev.participants(selectedZevId || undefined) })
+        },
+        onError: (error) => pushToast(formatApiError(error, t('pages.participants.messages.onboardingLinkFailed')), 'error'),
+    })
+
+    const revokeLinkMutation = useMutation({
+        mutationFn: revokeOnboardingLink,
+        onSuccess: () => {
+            pushToast(t('pages.participants.messages.onboardingLinkRevoked'), 'success')
+            void queryClient.invalidateQueries({ queryKey: queryKeys.zev.participants(selectedZevId || undefined) })
+        },
+        onError: (error) => pushToast(formatApiError(error, t('pages.participants.messages.onboardingLinkFailed')), 'error'),
+    })
+
+    const onboardingLinkPending = sendLinkMutation.isPending || copyLinkMutation.isPending || revokeLinkMutation.isPending
 
     function formatParticipantNameWithTitle(participant: Participant): string {
         const titleLabel = participant.title ? (titleLabelByValue[participant.title as keyof typeof titleLabelByValue] ?? '') : ''
@@ -311,7 +332,7 @@ export function ParticipantsPage() {
                 <p className="muted">{t('pages.participants.description')}</p>
             </header>
 
-            {credentialsNotice && <ParticipantCredentialsNotice notice={credentialsNotice} onDismiss={() => setCredentialsNotice(null)} />}
+            {onboardingNotice && <ParticipantOnboardingNotice notice={onboardingNotice} onDismiss={() => setOnboardingNotice(null)} />}
 
             <ParticipantToolbar
                 totalCount={participantCards.length}
@@ -356,9 +377,11 @@ export function ParticipantsPage() {
                 onClearFilters={clearFilters}
                 onStartEdit={startEdit}
                 onDownloadContract={downloadContract}
-                onInvite={(participantId) => invitationMutation.mutate(participantId)}
+                onSendOnboardingLink={(participantId) => sendLinkMutation.mutate(participantId)}
+                onCopyOnboardingLink={(participantId) => copyLinkMutation.mutate(participantId)}
+                onRevokeOnboardingLink={(participantId) => revokeLinkMutation.mutate(participantId)}
                 onConfirmDelete={confirmDeleteParticipant}
-                invitationPending={invitationMutation.isPending}
+                onboardingLinkPending={onboardingLinkPending}
                 deletePendingOrDialogLoading={deleteMutation.isPending || dialogLoading}
                 focusParticipantId={highlightedId}
             />
