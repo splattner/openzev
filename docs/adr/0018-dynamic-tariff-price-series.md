@@ -131,6 +131,18 @@ V2 embeds `tariff_name` in its response, so the wizard can present it. V1 has
 no product catalogue in the response contract; its product name remains an
 optional manual input when an endpoint requires one.
 
+`api_version` has since grown a third member, `bfe_rmp`, that is not an
+endpoint version at all: it names the BFE reference market price, a quarterly
+open-data CSV publication (Art. 15 EnFV), not a live VSE-protocol endpoint.
+It has no request protocol to discover — one request returns the whole
+published history — so source creation skips the probe entirely and parses
+the CSV directly, and its "product" slot carries a technology (`pv`,
+`wasserkraft`, `windenergie`, `biomasse`) rather than an operator's product
+name. It was folded into `api_version` rather than given a parallel model:
+doing so reuses the whole apparatus this ADR already justifies — shared
+global identity, evidence retention, admin operations — for the cost of one
+more dispatch arm per VSE-specific code path, rather than a second one.
+
 ## Consequences
 
 Positive:

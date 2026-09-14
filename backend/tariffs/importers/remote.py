@@ -108,20 +108,19 @@ class _ValidatingRedirectHandler(urllib.request.HTTPRedirectHandler):
         return super().redirect_request(req, fp, code, msg, headers, newurl)
 
 
-def fetch_tariff_document(url: str) -> tuple[dict, str]:
-    """Download and decode the document at ``url``.
+def _download(url: str, *, accept: str) -> tuple[bytes, str]:
+    """Download the bytes at ``url`` and a SHA-256 digest of them.
 
-    Returns the decoded payload and a SHA-256 digest of the exact bytes, which
-    lets the apply step verify it is writing the document the user previewed.
+    Shared by every document shape this module can fetch: the SSRF guard and
+    size limit must stay in exactly one place, since a second copy is a second
+    place to forget them.
     """
     url = (url or "").strip()
     if not url:
         raise TariffFetchError("No URL was given.")
     _check_public_host(url)
 
-    request = urllib.request.Request(
-        url, headers={"User-Agent": USER_AGENT, "Accept": "application/json, */*;q=0.5"}
-    )
+    request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT, "Accept": accept})
     opener = urllib.request.build_opener(_ValidatingRedirectHandler)
 
     try:
@@ -155,7 +154,16 @@ def fetch_tariff_document(url: str) -> tuple[dict, str]:
             f"The document is larger than the {MAX_DOCUMENT_BYTES // (1024 * 1024)} MB limit."
         )
 
-    digest = sha256(body).hexdigest()
+    return body, sha256(body).hexdigest()
+
+
+def fetch_tariff_document(url: str) -> tuple[dict, str]:
+    """Download and JSON-decode the document at ``url``.
+
+    Returns the decoded payload and a SHA-256 digest of the exact bytes, which
+    lets the apply step verify it is writing the document the user previewed.
+    """
+    body, digest = _download(url, accept="application/json, */*;q=0.5")
     try:
         payload = json.loads(body.decode("utf-8-sig"))
     except (UnicodeDecodeError, json.JSONDecodeError) as exc:
@@ -166,3 +174,20 @@ def fetch_tariff_document(url: str) -> tuple[dict, str]:
         ) from exc
 
     return payload, digest
+
+
+def fetch_tariff_text(url: str) -> tuple[str, str]:
+    """Download and decode the document at ``url`` as text (e.g. CSV).
+
+    Returns the decoded text and a SHA-256 digest of the exact bytes.
+    """
+    body, digest = _download(url, accept="text/csv, text/plain, */*;q=0.5")
+    try:
+        text = body.decode("utf-8-sig")
+    except UnicodeDecodeError as exc:
+        raise TariffFetchError(
+            "The document at this URL is not valid UTF-8 text.",
+            log_detail=f"{type(exc).__name__}: {exc}",
+        ) from exc
+
+    return text, digest

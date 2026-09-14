@@ -74,7 +74,7 @@ describe('DynamicSourceFormModal discovery wizard', () => {
   it('asks for name and URL first, then renders discovered components', async () => {
     expect(container.textContent).toContain('pages.dynamicSources.discovery.step')
     const versionOptions = Array.from(container.querySelectorAll('option')).map((option) => option.value)
-    expect(versionOptions).toEqual(['auto', 'v1_0_5', 'v2_0_0'])
+    expect(versionOptions).toEqual(['vse', 'bfe_rmp', 'auto', 'v1_0_5', 'v2_0_0'])
     expect(container.textContent).not.toContain('Groupe E')
     expect(container.textContent).not.toContain('BKW')
 

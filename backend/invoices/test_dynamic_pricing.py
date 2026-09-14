@@ -221,6 +221,49 @@ class TestPriceAt:
         with pytest.raises(ValueError, match="generation_context"):
             resolver.price_at(tariff, datetime(2026, 1, 5, 10, tzinfo=UTC))
 
+    def test_a_minimum_price_floors_a_fetched_price_below_it(self):
+        zev = factories.ZevFactory()
+        source = make_source(tariff_type="feed_in", tariff_name="")
+        store(source, datetime(2026, 1, 5, 10, tzinfo=UTC), "0.05000")
+        tariff = dynamic_tariff(
+            zev, source, energy_type=EnergyType.FEED_IN,
+            minimum_price_chf_per_kwh=Decimal("0.08000"),
+        )
+        resolver = TariffResolver([tariff], self._context(zev))
+
+        price, period = resolver.price_at(tariff, datetime(2026, 1, 5, 10, tzinfo=UTC))
+
+        assert price == Decimal("0.08000")
+        assert period is None
+
+    def test_a_minimum_price_does_not_lower_a_fetched_price_above_it(self):
+        zev = factories.ZevFactory()
+        source = make_source(tariff_type="feed_in", tariff_name="")
+        store(source, datetime(2026, 1, 5, 10, tzinfo=UTC), "0.12000")
+        tariff = dynamic_tariff(
+            zev, source, energy_type=EnergyType.FEED_IN,
+            minimum_price_chf_per_kwh=Decimal("0.08000"),
+        )
+        resolver = TariffResolver([tariff], self._context(zev))
+
+        price, _period = resolver.price_at(tariff, datetime(2026, 1, 5, 10, tzinfo=UTC))
+
+        assert price == Decimal("0.12000")
+
+    def test_a_gap_still_raises_even_with_a_minimum_price_set(self):
+        # A floor is a floor under the fetched price, not a fallback when the
+        # fetched price is missing — those are different failure modes.
+        zev = factories.ZevFactory()
+        source = make_source(tariff_type="feed_in", tariff_name="")
+        tariff = dynamic_tariff(
+            zev, source, energy_type=EnergyType.FEED_IN,
+            minimum_price_chf_per_kwh=Decimal("0.08000"),
+        )
+        resolver = TariffResolver([tariff], self._context(zev))
+
+        with pytest.raises(DynamicPriceGapError):
+            resolver.price_at(tariff, datetime(2026, 1, 5, 10, tzinfo=UTC))
+
 
 # ---------------------------------------------------------------------------
 # generate_invoice — end-to-end
@@ -356,3 +399,32 @@ class TestDynamicInvoiceGeneration:
 
         # A credit: 8 kWh exported at 0.177 CHF/kWh.
         assert invoice.subtotal_chf == Decimal("-1.42")
+
+    def test_feed_in_export_is_credited_at_the_minimum_when_the_fetched_price_is_lower(self):
+        participant = factories.ParticipantFactory(valid_from=date(2026, 1, 1))
+        zev = participant.zev
+        production_mp = factories.MeteringPointFactory(
+            zev=zev, meter_type=factories.MeteringPointType.PRODUCTION,
+        )
+        factories.MeteringPointAssignmentFactory(
+            metering_point=production_mp, participant=participant, valid_from=date(2026, 1, 1),
+        )
+        source = make_source(
+            tariff_type="feed_in", tariff_name="", label="Example feed-in", api_version="v1_0_5",
+            request_mode="exact_url", supports_range=False,
+            url="https://api.bkw.ch/api/dyntariffs/v1/Tariffs/energyreturn",
+        )
+        store(source, datetime(2026, 1, 15, 12, 0, tzinfo=UTC), "0.05000")
+        dynamic_tariff(
+            zev, source, name="Feed-in (dynamic)", category=TariffCategory.ENERGY,
+            energy_type=EnergyType.FEED_IN, minimum_price_chf_per_kwh=Decimal("0.08000"),
+        )
+        MeterReading.objects.create(
+            metering_point=production_mp, timestamp=datetime(2026, 1, 15, 12, 0, tzinfo=UTC),
+            energy_kwh=Decimal("8.0"), direction=ReadingDirection.OUT,
+        )
+
+        invoice = generate_invoice(participant, date(2026, 1, 1), date(2026, 1, 31))
+
+        # A credit at the 0.08 CHF/kWh floor, not the fetched 0.05: 8 * 0.08 = 0.64.
+        assert invoice.subtotal_chf == Decimal("-0.64")

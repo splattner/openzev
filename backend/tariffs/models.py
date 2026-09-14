@@ -169,6 +169,16 @@ class Tariff(models.Model):
         DynamicTariffSource, on_delete=models.PROTECT, null=True, blank=True,
         related_name="tariffs", help_text="Price series this tariff is billed from.",
     )
+    # A floor under a fetched series, not a price of its own — the greater of
+    # this and the fetched price is billed. Restricted to feed-in: a floor on
+    # a grid series would leak into the percentage-of-energy base every such
+    # tariff feeds (Art. 16 ceiling), which is not what a VNB's "at least X"
+    # feed-in clause means.
+    minimum_price_chf_per_kwh = models.DecimalField(
+        max_digits=8, decimal_places=5, null=True, blank=True,
+        help_text="Floor for a fetched feed-in series: the greater of this and the "
+                  "fetched price is billed.",
+    )
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -193,6 +203,16 @@ class Tariff(models.Model):
                 "dynamic_source",
                 "A tariff priced from a fetched series cannot carry price bands.",
             )
+
+        if self.minimum_price_chf_per_kwh is not None:
+            if not self.dynamic_source_id:
+                errors["minimum_price_chf_per_kwh"] = (
+                    "A minimum price only applies to a tariff priced from a fetched series."
+                )
+            elif self.energy_type != EnergyType.FEED_IN:
+                errors["minimum_price_chf_per_kwh"] = (
+                    "A minimum price only applies to a feed-in tariff."
+                )
 
         # A ZEV legitimately carries several simultaneous per-kWh components in
         # one category — grid fees are Netznutzung *and* SDL, levies are the

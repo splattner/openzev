@@ -147,6 +147,7 @@ TARIFF_FIELDS = (
     "energy_type",
     "fixed_price_chf",
     "percentage",
+    "minimum_price_chf_per_kwh",
     "split_key",
     "valid_from",
     "valid_to",

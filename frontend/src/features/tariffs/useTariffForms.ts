@@ -15,6 +15,8 @@ export type TariffFormValues = {
   notes: string
   /** A `DynamicTariffSource` id, or `''` to price from bands instead. */
   dynamic_source: string
+  /** Floor under a fetched feed-in series; `''` for none. */
+  minimum_price_chf_per_kwh: string
 }
 
 export type TariffPeriodFormValues = {
@@ -50,9 +52,21 @@ export const tariffFormSchema = z
     valid_to: z.string(),
     notes: z.string(),
     dynamic_source: z.string(),
+    minimum_price_chf_per_kwh: z.string(),
   })
   .superRefine((values, ctx) => {
     const isEnergyBased = values.billing_mode === 'energy' || values.billing_mode === 'percentage_of_energy'
+
+    if (
+      values.minimum_price_chf_per_kwh &&
+      Number.isNaN(Number(values.minimum_price_chf_per_kwh))
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['minimum_price_chf_per_kwh'],
+        message: 'Minimum price must be a number.',
+      })
+    }
 
     if (isEnergyBased && !values.energy_type) {
       ctx.addIssue({
@@ -120,6 +134,7 @@ export const defaultTariffFormValues: TariffFormValues = {
   valid_to: '',
   notes: '',
   dynamic_source: '',
+  minimum_price_chf_per_kwh: '',
 }
 
 export const defaultTariffPeriodFormValues: TariffPeriodFormValues = {
@@ -146,6 +161,9 @@ export function mapTariffToFormValues(tariff: Tariff): TariffFormValues {
     valid_to: tariff.valid_to || '',
     notes: tariff.notes || '',
     dynamic_source: tariff.dynamic_source || '',
+    minimum_price_chf_per_kwh: tariff.minimum_price_chf_per_kwh
+      ? String(tariff.minimum_price_chf_per_kwh)
+      : '',
   }
 }
 
@@ -169,6 +187,12 @@ export function mapTariffFormValuesToInput(values: TariffFormValues, zevId: stri
     // anything else) — clearing it here as well as hiding the picker means a
     // stale value from switching billing modes can never reach the server.
     dynamic_source: values.billing_mode === 'energy' ? (values.dynamic_source || null) : null,
+    // A minimum price only applies to a feed-in tariff priced from a fetched
+    // series — same reasoning as dynamic_source above.
+    minimum_price_chf_per_kwh:
+      values.billing_mode === 'energy' && values.energy_type === 'feed_in' && values.dynamic_source
+        ? (values.minimum_price_chf_per_kwh || null)
+        : null,
   }
 }
 

@@ -69,7 +69,7 @@ def _apply_price_overrides(tariff, data: dict) -> None:
     Absent keys leave the copied value in place; a new version that only shifts
     its validity window should not have to restate its price.
     """
-    for field in ('fixed_price_chf', 'percentage'):
+    for field in ('fixed_price_chf', 'percentage', 'minimum_price_chf_per_kwh'):
         if field in data:
             setattr(tariff, field, data[field])
 

@@ -10,7 +10,7 @@ from django.utils import timezone as djtimezone
 from allocation.validity import period_start_dt, period_end_exclusive_dt
 from invoices.models import InvoiceDynamicSourceEvidence, InvoiceStatus
 
-from .discovery import probe_source_configuration
+from .discovery import probe_bfe_rmp_source, probe_source_configuration
 from .adapters import DynamicApiVersion
 from .storage import PriceSeriesConflict, store_points
 from .models import DynamicTariffSource, FetchStatus
@@ -44,12 +44,15 @@ def create_or_reuse_source(
     if existing is not None:
         return existing, False, []
 
-    capabilities = probe_source_configuration(
-        url,
-        api_version=api_version,
-        tariff_type=tariff_type,
-        tariff_name=tariff_name,
-    )
+    if api_version == DynamicApiVersion.BFE_RMP:
+        capabilities = probe_bfe_rmp_source(url, tariff_name=tariff_name)
+    else:
+        capabilities = probe_source_configuration(
+            url,
+            api_version=api_version,
+            tariff_type=tariff_type,
+            tariff_name=tariff_name,
+        )
     now = djtimezone.now()
 
     natural_key["tariff_name"] = capabilities.tariff_name or tariff_name
@@ -100,7 +103,13 @@ def initialise_source_from_probe(source, capabilities, *, now=None):
 
 
 def recheck_source_capabilities(source: DynamicTariffSource) -> tuple[DynamicTariffSource, list[str]]:
-    """Re-probe request capabilities without changing identity or the explicit 404 setting."""
+    """Re-probe request capabilities without changing identity or the explicit 404 setting.
+
+    A BFE reference-price source has nothing to re-probe: its request shape
+    is fixed (an exact URL, no range support), not discovered.
+    """
+    if source.api_version == DynamicApiVersion.BFE_RMP:
+        return source, []
     capabilities = probe_source_configuration(
         source.url,
         api_version=source.api_version,

@@ -8,8 +8,8 @@ from datetime import datetime, timedelta, timezone
 
 from django.db.models import F, Max, Min, RowRange, Window
 
-from ..importers.remote import TariffFetchError, fetch_tariff_document
-from .adapters import MAX_WINDOW_DAYS, FetchWindow, request_url
+from ..importers.remote import TariffFetchError, fetch_tariff_document, fetch_tariff_text
+from .adapters import MAX_WINDOW_DAYS, DynamicApiVersion, FetchWindow, request_url
 from .models import DynamicPricePoint, DynamicTariffSource, FetchStatus
 from .protocol import parse_tariff_response
 from .vse_v1 import DynamicTariffResponseError, PricePoint
@@ -80,8 +80,9 @@ def fetch_window(source: DynamicTariffSource, window: FetchWindow | None) -> tup
         tariff_name=source.tariff_name,
         window=window,
     )
+    downloader = fetch_tariff_text if source.api_version == DynamicApiVersion.BFE_RMP else fetch_tariff_document
     try:
-        payload, _digest = fetch_tariff_document(url)
+        payload, _digest = downloader(url)
     except TariffFetchError as exc:
         if source.empty_on_not_found and exc.status_code == 404:
             return [], []

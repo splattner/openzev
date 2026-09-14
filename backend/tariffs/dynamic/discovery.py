@@ -4,8 +4,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from ..importers.remote import TariffFetchError, fetch_tariff_document
+from ..importers.remote import TariffFetchError, fetch_tariff_document, fetch_tariff_text
 from .adapters import DynamicApiVersion, DynamicRequestMode, FetchWindow, request_url
+from .bfe_rmp import TECHNOLOGIES as BFE_RMP_TECHNOLOGIES
+from .bfe_rmp import parse_tariff_response as parse_bfe_rmp
 from .protocol import (
     DiscoveredComponent,
     V2_PRODUCT_REQUIRED,
@@ -72,6 +74,32 @@ def discover_endpoint(url: str, *, api_version: str | None = None) -> EndpointDi
         components=components,
         version_detected=version_detected,
         components_discovered=True,
+    )
+
+
+def probe_bfe_rmp_source(url: str, *, tariff_name: str) -> SourceCapabilities:
+    """Fetch and parse a BFE reference-price CSV once, at source creation.
+
+    Unlike a VSE endpoint there is no request protocol to discover — the URL
+    is exact, one request returns the whole published history, and there is
+    nothing to probe for range support.
+    """
+    if tariff_name not in BFE_RMP_TECHNOLOGIES:
+        raise DynamicTariffResponseError(
+            f"Select a technology: one of {', '.join(BFE_RMP_TECHNOLOGIES)}."
+        )
+    text, _digest = fetch_tariff_text(url)
+    series = parse_bfe_rmp(text, tariff_name=tariff_name)
+    if not series.points:
+        raise DynamicTariffResponseError("The CSV at this URL carries no published prices yet.")
+    return SourceCapabilities(
+        api_version=DynamicApiVersion.BFE_RMP,
+        request_mode=DynamicRequestMode.EXACT_URL,
+        query_tariff_type="",
+        supports_range=False,
+        points=series.points,
+        warnings=series.warnings,
+        tariff_name=tariff_name,
     )
 
 

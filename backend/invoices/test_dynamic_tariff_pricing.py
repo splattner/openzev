@@ -120,6 +120,26 @@ class TestDynamicAverageChfPerKwh:
             tariff, as_of=date(2026, 1, 1), days=1
         ).status == "complete"
 
+    def test_a_minimum_price_floors_each_interval_before_weighting(self):
+        # Flooring the finished average instead would produce a different
+        # number here (0.25000, the raw average, since it already clears the
+        # floor) than flooring per interval does — the discrepancy is exactly
+        # what would let the contract/overview disagree with the invoice,
+        # which prices per interval via TariffResolver.price_at.
+        zev = factories.ZevFactory()
+        source = make_source(tariff_type="feed_in", tariff_name="")
+        tariff = dynamic_tariff(
+            zev, source, energy_type=EnergyType.FEED_IN,
+            minimum_price_chf_per_kwh=Decimal("0.08000"),
+        )
+        store(source, datetime(2026, 1, 1, 10, tzinfo=UTC), "0.05000", minutes=15)
+        store(source, datetime(2026, 1, 1, 11, tzinfo=UTC), "0.30000", minutes=45)
+
+        # Per-interval floor: (0.08*15 + 0.30*45) / 60 = 0.24500.
+        assert summarize_dynamic_tariff(
+            tariff, as_of=date(2026, 1, 1)
+        ).average_chf_per_kwh == Decimal("0.24500")
+
 
 class TestDisplayGridBaseWithDynamicTariffs:
     @pytest.mark.parametrize("types,expected", [

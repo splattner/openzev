@@ -112,6 +112,44 @@ class TestValidation:
         with pytest.raises(ValidationError):
             make_tariff(zev, make_source(), energy_type=EnergyType.LOCAL)
 
+    def test_a_minimum_price_requires_a_dynamic_source(self):
+        zev = factories.ZevFactory()
+
+        with pytest.raises(ValidationError) as caught:
+            factories.TariffFactory(
+                zev=zev, category=TariffCategory.ENERGY, billing_mode=BillingMode.ENERGY,
+                energy_type=EnergyType.FEED_IN, valid_from=date(2026, 1, 1),
+                minimum_price_chf_per_kwh=Decimal("0.08000"),
+            )
+
+        assert "minimum_price_chf_per_kwh" in caught.value.message_dict
+
+    def test_a_minimum_price_requires_a_feed_in_tariff(self):
+        zev = factories.ZevFactory()
+        source = make_source(tariff_type="grid", label="Grid")
+
+        with pytest.raises(ValidationError) as caught:
+            make_tariff(
+                zev, source, energy_type=EnergyType.GRID,
+                minimum_price_chf_per_kwh=Decimal("0.08000"),
+            )
+
+        assert "minimum_price_chf_per_kwh" in caught.value.message_dict
+
+    def test_a_minimum_price_is_accepted_on_a_dynamic_feed_in_tariff(self):
+        zev = factories.ZevFactory()
+        source = make_source(tariff_type="feed_in", tariff_name="", label="BKW feed-in",
+                             url="https://prices.example.test/current", api_version="v1_0_5",
+                             request_mode="exact_url", supports_range=False)
+
+        tariff = make_tariff(
+            zev, source, name="Feed-in (dynamic)",
+            category=TariffCategory.ENERGY, energy_type=EnergyType.FEED_IN,
+            minimum_price_chf_per_kwh=Decimal("0.08000"),
+        )
+
+        assert tariff.minimum_price_chf_per_kwh == Decimal("0.08000")
+
 
 class TestSeriesVersioning:
     def test_a_tariff_series_may_go_static_then_dynamic_across_versions(self):

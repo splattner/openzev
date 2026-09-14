@@ -37,8 +37,14 @@ class DynamicPriceSummary:
         }
 
 
-def _summarize_rows(rows, *, start, end, reference_from, reference_to) -> DynamicPriceSummary:
-    """Duration weighting over sorted, non-overlapping stored intervals."""
+def _summarize_rows(rows, *, start, end, reference_from, reference_to, floor=None) -> DynamicPriceSummary:
+    """Duration weighting over sorted, non-overlapping stored intervals.
+
+    ``floor`` is applied per interval, before weighting — flooring the
+    finished average instead would understate a tariff whose series dips
+    below the floor for only part of the window, and would disagree with
+    what the invoice actually bills (see ``TariffResolver.price_at``).
+    """
     cursor = start
     weighted_total = Decimal("0")
     covered_seconds = Decimal("0")
@@ -51,7 +57,10 @@ def _summarize_rows(rows, *, start, end, reference_from, reference_to) -> Dynami
         if clipped_from > cursor:
             complete = False
         seconds = Decimal(str((clipped_to - clipped_from).total_seconds()))
-        weighted_total += Decimal(str(price)) * seconds
+        price = Decimal(str(price))
+        if floor is not None:
+            price = max(price, floor)
+        weighted_total += price * seconds
         covered_seconds += seconds
         cursor = clipped_to
 
@@ -107,12 +116,14 @@ def summarize_requests(requests: dict, *, days: int = DYNAMIC_DISPLAY_DAYS) -> d
         if not tariff.dynamic_source_id:
             raise ValueError("A dynamic price summary requires dynamic_source.")
         window = _summary_window(tariff, as_of=as_of, days=days)
-        windows[key] = (tariff.dynamic_source_id, *window) if window else None
+        windows[key] = (
+            (tariff.dynamic_source_id, tariff.minimum_price_chf_per_kwh, *window) if window else None
+        )
     spans: dict = {}
     for value in windows.values():
         if value is None:
             continue
-        source_id, _rf, _rt, start, end = value
+        source_id, _floor, _rf, _rt, start, end = value
         spans.setdefault(source_id, []).append((start, end))
     rows_by_source = {}
     for source_id, ranges in spans.items():
@@ -133,11 +144,11 @@ def summarize_requests(requests: dict, *, days: int = DYNAMIC_DISPLAY_DAYS) -> d
         if window is None:
             summaries[key] = DynamicPriceSummary("unavailable", None, None, None)
             continue
-        source_id, reference_from, reference_to, start, end = window
+        source_id, floor, reference_from, reference_to, start, end = window
         source_rows, starts, ends = rows_by_source[source_id]
         rows = source_rows[bisect_right(ends, start):bisect_left(starts, end)]
         summaries[key] = _summarize_rows(
             rows, start=start, end=end,
-            reference_from=reference_from, reference_to=reference_to,
+            reference_from=reference_from, reference_to=reference_to, floor=floor,
         )
     return summaries

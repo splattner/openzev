@@ -512,6 +512,8 @@ class TariffResolver:
             price = self._context.dynamic_series(tariff.dynamic_source_id).price_at(ts)
             if price is None:
                 raise DynamicPriceGapError(tariff=tariff, missing_at=ts)
+            if tariff.minimum_price_chf_per_kwh is not None:
+                price = max(price, tariff.minimum_price_chf_per_kwh)
             return price, None
         period = _resolve_tariff_band(tariff, ts)
         return (period.price_chf_per_kwh if period is not None else Decimal("0")), period

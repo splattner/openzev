@@ -143,15 +143,18 @@ export function TariffCategorySections({
             const sourceLabel = source
                 ? t('pages.tariffs.dynamicPricedFrom', { label: source.label })
                 : t('pages.tariffs.dynamicPriced')
+            const minimumSuffix = version.minimum_price_chf_per_kwh
+                ? ` · ${t('pages.tariffs.dynamicMinimum', { price: Number(version.minimum_price_chf_per_kwh).toFixed(3) })}`
+                : ''
             if (summary?.average_chf_per_kwh) {
                 return `${sourceLabel} · ${t(
                     summary.status === 'partial'
                         ? 'pages.tariffs.dynamicAveragePartial'
                         : 'pages.tariffs.dynamicAverage',
                     { price: Number(summary.average_chf_per_kwh).toFixed(3) },
-                )}`
+                )}${minimumSuffix}`
             }
-            return `${sourceLabel} · ${t('pages.tariffs.dynamicPriceUnavailable')}`
+            return `${sourceLabel} · ${t('pages.tariffs.dynamicPriceUnavailable')}${minimumSuffix}`
         }
         if (series.billing_mode === 'energy') {
             const prices = version.periods.map((period) => `${period.price_chf_per_kwh}`)

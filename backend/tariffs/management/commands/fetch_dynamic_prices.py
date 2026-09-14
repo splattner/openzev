@@ -15,7 +15,7 @@ to try a URL that arrived in a published tariff document.
 from django.core.management.base import BaseCommand, CommandError
 
 from tariffs.dynamic.adapters import DynamicApiVersion
-from tariffs.dynamic.discovery import probe_source_configuration
+from tariffs.dynamic.discovery import probe_bfe_rmp_source, probe_source_configuration
 from tariffs.dynamic.fetch import coverage_gaps, refresh_source
 from tariffs.dynamic.models import DynamicTariffSource, DynamicTariffType
 from tariffs.importers.remote import TariffFetchError
@@ -64,12 +64,15 @@ class Command(BaseCommand):
     def _probe(self, options):
         """Read an endpoint without touching the database."""
         try:
-            capabilities = probe_source_configuration(
-                options["probe"],
-                api_version=options["api_version"],
-                tariff_type=options["tariff_type"],
-                tariff_name=options["tariff_name"],
-            )
+            if options["api_version"] == DynamicApiVersion.BFE_RMP:
+                capabilities = probe_bfe_rmp_source(options["probe"], tariff_name=options["tariff_name"])
+            else:
+                capabilities = probe_source_configuration(
+                    options["probe"],
+                    api_version=options["api_version"],
+                    tariff_type=options["tariff_type"],
+                    tariff_name=options["tariff_name"],
+                )
         except (TariffFetchError, ValueError) as exc:
             raise CommandError(str(exc)) from exc
         points, warnings = capabilities.points, capabilities.warnings

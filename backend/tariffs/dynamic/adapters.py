@@ -17,8 +17,20 @@ from django.db import models
 
 
 class DynamicApiVersion(models.TextChoices):
+    """The publication protocol a source speaks.
+
+    ``V1_0_5``/``V2_0_0`` name VSE-protocol endpoint versions, as the name
+    always meant. ``BFE_RMP`` is not an endpoint version at all — it names a
+    different publication entirely, the BFE reference market price CSV — but
+    it slots into the same "which protocol does this source speak" role, and
+    reuses the whole apparatus built around that choice (identity, evidence
+    retention, admin operations) rather than forking a parallel one. See
+    ``docs/adr/0018-dynamic-tariff-price-series.md`` point 5.
+    """
+
     V1_0_5 = "v1_0_5", "v1.0.5"
     V2_0_0 = "v2_0_0", "v2.0.0"
+    BFE_RMP = "bfe_rmp", "BFE reference market price"
 
 
 class DynamicRequestMode(models.TextChoices):

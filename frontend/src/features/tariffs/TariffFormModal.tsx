@@ -73,6 +73,10 @@ export function TariffFormModal({
     control: form.control,
     name: 'dynamic_source',
   })
+  const energyType = useWatch({
+    control: form.control,
+    name: 'energy_type',
+  })
   // An existing tariff is one version of a series; its identity fields are
   // fixed. Creating a new tariff still sets them freely.
   const isVersion = Boolean(initialTariff)
@@ -208,6 +212,19 @@ export function TariffFormModal({
                   : t('pages.tariffs.form.dynamicSourceHint')}
               </small>
             </label>
+            {energyType === 'feed_in' && dynamicSourceId && (
+              <label>
+                <span>{t('pages.tariffs.form.minimumPrice')}</span>
+                <input
+                  type="number"
+                  step="0.00001"
+                  min="0"
+                  placeholder={t('pages.tariffs.form.minimumPricePlaceholder')}
+                  {...form.register('minimum_price_chf_per_kwh')}
+                />
+                <small className="muted">{t('pages.tariffs.form.minimumPriceHint')}</small>
+              </label>
+            )}
             {selectedSourceAggregatedTypes.length > 0 && (
               <div className="warning-banner">
                 {t('pages.dynamicSources.form.doubleCountingWarning', {

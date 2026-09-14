@@ -22,9 +22,12 @@ from django.core.exceptions import ValidationError
 from django.db import models
 
 from .adapters import DynamicApiVersion, DynamicRequestMode
+from .bfe_rmp import TECHNOLOGIES as BFE_RMP_TECHNOLOGIES
 from .protocol import V2_PRODUCT_REQUIRED
 from .vse_v1 import TARIFF_TYPES as V1_TARIFF_TYPES
 from .vse_v2 import TARIFF_TYPES as V2_TARIFF_TYPES
+
+BFE_RMP_TECHNOLOGY_REQUIRED = f"Select a technology: one of {', '.join(BFE_RMP_TECHNOLOGIES)}."
 
 
 class DynamicTariffType(models.TextChoices):
@@ -138,6 +141,8 @@ class DynamicTariffSource(models.Model):
         if (self.api_version == DynamicApiVersion.V2_0_0 and not self.tariff_name.strip()
                 and (self._state.adding or self.enabled)):
             errors["tariff_name"] = V2_PRODUCT_REQUIRED
+        if self.api_version == DynamicApiVersion.BFE_RMP and self.tariff_name not in BFE_RMP_TECHNOLOGIES:
+            errors["tariff_name"] = BFE_RMP_TECHNOLOGY_REQUIRED
         if not self._state.adding:
             original = type(self).objects.get(pk=self.pk)
             for field in ("url", "api_version", "tariff_type", "tariff_name"):

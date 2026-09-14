@@ -65,6 +65,7 @@ export function TariffVersionModal({
   const [name, setName] = useState('')
   const [fixedPrice, setFixedPrice] = useState('')
   const [percentage, setPercentage] = useState('')
+  const [minimumPrice, setMinimumPrice] = useState('')
   const [periods, setPeriods] = useState<PeriodDraft[]>([])
 
   // Re-seed whenever the dialog target changes: prices start from the source
@@ -77,6 +78,7 @@ export function TariffVersionModal({
     setName(dialog.kind === 'duplicate' ? '' : series.name)
     setFixedPrice(source.fixed_price_chf ? String(source.fixed_price_chf) : '')
     setPercentage(source.percentage ? String(source.percentage) : '')
+    setMinimumPrice(source.minimum_price_chf_per_kwh ? String(source.minimum_price_chf_per_kwh) : '')
     setPeriods(draftsFrom(source))
   }, [dialog])
 
@@ -87,6 +89,7 @@ export function TariffVersionModal({
   const usesPeriods = series.billing_mode === 'energy' && !isDynamic
   const usesPercentage = series.billing_mode === 'percentage_of_energy'
   const usesFixedPrice = !usesPeriods && !usesPercentage && !isDynamic
+  const usesMinimumPrice = isDynamic && series.energy_type === 'feed_in'
 
   const title = kind === 'new-version'
     ? t('pages.tariffs.versions.newVersionTitle', { name: series.name })
@@ -98,6 +101,7 @@ export function TariffVersionModal({
     const payload: TariffVersionInput = { valid_from: validFrom }
     if (usesFixedPrice) payload.fixed_price_chf = fixedPrice || null
     if (usesPercentage) payload.percentage = percentage || null
+    if (usesMinimumPrice) payload.minimum_price_chf_per_kwh = minimumPrice || null
     if (usesPeriods) {
       payload.periods = periods.map((period) => ({
         period_type: period.period_type,
@@ -198,6 +202,21 @@ export function TariffVersionModal({
               onChange={(event) => setPercentage(event.target.value)}
               required
             />
+          </label>
+        )}
+
+        {kind !== 'rename' && usesMinimumPrice && (
+          <label>
+            <span>{t('pages.tariffs.form.minimumPrice')}</span>
+            <input
+              type="number"
+              step="0.00001"
+              min="0"
+              placeholder={t('pages.tariffs.form.minimumPricePlaceholder')}
+              value={minimumPrice}
+              onChange={(event) => setMinimumPrice(event.target.value)}
+            />
+            <small className="muted">{t('pages.tariffs.form.minimumPriceHint')}</small>
           </label>
         )}
 

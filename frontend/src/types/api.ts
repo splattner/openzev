@@ -448,6 +448,8 @@ export interface Tariff {
     source_series_name?: string
     /** Set when this tariff is priced from a fetched series instead of bands. */
     dynamic_source?: string | null
+    /** Floor under a fetched series: the greater of this and the fetched price is billed. Feed-in only. */
+    minimum_price_chf_per_kwh?: string | null
     /** Bounded, duration-weighted display summary for the fetched series. */
     dynamic_price_summary?: DynamicPriceSummary | null
     /** Shared document/display grid base at today clamped to this version's validity. */
@@ -471,6 +473,7 @@ export interface TariffInput {
     valid_to?: string | null
     notes?: string
     dynamic_source?: string | null
+    minimum_price_chf_per_kwh?: string | null
 }
 
 /**
@@ -482,7 +485,10 @@ export type DynamicTariffType =
     | 'electricity' | 'grid' | 'metering' | 'national_fees' | 'regional_fees'
     | 'dso' | 'dso_complete' | 'integrated' | 'integrated_complete' | 'feed_in' | 'refund'
 
-export type DynamicApiVersion = 'v1_0_5' | 'v2_0_0'
+export type DynamicApiVersion = 'v1_0_5' | 'v2_0_0' | 'bfe_rmp'
+
+/** The technology column a BFE reference-market-price source reads. */
+export type BfeRmpTechnology = 'pv' | 'wasserkraft' | 'windenergie' | 'biomasse'
 
 /**
  * A shared price series, fetched from one operator endpoint. Global, not
@@ -624,6 +630,7 @@ export interface TariffVersionInput {
     valid_from: string
     fixed_price_chf?: string | null
     percentage?: string | null
+    minimum_price_chf_per_kwh?: string | null
     periods?: Array<Omit<TariffPeriodInput, 'tariff'>>
 }
 

@@ -11,12 +11,23 @@ import { formatApiError } from '../../lib/api/errors'
 import { queryKeys } from '../../lib/api/queryKeys'
 import { useToast } from '../../lib/toast'
 import type {
+  BfeRmpTechnology,
   DynamicApiVersion,
   DynamicSourceDiscovery,
   DynamicTariffSource,
 } from '../../types/api'
 
 type VersionChoice = 'auto' | DynamicApiVersion
+
+type SourceKind = 'vse' | 'bfe_rmp'
+
+/** BFE's two published series — see docs/adr/0018-dynamic-tariff-price-series.md. */
+const BFE_RMP_URLS: Record<'quarterly' | 'monthly', string> = {
+  quarterly: 'https://www.bfe-ogd.ch/ogd60_rmp_quartalspreise.csv',
+  monthly: 'https://www.bfe-ogd.ch/ogd60_rmp_monatspreise.csv',
+}
+
+const BFE_RMP_TECHNOLOGIES: BfeRmpTechnology[] = ['pv', 'wasserkraft', 'windenergie', 'biomasse']
 
 type Props = {
   isOpen: boolean
@@ -41,6 +52,9 @@ export function DynamicSourceFormModal({ isOpen, onClose, onSaved, source }: Pro
   const [selection, setSelection] = useState('')
   const [tariffName, setTariffName] = useState('')
   const [enabled, setEnabled] = useState(true)
+  const [sourceKind, setSourceKind] = useState<SourceKind>('vse')
+  const [bfeSeries, setBfeSeries] = useState<'quarterly' | 'monthly'>('quarterly')
+  const [bfeTechnology, setBfeTechnology] = useState<BfeRmpTechnology>('pv')
 
   useEffect(() => {
     setStep(1)
@@ -51,6 +65,11 @@ export function DynamicSourceFormModal({ isOpen, onClose, onSaved, source }: Pro
     setSelection('')
     setTariffName(source?.tariff_name ?? '')
     setEnabled(source?.enabled ?? true)
+    setSourceKind(source?.api_version === 'bfe_rmp' ? 'bfe_rmp' : 'vse')
+    setBfeSeries(
+      source?.url === BFE_RMP_URLS.monthly ? 'monthly' : 'quarterly',
+    )
+    setBfeTechnology((source?.tariff_name as BfeRmpTechnology) || 'pv')
   }, [source, isOpen])
 
   const discoverMutation = useMutation({
@@ -81,15 +100,25 @@ export function DynamicSourceFormModal({ isOpen, onClose, onSaved, source }: Pro
   )
 
   const saveMutation = useMutation({
-    mutationFn: (): Promise<DynamicTariffSource & { warnings?: string[] }> => source
-      ? updateDynamicTariffSource(source.id, { label, enabled })
-      : createDynamicTariffSource({
+    mutationFn: (): Promise<DynamicTariffSource & { warnings?: string[] }> => {
+      if (source) return updateDynamicTariffSource(source.id, { label, enabled })
+      if (sourceKind === 'bfe_rmp') {
+        return createDynamicTariffSource({
           label,
-          url,
-          api_version: discovery!.api_version,
-          tariff_type: selected!.tariff_type,
-          tariff_name: selected!.tariff_name || tariffName,
-        }),
+          url: BFE_RMP_URLS[bfeSeries],
+          api_version: 'bfe_rmp',
+          tariff_type: 'feed_in',
+          tariff_name: bfeTechnology,
+        })
+      }
+      return createDynamicTariffSource({
+        label,
+        url,
+        api_version: discovery!.api_version,
+        tariff_type: selected!.tariff_type,
+        tariff_name: selected!.tariff_name || tariffName,
+      })
+    },
     onSuccess: async (saved) => {
       await queryClient.invalidateQueries({ queryKey: queryKeys.tariffs.dynamicSources() })
       pushToast(t(source ? 'pages.dynamicSources.updated' : 'pages.dynamicSources.created'), 'success')
@@ -110,6 +139,7 @@ export function DynamicSourceFormModal({ isOpen, onClose, onSaved, source }: Pro
   function submit(event: React.FormEvent) {
     event.preventDefault()
     if (source) saveMutation.mutate()
+    else if (sourceKind === 'bfe_rmp') saveMutation.mutate()
     else if (step === 1) discoverMutation.mutate()
     else if (selected) saveMutation.mutate()
   }
@@ -123,10 +153,20 @@ export function DynamicSourceFormModal({ isOpen, onClose, onSaved, source }: Pro
       onClose={onClose}
     >
       <form className="form-grid" onSubmit={submit}>
-        {!source && (
+        {!source && sourceKind === 'vse' && (
           <div className="muted" style={{ gridColumn: '1 / -1' }}>
             {t('pages.dynamicSources.discovery.step', { current: step, total: 2 })}
           </div>
+        )}
+
+        {!source && (
+          <label style={{ gridColumn: '1 / -1' }}>
+            <span>{t('pages.dynamicSources.form.kind')}</span>
+            <select value={sourceKind} onChange={(event) => setSourceKind(event.target.value as SourceKind)}>
+              <option value="vse">{t('pages.dynamicSources.form.kindVse')}</option>
+              <option value="bfe_rmp">{t('pages.dynamicSources.form.kindBfeRmp')}</option>
+            </select>
+          </label>
         )}
 
         <label style={{ gridColumn: '1 / -1' }}>
@@ -134,7 +174,28 @@ export function DynamicSourceFormModal({ isOpen, onClose, onSaved, source }: Pro
           <input value={label} onChange={(event) => setLabel(event.target.value)} required />
         </label>
 
-        {source ? (
+        {!source && sourceKind === 'bfe_rmp' ? (
+          <>
+            <label style={{ gridColumn: '1 / -1' }}>
+              <span>{t('pages.dynamicSources.form.bfeSeries')}</span>
+              <select value={bfeSeries} onChange={(event) => setBfeSeries(event.target.value as 'quarterly' | 'monthly')}>
+                <option value="quarterly">{t('pages.dynamicSources.form.bfeSeriesQuarterly')}</option>
+                <option value="monthly">{t('pages.dynamicSources.form.bfeSeriesMonthly')}</option>
+              </select>
+              <small className="muted">{t('pages.dynamicSources.form.bfeSeriesHint')}</small>
+            </label>
+            <label style={{ gridColumn: '1 / -1' }}>
+              <span>{t('pages.dynamicSources.form.bfeTechnology')}</span>
+              <select value={bfeTechnology} onChange={(event) => setBfeTechnology(event.target.value as BfeRmpTechnology)}>
+                {BFE_RMP_TECHNOLOGIES.map((technology) => (
+                  <option key={technology} value={technology}>
+                    {t(`pages.dynamicSources.bfeTechnologies.${technology}` as Parameters<typeof t>[0])}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </>
+        ) : source ? (
           <>
             <div className="info-banner" style={{ gridColumn: '1 / -1' }}>
               <strong>{source.url}</strong>
@@ -229,7 +290,7 @@ export function DynamicSourceFormModal({ isOpen, onClose, onSaved, source }: Pro
         )}
 
         <div style={{ gridColumn: '1 / -1', display: 'flex', gap: '1rem', justifyContent: 'flex-end', marginTop: '1rem' }}>
-          {!source && step === 2 && (
+          {!source && sourceKind === 'vse' && step === 2 && (
             <button className="button button-secondary" type="button" onClick={() => setStep(1)} disabled={pending}>
               {t('pages.dynamicSources.discovery.back')}
             </button>
@@ -237,9 +298,13 @@ export function DynamicSourceFormModal({ isOpen, onClose, onSaved, source }: Pro
           <button className="button button-secondary" type="button" onClick={onClose} disabled={pending}>
             {t('common.cancel')}
           </button>
-          <button className="button button-primary" type="submit" disabled={pending || (!source && step === 2 && !selected)}>
-            {source
-              ? t('common.save')
+          <button
+            className="button button-primary"
+            type="submit"
+            disabled={pending || (!source && sourceKind === 'vse' && step === 2 && !selected)}
+          >
+            {source || sourceKind === 'bfe_rmp'
+              ? t(source ? 'common.save' : 'pages.dynamicSources.createAction')
               : step === 1
                 ? t('pages.dynamicSources.discovery.continue')
                 : t('pages.dynamicSources.createAction')}

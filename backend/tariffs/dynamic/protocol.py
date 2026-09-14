@@ -5,6 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from .adapters import DynamicApiVersion
+from .bfe_rmp import TARIFF_TYPES as BFE_RMP_TARIFF_TYPES
+from .bfe_rmp import parse_tariff_response as parse_bfe_rmp
 from .vse_v1 import BILLABLE_UNIT as V1_BILLABLE_UNIT
 from .vse_v1 import TARIFF_TYPES as V1_TARIFF_TYPES
 from .vse_v1 import DynamicTariffResponseError, parse_tariff_response as parse_v1
@@ -27,6 +29,8 @@ def possible_components(api_version: str) -> list[DiscoveredComponent]:
         tariff_types = V1_TARIFF_TYPES
     elif api_version == DynamicApiVersion.V2_0_0:
         tariff_types = V2_TARIFF_TYPES
+    elif api_version == DynamicApiVersion.BFE_RMP:
+        tariff_types = BFE_RMP_TARIFF_TYPES
     else:
         raise DynamicTariffResponseError(f"Unsupported API version {api_version!r}.")
     return [DiscoveredComponent(tariff_type) for tariff_type in tariff_types if tariff_type != "refund"]
@@ -85,6 +89,12 @@ def discover_components(payload: object, api_version: str) -> list[DiscoveredCom
 
 
 def parse_tariff_response(payload: object, *, api_version: str, tariff_type: str, tariff_name: str = ""):
+    if api_version == DynamicApiVersion.BFE_RMP:
+        # Not a VSE response: ``payload`` is the decoded CSV text, and the
+        # technology (not a live-endpoint product) selects the column.
+        if not tariff_name.strip():
+            raise DynamicTariffResponseError("A BFE reference-price source requires a technology.")
+        return parse_bfe_rmp(payload, tariff_name=tariff_name)
     if api_version == DynamicApiVersion.V1_0_5:
         return parse_v1(payload, tariff_type=tariff_type)
     if api_version == DynamicApiVersion.V2_0_0:

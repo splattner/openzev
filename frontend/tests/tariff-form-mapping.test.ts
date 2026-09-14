@@ -65,6 +65,7 @@ describe('tariff form mapping', () => {
       valid_to: null,
       notes: '',
       dynamic_source: null,
+      minimum_price_chf_per_kwh: null,
     })
   })
 
@@ -102,6 +103,42 @@ describe('tariff form mapping', () => {
 
   it('defaults dynamic_source to blank when the api omits it', () => {
     expect(defaultTariffFormValues.dynamic_source).toBe('')
+  })
+
+  it('carries a minimum price through for a dynamic feed-in tariff', () => {
+    const payload = mapTariffFormValuesToInput(
+      {
+        ...defaultTariffFormValues, billing_mode: 'energy', energy_type: 'feed_in',
+        dynamic_source: 'src-1', minimum_price_chf_per_kwh: '0.08000',
+      },
+      'z-1',
+    )
+
+    expect(payload.minimum_price_chf_per_kwh).toBe('0.08000')
+  })
+
+  it('drops a minimum price when there is no dynamic source', () => {
+    const payload = mapTariffFormValuesToInput(
+      {
+        ...defaultTariffFormValues, billing_mode: 'energy', energy_type: 'feed_in',
+        dynamic_source: '', minimum_price_chf_per_kwh: '0.08000',
+      },
+      'z-1',
+    )
+
+    expect(payload.minimum_price_chf_per_kwh).toBeNull()
+  })
+
+  it('drops a minimum price for a dynamic grid tariff, not just feed-in', () => {
+    const payload = mapTariffFormValuesToInput(
+      {
+        ...defaultTariffFormValues, billing_mode: 'energy', energy_type: 'grid',
+        dynamic_source: 'src-1', minimum_price_chf_per_kwh: '0.08000',
+      },
+      'z-1',
+    )
+
+    expect(payload.minimum_price_chf_per_kwh).toBeNull()
   })
 
   it('preserves split_key for a shared fee, and ignores it for a non-shared one', () => {

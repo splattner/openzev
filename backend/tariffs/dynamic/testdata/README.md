@@ -9,6 +9,8 @@ single real day does not contain.
 |---|---|---|
 | `groupe_e_v2_day.json` | `https://api.tariffs.groupe-e.ch/v2/tariffs` | One day of the `vario` product: 96 quarter-hours carrying `grid` and `integrated`. Timestamps are local Swiss time with offset. **22 of the 96 `grid` values are negative** (min `-0.0543`) — that is the fixture's whole point, negative grid-usage prices are how a dynamic tariff steers consumption into the solar peak, and no synthetic file would be believed. |
 | `bkw_energyreturn_day.json` | `https://api.bkw.ch/api/dyntariffs/v1/Tariffs/energyreturn` | One day of feed-in remuneration: 96 quarter-hours carrying `feed_in`, timestamps in UTC. |
+| `bfe_rmp_quarterly.csv` | `https://www.bfe-ogd.ch/ogd60_rmp_quartalspreise.csv` | Full published history (2023-Q3 onward) of the BFE reference market price, quarterly, per technology. Captured 2026-09-14; re-takeable any time, BFE keeps the whole series. |
+| `bfe_rmp_monthly.csv` | `https://www.bfe-ogd.ch/ogd60_rmp_monatspreise.csv` | Same series, monthly. Captured 2026-09-14. |
 
 **The BKW capture cannot be re-taken.** That endpoint accepts no query parameters and
 serves only the current day out of a cache; the day it was captured is gone from the
