@@ -1485,6 +1485,8 @@ export const de = {
                 gapTitle: 'Unbepreiste Intervalle in diesem Zeitraum', empty: 'Keine Preise in diesem Zeitraum.',
                 loadError: 'Der Preisverlauf konnte nicht geladen werden.',
                 coverage: '{{count}} Punkte gespeichert · Abdeckung {{from}} – {{to}}',
+                validityScope: 'Zeigt nur Preise während der Gültigkeit dieses Tarifs ({{from}} – {{to}}).',
+                minimumApplied: 'Preise unter dem Mindestpreis von CHF {{price}}/kWh werden als Mindestpreis angezeigt.',
             },
         },
         meteringPoints: {

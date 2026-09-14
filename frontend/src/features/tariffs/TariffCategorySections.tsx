@@ -86,7 +86,9 @@ export function TariffCategorySections({
     // Which version a card is showing. Defaults to the active one, so a card
     // reads as "what this tariff costs now" until you deliberately look back.
     const [shownVersionBySeries, setShownVersionBySeries] = useState<Record<string, string>>({})
-    const [historySource, setHistorySource] = useState<DynamicTariffSource | null>(null)
+    const [historyContext, setHistoryContext] = useState<
+        { source: DynamicTariffSource, tariff: TariffVersion } | null
+    >(null)
     const today = todayLocalIso()
 
     // Shares its cache with TariffFormModal's picker (same query key), so
@@ -467,7 +469,7 @@ export function TariffCategorySections({
                                                         <button
                                                             className="button button-secondary button-compact"
                                                             type="button"
-                                                            onClick={() => setHistorySource(dynamicSource)}
+                                                            onClick={() => setHistoryContext({ source: dynamicSource, tariff: shown })}
                                                         >
                                                             <FontAwesomeIcon icon={faChartLine} fixedWidth />
                                                             {t('pages.dynamicSources.history.open')}
@@ -569,7 +571,11 @@ export function TariffCategorySections({
                     </div>
                 </section>
             ))}
-            <DynamicPriceHistoryModal source={historySource} onClose={() => setHistorySource(null)} />
+            <DynamicPriceHistoryModal
+                source={historyContext?.source ?? null}
+                tariff={historyContext?.tariff ?? null}
+                onClose={() => setHistoryContext(null)}
+            />
         </div>
     )
 }

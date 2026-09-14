@@ -275,6 +275,29 @@ class TestPriceHistory:
 
         assert response.status_code == 400
 
+    def test_a_bfe_reference_price_source_is_not_limited_to_31_days(self, admin_client):
+        # A BFE point covers a whole quarter, not a quarter-hour — the 31-day
+        # cap exists to bound a VSE series' point count, which does not apply.
+        source = make_source(
+            api_version="bfe_rmp", tariff_type="feed_in", tariff_name="pv",
+            url="https://www.bfe-ogd.ch/ogd60_rmp_quartalspreise.csv",
+            request_mode="exact_url", supports_range=False,
+        )
+        DynamicPricePoint.objects.create(
+            source=source,
+            valid_from=datetime(2026, 3, 31, 22, 0, tzinfo=UTC),
+            valid_to=datetime(2026, 6, 30, 22, 0, tzinfo=UTC),
+            price_chf_per_kwh=Decimal("0.03896"),
+        )
+
+        response = admin_client.get(
+            f"/api/v1/tariffs/dynamic-sources/{source.pk}/prices/",
+            {"date_from": "2026-04-01", "date_to": "2026-06-30"},
+        )
+
+        assert response.status_code == 200
+        assert response.json()["stats"]["point_count"] == 1
+
 
 class TestOperations:
     def test_admin_can_queue_a_manual_fetch(self, admin_client):

@@ -1485,6 +1485,8 @@ export const fr = {
                 gapTitle: 'Intervalles sans prix dans cette période', empty: 'Aucun prix dans cette période.',
                 loadError: 'Impossible de charger l’historique des prix.',
                 coverage: '{{count}} points stockés · couverture {{from}} – {{to}}',
+                validityScope: 'N’affiche que les prix pendant la validité de ce tarif ({{from}} – {{to}}).',
+                minimumApplied: 'Les prix inférieurs au minimum de CHF {{price}}/kWh sont affichés au minimum.',
             },
         },
         meteringPoints: {

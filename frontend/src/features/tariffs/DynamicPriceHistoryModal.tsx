@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
@@ -7,11 +7,14 @@ import { DataTable, type ColumnDef } from '../../components/DataTable'
 import { FormModal } from '../../components/FormModal'
 import { StatCard } from '../../components/StatCard'
 import { fetchDynamicPriceHistory } from '../../lib/api/tariffs'
-import { formatDateTime, useAppSettings } from '../../lib/appSettings'
+import { formatDateTime, formatShortDate, useAppSettings } from '../../lib/appSettings'
 import { AXIS_COLOR, CHART_GRIDLINE, CONS_COLORS } from '../../lib/chartTokens'
-import { todayLocalIso } from '../../lib/dates'
+import { formatIsoDate, todayLocalIso } from '../../lib/dates'
 import { queryKeys } from '../../lib/api/queryKeys'
-import type { DynamicPricePoint, DynamicTariffSource } from '../../types/api'
+import type { DynamicPriceHistory, DynamicPricePoint, DynamicTariffSource, Tariff } from '../../types/api'
+
+/** What the history view needs from the tariff it was opened for, if any. */
+export type TariffValidityContext = Pick<Tariff, 'valid_from' | 'valid_to' | 'minimum_price_chf_per_kwh'>
 
 function daysBefore(isoDate: string, days: number): string {
   const value = new Date(`${isoDate}T12:00:00Z`)
@@ -19,17 +22,134 @@ function daysBefore(isoDate: string, days: number): string {
   return value.toISOString().slice(0, 10)
 }
 
+/**
+ * The last civil date a tariff's own prices should be shown for.
+ *
+ * An open-ended tariff (`valid_to` null) is bounded at "today", since nothing
+ * is published beyond it yet — except for a not-yet-started tariff, where
+ * "today" would sit *before* `valid_from` and invert the range; there, the
+ * bound is `valid_from` itself, an intentionally empty one-day window.
+ */
+function validityUpperBound(tariff: TariffValidityContext, today: string): string {
+  const openEndedBound = tariff.valid_from > today ? tariff.valid_from : today
+  return tariff.valid_to && tariff.valid_to < openEndedBound ? tariff.valid_to : openEndedBound
+}
+
+/**
+ * Clip a range to a tariff's own validity window.
+ *
+ * A dynamic source is shared globally (ADR 0018) — its stored series can run
+ * years before a given tariff ever linked to it, and past any date the
+ * tariff was closed on. Opened from the tariff page, "price history" means
+ * this tariff's prices, so neither end belongs in view: showing them reads
+ * as the tariff having billed at a price it never charged anyone at.
+ */
+function clampToValidity(
+  range: { dateFrom: string, dateTo: string },
+  tariff: TariffValidityContext,
+  today: string,
+): { dateFrom: string, dateTo: string } {
+  const upperBound = validityUpperBound(tariff, today)
+  const dateFrom = range.dateFrom < tariff.valid_from ? tariff.valid_from : range.dateFrom
+  const dateTo = range.dateTo > upperBound ? upperBound : range.dateTo
+  // The source's own default window and the tariff's validity can be
+  // disjoint entirely (a brand-new tariff on a source with years of prior
+  // history) — clamping each end independently would then invert the range.
+  return dateFrom > dateTo ? { dateFrom: tariff.valid_from, dateTo: upperBound } : { dateFrom, dateTo }
+}
+
+/**
+ * The date range a freshly opened history view should start on.
+ *
+ * A quarter-hourly VSE source defaults to the last week, which is a
+ * reasonable recent slice. A BFE reference-price source publishes one point
+ * per quarter (or month), so the same default almost always lands on an
+ * unpublished period and looks like nothing was ever fetched — default to
+ * the source's own covered range instead. Either way, opened for a specific
+ * tariff, the range is then clipped to that tariff's own validity.
+ */
+export function defaultHistoryDateRange(
+  source: DynamicTariffSource,
+  today: string,
+  tariff?: TariffValidityContext | null,
+): { dateFrom: string, dateTo: string } {
+  const base = source.api_version === 'bfe_rmp' && source.covers_from && source.covers_to
+    ? {
+      // covers_to is the exclusive end of the last interval, which always
+      // lands on a local month boundary here — the inclusive last covered
+      // day is the one before it.
+      dateFrom: formatIsoDate(new Date(source.covers_from)),
+      dateTo: daysBefore(formatIsoDate(new Date(source.covers_to)), 1),
+    }
+    : { dateFrom: daysBefore(today, 6), dateTo: today }
+  return tariff ? clampToValidity(base, tariff, today) : base
+}
+
+/**
+ * Floor each point at the tariff's minimum, the same way
+ * `TariffResolver.price_at` bills it (`backend/invoices/engine.py`) — a
+ * fetched price below the floor is displayed at the floor, not at what the
+ * series actually published.
+ */
+export function applyMinimumPrice(
+  points: DynamicPricePoint[],
+  minimumPriceChfPerKwh: string | null | undefined,
+): DynamicPricePoint[] {
+  if (!minimumPriceChfPerKwh) return points
+  const floor = Number(minimumPriceChfPerKwh)
+  return points.map((point) => (
+    Number(point.price_chf_per_kwh) < floor
+      ? { ...point, price_chf_per_kwh: minimumPriceChfPerKwh }
+      : point
+  ))
+}
+
+/**
+ * Recompute the price-derived stats from (already floored) points.
+ *
+ * `gap_count` is about coverage, not price, so it is passed through from the
+ * server response rather than recomputed.
+ */
+export function statsFromPoints(points: DynamicPricePoint[], gapCount: number): DynamicPriceHistory['stats'] {
+  const prices = points.map((point) => Number(point.price_chf_per_kwh))
+  if (prices.length === 0) {
+    return {
+      point_count: 0, minimum_chf_per_kwh: null, maximum_chf_per_kwh: null,
+      average_chf_per_kwh: null, negative_count: 0, gap_count: gapCount,
+    }
+  }
+  const sum = prices.reduce((total, price) => total + price, 0)
+  return {
+    point_count: prices.length,
+    minimum_chf_per_kwh: Math.min(...prices).toFixed(5),
+    maximum_chf_per_kwh: Math.max(...prices).toFixed(5),
+    average_chf_per_kwh: (sum / prices.length).toFixed(5),
+    negative_count: prices.filter((price) => price < 0).length,
+    gap_count: gapCount,
+  }
+}
+
 type Props = {
   source: DynamicTariffSource | null
   onClose: () => void
+  /** The tariff this history was opened for, if any — see `TariffValidityContext`. */
+  tariff?: TariffValidityContext | null
 }
 
-export function DynamicPriceHistoryModal({ source, onClose }: Props) {
+export function DynamicPriceHistoryModal({ source, onClose, tariff }: Props) {
   const { t } = useTranslation()
   const { settings } = useAppSettings()
   const today = todayLocalIso()
   const [dateFrom, setDateFrom] = useState(daysBefore(today, 6))
   const [dateTo, setDateTo] = useState(today)
+
+  useEffect(() => {
+    if (!source) return
+    const range = defaultHistoryDateRange(source, today, tariff)
+    setDateFrom(range.dateFrom)
+    setDateTo(range.dateTo)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [source?.id, tariff?.valid_from, tariff?.valid_to])
 
   const historyQuery = useQuery({
     queryKey: queryKeys.tariffs.dynamicPrices(source?.id ?? '', dateFrom, dateTo),
@@ -37,10 +157,15 @@ export function DynamicPriceHistoryModal({ source, onClose }: Props) {
     enabled: Boolean(source && dateFrom && dateTo),
   })
 
-  const chartData = useMemo(() => (historyQuery.data?.points ?? []).map((point) => ({
+  const points = useMemo(
+    () => applyMinimumPrice(historyQuery.data?.points ?? [], tariff?.minimum_price_chf_per_kwh),
+    [historyQuery.data, tariff?.minimum_price_chf_per_kwh],
+  )
+
+  const chartData = useMemo(() => points.map((point) => ({
     timestamp: new Date(point.valid_from).getTime(),
     price: Number(point.price_chf_per_kwh),
-  })), [historyQuery.data])
+  })), [points])
 
   const columns = useMemo<ColumnDef<DynamicPricePoint, unknown>[]>(() => [
     {
@@ -61,7 +186,12 @@ export function DynamicPriceHistoryModal({ source, onClose }: Props) {
     },
   ], [settings, t])
 
-  const stats = historyQuery.data?.stats
+  const hasFloor = Boolean(tariff?.minimum_price_chf_per_kwh)
+  const stats = hasFloor && historyQuery.data
+    ? statsFromPoints(points, historyQuery.data.stats.gap_count)
+    : historyQuery.data?.stats
+  const validityMin = tariff?.valid_from
+  const validityMax = tariff ? validityUpperBound(tariff, today) : undefined
 
   return (
     <FormModal
@@ -74,13 +204,35 @@ export function DynamicPriceHistoryModal({ source, onClose }: Props) {
         <div className="form-grid">
           <label>
             <span>{t('pages.dynamicSources.history.dateFrom')}</span>
-            <CivilDateInput value={dateFrom} onChange={(value) => setDateFrom(value ?? '')} />
+            <CivilDateInput
+              value={dateFrom}
+              onChange={(value) => setDateFrom(value ?? '')}
+              minDate={validityMin}
+              maxDate={validityMax}
+            />
           </label>
           <label>
             <span>{t('pages.dynamicSources.history.dateTo')}</span>
-            <CivilDateInput value={dateTo} onChange={(value) => setDateTo(value ?? '')} />
+            <CivilDateInput
+              value={dateTo}
+              onChange={(value) => setDateTo(value ?? '')}
+              minDate={validityMin}
+              maxDate={validityMax}
+            />
           </label>
         </div>
+
+        {tariff && (
+          <p className="muted" style={{ margin: 0 }}>
+            {t('pages.dynamicSources.history.validityScope', {
+              from: formatShortDate(tariff.valid_from, settings),
+              to: tariff.valid_to ? formatShortDate(tariff.valid_to, settings) : t('pages.tariffs.openEnded'),
+            })}
+            {hasFloor && ` ${t('pages.dynamicSources.history.minimumApplied', {
+              price: Number(tariff.minimum_price_chf_per_kwh).toFixed(5),
+            })}`}
+          </p>
+        )}
 
         {historyQuery.isError && <div className="error-banner">{t('pages.dynamicSources.history.loadError')}</div>}
 
@@ -146,7 +298,7 @@ export function DynamicPriceHistoryModal({ source, onClose }: Props) {
         )}
 
         <DataTable
-          data={historyQuery.data?.points ?? []}
+          data={points}
           columns={columns}
           getRowId={(point) => point.valid_from}
           loading={historyQuery.isLoading}

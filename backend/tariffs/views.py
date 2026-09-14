@@ -21,6 +21,7 @@ from .dynamic.evidence import lock_sources
 from .dynamic.components import aggregated_tariff_types
 from .dynamic.discovery import discover_endpoint
 from .dynamic.locking import dynamic_source_lock
+from .dynamic.adapters import DynamicApiVersion
 from .dynamic.models import DynamicPricePoint, DynamicTariffSource
 from .dynamic.services import (
     clear_source_points,
@@ -53,6 +54,15 @@ from audit.services import record_audit_event
 # Every audit event in this module is a tariff event; bind the category once.
 _record_tariff_event = partial(record_audit_event, action_category=AuditActionCategory.TARIFF)
 logger = logging.getLogger(__name__)
+
+DEFAULT_MAX_PRICE_HISTORY_DAYS = 31
+# A BFE reference-price point covers a whole quarter or month, not a
+# quarter-hour — the entire published history is a few dozen rows, so a wide
+# range costs nothing to query. The cap still exists so a client can't be
+# pointed at an unbounded range by construction.
+MAX_PRICE_HISTORY_DAYS_BY_API_VERSION = {
+    DynamicApiVersion.BFE_RMP: 20 * 366,
+}
 
 
 def _parse_required_date(raw, field: str):
@@ -665,12 +675,19 @@ class DynamicTariffSourceViewSet(viewsets.ReadOnlyModelViewSet):
         query = DynamicPriceHistoryQuerySerializer(data=request.query_params)
         query.is_valid(raise_exception=True)
 
+        # The 31-day cap exists so a quarter-hourly VSE series can't be asked
+        # for thousands of points at once. A BFE reference-price point covers
+        # a whole quarter (or month) — the entire published history is a few
+        # dozen rows — so the same volume reason to cap it does not apply.
+        max_days = MAX_PRICE_HISTORY_DAYS_BY_API_VERSION.get(source.api_version, DEFAULT_MAX_PRICE_HISTORY_DAYS)
+        default_span = max_days if source.api_version == DynamicApiVersion.BFE_RMP else 6
+
         date_to = query.validated_data.get("date_to", timezone.localdate())
-        date_from = query.validated_data.get("date_from", date_to - timedelta(days=6))
+        date_from = query.validated_data.get("date_from", date_to - timedelta(days=default_span))
         if date_from > date_to:
             raise DRFValidationError({"date_to": ["date_to must be on or after date_from."]})
-        if (date_to - date_from).days >= 31:
-            raise DRFValidationError({"date_to": ["Price history is limited to 31 days."]})
+        if (date_to - date_from).days >= max_days:
+            raise DRFValidationError({"date_to": [f"Price history is limited to {max_days} days."]})
 
         window_start, window_end = local_civil_day_window(date_from, date_to)
         points = source.points.filter(

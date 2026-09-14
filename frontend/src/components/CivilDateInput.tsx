@@ -5,6 +5,9 @@ interface CivilDateInputProps {
     /** Plain civil date as `YYYY-MM-DD`; empty string or null clears the field. */
     value: string | null
     onChange: (iso: string | null) => void
+    /** Earliest/latest selectable civil date, as `YYYY-MM-DD`. Omit for no bound. */
+    minDate?: string
+    maxDate?: string
 }
 
 /**
@@ -15,13 +18,15 @@ interface CivilDateInputProps {
  * no `Date` round-trip, no timezone shift in either direction. Only the
  * visible label is formatted to the user's short date format.
  */
-export function CivilDateInput({ value, onChange }: CivilDateInputProps) {
+export function CivilDateInput({ value, onChange, minDate, maxDate }: CivilDateInputProps) {
     const { settings } = useAppSettings()
     return (
         <DatePickerInput
             valueFormat={toDayJsDateFormat(settings.date_format_short)}
             value={value || null}
             onChange={onChange}
+            minDate={minDate}
+            maxDate={maxDate}
             clearable
         />
     )

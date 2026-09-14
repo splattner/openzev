@@ -1496,6 +1496,8 @@ export const en = {
                 gapTitle: 'Unpriced intervals in this window', empty: 'No prices in this date range.',
                 loadError: 'Price history could not be loaded.',
                 coverage: '{{count}} points stored · coverage {{from}} – {{to}}',
+                validityScope: 'Only shows prices during this tariff’s validity ({{from}} – {{to}}).',
+                minimumApplied: 'Prices below the minimum of CHF {{price}}/kWh are shown at the minimum.',
             },
         },
         meteringPoints: {

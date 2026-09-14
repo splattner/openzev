@@ -393,8 +393,9 @@ class DynamicPriceHistoryQuerySerializer(serializers.Serializer):
         date_to = attrs.get("date_to")
         if date_from and date_to and date_from > date_to:
             raise serializers.ValidationError({"date_to": "date_to must be on or after date_from."})
-        if date_from and date_to and (date_to - date_from).days >= 31:
-            raise serializers.ValidationError({"date_to": "Price history is limited to 31 days."})
+        # The day-count cap depends on the source's resolution — a quarterly
+        # BFE point covers ~91 days, so it belongs in the view, which has the
+        # source; this serializer only checks the shape of the query itself.
         return attrs
 
 
