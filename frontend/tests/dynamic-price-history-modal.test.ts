@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import {
   applyMinimumPrice,
   defaultHistoryDateRange,
@@ -6,6 +6,27 @@ import {
   type TariffValidityContext,
 } from '../src/features/tariffs/DynamicPriceHistoryModal'
 import type { DynamicPricePoint, DynamicTariffSource } from '../src/types/api'
+
+// defaultHistoryDateRange reads a BFE source's covers_from/covers_to (UTC
+// instants marking Europe/Zurich civil-month boundaries) via formatIsoDate's
+// local Date getters — the same "viewer's own timezone" convention every
+// billing-period picker in this app uses (see lib/dates.ts). That only
+// resolves to the intended calendar date for a Zurich-local viewer, so it is
+// pinned here the same way date-utils.test.ts pins a fixed zone, rather than
+// depending on whatever TZ the machine running the tests happens to have.
+const SAVED_TZ = process.env.TZ
+
+beforeAll(() => {
+  process.env.TZ = 'Europe/Zurich'
+})
+
+afterAll(() => {
+  if (SAVED_TZ === undefined) {
+    delete process.env.TZ
+  } else {
+    process.env.TZ = SAVED_TZ
+  }
+})
 
 const TODAY = '2026-09-14'
 
