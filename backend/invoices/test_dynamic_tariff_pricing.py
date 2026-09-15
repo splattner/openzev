@@ -120,6 +120,46 @@ class TestDynamicAverageChfPerKwh:
             tariff, as_of=date(2026, 1, 1), days=1
         ).status == "complete"
 
+    def test_a_period_published_source_anchors_on_the_end_of_coverage(self):
+        # BFE publishes a quarter on the 10th working day *after* it ends, so
+        # a window anchored on today permanently sits in the unpublished
+        # stretch: the tariff would read "price unavailable" roughly ten weeks
+        # out of every thirteen, printed document included.
+        from tariffs.dynamic.storage import store_points
+        from tariffs.dynamic.vse_v1 import PricePoint
+
+        zev = factories.ZevFactory()
+        source = make_source(
+            label="BFE reference market price — PV",
+            url="https://www.bfe-ogd.ch/ogd60_rmp_quartalspreise.csv",
+            api_version="bfe_rmp", request_mode="exact_url", supports_range=False,
+            tariff_type="feed_in", tariff_name="pv",
+        )
+        # Q2 2026 in Europe/Zurich civil time, stored as UTC.
+        store_points(source, [PricePoint(
+            datetime(2026, 3, 31, 22, tzinfo=UTC), datetime(2026, 6, 30, 22, tzinfo=UTC),
+            Decimal("0.03896"),
+        )])
+        tariff = dynamic_tariff(zev, source, energy_type=EnergyType.FEED_IN)
+
+        # Two and a half months after the last published quarter ended.
+        summary = summarize_dynamic_tariff(tariff, as_of=date(2026, 9, 15))
+
+        assert summary.status == "complete"
+        assert summary.average_chf_per_kwh == Decimal("0.03896")
+        assert summary.reference_to == date(2026, 6, 29)
+
+    def test_a_vse_source_still_reports_a_stalled_series_as_unavailable(self):
+        # The same anchoring must not apply to a continuously published
+        # endpoint: there, an empty recent window is how a stalled fetch
+        # surfaces, and hiding it behind a month-old average would bury it.
+        zev = factories.ZevFactory()
+        source = make_source()
+        tariff = dynamic_tariff(zev, source)
+        store(source, datetime(2026, 1, 5, 10, tzinfo=UTC), "0.20000")
+
+        assert summarize_dynamic_tariff(tariff, as_of=date(2026, 9, 15)).status == "unavailable"
+
     def test_a_minimum_price_floors_each_interval_before_weighting(self):
         # Flooring the finished average instead would produce a different
         # number here (0.25000, the raw average, since it already clears the
@@ -176,7 +216,11 @@ class TestDisplayGridBaseWithDynamicTariffs:
         store(source, datetime(2026, 6, 30, tzinfo=UTC), "0.1")
         store(source, datetime(2026, 9, 12, tzinfo=UTC), "0.9")
         tariffs = list(zev.tariffs.prefetch_related("periods"))
-        with django_assert_num_queries(1):
+        # Two queries for the whole batch — the coverage anchors for
+        # period-published sources, then the points — and two however many
+        # tariffs, versions or shared sources it holds. The budget is here to
+        # catch a per-tariff query, not to pin the constant.
+        with django_assert_num_queries(2):
             prepare_tariff_display_summaries(tariffs, as_of=date(2026, 9, 12))
             payload = {row["id"]: row for row in TariffSerializer(tariffs, many=True).data}
         assert payload[str(past.pk)]["percentage_base_summary"] == {
@@ -193,7 +237,7 @@ class TestDisplayGridBaseWithDynamicTariffs:
         store(source, datetime(2026, 1, 31, tzinfo=UTC), "0.1")
         store(source, datetime(2026, 5, 1, tzinfo=UTC), "9.0")
         store(source, datetime(2026, 9, 12, tzinfo=UTC), "0.3")
-        with django_assert_num_queries(1):
+        with django_assert_num_queries(2):
             summaries = summarize_requests({
                 tariff.pk: (tariff, date(2026, 9, 12)) for tariff in [old, current]
             })

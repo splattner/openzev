@@ -67,6 +67,15 @@ class TestModelValidation:
 
         assert source.tariff_name == "wasserkraft"
 
+    def test_the_reference_price_cannot_be_filed_as_a_grid_component(self):
+        # It prices exported energy. Filed as `grid` it would pass
+        # Tariff._dynamic_source_errors for grid *consumption*, billing what
+        # a producer is paid as what a consumer owes.
+        with pytest.raises(ValidationError) as caught:
+            make_bfe_source(tariff_type="grid")
+
+        assert "tariff_type" in caught.value.message_dict
+
 
 class TestRefreshSource:
     def test_a_bfe_source_is_fetched_as_text_once_and_bare(self):

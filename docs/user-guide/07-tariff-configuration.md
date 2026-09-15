@@ -164,11 +164,17 @@ moment, negative prices included.
 
 ### Reading a dynamic tariff's price
 
-A fetched price changes every quarter-hour, so the Tariffs page shows a
-**representative average** instead of a rate: `Avg CHF 0.123/kWh`, with a
-tooltip explaining the reference window. It is weighted by interval duration over
-the trailing 30 days within the tariff's validity — not a fixed rate, and
-the contract and tariff overview say so in a footnote.
+An operator's fetched price changes every quarter-hour, so the Tariffs page
+shows a **representative average** instead of a rate: `Avg CHF 0.123/kWh`,
+with a tooltip explaining the reference window. It is weighted by interval
+duration over the trailing 30 days within the tariff's validity — not a fixed
+rate, and the contract and tariff overview say so in a footnote.
+
+The BFE reference market price (below) publishes one price per *quarter*, and
+only weeks after that quarter has ended, so its trailing 30 days would always
+be empty. For that kind of source the window ends at the last fully published
+day instead of at today; the reference dates beside the figure say which
+period it covers.
 
 For a percentage tariff, the base uses grid tariffs and prices at today, clamped
 to the displayed version's validity. A historical percentage version therefore
@@ -180,6 +186,42 @@ uses its historical base, not the latest average of an ongoing grid tariff.
   tariff) means nothing was fetched for the window. No substitute number is
   shown, and a percentage tariff built on it has no base either — printing a
   partial sum would understate the rate.
+
+### Feed-in at the BFE reference market price
+
+Many operators pay feed-in remuneration as **the greater of** a minimum price
+they guarantee **or** the federal reference market price for the period. Since
+1 January 2026 that is also the statutory default when nothing else is agreed
+(Art. 15 EnG/EnV, reference price per Art. 15 EnFV).
+
+Set this up in two parts:
+
+1. **Add the reference price as a source.** In the dynamic source dialog,
+   choose the kind **BFE reference market price** instead of an operator
+   endpoint. Pick the series your installation reports on — **quarterly** or
+   **monthly** — and the **technology** (photovoltaics for a normal rooftop
+   ZEV). There is no URL to enter and nothing to discover: OpenZEV downloads
+   the federal publication and stores its whole history, back to Q3 2023, the
+   moment you save.
+2. **Link a feed-in tariff to it and enter the minimum.** On a feed-in tariff
+   with that source selected, the form shows **Minimum price (CHF/kWh)**.
+   Leave it empty if your operator pays the reference price flat.
+
+Every exported kWh is then credited at whichever is higher for that moment.
+The Tariffs page shows the reference average with `min. CHF 0.080/kWh` beside
+it, and the tariff overview PDF prints the rate together with the guaranteed
+minimum.
+
+- **A quarter can only be billed once BFE has published it** — roughly ten
+  working days after the quarter ends. Until then the period counts as
+  unpriced: readiness names the days and invoice generation refuses, rather
+  than falling back to the minimum and under-crediting a producer whose
+  reference price later turns out to be higher.
+- The minimum is part of a tariff *version*. Renegotiating it means creating
+  a new version from the date it changes, exactly like any other price.
+- The figures are federal open data (`Opendata BY`). Reusing them outside
+  OpenZEV — a newsletter, your own report — requires naming the source, the
+  Swiss Federal Office of Energy (BFE).
 
 ### Operating a price source (administrators)
 
@@ -210,6 +252,11 @@ communities: two ZEVs on the same operator product fetch once, together.
   retained for an invoice. The original remains stored. Check the operator's
   publication and affected invoices before correcting or cancelling invoices;
   retries cannot reconcile conflicting billing evidence.
+  On a **BFE reference price** source this also stops *newly published*
+  quarters from arriving, because every fetch re-reads the whole federal
+  history and the conflict fails the run as a whole. Resolve the revised
+  quarter — cancel or correct the affected invoice, then clear the source's
+  prices — rather than waiting for the next scheduled refresh.
 - **PriceIntervalConflict:** a replacement is overlapping or incomplete.
   Backfill the complete unbilled range. A complete replacement can change
   interval resolution atomically while preserving billed historical intervals.

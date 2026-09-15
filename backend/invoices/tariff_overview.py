@@ -107,8 +107,17 @@ def _price_rows_for_energy_tariff(
             )
         footnote = DYNAMIC_FOOTNOTE[summary.status]
         label_key = f"{footnote}_label"
+        # The floor is part of what this tariff pays, and it is knowable even
+        # when the series is not — so it is stated beside the figure rather
+        # than left for the reader to infer from a flat-looking average.
+        minimum = ""
+        if tariff.minimum_price_chf_per_kwh is not None:
+            minimum = tr["dynamic_minimum"].format(
+                price=f"{float(tariff.minimum_price_chf_per_kwh) * 100:.2f}",
+                unit=tr["unit_rp"],
+            )
         return [{
-            "label": f"{tr[label_key]}{dates}",
+            "label": f"{tr[label_key]}{dates}{minimum}",
             "recurrence": "",
             "amount": (
                 f"{float(summary.average_chf_per_kwh) * 100:.2f}"

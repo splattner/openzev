@@ -512,6 +512,52 @@ class TariffOverviewDynamicTariffTests(TariffOverviewTestCase):
             [text for _index, text in ctx["footnotes"]],
         )
 
+    def test_a_floored_feed_in_tariff_states_its_minimum_beside_the_figure(self):
+        # The floor is what this tariff actually pays when the series dips
+        # below it, and it is knowable even when the series is not — a reader
+        # of the printed document should not have to infer it from a
+        # suspiciously flat average.
+        from tariffs.dynamic.models import DynamicPricePoint, DynamicTariffSource
+
+        source = DynamicTariffSource.objects.create(
+            label="BFE reference market price — PV",
+            url="https://www.bfe-ogd.ch/ogd60_rmp_quartalspreise.csv",
+            api_version="bfe_rmp", request_mode="exact_url", supports_range=False,
+            tariff_type="feed_in", tariff_name="pv",
+        )
+        DynamicPricePoint.objects.create(
+            source=source,
+            valid_from=datetime(2026, 5, 1, tzinfo=timezone.utc),
+            valid_to=datetime(2026, 7, 1, tzinfo=timezone.utc),
+            price_chf_per_kwh=Decimal("0.03896"),
+        )
+        self._energy_tariff(
+            name="Feed-in (BFE)", energy_type=EnergyType.FEED_IN, dynamic_source=source,
+            minimum_price_chf_per_kwh=Decimal("0.08000"),
+        )
+
+        ctx = _build_template_context(self.zev, date(2026, 6, 1), "valid")
+
+        row = next(
+            row for group in ctx["groups"] for t in group["tariffs"]
+            for row in t["price_rows"] if t["name"] == "Feed-in (BFE)"
+        )
+        # Billed at the floor, not at the 3.90 Rp. the series published.
+        self.assertEqual(row["amount"], "8.00")
+        self.assertIn("mindestens 8.00 Rp./kWh", row["label"])
+
+    def test_an_unfloored_dynamic_tariff_states_no_minimum(self):
+        tariff, source = self._dynamic_grid_tariff()
+        self._store(source, "0.20000")
+
+        ctx = _build_template_context(self.zev, date(2026, 6, 1), "valid")
+
+        row = next(
+            row for group in ctx["groups"] for t in group["tariffs"]
+            for row in t["price_rows"] if t["name"] == "Grid (dynamic)"
+        )
+        self.assertNotIn("mindestens", row["label"])
+
     def test_a_percentage_tariff_on_a_dynamic_base_gets_the_dynamic_footnote(self):
         _tariff, source = self._dynamic_grid_tariff()
         self._store(source, "0.20000")

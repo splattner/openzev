@@ -9,6 +9,7 @@
 - Target Release: Ongoing
 - Related Issues: #530 (parent gap #507, importer #520), #702, #703
 - Related ADRs: [0018](../adr/0018-dynamic-tariff-price-series.md), [0019](../adr/0019-frozen-dynamic-price-evidence.md)
+- Extended by: [BFE reference market price](2026-09-bfe-reference-market-price.md) — a third, period-published protocol and a minimum feed-in price
 - Impacted Areas: backend, frontend, async jobs, docs
 
 ---
@@ -152,7 +153,7 @@ Global, **not** ZEV-scoped — see ADR 0018.
 | `id` | UUID pk | |
 | `label` | `CharField(200)` | Shown when picking a source |
 | `url` | `URLField(500)` | |
-| `api_version` | `CharField(20)` | `v1_0_5` \| `v2_0_0` |
+| `api_version` | `CharField(20)` | `v1_0_5` \| `v2_0_0` \| `bfe_rmp` (see [BFE reference market price](2026-09-bfe-reference-market-price.md)) |
 | `request_mode` | `CharField(20)` | discovered `standard` \| `exact_url` |
 | `query_tariff_type` | `CharField(20)` | discovered wire spelling, not user-entered |
 | `supports_range` | `BooleanField` | discovered endpoint capability |

@@ -5,14 +5,22 @@ from bisect import bisect_left, bisect_right
 from datetime import date, timedelta
 from decimal import Decimal, ROUND_HALF_UP
 
-from allocation.validity import period_window
+from allocation.validity import period_end_exclusive_dt, period_window
 from django.db.models import Q
 
-from .models import DynamicPricePoint
+from .adapters import DynamicApiVersion
+from .models import DynamicPricePoint, DynamicTariffSource
 
 
 DYNAMIC_DISPLAY_DAYS = 30
 DISPLAY_PRICE_QUANTUM = Decimal("0.00001")
+
+#: Protocols that publish one price for a whole period (a quarter, a month)
+#: rather than continuously. Their newest figure is always weeks old — BFE
+#: publishes a quarter on the 10th working day *after* it ends — so a display
+#: window anchored on today would sit in the unpublished stretch and report
+#: nothing at all, permanently. These anchor on the end of coverage instead.
+PERIOD_PUBLISHED_API_VERSIONS = frozenset({DynamicApiVersion.BFE_RMP})
 
 
 @dataclass(frozen=True)
@@ -81,6 +89,30 @@ def _summarize_rows(rows, *, start, end, reference_from, reference_to, floor=Non
     )
 
 
+def _last_fully_covered_day(covers_to) -> date:
+    """The newest civil day the stored series prices from end to end.
+
+    A period-published series ends on a local month boundary, which is 22:00
+    or 23:00 UTC — so the UTC day holding that instant is only priced for part
+    of itself, and anchoring on it would report an otherwise complete window
+    as partial. Stepping back one day lands on the last whole one.
+    """
+    day = (covers_to - timedelta(microseconds=1)).date()
+    return day if period_end_exclusive_dt(day) <= covers_to else day - timedelta(days=1)
+
+
+def _display_anchor(tariff, as_of: date, coverage_ends: dict) -> date:
+    """The day a period-published source's display window should end on.
+
+    Every other source is anchored on ``as_of``: a window with nothing in it
+    is the honest answer there, and it is how a stalled endpoint surfaces.
+    """
+    covers_to = coverage_ends.get(tariff.dynamic_source_id)
+    if covers_to is None:
+        return as_of
+    return min(as_of, _last_fully_covered_day(covers_to))
+
+
 def _summary_window(tariff, *, as_of: date, days: int):
     """The clipped display window for ``tariff``, or None when pre-validity."""
     reference_to = min(as_of, tariff.valid_to) if tariff.valid_to else as_of
@@ -111,11 +143,24 @@ def summarize_requests(requests: dict, *, days: int = DYNAMIC_DISPLAY_DAYS) -> d
     """
     if days < 1:
         raise ValueError("days must be at least 1.")
+    source_ids = {
+        tariff.dynamic_source_id for tariff, _as_of in requests.values() if tariff.dynamic_source_id
+    }
+    # One query for every period-published source in the batch, so anchoring
+    # the window costs nothing per tariff.
+    coverage_ends = dict(
+        DynamicTariffSource.objects
+        .filter(pk__in=source_ids, api_version__in=PERIOD_PUBLISHED_API_VERSIONS)
+        .exclude(covers_to=None)
+        .values_list("pk", "covers_to")
+    )
     windows = {}
     for key, (tariff, as_of) in requests.items():
         if not tariff.dynamic_source_id:
             raise ValueError("A dynamic price summary requires dynamic_source.")
-        window = _summary_window(tariff, as_of=as_of, days=days)
+        window = _summary_window(
+            tariff, as_of=_display_anchor(tariff, as_of, coverage_ends), days=days
+        )
         windows[key] = (
             (tariff.dynamic_source_id, tariff.minimum_price_chf_per_kwh, *window) if window else None
         )

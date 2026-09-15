@@ -72,7 +72,7 @@ PVshare Cockpit is a closed, subscription-based SaaS (CHF ~30/participant/year) 
 | Proactive status-check page for ZEV owners | Partial — readiness/attention cockpit shipped | Participant Self-Service — status-check page (medium) |
 | Guided vZEV founding wizard with document templates | Setup wizard partial | Participants & Community (medium) |
 | vZEV profit/feasibility calculator | Shipped | See Invoicing & Billing |
-| BFE reference market price auto-fetch | Not supported; manual entry | Metering & Data Quality — BFE reference price (low); VSE importer does not fetch it |
+| BFE reference market price auto-fetch | Shipped | See Metering & Data Quality — BFE reference price |
 | CO₂ savings display in participant statistics | Not present | Participant Self-Service (low) |
 | Partner / third-party billing access model | Not present | Participants & Community (low) |
 
@@ -159,7 +159,7 @@ PVshare Cockpit is a closed, subscription-based SaaS (CHF ~30/participant/year) 
 | Anomaly / outlier detection on imported readings | `idea` | `low` | Flag unusually high/low values before billing |
 | Real-time or near-real-time metering ingestion (MQTT / push API) | `deferred` | — | Significant infrastructure change; out of scope for current architecture |
 | Demand tariff (Leistungstarif) support | `idea` | `high` | Monthly peak-demand billing (CHF/kW); CKW introduced in 2025; required for some Swiss grids. Peak kW *is* derivable from stored readings (`energy_kwh × 4` at 15-minute resolution); what is missing is a billing mode, an engine pass, and a decision on whose peak is billed — #529 |
-| BFE reference market price auto-fetch | `idea` | `low` | Automatically retrieve Swiss federal BFE quarterly PV feed-in reference price so ZEV owners don't need to look it up manually |
+| BFE reference market price auto-fetch | `shipped` | — | Quarterly/monthly federal reference price fetched as a shared price source, with an optional guaranteed minimum on the feed-in tariff — [spec](specs/2026-09-bfe-reference-market-price.md), #720 |
 
 ---
 
