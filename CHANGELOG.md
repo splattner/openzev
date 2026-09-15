@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.14.0](https://github.com/splattner/openzev/compare/v1.13.0...v1.14.0) (2026-09-15)
+
+
+### Features
+
+* **dynamic tariffs:** floor a feed-in tariff at the BFE reference market price ([#721](https://github.com/splattner/openzev/issues/721)) ([09c6547](https://github.com/splattner/openzev/commit/09c6547fc4cbebcbe53200d46001feb1683abf6c))
+
 ## [1.13.0](https://github.com/splattner/openzev/compare/v1.12.0...v1.13.0) (2026-09-14)
 
 
