@@ -5,6 +5,7 @@
   "components/EmailLogsModal.tsx@alpha",
   "features/invoices/InvoiceDeleteModal.tsx@alpha",
   "features/audit/AuditEventDrawer.tsx@alpha",
+  "features/tariffs/TariffDetailDrawer.tsx@alpha",
   "pages/MeteringChartPage.tsx@alpha",
   "features/feasibility/ParticipantRowsEditor.tsx@alpha",
   "invoices/invoice_pdf.html@alpha",
