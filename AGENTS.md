@@ -8,7 +8,11 @@ This file gives coding agents the minimum project-specific context needed to wor
 
 - `backend/` — Django + Django REST Framework backend
 - `frontend/` — React + TypeScript + Vite frontend
-- `docker-compose.yml` — local full-stack setup with backend, frontend, db, redis, and celery worker
+- `docker-compose.dev.yml` — the development stack (backend with live reload, Vite dev server with HMR, Celery worker + beat, Postgres, Redis); this is the one used day to day
+- `docker-compose.yml` — production-like local stack (built frontend behind nginx)
+- `docs/specs/`, `docs/adr/` — feature specs and architecture decisions
+- `docs/user-guide/` — end-user documentation
+- `docs/release-notes/` — hand-written release notes for minor/major releases
 
 ## Key Stack
 
@@ -16,19 +20,26 @@ This file gives coding agents the minimum project-specific context needed to wor
 - Frontend: React, TypeScript, TanStack Query, Vite
 - Async jobs: Celery + Redis
 - DB: PostgreSQL
-- Use the Node version pinned in `.node-version` (currently 24.20.0) for frontend commands and tests; verify with `node --version` before running them
+- Use the Node version pinned in `.node-version` for frontend commands and tests; verify with `node --version` before running them
 
 ## Local Development Commands
 
-### Full stack
+### Full stack (dev)
 
-- `docker compose up -d --build`
+The container runtime may be Docker or Podman — check which is available (`command -v docker podman`) and use `docker compose` or `podman compose` accordingly. Before starting anything, check whether the stack is already running (`docker ps` / `podman ps`); it often is.
+
+- Start: `docker compose -f docker-compose.dev.yml up -d --build` (or `podman compose ...`)
+- Frontend (Vite, HMR): http://localhost:5173 — source is bind-mounted, so edits apply without a restart
+- Backend API: http://localhost:8001/api/v1
+- Seed demo data: `docker compose -f docker-compose.dev.yml exec backend python manage.py seed_demo` — demo admin is `admin@openzev.local` / `admin1234`
+- If the backend starts failing with Postgres `too many clients already`, restart the backend container to release its connections.
 
 ### Backend
 
 From `backend/`:
 
 - Activate venv: `source ../.venv/bin/activate`
+- Lint: `ruff check .`
 - Run tests: `python -m pytest -q` (parallel; `-n 0` = serial, `-m "not slow"` = skip slow PDF tests; counts: `pytest -v | tail -2`, pipe masks exit code)
 - Run invoice tests only: `python -m pytest invoices -q`
 
@@ -36,7 +47,11 @@ From `backend/`:
 
 From `frontend/`:
 
+- Lint: `npm run lint` and `npm run lint:style`
+- Color-literal sweep: `node ../scripts/check-frontend-hex.mjs` — raw hex/rgb()/rgba() is rejected outside the design tokens; an alpha shadow/scrim needs its file added to `scripts/hex-migration-allowlist.json` with an `@alpha` suffix
+- Unit tests: `npm run test:unit`
 - Build: `npm run build`
+- Screenshots against the running dev stack: `npm run shot` (one-off) or `npm run screenshots` (user-guide set). The Playwright config defaults to the production-like ports, so for the dev stack set `SCREENSHOT_BASE_URL=http://localhost:5173 SCREENSHOT_API_URL=http://localhost:8001/api/v1`. `npm run shot` renders in English (`SHOT_LANG`); other specs use the config's `de-CH` locale, so match button labels accordingly.
 
 ## Working Agreements
 
@@ -79,7 +94,7 @@ For larger or risky changes, consult or create specs and ADRs:
 - **Reference specs** document reusable cross-cutting patterns that should guide future work even when no baseline feature spec changes directly:
   - `2026-04-frontend-management-page-design.md` — reference spec for frontend CRUD / management-page cleanup, action hierarchy, page grouping, icons, i18n discipline, and responsive layouts
 
-- **Completed feature specs** describe shipped capabilities with their own implementation spec (`2026-08-shared-metering-points.md`, `2026-09-vse-tariff-import.md`, `2026-09-tariff-overview-pdf.md`, `2026-09-participant-invoice-access.md`). Update the linked spec when the capability changes; they are not baselines.
+- **Completed feature specs** describe shipped capabilities with their own implementation spec (`2026-08-shared-metering-points.md`, `2026-09-vse-tariff-import.md`, `2026-09-tariff-overview-pdf.md`, `2026-09-participant-invoice-access.md`, `2026-09-dynamic-tariffs.md`, `2026-09-bfe-reference-market-price.md`). Update the linked spec when the capability changes; they are not baselines.
 
 - When you create or modify a spec, link it in your PR using `.github/PULL_REQUEST_TEMPLATE.md`.
 
@@ -97,19 +112,26 @@ When making code changes, follow these rules to keep specs accurate:
 
 For detailed guidance, see `docs/specs/README.md` and `docs/adr/README.md`.
 
-## Invoicing Notes
-
-- Invoice overview page is period-based and uses the selected global ZEV.
-- Billing intervals: `monthly`, `quarterly`, `semi_annual`, `annual`.
-- Email behavior is asynchronous via Celery; frontend may poll for updated email status.
-- Metering completeness in period overview is strict daily completeness, respecting participant and metering point validity ranges.
-
 ## Validation Expectations
 
-After relevant changes:
+After relevant changes, run what CI runs for the side you touched:
 
-- Backend: run `python -m pytest -q`
-- Frontend: run `npm run test:unit` and `npm run build`
+- Backend: `ruff check .`, `python manage.py check`, `python -m pytest -q`
+- Frontend: `npm run lint`, `npm run lint:style`, `node ../scripts/check-frontend-hex.mjs`, `npm run test:unit`, `npm run build`
+- For user-facing frontend changes, also check the change in the running dev stack (screenshot it, check the console for errors), including a narrow (~400px) viewport.
+
+## Documentation
+
+- **User guide** (`docs/user-guide/`): when a change alters what a user sees or does, update the matching chapter in the same PR. Its screenshots are regenerated as a set with `npm run screenshots`, not edited one by one.
+- **Release notes** (`docs/release-notes/`): written for minor and major releases only, using the `release-notes` skill. Don't write them per PR, and never hand-edit `CHANGELOG.md` — release-please regenerates it on every merge.
+
+## Git and Pull Requests
+
+- Never commit to `main`; branch off an up-to-date `origin/main`.
+- PR titles follow Conventional Commits (`feat(scope): ...`, `fix(scope): ...`) — CI checks this.
+- Fill in `.github/PULL_REQUEST_TEMPLATE.md` (linked spec, validation).
+- **Before pushing follow-up commits to an existing PR branch, check the PR is still open** (`gh pr view <number> --json state`). If it was merged or closed in the meantime, do not push to that branch: create a new branch from `origin/main`, cherry-pick the new commits, and open a new PR.
+- After pushing, check CI (`gh pr checks <number>`) rather than assuming it passes.
 
 ## Safe Editing Guidance
 
