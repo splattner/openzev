@@ -1,7 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { ConfirmDialog, useConfirmDialog } from '../components/ConfirmDialog'
 import { TariffCategorySections } from '../features/tariffs/TariffCategorySections'
+import { TariffDetailDrawer } from '../features/tariffs/TariffDetailDrawer'
 import { useTariffCrud } from '../features/tariffs/useTariffCrud'
 import { TariffEmptyState } from '../features/tariffs/TariffEmptyState'
 import { TariffFormModal } from '../features/tariffs/TariffFormModal'
@@ -12,6 +14,7 @@ import { TariffVersionModal } from '../features/tariffs/TariffVersionModal'
 import { useTariffVersions } from '../features/tariffs/useTariffVersions'
 import { seasonSortKey } from '../features/tariffs/recurrence'
 import { isTariffCurrentlyValid } from '../features/tariffs/validity'
+import { seriesKeyOf } from '../features/tariffs/useTariffDisplay'
 import { tariffOverviewFilename, tariffOverviewParams } from '../features/tariffs/tariffOverview'
 import { fetchTariffSeries } from '../lib/api/tariffs'
 import { downloadTariffOverview } from '../lib/api/invoices'
@@ -25,7 +28,10 @@ import { useManagedZev } from '../lib/managedZev'
 import { PageSkeleton } from '../components/PageSkeleton'
 import { useTranslation } from 'react-i18next'
 import { useToast } from '../lib/toast'
-import type { Tariff, TariffPeriod } from '../types/api'
+import type { Tariff, TariffPeriod, TariffSeries } from '../types/api'
+
+const TARIFF_PARAM = 'tariff'
+const VERSION_PARAM = 'version'
 
 const tariffCategoryOrder: Tariff['category'][] = ['energy', 'grid_fees', 'levies', 'metering']
 
@@ -40,6 +46,7 @@ export function TariffsPage() {
     const isManagedScope = user?.role === 'admin' || user?.role === 'zev_owner'
     const [validityFilter, setValidityFilter] = useState<TariffValidityFilter>('valid')
     const [showImportModal, setShowImportModal] = useState(false)
+    const [searchParams, setSearchParams] = useSearchParams()
     // Shared with the validity badge on each card, so the filter and the badge
     // can never disagree about whether a tariff is in force.
     const today = useMemo(() => todayLocalIso(), [])
@@ -64,6 +71,43 @@ export function TariffsPage() {
         () => allSeries.flatMap((series) => series.versions),
         [allSeries],
     )
+
+    // The detail drawer's open tariff (and, within it, which version) lives in
+    // the URL rather than component state: a reload, the back button, or a
+    // shared link all reopen the same view instead of dropping back to the
+    // bare list (#728).
+    const openSeries = useMemo<TariffSeries | null>(() => {
+        const key = searchParams.get(TARIFF_PARAM)
+        if (!key) return null
+        return allSeries.find((series) => seriesKeyOf(series) === key) ?? null
+    }, [allSeries, searchParams])
+    const shownVersionId = searchParams.get(VERSION_PARAM)
+
+    function openDetail(series: TariffSeries) {
+        setSearchParams((previous) => {
+            const next = new URLSearchParams(previous)
+            next.set(TARIFF_PARAM, seriesKeyOf(series))
+            next.delete(VERSION_PARAM)
+            return next
+        }, { replace: true })
+    }
+
+    function closeDetail() {
+        setSearchParams((previous) => {
+            const next = new URLSearchParams(previous)
+            next.delete(TARIFF_PARAM)
+            next.delete(VERSION_PARAM)
+            return next
+        }, { replace: true })
+    }
+
+    function showVersion(versionId: string) {
+        setSearchParams((previous) => {
+            const next = new URLSearchParams(previous)
+            next.set(VERSION_PARAM, versionId)
+            return next
+        }, { replace: true })
+    }
 
     const periods = useMemo(
         () => allSeries.flatMap((series) => series.versions.flatMap((version) => version.periods)),
@@ -282,19 +326,30 @@ export function TariffsPage() {
                 <TariffCategorySections
                     settings={settings}
                     tariffSections={tariffSections}
-                    allSeries={allSeries}
-                    deleteTariffDisabled={deleteTariffPending || dialogLoading}
-                    deletePeriodDisabled={deletePeriodPending || dialogLoading}
+                    openSeriesKey={openSeries ? seriesKeyOf(openSeries) : null}
                     onEditTariff={startTariffEdit}
-                    onDeleteTariff={confirmDeleteTariff}
-                    onOpenCreatePeriodModal={openCreatePeriodModal}
-                    onEditPeriod={startPeriodEdit}
-                    onDeletePeriod={confirmDeletePeriod}
-                    onNewVersion={versions.openNewVersion}
-                    onDuplicate={versions.openDuplicate}
-                    onRenameSeries={versions.openRename}
+                    onOpenDetail={openDetail}
                 />
             )}
+
+            <TariffDetailDrawer
+                series={openSeries}
+                allSeries={allSeries}
+                settings={settings}
+                shownVersionId={shownVersionId}
+                onShowVersion={showVersion}
+                deleteTariffDisabled={deleteTariffPending || dialogLoading}
+                deletePeriodDisabled={deletePeriodPending || dialogLoading}
+                onClose={closeDetail}
+                onEditTariff={startTariffEdit}
+                onDeleteTariff={confirmDeleteTariff}
+                onOpenCreatePeriodModal={openCreatePeriodModal}
+                onEditPeriod={startPeriodEdit}
+                onDeletePeriod={confirmDeletePeriod}
+                onNewVersion={versions.openNewVersion}
+                onDuplicate={versions.openDuplicate}
+                onRenameSeries={versions.openRename}
+            />
 
             {dialog && (
                 <ConfirmDialog {...dialog} isLoading={dialogLoading} onConfirm={handleConfirm} onCancel={handleCancel} />

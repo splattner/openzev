@@ -2290,6 +2290,13 @@ input.recurrence-chip-input {
   gap: 1rem;
 }
 
+/* The card whose detail drawer is currently open — so it stays identifiable
+   once you've scrolled or the list re-sorts under you. */
+.tariff-card.is-open {
+  border-color: var(--brand-accent);
+  background: var(--brand-pale);
+}
+
 .tariff-card-header {
   display: flex;
   align-items: flex-start;
@@ -3333,6 +3340,50 @@ input.recurrence-chip-input {
   .audit-detail-grid {
     grid-template-columns: 1fr;
   }
+}
+
+/* ── Tariff detail drawer ────────────────────────────────────────────────── */
+
+.tariff-drawer {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--surface);
+}
+
+.tariff-drawer-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.1rem 1.4rem;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.28);
+  background: rgba(255, 255, 255, 0.92);
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.tariff-drawer-heading {
+  display: grid;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.tariff-drawer-heading h3 {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.tariff-drawer-body {
+  padding: 1.3rem 1.4rem 2rem;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.tariff-drawer-actions {
+  padding-bottom: 0.25rem;
+  border-bottom: 1px solid var(--border-default);
 }
 
 /* ── Tariff versions ─────────────────────────────────────────────────────── */

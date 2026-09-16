@@ -153,8 +153,6 @@ export const de = {
         back: 'Zurück zum Dashboard',
         close: 'Schliessen',
         openPdf: 'PDF öffnen',
-        showDetails: 'Details anzeigen',
-        hideDetails: 'Details ausblenden',
         periodSelector: {
             currentPeriod: 'Aktueller Zeitraum',
             custom: 'Benutzerdefiniert',
@@ -1213,6 +1211,7 @@ export const de = {
             createPeriodTitle: 'Tarifperiode erstellen',
             savePeriod: 'Tarifperiode speichern',
             createPeriod: 'Tarifperiode erstellen',
+            viewDetails: 'Details anzeigen',
             col: {
                 pricing: 'Preis',
             },

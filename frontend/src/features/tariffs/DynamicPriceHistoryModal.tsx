@@ -129,14 +129,22 @@ export function statsFromPoints(points: DynamicPricePoint[], gapCount: number): 
   }
 }
 
-type Props = {
-  source: DynamicTariffSource | null
-  onClose: () => void
+type PanelProps = {
+  source: DynamicTariffSource
   /** The tariff this history was opened for, if any — see `TariffValidityContext`. */
   tariff?: TariffValidityContext | null
 }
 
-export function DynamicPriceHistoryModal({ source, onClose, tariff }: Props) {
+/**
+ * The date-range picker, stats, chart and point table for one dynamic
+ * source's fetched prices. Split out from `DynamicPriceHistoryModal` so the
+ * tariff detail drawer can show it inline — there is room for it there, and
+ * it is the one thing on that drawer a click used to be needed for (#728) —
+ * while the dynamic-sources admin table, which opens it out of context from
+ * a table row rather than an already-open detail view, still wants it as a
+ * modal.
+ */
+export function DynamicPriceHistoryPanel({ source, tariff }: PanelProps) {
   const { t } = useTranslation()
   const { settings } = useAppSettings()
   const today = todayLocalIso()
@@ -144,17 +152,16 @@ export function DynamicPriceHistoryModal({ source, onClose, tariff }: Props) {
   const [dateTo, setDateTo] = useState(today)
 
   useEffect(() => {
-    if (!source) return
     const range = defaultHistoryDateRange(source, today, tariff)
     setDateFrom(range.dateFrom)
     setDateTo(range.dateTo)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [source?.id, tariff?.valid_from, tariff?.valid_to])
+  }, [source.id, tariff?.valid_from, tariff?.valid_to])
 
   const historyQuery = useQuery({
-    queryKey: queryKeys.tariffs.dynamicPrices(source?.id ?? '', dateFrom, dateTo),
-    queryFn: () => fetchDynamicPriceHistory(source!.id, dateFrom, dateTo),
-    enabled: Boolean(source && dateFrom && dateTo),
+    queryKey: queryKeys.tariffs.dynamicPrices(source.id, dateFrom, dateTo),
+    queryFn: () => fetchDynamicPriceHistory(source.id, dateFrom, dateTo),
+    enabled: Boolean(dateFrom && dateTo),
   })
 
   const points = useMemo(
@@ -194,118 +201,135 @@ export function DynamicPriceHistoryModal({ source, onClose, tariff }: Props) {
   const validityMax = tariff ? validityUpperBound(tariff, today) : undefined
 
   return (
+    <div className="page-stack">
+      <div className="form-grid">
+        <label>
+          <span>{t('pages.dynamicSources.history.dateFrom')}</span>
+          <CivilDateInput
+            value={dateFrom}
+            onChange={(value) => setDateFrom(value ?? '')}
+            minDate={validityMin}
+            maxDate={validityMax}
+          />
+        </label>
+        <label>
+          <span>{t('pages.dynamicSources.history.dateTo')}</span>
+          <CivilDateInput
+            value={dateTo}
+            onChange={(value) => setDateTo(value ?? '')}
+            minDate={validityMin}
+            maxDate={validityMax}
+          />
+        </label>
+      </div>
+
+      {tariff && (
+        <p className="muted" style={{ margin: 0 }}>
+          {t('pages.dynamicSources.history.validityScope', {
+            from: formatShortDate(tariff.valid_from, settings),
+            to: tariff.valid_to ? formatShortDate(tariff.valid_to, settings) : t('pages.tariffs.openEnded'),
+          })}
+          {hasFloor && ` ${t('pages.dynamicSources.history.minimumApplied', {
+            price: Number(tariff.minimum_price_chf_per_kwh).toFixed(5),
+          })}`}
+        </p>
+      )}
+
+      {historyQuery.isError && <div className="error-banner">{t('pages.dynamicSources.history.loadError')}</div>}
+
+      {stats && (
+        <div className="kpi-row">
+          <StatCard label={t('pages.dynamicSources.history.points')} value={stats.point_count} flat />
+          <StatCard
+            label={t('pages.dynamicSources.history.average')}
+            value={stats.average_chf_per_kwh == null ? '—' : Number(stats.average_chf_per_kwh).toFixed(5)}
+            flat
+          />
+          <StatCard label={t('pages.dynamicSources.history.negative')} value={stats.negative_count} flat />
+          <StatCard
+            label={t('pages.dynamicSources.history.gaps')}
+            value={stats.gap_count}
+            tone={stats.gap_count > 0 ? 'warning' : 'success'}
+          />
+        </div>
+      )}
+
+      {chartData.length > 0 && (
+        <section className="card">
+          <ResponsiveContainer width="100%" height={280}>
+            <LineChart data={chartData} margin={{ top: 8, right: 18, left: 8, bottom: 8 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke={CHART_GRIDLINE} />
+              <XAxis
+                dataKey="timestamp"
+                type="number"
+                scale="time"
+                domain={['dataMin', 'dataMax']}
+                tickFormatter={(value: number) => formatDateTime(new Date(value).toISOString(), settings)}
+                stroke={AXIS_COLOR}
+                fontSize={11}
+                minTickGap={48}
+              />
+              <YAxis stroke={AXIS_COLOR} fontSize={11} width={64} tickFormatter={(value) => Number(value).toFixed(3)} />
+              <Tooltip
+                labelFormatter={(value) => formatDateTime(new Date(Number(value)).toISOString(), settings)}
+                formatter={(value) => [`${Number(value).toFixed(5)} CHF/kWh`, t('pages.dynamicSources.history.price')]}
+              />
+              <Line
+                dataKey="price"
+                type="stepAfter"
+                stroke={CONS_COLORS[0]}
+                dot={false}
+                activeDot={{ r: 4 }}
+                isAnimationActive={false}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        </section>
+      )}
+
+      {historyQuery.data && historyQuery.data.gaps.length > 0 && (
+        <section className="warning-banner">
+          <strong>{t('pages.dynamicSources.history.gapTitle')}</strong>
+          <ul>
+            {historyQuery.data.gaps.map((gap) => (
+              <li key={gap.from}>{formatDateTime(gap.from, settings)} – {formatDateTime(gap.to, settings)}</li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      <DataTable
+        data={points}
+        columns={columns}
+        getRowId={(point) => point.valid_from}
+        loading={historyQuery.isLoading}
+        initialPageSize={25}
+        emptyMessage={t('pages.dynamicSources.history.empty')}
+      />
+    </div>
+  )
+}
+
+type ModalProps = {
+  source: DynamicTariffSource | null
+  onClose: () => void
+  /** The tariff this history was opened for, if any — see `TariffValidityContext`. */
+  tariff?: TariffValidityContext | null
+}
+
+/** The admin dynamic-sources table opens this out of context, from a row
+ * action rather than an already-open detail view — so unlike the tariff
+ * drawer, it still gets a modal around the same panel. */
+export function DynamicPriceHistoryModal({ source, onClose, tariff }: ModalProps) {
+  const { t } = useTranslation()
+  return (
     <FormModal
       isOpen={Boolean(source)}
       title={t('pages.dynamicSources.history.title', { label: source?.label ?? '' })}
       onClose={onClose}
       maxWidth="1000px"
     >
-      <div className="page-stack">
-        <div className="form-grid">
-          <label>
-            <span>{t('pages.dynamicSources.history.dateFrom')}</span>
-            <CivilDateInput
-              value={dateFrom}
-              onChange={(value) => setDateFrom(value ?? '')}
-              minDate={validityMin}
-              maxDate={validityMax}
-            />
-          </label>
-          <label>
-            <span>{t('pages.dynamicSources.history.dateTo')}</span>
-            <CivilDateInput
-              value={dateTo}
-              onChange={(value) => setDateTo(value ?? '')}
-              minDate={validityMin}
-              maxDate={validityMax}
-            />
-          </label>
-        </div>
-
-        {tariff && (
-          <p className="muted" style={{ margin: 0 }}>
-            {t('pages.dynamicSources.history.validityScope', {
-              from: formatShortDate(tariff.valid_from, settings),
-              to: tariff.valid_to ? formatShortDate(tariff.valid_to, settings) : t('pages.tariffs.openEnded'),
-            })}
-            {hasFloor && ` ${t('pages.dynamicSources.history.minimumApplied', {
-              price: Number(tariff.minimum_price_chf_per_kwh).toFixed(5),
-            })}`}
-          </p>
-        )}
-
-        {historyQuery.isError && <div className="error-banner">{t('pages.dynamicSources.history.loadError')}</div>}
-
-        {stats && (
-          <div className="kpi-row">
-            <StatCard label={t('pages.dynamicSources.history.points')} value={stats.point_count} flat />
-            <StatCard
-              label={t('pages.dynamicSources.history.average')}
-              value={stats.average_chf_per_kwh == null ? '—' : Number(stats.average_chf_per_kwh).toFixed(5)}
-              flat
-            />
-            <StatCard label={t('pages.dynamicSources.history.negative')} value={stats.negative_count} flat />
-            <StatCard
-              label={t('pages.dynamicSources.history.gaps')}
-              value={stats.gap_count}
-              tone={stats.gap_count > 0 ? 'warning' : 'success'}
-            />
-          </div>
-        )}
-
-        {chartData.length > 0 && (
-          <section className="card">
-            <ResponsiveContainer width="100%" height={280}>
-              <LineChart data={chartData} margin={{ top: 8, right: 18, left: 8, bottom: 8 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke={CHART_GRIDLINE} />
-                <XAxis
-                  dataKey="timestamp"
-                  type="number"
-                  scale="time"
-                  domain={['dataMin', 'dataMax']}
-                  tickFormatter={(value: number) => formatDateTime(new Date(value).toISOString(), settings)}
-                  stroke={AXIS_COLOR}
-                  fontSize={11}
-                  minTickGap={48}
-                />
-                <YAxis stroke={AXIS_COLOR} fontSize={11} width={64} tickFormatter={(value) => Number(value).toFixed(3)} />
-                <Tooltip
-                  labelFormatter={(value) => formatDateTime(new Date(Number(value)).toISOString(), settings)}
-                  formatter={(value) => [`${Number(value).toFixed(5)} CHF/kWh`, t('pages.dynamicSources.history.price')]}
-                />
-                <Line
-                  dataKey="price"
-                  type="stepAfter"
-                  stroke={CONS_COLORS[0]}
-                  dot={false}
-                  activeDot={{ r: 4 }}
-                  isAnimationActive={false}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </section>
-        )}
-
-        {historyQuery.data && historyQuery.data.gaps.length > 0 && (
-          <section className="warning-banner">
-            <strong>{t('pages.dynamicSources.history.gapTitle')}</strong>
-            <ul>
-              {historyQuery.data.gaps.map((gap) => (
-                <li key={gap.from}>{formatDateTime(gap.from, settings)} – {formatDateTime(gap.to, settings)}</li>
-              ))}
-            </ul>
-          </section>
-        )}
-
-        <DataTable
-          data={points}
-          columns={columns}
-          getRowId={(point) => point.valid_from}
-          loading={historyQuery.isLoading}
-          initialPageSize={25}
-          emptyMessage={t('pages.dynamicSources.history.empty')}
-        />
-      </div>
+      {source && <DynamicPriceHistoryPanel source={source} tariff={tariff} />}
     </FormModal>
   )
 }

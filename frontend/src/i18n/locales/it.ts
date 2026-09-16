@@ -153,8 +153,6 @@ export const it = {
         back: 'Torna alla dashboard',
         close: 'Chiudi',
         openPdf: 'Apri PDF',
-        showDetails: 'Mostra dettagli',
-        hideDetails: 'Nascondi dettagli',
         periodSelector: {
             currentPeriod: 'Periodo corrente',
             custom: 'Personalizzato',
@@ -1213,6 +1211,7 @@ export const it = {
             createPeriodTitle: 'Crea periodo tariffario',
             savePeriod: 'Salva periodo tariffario',
             createPeriod: 'Crea periodo tariffario',
+            viewDetails: 'Visualizza dettagli',
             col: {
                 pricing: 'Prezzi',
             },

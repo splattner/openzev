@@ -162,8 +162,6 @@ export const en = {
         back: 'Back to dashboard',
         close: 'Close',
         openPdf: 'Open PDF',
-        showDetails: 'Show details',
-        hideDetails: 'Hide details',
         periodSelector: {
             currentPeriod: 'Current period',
             custom: 'Custom',
@@ -1224,6 +1222,7 @@ export const en = {
             createPeriodTitle: 'Create Tariff Period',
             savePeriod: 'Save Tariff Period',
             createPeriod: 'Create Tariff Period',
+            viewDetails: 'View details',
             col: {
                 pricing: 'Pricing',
             },

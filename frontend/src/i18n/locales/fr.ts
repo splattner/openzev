@@ -153,8 +153,6 @@ export const fr = {
         back: 'Retour au tableau de bord',
         close: 'Fermer',
         openPdf: 'Ouvrir le PDF',
-        showDetails: 'Afficher les détails',
-        hideDetails: 'Masquer les détails',
         periodSelector: {
             currentPeriod: 'Période actuelle',
             custom: 'Personnalisée',
@@ -1213,6 +1211,7 @@ export const fr = {
             createPeriodTitle: 'Créer une période tarifaire',
             savePeriod: 'Enregistrer la période tarifaire',
             createPeriod: 'Créer la période tarifaire',
+            viewDetails: 'Voir les détails',
             col: {
                 pricing: 'Tarification',
             },

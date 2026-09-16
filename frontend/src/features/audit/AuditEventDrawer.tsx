@@ -55,11 +55,17 @@ export function AuditEventDrawer({ eventId, onClose, statusBadgeClass }: AuditEv
             opened={Boolean(eventId)}
             onClose={onClose}
             position="right"
+            // Sizing goes through `size`, not `styles.content.width`: the
+            // drawer's own CSS sets `flex: 0 0 var(--drawer-size)`, and
+            // flex-basis wins over a plain `width` override, so the latter was
+            // silently ignored and this drawer rendered at Mantine's 440px
+            // default instead of the intended 560px.
+            size="min(100vw, 560px)"
             withCloseButton={false}
             trapFocus={false}
             lockScroll={false}
             styles={{
-                content: { width: 'min(100vw, 560px)', pointerEvents: 'auto', boxShadow: '-8px 0 24px -12px rgba(0, 0, 0, 0.35)' },
+                content: { pointerEvents: 'auto', boxShadow: '-8px 0 24px -12px rgba(0, 0, 0, 0.35)' },
                 inner: { padding: 0 },
                 root: { pointerEvents: 'none' },
             }}
