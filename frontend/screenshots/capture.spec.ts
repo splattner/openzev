@@ -232,53 +232,52 @@ test.describe('User Guide Screenshots', () => {
     await screenshotFull(page, '07-tariffs')
   })
 
-  // 07b — A tariff's version history and price chart, both behind the expander
+  // 07b — A tariff's version history and price chart, both in its detail
+  // drawer (opened from the card, but rendered as a page-level sibling —
+  // not inside article.tariff-card — so it's located from `page`, not `card`).
   test('07b-tariff-versions', async ({ page }) => {
     await navigateTo(page, '/tariffs')
     const card = page.locator('article.tariff-card').filter({ hasText: 'Grid Energy HT/NT' }).first()
     await card.waitFor({ timeout: 10_000 })
-    // The expander is the only button on the card carrying aria-expanded.
+    // "View details" is the only button on the card carrying aria-expanded.
     await card.getByRole('button', { expanded: false }).click()
+    const drawer = page.locator('.tariff-drawer')
     // Waiting on the chart rather than the history: it renders only for a series
     // with more than one version, so it also asserts the seed still has them.
-    await card.locator('.tariff-price-history').waitFor({ timeout: 10_000 })
+    await drawer.locator('.tariff-price-history').waitFor({ timeout: 10_000 })
     await page.waitForTimeout(1000)  // let Recharts finish laying out
     await screenshotFull(page, '07b-tariff-versions')
   })
 
-  // 07d — A dynamic tariff's card, expanded to show its Dynamic badge and
-  // fetched-price section. Requires a tariff named "Netznutzung dynamisch"
-  // linked to a real dynamic source — seed_demo does not create this on its
-  // own; the checked-in screenshot was captured against a source manually
-  // configured for Groupe E's public vario grid endpoint
-  // (https://api.tariffs.groupe-e.ch/v2/tariffs, tariff_type=grid), created
-  // through the ordinary two-step wizard / POST .../dynamic-sources/ and
-  // linked to a tariff on the demo ZEV. Re-running this against a stack
-  // without that fixture will time out on the card lookup below.
+  // 07d — A dynamic tariff's detail drawer, showing its Dynamic badge and
+  // fetched-price section (stats, chart and point table render inline now,
+  // no separate click into a modal — see 07e's removal below). Requires a
+  // tariff named "Netznutzung dynamisch" linked to a real dynamic source —
+  // seed_demo does not create this on its own; the checked-in screenshot was
+  // captured against a source manually configured for Groupe E's public
+  // vario grid endpoint (https://api.tariffs.groupe-e.ch/v2/tariffs,
+  // tariff_type=grid), created through the ordinary two-step wizard / POST
+  // .../dynamic-sources/ and linked to a tariff on the demo ZEV. Re-running
+  // this against a stack without that fixture will time out on the card
+  // lookup below.
   test('07d-tariff-dynamic-source', async ({ page }) => {
     await navigateTo(page, '/tariffs')
     const card = page.locator('article.tariff-card').filter({ hasText: 'Netznutzung dynamisch' }).first()
     await card.waitFor({ timeout: 10_000 })
     await card.getByRole('button', { expanded: false }).click()
-    await card.locator('.tariff-period-section').filter({ hasText: /price|preis/i }).waitFor({ timeout: 10_000 })
-    await page.waitForTimeout(500)
+    const drawer = page.locator('.tariff-drawer')
+    await drawer.locator('.tariff-period-section').filter({ hasText: /price|preis/i }).waitFor({ timeout: 10_000 })
+    // Let the inline price-history panel's own chart finish laying out too —
+    // it fetches and renders as part of this same drawer now.
+    await page.waitForTimeout(1000)
     await screenshotFull(page, '07d-tariff-dynamic-source')
   })
 
-  // 07e — The fetched-price history modal opened from that same card: chart,
-  // stats, and coverage. Same fixture requirement as 07d above.
-  test('07e-dynamic-price-history', async ({ page }) => {
-    await navigateTo(page, '/tariffs')
-    const card = page.locator('article.tariff-card').filter({ hasText: 'Netznutzung dynamisch' }).first()
-    await card.waitFor({ timeout: 10_000 })
-    await card.getByRole('button', { expanded: false }).click()
-    const openHistory = card.getByRole('button', { name: /view prices|preise anzeigen|voir les prix|visualizza prezzi/i })
-    await openHistory.waitFor({ timeout: 10_000 })
-    await openHistory.click()
-    await page.waitForSelector('.kpi-row', { timeout: 10_000 })
-    await page.waitForTimeout(1000)  // let Recharts finish laying out
-    await screenshotFull(page, '07e-dynamic-price-history')
-  })
+  // 07e was the fetched-price history modal opened from a dynamic tariff's
+  // card: chart, stats, coverage. That modal is gone — the same content now
+  // renders inline in the drawer 07d already captures — so there is nothing
+  // left for a separate shot to show. Removed along with
+  // 07e-dynamic-price-history.png.
 
   // 08 — Invoices (period overview)
   test('08-invoices', async ({ page }) => {

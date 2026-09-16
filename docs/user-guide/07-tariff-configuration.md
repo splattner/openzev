@@ -479,8 +479,8 @@ Default periods:
 
 Create custom periods if your ZEV has different peak hours:
 
-1. Edit a tariff
-2. Click **Add Period**
+1. Open the tariff's detail panel (**View details**)
+2. Click **Add Period** in the Tariff Periods section
 3. Enter:
    - **Name** — Period identifier (e.g., "Winter Peak")
    - **Start Time** — HH:MM (24-hour format)
@@ -523,7 +523,8 @@ Local Energy                                    ← one tariff, three versions
 
 ### Adding a New Version
 
-1. Find the tariff and click **New version**
+1. Find the tariff, click **View details** to open its detail panel, then
+   click **New version**
 2. Enter the date the new prices take effect (defaults to today)
 3. Adjust the prices (pre-filled from the current version)
 4. Click **Create**
@@ -544,24 +545,30 @@ both sides.
 ### Comparing Versions
 
 The Tariffs page shows **one card per tariff**, displaying what it costs *today*
-rather than a card per version. A badge tells you how many versions it has. Click
-**Show details** for the rest.
+rather than a card per version. A badge tells you how many versions it has.
+Click **View details** to open a panel on the right with everything else:
+version history, the price chart, price bands, and notes.
 
-**Version history** lists every version with its window and price. Click one to
-make the card show that version — its price bands and periods switch to the ones
-in force then, and a **Viewing an older version** badge appears so you can't
-mistake a historical rate for the current one. Click the active version to go
+**Version history** lists every version with its window and price. Click one
+to make the *panel* show that version — its price bands switch to the ones in
+force then, and a **Viewing an older version** badge appears so you can't
+mistake a historical rate for the current one. The card behind the panel keeps
+showing the active version throughout, so switching versions to look something
+up never changes what the list itself reports. Click the active version to go
 back.
 
 Each row has its own edit and delete buttons, because correcting a superseded
 version's end date is a normal follow-up to adding a new one.
 
+The panel stays open across a page reload or a shared link — the URL records
+which tariff and version you're looking at.
+
 ![Tariff version history and price chart](screenshots/07b-tariff-versions.png)
 
 ### Price History
 
-Once a tariff has **more than one version**, expanding it also charts how its
-price moved over time.
+Once a tariff has **more than one version**, its detail panel also charts how
+its price moved over time.
 
 - The line is **stepped**, not sloped — a price holds for its whole window and
   then jumps. A sloped line would suggest it drifted between two Januaries.
@@ -577,12 +584,12 @@ price moved over time.
 
 Renaming is done for the **whole tariff**, not per version — the name is what
 holds the versions together, so renaming just one would split it into two
-unrelated tariffs. **Rename** sits in the version history header, and tells you
-how many versions it will affect.
+unrelated tariffs. **Rename** sits at the top of the detail panel, and tells
+you how many versions it will affect.
 
 ### Duplicating
 
-Use **Duplicate** (also in the version history header) to create a *different*
+Use **Duplicate** (also at the top of the detail panel) to create a *different*
 tariff starting from an existing one's numbers. It asks for a new name and leaves
 the original untouched. (Use **New version** instead when the prices of the
 *same* tariff have changed.)
