@@ -1274,6 +1274,7 @@ export const en = {
                 dynamicSourceNone: '— Use fixed bands instead —',
                 dynamicSourceHint: 'Optional: price this tariff from a fetched time series instead of the bands below.',
                 dynamicSourceHintActive: 'Priced from the selected source’s fetched series. No bands are used.',
+                dynamicSourceBlockedByPeriods: 'This version already has price bands — remove them first, or use “New version” to switch to a dynamic source without touching this one.',
                 minimumPrice: 'Minimum price (CHF/kWh)',
                 minimumPricePlaceholder: 'e.g. 0.08000',
                 minimumPriceHint: 'Optional: the greater of the fetched price and this minimum is billed — for a feed-in clause such as “minimum price or the BFE reference market price, whichever is higher.”',

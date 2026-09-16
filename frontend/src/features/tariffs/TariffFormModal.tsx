@@ -10,7 +10,7 @@ import { FormModalFooter } from '../../components/FormModalFooter'
 import { CivilDateInput } from '../../components/CivilDateInput'
 import { fetchDynamicTariffSources } from '../../lib/api/tariffs'
 import { queryKeys } from '../../lib/api/queryKeys'
-import type { Tariff, TariffBillingMode, TariffInput } from '../../types/api'
+import type { Tariff, TariffBillingMode, TariffInput, TariffPeriod } from '../../types/api'
 import { dynamicSourceOptions, impliedEnergyType } from './dynamicSources'
 import { DynamicSourceFormModal } from './DynamicSourceFormModal'
 import {
@@ -38,7 +38,10 @@ type TariffFormModalProps = {
   title: string
   onClose: () => void
   onSubmit: (payload: TariffInput) => void
-  initialTariff?: Tariff
+  // Every caller actually passes a `TariffVersion` (the flattened `Tariff[]`
+  // lists upstream just don't say so) — `periods` is read to decide whether
+  // switching this version to a dynamic source is currently possible.
+  initialTariff?: Tariff & { periods?: TariffPeriod[] }
   selectedZevId: string
   isPending?: boolean
 }
@@ -80,6 +83,12 @@ export function TariffFormModal({
   // An existing tariff is one version of a series; its identity fields are
   // fixed. Creating a new tariff still sets them freely.
   const isVersion = Boolean(initialTariff)
+  // The backend refuses to link a dynamic source onto a version that already
+  // has price bands (and, symmetrically, to add a band to an already-dynamic
+  // version) — switching between the two happens by creating a new version
+  // instead. Disabling the picker here surfaces that up front rather than
+  // letting the pick fail at submit with a raw field-name toast.
+  const hasExistingPeriods = isVersion && (initialTariff?.periods?.length ?? 0) > 0
 
   // Fetched once per modal session, not gated on billing_mode: the picker
   // only *renders* for an energy tariff, but the list has to be ready by
@@ -200,16 +209,18 @@ export function TariffFormModal({
           <div style={{ gridColumn: '1 / -1', display: 'grid', gap: '0.5rem' }}>
             <label>
               <span>{t('pages.tariffs.form.dynamicSource')}</span>
-              <select {...form.register('dynamic_source')} disabled={sourcesQuery.isLoading}>
+              <select {...form.register('dynamic_source')} disabled={sourcesQuery.isLoading || hasExistingPeriods}>
                 <option value="">{t('pages.tariffs.form.dynamicSourceNone')}</option>
                 {availableSources.map((source) => (
                   <option key={source.id} value={source.id}>{source.label}</option>
                 ))}
               </select>
               <small className="muted">
-                {dynamicSourceId
-                  ? t('pages.tariffs.form.dynamicSourceHintActive')
-                  : t('pages.tariffs.form.dynamicSourceHint')}
+                {hasExistingPeriods
+                  ? t('pages.tariffs.form.dynamicSourceBlockedByPeriods')
+                  : dynamicSourceId
+                    ? t('pages.tariffs.form.dynamicSourceHintActive')
+                    : t('pages.tariffs.form.dynamicSourceHint')}
               </small>
             </label>
             {energyType === 'feed_in' && dynamicSourceId && (

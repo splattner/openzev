@@ -1263,6 +1263,7 @@ export const it = {
                 dynamicSourceNone: '— Usa fasce fisse —',
                 dynamicSourceHint: 'Facoltativo: tariffare questa tariffa in base a una serie storica recuperata anziché alle fasce sottostanti.',
                 dynamicSourceHintActive: 'Tariffata in base alla serie recuperata della fonte selezionata. Non vengono usate fasce.',
+                dynamicSourceBlockedByPeriods: 'Questa versione ha già fasce tariffarie — rimuovile prima, oppure usa «Nuova versione» per passare a una fonte dinamica senza modificare questa versione.',
                 minimumPrice: 'Prezzo minimo (CHF/kWh)',
                 minimumPricePlaceholder: 'es. 0.08000',
                 minimumPriceHint: 'Facoltativo: viene fatturato l’importo più alto tra il prezzo recuperato e questo minimo — ad esempio per una clausola «prezzo minimo o prezzo di mercato di riferimento UFE, il più alto dei due».',

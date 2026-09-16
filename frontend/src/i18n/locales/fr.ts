@@ -1263,6 +1263,7 @@ export const fr = {
                 dynamicSourceNone: '— Utiliser des tarifs fixes —',
                 dynamicSourceHint: 'Facultatif : facturer ce tarif à partir d’une série temporelle récupérée plutôt que des tarifs ci-dessous.',
                 dynamicSourceHintActive: 'Facturé à partir de la série récupérée de la source sélectionnée. Aucun tarif fixe n’est utilisé.',
+                dynamicSourceBlockedByPeriods: 'Cette version a déjà des tranches tarifaires — supprimez-les d’abord, ou utilisez « Nouvelle version » pour passer à une source dynamique sans modifier cette version.',
                 minimumPrice: 'Prix minimum (CHF/kWh)',
                 minimumPricePlaceholder: 'p. ex. 0.08000',
                 minimumPriceHint: 'Facultatif : le montant le plus élevé entre le prix récupéré et ce minimum est facturé — pour une clause de reprise du type « prix minimum ou prix de marché de référence de l’OFEN, le plus élevé des deux ».',

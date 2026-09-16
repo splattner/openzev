@@ -1263,6 +1263,7 @@ export const de = {
                 dynamicSourceNone: '— Feste Bänder verwenden —',
                 dynamicSourceHint: 'Optional: diesen Tarif anhand einer abgerufenen Zeitreihe statt der untenstehenden Bänder bepreisen.',
                 dynamicSourceHintActive: 'Wird anhand der abgerufenen Zeitreihe der gewählten Quelle bepreist. Es werden keine Bänder verwendet.',
+                dynamicSourceBlockedByPeriods: 'Diese Version hat bereits Tarifbänder – entfernen Sie diese zuerst, oder verwenden Sie „Neue Version“, um zu einer dynamischen Quelle zu wechseln, ohne diese Version zu ändern.',
                 createDynamicSource: 'Neue dynamische Quelle erstellen',
                 minimumPrice: 'Mindestpreis (CHF/kWh)',
                 minimumPricePlaceholder: 'z. B. 0.08000',
