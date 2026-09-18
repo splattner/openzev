@@ -354,6 +354,8 @@ Helper `accounts.views._make_jwt_for_user(user) -> dict` adds custom claims (als
 
 **Frontend:** `frontend/src/lib/api/client.ts` `api = axios.create({withCredentials:true, xsrfCookieName:'csrftoken', xsrfHeaderName:'X-CSRFToken'})` scoped to instance (no `axios.defaults`).
 
+**Audit:** `CustomTokenObtainPairView.post` records an `AuditActionCategory.AUTH` event on every attempt rather than delegating to `TokenObtainPairView.post` unmodified — a successful login records `auth.login` (`status=success`, the authenticated user as both actor and target); a wrong password, unknown username, or inactive account each record `auth.login_failed` (`status=failed`, no actor — the caller proved nothing) with the attempted `email`/`username` value in `target_display` so a credential-stuffing pattern is visible without correlating requests by IP alone. The failure reason is deliberately not distinguished in the response (`CustomTokenObtainPairSerializer`'s generic "no active account" message) or in the audit event itself, to avoid the audit log becoming an oracle for account enumeration.
+
 ### 5.2 Self-registration (zev_owner)
 
 **Endpoint:** `POST /api/v1/auth/register/` (AllowAny)
@@ -1089,13 +1091,14 @@ interface ParticipantAccountCreateResult { participant: Participant; account: Us
 Line counts are not tracked here — they drift with every change. The inventory
 lists the test classes per module (test counts are the `test_*` methods).
 
-**`accounts/tests.py`** (15 test classes):
+**`accounts/tests.py`** (16 test classes):
 
 | Class | Tests | Description |
 |---|---|---|
 | `UserModelTests` | 3 | Role helper properties; superuser creation sets `role=ADMIN`; superuser creation rejects non-admin role |
 | `PasswordChangeFlagTests` | 1 | `must_change_password` cleared on password change |
 | `TokenLoginCredentialTests` | 1 | Email login issues httpOnly cookie JWTs instead of a response body token |
+| `PasswordLoginAuditTests` | 5 | Successful login records `auth.login` with the user as actor and target; wrong password, unknown username, and inactive account each record `auth.login_failed` (status `failed`, no actor) with the attempted identifier in `target_display`; a request with no identifier is still audited |
 | `RegistrationTests` | 4 | Self-registration accepts email only and generates a username; creates an inactive `zev_owner`; verification activates the account; disabled registration is refused |
 | `FeatureFlagsApiTests` | 5 | Anonymous 401 and non-admin 403 on list; admin can list and toggle; defaults sync on read |
 | `ImpersonationTests` | 4 | Admin can impersonate participant/owner; non-admin blocked; admin cannot impersonate admin |

@@ -2,7 +2,7 @@ from rest_framework import generics, status
 from rest_framework.decorators import api_view, authentication_classes, permission_classes, throttle_classes
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
-from rest_framework.exceptions import PermissionDenied, ValidationError
+from rest_framework.exceptions import AuthenticationFailed, PermissionDenied, ValidationError
 from rest_framework.views import APIView
 import logging
 import secrets
@@ -12,7 +12,7 @@ from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.core.mail import EmailMessage
 from django.utils import timezone
-from rest_framework_simplejwt.exceptions import TokenError
+from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
 from rest_framework_simplejwt.serializers import TokenRefreshSerializer
 from rest_framework_simplejwt.views import TokenObtainPairView
 from .api_keys import default_api_key_expiry, generate_key
@@ -57,11 +57,55 @@ class CustomTokenObtainPairView(TokenObtainPairView):
     throttle_classes = [AuthLoginThrottle]
 
     def post(self, request, *args, **kwargs):
-        response = super().post(request, *args, **kwargs)
-        if response.status_code == 200:
-            set_auth_cookies(request, response, access=response.data["access"], refresh=response.data["refresh"])
-            response.data = {"detail": "Login successful."}
+        # Reimplements TokenObtainPairView.post rather than wrapping it: the
+        # serializer instance is the only place the attempted username lives
+        # (on failure) or the authenticated user lives (on success,
+        # ``serializer.user``), and both are needed for the audit event below.
+        serializer = self.get_serializer(data=request.data)
+        try:
+            serializer.is_valid(raise_exception=True)
+        except TokenError as exc:
+            self._record_login_failed(request)
+            raise InvalidToken(exc.args[0]) from exc
+        except (AuthenticationFailed, ValidationError):
+            self._record_login_failed(request)
+            raise
+
+        response = Response({"detail": "Login successful."})
+        set_auth_cookies(
+            request, response,
+            access=serializer.validated_data["access"],
+            refresh=serializer.validated_data["refresh"],
+        )
+        record_audit_event(
+            request=request,
+            action_category=AuditActionCategory.AUTH,
+            action_type="auth.login",
+            target_type="accounts.User",
+            target=serializer.user,
+            target_id=str(serializer.user.pk),
+            target_display=serializer.user.email or serializer.user.username,
+            summary=f"Password login succeeded for {serializer.user.email or serializer.user.username}.",
+            user=serializer.user,
+        )
         return response
+
+    def _record_login_failed(self, request):
+        # Wrong password, unknown user, and inactive user all surface as the
+        # same generic failure to the caller (see CustomTokenObtainPairSerializer's
+        # own "no_active_account" fallback) so an attacker cannot distinguish
+        # them — but internally the audit trail keeps the attempted identifier
+        # for anyone reviewing a credential-stuffing pattern.
+        identifier = str((request.data or {}).get("email") or (request.data or {}).get("username") or "").strip()
+        record_audit_event(
+            request=request,
+            action_category=AuditActionCategory.AUTH,
+            action_type="auth.login_failed",
+            target_type="accounts.User",
+            target_display=identifier,
+            summary=f"Password login failed for {identifier or '(no identifier supplied)'}.",
+            status=AuditEventStatus.FAILED,
+        )
 
 
 class CookieTokenRefreshView(APIView):

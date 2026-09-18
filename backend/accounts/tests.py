@@ -16,7 +16,7 @@ from .models import (
 	UserRole,
 	VatRate,
 )
-from audit.models import AuditEvent
+from audit.models import AuditActionCategory, AuditEvent, AuditEventStatus
 from invoices.models import Invoice, InvoiceStatus
 from zev.models import MeteringPoint, MeteringPointAssignment, MeteringPointType, Participant, Zev
 from datetime import date, timedelta
@@ -112,6 +112,95 @@ class TokenLoginCredentialTests(TestCase):
 		self.assertIn("openzev_refresh", resp.cookies)
 		self.assertNotIn("access", resp.data)
 		self.assertNotIn("refresh", resp.data)
+
+
+class PasswordLoginAuditTests(TestCase):
+	def test_a_successful_login_is_audited(self):
+		client = APIClient()
+		user = User.objects.create_user(
+			username="audit_login_ok",
+			email="audit-login-ok@example.com",
+			password="pass1234",
+			role=UserRole.PARTICIPANT,
+		)
+
+		resp = client.post(
+			"/api/v1/auth/token/",
+			{"username": user.username, "password": "pass1234"},
+		)
+
+		self.assertEqual(resp.status_code, 200)
+		event = AuditEvent.objects.get(action_type="auth.login")
+		self.assertEqual(event.action_category, AuditActionCategory.AUTH)
+		self.assertEqual(event.status, AuditEventStatus.SUCCESS)
+		self.assertEqual(event.target_id, str(user.pk))
+		self.assertEqual(event.target_display, user.email)
+		self.assertEqual(event.actor_user_id, user.pk)
+
+	def test_a_wrong_password_is_audited_without_revealing_which_part_was_wrong(self):
+		client = APIClient()
+		user = User.objects.create_user(
+			username="audit_login_badpass",
+			email="audit-login-badpass@example.com",
+			password="pass1234",
+			role=UserRole.PARTICIPANT,
+		)
+
+		resp = client.post(
+			"/api/v1/auth/token/",
+			{"username": user.username, "password": "wrong-password"},
+		)
+
+		self.assertEqual(resp.status_code, 401)
+		event = AuditEvent.objects.get(action_type="auth.login_failed")
+		self.assertEqual(event.action_category, AuditActionCategory.AUTH)
+		self.assertEqual(event.status, AuditEventStatus.FAILED)
+		self.assertEqual(event.target_display, user.username)
+		# No account is attributed as actor — this is exactly the caller,
+		# authenticated or not, that failed to prove who it is.
+		self.assertIsNone(event.actor_user_id)
+
+	def test_an_unknown_username_is_audited_with_the_attempted_identifier(self):
+		client = APIClient()
+
+		resp = client.post(
+			"/api/v1/auth/token/",
+			{"username": "nobody-like-this", "password": "whatever1234"},
+		)
+
+		self.assertEqual(resp.status_code, 401)
+		event = AuditEvent.objects.get(action_type="auth.login_failed")
+		self.assertEqual(event.target_display, "nobody-like-this")
+
+	def test_an_inactive_account_login_is_audited_as_a_failure(self):
+		"""Django's ModelBackend rejects inactive users the same way as a
+		wrong password — deliberately indistinguishable to the caller, but
+		still worth an audit row."""
+		client = APIClient()
+		user = User.objects.create_user(
+			username="audit_login_inactive",
+			password="pass1234",
+			role=UserRole.PARTICIPANT,
+			is_active=False,
+		)
+
+		resp = client.post(
+			"/api/v1/auth/token/",
+			{"username": user.username, "password": "pass1234"},
+		)
+
+		self.assertEqual(resp.status_code, 401)
+		event = AuditEvent.objects.get(action_type="auth.login_failed")
+		self.assertEqual(event.target_display, user.username)
+
+	def test_a_request_with_no_identifier_is_still_audited(self):
+		client = APIClient()
+
+		resp = client.post("/api/v1/auth/token/", {"password": "whatever1234"})
+
+		self.assertEqual(resp.status_code, 400)
+		event = AuditEvent.objects.get(action_type="auth.login_failed")
+		self.assertEqual(event.target_display, "")
 
 
 class RegistrationTests(TestCase):
