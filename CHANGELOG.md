@@ -1,5 +1,22 @@
 # Changelog
 
+## [1.15.0](https://github.com/splattner/openzev/compare/v1.14.0...v1.15.0) (2026-09-18)
+
+
+### Features
+
+* **accounts:** audit password login attempts ([#741](https://github.com/splattner/openzev/issues/741)) ([e7aa0e4](https://github.com/splattner/openzev/commit/e7aa0e4d4c664fcb651b8b65bd51b65f80c18e78))
+* **accounts:** seed Swiss VAT history via data migration ([#736](https://github.com/splattner/openzev/issues/736)) ([948095e](https://github.com/splattner/openzev/commit/948095eddd7f72a4bc8f96806848d5fecc5c8827))
+* **frontend:** adopt Swiss number formatting at display boundaries ([#737](https://github.com/splattner/openzev/issues/737)) ([24b77c1](https://github.com/splattner/openzev/commit/24b77c11a5fde9be59c025ec0a0271fd20858cc6))
+* **tariffs:** replace in-card expand with a detail drawer ([#729](https://github.com/splattner/openzev/issues/729)) ([d79a149](https://github.com/splattner/openzev/commit/d79a149a4b2a05dcfff55632373b4252795fc835))
+
+
+### Bug Fixes
+
+* **invoices:** close the workflow status-transition race ([#572](https://github.com/splattner/openzev/issues/572)) ([#738](https://github.com/splattner/openzev/issues/738)) ([d356d57](https://github.com/splattner/openzev/commit/d356d571982399b4628bdb9a502279b2ca8f1e27))
+* **invoices:** don't retry a successfully sent invoice email ([#576](https://github.com/splattner/openzev/issues/576)) ([#739](https://github.com/splattner/openzev/issues/739)) ([5cb32a0](https://github.com/splattner/openzev/commit/5cb32a018bf96e7adcf0ab47b995062410bf146d))
+* **tariffs:** disable dynamic-source picker on a version with bands ([#732](https://github.com/splattner/openzev/issues/732)) ([e344246](https://github.com/splattner/openzev/commit/e34424668138c4afe0ea94624567b92359bcc25f))
+
 ## [1.14.0](https://github.com/splattner/openzev/compare/v1.13.0...v1.14.0) (2026-09-15)
 
 
