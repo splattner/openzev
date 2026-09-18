@@ -123,7 +123,7 @@ jobs:
             - name: Run tests with coverage
               run: python -m pytest --cov --cov-report=term-missing --cov-report=xml
 
-            - name: Verify PostgreSQL price retention and concurrency
+            - name: Verify PostgreSQL retention and concurrency
               env:
                   DATABASE_URL: postgres://openzev:openzev@localhost:5432/openzev
-              run: python -m pytest -n 2 invoices/test_dynamic_evidence.py tariffs/test_dynamic_fetch.py zev/test_transfer.py
+              run: python -m pytest -n 2 invoices/test_dynamic_evidence.py tariffs/test_dynamic_fetch.py zev/test_transfer.py invoices/test_workflow.py

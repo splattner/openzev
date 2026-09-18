@@ -250,6 +250,24 @@ Guard violations raise `InvoiceWorkflowError`; views translate this into a
 email task's approved→sent auto-transition uses `record_email_delivery` from
 the same module.
 
+**Concurrency (#572).** Every transition above re-reads and locks the row
+(`SELECT ... FOR UPDATE` inside one transaction) and decides against that
+committed status, never against whatever status the caller's already-loaded
+`Invoice` instance happened to hold. Two overlapping calls — two requests, or
+a request racing the email task's delayed `record_email_delivery` — serialize
+on the row lock instead of racing: the second sees the first one's committed
+result and is refused (or, for `record_email_delivery`, simply leaves the
+status alone) rather than silently overwriting it. This closes two concrete
+failures: a stale `cancel_invoice` un-cancelling a `paid` invoice, and a
+delayed email delivery resurrecting a `cancelled` one back to `sent`. The
+lock is acquired inside `record_email_delivery` itself, *after* the task's
+SMTP send has already completed — never held across it. On SQLite (used for
+the default local/CI test run) `SELECT ... FOR UPDATE` is a silent no-op;
+correctness still holds there because each call re-reads the row rather than
+trusting the caller's instance, and the sequential test scenarios below don't
+need real locking to demonstrate that. Genuine concurrent-transaction
+coverage runs against PostgreSQL only (§13, `test_workflow.py`).
+
 ### 5.4 PDF and email
 
 | Method | URL | Permission | Description |
@@ -902,6 +920,8 @@ the cockpit readiness and attention caches.
 | `tests.py` | `InvoiceBillingIntegrationTests` | §5.2: end-to-end generation via API with metering data; allocation failures reported as 400, not the 409 duplicate-invoice message |
 | `test_workflow.py` | `InvoiceWorkflowTests` | §4.2: approve draft ✓, approve non-draft ✗, mark-sent from approved ✓, mark-sent from draft ✗, mark-paid from sent ✓, mark-paid from draft ✗, cancel from draft/approved/sent ✓, cancel from paid ✗, cancel already-cancelled ✗ |
 | `test_workflow.py` | `InvoiceEngineGuardTests` | §4.4: regenerate approved/paid → 409, regenerate draft/cancelled → success |
+| `test_workflow.py` | `StaleInstanceConcurrencyTests` | §5.3 concurrency (#572): a stale-in-memory `cancel_invoice`/`approve_invoice`/`mark_invoice_sent` cannot undo a transition another already-loaded instance committed first (a `paid` invoice survives a stale cancel, a `cancelled` one survives a stale mark-sent/approve); a stale `record_email_delivery` never raises and never resurrects a status past cancellation, but still records `sent_at` and reports the row's real prior status; a second stale cancel is reported as "already cancelled", not the original status |
+| `test_workflow.py` | `test_concurrent_cancel_and_mark_paid_serialize_on_the_row_lock` (PostgreSQL only — CI's "Verify PostgreSQL retention and concurrency" step) | §5.3 concurrency (#572): two genuinely overlapping transactions — one holding the invoice row lock, the other running real `mark_invoice_paid` — serialize on that lock (verified via `pg_blocking_pids`) rather than racing; the second sees the first's committed `cancelled` status and correctly refuses |
 | `test_period_overview.py` | `InvoicePeriodOverviewTests` | §5.5: metering completeness, missing-day detection, partial-assignment windows, no-assignment exclusion, cross-ZEV permission denial |
 | `test_period_overview_unit.py` | `ComputePeriodOverviewTests` (10 tests) | §5.5 unit level: complete/incomplete participants, single missing day, exclusion without assignment, partial-assignment required-day windows and gaps, invoice period matching, row ordering, multiple-metering-point counts |
 | `test_readiness.py` | 20 test classes (96 tests) | §5.6a: cockpit period resolution, bulk parity and stable query count, exact historical periods, running-versus-ended lifecycle metadata, first-run/awaiting/caught-up states, structured step details, attention and RBAC |
