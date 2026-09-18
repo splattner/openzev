@@ -13,6 +13,7 @@ from unittest import mock
 import pytest
 from django.core.files.base import ContentFile
 
+from audit.models import AuditEvent, AuditEventStatus
 from invoices.models import EmailLog, InvoiceStatus
 from invoices.tasks import send_invoice_email_task
 from testing import factories
@@ -95,6 +96,51 @@ def test_send_failure_marks_log_failed_and_retries():
     invoice.refresh_from_db()
     # Status must NOT advance to SENT on failure.
     assert invoice.status == InvoiceStatus.APPROVED
+
+
+def test_bookkeeping_failure_after_successful_send_does_not_retry_or_resend(mailoutbox):
+    """#576 reproduction: SMTP succeeds, then record_email_delivery raises
+    (standing in for any post-delivery database write failing). The message
+    already went out — that must not be retried (a retry resends it) or
+    reported as an SMTP failure, and the task must still complete rather
+    than propagate the bookkeeping error as if the send itself had failed.
+    """
+    invoice = _approved_invoice_with_pdf()
+
+    with mock.patch(
+        "invoices.workflow.record_email_delivery", side_effect=RuntimeError("db down"),
+    ), mock.patch.object(
+        send_invoice_email_task, "retry", side_effect=AssertionError("must not retry a delivered email"),
+    ) as retry_mock:
+        # Completes without raising: a bookkeeping failure is caught and
+        # logged/audited here, not left to propagate as a task failure.
+        send_invoice_email_task.run(str(invoice.pk), "recipient@example.com")
+
+    retry_mock.assert_not_called()
+    # Exactly one email actually went out — no duplicate.
+    assert len(mailoutbox) == 1
+
+    log = EmailLog.objects.get(invoice=invoice)
+    # The send genuinely succeeded — the log must say so, not FAILED, both
+    # because it's true and because a FAILED log is what "Retry email" acts
+    # on: mislabelling it would let an operator trigger the actual resend
+    # this fix exists to prevent.
+    assert log.status == EmailLog.Status.SENT
+    assert log.sent_at is not None
+    assert log.error_message == ""
+
+    # record_email_delivery never committed, so the invoice status is a
+    # visible, correctable gap rather than silently wrong data — the same
+    # place it would be if this task had never run.
+    invoice.refresh_from_db()
+    assert invoice.status == InvoiceStatus.APPROVED
+    assert invoice.sent_at is None
+
+    event = AuditEvent.objects.filter(action_type="invoice.email_sent").latest("created_at")
+    assert event.status == AuditEventStatus.FAILED
+    assert "sent" in event.summary.lower()
+    assert "db down" in event.summary
+    assert event.metadata_json.get("delivered") is True
 
 
 def test_draft_invoice_stays_draft_after_send(mailoutbox):

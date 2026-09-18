@@ -16,8 +16,28 @@ Deliver invoice emails asynchronously via Celery tasks with persistent delivery 
 - Queue `send-email` operations as background tasks.
 - Ensure PDF exists before sending.
 - Record each send attempt in `EmailLog` (`pending`/`sent`/`failed` with error details).
-- Retry failed task execution up to configured task retry count.
+- Retry a **failed SMTP send** up to configured task retry count. Retrying
+  resends the message, so nothing past that point may trigger it — see
+  "Post-delivery bookkeeping is not part of the retried step" below.
 - Reflect latest email status in invoice UI and allow explicit retry from failed logs.
+
+### Post-delivery bookkeeping is not part of the retried step (#576)
+
+The SMTP send and everything after it (`EmailLog` → `sent`, the invoice's
+`approved` → `sent` transition, the success audit event) originally shared
+one exception handler, so a failure in any of those bookkeeping writes was
+indistinguishable from the send itself failing: the log was marked `failed`
+and the task retried, resending an email the recipient had already
+received. A `failed` `EmailLog` is also what the explicit-retry action
+checks for, so the mislabelling could additionally let an operator trigger a
+second manual resend.
+
+The send is now its own try/except; nothing after it can retry the task or
+mark the `EmailLog` `failed`. A bookkeeping failure there is logged and
+recorded as its own `FAILED` audit event (still naming the delivery as
+having happened, via `metadata.delivered = true`) instead, leaving a visible
+gap an operator resolves with the existing "Mark sent" action rather than a
+resend.
 
 ## Consequences
 

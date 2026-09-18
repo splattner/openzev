@@ -520,14 +520,29 @@ If custom template rendering fails (e.g. `KeyError` or `ValueError` from `format
 4. Render subject and body from ZEV templates (with fallback).
 5. Create `EmailLog` entry with `status = "pending"`.
 6. Build `EmailMessage` with PDF attachment (`invoice_{number}.pdf`, `application/pdf`).
-7. Call `email.send()`.
-8. **On success:**
-   - Update `EmailLog`: `status = "sent"`, `sent_at = now()`.
-   - Update `Invoice`: `sent_at = now()`.
-   - If invoice `status == approved` → **auto-transition to `sent`**.
-9. **On failure:**
+7. Call `email.send()` — the only step below that may retry the task.
+8. **On send failure** (steps 6–7 raise):
    - Update `EmailLog`: `status = "failed"`, `error_message = str(exc)`.
+   - Record a `FAILED` `invoice.email_sent` audit event.
    - Call `self.retry(exc=exc, countdown=60)` — up to 3 retries with 60s delay.
+9. **On send success**, the following bookkeeping runs in its own
+   try/except — no exception here calls `self.retry()` (which would resend
+   the already-delivered message) or marks the `EmailLog` `"failed"`
+   (`#576`; see ADR 0004):
+   - Update `EmailLog`: `status = "sent"`, `sent_at = now()`.
+   - `record_email_delivery(invoice, sent_at)`: update `Invoice.sent_at`;
+     if `status == approved` → **auto-transition to `sent`** (locked against
+     a concurrent status change — `#572`, §5.3).
+   - Record a `SUCCESS` `invoice.email_sent` audit event.
+10. **On a bookkeeping failure** (any write in step 9 raises): log the
+    exception and record a `FAILED` `invoice.email_sent` audit event whose
+    summary names the send as having succeeded and `metadata.delivered =
+    true`, distinguishing it from a step-8 send failure. Whatever step-9
+    write already committed (e.g. `EmailLog` reaching `"sent"` before
+    `record_email_delivery` raised) stays committed. The task then returns
+    normally — the underlying job (deliver the email) succeeded, only a
+    side effect around it didn't — leaving a visible gap an operator closes
+    with the existing "Mark sent" action rather than a resend.
 
 ### 7.3 Email retry
 
@@ -899,7 +914,7 @@ the cockpit readiness and attention caches.
 | Risk | Impact | Mitigation |
 |---|---|---|
 | Invalid state transitions exposed in UI/API | High | Centralized transition guards per endpoint + frontend button gating by status |
-| Duplicate or lost email sends | High | Per-attempt `EmailLog` audit trail, bounded retries (max 3), explicit retry endpoint |
+| Duplicate or lost email sends | High | Per-attempt `EmailLog` audit trail, bounded retries (max 3) scoped to the SMTP send only — a post-delivery bookkeeping failure cannot trigger one (`#576`) — explicit retry endpoint refuses an already-`sent` log |
 | Regeneration races with approval/sending | Medium | Lifecycle locking: only draft/cancelled invoices may be replaced (`@transaction.atomic`) |
 | QR-Rechnung generation failure | Low | Graceful skip with log warning; invoice renders without QR section |
 | PDF template corruption via admin API | Medium | Templates stored in DB; on-disk default always intact and recoverable via DELETE endpoint |
@@ -928,7 +943,7 @@ the cockpit readiness and attention caches.
 | `test_engine_edge_cases.py` | `InvoiceMathEdgeCaseTests` | Edge cases: monthly fee month-boundary counting, tariff validity windows, zero/negative fees, rounding |
 | `test_engine_edge_cases.py` | `InvoiceVatRateSelectionTests` | VAT rate active at period_end, zero VAT when no vat_number |
 | `test_email_formatting.py` | `InvoiceEmailFormattingTests` | §7.1–7.2: date format in email body, custom ZEV templates, auto-transition to sent |
-| `test_email_task.py` | 5 function-based tests | §7.2: missing invoice no-ops, no recipient skips with failed log, success records sent log and transitions status, failure marks log failed and retries, draft stays draft after send |
+| `test_email_task.py` | 6 function-based tests | §7.2: missing invoice no-ops, no recipient skips with failed log, success records sent log and transitions status, send failure marks log failed and retries, draft stays draft after send, a post-delivery bookkeeping failure (`#576`) leaves the log `sent` (not `failed`) with exactly one email sent, does not retry, leaves the invoice status as a visible gap, and records a distinct `FAILED` audit event naming the delivery as having happened |
 | `test_reports.py` | `AnnualStatementTests` (11), `FinancialSummaryTests` (6), `MalformedInputTests` (5), `AnnualStatementMonthlyDataTests` (3) | §5.4/§8.2: single-statement report permissions and self-service scoping, malformed/out-of-range input handling, financial-summary fallbacks, `/auth/me` label-vs-download agreement for multi-membership users, and per-timestamp monthly data attribution (ADR 0013). The whole-ZEV ZIP tests moved to `exports/tests.py` with the job flow |
 | `exports/tests.py` | `ExportJobCreateTests` (17), `ExportJobListTests` (4), `ExportJobRunnerTests` (11), `ExportJobDownloadTests` (6), `ExportJobSweepTests` (5), `AnnualStatementExportBuilderTests` (13), `AnnualStatementExportRealRenderTests` (1, slow) | §5.4/§8.1 (ADR 0017): `202` creation with year/participant validation and `queued` audit, unknown or malformed `zev_id` → `404`, in-flight dedupe on the full validated params dict across any matching active job (not just the newest), per-type audit display/summaries/metadata from `ExportDefinition`, enqueue-after-commit wiring, enqueue failure → `503` + `failed`, requester-scoped list/status/download (including loss of ZEV ownership), task-level soft/hard time limits, one-claim duplicate delivery, retention anchored at completion, late completion never resurrecting a swept-failed job, soft time limits aborting a mid-batch render without publishing a (partial) ZIP, partial → completed with `omitted.txt` manifest and counts, all-fail / unexpected / publish failures → `failed` without an artifact, expired → `410` + `expired` flag, sweep file deletion with metadata retention, stale running / lost queued recovery that never fails a job claimed meanwhile (backlog-safe queued window), ZIP entry byte-budget + sanitization rules with pk appended only on collisions (including a final guard against readable names mimicking a pk-suffixed entry), storage roundtrip, and one real-render end-to-end job |
 | `test_invoice_numbering.py` | `TestNumberingIsScopedToTheZev`, `TestDuplicatesWithinOneZevAreStillRejected` | §4.1: two ZEVs on the default `INV` prefix both bill and each counts from 1; a duplicate number within one ZEV is refused at the database level (`bulk_create` bypasses `save()`) |

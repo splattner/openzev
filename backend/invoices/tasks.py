@@ -98,6 +98,12 @@ def send_invoice_email_task(self, invoice_id: str, recipient_email: str = None):
         status=EmailLog.Status.PENDING,
     )
 
+    # The SMTP send itself is the only step that may retry (which resends the
+    # message) or mark this EmailLog FAILED — everything after it is
+    # bookkeeping around a delivery that has already, unambiguously,
+    # happened (#576). Keeping that in its own try/except means a failure in
+    # the invoice-status write or the audit log can no longer be mistaken
+    # for the send itself failing and cause a duplicate delivery.
     try:
         email = EmailMessage(subject=subject, body=body, to=[recipient])
         email.attach(
@@ -106,12 +112,33 @@ def send_invoice_email_task(self, invoice_id: str, recipient_email: str = None):
             "application/pdf",
         )
         email.send()
+    except Exception as exc:
+        log.status = EmailLog.Status.FAILED
+        log.error_message = str(exc)
+        log.save()
+        logger.error("Failed to send invoice %s: %s", invoice.invoice_number, exc)
+        record_audit_event(
+            action_category=AuditActionCategory.INVOICE,
+            action_type="invoice.email_sent",
+            target_type="invoices.Invoice",
+            target=invoice,
+            target_id=str(invoice.pk),
+            target_display=invoice.invoice_number,
+            summary=f"Invoice email send failed for {invoice.invoice_number}.",
+            status=AuditEventStatus.FAILED,
+            source=AuditEventSource.CELERY,
+            metadata={"recipient": recipient, "email_log_id": str(log.id), "error": str(exc)},
+        )
+        raise self.retry(exc=exc, countdown=60)
+
+    sent_at = djtimezone.now()
+    logger.info("Sent invoice %s to %s", invoice.invoice_number, recipient)
+    try:
         log.status = EmailLog.Status.SENT
-        log.sent_at = djtimezone.now()
+        log.sent_at = sent_at
         log.save()
 
-        previous_status = record_email_delivery(invoice, log.sent_at)
-        logger.info("Sent invoice %s to %s", invoice.invoice_number, recipient)
+        previous_status = record_email_delivery(invoice, sent_at)
         record_audit_event(
             action_category=AuditActionCategory.INVOICE,
             action_type="invoice.email_sent",
@@ -131,23 +158,43 @@ def send_invoice_email_task(self, invoice_id: str, recipient_email: str = None):
             metadata={"recipient": recipient, "email_log_id": str(log.id)},
         )
     except Exception as exc:
-        log.status = EmailLog.Status.FAILED
-        log.error_message = str(exc)
-        log.save()
-        logger.error("Failed to send invoice %s: %s", invoice.invoice_number, exc)
-        record_audit_event(
-            action_category=AuditActionCategory.INVOICE,
-            action_type="invoice.email_sent",
-            target_type="invoices.Invoice",
-            target=invoice,
-            target_id=str(invoice.pk),
-            target_display=invoice.invoice_number,
-            summary=f"Invoice email send failed for {invoice.invoice_number}.",
-            status=AuditEventStatus.FAILED,
-            source=AuditEventSource.CELERY,
-            metadata={"recipient": recipient, "email_log_id": str(log.id), "error": str(exc)},
+        # A known-successful delivery must not be retried (it would resend
+        # the message) or reported as an SMTP failure — whatever went wrong
+        # here happened after the recipient already has the invoice. Each
+        # write above that did commit (e.g. the log reaching SENT before
+        # record_email_delivery raised) stays committed rather than being
+        # rolled back, and whatever didn't is a visible, correctable gap:
+        # an operator can bring the invoice status in line by hand (the
+        # existing "Mark sent" action), same as if this task had never run.
+        logger.exception(
+            "Invoice %s was emailed to %s but post-delivery bookkeeping failed",
+            invoice.invoice_number, recipient,
         )
-        raise self.retry(exc=exc, countdown=60)
+        try:
+            record_audit_event(
+                action_category=AuditActionCategory.INVOICE,
+                action_type="invoice.email_sent",
+                target_type="invoices.Invoice",
+                target=invoice,
+                target_id=str(invoice.pk),
+                target_display=invoice.invoice_number,
+                summary=(
+                    f"Invoice email for {invoice.invoice_number} was sent to {recipient}, "
+                    f"but recording the delivery failed: {exc}. The invoice status may "
+                    f"need a manual check."
+                ),
+                status=AuditEventStatus.FAILED,
+                source=AuditEventSource.CELERY,
+                metadata={
+                    "recipient": recipient, "email_log_id": str(log.id),
+                    "error": str(exc), "delivered": True,
+                },
+            )
+        except Exception:
+            logger.exception(
+                "Additionally failed to audit-log invoice %s's post-delivery bookkeeping failure",
+                invoice.invoice_number,
+            )
 
 
 def _render_pdfs(invoices) -> int:
