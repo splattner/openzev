@@ -321,6 +321,8 @@ pre .p { color: var(--ozv-lime); }
 .stack-item { border-left: 2px solid var(--accent-hi); padding-left: 16px; }
 .stack-item dt { font-family: "IBM Plex Mono", monospace; font-size: .69rem; letter-spacing: .13em; text-transform: uppercase; color: var(--fg-muted); }
 .stack-item dd { margin: 7px 0 0; font-size: .93rem; color: var(--fg-soft); line-height: 1.55; }
+.stack-item a { color: var(--accent-hi); text-decoration: none; border-bottom: 1px solid currentColor; }
+.stack-item a:hover { color: var(--fg); }
 
 .note {
   margin-top: clamp(44px, 5vw, 64px);
@@ -359,7 +361,7 @@ footer { background: var(--bg-sunk); border-top: 1px solid var(--line); padding-
 
     <div class="hero-grid">
       <div>
-        <p class="eyebrow">Swiss ZEV &amp; vZEV · self-hosted</p>
+        <p class="eyebrow">Swiss ZEV &amp; vZEV · self-hosted · AGPL-3.0</p>
         <h1>From quarter-hourly meter data to a <em>paid invoice</em>.</h1>
         <p class="hero-lede">
           OpenZEV runs the whole operating cycle of a Swiss energy community: import the
@@ -690,6 +692,14 @@ footer { background: var(--bg-sunk); border-top: 1px solid var(--line); padding-
       <div class="stack-item"><dt>Data</dt><dd>PostgreSQL, MariaDB or SQLite</dd></div>
       <div class="stack-item"><dt>API</dt><dd>OpenAPI schema with Swagger and ReDoc</dd></div>
       <div class="stack-item"><dt>Deploy</dt><dd>Docker Compose or the Helm chart</dd></div>
+      <div class="stack-item">
+        <dt>Licence</dt>
+        <dd>
+          <a href="https://github.com/splattner/openzev/blob/main/LICENCE.md">AGPL-3.0</a> —
+          run it, change it, host it. If you offer a modified version to others over a
+          network, they get the source too.
+        </dd>
+      </div>
     </dl>
 
     <div class="note">
@@ -720,10 +730,12 @@ footer { background: var(--bg-sunk); border-top: 1px solid var(--line); padding-
       <a href="https://github.com/splattner/openzev/releases">Releases</a>
       <a href="https://github.com/splattner/openzev/blob/main/docs/ROADMAP.md">Roadmap</a>
       <a href="https://github.com/splattner/openzev/issues">Issues</a>
+      <a href="https://github.com/splattner/openzev/blob/main/LICENCE.md">Licence</a>
     </div>
     <p class="foot-meta">
-      An open source project for Swiss (v)ZEV energy communities, under the Energy Ordinance
-      (EnV, Art. 16a–16g). Not affiliated with any utility or federal office.
+      Free software under the GNU Affero General Public License v3, for Swiss (v)ZEV energy
+      communities under the Energy Ordinance (EnV, Art. 16a–16g). Not affiliated with any
+      utility or federal office.
     </p>
   </div>
 </footer>
