@@ -1,0 +1,744 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OpenZEV</title>
+<meta name="description" content="Open source platform for operating and billing Swiss (v)ZEV energy communities — from quarter-hourly meter data to a paid, QR-bill invoice.">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<meta property="og:title" content="OpenZEV">
+<meta property="og:description" content="Open source platform for operating and billing Swiss (v)ZEV energy communities — from quarter-hourly meter data to a paid, QR-bill invoice.">
+<meta property="og:type" content="website">
+<meta property="og:image" content="assets/site-energy.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+/* ── Tokens ────────────────────────────────────────────────────────────────
+   Brand values are the product's own, from frontend/src/styles/tokens.css;
+   sun/sky/lime are the logo's accent colours.                              */
+:root {
+  --ozv-ink:    #091a14;
+  --ozv-deep:   #0d2b1d;
+  --ozv-brand:  #143828;
+  --ozv-mid:    #1f5c3a;
+  --ozv-step5:  #2f7a4d;
+  --ozv-sage:   #9ec3ac;
+  --ozv-pale:   #e8f0ec;
+  --ozv-sun:    #f6c213;
+  --ozv-sky:    #62c8ff;
+  --ozv-lime:   #a7d63a;
+
+  --bg:         #f8faf7;
+  --bg-raised:  #ffffff;
+  --bg-sunk:    #f3f6f2;
+  --fg:         #0f172a;
+  --fg-soft:    #334155;
+  --fg-muted:   #5c6d64;
+  --line:       #dde5df;
+  --line-soft:  #e9efea;
+  --accent:     #1f5c3a;
+  --accent-hi:  #2f7a4d;
+  --on-accent:  #ffffff;
+  --shadow:     0 1px 2px rgba(9,26,20,.05), 0 8px 24px -12px rgba(9,26,20,.18);
+
+  --measure: 65ch;
+  --radius: 14px;
+  --step--1: clamp(.82rem, .8rem + .1vw, .88rem);
+  --step-0:  clamp(1rem, .96rem + .2vw, 1.075rem);
+  --step-1:  clamp(1.2rem, 1.1rem + .45vw, 1.4rem);
+  --step-2:  clamp(1.5rem, 1.3rem + .9vw, 2rem);
+  --step-3:  clamp(2rem, 1.6rem + 1.9vw, 3.1rem);
+  --step-4:  clamp(2.5rem, 1.9rem + 3vw, 4.2rem);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg:        #0b1410;
+    --bg-raised: #11211a;
+    --bg-sunk:   #091a14;
+    --fg:        #e9f1ec;
+    --fg-soft:   #c2d4c8;
+    --fg-muted:  #93a89b;
+    --line:      #1f3a2c;
+    --line-soft: #172c21;
+    --accent:    #9ec3ac;
+    --accent-hi: #a7d63a;
+    --on-accent: #06120d;
+    --shadow:    0 1px 2px rgba(0,0,0,.4), 0 10px 28px -14px rgba(0,0,0,.7);
+  }
+}
+:root[data-theme="dark"] {
+  --bg:        #0b1410;
+  --bg-raised: #11211a;
+  --bg-sunk:   #091a14;
+  --fg:        #e9f1ec;
+  --fg-soft:   #c2d4c8;
+  --fg-muted:  #93a89b;
+  --line:      #1f3a2c;
+  --line-soft: #172c21;
+  --accent:    #9ec3ac;
+  --accent-hi: #a7d63a;
+  --on-accent: #06120d;
+  --shadow:    0 1px 2px rgba(0,0,0,.4), 0 10px 28px -14px rgba(0,0,0,.7);
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after { animation-duration: .001ms !important; transition-duration: .001ms !important; }
+}
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-size: var(--step-0);
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+}
+img { max-width: 100%; height: auto; display: block; }
+a { color: inherit; }
+:focus-visible { outline: 2px solid var(--ozv-lime); outline-offset: 3px; border-radius: 4px; }
+
+h1, h2, h3 {
+  font-family: Archivo, Inter, system-ui, sans-serif;
+  text-wrap: balance;
+  letter-spacing: -.021em;
+  line-height: 1.08;
+  margin: 0;
+}
+p { margin: 0; }
+
+.wrap { width: min(1180px, 100%); margin-inline: auto; padding-inline: clamp(20px, 4vw, 44px); }
+.eyebrow {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: .72rem;
+  font-weight: 500;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+}
+.mono { font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, monospace; font-variant-numeric: tabular-nums; }
+
+/* ── Hero — deliberately dark in both themes, echoing the app's sidebar ── */
+.hero {
+  background:
+    radial-gradient(120% 80% at 82% -10%, rgba(47,122,77,.42), transparent 62%),
+    radial-gradient(80% 60% at 8% 0%, rgba(98,200,255,.10), transparent 60%),
+    var(--ozv-ink);
+  color: #eaf3ed;
+  border-bottom: 1px solid rgba(158,195,172,.16);
+}
+.hero-inner { padding-block: clamp(30px, 5vw, 56px) clamp(40px, 6vw, 76px); }
+.topbar { display: flex; align-items: center; justify-content: space-between; gap: 20px; flex-wrap: wrap; }
+.topbar img { width: 132px; }
+.toplinks { display: flex; align-items: center; gap: 22px; flex-wrap: wrap; }
+.toplinks a { color: var(--ozv-sage); text-decoration: none; font-size: var(--step--1); font-weight: 500; }
+.toplinks a:hover { color: #fff; }
+
+.hero-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, .95fr);
+  gap: clamp(32px, 5vw, 64px);
+  align-items: center;
+  margin-top: clamp(38px, 6vw, 70px);
+}
+@media (max-width: 900px) { .hero-grid { grid-template-columns: 1fr; } }
+
+.hero .eyebrow { color: var(--ozv-lime); }
+.hero h1 {
+  font-size: var(--step-4);
+  font-weight: 800;
+  margin-top: 18px;
+  letter-spacing: -.033em;
+}
+.hero h1 em { font-style: normal; color: var(--ozv-sun); }
+.hero-lede {
+  margin-top: 20px;
+  max-width: 48ch;
+  color: #c6dacd;
+  font-size: var(--step-1);
+  line-height: 1.5;
+}
+.cta-row { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 32px; }
+.btn {
+  display: inline-flex; align-items: center; gap: 9px;
+  padding: 13px 22px;
+  border-radius: 10px;
+  font-weight: 600;
+  font-size: var(--step--1);
+  text-decoration: none;
+  border: 1px solid transparent;
+  transition: transform .15s ease, background-color .15s ease, border-color .15s ease;
+}
+.btn:hover { transform: translateY(-1px); }
+.btn-primary { background: var(--ozv-step5); color: #fff; }
+.btn-primary:hover { background: #379059; }
+.btn-ghost { border-color: rgba(158,195,172,.34); color: #dcebe1; }
+.btn-ghost:hover { border-color: var(--ozv-sage); background: rgba(158,195,172,.09); }
+
+/* Energy-flow ribbon */
+.flow-card {
+  background: rgba(255,255,255,.045);
+  border: 1px solid rgba(158,195,172,.2);
+  border-radius: 18px;
+  padding: clamp(20px, 3vw, 28px);
+  backdrop-filter: blur(2px);
+}
+.flow-card .eyebrow { color: var(--ozv-sage); }
+.flow-card svg { width: 100%; height: auto; margin-top: 14px; }
+.flow-legend { display: flex; gap: 18px; flex-wrap: wrap; margin-top: 16px; font-size: .78rem; color: #b6cdc0; }
+.flow-legend span { display: inline-flex; align-items: center; gap: 7px; }
+.swatch { width: 11px; height: 11px; border-radius: 3px; flex: none; }
+.flow-note { margin-top: 14px; font-size: .78rem; color: #8fa89a; line-height: 1.5; }
+
+.stat-strip {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1px;
+  margin-top: clamp(40px, 6vw, 64px);
+  background: rgba(158,195,172,.18);
+  border: 1px solid rgba(158,195,172,.18);
+  border-radius: 14px;
+  overflow: hidden;
+}
+@media (max-width: 760px) { .stat-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.stat { background: var(--ozv-deep); padding: 18px 20px; }
+.stat dt { font-size: .7rem; letter-spacing: .13em; text-transform: uppercase; color: var(--ozv-sage); font-family: "IBM Plex Mono", monospace; margin: 0; }
+.stat dd { margin: 7px 0 0; font-family: Archivo, sans-serif; font-weight: 700; font-size: 1.16rem; color: #fff; letter-spacing: -.01em; }
+
+/* ── Sections ─────────────────────────────────────────────────────────── */
+section { padding-block: clamp(56px, 8vw, 104px); }
+.sec-head { max-width: var(--measure); }
+.sec-head .eyebrow { color: var(--accent-hi); }
+.sec-head h2 { font-size: var(--step-3); font-weight: 700; margin-top: 14px; }
+.sec-head p { margin-top: 16px; color: var(--fg-soft); font-size: var(--step-1); line-height: 1.55; }
+
+/* Feature grid — spans vary by weight, so it doesn't read as six equal boxes */
+.features { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 18px; margin-top: clamp(34px, 4vw, 52px); }
+.feature {
+  grid-column: span 2;
+  background: var(--bg-raised);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 26px 26px 28px;
+  min-width: 0;
+}
+.feature.wide { grid-column: span 3; }
+@media (max-width: 980px) { .features { grid-template-columns: repeat(2, minmax(0, 1fr)); } .feature, .feature.wide { grid-column: span 1; } }
+@media (max-width: 620px) { .features { grid-template-columns: minmax(0, 1fr); } }
+.feature h3 { font-size: var(--step-1); font-weight: 700; }
+.feature .eyebrow { color: var(--fg-muted); display: block; margin-bottom: 11px; }
+.feature p { margin-top: 11px; color: var(--fg-soft); font-size: .95rem; line-height: 1.6; }
+.feature ul { margin: 14px 0 0; padding: 0; list-style: none; display: grid; gap: 8px; }
+.feature li { position: relative; padding-left: 20px; font-size: .9rem; color: var(--fg-soft); line-height: 1.5; }
+.feature li::before {
+  content: ""; position: absolute; left: 3px; top: .58em;
+  width: 6px; height: 6px; border-radius: 2px; background: var(--accent-hi);
+}
+
+/* Invoice lifecycle — a real sequence, so it earns a chain */
+.lifecycle { background: var(--bg-sunk); border-block: 1px solid var(--line-soft); }
+.chain { display: flex; align-items: stretch; gap: 10px; flex-wrap: wrap; margin-top: clamp(30px, 4vw, 44px); }
+.stage {
+  flex: 1 1 150px;
+  background: var(--bg-raised);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 16px 18px;
+  position: relative;
+}
+.stage .pill {
+  display: inline-block;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: .68rem; font-weight: 600;
+  letter-spacing: .08em; text-transform: uppercase;
+  padding: 4px 9px; border-radius: 999px;
+  background: var(--ozv-pale); color: var(--ozv-brand);
+}
+:root[data-theme="dark"] .stage .pill { background: rgba(158,195,172,.16); color: var(--ozv-sage); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .stage .pill { background: rgba(158,195,172,.16); color: var(--ozv-sage); } }
+.stage.paid { border-color: var(--accent-hi); }
+.stage.paid .pill { background: var(--accent-hi); color: #fff; }
+.stage p { margin-top: 10px; font-size: .84rem; color: var(--fg-muted); line-height: 1.5; }
+.chain-tail { margin-top: 18px; font-size: .86rem; color: var(--fg-muted); }
+.chain-tail code { font-family: "IBM Plex Mono", monospace; font-size: .82rem; background: var(--bg-raised); border: 1px solid var(--line); padding: 2px 7px; border-radius: 6px; }
+
+/* Screenshots */
+.shots { display: grid; gap: clamp(26px, 4vw, 44px); margin-top: clamp(34px, 4vw, 52px); }
+.shot { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr); gap: clamp(20px, 3vw, 44px); align-items: center; }
+.shot:nth-child(even) .shot-text { order: 2; }
+@media (max-width: 900px) { .shot, .shot:nth-child(even) .shot-text { grid-template-columns: 1fr; order: 0; } }
+.shot-text h3 { font-size: var(--step-2); font-weight: 700; }
+.shot-text p { margin-top: 12px; color: var(--fg-soft); font-size: .96rem; line-height: 1.6; }
+.shot-text .eyebrow { color: var(--fg-muted); display: block; margin-bottom: 10px; }
+.shot figure { margin: 0; }
+.shot img {
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow);
+  width: 100%;
+}
+.shot figcaption { margin-top: 10px; font-size: .78rem; color: var(--fg-muted); }
+
+/* Quick start */
+.quickstart { background: var(--ozv-ink); color: #e6efe9; }
+.quickstart .sec-head h2 { color: #fff; }
+.quickstart .sec-head p { color: #b9cfc2; }
+.quickstart .eyebrow { color: var(--ozv-lime); }
+.paths { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; margin-top: clamp(32px, 4vw, 48px); }
+@media (max-width: 920px) { .paths { grid-template-columns: minmax(0, 1fr); } }
+.path {
+  background: rgba(255,255,255,.04);
+  border: 1px solid rgba(158,195,172,.2);
+  border-radius: var(--radius);
+  padding: 24px 22px 26px;
+  display: flex; flex-direction: column;
+  min-width: 0;
+}
+.path h3 { font-size: 1.12rem; font-weight: 700; color: #fff; }
+.path .eyebrow { color: var(--ozv-sage); display: block; margin-bottom: 10px; }
+.path > p { margin-top: 10px; font-size: .88rem; color: #b3c9bc; line-height: 1.55; flex: 1; }
+pre {
+  margin: 16px 0 0;
+  background: rgba(0,0,0,.34);
+  border: 1px solid rgba(158,195,172,.15);
+  border-radius: 10px;
+  padding: 14px 16px;
+  overflow-x: auto;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: .8rem;
+  line-height: 1.75;
+  color: #dcecdf;
+}
+pre .c { color: #85a894; }
+pre .p { color: var(--ozv-lime); }
+.after { margin-top: 26px; display: flex; gap: 12px 26px; flex-wrap: wrap; font-size: .84rem; color: #b3c9bc; }
+.after b { color: #fff; font-weight: 600; }
+
+/* Stack + honesty */
+.stack-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 18px; margin-top: clamp(30px, 4vw, 44px); }
+.stack-item { border-left: 2px solid var(--accent-hi); padding-left: 16px; }
+.stack-item dt { font-family: "IBM Plex Mono", monospace; font-size: .69rem; letter-spacing: .13em; text-transform: uppercase; color: var(--fg-muted); }
+.stack-item dd { margin: 7px 0 0; font-size: .93rem; color: var(--fg-soft); line-height: 1.55; }
+.stack-item a { color: var(--accent-hi); text-decoration: none; border-bottom: 1px solid currentColor; }
+.stack-item a:hover { color: var(--fg); }
+
+.note {
+  margin-top: clamp(44px, 5vw, 64px);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--ozv-sun);
+  border-radius: 10px;
+  background: var(--bg-raised);
+  padding: 24px 26px;
+  max-width: 78ch;
+}
+.note h3 { font-size: 1.06rem; font-weight: 700; }
+.note p { margin-top: 11px; font-size: .9rem; color: var(--fg-soft); line-height: 1.62; }
+
+/* Footer */
+footer { background: var(--bg-sunk); border-top: 1px solid var(--line); padding-block: 46px; }
+.foot { display: flex; justify-content: space-between; gap: 28px; flex-wrap: wrap; align-items: flex-start; }
+.foot-links { display: flex; gap: 14px 30px; flex-wrap: wrap; }
+.foot-links a { color: var(--fg-soft); text-decoration: none; font-size: .88rem; }
+.foot-links a:hover { color: var(--accent-hi); text-decoration: underline; }
+.foot-meta { font-size: .8rem; color: var(--fg-muted); max-width: 42ch; line-height: 1.6; }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="wrap hero-inner">
+    <nav class="topbar">
+      <img src="assets/logo.png" alt="OpenZEV" width="132" height="132">
+      <div class="toplinks">
+        <a href="#features">Features</a>
+        <a href="#screens">Screenshots</a>
+        <a href="#quickstart">Quick start</a>
+        <a href="https://github.com/splattner/openzev">GitHub</a>
+      </div>
+    </nav>
+
+    <div class="hero-grid">
+      <div>
+        <p class="eyebrow">Swiss ZEV &amp; vZEV · self-hosted · AGPL-3.0</p>
+        <h1>From quarter-hourly meter data to a <em>paid invoice</em>.</h1>
+        <p class="hero-lede">
+          OpenZEV runs the whole operating cycle of a Swiss energy community: import the
+          load curves, split the solar between neighbours timestamp by timestamp, price it
+          against real tariffs, and send a QR-bill invoice that reconciles.
+        </p>
+        <div class="cta-row">
+          <a class="btn btn-primary" href="#quickstart">Start in one command</a>
+          <a class="btn btn-ghost" href="https://github.com/splattner/openzev">View source on GitHub</a>
+        </div>
+      </div>
+
+      <div class="flow-card">
+        <p class="eyebrow">Energy balance · demo community · Q3 2026</p>
+        <!-- Sources (left) split into sinks (right); band heights are to scale,
+             and both sides reconcile: 625.8 + 1263.05 = 1888.85 produced,
+             625.8 + 738.9 = 1364.7 consumed. -->
+        <svg viewBox="0 0 470 220" role="img" aria-label="Energy flow for one quarter. Of 1888.85 kWh produced on site, 625.8 kWh is used locally and 1263.05 kWh is exported to the grid. A further 738.9 kWh is imported from the grid, bringing local consumption to 1364.7 kWh and the self-consumption rate to 33.1 percent.">
+          <defs>
+            <linearGradient id="pvLocal" x1="0" x2="1">
+              <stop offset="0" stop-color="#2f7a4d" stop-opacity=".95"/>
+              <stop offset="1" stop-color="#a7d63a" stop-opacity=".85"/>
+            </linearGradient>
+            <linearGradient id="pvExport" x1="0" x2="1">
+              <stop offset="0" stop-color="#2f7a4d" stop-opacity=".6"/>
+              <stop offset="1" stop-color="#62c8ff" stop-opacity=".45"/>
+            </linearGradient>
+            <linearGradient id="gridLocal" x1="0" x2="1">
+              <stop offset="0" stop-color="#62c8ff" stop-opacity=".42"/>
+              <stop offset="1" stop-color="#f6c213" stop-opacity=".5"/>
+            </linearGradient>
+          </defs>
+
+          <!-- flows, drawn under the bars -->
+          <path d="M17 30 L300 30 L300 65.7 L17 65.7 Z" fill="url(#pvLocal)"/>
+          <path d="M17 65.7 C 160 65.7, 160 118, 300 118 L300 190 C 160 190, 160 138, 17 138 Z" fill="url(#pvExport)"/>
+          <path d="M17 166 C 160 166, 160 65.7, 300 65.7 L300 108 C 160 108, 160 208, 17 208 Z" fill="url(#gridLocal)"/>
+
+          <!-- sources -->
+          <rect x="8" y="30" width="9" height="108" rx="3" fill="#2f7a4d"/>
+          <text x="8" y="22" fill="#cfe3d6" font-family="IBM Plex Mono, monospace" font-size="9.5">PV  1888.85 kWh</text>
+          <rect x="8" y="166" width="9" height="42" rx="3" fill="#62c8ff" opacity=".85"/>
+          <text x="8" y="158" fill="#cfe3d6" font-family="IBM Plex Mono, monospace" font-size="9.5">Grid  738.9 kWh</text>
+
+          <!-- sinks -->
+          <rect x="300" y="30" width="9" height="78" rx="3" fill="#a7d63a"/>
+          <text x="316" y="54" fill="#eaf3ed" font-family="Archivo, sans-serif" font-size="14" font-weight="700">625.8 kWh</text>
+          <text x="316" y="69" fill="#a7d63a" font-family="IBM Plex Mono, monospace" font-size="9.5">used locally</text>
+          <text x="316" y="83" fill="#8fa89a" font-family="IBM Plex Mono, monospace" font-size="9">33.1 % self-consumed</text>
+
+          <rect x="300" y="118" width="9" height="72" rx="3" fill="#62c8ff" opacity=".7"/>
+          <text x="316" y="150" fill="#eaf3ed" font-family="Archivo, sans-serif" font-size="14" font-weight="700">1263.05 kWh</text>
+          <text x="316" y="165" fill="#8fa89a" font-family="IBM Plex Mono, monospace" font-size="9.5">exported to grid</text>
+        </svg>
+        <div class="flow-legend">
+          <span><i class="swatch" style="background:#a7d63a"></i>Local consumption</span>
+          <span><i class="swatch" style="background:#62c8ff"></i>Grid exchange</span>
+          <span><i class="swatch" style="background:#2f7a4d"></i>Production</span>
+        </div>
+        <p class="flow-note">
+          The same split the billing engine performs — <code class="mono">min(production, consumption)</code>
+          per 15-minute interval — is what every invoice line is derived from.
+        </p>
+      </div>
+    </div>
+
+    <dl class="stat-strip">
+      <div class="stat"><dt>Resolution</dt><dd>15-minute intervals</dd></div>
+      <div class="stat"><dt>Documents</dt><dd>PDF/A-3b + QR-bill</dd></div>
+      <div class="stat"><dt>Languages</dt><dd>DE · FR · IT · EN</dd></div>
+      <div class="stat"><dt>Deploy</dt><dd>Docker &amp; Helm</dd></div>
+    </dl>
+  </div>
+</header>
+
+<main>
+
+<section id="features">
+  <div class="wrap">
+    <div class="sec-head">
+      <p class="eyebrow">What it does</p>
+      <h2>Everything between the meter and the money.</h2>
+      <p>
+        A ZEV is only simple until you have to bill one. OpenZEV covers the parts that
+        actually consume the evenings: reconciling imports, keeping tariff history straight,
+        and producing documents a participant will accept.
+      </p>
+    </div>
+
+    <div class="features">
+      <article class="feature wide">
+        <span class="eyebrow">Metering &amp; imports</span>
+        <h3>Load curves in, validated.</h3>
+        <p>Import from the formats utilities actually send, and see what will land before it does.</p>
+        <ul>
+          <li>CSV and Excel with configurable column mapping, plus SDAT-CH for utility workflows</li>
+          <li>Preview-based validation with a per-row import protocol</li>
+          <li>Data-quality checks that flag readings nobody would be billed for</li>
+          <li>Consumption and production analysis by period or daily profile</li>
+        </ul>
+      </article>
+
+      <article class="feature wide">
+        <span class="eyebrow">Tariffs &amp; billing</span>
+        <h3>Priced the way the tariff really works.</h3>
+        <p>Allocation runs per timestamp, not per month — so high/low bands and spot prices land correctly.</p>
+        <ul>
+          <li>Versioned tariffs with high/low bands, seasonal periods and validity windows</li>
+          <li>Dynamic price series, including the BFE reference market price</li>
+          <li>Import a grid operator's machine-readable tariff file (Art. 7b StromVV)</li>
+          <li>Per-timestamp local-pool split across every participant</li>
+        </ul>
+      </article>
+
+      <article class="feature">
+        <span class="eyebrow">Documents</span>
+        <h3>Swiss-ready output.</h3>
+        <p>
+          Invoices as PDF/A-3b with a QR-bill payment slip, plus annual statements and
+          participation contracts — each issued version kept exactly as it was sent.
+        </p>
+      </article>
+
+      <article class="feature">
+        <span class="eyebrow">Community</span>
+        <h3>Roles and scope.</h3>
+        <p>
+          Admins, ZEV owners and participants see different products. Metering points carry
+          validity-based assignments, so a participant moving out mid-period bills correctly.
+        </p>
+      </article>
+
+      <article class="feature">
+        <span class="eyebrow">Planning</span>
+        <h3>Before you found one.</h3>
+        <p>
+          A feasibility calculator estimates savings, payback, ROI and NPV — and can prefill
+          from a real community's participants and measured self-consumption.
+        </p>
+      </article>
+
+      <article class="feature wide">
+        <span class="eyebrow">Operations</span>
+        <h3>Built to be run by one person.</h3>
+        <ul>
+          <li>Audit log across every privileged action, scoped to what you may see</li>
+          <li>Asynchronous email delivery with per-invoice history and retry</li>
+          <li>API keys for scripting, with read-only scope and their own rate budget</li>
+          <li>Export or move a whole community between instances as a versioned archive</li>
+        </ul>
+      </article>
+    </div>
+  </div>
+</section>
+
+<section class="lifecycle">
+  <div class="wrap">
+    <div class="sec-head">
+      <p class="eyebrow">Invoice lifecycle</p>
+      <h2>One state at a time, and it is always visible.</h2>
+      <p>
+        Every invoice moves through the same chain. Transitions lock the row and decide against
+        committed state, so two people working the same billing run cannot overwrite each other.
+      </p>
+    </div>
+
+    <div class="chain">
+      <div class="stage">
+        <span class="pill">Draft</span>
+        <p>Generated from the period's readings and tariffs. Re-generate freely.</p>
+      </div>
+      <div class="stage">
+        <span class="pill">Approved</span>
+        <p>Figures accepted. The PDF is rendered off-request and attached.</p>
+      </div>
+      <div class="stage">
+        <span class="pill">Sent</span>
+        <p>Emailed to the participant; delivery and failures both recorded.</p>
+      </div>
+      <div class="stage paid">
+        <span class="pill">Paid</span>
+        <p>Marked on receipt, closing the period for that participant.</p>
+      </div>
+    </div>
+    <p class="chain-tail">
+      <code>Cancelled</code> branches off any stage and is never a deletion — the document
+      and its number stay, because an invoice a participant already holds cannot be unsent.
+    </p>
+  </div>
+</section>
+
+<section id="screens">
+  <div class="wrap">
+    <div class="sec-head">
+      <p class="eyebrow">Screenshots</p>
+      <h2>The working interface.</h2>
+      <p>From the demo community that ships with the project — seeded with one command.</p>
+    </div>
+
+    <div class="shots">
+      <article class="shot">
+        <div class="shot-text">
+          <span class="eyebrow">Overview</span>
+          <h3>Opens on what is due.</h3>
+          <p>
+            Billing periods are listed oldest first with the action each one needs, so a session
+            starts on the work rather than on a search. The period still collecting data says so
+            and asks for nothing.
+          </p>
+        </div>
+        <figure>
+          <img src="assets/site-overview.png" alt="OpenZEV overview screen listing billing periods by status, each with its next action" width="1440" height="900">
+        </figure>
+      </article>
+
+      <article class="shot">
+        <div class="shot-text">
+          <span class="eyebrow">Energy balance</span>
+          <h3>Where the solar actually went.</h3>
+          <p>
+            Production, consumption, self-consumption and grid exchange for the selected period,
+            with a Sankey diagram tracing every kWh from producer to participant. Filter by
+            participant, or change resolution down to the interval.
+          </p>
+        </div>
+        <figure>
+          <img src="assets/site-energy.png" alt="Energy balance screen with KPI tiles and a Sankey diagram of energy flow between producer, participants and the grid" width="1440" height="900" loading="lazy">
+        </figure>
+      </article>
+
+      <article class="shot">
+        <div class="shot-text">
+          <span class="eyebrow">Billing</span>
+          <h3>A billing run on one screen.</h3>
+          <p>
+            Every participant's invoice for the period with its metering completeness, status,
+            total and PDF state — and batch actions for the steps you would otherwise repeat
+            once per household.
+          </p>
+        </div>
+        <figure>
+          <img src="assets/site-invoices.png" alt="Billing screen listing each participant's invoice with status badges, totals and batch actions" width="1440" height="900" loading="lazy">
+        </figure>
+      </article>
+
+      <article class="shot">
+        <div class="shot-text">
+          <span class="eyebrow">Tariffs</span>
+          <h3>Price history you can audit.</h3>
+          <p>
+            Tariffs are versioned series, not editable rows. Each version keeps its own bands and
+            validity, so an invoice raised last year still prices at last year's rate — and the
+            chart shows exactly when each change took effect.
+          </p>
+        </div>
+        <figure>
+          <img src="assets/site-tariffs.png" alt="Tariff detail drawer showing version history, a price history chart and the high and low tariff bands" width="1440" height="900" loading="lazy">
+        </figure>
+      </article>
+    </div>
+  </div>
+</section>
+
+<section id="quickstart" class="quickstart">
+  <div class="wrap">
+    <div class="sec-head">
+      <p class="eyebrow">Quick start</p>
+      <h2>Running locally in about a minute.</h2>
+      <p>Pick the path that matches where you want it to live. All three pull prebuilt images from GHCR.</p>
+    </div>
+
+    <div class="paths">
+      <article class="path">
+        <span class="eyebrow">Try it</span>
+        <h3>Demo community</h3>
+        <p>Starts the stack and seeds a full community — participants, meters, tariffs and readings — so there is something to look at.</p>
+<pre><span class="c"># clone, then:</span>
+<span class="p">scripts/start-demo-environment.sh</span>
+
+<span class="c"># → http://localhost:8080</span>
+<span class="c"># admin@openzev.local / admin1234</span></pre>
+      </article>
+
+      <article class="path">
+        <span class="eyebrow">Self-host</span>
+        <h3>Docker Compose</h3>
+        <p>The full stack — frontend, API, Celery worker and beat, PostgreSQL and Redis — with no demo data.</p>
+<pre><span class="p">docker compose up -d --build</span>
+
+<span class="c"># frontend  :8080</span>
+<span class="c"># api       :8001</span>
+
+<span class="p">docker compose down</span></pre>
+      </article>
+
+      <article class="path">
+        <span class="eyebrow">Kubernetes</span>
+        <h3>Helm chart</h3>
+        <p>Deploys frontend, backend, worker and beat with an Ingress and a media PVC. Bring your own PostgreSQL and Redis.</p>
+<pre><span class="p">helm repo add openzev \
+  https://splattner.github.io/openzev</span>
+<span class="p">helm repo update</span>
+<span class="p">helm install openzev openzev/openzev \
+  -n openzev --create-namespace</span></pre>
+      </article>
+    </div>
+
+    <div class="after">
+      <span><b>Images</b> ghcr.io/splattner/openzev-{backend,frontend,fullstack}</span>
+      <span><b>Signed</b> release manifests and SBOM attestations</span>
+      <span><b>Databases</b> PostgreSQL, MariaDB or SQLite via DATABASE_URL</span>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="sec-head">
+      <p class="eyebrow">Under it</p>
+      <h2>A boring stack, on purpose.</h2>
+      <p>Nothing here is exotic. It is meant to still start in three years.</p>
+    </div>
+
+    <dl class="stack-row">
+      <div class="stack-item"><dt>Backend</dt><dd>Django, Django REST Framework, SimpleJWT</dd></div>
+      <div class="stack-item"><dt>Frontend</dt><dd>React, TypeScript, Vite, React Query, i18next</dd></div>
+      <div class="stack-item"><dt>Async</dt><dd>Celery worker and beat on Redis</dd></div>
+      <div class="stack-item"><dt>Data</dt><dd>PostgreSQL, MariaDB or SQLite</dd></div>
+      <div class="stack-item"><dt>API</dt><dd>OpenAPI schema with Swagger and ReDoc</dd></div>
+      <div class="stack-item"><dt>Deploy</dt><dd>Docker Compose or the Helm chart</dd></div>
+      <div class="stack-item">
+        <dt>Licence</dt>
+        <dd>
+          <a href="https://github.com/splattner/openzev/blob/main/LICENCE.md">AGPL-3.0</a> —
+          run it, change it, host it. If you offer a modified version to others over a
+          network, they get the source too.
+        </dd>
+      </div>
+    </dl>
+
+    <div class="note">
+      <h3>Read this before you bill someone with it</h3>
+      <p>
+        OpenZEV is built for self-hosters who enjoy running their own stack, and is shipped
+        as-is with no warranty. Check your imports, your tariffs and your invoices before they
+        reach a participant — responsibility for what the numbers say stays with you.
+      </p>
+      <p>
+        It is also built with substantial AI assistance, down to the specs, ADRs and user
+        documentation. Some choices will look unconventional to an experienced team. That is
+        the trade the project makes: it is optimised for learning, experimentation, and running
+        one real ZEV — not for enterprise process.
+      </p>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <div class="wrap foot">
+    <div class="foot-links">
+      <a href="https://github.com/splattner/openzev">Source</a>
+      <a href="https://github.com/splattner/openzev/tree/main/docs/user-guide">User guide</a>
+      <a href="https://github.com/splattner/openzev/tree/main/charts/openzev">Helm chart</a>
+      <a href="https://github.com/splattner/openzev/releases">Releases</a>
+      <a href="https://github.com/splattner/openzev/blob/main/docs/ROADMAP.md">Roadmap</a>
+      <a href="https://github.com/splattner/openzev/issues">Issues</a>
+      <a href="https://github.com/splattner/openzev/blob/main/LICENCE.md">Licence</a>
+    </div>
+    <p class="foot-meta">
+      Free software under the GNU Affero General Public License v3, for Swiss (v)ZEV energy
+      communities under the Energy Ordinance (EnV, Art. 16a–16g). Not affiliated with any
+      utility or federal office.
+    </p>
+  </div>
+</footer>
+
+</body>
+</html>
