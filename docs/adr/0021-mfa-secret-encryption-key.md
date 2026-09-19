@@ -1,6 +1,6 @@
 # ADR 0021: MFA secrets are encrypted under a dedicated, rotatable key, not `SECRET_KEY`
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-09-19
 
 ## Context

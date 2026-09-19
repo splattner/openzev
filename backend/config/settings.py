@@ -206,6 +206,18 @@ API_KEY_LAST_USED_RESOLUTION = timedelta(
     minutes=env.int("API_KEY_LAST_USED_RESOLUTION_MINUTES", default=5)
 )
 
+# ── Two-factor authentication (MFA) ────────────────────────────────────────────
+# Fernet keys for the TOTP secret at rest (accounts.mfa_crypto). Deliberately
+# independent of SECRET_KEY — see ADR 0021 — because SECRET_KEY is designed to
+# be rotated and a TOTP secret is durable state with no other copy on the
+# server. The FIRST key encrypts; every key is tried on decrypt, so a rotation
+# is: prepend the new key, run `manage.py rotate_mfa_key`, then drop the old
+# key. Generate one with:
+#     python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+# Empty by default: MFA enrolment is refused (503) until this is set, rather
+# than falling back to a weaker guarantee. See accounts.checks.mfa_key_configured.
+MFA_ENCRYPTION_KEYS = env.list("MFA_ENCRYPTION_KEYS", default=[])
+
 # ── CORS ──────────────────────────────────────────────────────────────────────
 CORS_ALLOWED_ORIGINS = env.list(
     "CORS_ALLOWED_ORIGINS",

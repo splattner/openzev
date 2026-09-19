@@ -2287,6 +2287,11 @@ export const fr = {
                     workers_other: '{{count}} workers répondent',
                     queueDepth: '{{count}} en file',
                 },
+                mfa: {
+                    title: 'Authentification à deux facteurs',
+                    configured: 'MFA_ENCRYPTION_KEYS est configuré',
+                    notConfigured: 'MFA_ENCRYPTION_KEYS n\'est pas défini — l\'inscription est refusée jusqu\'à ce qu\'il le soit',
+                },
                 email: {
                     title: 'E-mail',
                     mode: {

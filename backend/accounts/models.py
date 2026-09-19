@@ -1,13 +1,17 @@
 import uuid
 from datetime import date, timedelta
 
+import pyotp
+from pyotp.utils import strings_equal
+
 from django.contrib.auth.models import AbstractUser, UserManager
 from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator
-from django.db import models
+from django.db import models, transaction
 from django.utils import timezone
 
 from allocation.validity import active_during, active_on
+from . import mfa_crypto
 
 
 class UserRole(models.TextChoices):
@@ -153,6 +157,122 @@ class MagicLinkToken(models.Model):
         if self.consumed_at:
             return False
         return timezone.now() < self.created_at + MAGIC_LINK_LIFETIME
+
+
+# TOTP codes are accepted one step early or late (±30s at the default 30s
+# interval), to absorb clock drift between the server and the user's phone
+# without widening the replay window by more than that.
+TOTP_VALID_WINDOW = 1
+
+
+class TotpDevice(models.Model):
+    """A user's authenticator-app second factor (RFC 6238 TOTP).
+
+    One device per user — a second authenticator app is not a meaningfully
+    different factor, and the multi-device handling it would need is not
+    worth the surface. Compare ``WebAuthnCredential`` (spec §4.2, added in a
+    later PR), which deliberately does allow several per user.
+
+    The secret is the one field in this feature that needs *reversible*
+    encryption: verification recomputes the code from it, so it cannot be
+    hashed the way ``ApiKey`` or ``MfaRecoveryCode`` are. See
+    ``accounts.mfa_crypto`` and ADR 0021 for why the key is not ``SECRET_KEY``.
+    """
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="totp_device")
+    secret_encrypted = models.BinaryField()
+    # Null until a code is verified. An unconfirmed device never gates login —
+    # otherwise a user who abandons enrolment mid-flow (closed the tab before
+    # scanning the QR) would be locked out of an account they never actually
+    # protected.
+    confirmed_at = models.DateTimeField(null=True, blank=True)
+    # The absolute TOTP step last accepted, so a valid code cannot be replayed
+    # a second time inside its own skew window. Null until the first accepted
+    # code. See ``verify()``.
+    last_used_step = models.BigIntegerField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"TOTP device for {self.user}"
+
+    @property
+    def secret(self) -> str:
+        """The base32 shared secret, decrypted on access — never cached on
+        the instance, so a long-lived object in memory does not hold it any
+        longer than the call that needs it."""
+        return mfa_crypto.decrypt_secret(bytes(self.secret_encrypted))
+
+    def set_secret(self, value: str) -> None:
+        """Encrypt and stage ``value``. Does not save — the caller decides
+        the transaction boundary (enrolment also writes the confirming
+        code's step and issues recovery codes in the same commit)."""
+        self.secret_encrypted = mfa_crypto.encrypt_secret(value)
+
+    @property
+    def is_active(self) -> bool:
+        return self.confirmed_at is not None
+
+    def _matching_step(self, code: str, *, valid_window: int = TOTP_VALID_WINDOW) -> int | None:
+        """The absolute TOTP step ``code`` matches within the skew window, or
+        ``None``. Checked step-by-step rather than via ``pyotp.TOTP.verify()``
+        because replay protection needs to know *which* step matched, not
+        merely whether some step in the window did."""
+        totp = pyotp.TOTP(self.secret)
+        now = timezone.now()
+        base_step = totp.timecode(now)
+        for offset in range(-valid_window, valid_window + 1):
+            if strings_equal(str(code), str(totp.at(now, offset))):
+                return base_step + offset
+        return None
+
+    def verify(self, code: str) -> bool:
+        """Verify a TOTP code and record its step to prevent replay.
+
+        Locks this device's row for the check (mirrors the row-locking
+        approach taken for invoice status transitions,
+        ``2026-03-invoice-lifecycle-and-communication.md`` §5.3): two
+        concurrent submissions of the same still-valid code must not both
+        succeed, and a code already accepted once must not be accepted again
+        even though it remains within its skew window for a few more seconds.
+        """
+        matched_step = self._matching_step(code)
+        if matched_step is None:
+            return False
+        with transaction.atomic():
+            locked = TotpDevice.objects.select_for_update().get(pk=self.pk)
+            if locked.last_used_step is not None and matched_step <= locked.last_used_step:
+                return False
+            locked.last_used_step = matched_step
+            locked.save(update_fields=["last_used_step"])
+        self.last_used_step = matched_step
+        return True
+
+
+class MfaRecoveryCode(models.Model):
+    """A single-use fallback credential, issued ten at a time.
+
+    Hashed the same way ``ApiKey``/``ApiKey``-adjacent secrets are — SHA-256,
+    not a password hasher. ``api_keys.hash_secret`` already documents why:
+    the code is generated by ``secrets``, not chosen by a human, so there is
+    nothing for an attacker to guess and no iteration count changes that.
+    """
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="mfa_recovery_codes")
+    code_hash = models.CharField(max_length=64)
+    used_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at", "id"]
+
+    def __str__(self):
+        return f"Recovery code for {self.user} ({'used' if self.used_at else 'unused'})"
+
+    @property
+    def is_active(self) -> bool:
+        return self.used_at is None
 
 
 class AppSettings(models.Model):

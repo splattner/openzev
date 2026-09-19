@@ -2287,6 +2287,11 @@ export const it = {
                     workers_other: '{{count}} worker rispondono',
                     queueDepth: '{{count}} in coda',
                 },
+                mfa: {
+                    title: 'Autenticazione a due fattori',
+                    configured: 'MFA_ENCRYPTION_KEYS è configurato',
+                    notConfigured: 'MFA_ENCRYPTION_KEYS non è impostato — la registrazione è rifiutata finché non lo sarà',
+                },
                 email: {
                     title: 'E-mail',
                     mode: {

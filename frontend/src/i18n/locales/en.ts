@@ -2298,6 +2298,11 @@ export const en = {
                     workers_other: '{{count}} workers responding',
                     queueDepth: '{{count}} queued',
                 },
+                mfa: {
+                    title: 'Two-factor auth',
+                    configured: 'MFA_ENCRYPTION_KEYS is configured',
+                    notConfigured: 'MFA_ENCRYPTION_KEYS is not set — enrolment is refused until it is',
+                },
                 email: {
                     title: 'Email',
                     mode: {

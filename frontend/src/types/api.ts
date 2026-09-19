@@ -67,6 +67,13 @@ export interface SystemHealth {
         broker_configured: boolean
         detail?: string
     }
+    /** ADR 0021: whether TOTP secrets can be encrypted at rest. "unknown"
+     * means MFA_ENCRYPTION_KEYS is unset — expected on an instance that
+     * hasn't opted into two-factor authentication, not a fault. */
+    mfa: {
+        status: SystemHealthStatus
+        encryption_key_configured: boolean
+    }
     email: {
         status: SystemHealthStatus
         mode: 'smtp' | 'console' | 'memory' | 'other'

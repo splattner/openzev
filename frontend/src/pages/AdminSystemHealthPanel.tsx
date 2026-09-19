@@ -59,7 +59,7 @@ export function AdminSystemHealthPanel() {
 
     return (
         <div className="page-stack">
-            <div className="grid grid-3">
+            <div className="grid grid-4">
                 <ProbeCard status={health.database.status} title={t('pages.adminOverview.health.database.title')}>
                     <p className="muted" style={{ margin: 0 }}>
                         {health.database.engine}
@@ -78,6 +78,13 @@ export function AdminSystemHealthPanel() {
                         )}
                     </p>
                     {health.celery.detail && <p className="muted text-error">{health.celery.detail}</p>}
+                </ProbeCard>
+                <ProbeCard status={health.mfa.status} title={t('pages.adminOverview.health.mfa.title')}>
+                    <p className="muted" style={{ margin: 0 }}>
+                        {t(health.mfa.encryption_key_configured
+                            ? 'pages.adminOverview.health.mfa.configured'
+                            : 'pages.adminOverview.health.mfa.notConfigured')}
+                    </p>
                 </ProbeCard>
                 <ProbeCard status={health.email.status} title={t('pages.adminOverview.health.email.title')}>
                     <p className="muted" style={{ margin: 0 }}>

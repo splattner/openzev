@@ -1,7 +1,7 @@
 # Feature Spec: Two-factor authentication — TOTP and passkeys
 
 - Spec ID: SPEC-2026-09-two-factor-authentication
-- Status: Draft
+- Status: In Progress (PR 1 of 3 landed — see §10)
 - Scope: Major
 - Type: Feature
 - Owners: @splattner
@@ -257,6 +257,15 @@ idempotent and safe to re-run.
 **Not encrypted:** recovery codes (hashed — one-way is sufficient and correct) and WebAuthn
 public keys (public by construction). Exactly one field needs reversible encryption, because
 TOTP verification requires the shared secret.
+
+**As shipped in PR 1**, two small additions beyond the above, both natural fits for "the crypto
+and audit substrate" rather than separate scope: `rotate_mfa_key` records `auth.mfa.key_rotated`
+(`AuditEventSource.MANAGEMENT_COMMAND`, `metadata.devices_reencrypted`) — the one PR-1-scoped
+action that actually happens, so it is the one PR-1-scoped audit event — and
+`SystemHealthView`'s payload gains an `mfa` probe (`{status, encryption_key_configured}`,
+`"unknown"` rather than `"degraded"` when unset, matching how the existing Celery probe treats
+"no broker in dev" as an expected state, not a fault), surfacing the same fact `manage.py check`
+does, in the tab an admin actually looks at day to day.
 
 ---
 
@@ -532,6 +541,14 @@ user-facing text, per AGENTS.md.
 
 ## 9. Test plan
 
+**As shipped in PR 1**, ahead of the API-level tests below (which need the enrolment/login
+endpoints landing in PR 2): `accounts/test_mfa_crypto.py` carries the spec's own
+`MfaCryptoTests` (5) plus `RotateMfaKeyCommandTests` (3) and `MfaKeyConfiguredCheckTests` (2) —
+10 total. `accounts/test_mfa_models.py` (not named above; added because the replay-protection
+logic in `TotpDevice.verify()` ships now) carries `TotpDeviceTests` (9) and
+`MfaRecoveryCodeTests` (2) — 11 total. `accounts/test_system_health.py` gains 2 tests for the
+`mfa` probe. 23 tests, all passing alongside the full existing suite unchanged.
+
 ### Backend — `accounts/test_mfa.py` (new)
 
 **`TotpEnrolmentTests`** (8 tests):
@@ -641,7 +658,7 @@ Three PRs, in order. Each is independently releasable.
 
 | PR | Contents | Why this boundary |
 |---|---|---|
-| 1 | `mfa_crypto.py`, `MFA_ENCRYPTION_KEYS`, system check, `TotpDevice` + `MfaRecoveryCode` models and migrations, the `auth.mfa.*` audit types | The crypto and audit substrate, with no user-visible change — reviewable on its own merits |
+| 1 ✅ | `mfa_crypto.py`, `MFA_ENCRYPTION_KEYS`, system check, `TotpDevice` + `MfaRecoveryCode` models and migrations, the `auth.mfa.*` audit types | The crypto and audit substrate, with no user-visible change — reviewable on its own merits |
 | 2 | TOTP enrolment and the two-step login, the six other doors, throttling, `AccountProfilePage` security section, login challenge step | The first shippable factor |
 | 3 | `WebAuthnCredential`, passkey registration and passwordless authentication, policy fields, enrolment gate, admin reset | The larger surface, once the flow it plugs into is proven |
 

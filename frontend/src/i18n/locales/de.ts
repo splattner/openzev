@@ -2287,6 +2287,11 @@ export const de = {
                     workers_other: '{{count}} Worker antworten',
                     queueDepth: '{{count}} in Warteschlange',
                 },
+                mfa: {
+                    title: 'Zwei-Faktor-Auth',
+                    configured: 'MFA_ENCRYPTION_KEYS ist konfiguriert',
+                    notConfigured: 'MFA_ENCRYPTION_KEYS ist nicht gesetzt — die Registrierung wird verweigert, bis dies erfolgt ist',
+                },
                 email: {
                     title: 'E-Mail',
                     mode: {

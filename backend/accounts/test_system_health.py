@@ -10,6 +10,7 @@ from __future__ import annotations
 from unittest.mock import MagicMock
 
 import pytest
+from django.test import override_settings
 
 pytestmark = pytest.mark.django_db
 
@@ -55,9 +56,10 @@ def test_system_health_returns_probe_snapshot(admin_client):
 
     assert response.status_code == 200
     body = response.json()
-    assert set(body) == {"database", "celery", "email", "checked_at"}
+    assert set(body) == {"database", "celery", "mfa", "email", "checked_at"}
     _assert_probe_shape(body["database"])
     _assert_probe_shape(body["celery"])
+    _assert_probe_shape(body["mfa"])
     _assert_probe_shape(body["email"])
     # Configuration facts the tab renders directly.
     assert body["database"]["engine"]
@@ -65,8 +67,25 @@ def test_system_health_returns_probe_snapshot(admin_client):
     assert isinstance(body["database"]["size_bytes"], int | None)
     assert isinstance(body["celery"]["workers_responding"], int | None)
     assert isinstance(body["celery"]["queue_depth"], int | None)
+    assert isinstance(body["mfa"]["encryption_key_configured"], bool)
     assert body["email"]["mode"] in {"smtp", "console", "memory", "other"}
     assert body["checked_at"]
+
+
+@override_settings(MFA_ENCRYPTION_KEYS=[])
+def test_system_health_mfa_probe_unconfigured_by_default(admin_client):
+    """This is also the "fresh install" case: unconfigured reports "unknown",
+    not "degraded" — it is an expected state, not a fault (ADR 0021)."""
+    response = admin_client.get(URL)
+
+    assert response.json()["mfa"] == {"status": "unknown", "encryption_key_configured": False}
+
+
+@override_settings(MFA_ENCRYPTION_KEYS=["dummy-key-for-this-test-only"])
+def test_system_health_mfa_probe_reports_configured_key(admin_client):
+    response = admin_client.get(URL)
+
+    assert response.json()["mfa"] == {"status": "ok", "encryption_key_configured": True}
 
 
 def test_system_health_celery_probe_shape_without_broker(admin_client, broker):

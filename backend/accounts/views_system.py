@@ -151,6 +151,21 @@ def _probe_celery() -> dict:
     return payload
 
 
+def _probe_mfa() -> dict:
+    """Whether TOTP secrets can be encrypted at rest — see ADR 0021.
+
+    "unknown" rather than "degraded": an unconfigured key is the expected
+    state on a fresh or upgraded instance that has not opted into MFA, not a
+    fault. Mirrors how the Celery probe above uses "unknown" for "no broker
+    reachable in dev" rather than treating that as broken.
+    """
+    configured = bool(settings.MFA_ENCRYPTION_KEYS)
+    return {
+        "status": "ok" if configured else "unknown",
+        "encryption_key_configured": configured,
+    }
+
+
 def _probe_email() -> dict:
     backend = settings.EMAIL_BACKEND
     if "smtp" in backend:
@@ -186,6 +201,7 @@ class SystemHealthView(APIView):
             {
                 "database": _probe_database(),
                 "celery": _probe_celery(),
+                "mfa": _probe_mfa(),
                 "email": _probe_email(),
                 "checked_at": datetime.now(timezone.utc).isoformat(),
             }

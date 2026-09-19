@@ -11,6 +11,7 @@ click-plugins==1.1.1.2
 click-repl==0.3.0
 coverage==7.15.3
 cron-descriptor==1.4.5
+cryptography==50.0.1  # direct: Fernet encryption of the TOTP secret at rest (ADR 0021)
 cssselect2==0.9.0
 dj-database-url==3.1.2
 Django==6.0.8
@@ -42,6 +43,7 @@ prompt_toolkit==3.0.53
 psycopg2-binary==2.9.12
 pycparser==3.0
 pydyf==0.12.1
+pyotp==2.10.0  # direct: TOTP secret generation and code verification
 pypdf==6.14.2
 Pygments==2.20.0
 PyJWT==2.13.0
