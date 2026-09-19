@@ -23,6 +23,8 @@ This directory captures key architectural decisions for OpenZEV.
 - [0017: Async export jobs for whole-ZEV annual statements](0017-async-export-jobs.md) (supersedes the unmerged subprocess-pool experiment, recorded in its alternatives)
 - [0018: Dynamic tariff prices are stored evidence, in globally shared series](0018-dynamic-tariff-price-series.md)
 - [0019: Frozen invoice source provenance and serialized price mutations](0019-frozen-dynamic-price-evidence.md)
+- [0020: A user-verified passkey replaces the password, rather than supplementing it](0020-passkeys-replace-the-password.md)
+- [0021: MFA secrets are encrypted under a dedicated, rotatable key, not `SECRET_KEY`](0021-mfa-secret-encryption-key.md)
 
 ## Conventions
 

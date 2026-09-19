@@ -8,7 +8,7 @@
 - Created: 2026-09-19
 - Target Release: 1.16.0 (staged over three PRs)
 - Related Issues: [#740](https://github.com/splattner/openzev/issues/740)
-- Related ADRs: ADR 0020 (to be written — passkeys as a first factor, and the MFA key lifecycle)
+- Related ADRs: [ADR 0020](../adr/0020-passkeys-replace-the-password.md) (a verified passkey replaces the password), [ADR 0021](../adr/0021-mfa-secret-encryption-key.md) (the MFA encryption key is independent of `SECRET_KEY`)
 - Impacted Areas: backend | frontend | docs
 
 ---
@@ -270,8 +270,8 @@ All paths are under `/api/v1/auth/`.
 |---|---|---|---|
 | `token/` | POST | `AllowAny` | Password step. **Unchanged** when the account has no active factor. With one: returns `200` with `{"mfa_required": true, "mfa_token": "…", "methods": ["totp"]}` and sets **no** auth cookies |
 | `token/mfa/` | POST | `AllowAny` | `{mfa_token, code}` → sets auth cookies, returns `{"detail": "Login successful."}`. `code` accepts a TOTP code or a recovery code |
-| `passkeys/authenticate/begin/` | POST | `AllowAny` | `{email?}` → WebAuthn `PublicKeyCredentialRequestOptions`. Challenge cached 5 min |
-| `passkeys/authenticate/complete/` | POST | `AllowAny` | Verifies the assertion → sets auth cookies. **No password involved** (D1) |
+| `passkeys/authenticate/begin/` | POST | `AllowAny` | `{email?}` → WebAuthn `PublicKeyCredentialRequestOptions` with `userVerification: "required"`. Challenge cached 5 min |
+| `passkeys/authenticate/complete/` | POST | `AllowAny` | Verifies the assertion, **refusing one whose `uv` flag is false**, → sets auth cookies. **No password involved** (D1, ADR 0020) |
 
 **The challenge token** is `django.core.signing.TimestampSigner(salt="accounts.mfa.challenge")`
 over the user PK, with `max_age = MFA_CHALLENGE_TTL` (5 minutes). A signed token rather than a
@@ -292,7 +292,7 @@ server-side nonce would buy nothing and add state.
 | `me/mfa/totp/` | DELETE | `IsAuthenticated` | Removes the device. Refused with `409` if policy requires a factor and no passkey remains |
 | `me/mfa/recovery-codes/` | POST | `IsAuthenticated` | Regenerates all ten, returns them once |
 | `me/passkeys/` | GET | `IsAuthenticated` | List (`WebAuthnCredentialSerializer`) |
-| `me/passkeys/register/begin/` | POST | `IsAuthenticated` | `PublicKeyCredentialCreationOptions`; `residentKey: "preferred"`, `userVerification: "preferred"` |
+| `me/passkeys/register/begin/` | POST | `IsAuthenticated` | `PublicKeyCredentialCreationOptions`; `residentKey: "preferred"`, `userVerification: "required"` (ADR 0020) |
 | `me/passkeys/register/complete/` | POST | `IsAuthenticated` | `{credential, name}` → verifies attestation, stores the credential |
 | `me/passkeys/<uuid:pk>/` | PATCH, DELETE | `IsAuthenticated` | Rename or remove own credential. Same `409` guard as TOTP removal |
 
@@ -559,7 +559,7 @@ user-facing text, per AGENTS.md.
 | `test_account_without_a_factor_is_unaffected` | Response byte-identical to today's |
 | `test_challenge_token_cannot_authenticate_a_request` | Presented as a bearer token → 401 |
 
-**`PasskeyTests`** (6 tests):
+**`PasskeyTests`** (7 tests):
 
 | Test | Asserts |
 |---|---|
@@ -569,6 +569,7 @@ user-facing text, per AGENTS.md.
 | `test_multiple_credentials_per_user_are_allowed` | Two rows, both usable |
 | `test_removing_one_leaves_the_other_usable` | Login still works |
 | `test_credential_id_is_globally_unique` | `IntegrityError` on duplicate |
+| `test_assertion_without_user_verification_is_refused` | An assertion with `uv=false` is rejected on the passwordless route — the guarantee ADR 0020 rests on |
 
 **`MfaDoorTests`** (6 tests) — one per door in §5.4:
 
@@ -603,7 +604,7 @@ user-facing text, per AGENTS.md.
 **`MfaThrottleTests`** (2 tests): per-account budget on `token/mfa/`; the passkey scope is
 per-IP.
 
-Expected new backend tests: **38**. Existing `accounts` and `audit` suites must pass unchanged —
+Expected new backend tests: **39**. Existing `accounts` and `audit` suites must pass unchanged —
 an account with no factor must behave exactly as it does today.
 
 ### Frontend — `frontend/tests/mfa.test.ts` (new)
