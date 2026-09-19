@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.16.0](https://github.com/splattner/openzev/compare/v1.15.0...v1.16.0) (2026-09-19)
+
+
+### Features
+
+* **site:** add a landing page served from gh-pages ([#743](https://github.com/splattner/openzev/issues/743)) ([b1a7bcf](https://github.com/splattner/openzev/commit/b1a7bcf0f5d48250fd23e9e9c518215323b8d4d0))
+
 ## [1.15.0](https://github.com/splattner/openzev/compare/v1.14.0...v1.15.0) (2026-09-18)
 
 
