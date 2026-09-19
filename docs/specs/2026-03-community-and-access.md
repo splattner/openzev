@@ -726,7 +726,7 @@ On update:
 | Route | Allowed roles | Page component |
 |---|---|---|
 | `/` | any authenticated | `HomePage`: `OverviewPage` for `admin` / `zev_owner`; `DashboardPage` for `participant` |
-| `/dashboard` | any authenticated | `DashboardPage` (manager title/navigation: Energy balance; participant root remains `/`) |
+| `/dashboard` | any authenticated | `DashboardPage` (manager title/navigation: Energy balance; participant root remains `/`). Manager slice is slimmed: ZEV-wide KPI row → `EnergyFlowCard` → `BalanceChart` → period-preserving link to `/metering/chart?period_start&period_end` (per-participant table and manager hourly profile removed; per-meter charts live on Metering) |
 | `/account` | any authenticated | `AccountProfilePage` |
 | `/admin` | `admin` | `AdminOverviewHubPage` (tabs = routes; default tab `overview`) |
 | `/admin/overview` · `/admin/zevs` · `/admin/invoices` · `/admin/audit` · `/admin/health` | `admin` | `AdminOverviewHubPage tab=…` (KPIs · ZEVs table · all invoices · platform audit log · System health) |

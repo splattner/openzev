@@ -96,7 +96,7 @@ If logged in as admin:
 
 If logged in as a ZEV owner:
 - Go to **Overview** for setup guidance and billing work grouped by period
-- Go to **Energy balance** to analyse production, consumption, self-consumption, and grid exchange for a period
+- Go to **Energy balance** to analyse production, consumption, self-consumption, and grid exchange for a period (ZEV-wide KPIs, energy flow, and balance charts; per-meter charts for the same period live under **Metering**)
 - Go to **Settings** to configure your community parameters (General · Billing & payment · Documents & emails · Audit log · Export/transfer)
 - Go to **Participants** to view member list
 - Go to **Metering Points** to see participant meters

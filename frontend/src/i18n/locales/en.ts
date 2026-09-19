@@ -2077,14 +2077,8 @@ export const en = {
             },
             noData: 'No metering data for selected period.',
             perParticipant: 'Per Participant',
-            noParticipantData: 'No participant-level data for selected period.',
-            col: {
-                participant: 'Participant',
-                consumption: 'Consumption',
-                productionExport: 'Production/Export',
-                fromZev: 'From ZEV',
-                fromGrid: 'From Grid',
-            },
+            perParticipantMigrated: 'Per-participant breakdown is no longer shown here. Use Metering Data to chart individual meters for the same period.',
+            viewMeteringChart: 'View metering chart',
             participantStats: {
                 consumedFromZev: 'Consumed from ZEV',
                 importedFromGrid: 'Imported from Grid',

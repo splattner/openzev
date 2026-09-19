@@ -2066,14 +2066,8 @@ export const fr = {
             },
             noData: 'Aucune donnée de mesure pour la période sélectionnée.',
             perParticipant: 'Par participant',
-            noParticipantData: 'Aucune donnée par participant pour la période sélectionnée.',
-            col: {
-                participant: 'Participant',
-                consumption: 'Consommation',
-                productionExport: 'Production/Injection',
-                fromZev: 'Du RCP',
-                fromGrid: 'Du réseau',
-            },
+            perParticipantMigrated: 'Le détail par participant n’est plus affiché ici. Utilisez Données de comptage pour visualiser les compteurs individuels sur la même période.',
+            viewMeteringChart: 'Voir les mesures',
             participantStats: {
                 consumedFromZev: 'Consommé du RCP',
                 importedFromGrid: 'Importé du réseau',

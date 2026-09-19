@@ -2066,14 +2066,8 @@ export const de = {
             },
             noData: 'Keine Messdaten für den ausgewählten Zeitraum.',
             perParticipant: 'Pro Teilnehmer',
-            noParticipantData: 'Keine Daten auf Teilnehmerebene für den ausgewählten Zeitraum.',
-            col: {
-                participant: 'Teilnehmer',
-                consumption: 'Verbrauch',
-                productionExport: 'Produktion/Export',
-                fromZev: 'Aus ZEV',
-                fromGrid: 'Aus Netz',
-            },
+            perParticipantMigrated: 'Die Aufschlüsselung pro Teilnehmer wird hier nicht mehr angezeigt. Unter Messdaten können einzelne Zähler für denselben Zeitraum dargestellt werden.',
+            viewMeteringChart: 'Messdaten öffnen',
             participantStats: {
                 consumedFromZev: 'Aus ZEV verbraucht',
                 importedFromGrid: 'Aus Netz importiert',

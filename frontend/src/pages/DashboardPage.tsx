@@ -2,41 +2,23 @@ import { Link } from 'react-router-dom'
 import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useQuery } from '@tanstack/react-query'
-import {
-    Bar,
-    BarChart,
-    CartesianGrid,
-    ComposedChart,
-    Legend,
-    Line,
-    ResponsiveContainer,
-    Tooltip,
-    XAxis,
-    YAxis,
-} from 'recharts'
-import {
-    fetchHourlyProfile,
-    fetchMeteringDashboardSummary,
-} from '../lib/api/metering'
-import { fetchInvoices, openInvoicePdf } from '../lib/api/invoices'
+import { fetchHourlyProfile, fetchMeteringDashboardSummary } from '../lib/api/metering'
 import { queryKeys } from '../lib/api/queryKeys'
 import { formatKwh, formatPercent } from '../lib/numbers'
 import { dashboardKwhStat, hourlyKwhTick, hourlyKwhTooltipValue, kwhTick, kwhTooltipValue } from '../lib/dashboardFormatting'
-import { formatProductionMixTooltip } from '../lib/dashboardTooltips'
 import { formatMeteringBucketLabel } from '../lib/meteringLabels'
-import { formatShortDate, useAppSettings } from '../lib/appSettings'
+import { useAppSettings } from '../lib/appSettings'
 import { useAuth } from '../lib/auth'
 import { useManagedZev } from '../lib/managedZev'
 import { PageSkeleton } from '../components/PageSkeleton'
 import { StatCard } from '../components/StatCard'
 import { PeriodSelector } from '../components/PeriodSelector'
-import { EnergyFlowChart } from '../components/EnergyFlowChart'
-import {
-    type BillingInterval,
-    getCurrentBillingPeriod,
-} from '../lib/billingPeriod'
-import { AXIS_COLOR, CHART_GRIDLINE, CHART_GRID, CHART_LABEL, CHART_LOCAL, FLOW_GRID_EXP, FLOW_LOCAL_CONS } from '../lib/chartTokens'
-import { CHART_AXIS_TICK, CHART_TOOLTIP_STYLE } from '../lib/chartTheme'
+import { BalanceChart } from '../components/dashboard/BalanceChart'
+import { ConsumptionSplitCard } from '../components/dashboard/ConsumptionSplitCard'
+import { EnergyFlowCard } from '../components/dashboard/EnergyFlowCard'
+import { HourlyProfileCard } from '../components/dashboard/HourlyProfileCard'
+import { ParticipantInvoicesCard } from '../components/dashboard/ParticipantInvoicesCard'
+import { type BillingInterval, getCurrentBillingPeriod } from '../lib/billingPeriod'
 
 export function DashboardPage() {
     const { t } = useTranslation()
@@ -50,14 +32,12 @@ export function DashboardPage() {
     const [selectedParticipantId, setSelectedParticipantId] = useState('')
 
     const isZevScopedRole = user?.role === 'admin' || user?.role === 'zev_owner'
-
     const formatBucketLabel = (value: string) => formatMeteringBucketLabel(value, bucket, settings)
     const formatBucketTooltipLabel = (label: unknown) => formatBucketLabel(String(label ?? ''))
 
     useEffect(() => {
         setSelectedParticipantId('')
     }, [selectedZevId])
-
     useEffect(() => {
         setPeriod(getCurrentBillingPeriod(interval))
     }, [selectedZevId, interval])
@@ -81,62 +61,38 @@ export function DashboardPage() {
             }),
         enabled: user?.role === 'participant' || (isZevScopedRole && !!selectedZevId),
     })
-    const invoicesQuery = useQuery({
-        queryKey: queryKeys.invoices.list(),
-        queryFn: () => fetchInvoices(),
-        // Managers use Overview's period cards. Participants still receive
-        // their own invoices here from the role-scoped endpoint.
-        enabled: user?.role === 'participant',
-    })
     const hourlyProfileQuery = useQuery({
-        queryKey: queryKeys.metering.hourlyProfile(period.from, period.to, selectedZevId || undefined, selectedParticipantId || undefined),
+        queryKey: queryKeys.metering.hourlyProfile(period.from, period.to, selectedZevId || undefined, undefined),
         queryFn: () =>
             fetchHourlyProfile({
                 dateFrom: period.from,
                 dateTo: period.to,
                 zevId: isZevScopedRole ? selectedZevId : undefined,
-                participantId: isZevScopedRole && selectedParticipantId ? selectedParticipantId : undefined,
             }),
-        enabled: user?.role === 'participant' || (isZevScopedRole && !!selectedParticipantId),
+        enabled: user?.role === 'participant',
     })
 
     const summary = summaryQuery.data
     const selectedZevName = selectedZev?.name
     const participantScopeName = user?.zev_count === 1 ? user?.zev_name : undefined
     const selectedParticipantName = summary?.role === 'zev_owner' ? summary.selected_participant_name : undefined
-    const ownerTimeline = useMemo(
-        () => (summary?.role === 'zev_owner' ? summary.timeline : []),
-        [summary],
-    )
+    const ownerTimeline = useMemo(() => (summary?.role === 'zev_owner' ? summary.timeline : []), [summary])
     const ownerChartData = useMemo(
-        () => ownerTimeline.map((entry) => {
-            const locally_consumed = Math.max(0, entry.consumed_kwh - entry.imported_kwh)
-            const locally_produced = Math.max(0, entry.produced_kwh - entry.exported_kwh)
-            const self_consumption_rate = entry.produced_kwh > 0
-                ? Math.round((locally_produced / entry.produced_kwh) * 1000) / 10
-                : null
-            return { ...entry, locally_consumed, locally_produced, self_consumption_rate }
-        }),
+        () =>
+            ownerTimeline.map((entry) => {
+                const locally_consumed = Math.max(0, entry.consumed_kwh - entry.imported_kwh)
+                const locally_produced = Math.max(0, entry.produced_kwh - entry.exported_kwh)
+                const self_consumption_rate =
+                    entry.produced_kwh > 0 ? Math.round((locally_produced / entry.produced_kwh) * 1000) / 10 : null
+                return { ...entry, locally_consumed, locally_produced, self_consumption_rate }
+            }),
         [ownerTimeline],
     )
-    const participantTimeline = useMemo(
-        () => (summary?.role === 'participant' ? summary.timeline : []),
-        [summary],
-    )
+    const participantTimeline = useMemo(() => (summary?.role === 'participant' ? summary.timeline : []), [summary])
     const hourlyProfile = hourlyProfileQuery.data?.hourly_profile ?? null
     const hourlyProfileData = useMemo(
-        () => hourlyProfile?.map((entry) => ({
-            ...entry,
-            label: `${String(entry.hour).padStart(2, '0')}:00`,
-        })) ?? [],
+        () => hourlyProfile?.map((entry) => ({ ...entry, label: `${String(entry.hour).padStart(2, '0')}:00` })) ?? [],
         [hourlyProfile],
-    )
-    const participantInvoicesWithPdf = useMemo(
-        () =>
-            (invoicesQuery.data ?? []).filter(
-                (invoice) => ['approved', 'sent', 'paid'].includes(invoice.status) && !!invoice.pdf_url,
-            ),
-        [invoicesQuery.data],
     )
     const ownerSelfConsumption = useMemo(() => {
         if (summary?.role !== 'zev_owner') return null
@@ -146,40 +102,31 @@ export function DashboardPage() {
         return { pct: (localKwh / produced_kwh) * 100, localKwh, producedKwh: produced_kwh }
     }, [summary])
 
+    const meteringChartHref = `/metering/chart?period_start=${period.from}&period_end=${period.to}`
+
     return (
         <div className="page-stack">
             <header>
                 {(selectedZevName || participantScopeName) ? <p className="eyebrow">{selectedZevName ?? participantScopeName}</p> : null}
-                <h2>
-                    {t(isZevScopedRole ? 'pages.energyBalancePage.title' : 'dashboard.title')}
-                </h2>
-                <p className="muted">
-                    {t(isZevScopedRole ? 'pages.energyBalancePage.description' : 'dashboard.description')}
-                </p>
+                <h2>{t(isZevScopedRole ? 'pages.energyBalancePage.title' : 'dashboard.title')}</h2>
+                <p className="muted">{t(isZevScopedRole ? 'pages.energyBalancePage.description' : 'dashboard.description')}</p>
             </header>
 
             {(user?.role === 'admin' || user?.role === 'zev_owner') && (
                 <section className="card">
                     <div className="grid">
-                        <PeriodSelector
-                            interval={interval}
-                            from={period.from}
-                            to={period.to}
-                            onChange={setPeriod}
-                        />
+                        <PeriodSelector interval={interval} from={period.from} to={period.to} onChange={setPeriod} />
                         <div className="inline-form grid grid-2">
                             <label>
                                 <span>{t('pages.dashboard.participant')}</span>
-                                <select
-                                    value={selectedParticipantId}
-                                    onChange={(e) => setSelectedParticipantId(e.target.value)}
-                                >
+                                <select value={selectedParticipantId} onChange={(e) => setSelectedParticipantId(e.target.value)}>
                                     <option value="">{t('pages.dashboard.allParticipants')}</option>
-                                    {summary?.role === 'zev_owner' && summary.participant_stats.map((participant) => (
-                                        <option key={participant.participant_id} value={participant.participant_id}>
-                                            {participant.participant_name || participant.participant_id}
-                                        </option>
-                                    ))}
+                                    {summary?.role === 'zev_owner' &&
+                                        summary.participant_stats.map((participant) => (
+                                            <option key={participant.participant_id} value={participant.participant_id}>
+                                                {participant.participant_name || participant.participant_id}
+                                            </option>
+                                        ))}
                                 </select>
                             </label>
                             <label>
@@ -198,12 +145,7 @@ export function DashboardPage() {
             {user?.role === 'participant' && (
                 <section className="card">
                     <div className="grid">
-                        <PeriodSelector
-                            interval={interval}
-                            from={period.from}
-                            to={period.to}
-                            onChange={setPeriod}
-                        />
+                        <PeriodSelector interval={interval} from={period.from} to={period.to} onChange={setPeriod} />
                         <div className="inline-form" style={{ maxWidth: '320px' }}>
                             <label>
                                 <span>{t('pages.dashboard.resolution')}</span>
@@ -218,10 +160,7 @@ export function DashboardPage() {
                 </section>
             )}
 
-            {isZevScopedRole && !selectedZevId && !managedZevLoading && (
-                <div className="card">{t('pages.dashboard.noZev')}</div>
-            )}
-
+            {isZevScopedRole && !selectedZevId && !managedZevLoading && <div className="card">{t('pages.dashboard.noZev')}</div>}
             {isZevScopedRole && selectedZevId && !selectedZev && !managedZevLoading && managedZevs.length > 0 && (
                 <div className="card">{t('pages.dashboard.selectZev')}</div>
             )}
@@ -231,159 +170,47 @@ export function DashboardPage() {
 
             {summary && summary.role === 'zev_owner' && (
                 <>
-                    {/* Hero + KPI row (spec §5.1): always ZEV-wide, even when a
-                        participant drill-down filters the charts below. */}
                     <section className="kpi-row">
                         <StatCard
                             accent
                             label={t('pages.dashboard.stats.selfConsumptionRate')}
                             value={ownerSelfConsumption ? formatPercent(ownerSelfConsumption.pct) : '—'}
-                            hint={ownerSelfConsumption
-                                ? t('pages.dashboard.hints.selfConsumption', {
-                                    local: formatKwh(ownerSelfConsumption.localKwh, { maxDecimals: 0 }),
-                                    total: formatKwh(ownerSelfConsumption.producedKwh, { maxDecimals: 0 }),
-                                })
-                                : undefined}
+                            hint={
+                                ownerSelfConsumption
+                                    ? t('pages.dashboard.hints.selfConsumption', {
+                                          local: formatKwh(ownerSelfConsumption.localKwh, { maxDecimals: 0 }),
+                                          total: formatKwh(ownerSelfConsumption.producedKwh, { maxDecimals: 0 }),
+                                      })
+                                    : undefined
+                            }
                         />
                         <StatCard label={t('pages.dashboard.stats.producedInZev')} value={dashboardKwhStat(summary.zev_totals.produced_kwh)} />
                         <StatCard label={t('pages.dashboard.stats.consumedInZev')} value={dashboardKwhStat(summary.zev_totals.consumed_kwh)} />
                         <StatCard label={t('pages.dashboard.stats.importedFromGrid')} value={dashboardKwhStat(summary.zev_totals.imported_kwh)} />
                         <StatCard label={t('pages.dashboard.stats.exportedToGrid')} value={dashboardKwhStat(summary.zev_totals.exported_kwh)} />
                     </section>
-
-                    {summary.participant_stats.length > 0 && (
-                        <section className="card">
-                            <h3 style={{ marginTop: 0 }}>
-                                {t('pages.dashboard.energyFlow.title')}
-                                {selectedZevName ? ` — ${selectedZevName}` : ''}
-                            </h3>
-                            <EnergyFlowChart
-                                totals={summary.zev_totals}
-                                participantStats={summary.participant_stats}
-                                highlightParticipantId={selectedParticipantId || undefined}
-                            />
-                        </section>
-                    )}
-
-                    <section className="card">
-                        <h3 style={{ marginTop: 0 }}>
-                            {t('pages.dashboard.consumptionAndProduction')}
-                            {selectedZevName ? ` — ${selectedZevName}` : ''}
-                            {selectedParticipantName ? ` — ${selectedParticipantName}` : ''}
-                        </h3>
-                        {ownerChartData.length === 0 ? (
-                            <p className="muted">{t('pages.dashboard.noData')}</p>
-                        ) : (
-                            <div className="form-grid" style={{ gap: '2rem' }}>
-                                <div>
-                                    <p style={{ margin: '0 0 0.5rem', fontWeight: 600, fontSize: '0.875rem', color: CHART_LABEL }}>{t('pages.dashboard.consumption')}</p>
-                                    <ResponsiveContainer width="100%" height={300}>
-                                        <BarChart data={ownerChartData} margin={{ top: 4, right: 4, bottom: 4, left: 0 }}>
-                                            <CartesianGrid stroke={CHART_GRIDLINE} strokeDasharray="3 3" vertical={false} />
-                                            <XAxis dataKey="bucket" tick={CHART_AXIS_TICK} stroke={AXIS_COLOR} tickFormatter={formatBucketLabel} />
-                                            <YAxis tick={CHART_AXIS_TICK} stroke={AXIS_COLOR} unit=" kWh" width={60} tickFormatter={kwhTick} />
-                                            <Tooltip contentStyle={CHART_TOOLTIP_STYLE} formatter={kwhTooltipValue} labelFormatter={formatBucketTooltipLabel} />
-                                            <Legend />
-                                            <Bar dataKey="locally_consumed" name={t('pages.dashboard.chart.fromZev')} stackId="c" fill={CHART_LOCAL} />
-                                            <Bar dataKey="imported_kwh" name={t('pages.dashboard.chart.fromGrid')} stackId="c" fill={CHART_GRID} radius={[3, 3, 0, 0]} />
-                                        </BarChart>
-                                    </ResponsiveContainer>
-                                </div>
-                                <div>
-                                    <p style={{ margin: '0 0 0.5rem', fontWeight: 600, fontSize: '0.875rem', color: CHART_LABEL }}>{t('pages.dashboard.production')}</p>
-                                    <ResponsiveContainer width="100%" height={300}>
-                                        <ComposedChart data={ownerChartData} margin={{ top: 4, right: 50, bottom: 4, left: 0 }}>
-                                            <CartesianGrid stroke={CHART_GRIDLINE} strokeDasharray="3 3" vertical={false} />
-                                            <XAxis dataKey="bucket" tick={CHART_AXIS_TICK} stroke={AXIS_COLOR} tickFormatter={formatBucketLabel} />
-                                            <YAxis yAxisId="kwh" tick={CHART_AXIS_TICK} stroke={AXIS_COLOR} unit=" kWh" width={60} tickFormatter={kwhTick} />
-                                            <YAxis yAxisId="pct" orientation="right" tick={CHART_AXIS_TICK} stroke={AXIS_COLOR} unit="%" width={44} domain={[0, 100]} />
-                                            <Tooltip
-                                                contentStyle={CHART_TOOLTIP_STYLE}
-                                                labelFormatter={formatBucketTooltipLabel}
-                                                formatter={(v, name, props) =>
-                                                    formatProductionMixTooltip(v, String(name), props?.dataKey, t('pages.dashboard.chart.selfConsumedPct'))
-                                                }
-                                            />
-                                            <Legend />
-                                            <Bar yAxisId="kwh" dataKey="locally_produced" name={t('pages.dashboard.chart.usedLocally')} stackId="p" fill={CHART_LOCAL} />
-                                            <Bar yAxisId="kwh" dataKey="exported_kwh" name={t('pages.dashboard.chart.exported')} stackId="p" fill={FLOW_GRID_EXP} radius={[3, 3, 0, 0]} />
-                                            <Line yAxisId="pct" type="monotone" dataKey="self_consumption_rate" name={t('pages.dashboard.chart.selfConsumedPct')} stroke={FLOW_LOCAL_CONS} dot={false} strokeWidth={2} connectNulls />
-                                        </ComposedChart>
-                                    </ResponsiveContainer>
-                                </div>
-                            </div>
-                        )}
-                    </section>
-
+                    <EnergyFlowCard
+                        totals={summary.zev_totals}
+                        participantStats={summary.participant_stats}
+                        highlightParticipantId={selectedParticipantId || undefined}
+                        zevName={selectedZevName}
+                    />
+                    <BalanceChart
+                        data={ownerChartData}
+                        zevName={selectedZevName}
+                        participantName={selectedParticipantName ?? undefined}
+                        formatBucketLabel={formatBucketLabel}
+                        formatBucketTooltipLabel={formatBucketTooltipLabel}
+                        kwhTick={kwhTick}
+                        kwhTooltipValue={kwhTooltipValue}
+                    />
                     <section className="card">
                         <h3 style={{ marginTop: 0 }}>{t('pages.dashboard.perParticipant')}</h3>
-                        {summary.participant_stats.length === 0 ? (
-                            <p className="muted">{t('pages.dashboard.noParticipantData')}</p>
-                        ) : (
-                            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                                <thead>
-                                    <tr>
-                                        <th style={{ textAlign: 'left', padding: '0.5rem 0.6rem' }}>{t('pages.dashboard.col.participant')}</th>
-                                        <th style={{ textAlign: 'right', padding: '0.5rem 0.6rem' }}>{t('pages.dashboard.col.consumption')}</th>
-                                        <th style={{ textAlign: 'right', padding: '0.5rem 0.6rem' }}>{t('pages.dashboard.col.productionExport')}</th>
-                                        <th style={{ textAlign: 'right', padding: '0.5rem 0.6rem' }}>{t('pages.dashboard.col.fromZev')}</th>
-                                        <th style={{ textAlign: 'right', padding: '0.5rem 0.6rem' }}>{t('pages.dashboard.col.fromGrid')}</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {summary.participant_stats.map((participant) => (
-                                        <tr
-                                            key={participant.participant_id}
-                                            onClick={() => setSelectedParticipantId(participant.participant_id)}
-                                            style={{
-                                                borderTop: '1px solid var(--border-default)',
-                                                cursor: 'pointer',
-                                                backgroundColor: selectedParticipantId === participant.participant_id ? 'var(--surface)' : 'transparent',
-                                                transition: 'background-color 150ms ease-in-out',
-                                            }}
-                                            onMouseEnter={(e) => {
-                                                if (selectedParticipantId !== participant.participant_id) {
-                                                    e.currentTarget.style.backgroundColor = 'var(--surface)'
-                                                }
-                                            }}
-                                            onMouseLeave={(e) => {
-                                                if (selectedParticipantId !== participant.participant_id) {
-                                                    e.currentTarget.style.backgroundColor = 'transparent'
-                                                }
-                                            }}
-                                        >
-                                            <td style={{ padding: '0.5rem 0.6rem' }}>{participant.participant_name || '-'}</td>
-                                            <td style={{ textAlign: 'right', padding: '0.5rem 0.6rem' }} className="numeric">{dashboardKwhStat(participant.total_consumed_kwh)}</td>
-                                            <td style={{ textAlign: 'right', padding: '0.5rem 0.6rem' }} className="numeric">{dashboardKwhStat(participant.total_produced_kwh)}</td>
-                                            <td style={{ textAlign: 'right', padding: '0.5rem 0.6rem' }} className="numeric">{dashboardKwhStat(participant.from_zev_kwh)}</td>
-                                            <td style={{ textAlign: 'right', padding: '0.5rem 0.6rem' }} className="numeric">{dashboardKwhStat(participant.from_grid_kwh)}</td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        )}
+                        <p className="muted">{t('pages.dashboard.perParticipantMigrated')}</p>
+                        <Link className="button button-secondary button-compact" to={meteringChartHref}>
+                            {t('pages.dashboard.viewMeteringChart')}
+                        </Link>
                     </section>
-
-                    {selectedParticipantId && hourlyProfileData.length > 0 && (
-                        <section className="card" style={{ minHeight: 360 }}>
-                            <h3 style={{ marginTop: 0 }}>
-                                {t('pages.dashboard.hourlyProfile.title')}
-                                {selectedParticipantName ? ` — ${selectedParticipantName}` : ''}
-                            </h3>
-                            <p className="muted" style={{ marginTop: 0, fontSize: '0.875rem' }}>{t('pages.dashboard.hourlyProfile.description')}</p>
-                            <ResponsiveContainer width="100%" height={320}>
-                                <BarChart data={hourlyProfileData} margin={{ top: 4, right: 4, bottom: 4, left: 0 }}>
-                                    <CartesianGrid stroke={CHART_GRIDLINE} strokeDasharray="3 3" vertical={false} />
-                                    <XAxis dataKey="label" tick={CHART_AXIS_TICK} stroke={AXIS_COLOR} />
-                                    <YAxis tick={CHART_AXIS_TICK} stroke={AXIS_COLOR} unit=" kWh" width={60} tickFormatter={hourlyKwhTick} />
-                                    <Tooltip contentStyle={CHART_TOOLTIP_STYLE} formatter={hourlyKwhTooltipValue} />
-                                    <Legend />
-                                    <Bar dataKey="from_zev_kwh" name={t('pages.dashboard.chart.fromZev')} stackId="c" fill={CHART_LOCAL} />
-                                    <Bar dataKey="from_grid_kwh" name={t('pages.dashboard.chart.fromGrid')} stackId="c" fill={CHART_GRID} radius={[3, 3, 0, 0]} />
-                                </BarChart>
-                            </ResponsiveContainer>
-                        </section>
-                    )}
                 </>
             )}
 
@@ -394,107 +221,24 @@ export function DashboardPage() {
                         <StatCard label={t('pages.dashboard.participantStats.importedFromGrid')} value={dashboardKwhStat(summary.totals.imported_from_grid_kwh)} />
                         <StatCard label={t('pages.dashboard.participantStats.totalConsumption')} value={dashboardKwhStat(summary.totals.total_consumed_kwh)} />
                     </section>
-
-                    {summary.zev_participant_stats.length > 0 && summary.current_participant_id && (
-                        <section className="card">
-                            <h3 style={{ marginTop: 0 }}>{t('pages.dashboard.energyFlow.title')}</h3>
-                            <EnergyFlowChart
-                                totals={summary.zev_totals}
-                                participantStats={summary.zev_participant_stats}
-                                highlightParticipantId={summary.current_participant_id}
-                            />
-                        </section>
-                    )}
-
-                    <section className="card" style={{ minHeight: 360 }}>
-                        <h3 style={{ marginTop: 0 }}>{t('pages.dashboard.consumptionSplit')}</h3>
-                        {participantTimeline.length === 0 ? (
-                            <p className="muted">{t('pages.dashboard.noData')}</p>
-                        ) : (
-                            <ResponsiveContainer width="100%" height={320}>
-                                <BarChart data={participantTimeline} margin={{ top: 4, right: 4, bottom: 4, left: 0 }}>
-                                    <CartesianGrid stroke={CHART_GRIDLINE} strokeDasharray="3 3" vertical={false} />
-                                    <XAxis dataKey="bucket" tick={CHART_AXIS_TICK} stroke={AXIS_COLOR} tickFormatter={formatBucketLabel} />
-                                    <YAxis tick={CHART_AXIS_TICK} stroke={AXIS_COLOR} unit=" kWh" width={60} tickFormatter={kwhTick} />
-                                    <Tooltip contentStyle={CHART_TOOLTIP_STYLE} formatter={kwhTooltipValue} labelFormatter={formatBucketTooltipLabel} />
-                                    <Legend />
-                                    <Bar dataKey="consumed_from_zev_kwh" name={t('pages.dashboard.chart.fromZev')} stackId="c" fill={CHART_LOCAL} />
-                                    <Bar dataKey="imported_from_grid_kwh" name={t('pages.dashboard.chart.fromGrid')} stackId="c" fill={CHART_GRID} radius={[3, 3, 0, 0]} />
-                                </BarChart>
-                            </ResponsiveContainer>
-                        )}
-                    </section>
-
-                    {hourlyProfileData.length > 0 && (
-                        <section className="card" style={{ minHeight: 360 }}>
-                            <h3 style={{ marginTop: 0 }}>{t('pages.dashboard.hourlyProfile.title')}</h3>
-                            <p className="muted" style={{ marginTop: 0, fontSize: '0.875rem' }}>{t('pages.dashboard.hourlyProfile.description')}</p>
-                            <ResponsiveContainer width="100%" height={320}>
-                                <BarChart data={hourlyProfileData} margin={{ top: 4, right: 4, bottom: 4, left: 0 }}>
-                                    <CartesianGrid stroke={CHART_GRIDLINE} strokeDasharray="3 3" vertical={false} />
-                                    <XAxis dataKey="label" tick={CHART_AXIS_TICK} stroke={AXIS_COLOR} />
-                                    <YAxis tick={CHART_AXIS_TICK} stroke={AXIS_COLOR} unit=" kWh" width={60} tickFormatter={hourlyKwhTick} />
-                                    <Tooltip contentStyle={CHART_TOOLTIP_STYLE} formatter={hourlyKwhTooltipValue} />
-                                    <Legend />
-                                    <Bar dataKey="from_zev_kwh" name={t('pages.dashboard.chart.fromZev')} stackId="c" fill={CHART_LOCAL} />
-                                    <Bar dataKey="from_grid_kwh" name={t('pages.dashboard.chart.fromGrid')} stackId="c" fill={CHART_GRID} radius={[3, 3, 0, 0]} />
-                                </BarChart>
-                            </ResponsiveContainer>
-                        </section>
-                    )}
-
-                    <section className="card">
-                        <h3 style={{ marginTop: 0 }}>{t('pages.dashboard.invoicesSection')}</h3>
-                        {invoicesQuery.isLoading ? (
-                            <PageSkeleton variant="tableRows" />
-                        ) : invoicesQuery.isError ? (
-                            <p className="muted">{t('pages.dashboard.failedInvoices')}</p>
-                        ) : participantInvoicesWithPdf.length === 0 ? (
-                            <p className="muted">{t('pages.dashboard.noInvoices')}</p>
-                        ) : (
-                            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                                <thead>
-                                    <tr>
-                                        <th style={{ textAlign: 'left', padding: '0.5rem 0.6rem' }}>{t('pages.dashboard.invoiceCol.invoice')}</th>
-                                        <th style={{ textAlign: 'left', padding: '0.5rem 0.6rem' }}>{t('pages.dashboard.invoiceCol.period')}</th>
-                                        <th style={{ textAlign: 'right', padding: '0.5rem 0.6rem' }}>{t('pages.dashboard.invoiceCol.total')}</th>
-                                        <th style={{ textAlign: 'left', padding: '0.5rem 0.6rem' }}>{t('pages.dashboard.invoiceCol.actions')}</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {participantInvoicesWithPdf.map((invoice) => (
-                                        <tr key={invoice.id} style={{ borderTop: '1px solid var(--border-default)' }}>
-                                            <td style={{ padding: '0.5rem 0.6rem' }}>{invoice.invoice_number}</td>
-                                            <td style={{ padding: '0.5rem 0.6rem' }}>{formatShortDate(invoice.period_start, settings)} → {formatShortDate(invoice.period_end, settings)}</td>
-                                            <td style={{ textAlign: 'right', padding: '0.5rem 0.6rem' }}>CHF {invoice.total_chf}</td>
-                                            <td style={{ padding: '0.5rem 0.6rem' }}>
-                                                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                                                    <Link
-                                                        className="button button-primary"
-                                                        style={{ textDecoration: 'none' }}
-                                                        to={`/billing/invoices/${invoice.id}`}
-                                                        state={{ from: '/' }}
-                                                    >
-                                                        {t('pages.dashboard.viewDetails')}
-                                                    </Link>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => openInvoicePdf(invoice.id)}
-                                                        className="button button-primary"
-                                                        style={{ textDecoration: 'none', padding: '0.3rem 0.5rem', lineHeight: 1 }}
-                                                        aria-label={t('pages.dashboard.openInvoicePdf', { number: invoice.invoice_number })}
-                                                        title={t('common.openPdf')}
-                                                    >
-                                                        📄
-                                                    </button>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        )}
-                    </section>
+                    <EnergyFlowCard
+                        totals={summary.zev_totals}
+                        participantStats={summary.zev_participant_stats}
+                        highlightParticipantId={summary.current_participant_id ?? undefined}
+                    />
+                    <ConsumptionSplitCard
+                        data={participantTimeline}
+                        formatBucketLabel={formatBucketLabel}
+                        formatBucketTooltipLabel={formatBucketTooltipLabel}
+                        kwhTick={kwhTick}
+                        kwhTooltipValue={kwhTooltipValue}
+                    />
+                    <HourlyProfileCard
+                        data={hourlyProfileData}
+                        hourlyKwhTick={hourlyKwhTick}
+                        hourlyKwhTooltipValue={hourlyKwhTooltipValue}
+                    />
+                    <ParticipantInvoicesCard enabled={user?.role === 'participant'} />
                 </>
             )}
         </div>
