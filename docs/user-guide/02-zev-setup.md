@@ -93,6 +93,10 @@ Admins can create a ZEV together with a new responsible-person account in a sing
 
 The General and Billing & payment tabs hold the settings form sections:
 
+Text, selection, and date fields share the same compact size. In **Grid Connection**,
+each field's guidance appears directly beneath it. On narrow screens the fields
+stack into one column. Select the start-date field to open its calendar.
+
 #### Basic Information
 
 | Setting | Purpose | Required |

@@ -210,6 +210,11 @@ Admins configure VAT rates in **Platform → System Settings → VAT** (fourth t
 
 ![VAT settings](screenshots/13-admin-vat-settings.png)
 
+The rate, **Valid from**, and optional **Valid to** fields appear together with
+guidance beneath each field. Select either date field to open its calendar;
+leave **Valid to** empty for an open-ended rate. On narrow screens the form wraps
+the fields onto separate rows.
+
 VAT rates are validity-window based — you can set rates for specific time periods. The system automatically applies the correct rate based on the invoice period end date.
 
 ### How VAT Works

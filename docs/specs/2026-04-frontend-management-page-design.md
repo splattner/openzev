@@ -121,12 +121,37 @@ language and should be reused instead of ad hoc page-local CSS when possible:
 | `.checkbox-row` | Flex row for a checkbox and its label (`display:flex; align-items:center; gap:0.6rem`) |
 | `.participant-*`, `.metering-*`, `.tariff-*`, `.invoice-*` | Page-family-specific structural patterns that are already in active use |
 
-Form controls: the base `input, select` rule sets `width: 100%`, which is
-written for text fields. `input[type="checkbox"]` and `input[type="radio"]`
-are excluded back to `width: auto` — without that exclusion a checkbox
+Form controls: native text-like inputs and single-value selects share one
+default presentation with Mantine field controls (`TextInput`,
+`Autocomplete`, `DatePickerInput`). Both implementations consume the same
+field tokens (`design/tokens.json` → `fields`): 2.75rem (44px) height, 1rem value
+type at 1.5 line height (native selects retain platform line-height behavior),
+0.75rem radius, 0.95rem base inline padding, 1rem/400 labels, 0.875rem
+helpers, and 0.4rem label/control/helper gaps. Native rules live in `index.css`;
+their input-type exclusions use `:where()` to keep specificity below Mantine's
+state and section rules. Native helpers (`label > small.muted`) use the shared
+helper size and line height.
+
+Mantine defaults live in `frontend/src/lib/mantineTheme.ts`: `Input` box vars
+and `InputWrapper` label → input → description → error order, label/help type,
+label bottom margin, and conditional input offsets for descriptions/errors.
+Left/right section insets continue to reserve space for icons and clear buttons.
+The neutral default border uses `--border-default`; the theme omits that override
+when an error/success border is enabled, leaving Mantine's state colors intact.
+Focus changes the border on the control itself and disabled backgrounds remain
+Mantine-owned. Filled/unstyled variants retain their own border behavior. Mantine
+`size` still drives calendars, dropdown options, and section icons — field
+height must never be solved with per-field `size` props, and multiline
+textareas keep growing (the theme skips `Textarea`). Intentional exceptions
+to the default (e.g. compact toolbar/filter density) must be explicit and
+narrowly scoped; do not build a speculative size/variant framework.
+
+The base field rule sets `width: 100%`, which is written for text fields.
+Checkboxes, radios, file/range/color inputs, hidden inputs, input buttons, and
+multiple selects are excluded. Checkboxes and radios additionally have an
+explicit `width: auto` guard — without that guard a checkbox
 stretches across its flex row and pushes its own label to the far right, where
-it wraps (#490). The remaining declarations in that rule (padding, border,
-background) are ignored by the native controls and need no reset. Guarded by
+it wraps (#490). Guarded by
 `frontend/tests/form-control-widths.test.ts`, which resolves the cascade in
 jsdom.
 
@@ -358,6 +383,13 @@ These pages define the current management-page reference set.
 
 - Build and type checks: `npm run build`
 - Lint: `npm run lint`
+- `frontend/screenshots/field-geometry.spec.ts`: real-browser geometry, neutral
+  border and label/helper spacing parity, native checkbox sizing, VAT and modal
+  fields, calendar/autocomplete interaction above modals, keyboard focus,
+  error/success/disabled states, icon insets, multiline height, and 400px layouts
+  in English and German. The test-only `fixtures/field-states.tsx` mounts real
+  Mantine components with state props; it adds no product route. Run via
+  `npm run test:browser` against the development stack.
 - Locale parity: `npx vitest run tests/locale-parity.test.ts` — en/de/fr/it key-structure equality, no empty values, all leaves are strings, interpolation placeholders match
 - Manual verification on the reference pages:
   - page header and description are present

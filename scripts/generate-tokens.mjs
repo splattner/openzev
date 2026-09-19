@@ -45,7 +45,7 @@ function relativeLuminance(hex) {
 }
 
 function validate(tokens) {
-  const required = ['primitives', 'semantics', 'themes', 'charts', 'type']
+  const required = ['primitives', 'semantics', 'fields', 'themes', 'charts', 'type']
   for (const k of required) {
     assert(tokens[k] !== undefined, `Missing top-level key: ${k}`)
     assert(tokens[k] !== null && typeof tokens[k] === 'object' && !Array.isArray(tokens[k]), `Top-level key ${k} must be an object`)
@@ -64,6 +64,18 @@ function validate(tokens) {
     const ref = v.slice(4, -1)
     assert(tokens.primitives[ref] !== undefined, `Semantic ${k} references unknown primitive ${ref}`)
     assert(!HEX_CONTAINS.test(v), `Semantic ${k} must not contain raw hex`)
+  }
+
+  // fields: frontend-only form-field dimensions. Keys --field-*, values are
+  // CSS dimension literals (rem/px/em/%) or bare numbers (weights, line
+  // height) — never hex, never var(). Emitted to the frontend token
+  // stylesheet only; chart/PDF outputs stay color-only.
+  const FIELD_RE = /^(\d*\.?\d+(rem|px|em|%)?|\d+)$/
+  assert(tokens.fields && typeof tokens.fields === 'object' && !Array.isArray(tokens.fields), 'fields must be an object')
+  for (const [k, v] of Object.entries(tokens.fields)) {
+    assert(k.startsWith('--field-'), `Field key must start with --field-: ${k}`)
+    assert(typeof v === 'string' && FIELD_RE.test(v), `Field ${k} must be a dimension literal, got: ${v}`)
+    assert(!HEX_CONTAINS.test(v), `Field ${k} must not contain raw hex`)
   }
 
   // themes: each theme is map semantic -> var(--primitive)
@@ -130,6 +142,11 @@ function generateTokensCss(tokens) {
   const semKeys = Object.keys(tokens.semantics).sort()
   for (const k of semKeys) {
     lines.push(`  ${k}: ${tokens.semantics[k]};`)
+  }
+  // fields (frontend-only dimensions) — sorted
+  const fieldKeys = Object.keys(tokens.fields).sort()
+  for (const k of fieldKeys) {
+    lines.push(`  ${k}: ${tokens.fields[k]};`)
   }
   lines.push('}')
   // themes: emit [data-theme] overrides for any alternate theme maps

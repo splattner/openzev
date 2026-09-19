@@ -1977,6 +1977,7 @@ export const en = {
                 },
                         tariffSourceUrl: 'Tariff document URL',
                         tariffSourceUrlHint: 'Where this grid operator publishes its machine-readable tariffs (Art. 7b StromVV). Used by the tariff import.',
+                        tariffSourceUrlPlaceholder: 'https://…/tariffs.json',
                 gridConnectionPoint: 'Grid connection point',
                 invoicePrefix: 'Invoice prefix',
                 vatMode: 'VAT treatment',

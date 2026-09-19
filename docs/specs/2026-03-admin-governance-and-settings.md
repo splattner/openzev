@@ -457,6 +457,10 @@ corresponding hub tab or `/admin/system-settings` tab.
 - Query: `useQuery({ queryKey: ['vat-rates'], queryFn: fetchVatRates })`.
 - Layout: root is a `.page-stack` (stats grid, full-width form card, rate list);
   the form fields use a wrapping `repeat(auto-fit, minmax(200px, 1fr))` grid.
+  The native rate input and both `CivilDateInput` controls use the shared
+  2.75rem field height, 1rem value text, and 0.75rem radius. Labels and helper
+  text have the same spacing across all three fields; calendar sizing remains
+  independent of field height.
 - **Summary cards:** three `StatCard` components above the form — configured rate count, today's active rate (percentage, or the translated "none" label), and count of scheduled rates with `valid_from` in the future.
 - **Create/Edit form:** 3 fields (rate %, valid_from date input with app-settings format, valid_to date input optional). Default rate: `8.1`. The frontend converts percentage to fraction before sending (`(percentage / 100).toFixed(4)`). Dates use the shared `CivilDateInput` (`frontend/src/components/CivilDateInput.tsx`, a Mantine `DatePickerInput` typing civil dates in the app's configured format); calendar localization comes from the app-level Mantine `DatesProvider` supplied by `DateLocaleProvider` (`frontend/src/components/DateLocaleProvider.tsx`, mounted in `main.tsx`), which maps the active UI language to a dayjs locale for month names, weekday order, and picker text. Submitting an empty valid_from is rejected client-side with a toast (`adminVatSettings.messages.missingValidFrom`).
 - **Rate table:** inside `.table-card`, a `data-table` (same shared table styling
@@ -493,6 +497,13 @@ omitting it renders every group for existing full-form consumers.
 
 - **General** (`general`): name, start date, ZEV type, grid operator (including
   ElCom ID and tariff-source URL), grid connection point.
+  The grid-connection section uses Mantine `TextInput` for postal code,
+  tariff-source URL, and connection point, plus `GridOperatorField` autocomplete.
+  Its two-column grid aligns fields at the top, with descriptions below the
+  controls and a full-width tariff URL. Native fields, autocomplete, and the
+  shared civil-date picker inherit the same field tokens and neutral border;
+  no caller-specific Mantine size prop is required. URL placeholders are
+  translated in all four locales.
 - **Billing & payment** (`billing`): billing interval, invoice language,
   payment term, `itemize_tariff_bands`, `participant_invoice_access`, invoice
   prefix, VAT treatment (`vat_mode`), VAT number (only when registered), bank

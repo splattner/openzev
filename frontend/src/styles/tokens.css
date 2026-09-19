@@ -59,4 +59,13 @@
   --text-body: var(--ink-soft);
   --text-muted: var(--muted);
   --text-primary: var(--ink);
+  --field-font-size: 1rem;
+  --field-gap: 0.4rem;
+  --field-height: 2.75rem;
+  --field-help-size: 0.875rem;
+  --field-label-size: 1rem;
+  --field-label-weight: 400;
+  --field-line-height: 1.5;
+  --field-padding-inline: 0.95rem;
+  --field-radius: 0.75rem;
 }

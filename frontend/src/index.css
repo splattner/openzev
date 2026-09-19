@@ -42,19 +42,24 @@ select {
   font: inherit;
 }
 
-input,
-select {
+/* Text-like controls share the field-token dimensions with Mantine inputs
+   (same tokens via the theme). `:where()` keeps this rule below Mantine's
+   own input styles so focused/error/disabled states keep working.
+   Excluded types keep their intrinsic rendering. */
+input:where(:not([type='checkbox']):not([type='radio']):not([type='file']):not([type='range']):not([type='hidden']):not([type='submit']):not([type='button']):not([type='reset']):not([type='image']):not([type='color'])),
+select:where(:not([multiple])) {
   width: 100%;
-  padding: 0.8rem 0.95rem;
+  height: var(--field-height);
+  padding: 0 var(--field-padding-inline);
   border: 1px solid var(--border-default);
-  border-radius: 0.75rem;
+  border-radius: var(--field-radius);
   background: var(--white);
+  font-size: var(--field-font-size);
+  line-height: var(--field-line-height);
 }
 
-/* The rule above is written for text fields. A checkbox or radio inheriting
-   width: 100% stretches across its flex row and shoves its own label to the
-   far right, where it wraps — so restore their intrinsic size. The other
-   declarations above are ignored by the native control and need no reset. */
+/* Keep checkboxes and radios at intrinsic width even when another form rule
+   applies a width to inputs. They are excluded from the field rule above. */
 input[type="checkbox"],
 input[type="radio"] {
   width: auto;
@@ -62,7 +67,12 @@ input[type="radio"] {
 
 label {
   display: grid;
-  gap: 0.4rem;
+  gap: var(--field-gap);
+}
+
+label > small.muted {
+  font-size: var(--field-help-size);
+  line-height: var(--field-line-height);
 }
 
 .page-stack table,
@@ -1823,6 +1833,11 @@ h3 {
 
 .inline-form {
   align-items: end;
+}
+
+/* Keep two-column inputs aligned when descriptions vary in height. */
+.inline-form.align-start {
+  align-items: start;
 }
 
 .actions-row {

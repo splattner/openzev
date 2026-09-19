@@ -1,5 +1,6 @@
-import { CivilDateInput } from './CivilDateInput'
+import { TextInput } from '@mantine/core'
 import { useTranslation } from 'react-i18next'
+import { CivilDateInput } from './CivilDateInput'
 import { BILLING_INTERVAL_OPTIONS, ZEV_TYPE_OPTIONS } from '../lib/options'
 import type { ZevInput } from '../types/api'
 import { isValidIban, normalizeIban } from '../lib/iban'
@@ -150,15 +151,13 @@ export function ZevGeneralSettingsFields({ form, onChange, group, zevId }: ZevGe
             {(!group || group === 'general') && (
             <div className="form-section">
                 <p className="form-section-header">{t('pages.zevSettings.sections.gridConnection')}</p>
-                <div className="inline-form grid grid-2">
-                    <label>
-                        <span>{t('pages.zevSettings.fields.postalCode')}</span>
-                        <input
-                            value={form.postal_code ?? ''}
-                            onChange={(event) => onChange({ postal_code: event.target.value })}
-                        />
-                        <small className="muted">{t('pages.zevSettings.fields.postalCodeHint')}</small>
-                    </label>
+                <div className="inline-form grid grid-2 align-start">
+                    <TextInput
+                        label={t('pages.zevSettings.fields.postalCode')}
+                        description={t('pages.zevSettings.fields.postalCodeHint')}
+                        value={form.postal_code ?? ''}
+                        onChange={(event) => onChange({ postal_code: event.target.value })}
+                    />
                     <GridOperatorField
                         label={t('pages.zevSettings.fields.gridOperator')}
                         value={form.grid_operator ?? ''}
@@ -179,26 +178,22 @@ export function ZevGeneralSettingsFields({ form, onChange, group, zevId }: ZevGe
                             />
                         </div>
                     )}
-                    <label className="grid-span-full">
-                        <span>{t('pages.zevSettings.fields.tariffSourceUrl')}</span>
-                        <input
-                            type="url"
-                            value={form.tariff_source_url ?? ''}
-                            placeholder="https://…/tarife.json"
-                            onChange={(event) => onChange({ tariff_source_url: event.target.value })}
-                        />
-                        <small className="muted">{t('pages.zevSettings.fields.tariffSourceUrlHint')}</small>
-                    </label>
-                    <label>
-                        <span>{t('pages.zevSettings.fields.gridConnectionPoint')}</span>
-                        <input
-                            value={form.grid_connection_point ?? ''}
-                            onChange={(event) => onChange({ grid_connection_point: event.target.value })}
-                        />
-                    </label>
+                    <TextInput
+                        className="grid-span-full"
+                        label={t('pages.zevSettings.fields.tariffSourceUrl')}
+                        description={t('pages.zevSettings.fields.tariffSourceUrlHint')}
+                        type="url"
+                        value={form.tariff_source_url ?? ''}
+                        placeholder={t('pages.zevSettings.fields.tariffSourceUrlPlaceholder')}
+                        onChange={(event) => onChange({ tariff_source_url: event.target.value })}
+                    />
+                    <TextInput
+                        label={t('pages.zevSettings.fields.gridConnectionPoint')}
+                        value={form.grid_connection_point ?? ''}
+                        onChange={(event) => onChange({ grid_connection_point: event.target.value })}
+                    />
                 </div>
             </div>
-
             )}
 
             {/* Payment details (billing & payment tab) */}
