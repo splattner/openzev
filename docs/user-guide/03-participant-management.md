@@ -50,6 +50,13 @@ Participants **cannot**:
 - Manage ZEV settings
 - Create tariffs or invoices
 
+Each participant card shows the **Account** it is linked to, or *No account
+yet*. Open **More** on a card to send or copy the participant's onboarding link
+(which creates the account). Administrators can also **Link existing** — attach
+a guest or participant account that is not yet linked to anyone — or **Unlink**
+the current one. Platform → Accounts lists every account and which communities
+it belongs to; see [Roles and Permissions](11-roles-and-permissions.md).
+
 ## Editing Participant Details
 
 1. Go to **Participants**

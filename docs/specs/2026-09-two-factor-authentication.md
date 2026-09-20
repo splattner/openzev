@@ -525,8 +525,9 @@ key as unconfigured — mirroring the pattern PR #732 used for the dynamic-sourc
 
 **File:** `frontend/src/pages/AdminAccountsPage.tsx`
 
-Each user row gains a **Reset two-factor** action (admin only), behind a confirmation dialog
-naming the user and what will be removed.
+Each account row gains a **Reset two-factor** action (admin only), behind a confirmation dialog
+naming the user and what will be removed. The row also shows which factors the account has (from
+`AdminUserSerializer.mfa_methods`) — see `2026-03-community-and-access.md` §6.4.
 
 ### TypeScript types
 

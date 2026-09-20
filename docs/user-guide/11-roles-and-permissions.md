@@ -172,38 +172,62 @@ has no access to a ZEV's data until an admin links it to a participant.
 
 **Only Admins** can assign roles to other users.
 
-### Create a New User
+### The Accounts list
 
 ![Admin accounts page](screenshots/11-admin-accounts.png)
 
-1. Go to **Platform → Accounts**
-2. Click **Create New Account**
-3. Enter:
-   - **Email** (login credential)
-   - **First/Last Name**
-   - **Role:** Admin, ZEV Owner, or Participant
-   - **Assign to ZEVs** (if ZEV Owner or Participant)
-4. Click **Create**
+**Platform → Accounts → Users** lists every account on the platform, one row
+each:
 
-User receives invitation email with password setup link.
+- **Account** — name, username, email and the account's **platform role**.
+- **Communities** — one chip per community the account belongs to, marked
+  *Owner* or *Participant*. An account that belongs to several communities
+  still has a single row. Click a chip to open that community's Participants
+  page.
+- **Security** — which second factors the account has (authenticator app,
+  passkey), or *No two-factor*.
 
-### Update User Role
+Use **Search**, **Platform role** and **Community** to narrow the list — the
+community filter finds everyone who is an owner or participant there.
 
-1. Go to **Platform → Accounts**
-2. Click on user name
-3. Click **Edit**
-4. Change **Role** or **ZEV Assignments**
-5. Click **Save**
+> **Platform role vs. community membership.** The platform role (Admin, ZEV
+> Owner, Participant, Guest) belongs to the *account* and applies in every
+> community. Which communities an account belongs to is set on each community's
+> **Participants** page, not here.
 
-Changes take effect immediately.
+### Change an Account's Role
 
-### Remove User
+1. Go to **Platform → Accounts → Users**
+2. Click **Edit** on the account
+3. Change the **Platform role** (and name or email if needed)
+4. Click **Save account**
 
-1. Go to **Platform → Accounts**
-2. Click on user
-3. Click **Deactivate**
+Changes take effect immediately. You cannot change your own role.
 
-User cannot login; their account is preserved in history.
+### Give a Participant an Account
+
+Accounts are attached to participants from the community that the participant
+belongs to:
+
+1. Switch to the community and open **Participants**
+2. On the participant's card, open **More**
+3. Choose **Send onboarding link** or **Copy onboarding link** (creates the
+   account and gives the participant a sign-in link), or — as an admin —
+   **Link existing** to attach a guest or participant account that is not yet
+   linked
+4. To detach an account again, choose **Unlink** (it becomes a Guest account)
+
+### Other Account Actions
+
+Open **More** on an account row for:
+
+- **Impersonate** — view the platform as a participant or owner (never an
+  admin).
+- **Reset two-factor** — removes the account's passkeys, authenticator app and
+  recovery codes, so someone locked out can sign in with their password again.
+- **Delete** — only available for accounts that do not belong to a community.
+  Unlink the account from its participant first; an owner's account cannot be
+  deleted while it owns a community.
 
 ## Data Privacy and Scoping
 

@@ -522,6 +522,32 @@ Owners have no consumer for it: account linking is admin-only.
 
 **Queryset:** all users, ordered by username. Any non-admin role → 403.
 
+**Serializer:** `AdminUserSerializer` (list only) — `UserSerializer` plus two
+read-only fields, so the page can say where an account belongs without a second
+request per row:
+
+- `memberships` — one entry per community the account is tied to, sorted by
+  community name (case-insensitive): `{ zev, zev_name, is_owner, participant }`.
+  `Zev.owner` and `Participant.user` are separate relations, so they are merged
+  per ZEV: an owner who is also their own community's owner-participant is
+  *one* entry (`is_owner: true`, `participant: <id>`), not an "owner" and a
+  "participant" entry. `participant` is `null` for an owner with no participant
+  record. An account holds at most one participant record per link rule, but
+  owners of several communities routinely have several entries.
+- `mfa_methods` — `"totp"` (a *confirmed* authenticator device; an abandoned
+  enrolment does not count) and/or `"passkey"`, in that order.
+
+Both are derived from prefetched relations (`select_related("totp_device")`,
+`prefetch_related` on `owned_zevs`, `participations__zev`,
+`webauthn_credentials`), so the list costs a fixed number of queries whatever the
+number of accounts (pinned by a query-count test). `/auth/me/`, impersonation
+responses and the detail view keep the plain `UserSerializer` and do not carry
+these fields.
+
+`last_login` is deliberately **not** exposed: the JWT login paths (password,
+MFA, passkey, magic link, onboarding, OAuth) do not maintain it, so it would
+report "never" for accounts that sign in every day.
+
 ### 6.2 User create
 
 **Endpoint:** `POST /api/v1/auth/users/` (IsAdmin)
@@ -547,6 +573,57 @@ Admin only. Passwords must match. Created via `User.objects.create_user()`.
   Success audit is recorded before `instance.delete()` so the actor FK is
   valid; `on_delete=SET_NULL` nullifies `actor_user` on self-deletion while
   preserving `actor_display` and `target_id`.
+
+### 6.4 Admin accounts page (frontend)
+
+**File:** `frontend/src/pages/AdminAccountsPage.tsx` (Users tab of
+`AdminAccountsHubPage`). Helpers in `frontend/src/features/accounts/`.
+
+**Model of the page:** one row per *account* — not per participant. An account
+that belongs to several communities is still one row, with one chip per
+community. This replaced a participant-first table in which the same account
+repeated per participant row and the role editor on each row silently changed
+the account's role everywhere.
+
+- **Columns:** *Account* (display name, platform-role badge, `Inactive` badge
+  when `is_active` is false, `username · email`), *Communities*
+  (`AccountMemberships`), *Security* (a badge per `mfa_methods` entry, or
+  "No two-factor"), *Actions*.
+- **Membership chips** read `Owner|Participant · <community>`. Selecting one
+  calls `setSelectedZevId(zev)` (the shell's community switcher — which also
+  saves the admin's `preferred_zev`, as any switch does) and opens
+  `/participants?focus=<participant>` (`/participants` when the account is an
+  owner with no participant record). Memberships are edited there, not here.
+- **Stats:** accounts, accounts with two-factor, guest accounts (the ones
+  waiting to be linked).
+- **Filters** (`accountList.filterAccounts`, client-side): search over display
+  name, username and email; platform role; community. The community filter
+  matches *any* membership, owner or participant.
+- **Actions:** *Edit* (username, email, names, **platform role** — labelled as
+  such, with a hint that it applies in every community); menu: *Impersonate*
+  (participant and owner accounts only — `canImpersonateAccount`), *Reset
+  two-factor*, *Delete*. *Delete* is disabled while the account belongs to any
+  community (`canDeleteAccount`, mirroring the server's guard) and is not
+  offered for the admin's own row.
+- **Removed from this page:** *Link existing*, *Create account*, *Unlink* and the
+  participants-without-account rows — see §6.5.
+
+### 6.5 Account linking on the Participants page (frontend)
+
+Linking is a fact about one community's participant, so it lives with the
+participants (`ParticipantCardsSection`, `useParticipantAccountLinking`,
+`LinkAccountModal` in `frontend/src/features/participants/`).
+
+- Each participant card has an **Account** section: the linked username, or "No
+  account yet".
+- **Admin only** (the endpoints are admin-only; the accounts query only runs for
+  admins): *Link existing* in the card menu when the participant has no account
+  and at least one linkable account exists (`accountList.linkableAccounts` —
+  participant/guest role and holding no participant record, matching the
+  server's rule); *Unlink* when it has one, except on the owner's own
+  participant, which the server refuses to detach.
+- Owners keep the existing *Send/Copy/Revoke onboarding link* actions, which
+  create the account. Nothing about the endpoints or permissions changed.
 
 ---
 
@@ -997,6 +1074,12 @@ frontend types it as required-nullable).
 the default; participants and guests cannot set one at all; admins may set
 any ZEV. `null` clears the preference.
 
+### 13.1a AdminUserSerializer
+
+Subclass of `UserSerializer` used by `GET /auth/users/` only. Adds the
+read-only `memberships` and `mfa_methods` fields described in §6.1. Not used on
+create (`UserCreateSerializer`) or detail/update (`UserSerializer`).
+
 ### 13.2 UserCreateSerializer
 
 **Fields:** `username`, `email`, `first_name`, `last_name`, `password`,
@@ -1130,6 +1213,7 @@ lists the test classes per module (test counts are the `test_*` methods).
 
 | Module | Classes | Tests | Coverage |
 |---|---|---|---|
+| `test_admin_users_list.py` | 1 | 7 | Admin user list: memberships per relationship (participant, owner-who-is-also-participant merged into one, owner of several communities sorted by name), confirmed-only `mfa_methods`, fixed query count, `/auth/me/` unaffected |
 | `test_api_keys.py` | 10 | 81 | Generation, hashing, auth, read-only keys, scope deny-list, audit, throttling, CRUD, admin management |
 | `test_oauth.py` | 12 | 55 | Provider listing, initiate, callback guards/redirects, link flow, social accounts, audit, `require_mfa_claim` (`OAuthMfaClaimTests`) |
 | `test_passkeys.py` | 9 | 62 | Passkey registration and passwordless sign-in against a software authenticator, MFA policy and grace arithmetic, removal guard, admin reset, RP-ID system check |
@@ -1243,8 +1327,11 @@ lists the test classes per module (test counts are the `test_*` methods).
 7. `BaseZevScopedPermission` enforces object-level ZEV ownership checks.
 8. Participant creation auto-provisions a linked user account with temporary
    password.
-9. Account linking is admin-only; unlink demotes to `guest`; delete blocked for
-   linked accounts and for the last admin. `create_superuser` enforces
+9. Account linking is admin-only and is done from the community's
+   **Participants** page (link an existing participant/guest account, or
+   unlink — the account becomes `guest`); the admin accounts page only *lists*
+   memberships and links out to that page. Delete is blocked for accounts that
+   belong to a community and for the last admin. `create_superuser` enforces
    `role=ADMIN`, so the `role` column is the canonical admin count.
 10. ZEV creation wizard atomically creates ZEV + owner user + owner participant
     + metering points + assignments.
@@ -1253,6 +1340,6 @@ lists the test classes per module (test counts are the `test_*` methods).
 12. Frontend `ProtectedRoute` enforces role-based route access; navigation
     visibility matches role capabilities.
 13. `ManagedZevProvider` scopes all management pages to the selected ZEV.
-14. Shared frontend helpers keep pages deduplicated: `frontend/src/lib/clipboard.ts` (`copyToClipboard`) consolidates direct `navigator.clipboard.writeText` calls and is used by `AdminAccountsPage`, `ApiKeysSection` and `ZevListPage`; `frontend/src/lib/participantTitle.ts` (`getTitleLabelMap`) is the single source of title (Mr/Ms/…) label maps used by `AdminAccountsPage` and `ParticipantsPage`; `frontend/src/lib/options.ts` exports `BILLING_INTERVAL_OPTIONS`, `ZEV_TYPE_OPTIONS`, `METER_TYPE_OPTIONS` (validated by `frontend/tests/options.test.ts`). `ZevListPage` stores its copy-feedback timeout in a ref and clears it on unmount/close so repeated copies don't race.
+14. Shared frontend helpers keep pages deduplicated: `frontend/src/lib/clipboard.ts` (`copyToClipboard`) consolidates direct `navigator.clipboard.writeText` calls and is used by `ApiKeysSection` and `ZevListPage`; `frontend/src/lib/participantTitle.ts` (`getTitleLabelMap`) is the single source of title (Mr/Ms/…) label maps used by `ParticipantsPage`; `frontend/src/lib/options.ts` exports `BILLING_INTERVAL_OPTIONS`, `ZEV_TYPE_OPTIONS`, `METER_TYPE_OPTIONS` (validated by `frontend/tests/options.test.ts`). `ZevListPage` stores its copy-feedback timeout in a ref and clears it on unmount/close so repeated copies don't race.
 15. Full RBAC matrix (list, create, update, delete, unauthenticated) is covered
     by automated tests.
