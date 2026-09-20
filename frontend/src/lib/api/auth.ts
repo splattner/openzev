@@ -8,7 +8,10 @@ import type {
   FeatureFlag,
   FeatureFlagInput,
   ImpersonationResult,
+  MfaResetResult,
   MfaStatus,
+  Passkey,
+  PasskeyRegistration,
   OAuthLoginInitiateResponse,
   OAuthProvider,
   OAuthProviderConfig,
@@ -23,6 +26,7 @@ import type {
   VatRateInput,
 } from '../../types/api'
 import { api } from './client'
+import type { CreationOptionsJSON, RequestOptionsJSON } from '../webauthn'
 import { fetchAllPages } from './pagination'
 
 /** Either a completed login (cookies already set by the backend) or a
@@ -54,9 +58,8 @@ export async function fetchMe(): Promise<User> {
   return data
 }
 
-// ── Two-factor authentication (TOTP) ──────────────────────────────────────
-// Passkey functions join these once WebAuthnCredential ships (spec
-// 2026-09-two-factor-authentication.md §5.2, PR 3).
+// ── Two-factor authentication (TOTP and passkeys) ─────────────────────────
+// Spec 2026-09-two-factor-authentication.md §5.
 
 export async function fetchMfaStatus(): Promise<MfaStatus> {
   const { data } = await api.get<MfaStatus>('/auth/me/mfa/')
@@ -84,6 +87,53 @@ export async function removeTotp(): Promise<void> {
 /** Regenerates all ten recovery codes, returned once. Invalidates the old set. */
 export async function regenerateRecoveryCodes(): Promise<{ recovery_codes: string[] }> {
   const { data } = await api.post<{ recovery_codes: string[] }>('/auth/me/mfa/recovery-codes/')
+  return data
+}
+
+export async function fetchPasskeys(): Promise<Passkey[]> {
+  const { data } = await api.get<Passkey[]>('/auth/me/passkeys/')
+  return data
+}
+
+/** Options for navigator.credentials.create(), in the backend's JSON form. */
+export async function passkeyRegisterBegin(): Promise<CreationOptionsJSON> {
+  const { data } = await api.post<CreationOptionsJSON>('/auth/me/passkeys/register/begin/')
+  return data
+}
+
+/** `recovery_codes` is non-empty only when this is the account's first factor. */
+export async function passkeyRegisterComplete(
+  credential: Record<string, unknown>,
+  name: string,
+): Promise<PasskeyRegistration> {
+  const { data } = await api.post<PasskeyRegistration>('/auth/me/passkeys/register/complete/', { credential, name })
+  return data
+}
+
+export async function renamePasskey(id: string, name: string): Promise<Passkey> {
+  const { data } = await api.patch<Passkey>(`/auth/me/passkeys/${id}/`, { name })
+  return data
+}
+
+export async function removePasskey(id: string): Promise<void> {
+  await api.delete(`/auth/me/passkeys/${id}/`)
+}
+
+/** Options for navigator.credentials.get(). `email` only narrows the allowed
+ * credentials as a hint; it is never required (discoverable credentials). */
+export async function passkeyAuthenticateBegin(email?: string): Promise<RequestOptionsJSON> {
+  const { data } = await api.post<RequestOptionsJSON>('/auth/passkeys/authenticate/begin/', email ? { email } : {})
+  return data
+}
+
+/** Verifies the assertion and sets the session cookies — no password. */
+export async function passkeyAuthenticateComplete(credential: Record<string, unknown>): Promise<void> {
+  await api.post('/auth/passkeys/authenticate/complete/', { credential })
+}
+
+/** Admin-only: remove every second factor and recovery code for a user. */
+export async function resetUserMfa(userId: number): Promise<MfaResetResult> {
+  const { data } = await api.delete<MfaResetResult>(`/auth/users/${userId}/mfa/`)
   return data
 }
 

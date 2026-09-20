@@ -53,6 +53,18 @@ spec:
             - name: MFA_ENCRYPTION_KEYS
               value: {{ .Values.mfaEncryptionKeys.value | quote }}
             {{- end }}
+            {{- if .Values.webauthn.rpId }}
+            - name: WEBAUTHN_RP_ID
+              value: {{ .Values.webauthn.rpId | quote }}
+            {{- end }}
+            {{- if .Values.webauthn.rpName }}
+            - name: WEBAUTHN_RP_NAME
+              value: {{ .Values.webauthn.rpName | quote }}
+            {{- end }}
+            {{- if .Values.webauthn.origin }}
+            - name: WEBAUTHN_ORIGIN
+              value: {{ .Values.webauthn.origin | quote }}
+            {{- end }}
             - name: DATABASE_URL
               {{- if .Values.database.existingSecret.name }}
               valueFrom:

@@ -1,12 +1,13 @@
 from django.contrib.auth.password_validation import validate_password
 from django.contrib.auth import get_user_model
 from django.conf import settings
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.utils.text import slugify
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from urllib.parse import urlparse
 from .jwt_utils import add_custom_claims
-from .models import ApiKey, AppSettings, FeatureFlag, OAuthProvider, SocialAccount, TotpDevice, User, UserRole, VatRate
+from .models import ApiKey, AppSettings, FeatureFlag, OAuthProvider, SocialAccount, TotpDevice, User, UserRole, VatRate, WebAuthnCredential
 from zev.models import Zev
 
 
@@ -139,8 +140,23 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
 class AppSettingsSerializer(serializers.ModelSerializer):
     class Meta:
         model = AppSettings
-        fields = ["date_format_short", "date_format_long", "date_time_format", "updated_at"]
+        fields = [
+            "date_format_short",
+            "date_format_long",
+            "date_time_format",
+            "mfa_required_roles",
+            "mfa_grace_period_days",
+            "updated_at",
+        ]
         read_only_fields = ["updated_at"]
+
+    def validate_mfa_required_roles(self, value):
+        # The model's clean() is not run by a DRF serializer; share its rules
+        # so an API write cannot save a policy the instance cannot honour.
+        try:
+            return AppSettings.validate_mfa_required_roles(value)
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError(exc.messages) from exc
 
 
 class FeatureFlagSerializer(serializers.ModelSerializer):
@@ -158,6 +174,16 @@ class TotpDeviceSerializer(serializers.ModelSerializer):
         model = TotpDevice
         fields = ["id", "confirmed_at", "created_at"]
         read_only_fields = fields
+
+
+class WebAuthnCredentialSerializer(serializers.ModelSerializer):
+    """A passkey as the account page lists it. ``credential_id`` and
+    ``public_key`` are never exposed; only ``name`` is writable."""
+
+    class Meta:
+        model = WebAuthnCredential
+        fields = ["id", "name", "aaguid", "transports", "created_at", "last_used_at"]
+        read_only_fields = ["id", "aaguid", "transports", "created_at", "last_used_at"]
 
 
 class OAuthProviderSerializer(serializers.ModelSerializer):

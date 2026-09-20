@@ -33,3 +33,24 @@ def mfa_key_configured(app_configs, **kwargs):
             id="accounts.W001",
         )
     ]
+
+
+@register(Tags.security)
+def webauthn_rp_configured(app_configs, **kwargs):
+    """Warn when passkeys would be served under the development RP ID.
+
+    A relying-party ID that does not match the domain the browser sees makes
+    every WebAuthn ceremony fail with an opaque error the user cannot act on,
+    so the operator is told here, once, instead. Skipped under DEBUG, where
+    ``localhost`` is exactly right.
+    """
+    if settings.DEBUG or settings.WEBAUTHN_RP_ID != "localhost":
+        return []
+    return [
+        Warning(
+            "WEBAUTHN_RP_ID is still 'localhost'. Passkey registration and "
+            "sign-in will fail for users on any other domain.",
+            hint="Set WEBAUTHN_RP_ID to the domain users open OpenZEV on, and WEBAUTHN_ORIGIN to its full origin.",
+            id="accounts.W002",
+        )
+    ]

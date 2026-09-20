@@ -13,6 +13,7 @@ vi.mock('../src/lib/api/auth', () => ({
     deleteOAuthProviderConfig: vi.fn(),
     fetchFeatureFlags: vi.fn().mockResolvedValue([]),
     fetchOAuthProviderConfigs: vi.fn().mockResolvedValue([]),
+    fetchSystemHealth: vi.fn().mockResolvedValue({ mfa: { status: 'ok', encryption_key_configured: true } }),
     updateAppSettings: vi.fn(),
     updateFeatureFlag: vi.fn(),
     updateOAuthProviderConfig: vi.fn(),
@@ -26,6 +27,8 @@ vi.mock('../src/lib/appSettings', async (importOriginal) => {
                 date_format_short: 'dd.MM.yyyy',
                 date_format_long: 'd. MMMM yyyy',
                 date_time_format: 'dd.MM.yyyy HH:mm',
+                mfa_required_roles: [],
+                mfa_grace_period_days: 14,
                 updated_at: '2026-01-01T00:00:00Z',
             },
             isLoading: false,
@@ -83,7 +86,7 @@ describe('system settings tab strip', () => {
         expect(list).not.toBeNull()
         expect(list!.closest('section')).toBeNull()
         const tabs = container.querySelectorAll('[role="tab"]')
-        expect(tabs).toHaveLength(4)
+        expect(tabs).toHaveLength(5)
         for (const tabElement of Array.from(tabs)) {
             expect(tabElement.classList.contains('app-tabs-tab')).toBe(true)
             const panel = container.querySelector(`#${tabElement.getAttribute('aria-controls')}`)
@@ -91,7 +94,7 @@ describe('system settings tab strip', () => {
         }
         // Inactive panels render as empty shells (Mantine hides panel content
         // for inactive tabs in the test env); only the active panel has content.
-        expect(container.querySelectorAll('[role="tabpanel"]')).toHaveLength(4)
+        expect(container.querySelectorAll('[role="tabpanel"]')).toHaveLength(5)
         expect(tab(container, 'regional').hasAttribute('data-active')).toBe(true)
         expect(activePanel(container).textContent).toContain('adminSystemSettings.regional.title')
     })

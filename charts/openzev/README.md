@@ -88,6 +88,23 @@ encrypted with the first, and all are tried on decrypt, so a key can be rotated
 without locking anyone out. Losing every key makes enrolled authenticator apps
 unusable — back it up like `SECRET_KEY`. The key is only needed by the backend.
 
+## Passkeys
+
+Passkeys (WebAuthn) are bound to the domain users open OpenZEV on, so the
+relying-party identity must match it:
+
+```yaml
+webauthn:
+  rpId: zev.example.ch          # bare domain: no scheme, no port
+  origin: https://zev.example.ch
+  rpName: OpenZEV               # optional, shown by the authenticator
+```
+
+Left empty, the backend uses `localhost`, which only works for local
+development; with `DEBUG` off, `manage.py check` warns (`accounts.W002`).
+Changing `rpId` later orphans every passkey registered under the old one.
+Passkeys need no encryption key — only TOTP does.
+
 ## Celery Beat
 
 The chart enables one Beat scheduler by default (`beat.enabled: true`) using

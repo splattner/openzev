@@ -4,6 +4,7 @@ from datetime import date, timedelta
 import pyotp
 from pyotp.utils import strings_equal
 
+from django.conf import settings
 from django.contrib.auth.models import AbstractUser, UserManager
 from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator
@@ -285,6 +286,39 @@ class MfaRecoveryCode(models.Model):
         return self.used_at is None
 
 
+class WebAuthnCredential(models.Model):
+    """A registered passkey (WebAuthn credential).
+
+    Many per user, deliberately — a lost phone must not be a lockout. Unlike
+    ``TotpDevice`` nothing here is secret: ``public_key`` is public by
+    construction, so it is stored as-is rather than encrypted.
+
+    A user-verified passkey authenticates on its own with no password step
+    (ADR 0020), which is why registration and authentication both demand
+    ``userVerification: "required"``.
+    """
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="webauthn_credentials")
+    credential_id = models.BinaryField(unique=True)
+    public_key = models.BinaryField()
+    # Monotonic counter reported by the authenticator; a decrease signals a
+    # cloned authenticator. Many platform authenticators always report 0,
+    # which the WebAuthn spec permits — the check is skipped for those.
+    sign_count = models.BigIntegerField(default=0)
+    transports = models.JSONField(default=list, blank=True)
+    aaguid = models.CharField(max_length=36, blank=True, default="")
+    name = models.CharField(max_length=100, blank=True, default="")
+    created_at = models.DateTimeField(auto_now_add=True)
+    last_used_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-created_at", "id"]
+
+    def __str__(self):
+        return f"Passkey {self.name or self.id} for {self.user}"
+
+
 class AppSettings(models.Model):
     SHORT_DATE_DD_MM_YYYY = "dd.MM.yyyy"
     SHORT_DATE_DD_SLASH_MM_SLASH_YYYY = "dd/MM/yyyy"
@@ -336,11 +370,53 @@ class AppSettings(models.Model):
         choices=DATETIME_FORMAT_CHOICES,
         default=DATETIME_DD_MM_YYYY_HH_MM,
     )
+    # Roles that must hold a second factor (spec 2026-09-two-factor-authentication
+    # §4.4). A passkey or TOTP satisfies it. Enforcement is by the frontend's
+    # enrolment gate after ``mfa_grace_period_days``, not by the API.
+    mfa_required_roles = models.JSONField(default=list, blank=True)
+    mfa_grace_period_days = models.PositiveIntegerField(default=14)
+    # When the policy last changed. The grace period runs from the later of
+    # this and the account's creation, so an admin switching the requirement
+    # on gives every existing account of that role a full grace period
+    # instead of locking out anyone whose account is older than the policy.
+    mfa_policy_changed_at = models.DateTimeField(null=True, blank=True, editable=False)
     updated_at = models.DateTimeField(auto_now=True)
+
+    MFA_POLICY_FIELDS = ("mfa_required_roles", "mfa_grace_period_days")
+
+    @staticmethod
+    def validate_mfa_required_roles(roles):
+        """Return ``roles`` de-duplicated, or raise ``ValidationError``.
+
+        A policy that cannot be honoured must not be saveable: unknown roles
+        are typos, and a requirement with no ``MFA_ENCRYPTION_KEYS`` would
+        demand a TOTP fallback the instance cannot provide (ADR 0021).
+        """
+        if not isinstance(roles, list):
+            raise ValidationError("mfa_required_roles must be a list of role names.")
+        valid = set(UserRole.values)
+        unknown = [role for role in roles if role not in valid]
+        if unknown:
+            raise ValidationError(f"Unknown role(s): {', '.join(str(r) for r in unknown)}.")
+        if roles and not settings.MFA_ENCRYPTION_KEYS:
+            raise ValidationError(
+                "Two-factor authentication cannot be required: MFA_ENCRYPTION_KEYS is not configured."
+            )
+        return list(dict.fromkeys(roles))
+
+    def clean(self):
+        super().clean()
+        self.mfa_required_roles = self.validate_mfa_required_roles(self.mfa_required_roles)
 
     def save(self, *args, **kwargs):
         self.pk = 1
         self.singleton_enforcer = True
+        previous = AppSettings.objects.filter(pk=1).values(*self.MFA_POLICY_FIELDS).first()
+        current = {field: getattr(self, field) for field in self.MFA_POLICY_FIELDS}
+        if previous is not None and previous != current:
+            self.mfa_policy_changed_at = timezone.now()
+            if kwargs.get("update_fields") is not None:
+                kwargs["update_fields"] = {*kwargs["update_fields"], "mfa_policy_changed_at"}
         super().save(*args, **kwargs)
 
     @classmethod

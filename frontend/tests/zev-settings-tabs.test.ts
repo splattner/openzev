@@ -11,6 +11,12 @@ const mocks = vi.hoisted(() => ({
     zev: { id: 'z1', name: 'First community', start_date: '2025-01-01', billing_interval: 'monthly' },
     update: vi.fn().mockResolvedValue({}),
 }))
+// The enrolment gate has its own tests (mfa.test.ts); the shell under test
+// here is not what is being asserted about.
+vi.mock('../src/components/MfaEnrolmentGate', () => ({
+    MfaEnrolmentGate: ({ children }: { children: unknown }) => children,
+}))
+
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }))
 vi.mock('../src/lib/auth', () => ({ useAuth: () => ({ isAuthenticated: true, user: { role: 'zev_owner' } }) }))
 vi.mock('../src/components/Layout', () => ({ Layout: () => createElement(Outlet) }))

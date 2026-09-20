@@ -7,11 +7,12 @@ import { useAuth } from '../lib/auth'
 import { fetchRegistrationEnabled, fetchOAuthProviders, oauthLoginInitiate, register as apiRegister } from '../lib/api/auth'
 import { formatApiError } from '../lib/api/errors'
 import { queryKeys } from '../lib/api/queryKeys'
+import { isPasskeySupported, PasskeyCancelledError } from '../lib/webauthn'
 
 export function LoginPage() {
     const { t } = useTranslation()
     const navigate = useNavigate()
-    const { login, completeMfaChallenge } = useAuth()
+    const { login, completeMfaChallenge, loginWithPasskey } = useAuth()
     const featureFlagsQuery = useQuery({
         queryKey: queryKeys.auth.registrationEnabled(),
         queryFn: fetchRegistrationEnabled,
@@ -29,6 +30,10 @@ export function LoginPage() {
     const [error, setError] = useState<string | null>(null)
     const [loading, setLoading] = useState(false)
     const [oauthLoading, setOauthLoading] = useState<string | null>(null)
+    const [passkeyLoading, setPasskeyLoading] = useState(false)
+    // Feature-detected, never sniffed: hide the button where the browser has no
+    // WebAuthn rather than offering something that cannot work.
+    const passkeySupported = isPasskeySupported()
 
     // Second step of a two-factor login (spec 2026-09-two-factor-authentication.md
     // §5.1). Set once the password step reports mfa_required; the form below
@@ -112,6 +117,23 @@ export function LoginPage() {
         setMfaCode('')
         setUseRecoveryCode(false)
         setError(null)
+    }
+
+    // A user-verified passkey signs in on its own — no password (ADR 0020). The
+    // email field, when filled in, only narrows which credentials the browser
+    // offers; it is not required and not validated here.
+    async function handlePasskeyLogin() {
+        setPasskeyLoading(true)
+        setError(null)
+        try {
+            const user = await loginWithPasskey(email.trim() || undefined)
+            navigate(user.must_change_password ? '/account' : '/')
+        } catch (err) {
+            // Dismissing the browser prompt is a choice, not an error.
+            if (!(err instanceof PasskeyCancelledError)) setError(t('auth.passkey.failed'))
+        } finally {
+            setPasskeyLoading(false)
+        }
     }
 
     async function handleOAuthLogin(providerSlug: string) {
@@ -255,12 +277,22 @@ export function LoginPage() {
                             {loading ? t('common.loading') : t('auth.submit')}
                         </button>
 
-                        {oauthProviders.length > 0 && (
+                        {(passkeySupported || oauthProviders.length > 0) && (
                             <>
                                 <div className="login-divider">
                                     <span>{t('auth.oauth.or')}</span>
                                 </div>
                                 <div className="oauth-provider-list">
+                                    {passkeySupported && (
+                                        <button
+                                            type="button"
+                                            className="button button-outline oauth-provider-button"
+                                            disabled={passkeyLoading || loading}
+                                            onClick={() => void handlePasskeyLogin()}
+                                        >
+                                            {passkeyLoading ? t('common.loading') : t('auth.passkey.signIn')}
+                                        </button>
+                                    )}
                                     {oauthProviders.map((provider) => (
                                         <button
                                             key={provider.name}

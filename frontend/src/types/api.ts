@@ -40,6 +40,9 @@ export interface AppSettings {
     date_format_short: ShortDateFormat
     date_format_long: LongDateFormat
     date_time_format: DateTimeFormat
+    /** Roles that must hold a second factor (a passkey or TOTP). */
+    mfa_required_roles: UserRole[]
+    mfa_grace_period_days: number
     updated_at: string
 }
 
@@ -47,6 +50,8 @@ export interface AppSettingsInput {
     date_format_short?: ShortDateFormat
     date_format_long?: LongDateFormat
     date_time_format?: DateTimeFormat
+    mfa_required_roles?: UserRole[]
+    mfa_grace_period_days?: number
 }
 
 /** Admin-only platform health snapshot (nav-regroup phase 3):
@@ -201,9 +206,8 @@ export interface TotpDevice {
     created_at: string
 }
 
-/** A WebAuthn credential. Not usable yet — no route returns one until
- * passkey registration lands — but MfaStatus's shape is stable across that
- * PR boundary, so the type exists now. */
+/** A registered WebAuthn credential (passkey). `credential_id` and
+ * `public_key` are never sent to the client. */
 export interface Passkey {
     id: string
     name: string
@@ -217,9 +221,23 @@ export interface MfaStatus {
     totp: TotpDevice | null
     passkeys: Passkey[]
     recovery_codes_remaining: number
-    /** Always false until AppSettings.mfa_required_roles lands. */
+    /** Whether AppSettings.mfa_required_roles names this user's role. */
     required: boolean
+    /** ISO datetime after which enrolment is no longer optional; null when
+     * no policy applies or the user already has a factor. */
     grace_until: string | null
+}
+
+/** POST /auth/me/passkeys/register/complete/ — `recovery_codes` is non-empty
+ * only when this passkey is the account's first factor. */
+export interface PasskeyRegistration {
+    passkey: Passkey
+    recovery_codes: string[]
+}
+
+/** Result of DELETE /auth/users/<id>/mfa/: what the admin's reset removed. */
+export interface MfaResetResult {
+    removed: { totp: number; passkeys: number; recovery_codes: number }
 }
 
 export interface TotpEnrolment {

@@ -24,6 +24,16 @@ mfaEncryptionKeys:
     name: ""
     key: MFA_ENCRYPTION_KEYS
 
+# Passkeys (WebAuthn) relying-party identity. It must match what the browser
+# sees: rpId is the bare domain users open OpenZEV on (no scheme, no port),
+# origin the full origin the frontend is served from. Leave empty for local
+# development (the backend defaults to localhost); set both in production or
+# every passkey ceremony fails with an opaque browser error.
+webauthn:
+  rpId: ""
+  rpName: ""
+  origin: ""
+
 backend:
   replicaCount: 1
   image:

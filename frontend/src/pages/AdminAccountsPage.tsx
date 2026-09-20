@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faCheck, faEllipsis, faLink, faPen, faPlus, faTrash, faUser, faXmark } from '@fortawesome/free-solid-svg-icons'
+import { faCheck, faEllipsis, faLink, faPen, faPlus, faShieldHalved, faTrash, faUser, faXmark } from '@fortawesome/free-solid-svg-icons'
 import { useMemo, useState, type FormEvent } from 'react'
 import { ActionMenu } from '../components/ActionMenu'
 import { ConfirmDialog, useConfirmDialog } from '../components/ConfirmDialog'
@@ -17,7 +17,7 @@ import {
     linkParticipantAccount,
     unlinkParticipantAccount,
 } from '../lib/api/zev'
-import { deleteUser, fetchUsers, updateUser } from '../lib/api/auth'
+import { deleteUser, fetchUsers, resetUserMfa, updateUser } from '../lib/api/auth'
 import { formatApiError } from '../lib/api/errors'
 import { queryKeys } from '../lib/api/queryKeys'
 import { useTranslation } from 'react-i18next'
@@ -130,6 +130,27 @@ export function AdminAccountsPage({ embedded = false }: { embedded?: boolean }) 
         },
         onError: (error) => pushToast(formatApiError(error, t('pages.accounts.feedback.deleteFailed')), 'error'),
     })
+
+    // Removing a user's second factors is the way out for someone locked out
+    // (spec 2026-09-two-factor-authentication.md, D3). Audited server-side.
+    const resetMfaMutation = useMutation({
+        mutationFn: (userId: number) => resetUserMfa(userId),
+        onSuccess: () => pushToast(t('pages.accounts.feedback.resetMfaSuccess'), 'success'),
+        onError: (error) => pushToast(formatApiError(error, t('pages.accounts.feedback.resetMfaFailed')), 'error'),
+    })
+
+    function confirmResetMfa(account: User) {
+        confirm({
+            title: t('pages.accounts.resetMfaTitle'),
+            message: t('pages.accounts.resetMfaMessage', { username: account.username }),
+            confirmText: t('pages.accounts.resetMfaConfirm'),
+            cancelText: t('common.cancel'),
+            isDangerous: true,
+            onConfirm: async () => {
+                await resetMfaMutation.mutateAsync(account.id)
+            },
+        })
+    }
 
     const impersonationMutation = useMutation({
         mutationFn: async (participantUserId: number) => {
@@ -280,6 +301,13 @@ export function AdminAccountsPage({ embedded = false }: { embedded?: boolean }) 
                                         }]
                                         : []),
                                     {
+                                        key: 'reset-mfa',
+                                        label: t('pages.accounts.resetMfa'),
+                                        icon: <FontAwesomeIcon icon={faShieldHalved} fixedWidth />,
+                                        disabled: resetMfaMutation.isPending || dialogLoading,
+                                        onClick: () => confirmResetMfa(linkedAccount),
+                                    },
+                                    {
                                         key: 'unlink',
                                         label: t('pages.accounts.unlink'),
                                         icon: <FontAwesomeIcon icon={faXmark} fixedWidth />,
@@ -388,6 +416,15 @@ export function AdminAccountsPage({ embedded = false }: { embedded?: boolean }) 
                                         <button className="button button-primary button-compact" type="button" onClick={() => openEditUserModal(account)}>
                                             <FontAwesomeIcon icon={faPen} fixedWidth />
                                             {t('common.edit')}
+                                        </button>
+                                        <button
+                                            className="button button-secondary button-compact"
+                                            type="button"
+                                            disabled={resetMfaMutation.isPending || dialogLoading}
+                                            onClick={() => confirmResetMfa(account)}
+                                        >
+                                            <FontAwesomeIcon icon={faShieldHalved} fixedWidth />
+                                            {t('pages.accounts.resetMfa')}
                                         </button>
                                         <button
                                             className="button button-danger button-compact"

@@ -61,6 +61,14 @@ class AuthOAuthExchangeThrottle(AuthRateThrottle):
     scope = "auth_oauth_exchange"
 
 
+class AuthPasskeyThrottle(AuthRateThrottle):
+    """Per-IP budget on the passkey authentication ceremony. Unlike
+    ``AuthMfaThrottle`` there is no account to key on before the assertion
+    is verified — a discoverable-credential login names nobody up front."""
+
+    scope = "auth_passkey"
+
+
 class AuthMfaThrottle(SimpleRateThrottle):
     """Per-account budget on the MFA challenge-exchange endpoint.
 

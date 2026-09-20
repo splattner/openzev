@@ -5,11 +5,14 @@ import {
     impersonateParticipant as impersonateParticipantRequest,
     login as loginRequest,
     logout as logoutRequest,
+    passkeyAuthenticateBegin,
+    passkeyAuthenticateComplete,
     stopImpersonation as stopImpersonationRequest,
     submitMfaChallenge,
     updateProfile,
 } from './api/auth'
 import type { User } from '../types/api'
+import { getPasskey } from './webauthn'
 
 /** Either the session is live (cookies set, `user` is the signed-in
  * account) or the account has a second factor and `completeMfaChallenge`
@@ -26,6 +29,9 @@ interface AuthContextValue {
     impersonator: User | null
     login: (email: string, password: string) => Promise<LoginOutcome>
     completeMfaChallenge: (mfaToken: string, code: string) => Promise<User>
+    /** Sign in with a passkey — no password (ADR 0020). Throws
+     * `PasskeyCancelledError` when the user dismisses the browser prompt. */
+    loginWithPasskey: (email?: string) => Promise<User>
     refreshUser: () => Promise<User>
     /** Persist the account's default community and refresh the cached user. */
     updatePreferredZev: (zevId: string | null) => Promise<void>
@@ -104,6 +110,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             },
             async completeMfaChallenge(mfaToken: string, code: string) {
                 await submitMfaChallenge(mfaToken, code)
+                return loadCurrentUser()
+            },
+            async loginWithPasskey(email?: string) {
+                invalidatePrefSaves()
+                await resetQueryCache()
+                const options = await passkeyAuthenticateBegin(email)
+                const assertion = await getPasskey(options)
+                await passkeyAuthenticateComplete(assertion)
                 return loadCurrentUser()
             },
             refreshUser() {

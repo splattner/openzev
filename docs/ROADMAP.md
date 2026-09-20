@@ -233,7 +233,7 @@ PVshare Cockpit is a closed, subscription-based SaaS (CHF ~30/participant/year) 
 | Admin-only restriction on `/auth/users/` endpoint | `shipped` | — | PR #430 |
 | Upload parsing hardening (zip bombs, parse loops, size caps) | `shipped` | — | PR #449; [spec](specs/2026-03-metering-import-and-quality.md) §4.4 |
 | `ProtectedRoute` with `allowedRoles` on all frontend routes | `shipped` | — | — |
-| Two-factor authentication (TOTP) | `idea` | `medium` | Security improvement for admin and ZEV owner accounts |
+| Two-factor authentication (TOTP and passkeys) | `shipped` | — | [spec](specs/2026-09-two-factor-authentication.md), ADR [0020](adr/0020-passkeys-replace-the-password.md) / [0021](adr/0021-mfa-secret-encryption-key.md); #740 |
 | Session management page (list and revoke active tokens) | `idea` | `low` | Useful for security-conscious owners |
 | Per-user API keys for automated integrations | `shipped` | — | Owner-managed keys with revoke; backend key auth + throttling — [guide](user-guide/16-api-keys.md) |
 | Admin console for API key management | `shipped` | — | PR #409 |

@@ -7,6 +7,12 @@ import { MantineProvider } from '@mantine/core'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { AppRoutes } from '../src/components/AppRoutes'
 
+// The enrolment gate has its own tests (mfa.test.ts); the shell under test
+// here is not what is being asserted about.
+vi.mock('../src/components/MfaEnrolmentGate', () => ({
+    MfaEnrolmentGate: ({ children }: { children: unknown }) => children,
+}))
+
 vi.mock('react-i18next', () => ({
     useTranslation: () => ({
         t: (k: string) => k,

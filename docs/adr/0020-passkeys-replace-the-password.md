@@ -1,6 +1,6 @@
 # ADR 0020: A user-verified passkey replaces the password, rather than supplementing it
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-09-19
 
 ## Context

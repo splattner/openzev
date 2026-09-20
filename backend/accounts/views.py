@@ -8,6 +8,7 @@ import logging
 import secrets
 import pyotp
 from django.conf import settings
+from django.db import transaction
 from django.utils.text import slugify
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
@@ -36,6 +37,7 @@ from .serializers import (
     FeatureFlagSerializer,
     TotpDeviceSerializer,
     VatRateSerializer,
+    WebAuthnCredentialSerializer,
 )
 from .authentication import enforce_csrf
 from .jwt_utils import make_jwt_for_user
@@ -489,19 +491,18 @@ def app_settings(request):
         )
         raise PermissionDenied("Only admins can update application settings.")
 
-    before = {
-        "date_format_short": settings_instance.date_format_short,
-        "date_format_long": settings_instance.date_format_long,
-        "date_time_format": settings_instance.date_time_format,
-    }
+    settings_fields = [
+        "date_format_short",
+        "date_format_long",
+        "date_time_format",
+        "mfa_required_roles",
+        "mfa_grace_period_days",
+    ]
+    before = {field: getattr(settings_instance, field) for field in settings_fields}
     serializer = AppSettingsSerializer(settings_instance, data=request.data, partial=True)
     serializer.is_valid(raise_exception=True)
     updated = serializer.save()
-    after = {
-        "date_format_short": updated.date_format_short,
-        "date_format_long": updated.date_format_long,
-        "date_time_format": updated.date_time_format,
-    }
+    after = {field: getattr(updated, field) for field in settings_fields}
     record_audit_event(
         request=request,
         action_category=AuditActionCategory.GOVERNANCE,
@@ -511,11 +512,7 @@ def app_settings(request):
         target_id="singleton",
         target_display="AppSettings",
         summary="Updated application settings.",
-        changes=build_diff(
-            before,
-            after,
-            ["date_format_short", "date_format_long", "date_time_format"],
-        ),
+        changes=build_diff(before, after, settings_fields),
     )
     return Response(serializer.data)
 
@@ -784,10 +781,8 @@ def set_initial_password(request):
 
 
 # ── Two-factor authentication (TOTP) ───────────────────────────────────────────
-# Spec: docs/specs/2026-09-two-factor-authentication.md §5.2. Passkeys
-# (WebAuthnCredential) and the AppSettings policy fields (mfa_required_roles,
-# mfa_grace_period_days) land in a later PR — until then MfaStatusView always
-# reports an empty passkey list and no enforced requirement.
+# Spec: docs/specs/2026-09-two-factor-authentication.md §5.2. Passkey
+# registration and sign-in live in views_passkeys.py.
 
 
 class MfaStatusView(APIView):
@@ -796,17 +791,24 @@ class MfaStatusView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, *args, **kwargs):
-        device = getattr(request.user, "totp_device", None)
-        has_active_totp = device is not None and device.is_active
+        user = request.user
+        device = getattr(user, "totp_device", None)
+        passkeys = user.webauthn_credentials.all()
+        protected = mfa.has_any_factor(user)
+        deadline = mfa.grace_deadline(user)
         return Response({
             "totp": TotpDeviceSerializer(device).data if device is not None else None,
-            "passkeys": [],
+            "passkeys": WebAuthnCredentialSerializer(passkeys, many=True).data,
             "recovery_codes_remaining": (
-                request.user.mfa_recovery_codes.filter(used_at__isnull=True).count()
-                if has_active_totp else 0
+                user.mfa_recovery_codes.filter(used_at__isnull=True).count() if protected else 0
             ),
-            "required": False,
-            "grace_until": None,
+            # Whether the policy names this user's role. The frontend's
+            # enrolment gate acts on ``required`` with no factor registered.
+            "required": deadline is not None,
+            # An ISO datetime rather than a bare date: the deadline is a
+            # moment, and the gate compares it with now. Null once enrolled —
+            # there is nothing left to enforce.
+            "grace_until": deadline.isoformat() if deadline is not None and not protected else None,
         })
 
 
@@ -854,14 +856,16 @@ class TotpDeviceView(APIView):
         if device is None:
             return Response(status=status.HTTP_404_NOT_FOUND)
 
-        # Refusing removal when a role requires a factor and no other one
-        # remains is AppSettings.mfa_required_roles's job (a later PR); any
-        # user may remove their own factor for now.
+        # Refused when the policy requires a factor from this user and this
+        # is the last one — a passkey elsewhere on the account still counts.
+        if mfa.removal_blocked(request.user, leaving=mfa.factor_count(request.user) - int(device.is_active)):
+            return Response(
+                {"detail": "Two-factor authentication is required for your role; add a passkey before removing this one."},
+                status=status.HTTP_409_CONFLICT,
+            )
+
         device.delete()
-        # A recovery code recovers into a challenge that no longer exists
-        # once no factor remains — dead weight, and re-enrolling issues a
-        # fresh set anyway.
-        MfaRecoveryCode.objects.filter(user=request.user).delete()
+        mfa.drop_recovery_codes_if_unprotected(request.user)
 
         record_audit_event(
             request=request,
@@ -893,9 +897,13 @@ class TotpEnrolConfirmView(APIView):
         if not ok:
             return Response({"detail": "Invalid code."}, status=status.HTTP_400_BAD_REQUEST)
 
+        # Recovery codes belong to the account, not to one factor: if a
+        # passkey already earned this user a set, confirming TOTP must not
+        # kill the printout they are holding. Only a first factor issues.
+        first_factor = not mfa.has_any_factor(request.user)
         device.confirmed_at = timezone.now()
         device.save(update_fields=["confirmed_at"])
-        recovery_codes = mfa.issue_recovery_codes(request.user)
+        recovery_codes = mfa.issue_recovery_codes(request.user) if first_factor else []
 
         record_audit_event(
             request=request,
@@ -919,8 +927,7 @@ class MfaRecoveryCodesView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, *args, **kwargs):
-        device = getattr(request.user, "totp_device", None)
-        if device is None or not device.is_active:
+        if not mfa.has_any_factor(request.user):
             return Response({"detail": "Two-factor authentication is not enabled."}, status=status.HTTP_400_BAD_REQUEST)
 
         recovery_codes = mfa.issue_recovery_codes(request.user)
@@ -937,6 +944,44 @@ class MfaRecoveryCodesView(APIView):
             user=request.user,
         )
         return Response({"recovery_codes": recovery_codes})
+
+
+class AdminMfaResetView(APIView):
+    """DELETE /users/<pk>/mfa/ — an admin removes *all* of a user's second
+    factors and recovery codes (D3: the way out for someone locked out).
+
+    A removal, never a creation: an admin cannot enrol a factor on someone
+    else's behalf and cannot read any secret, mirroring the API-key rule that
+    an admin may revoke but not mint for another user. Audited with the admin
+    as actor and the affected user as target.
+    """
+
+    permission_classes = [IsAuthenticated, IsAdmin]
+
+    def delete(self, request, pk, *args, **kwargs):
+        target = User.objects.filter(pk=pk).first()
+        if target is None:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+
+        with transaction.atomic():
+            totp_removed = TotpDevice.objects.filter(user=target).delete()[0]
+            passkeys_removed = target.webauthn_credentials.all().delete()[0]
+            codes_removed = MfaRecoveryCode.objects.filter(user=target).delete()[0]
+
+        removed = {"totp": totp_removed, "passkeys": passkeys_removed, "recovery_codes": codes_removed}
+        record_audit_event(
+            request=request,
+            action_category=AuditActionCategory.AUTH,
+            action_type="auth.mfa.reset",
+            target_type="accounts.User",
+            target=target,
+            target_id=str(target.pk),
+            target_display=target.email or target.username,
+            summary=f"Reset two-factor authentication for {target.email or target.username}.",
+            user=request.user,
+            metadata={"removed": removed},
+        )
+        return Response({"removed": removed})
 
 
 class ApiKeyListCreateView(generics.ListCreateAPIView):

@@ -4,6 +4,7 @@ from .views import (
     ApiKeyDetailView, ApiKeyListCreateView,
     CustomTokenObtainPairView, CookieTokenRefreshView, TokenMfaView, logout_view,
     MfaStatusView, MfaRecoveryCodesView, TotpDeviceView, TotpEnrolConfirmView,
+    AdminMfaResetView,
     UserListCreateView,
     UserDetailView, me, change_password, app_settings,
     VatRateListCreateView, VatRateDetailView,
@@ -20,6 +21,14 @@ from .views_oauth import (
     oauth_token_exchange,
     social_account_delete,
     social_accounts_list,
+)
+from .views_passkeys import (
+    PasskeyAuthenticateBeginView,
+    PasskeyAuthenticateCompleteView,
+    PasskeyDetailView,
+    PasskeyListView,
+    PasskeyRegisterBeginView,
+    PasskeyRegisterCompleteView,
 )
 from .views_impersonation import ImpersonateParticipantView, StopImpersonationView
 from .views_system import SystemHealthView
@@ -44,6 +53,13 @@ urlpatterns = [
     path("me/mfa/totp/", TotpDeviceView.as_view(), name="mfa-totp-device"),
     path("me/mfa/totp/confirm/", TotpEnrolConfirmView.as_view(), name="mfa-totp-confirm"),
     path("me/mfa/recovery-codes/", MfaRecoveryCodesView.as_view(), name="mfa-recovery-codes"),
+    path("me/passkeys/", PasskeyListView.as_view(), name="passkey-list"),
+    path("me/passkeys/register/begin/", PasskeyRegisterBeginView.as_view(), name="passkey-register-begin"),
+    path("me/passkeys/register/complete/", PasskeyRegisterCompleteView.as_view(), name="passkey-register-complete"),
+    path("me/passkeys/<uuid:pk>/", PasskeyDetailView.as_view(), name="passkey-detail"),
+    path("passkeys/authenticate/begin/", PasskeyAuthenticateBeginView.as_view(), name="passkey-authenticate-begin"),
+    path("passkeys/authenticate/complete/", PasskeyAuthenticateCompleteView.as_view(), name="passkey-authenticate-complete"),
+    path("users/<int:pk>/mfa/", AdminMfaResetView.as_view(), name="admin-mfa-reset"),
     # Deliberately absent from ACCOUNTS_API_KEY_ALLOWLIST: a key that can issue
     # or revoke keys makes revoking a leaked one pointless.
     path("me/api-keys/", ApiKeyListCreateView.as_view(), name="api-key-list-create"),

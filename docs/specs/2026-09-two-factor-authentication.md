@@ -1,7 +1,7 @@
 # Feature Spec: Two-factor authentication — TOTP and passkeys
 
 - Spec ID: SPEC-2026-09-two-factor-authentication
-- Status: In Progress (PRs 1–2 of 3 landed — see §10)
+- Status: Implemented (all three PRs — see §10)
 - Scope: Major
 - Type: Feature
 - Owners: @splattner
@@ -212,7 +212,16 @@ printout stops working.
 a non-empty list when `MFA_ENCRYPTION_KEYS` is unset (§4.5) — a policy that cannot be honoured
 must not be saveable.
 
-**Serializer:** `AppSettingsSerializer` gains both fields, writable by `admin` only.
+**Serializer:** `AppSettingsSerializer` gains both fields, writable by `admin` only. Validation lives
+in `AppSettings.validate_mfa_required_roles`, shared by `clean()` and the serializer (DRF does not run
+`clean()`), and clearing the list never needs a key. Policy changes are audited through the existing
+`app_settings.update` diff.
+
+**Addition beyond the table above: `mfa_policy_changed_at`** (`DateTimeField`, null, non-editable),
+set by `AppSettings.save()` whenever either policy field changes. The grace deadline is
+`max(user.date_joined, mfa_policy_changed_at) + mfa_grace_period_days`. Without it "days after the
+requirement is set" is not computable, and an admin account older than the grace period would be
+locked out the moment the policy was switched on — the failure §7.3 exists to prevent.
 
 ### 4.5 Secret encryption — the key, and why it is not `SECRET_KEY`
 
@@ -284,8 +293,8 @@ All paths are under `/api/v1/auth/`.
 
 **As shipped in PR 2.** `auth.login` carries `metadata.method` `password+totp` or `recovery_code`
 for the second-step logins; the `oauth` value listed in §5.6 is **not** emitted — OAuth sign-ins
-keep their existing `oauth.login` event, which already names the provider. `passkey` arrives with
-PR 3. `token/mfa/` returns `400` for every failure (bad, replayed or expired), each audited as
+keep their existing `oauth.login` event, which already names the provider. `passkey` is emitted by
+`passkeys/authenticate/complete/`. `token/mfa/` returns `400` for every failure (bad, replayed or expired), each audited as
 `auth.mfa.challenge_failed` with the reason.
 
 **The challenge token** is `django.core.signing.TimestampSigner(salt="accounts.mfa.challenge")`
@@ -304,19 +313,45 @@ server-side nonce would buy nothing and add state.
 | `me/mfa/` | GET | `IsAuthenticated` | `{totp: {...}\|null, passkeys: [...], recovery_codes_remaining: int, required: bool, grace_until: date\|null}` |
 | `me/mfa/totp/` | POST | `IsAuthenticated` | Begin enrolment. Creates an **unconfirmed** device, returns `{provisioning_uri, secret, qr_svg}`. Replaces any existing unconfirmed device |
 | `me/mfa/totp/confirm/` | POST | `IsAuthenticated` | `{code}` → sets `confirmed_at`, issues ten recovery codes, returns them **once** |
-| `me/mfa/totp/` | DELETE | `IsAuthenticated` | Removes the device **and its recovery codes**, audited as `auth.mfa.removed`. Refused with `409` if policy requires a factor and no passkey remains *(the guard lands with the policy fields in PR 3)* |
+| `me/mfa/totp/` | DELETE | `IsAuthenticated` | Removes the device **and its recovery codes**, audited as `auth.mfa.removed`. Refused with `409` if the policy requires a factor from this user and no other factor (a passkey) would remain |
 | `me/mfa/recovery-codes/` | POST | `IsAuthenticated` | Regenerates all ten, returns them once |
 | `me/passkeys/` | GET | `IsAuthenticated` | List (`WebAuthnCredentialSerializer`) |
 | `me/passkeys/register/begin/` | POST | `IsAuthenticated` | `PublicKeyCredentialCreationOptions`; `residentKey: "preferred"`, `userVerification: "required"` (ADR 0020) |
-| `me/passkeys/register/complete/` | POST | `IsAuthenticated` | `{credential, name}` → verifies attestation, stores the credential |
+| `me/passkeys/register/complete/` | POST | `IsAuthenticated` | `{credential, name}` → verifies attestation (user verification required), stores the credential, returns `{passkey, recovery_codes}`. `409` if the credential ID is already registered anywhere |
 | `me/passkeys/<uuid:pk>/` | PATCH, DELETE | `IsAuthenticated` | Rename or remove own credential. Same `409` guard as TOTP removal |
 
-**As shipped in PR 2:** `me/mfa/` already has its final shape but reports `passkeys: []`,
-`required: false` and `grace_until: null` until PR 3 fills them in. `me/mfa/totp/` POST returns
-`409` while an *active* device exists (remove it first) and `503` naming `MFA_ENCRYPTION_KEYS`
-when the key is unset. `me/mfa/recovery-codes/` POST returns `409` without an active device.
+**As shipped.** `me/mfa/` returns `required` (the policy names this user's role) and
+`grace_until` as an ISO **datetime** (a moment the gate compares with now, not a bare date), which is
+`null` once the user has any factor or when no policy applies. `me/mfa/totp/` POST returns `409`
+while an *active* device exists (remove it first) and `503` naming `MFA_ENCRYPTION_KEYS` when the
+key is unset. `me/mfa/recovery-codes/` POST returns `400` when the user has no factor at all.
 `me/mfa/totp/confirm/` audits `auth.mfa.enrolled` (`method=totp`). None of these endpoints is on
 `ACCOUNTS_API_KEY_ALLOWLIST`, so API keys are refused by default (tested).
+
+**Recovery codes belong to the account, not to a factor** (ADR 0020: they are the escape from both).
+They are issued when the user's **first** factor is enrolled — a passkey or TOTP — and confirming a
+second factor does not replace them (its response carries `recovery_codes: []`). Regeneration works
+with any factor. They are deleted when the last factor is removed.
+
+**What gates a password login.** Only an active TOTP device does (`mfa.has_active_factor`): a passkey
+authenticates on its own and cannot answer a challenge. `mfa.has_any_factor` (TOTP or passkey) is
+what the *policy* is satisfied by. The consequence is deliberate and worth stating: an account whose
+only factor is a passkey still accepts a password-only login, exactly as ADR 0020 describes ("the
+password route is unchanged"); the same holds for the magic-link and onboarding-link doors. A user who
+wants the password route protected too adds TOTP.
+
+**Passkey ceremony mechanics.** Challenges live in the Django cache for 5 minutes and are taken with
+an atomic `cache.delete`, so a ceremony completes once. Registration keys the challenge on the user
+(`mfa:webauthn:reg:{user_pk}`); authentication is unauthenticated, so it keys on the challenge itself
+(`mfa:webauthn:auth:{challenge}`), read back out of the assertion's own `clientDataJSON` — the browser
+still signs it, and py_webauthn still verifies it. `authenticate/begin/` returns the same shape
+whether or not the optional `email` matches an account (an unknown one yields an empty
+`allowCredentials`), so it cannot enumerate accounts. Every failure on `authenticate/complete/` is
+the same generic `400`; the audit reason distinguishes `expired_challenge`, `unknown_credential`,
+`invalid_assertion` (which includes an authenticator that did not verify the user, a wrong origin
+and a bad signature) and `inactive_user`. The library's own counter check is neutralised so a
+regression can be audited as `auth.passkey.sign_count_regression` (`DENIED`) rather than as a bare
+failure.
 
 `me/mfa/totp/` POST returns the secret in plain text **once**, because the user must be able to
 type it into an authenticator that cannot scan a QR code. `qr_svg` is rendered server-side with
@@ -353,7 +388,7 @@ New scope in `accounts/throttling.py` and `DEFAULT_THROTTLE_RATES`:
 | `auth_mfa` | `10/hour` | The **user PK** from the challenge token | The per-account brake that `auth_login` (40/hour per IP) does not provide |
 | `auth_passkey` | `30/hour` | Source IP | Bounds assertion-verification cost |
 
-*PR 2 ships `auth_mfa` only, overridable with `AUTH_MFA_THROTTLE_RATE`; `auth_passkey` arrives with the passkey endpoints in PR 3. A challenge token that cannot be resolved falls back to per-IP keying.*
+*Both scopes are overridable (`AUTH_MFA_THROTTLE_RATE`, `AUTH_PASSKEY_THROTTLE_RATE`). `auth_passkey` covers `begin` and `complete` together, so 30/hour is about fifteen sign-ins per IP. A challenge token that cannot be resolved falls back to per-IP keying.*
 
 `AuthMfaThrottle` keying on the account rather than the IP is the point: credential stuffing
 spread across a botnet is invisible to a per-IP budget.
@@ -408,7 +443,7 @@ opaque browser error, so the system check in §4.5 also warns when `DEBUG` is fa
 `MFA_ENCRYPTION_KEYS`. **As shipped (PR 2):** `mfaEncryptionKeys.{value, existingSecret}`, wired
 to the backend deployment only (workers never touch a TOTP secret), following the `secretKey`
 pattern — a plain `value` is accepted for parity, but an `existingSecret` reference is the
-documented production route. The three WebAuthn settings follow in PR 3.
+documented production route. The three WebAuthn settings ship as `webauthn.{rpId, rpName, origin}` (each optional; the backend defaults to `localhost`), and `manage.py check` gains `accounts.W002` when `DEBUG` is off and the RP ID is still `localhost`.
 
 **Challenge storage.** WebAuthn ceremony challenges live in the Django cache (Redis in
 production) under `mfa:webauthn:{user_pk|session_key}` with a 5-minute TTL — they are
@@ -455,6 +490,14 @@ Wraps the authenticated shell. When `/me/mfa/` reports `required && !enrolled`, 
 full-page interstitial rather than the app. Before `grace_until` the interstitial is
 dismissible ("Set this up later"); after it, it is not. A hard lockout of existing admins on
 upgrade is the failure mode this exists to prevent.
+
+**As shipped.** The decision lives in `lib/mfaGate.ts` (`pass` / `grace` / `hard`) so it is testable
+without a router. `/account` always passes, so the enrolment UI stays reachable, and an impersonating
+admin is never gated. **The gate is a UI control, not an API one:** a required user without a factor
+who calls the API directly (a script holding their session cookie or an API key) is not stopped by
+it. Server-side enforcement would have to touch every view's permission classes and every
+authentication class, which is a separate, larger change; the policy today is a strong nudge with an
+audit trail, not a hard wall. Say so before describing it to an operator as "enforced".
 
 ### 7.4 `AdminSystemSettingsPage`
 
@@ -575,7 +618,18 @@ lives in `accounts/test_oauth.py` as `OAuthMfaClaimTests` (5: refused without an
 refused with no claim at all, accepted with one, accepted as a space-separated string, and a
 provider without the requirement unaffected). TOTP tests pin the clock
 with a `totp_step` helper so replay protection never collides with a real 30-second step. The
-`MfaAdminTests`, `PasskeyTests`, policy-guard test and passkey throttle wait for PR 3.
+Passkeys, the policy, the removal guard and the admin reset shipped with PR 3 (below).
+
+**As shipped in PR 3**: `accounts/test_passkeys.py`, 56 tests, driving py_webauthn end to end
+through a small software authenticator (real `none` attestations, real ES256 assertions, nothing
+about the library mocked): `PasskeyRegistrationTests` (13), `PasskeyLoginTests` (15),
+`PasskeyThrottleTests` (1), `MfaPolicyTests` (11), `MfaRemovalGuardTests` (6),
+`MfaAdminResetTests` (7) and `WebAuthnRpCheckTests` (3). These replace the illustrative
+`PasskeyTests` / `MfaAdminTests` tables below and additionally cover replay of a spent ceremony,
+wrong-origin and tampered-signature assertions, the zero-counter exemption, the grace-period
+arithmetic (including an account far older than the policy), and recovery codes surviving a second
+factor. Frontend: `tests/mfa.test.ts` (19) covers the API client, the WebAuthn bridge and the gate's
+decision table (`lib/mfaGate.ts`).
 
 ### Backend — `accounts/test_mfa.py` (new)
 
@@ -688,7 +742,7 @@ Three PRs, in order. Each is independently releasable.
 |---|---|---|
 | 1 ✅ | `mfa_crypto.py`, `MFA_ENCRYPTION_KEYS`, system check, `TotpDevice` + `MfaRecoveryCode` models and migrations, the `auth.mfa.*` audit types | The crypto and audit substrate, with no user-visible change — reviewable on its own merits |
 | 2 ✅ | TOTP enrolment and the two-step login, the six other doors, throttling, `AccountProfilePage` security section, login challenge step | The first shippable factor |
-| 3 | `WebAuthnCredential`, passkey registration and passwordless authentication, policy fields, enrolment gate, admin reset | The larger surface, once the flow it plugs into is proven |
+| 3 ✅ | `WebAuthnCredential`, passkey registration and passwordless authentication, policy fields, enrolment gate, admin reset | The larger surface, once the flow it plugs into is proven |
 
 ADR 0020 should be written alongside PR 1, recording two decisions a future maintainer will
 otherwise re-litigate: that a user-verified passkey **replaces** the password rather than

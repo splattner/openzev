@@ -17,7 +17,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from .api_keys import hash_secret, verify_secret
-from .models import MfaRecoveryCode, User
+from .models import AppSettings, MfaRecoveryCode, TotpDevice, User
 
 MFA_CHALLENGE_SALT = "accounts.mfa.challenge"
 
@@ -83,13 +83,65 @@ def resolve_challenge(token: str) -> User:
 
 
 def has_active_factor(user: User) -> bool:
-    """Whether ``user`` has a second factor that gates login.
+    """Whether ``user`` has a second factor that *gates a password login* —
+    i.e. one that can answer a challenge. That is TOTP only.
 
-    Only TOTP exists yet; a passkey check joins this in the PR that adds
-    ``WebAuthnCredential``.
+    A passkey is deliberately not counted: it authenticates on its own and
+    replaces the password (ADR 0020), so it cannot be a second step after
+    one. See ``has_any_factor`` for "is this account protected at all".
     """
-    device = getattr(user, "totp_device", None)
-    return device is not None and device.is_active
+    # A query, not ``user.totp_device``: that reverse accessor caches on the
+    # instance, so right after a device is deleted it would still report one.
+    return TotpDevice.objects.filter(user=user, confirmed_at__isnull=False).exists()
+
+
+def has_any_factor(user: User) -> bool:
+    """Whether ``user`` has any registered factor — an active TOTP device or
+    at least one passkey. What the enrolment policy is satisfied by."""
+    return has_active_factor(user) or user.webauthn_credentials.exists()
+
+
+def policy_applies(user: User) -> bool:
+    """Whether ``AppSettings.mfa_required_roles`` names this user's role."""
+    return user.role in AppSettings.load().mfa_required_roles
+
+
+def grace_deadline(user: User):
+    """When enrolment stops being optional for ``user``, or ``None`` if no
+    policy applies to them.
+
+    Runs from the later of the account's creation and the last policy change,
+    so switching the requirement on never locks out an account that already
+    existed — the failure mode this deadline exists to prevent.
+    """
+    app_settings = AppSettings.load()
+    if user.role not in app_settings.mfa_required_roles:
+        return None
+    since = max(t for t in (user.date_joined, app_settings.mfa_policy_changed_at) if t is not None)
+    return since + timedelta(days=app_settings.mfa_grace_period_days)
+
+
+def removal_blocked(user: User, *, leaving: int) -> bool:
+    """Whether dropping a factor must be refused: the policy requires one
+    from this user and ``leaving`` factors would remain (zero means none).
+
+    Refused regardless of the grace period — the grace period is for people
+    who have not enrolled yet, not a way back out once they have.
+    """
+    return leaving == 0 and policy_applies(user)
+
+
+def factor_count(user: User) -> int:
+    """How many factors the user has: one for an active TOTP device plus one
+    per passkey. Only used to reason about what a removal would leave."""
+    return int(has_active_factor(user)) + user.webauthn_credentials.count()
+
+
+def drop_recovery_codes_if_unprotected(user: User) -> None:
+    """Recovery codes recover into a factor; with none left they are dead
+    weight (and re-enrolling issues a fresh set anyway)."""
+    if not has_any_factor(user):
+        MfaRecoveryCode.objects.filter(user=user).delete()
 
 
 def consume_recovery_code(user: User, code: str) -> bool:

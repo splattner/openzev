@@ -29,9 +29,10 @@ import { useToast } from '../lib/toast'
 import type { DateTimeFormat, LongDateFormat, OAuthProviderConfig, OAuthProviderConfigInput, ShortDateFormat } from '../types/api'
 import { ConfirmDialog, useConfirmDialog } from '../components/ConfirmDialog'
 import { FormModal } from '../components/FormModal'
+import { MfaPolicySection } from '../features/settings/MfaPolicySection'
 import { VatSettingsSection } from '../features/settings/VatSettingsSection'
 
-type SystemSettingsTab = 'regional' | 'features' | 'oauth' | 'vat'
+type SystemSettingsTab = 'regional' | 'features' | 'oauth' | 'security' | 'vat'
 
 const EMPTY_OAUTH_FORM: OAuthProviderConfigInput = {
     name: '',
@@ -47,7 +48,7 @@ const EMPTY_OAUTH_FORM: OAuthProviderConfigInput = {
     require_mfa_claim: false,
 }
 
-const TAB_ORDER: SystemSettingsTab[] = ['regional', 'features', 'oauth', 'vat']
+const TAB_ORDER: SystemSettingsTab[] = ['regional', 'features', 'oauth', 'security', 'vat']
 
 function getValidTab(value: string | null): SystemSettingsTab {
     return TAB_ORDER.includes(value as SystemSettingsTab) ? (value as SystemSettingsTab) : 'regional'
@@ -241,6 +242,7 @@ export function AdminSystemSettingsPage() {
                     <Tabs.Tab value="regional">{t('adminSystemSettings.tabs.regional.label')}</Tabs.Tab>
                     <Tabs.Tab value="features">{t('adminSystemSettings.tabs.features.label')}</Tabs.Tab>
                     <Tabs.Tab value="oauth">{t('adminSystemSettings.tabs.oauth.label')}</Tabs.Tab>
+                    <Tabs.Tab value="security">{t('adminSystemSettings.tabs.security.label')}</Tabs.Tab>
                     <Tabs.Tab value="vat">{t('adminSystemSettings.tabs.vat.label')}</Tabs.Tab>
                 </Tabs.List>
 
@@ -326,6 +328,10 @@ export function AdminSystemSettingsPage() {
                         </form>
                     )}
                 </section>
+                </Tabs.Panel>
+
+                <Tabs.Panel value="security">
+                    <MfaPolicySection />
                 </Tabs.Panel>
 
                 <Tabs.Panel value="features">

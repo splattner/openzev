@@ -2,6 +2,7 @@ import { Suspense, lazy } from 'react'
 import { Route, Routes } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Layout } from './Layout'
+import { MfaEnrolmentGate } from './MfaEnrolmentGate'
 import { ProtectedRoute } from './ProtectedRoute'
 import { AliasNavigate, InvoiceDetailAlias, MeteringDataAlias } from './RouteAliases'
 import { PageSkeleton } from './PageSkeleton'
@@ -53,11 +54,13 @@ export function AppRoutes() {
           path="/"
           element={
             <ProtectedRoute>
-              <ManagedZevProvider>
-                <Suspense fallback={<PageSkeleton variant="page" />}>
-                  <Layout />
-                </Suspense>
-              </ManagedZevProvider>
+              <MfaEnrolmentGate>
+                <ManagedZevProvider>
+                  <Suspense fallback={<PageSkeleton variant="page" />}>
+                    <Layout />
+                  </Suspense>
+                </ManagedZevProvider>
+              </MfaEnrolmentGate>
             </ProtectedRoute>
           }
         >

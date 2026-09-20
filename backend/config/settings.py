@@ -168,6 +168,9 @@ REST_FRAMEWORK = {
         # Per-ACCOUNT (not per-IP) budget on the MFA challenge exchange —
         # see accounts.throttling.AuthMfaThrottle.
         "auth_mfa": env("AUTH_MFA_THROTTLE_RATE", default="10/hour"),
+        # Per-IP budget on the passkey authentication ceremony (begin and
+        # complete both count) — bounds assertion-verification cost.
+        "auth_passkey": env("AUTH_PASSKEY_THROTTLE_RATE", default="30/hour"),
         # Per-IP budget for the unauthenticated invoice-link endpoints. A
         # household refreshing its own bill costs a handful; a scanner walking
         # prefixes runs out long before entropy would have saved it anyway.
@@ -220,6 +223,14 @@ API_KEY_LAST_USED_RESOLUTION = timedelta(
 # Empty by default: MFA enrolment is refused (503) until this is set, rather
 # than falling back to a weaker guarantee. See accounts.checks.mfa_key_configured.
 MFA_ENCRYPTION_KEYS = env.list("MFA_ENCRYPTION_KEYS", default=[])
+
+# WebAuthn relying-party identity. RP_ID must be the domain the browser sees
+# (e.g. "zev.example.ch") and ORIGIN the full origin the SPA is served from;
+# a mismatch makes every passkey ceremony fail with an opaque browser error,
+# which accounts.checks.webauthn_rp_configured warns about outside DEBUG.
+WEBAUTHN_RP_ID = env("WEBAUTHN_RP_ID", default="localhost")
+WEBAUTHN_RP_NAME = env("WEBAUTHN_RP_NAME", default="OpenZEV")
+WEBAUTHN_ORIGIN = env("WEBAUTHN_ORIGIN", default="http://localhost:5173")
 
 # ── CORS ──────────────────────────────────────────────────────────────────────
 CORS_ALLOWED_ORIGINS = env.list(

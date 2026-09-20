@@ -256,26 +256,57 @@ Audit log**) and to **ZEV owners** for their own communities (scoped events,
 
 ## Two-Factor Authentication
 
-Any user can add an authenticator app (Google Authenticator, Aegis, 1Password, …) as a second
-step at sign-in.
+Every user can protect their account with a **passkey**, an **authenticator app**, or both. Set them
+up under **My Account → Two-Factor Authentication**.
 
-**Turn it on:**
-1. Open **My Account** and find the **Two-factor authentication** section
-2. Click **Set up two-factor authentication**, scan the QR code with your authenticator app (or type the secret in by hand)
-3. Enter the 6-digit code the app shows to confirm
-4. Save the ten **recovery codes** shown once — each works a single time if you lose your phone
+### Passkeys (no password needed)
 
-**Signing in afterwards:** enter your password as usual, then the 6-digit code. Use
-**Use a recovery code instead** if you don't have your phone. The same code is asked for when you
-sign in through an emailed invoice link or onboarding link. Signing in through an external
-identity provider is unaffected unless the administrator requires the provider to assert a second
-factor.
+A passkey lets you sign in with your fingerprint, face or device PIN — no password. It is
+phishing-resistant: it only works on the real OpenZEV address.
 
-**Lost your phone and your recovery codes?** Ask an administrator to reset your second factor
-(coming with the next release); until then, an administrator cannot see or recover your secret.
+1. Click **Add a passkey**, give it a name (for example "MacBook Touch ID"), and confirm on your device
+2. Add a second one on another device, so a lost phone does not lock you out
+3. Save the **recovery codes** shown once when you add your first factor
 
-The server needs an encryption key (`MFA_ENCRYPTION_KEYS`, see the deployment docs) before
-anyone can enrol; without it the section shows an error naming the setting.
+To sign in, click **Sign in with a passkey** on the login page. The button only appears in browsers
+that support passkeys.
+
+### Authenticator app
+
+1. Click **Set up two-factor authentication**, scan the QR code with your authenticator app
+   (Google Authenticator, Aegis, 1Password, …) or type the key in by hand
+2. Enter the 6-digit code the app shows to confirm
+3. Save the ten **recovery codes** if you have no other factor yet — each works a single time
+
+Afterwards, signing in with your password asks for the 6-digit code as a second step. Use
+**Use a recovery code instead** if you don't have your phone. The same code is asked when you sign in
+through an emailed invoice link or onboarding link. Signing in through an external identity provider
+is unaffected unless the administrator requires the provider to assert a second factor.
+
+> **Note:** A passkey signs you in on its own, so it does not add a code prompt to the password
+> route. If you also want your password protected by a second step, set up the authenticator app too.
+
+### Requiring it for a role (administrators)
+
+Under **Platform administration → System Settings → Security**, choose which roles must use
+two-factor authentication and set a grace period in days. Users of those roles see a reminder on their
+account page and a set-up screen they can postpone until the grace period ends. The period counts from
+the later of the account's creation and the day you last changed the policy, so switching it on never
+locks anyone out immediately. A user whose role requires it cannot remove their last factor.
+
+Note that the set-up screen is shown by the web interface; it does not restrict scripts that call the
+API with an existing session or API key.
+
+### Locked out?
+
+Sign in with a recovery code. If you have lost your devices and your recovery codes, ask an
+administrator: **Admin → Accounts → Reset two-factor** removes every passkey, the authenticator app
+and all recovery codes for that user, and is recorded in the audit log. An administrator can never see
+or recover your secrets, and cannot set up a factor on your behalf.
+
+The server needs an encryption key (`MFA_ENCRYPTION_KEYS`) before authenticator apps can be enrolled
+or a requirement can be set, and the passkey domain settings (`WEBAUTHN_RP_ID`, `WEBAUTHN_ORIGIN`)
+must match the address users open OpenZEV on. See `backend/.env.example` and the Helm chart README.
 
 ## Multi-ZEV Setups
 
