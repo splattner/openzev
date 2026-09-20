@@ -6,7 +6,7 @@ from rest_framework.permissions import SAFE_METHODS
 from rest_framework_simplejwt.authentication import JWTAuthentication
 
 from .api_keys import split_key, verify_secret
-from .jwt_utils import SESSION_CLAIM
+from .jwt_utils import IMPERSONATOR_CLAIM, SESSION_CLAIM
 
 ACCESS_COOKIE = "openzev_access"
 
@@ -37,20 +37,150 @@ class CookieJWTAuthentication(JWTAuthentication):
             parts = header.split()
             if parts and parts[0].lower() == b"api-key":
                 return None
-            return super().authenticate(request)
+            result = super().authenticate(request)
+        else:
+            # Fall back to the httpOnly cookie set by the login endpoint
+            raw_token = request.COOKIES.get(ACCESS_COOKIE)
+            if raw_token is None:
+                return None
 
-        # Fall back to the httpOnly cookie set by the login endpoint
-        raw_token = request.COOKIES.get(ACCESS_COOKIE)
-        if raw_token is None:
-            return None
+            validated_token = self.get_validated_token(raw_token)
+            user = self.get_user(validated_token)
 
-        validated_token = self.get_validated_token(raw_token)
-        user = self.get_user(validated_token)
+            if request.method not in SAFE_METHODS:
+                enforce_csrf(request)
 
-        if request.method not in SAFE_METHODS:
-            enforce_csrf(request)
+            result = (user, validated_token)
 
-        return user, validated_token
+        if result is not None:
+            enforce_mfa_enrolment(request, *result)
+        return result
+
+
+# ── MFA policy enforcement ────────────────────────────────────────────────────
+#
+# ``AppSettings.mfa_required_roles`` (spec 2026-09-two-factor-authentication.md
+# §7.3) is otherwise a UI-only nag: ``MfaEnrolmentGate`` withholds the app shell
+# in the browser once an account's grace period ends, but nothing stops a
+# script from carrying on regardless, past its own grace period, forever. This
+# closes that gap for interactive (cookie or bearer JWT) sessions, without
+# reaching API keys — see the docstring on ``enforce_mfa_enrolment`` for why.
+#
+# Deliberately narrow in a second way too: only *unsafe* methods are refused.
+# Reading data was never gated by having a second factor, only by being signed
+# in at all, and this feature does not change that — it only forecloses acting
+# further until the account is protected the way its role requires.
+#
+# URL name -> methods exempt even while overdue, or ``None`` for all methods.
+# Two kinds of entry: the enrolment ceremony itself (a script cannot complete
+# it, but the person reaching it through the browser must be able to), and
+# self-protective actions with no capability to grant (revoking a key,
+# changing your own password, signing yourself out). Deliberately absent:
+# ``api-key-list-create`` (minting a *fresh* key would otherwise be the
+# obvious way around this — API keys themselves are exempt from this check
+# entirely, so a new one would work for everything else), ``app-settings``
+# (an overdue admin must not be able to edit the very policy blocking them —
+# enrolling is the only way out, by design), and every admin action that
+# targets *another* account (``admin-mfa-reset``, ``admin-sessions-revoke``,
+# ``impersonate-participant``, ``user-detail``, ...): those are not this
+# account protecting itself, and the calling admin being out of policy is
+# reason enough to refuse them.
+MFA_ENROLMENT_EXEMPT_URL_NAMES: dict[str, frozenset[str] | None] = {
+    # Refreshing a still-live session must never depend on the very policy
+    # that session might be blocked by.
+    "token_refresh": None,
+    "token-mfa": None,
+    # Self-service profile — email/role/must_change_password/is_active are
+    # already read-only here (SelfUserSerializer); nothing left to abuse.
+    "me": None,
+    "change-password": None,
+    "set-initial-password": None,
+    "email-change-request": None,
+    "email-change-confirm": None,
+    "sessions-revoke-own": None,
+    # The enrolment ceremony itself.
+    "mfa-totp-device": None,
+    "mfa-totp-confirm": None,
+    "mfa-recovery-codes": None,
+    "passkey-register-begin": None,
+    "passkey-register-complete": None,
+    "passkey-detail": None,
+    "passkey-authenticate-begin": None,
+    "passkey-authenticate-complete": None,
+    "oauth-link-initiate": None,
+    "social-account-delete": None,
+    # Revoking a key removes capability; renaming or minting one does not,
+    # so only DELETE is exempt.
+    "api-key-detail": frozenset({"DELETE"}),
+}
+
+
+def enforce_mfa_enrolment(request, user, token) -> None:
+    """Refuse a write from a session whose role requires two-factor
+    authentication and whose account is past its grace period without one.
+
+    API keys never reach this: it runs inside ``CookieJWTAuthentication``
+    only, which ``ApiKeyAuthentication`` does not share. That is deliberate,
+    not an oversight — the policy is about proving a second factor at the
+    *login* moment, and a key has none to prove; every login door already
+    demands one when a factor exists (``mfa.requires_challenge``), and a key
+    is barred from ever touching the MFA/login/key-management surface at all
+    (``ACCOUNTS_API_KEY_ALLOWLIST``, default-deny). Blocking key traffic here
+    too would only remove the one credential that keeps working when a human
+    cannot immediately get to a browser, for no security gained: a key cannot
+    complete the enrolment ceremony this check exists to push someone toward.
+
+    Also skipped for an active impersonation session (an admin cannot enrol a
+    factor on someone else's behalf, so their compliance state is not this
+    request's to answer for — the same exemption ``MfaEnrolmentGate`` makes in
+    the browser) and for safe methods (reading was never gated by this).
+    """
+    if request.method in SAFE_METHODS or token.get(IMPERSONATOR_CLAIM):
+        return
+
+    url_name = getattr(getattr(request, "resolver_match", None), "url_name", None)
+    exempt_methods = MFA_ENROLMENT_EXEMPT_URL_NAMES.get(url_name, frozenset())
+    if exempt_methods is None or request.method in exempt_methods:
+        return
+
+    from .models import AppSettings
+
+    app_settings = AppSettings.load()
+    if user.role not in app_settings.mfa_required_roles:
+        return
+
+    from . import mfa
+
+    status = mfa.compliance_status(user, app_settings=app_settings, has_factor=mfa.has_any_factor(user))
+    if status is None or status["status"] != "overdue":
+        return
+
+    _audit_enrolment_required(request, user)
+    raise exceptions.PermissionDenied({
+        "detail": "Set up two-factor authentication to continue.",
+        "code": "mfa_enrolment_required",
+    })
+
+
+def _audit_enrolment_required(request, user) -> None:
+    from audit.models import AuditActionCategory, AuditEventStatus
+    from audit.services import record_audit_event
+
+    url_name = getattr(getattr(request, "resolver_match", None), "url_name", None)
+    record_audit_event(
+        request=request,
+        action_category=AuditActionCategory.AUTH,
+        action_type="auth.mfa.enrolment_required",
+        target_type="accounts.User",
+        target=user,
+        target_id=str(user.pk),
+        target_display=user.email or user.username,
+        summary=f"Refused {request.method} {url_name or request.path} for "
+                f"{user.email or user.username}: two-factor authentication is overdue.",
+        user=user,
+        status=AuditEventStatus.DENIED,
+        metadata={"method": request.method, "url_name": url_name},
+    )
 
 
 # ── API key scope rules ───────────────────────────────────────────────────────

@@ -506,11 +506,87 @@ upgrade is the failure mode this exists to prevent.
 
 **As shipped.** The decision lives in `lib/mfaGate.ts` (`pass` / `grace` / `hard`) so it is testable
 without a router. `/account` always passes, so the enrolment UI stays reachable, and an impersonating
-admin is never gated. **The gate is a UI control, not an API one:** a required user without a factor
-who calls the API directly (a script holding their session cookie or an API key) is not stopped by
-it. Server-side enforcement would have to touch every view's permission classes and every
-authentication class, which is a separate, larger change; the policy today is a strong nudge with an
-audit trail, not a hard wall. Say so before describing it to an operator as "enforced".
+admin is never gated. **The gate withholds the app shell in the browser; it is not what makes the
+policy binding** — `accounts.authentication.enforce_mfa_enrolment` (§7.3a) is, and applies regardless
+of which client is calling.
+
+### 7.3a Server-side enforcement (`enforce_mfa_enrolment`)
+
+**File:** `backend/accounts/authentication.py`
+
+The gate alone left a real gap: a required account past its grace period with no factor could keep
+using the API forever through anything that did not run the gate's JavaScript — a script holding its
+session cookie, or simply never opening the browser. This closes it, at the same choke point
+`ApiKeyAuthentication`'s own scope check already uses (`check_api_key_scope` — an authentication
+class, not `DEFAULT_PERMISSION_CLASSES`, because a view that declares its own permission classes
+silently drops the default ones; an authentication class runs for every request that uses it).
+
+`CookieJWTAuthentication.authenticate()` calls `enforce_mfa_enrolment(request, user, token)` after
+resolving the caller, on both the cookie and the `Authorization: Bearer` paths. It raises
+`exceptions.PermissionDenied({"detail": ..., "code": "mfa_enrolment_required"})` — a 403, not a 401:
+the caller *is* authenticated, just not allowed to do this yet — and records
+`auth.mfa.enrolment_required` (`AuditEventStatus.DENIED`) first. Skipped entirely, in order:
+
+1. **Safe methods** (`GET`/`HEAD`/`OPTIONS`). Reading was never gated by holding a second factor,
+   only by being signed in at all; this feature only forecloses acting further, not seeing what is
+   already there.
+2. **An active impersonation session** (`token[IMPERSONATOR_CLAIM]` set) — the same exemption
+   `MfaEnrolmentGate` makes in the browser: an admin cannot enrol a factor on someone else's behalf,
+   so the *impersonated* account's compliance state is not this request's to answer for.
+3. **`MFA_ENROLMENT_EXEMPT_URL_NAMES`** — a URL-name allowlist (mirroring
+   `ACCOUNTS_API_KEY_ALLOWLIST`'s shape: name → exempt methods, or `None` for all) covering exactly
+   two kinds of route: the enrolment ceremony itself (`mfa-totp-device`, `mfa-totp-confirm`,
+   `mfa-recovery-codes`, `passkey-register-{begin,complete}`, `passkey-detail`,
+   `passkey-authenticate-{begin,complete}`, `oauth-link-initiate`, `social-account-delete`), and
+   self-protective account actions with no capability to grant (`me`, `change-password`,
+   `set-initial-password`, `email-change-request`, `email-change-confirm`, `sessions-revoke-own`,
+   `token_refresh`, `token-mfa`, and `api-key-detail` for `DELETE` only — revoking a key removes
+   capability, renaming or minting one does not).
+4. Otherwise: `user.role not in AppSettings.load().mfa_required_roles`, or
+   `mfa.compliance_status(...)` is not `"overdue"` (grace period still running, or the account
+   already holds a factor). `AppSettings.load()` runs once regardless — a single indexed lookup on
+   every unsafe request is the cost of the feature being usable at all; `mfa.has_any_factor` (two
+   more queries) only runs once the role actually matches the policy, so an instance that has never
+   turned the policy on pays exactly one query for this on every write and nothing more.
+
+**Deliberately absent from the exemption list**, and so blocked once overdue like anything else:
+
+- `api-key-list-create` (`POST`) — minting a *fresh* key. API keys are exempt from this check
+  entirely (below), so leaving key creation open would make it the obvious way around the whole
+  feature: create a key once, do everything through it forever.
+- `app-settings` (`PATCH`) — an overdue admin cannot edit the very policy blocking them. Enrolling
+  is the only way out, by design; the same "the escape hatch is always available, nothing else is"
+  reasoning as `MFA_ENCRYPTION_KEYS` being unrecoverable (ADR 0021).
+- Every admin action that targets *another* account: `admin-mfa-reset`, `admin-sessions-revoke`,
+  `impersonate-participant`, `user-detail`, `user-list-create`, `admin-api-key-detail`. These are
+  not the calling account protecting itself, and the admin being out of policy is reason enough to
+  refuse them.
+
+**API keys are not reached by this at all** — `ApiKeyAuthentication` does not call
+`enforce_mfa_enrolment`. The policy is about proving a second factor at the *login* moment; a key
+has none to prove and no login moment to prove it at, and cannot complete the enrolment ceremony
+this check exists to push someone toward. A key is separately barred from ever touching the
+MFA/login/key-management surface regardless of policy state (`ACCOUNTS_API_KEY_ALLOWLIST`,
+default-deny) — the two mechanisms are independent and this one intentionally adds nothing to that.
+The corollary: an account whose day-to-day access is entirely through a key it minted before the
+policy applied to it is never actually forced to enrol by this alone — a known, accepted limit, not
+an oversight; the policy is enforced against the browser/session login path, not against every
+credential an account might hold.
+
+No dedicated frontend handling: the SPA's own gate already prevents normal navigation from ever
+reaching this in practice (every self-service Security-tab action is on the exemption list above),
+so a 403 here only fires for a caller bypassing the SPA — and the existing generic error toast
+(`formatApiError`, which already prefers a string `detail`) shows something reasonable without
+needing a bespoke branch for `mfa_enrolment_required`.
+
+**Tests:** `accounts/test_mfa_enforcement.py` — a write refused once overdue (with the audit event);
+reads never blocked; grace-period writes unaffected; an enrolled account never blocked; a role
+outside the policy, or no policy at all, never blocked; every exempt self-service route stays
+reachable (including that beginning TOTP enrolment still works); minting a new API key is blocked;
+editing the policy itself is blocked; every admin action on another account is blocked while admin
+reads still work; an active impersonation session is exempt regardless of the target's compliance;
+an API key keeps working on an overdue account; the check fires on the cookie path too, and a token
+refresh is never caught by it.
 
 ### 7.4 `AdminSystemSettingsPage`
 

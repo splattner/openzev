@@ -353,6 +353,7 @@ Helper `accounts.jwt_utils.make_jwt_for_user(user, *, impersonated_by=None) -> d
 | `impersonated_by` | admin id; only on impersonation sessions |
 
 **Session version check:** `CookieJWTAuthentication.get_user` refuses an access token whose `sv` (a missing claim reads as `0`) differs from `user.session_version` (`401`, code `session_revoked`) — see §5.6b.
+**MFA policy enforcement:** `CookieJWTAuthentication.authenticate` also refuses (`403`) an unsafe request from an account whose role requires two-factor authentication and is past its grace period with no factor enrolled, with a short exemption list for self-service security actions and every admin action on another account excluded — see `2026-09-two-factor-authentication.md` §7.3a. Not reached by `ApiKeyAuthentication` at all.
 
 **Token refresh:** `POST /api/v1/auth/token/refresh/` reads `openzev_refresh` cookie; CSRF via `CookieJWTAuthentication` (`SessionAuthentication.enforce_csrf` on unsafe methods) + `CsrfViewMiddleware` kept for admin/Django views. Before rotating, `CookieTokenRefreshView` also requires the refresh token's `sv` to match the account's and the account to be active; otherwise `401` and the auth cookies are cleared.
 

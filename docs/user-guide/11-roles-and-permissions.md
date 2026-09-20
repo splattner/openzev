@@ -354,8 +354,12 @@ gets a badge in the Security column — "2FA required · due `<date>`" during th
 overdue" once it has passed — and the **Two-factor** filter narrows the list to exactly those
 accounts. The "Needs two-factor" stat at the top of the page counts them.
 
-Note that the set-up screen is shown by the web interface; it does not restrict scripts that call the
-API with an existing session or API key.
+Once the grace period ends, an account with no factor is also refused any change it tries to make
+through the API, not only in the web app — so this is enforced, not just suggested. Reading data is
+never affected, and neither is an API key: a key cannot complete the enrolment ceremony this policy
+pushes someone toward, so it is a separate credential this policy does not reach. An account whose
+day-to-day access is entirely through an API key it minted before the policy applied to it is
+therefore not forced to enrol by this alone.
 
 ### Locked out?
 
