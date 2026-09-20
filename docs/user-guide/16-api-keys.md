@@ -101,7 +101,8 @@ Some endpoints refuse key authentication regardless of your role, returning
 | --- | --- |
 | `auth/token/refresh/` | A key must not be upgradeable into a browser session |
 | `auth/me/change-password/`, `auth/me/set-initial-password/` | Otherwise a leaked key locks the real owner out |
-| `auth/me/` (PATCH) | Moving the account email moves password recovery with it |
+| `auth/me/` (PATCH), `auth/me/email-change/` | Moving the account email moves password recovery with it |
+| `auth/me/sessions/revoke/`, `auth/users/<id>/revoke-sessions/` | A key must not be able to sign its owner out |
 | `auth/users/` writes, `auth/users/<id>/impersonate/` | An admin's key must not be able to become somebody else |
 | `auth/me/api-keys/` | A key that can issue keys makes revoking a leaked one pointless |
 
@@ -172,10 +173,12 @@ and the administrator who revoked it.
 
 ### Changing your password does not revoke your keys
 
-This is deliberate: a routine password rotation should not silently break every
-automation you have. It also means that if you are changing your password
-**because you think your account was compromised**, you should revoke your keys
-as well — changing the password alone does not lock an attacker out of them.
+Changing your password signs out your other browser sessions, but keys are
+separate credentials. That is deliberate: a routine password rotation should not
+silently break every automation you have. It also means that if you are changing
+your password **because you think your account was compromised**, you should
+revoke your keys as well — changing the password alone does not lock an attacker
+out of them.
 
 ## Audit trail
 

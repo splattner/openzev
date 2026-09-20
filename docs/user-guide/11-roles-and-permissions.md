@@ -225,6 +225,10 @@ Open **More** on an account row for:
   admin).
 - **Reset two-factor** — removes the account's passkeys, authenticator app and
   recovery codes, so someone locked out can sign in with their password again.
+- **Sign out everywhere** — ends every session the account holds, on every
+  browser and device, so it has to sign in again. Use it when you suspect
+  someone else has access. It is recorded in the audit log and is not offered
+  on your own row (use **Sign out other devices** on your account page).
 - **Delete** — only available for accounts that do not belong to a community.
   Unlink the account from its participant first; an owner's account cannot be
   deleted while it owns a community.
@@ -336,6 +340,40 @@ or recover your secrets, and cannot set up a factor on your behalf.
 The server needs an encryption key (`MFA_ENCRYPTION_KEYS`) before authenticator apps can be enrolled
 or a requirement can be set, and the passkey domain settings (`WEBAUTHN_RP_ID`, `WEBAUTHN_ORIGIN`)
 must match the address users open OpenZEV on. See `backend/.env.example` and the Helm chart README.
+
+## Email Address and Sessions
+
+### Changing your email address
+
+Your email address is what you sign in with and where sign-in links are sent, so changing
+it takes a few extra steps. Under **My Account → Profile → Email address**:
+
+1. Click **Change email**, enter the new address and your **current password**
+2. Open the confirmation link OpenZEV sends to the **new** address (valid for 24 hours)
+3. Sign in again with the new address — the change signs you out everywhere
+
+The old address is emailed afterwards, so a change you did not make does not go unnoticed. The
+link works once, and stops working if your password or address changes before you use it.
+
+Accounts that have no password — participants, who sign in with emailed links, and accounts that
+only use an external identity provider — cannot do this themselves. For participants the address is
+maintained by the community owner on the participant record; an administrator can change any
+account's address under **Platform → Accounts → Edit**.
+
+### Signing out other devices
+
+Under **My Account → Security → Sessions**, **Sign out other devices** ends every session except the
+one you are using. Do it if you lost a device or suspect someone else has access. There is no list
+of individual devices — the action always covers all of them.
+
+Sessions on other devices also end automatically when you:
+
+- change your password (you stay signed in on the device you used),
+- confirm an email change, or
+- have your two-factor authentication reset by an administrator, or your account deactivated.
+
+Signing out on one device (**Log out**) only ends that browser's session. API keys are separate
+credentials and stay valid — see [API keys](16-api-keys.md).
 
 ## Multi-ZEV Setups
 

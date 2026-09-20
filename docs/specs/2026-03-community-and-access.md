@@ -341,7 +341,7 @@ Two consequences for anything added later:
 
 **Two-factor challenge:** if the account has a second factor (a confirmed `TotpDevice` or a registered passkey), the password step returns `200 {"mfa_required": true, "mfa_token": "<signed>", "methods": ["totp", "recovery_code"]}` and sets **no** cookies. `POST /api/v1/auth/token/mfa/` `{mfa_token, code}` then completes the login (TOTP code or one-time recovery code). Magic-link consume and onboarding-link consume return the same challenge shape; the OAuth door honours an IdP `amr` claim instead (`OAuthProvider.require_mfa_claim`, default `False`). `methods` is `["recovery_code"]` for an account whose only factor is a passkey. A passkey (WebAuthn) itself signs in on its own via `POST /auth/passkeys/authenticate/{begin,complete}/` with no password and is never challenged. Accounts without a factor see the pre-2FA behaviour unchanged. Full contract: `2026-09-two-factor-authentication.md` §5.
 
-Helper `accounts.views._make_jwt_for_user(user) -> dict` adds custom claims (also used by `CustomTokenObtainPairSerializer` and `verify_email`/`set_initial_password`; `views_oauth._make_jwt_for_user` and impersonation use the same claims):
+Helper `accounts.jwt_utils.make_jwt_for_user(user, *, impersonated_by=None) -> dict` and `add_custom_claims(token, user)` set the custom claims (used by `CustomTokenObtainPairSerializer`, every session-minting door — verify-email, set-initial-password, magic/onboarding links, OAuth, passkey — and impersonation, so all issue the same claims):
 
 | Claim | Value |
 |---|---|
@@ -349,8 +349,12 @@ Helper `accounts.views._make_jwt_for_user(user) -> dict` adds custom claims (als
 | `email` | `user.email` |
 | `full_name` | `user.get_full_name()` |
 | `must_change_password` | `user.must_change_password` |
+| `sv` | `user.session_version` — the account's session version when the token was issued (§5.6b) |
+| `impersonated_by` | admin id; only on impersonation sessions |
 
-**Token refresh:** `POST /api/v1/auth/token/refresh/` reads `openzev_refresh` cookie; CSRF via `CookieJWTAuthentication` (`SessionAuthentication.enforce_csrf` on unsafe methods) + `CsrfViewMiddleware` kept for admin/Django views.
+**Session version check:** `CookieJWTAuthentication.get_user` refuses an access token whose `sv` (a missing claim reads as `0`) differs from `user.session_version` (`401`, code `session_revoked`) — see §5.6b.
+
+**Token refresh:** `POST /api/v1/auth/token/refresh/` reads `openzev_refresh` cookie; CSRF via `CookieJWTAuthentication` (`SessionAuthentication.enforce_csrf` on unsafe methods) + `CsrfViewMiddleware` kept for admin/Django views. Before rotating, `CookieTokenRefreshView` also requires the refresh token's `sv` to match the account's and the account to be active; otherwise `401` and the auth cookies are cleared.
 
 **Cookie transport:** httpOnly cookies `openzev_access` / `openzev_refresh` + `csrftoken` via `django.middleware.csrf.get_token` (`CsrfViewMiddleware` sets cookie). `CSRF_TRUSTED_ORIGINS` defaults to `CORS_ALLOWED_ORIGINS`.
 
@@ -397,8 +401,8 @@ password. Otherwise returns 400 ("Use the change-password endpoint instead.").
 
 **Flow:**
 1. Validate password via Django password validators.
-2. Set password, clear `must_change_password` flag.
-3. Issue fresh JWT via `accounts.views._make_jwt_for_user(user)` set as httpOnly cookies `openzev_access` / `openzev_refresh` (+ `csrftoken` via `get_token`) so updated claims take effect.
+2. Set password, clear `must_change_password` flag, and revoke the account's other sessions (`revoke_sessions`, §5.6b).
+3. Issue fresh JWT via `accounts.jwt_utils.make_jwt_for_user(user)` set as httpOnly cookies `openzev_access` / `openzev_refresh` (+ `csrftoken` via `get_token`) so updated claims take effect.
 
 ### 5.5 Password change
 
@@ -406,7 +410,7 @@ password. Otherwise returns 400 ("Use the change-password endpoint instead.").
 
 **Payload:** `{ old_password, new_password }`
 
-Validates old password, sets new password, clears `must_change_password`.
+Validates old password, sets new password, clears `must_change_password`, then **signs the account out of every other session** (`revoke_sessions`, §5.6b): whoever knew the old password, or held a stolen session, must not stay signed in. The response carries a fresh token pair under the new session version, so the caller stays signed in (an impersonation session stays an impersonation session). API keys are not revoked — they are separate credentials.
 
 ### 5.6 Profile (me)
 
@@ -421,13 +425,106 @@ Validates old password, sets new password, clears `must_change_password`.
   downloads serve) — plus `zev_count: number`, the number of held
   memberships. `zev_name` is absent when the participant has no membership
   (`zev_count` is then `0`); admins/owners never get either field.
-- PATCH → partial update of own profile fields (name, email, `preferred_zev`).
-  Role change validation: admin cannot change own role; non-admin cannot
-  change role at all. The response is shaped like GET (including
-  `zev_name`/`zev_count` where applicable).
+- GET additionally carries `has_usable_password: boolean` — whether the account
+  can re-authenticate with a password (participants and OAuth-only accounts
+  cannot); the email-change form (§5.6a) is offered only when it is true.
+- PATCH → partial update of **first name, last name and `preferred_zev` only**
+  (`SelfUserSerializer`). A payload that tries to *change* `email`, `username`,
+  `role`, `must_change_password` or `is_active` is rejected `400` naming the
+  field (`"This cannot be changed here."`) and nothing in it is applied; a
+  payload that merely repeats the current value is accepted and ignored, so a
+  client that sends the whole object back keeps working. (Before this, any user
+  could change their own email — the sign-in identifier and magic-link target —
+  without re-authenticating, clear a forced password change, or deactivate
+  themselves.) Admins edit all of these through `PATCH /auth/users/{id}/`. The
+  response is shaped like GET (including `zev_name`/`zev_count` where
+  applicable).
 - `preferred_zev` accepts a ZEV UUID or `null`. Only communities the user
   manages are accepted: owners may only name their own ZEVs, participants/
   guests cannot set a preference at all (`400` otherwise).
+
+### 5.6a Email change
+
+The email is the login identifier and the target of every emailed sign-in link,
+so whoever controls it controls the account. Changing it therefore survives a
+stolen session: the request needs the current password, the new address must
+prove it is reachable before anything changes, and the old address is told.
+
+**Request:** `POST /api/v1/auth/me/email-change/` (IsAuthenticated) `{ new_email, current_password }`,
+throttled per account (`AuthEmailChangeThrottle`, scope `auth_email_change`,
+`5/hour`, `AUTH_EMAIL_CHANGE_THROTTLE_RATE` — it also bounds password guessing by
+a session holder).
+
+| Outcome | Response |
+|---|---|
+| Impersonation session | `403` |
+| Account has no usable password (participants — whose address the community owner maintains on the participant record — and OAuth-only accounts) | `403` `{code: "no_password"}` |
+| Malformed address / same as current / missing or wrong password | `400` (wrong password audited `auth.email_change.failed`, reason `bad_password`) |
+| Address held by another account (case-insensitive) | `202`, **same body as success**, no mail sent — cannot be used to find which addresses have accounts; audited `auth.email_change.failed` (`DENIED`, reason `address_in_use`) |
+| Otherwise | `202`; a confirmation link is emailed to the **new** address; audited `auth.email_change.requested`. A mail failure is `503` and is not recorded as requested. |
+
+**Token:** `accounts/email_change.py` — a `django.core.signing` token (salt
+`accounts.email-change`, 24 h) carrying `{u: user id, n: new address, f: fingerprint}`,
+where the fingerprint is a hash of the account's *current* address and password
+hash. It is stateless yet single-use and mortal: applying it changes the
+address, and any later change of address or password makes the fingerprint
+differ. It also dies if the account is deactivated or someone else took the
+target address meanwhile.
+
+**Confirm:** `POST /api/v1/auth/confirm-email-change/` `{ token }` (AllowAny,
+`AuthVerifyThrottle`, `auth_verify`) — unauthenticated because the link is opened
+from a mailbox, possibly on another device. Every refusal is the same `400 "This
+link is invalid or has expired."`. On success, under a row lock: set the
+address, **revoke all sessions** (§5.6b), email the *previous* address (which
+shows only a masked new address), audit `auth.email_change.confirmed` (actor =
+the account, diff of `email`). No session is minted; the person signs in again
+with the new address.
+
+Frontend: `EmailChangeForm` (Profile tab; "managed by your administrator" hint
+when `has_usable_password` is false) and the public `/confirm-email-change`
+page (`ConfirmEmailChangePage`, spends the single-use link exactly once even
+under React StrictMode). The mails are fixed system messages
+(`accounts/emails.py`), deliberately not `EMAIL_TEMPLATE_DEFAULTS` entries: a
+security notice an admin can reword can be made to stop saying what happened.
+
+### 5.6b Session revocation ("sign out everywhere")
+
+Tokens are stateless JWTs, so nothing server-side lists "sessions". Instead
+`User.session_version` (`PositiveIntegerField`, default `0`, migration `0019`)
+is stamped into every token as `sv`; bumping it makes all earlier tokens fail
+(§5.1). Decision and trade-offs: ADR 0022. API keys are separate credentials and
+are not affected.
+
+`accounts/session_revocation.py`: `revoke_sessions(user)` — an atomic
+`UPDATE … SET session_version = session_version + 1`, then a reload so tokens
+minted straight afterwards carry the new value; `keep_current_session(request,
+response, user)` — hand the caller a fresh pair so revoking *other* sessions
+does not sign them out. `User.save()` deliberately never writes
+`session_version` (a plain save from an instance loaded before a revocation
+would otherwise write the old value back and revive the sessions just signed
+out).
+
+Sessions are revoked, all with `auth.*` audit events where the action is an
+explicit one:
+
+| Trigger | Effect |
+|---|---|
+| Password change / initial password set | other sessions end; caller keeps theirs |
+| Email change confirmed | all sessions end |
+| Admin two-factor reset (`DELETE /users/{id}/mfa/`) | target's sessions end |
+| Admin deactivates an account (`PATCH /users/{id}/` `is_active: false`) | sessions end — so reactivating later does not bring back unexpired tokens |
+| `POST /api/v1/auth/me/sessions/revoke/` (IsAuthenticated; `403` while impersonating) | other sessions end; caller keeps theirs; audited `auth.sessions.revoked` (`scope: others`) |
+| `POST /api/v1/auth/users/{id}/revoke-sessions/` (IsAdmin; `400` for the admin's own account) | all of the target's sessions end; audited `auth.sessions.revoked` (`scope: all`, admin as actor) |
+
+Not revoked by design: logout (it ends *this* browser only), API keys, an
+outstanding MFA challenge token. There is no per-device list: a counter can say
+"everything before now is dead", not "this one device" (ADR 0022).
+
+All four new endpoints are absent from `ACCOUNTS_API_KEY_ALLOWLIST`
+(default-deny): a key must not be able to re-point or sign out its own owner.
+
+Frontend: `SessionsCard` on the Security tab ("Sign out other devices"), and
+"Sign out everywhere" in the admin accounts row menu (not on the admin's own row).
 
 ### 5.7 Impersonation
 
@@ -496,6 +593,8 @@ cookie sessions stay unthrottled:
 | `POST /api/v1/auth/token/refresh/` | `AuthRefreshThrottle` | `auth_refresh` | `60/hour` (`AUTH_REFRESH_THROTTLE_RATE`) |
 | `POST /api/v1/auth/register/` | `AuthRegisterThrottle` | `auth_register` | `10/hour` (`AUTH_REGISTER_THROTTLE_RATE`) |
 | `POST /api/v1/auth/verify-email/` | `AuthVerifyThrottle` | `auth_verify` | `30/hour` (`AUTH_VERIFY_THROTTLE_RATE`) |
+| `POST /api/v1/auth/confirm-email-change/` | `AuthVerifyThrottle` | `auth_verify` | shares the verify budget |
+| `POST /api/v1/auth/me/email-change/` | `AuthEmailChangeThrottle` | `auth_email_change` | `5/hour` (`AUTH_EMAIL_CHANGE_THROTTLE_RATE`), per authenticated account |
 | `POST /api/v1/auth/oauth/login/<provider_slug>/` | `AuthOAuthInitiateThrottle` | `auth_oauth_initiate` | `60/hour` (`AUTH_OAUTH_INITIATE_THROTTLE_RATE`) |
 | `POST /api/v1/auth/oauth/token-exchange/` | `AuthOAuthExchangeThrottle` | `auth_oauth_exchange` | `40/hour` (`AUTH_OAUTH_EXCHANGE_THROTTLE_RATE`) |
 
@@ -944,6 +1043,10 @@ documented in `2026-03-invoice-lifecycle-and-communication.md` §5.6a.
 | GET / PATCH | `/me/` | IsAuthenticated | View/update own profile |
 | POST | `/me/change-password/` | IsAuthenticated | Change password (requires old password) |
 | POST | `/me/set-initial-password/` | IsAuthenticated | Set password for first time (verification flow) |
+| POST | `/me/email-change/` | IsAuthenticated | Ask for an email change; needs the current password; link goes to the new address (§5.6a) |
+| POST | `/confirm-email-change/` | AllowAny (token) | Apply an emailed email-change link (§5.6a) |
+| POST | `/me/sessions/revoke/` | IsAuthenticated | Sign out every other session (§5.6b) |
+| POST | `/users/{id}/revoke-sessions/` | IsAdmin | Sign an account out everywhere (§5.6b) |
 | GET / POST | `/users/` | IsAdmin | List users / Create user |
 | GET / PATCH / DELETE | `/users/{id}/` | IsAdmin | User detail (delete blocked if linked or last admin) |
 | GET | `/me/mfa/` | IsAuthenticated | Own second-factor status: `{totp, passkeys, recovery_codes_remaining, required, grace_until}` |
@@ -1213,6 +1316,7 @@ lists the test classes per module (test counts are the `test_*` methods).
 
 | Module | Classes | Tests | Coverage |
 |---|---|---|---|
+| `test_session_hardening.py` | 5 | 44 | Self-service profile lockdown (protected fields rejected, repeats accepted, names/preferred community still editable); session revocation (revoked/new/legacy tokens, refresh refusal, deactivation, stale-instance save cannot revive, API keys and impersonation); password change and revoke endpoints; verified email change (request/confirm, single-use, dies on password/address/deactivation/expiry, no enumeration, throttle, mail failure, API keys) |
 | `test_admin_users_list.py` | 1 | 7 | Admin user list: memberships per relationship (participant, owner-who-is-also-participant merged into one, owner of several communities sorted by name), confirmed-only `mfa_methods`, fixed query count, `/auth/me/` unaffected |
 | `test_api_keys.py` | 10 | 81 | Generation, hashing, auth, read-only keys, scope deny-list, audit, throttling, CRUD, admin management |
 | `test_oauth.py` | 12 | 55 | Provider listing, initiate, callback guards/redirects, link flow, social accounts, audit, `require_mfa_claim` (`OAuthMfaClaimTests`) |

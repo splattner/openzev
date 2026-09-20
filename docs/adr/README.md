@@ -25,6 +25,7 @@ This directory captures key architectural decisions for OpenZEV.
 - [0019: Frozen invoice source provenance and serialized price mutations](0019-frozen-dynamic-price-evidence.md)
 - [0020: A user-verified passkey replaces the password, rather than supplementing it](0020-passkeys-replace-the-password.md)
 - [0021: MFA secrets are encrypted under a dedicated, rotatable key, not `SECRET_KEY`](0021-mfa-secret-encryption-key.md)
+- [0022: Sessions are revoked with a per-account version counter, not a token blacklist](0022-session-revocation-by-version-counter.md)
 
 ## Conventions
 

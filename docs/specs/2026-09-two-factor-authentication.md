@@ -528,6 +528,8 @@ key as unconfigured — mirroring the pattern PR #732 used for the dynamic-sourc
 Each account row gains a **Reset two-factor** action (admin only), behind a confirmation dialog
 naming the user and what will be removed. The row also shows which factors the account has (from
 `AdminUserSerializer.mfa_methods`) — see `2026-03-community-and-access.md` §6.4.
+An admin reset also signs the account out of every session it holds (`revoke_sessions`, ADR 0022): whoever
+was inside may have been let in by the factors that were just removed.
 
 ### TypeScript types
 
