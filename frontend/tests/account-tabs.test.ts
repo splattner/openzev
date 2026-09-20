@@ -19,6 +19,7 @@ vi.mock('../src/lib/auth', () => ({
 vi.mock('../src/features/account/ProfileCard', () => ({ ProfileCard: () => createElement('div', null, 'profile-card') }))
 vi.mock('../src/features/account/PasswordCard', () => ({ PasswordCard: () => createElement('div', null, 'password-card') }))
 vi.mock('../src/features/account/LinkedAccountsCard', () => ({ LinkedAccountsCard: () => createElement('div', null, 'linked-card') }))
+vi.mock('../src/features/account/SessionsCard', () => ({ SessionsCard: () => createElement('div', null, 'sessions-card') }))
 vi.mock('../src/features/account/TwoFactorSection', () => ({ TwoFactorSection: () => createElement('div', null, 'two-factor-card') }))
 vi.mock('../src/features/account/ApiKeysSection', () => ({ ApiKeysSection: () => createElement('div', null, 'api-keys-card') }))
 

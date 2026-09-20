@@ -29,6 +29,7 @@ const ParticipantOnboardingPage = lazy(async () => ({ default: (await import('..
 const PublicInvoicePage = lazy(async () => ({ default: (await import('../pages/PublicInvoicePage')).PublicInvoicePage }))
 const ParticipantsPage = lazy(async () => ({ default: (await import('../pages/ParticipantsPage')).ParticipantsPage }))
 const TariffsPage = lazy(async () => ({ default: (await import('../pages/TariffsPage')).TariffsPage }))
+const ConfirmEmailChangePage = lazy(async () => ({ default: (await import('../pages/ConfirmEmailChangePage')).ConfirmEmailChangePage }))
 const VerifyEmailPage = lazy(async () => ({ default: (await import('../pages/VerifyEmailPage')).VerifyEmailPage }))
 const ZevSettingsTabRoute = lazy(async () => ({ default: (await import('../pages/ZevSettingsPage')).ZevSettingsTabRoute }))
 const OAuthCallbackPage = lazy(async () => ({ default: (await import('../pages/OAuthCallbackPage')).OAuthCallbackPage }))
@@ -44,6 +45,8 @@ export function AppRoutes() {
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/verify-email" element={<VerifyEmailPage />} />
+        {/* Link emailed to a new address: public, the token is the authority. */}
+        <Route path="/confirm-email-change" element={<ConfirmEmailChangePage />} />
         <Route path="/oauth/callback" element={<OAuthCallbackPage />} />
         {/* Public (QR on invoice): no session, no app chrome. */}
         <Route path="/i/:prefix" element={<PublicInvoicePage />} />

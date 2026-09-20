@@ -6,6 +6,7 @@ from rest_framework.permissions import SAFE_METHODS
 from rest_framework_simplejwt.authentication import JWTAuthentication
 
 from .api_keys import split_key, verify_secret
+from .jwt_utils import SESSION_CLAIM
 
 ACCESS_COOKIE = "openzev_access"
 
@@ -16,6 +17,16 @@ def enforce_csrf(request) -> None:
 
 class CookieJWTAuthentication(JWTAuthentication):
     """JWT authentication that prefers the Authorization header and falls back to the httpOnly cookie."""
+
+    def get_user(self, validated_token):
+        user = super().get_user(validated_token)
+        # A token issued before the account was last signed out everywhere.
+        # Tokens minted before the claim existed carry none, which reads as 0 —
+        # the value every account starts at, so they stay valid until the first
+        # revocation and never after it.
+        if validated_token.get(SESSION_CLAIM, 0) != user.session_version:
+            raise exceptions.AuthenticationFailed("This session has been signed out.", code="session_revoked")
+        return user
 
     def authenticate(self, request):
         # Prefer the Authorization header (API clients / backward-compat)

@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faCheck, faEllipsis, faPen, faShieldHalved, faTrash, faUser, faXmark } from '@fortawesome/free-solid-svg-icons'
+import { faCheck, faEllipsis, faPen, faRightFromBracket, faShieldHalved, faTrash, faUser, faXmark } from '@fortawesome/free-solid-svg-icons'
 import { useMemo, useState, type FormEvent } from 'react'
 import { ActionMenu } from '../components/ActionMenu'
 import { ConfirmDialog, useConfirmDialog } from '../components/ConfirmDialog'
@@ -18,7 +18,7 @@ import {
     type AccountFilters,
 } from '../features/accounts/accountList'
 import { fetchZevs } from '../lib/api/zev'
-import { deleteUser, fetchUsers, resetUserMfa, updateUser } from '../lib/api/auth'
+import { deleteUser, fetchUsers, resetUserMfa, revokeUserSessions, updateUser } from '../lib/api/auth'
 import { formatApiError } from '../lib/api/errors'
 import { queryKeys } from '../lib/api/queryKeys'
 import { useTranslation } from 'react-i18next'
@@ -100,6 +100,13 @@ export function AdminAccountsPage({ embedded = false }: { embedded?: boolean }) 
         onError: (error) => pushToast(formatApiError(error, t('pages.accounts.feedback.resetMfaFailed')), 'error'),
     })
 
+    // Ends every session the account holds — for a suspected compromise. Audited server-side.
+    const revokeSessionsMutation = useMutation({
+        mutationFn: (userId: number) => revokeUserSessions(userId),
+        onSuccess: () => pushToast(t('pages.accounts.feedback.signOutSuccess'), 'success'),
+        onError: (error) => pushToast(formatApiError(error, t('pages.accounts.feedback.signOutFailed')), 'error'),
+    })
+
     const impersonationMutation = useMutation({
         mutationFn: async (userId: number) => {
             await startImpersonation(userId)
@@ -125,6 +132,19 @@ export function AdminAccountsPage({ embedded = false }: { embedded?: boolean }) 
             isDangerous: true,
             onConfirm: async () => {
                 await resetMfaMutation.mutateAsync(account.id)
+            },
+        })
+    }
+
+    function confirmSignOut(account: AdminUser) {
+        confirm({
+            title: t('pages.accounts.signOutTitle'),
+            message: t('pages.accounts.signOutMessage', { username: account.username }),
+            confirmText: t('pages.accounts.signOutConfirm'),
+            cancelText: t('common.cancel'),
+            isDangerous: true,
+            onConfirm: async () => {
+                await revokeSessionsMutation.mutateAsync(account.id)
             },
         })
     }
@@ -271,6 +291,17 @@ export function AdminAccountsPage({ embedded = false }: { embedded?: boolean }) 
                                     disabled: resetMfaMutation.isPending || dialogLoading,
                                     onClick: () => confirmResetMfa(account),
                                 },
+                                // Not for the admin's own row: it would sign them out too, and the
+                                // account page has "Sign out other devices" for that.
+                                ...(isSelf
+                                    ? []
+                                    : [{
+                                        key: 'sign-out',
+                                        label: t('pages.accounts.signOutEverywhere'),
+                                        icon: <FontAwesomeIcon icon={faRightFromBracket} fixedWidth />,
+                                        disabled: revokeSessionsMutation.isPending || dialogLoading,
+                                        onClick: () => confirmSignOut(account),
+                                    }]),
                                 {
                                     key: 'delete',
                                     label: t('common.delete'),

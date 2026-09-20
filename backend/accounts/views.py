@@ -17,6 +17,8 @@ from django.core.mail import EmailMessage
 from django.utils import timezone
 from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
 from rest_framework_simplejwt.serializers import TokenRefreshSerializer
+from rest_framework_simplejwt.settings import api_settings as jwt_settings
+from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView
 from . import mfa, mfa_crypto
 from .api_keys import default_api_key_expiry, generate_key
@@ -32,7 +34,7 @@ from .models import (
     VatRate,
 )
 from .serializers import (
-    AdminUserSerializer, UserSerializer, UserCreateSerializer, ChangePasswordSerializer, CustomTokenObtainPairSerializer,
+    AdminUserSerializer, SelfUserSerializer, UserSerializer, UserCreateSerializer, ChangePasswordSerializer, CustomTokenObtainPairSerializer,
     ApiKeySerializer, ApiKeyCreateSerializer, AdminApiKeySerializer,
     AppSettingsSerializer,
     FeatureFlagSerializer,
@@ -41,7 +43,8 @@ from .serializers import (
     WebAuthnCredentialSerializer,
 )
 from .authentication import enforce_csrf
-from .jwt_utils import make_jwt_for_user
+from .jwt_utils import SESSION_CLAIM, make_jwt_for_user
+from .session_revocation import keep_current_session, revoke_sessions
 from .cookies import (
     ADMIN_ACCESS_COOKIE,
     ADMIN_REFRESH_COOKIE,
@@ -223,6 +226,7 @@ class CookieTokenRefreshView(APIView):
 
         serializer = TokenRefreshSerializer(data={"refresh": refresh_token})
         try:
+            self._ensure_session_is_current(refresh_token)
             serializer.is_valid(raise_exception=True)
         except (TokenError, ValidationError):
             response = Response({"detail": "Token is invalid or expired."}, status=status.HTTP_401_UNAUTHORIZED)
@@ -234,6 +238,18 @@ class CookieTokenRefreshView(APIView):
         response = Response({"detail": "Token refreshed."})
         set_auth_cookies(request, response, access=new_access, refresh=new_refresh)
         return response
+
+    @staticmethod
+    def _ensure_session_is_current(refresh_token: str) -> None:
+        """Refuse a refresh token from a session that has since been signed out
+        (or whose account was deactivated). Without this a stolen refresh
+        cookie would keep minting access tokens that the authentication class
+        rejects one request later — and would work again if the account were
+        reactivated."""
+        token = RefreshToken(refresh_token)
+        user = User.objects.filter(pk=token[jwt_settings.USER_ID_CLAIM], is_active=True).first()
+        if user is None or token.get(SESSION_CLAIM, 0) != user.session_version:
+            raise TokenError("Session has been signed out.")
 
 
 @api_view(["POST"])
@@ -297,6 +313,14 @@ class UserDetailView(AuditedUpdateMixin, generics.RetrieveUpdateDestroyAPIView):
 
     def get_audit_target_display(self, instance):
         return instance.email or instance.username
+
+    def perform_update(self, serializer):
+        was_active = serializer.instance.is_active
+        super().perform_update(serializer)
+        # Deactivation also ends the sessions: otherwise reactivating the account
+        # later would bring back whatever tokens were still unexpired.
+        if was_active and not serializer.instance.is_active:
+            revoke_sessions(serializer.instance)
 
     def perform_destroy(self, instance):
         user_display = instance.email or instance.username
@@ -425,6 +449,9 @@ def _serialize_me(user):
     with the statement downloads).
     """
     data = UserSerializer(user).data
+    # Whether this account can re-authenticate with a password, which is what
+    # the email-change form needs. Participants and OAuth-only accounts cannot.
+    data["has_usable_password"] = user.has_usable_password()
     if user.role == UserRole.PARTICIPANT:
         from zev.services import own_participant_for_user
 
@@ -460,7 +487,11 @@ def me(request):
                         "impersonation claim references deleted user %s", impersonator_id
                     )
         return Response(data)
-    serializer = UserSerializer(request.user, data=request.data, partial=True, context={"request": request})
+    # Self-service edits only what the person owns: their name and default
+    # community. Everything else in the payload — email, username, role,
+    # must_change_password, is_active — is read-only here and ignored. The email
+    # has its own verified flow (views_security.EmailChangeRequestView).
+    serializer = SelfUserSerializer(request.user, data=request.data, partial=True, context={"request": request})
     serializer.is_valid(raise_exception=True)
     serializer.save()
     return Response(_serialize_me(serializer.instance))
@@ -472,6 +503,9 @@ def change_password(request):
     serializer = ChangePasswordSerializer(data=request.data, context={"request": request})
     serializer.is_valid(raise_exception=True)
     serializer.save()
+    # A new password ends every other session — someone who knew the old one
+    # (or held a stolen session) must not stay signed in. This session carries on.
+    revoke_sessions(request.user)
     record_audit_event(
         request=request,
         action_category=AuditActionCategory.AUTH,
@@ -482,7 +516,9 @@ def change_password(request):
         target_display=request.user.email or request.user.username,
         summary="Changed account password.",
     )
-    return Response({"detail": "Password updated successfully."})
+    response = Response({"detail": "Password updated successfully."})
+    keep_current_session(request, response, request.user)
+    return response
 
 
 @api_view(["GET", "PATCH"])
@@ -773,6 +809,7 @@ def set_initial_password(request):
     user.set_password(new_password)
     user.must_change_password = False
     user.save(update_fields=["password", "must_change_password"])
+    revoke_sessions(user)
 
     record_audit_event(
         request=request,
@@ -981,6 +1018,9 @@ class AdminMfaResetView(APIView):
             passkeys_removed = target.webauthn_credentials.all().delete()[0]
             codes_removed = MfaRecoveryCode.objects.filter(user=target).delete()[0]
 
+        # Whoever was inside the account may have been let in by the factors that
+        # were just removed; end their sessions too.
+        revoke_sessions(target)
         removed = {"totp": totp_removed, "passkeys": passkeys_removed, "recovery_codes": codes_removed}
         record_audit_event(
             request=request,

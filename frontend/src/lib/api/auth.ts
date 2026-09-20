@@ -210,10 +210,42 @@ export async function deleteUser(userId: number): Promise<void> {
   await api.delete(`/auth/users/${userId}/`)
 }
 
+/**
+ * Self-service profile edit. Only these fields: the email has its own verified
+ * flow (`requestEmailChange`) and the server rejects a changed email, role,
+ * username, `is_active` or `must_change_password` here.
+ */
 export async function updateProfile(
-  payload: Partial<Pick<User, 'email' | 'first_name' | 'last_name' | 'preferred_zev'>>,
+  payload: Partial<Pick<User, 'first_name' | 'last_name' | 'preferred_zev'>>,
 ): Promise<User> {
   const { data } = await api.patch<User>('/auth/me/', payload)
+  return data
+}
+
+/** Ask for a confirmation link to be sent to `newEmail`. Nothing changes until it is opened. */
+export async function requestEmailChange(newEmail: string, currentPassword: string): Promise<{ detail: string }> {
+  const { data } = await api.post<{ detail: string }>('/auth/me/email-change/', {
+    new_email: newEmail,
+    current_password: currentPassword,
+  })
+  return data
+}
+
+/** Apply an emailed email-change link. Unauthenticated: the token is the authority. */
+export async function confirmEmailChange(token: string): Promise<{ detail: string }> {
+  const { data } = await api.post<{ detail: string }>('/auth/confirm-email-change/', { token })
+  return data
+}
+
+/** Sign out every session but the one in use. */
+export async function revokeOtherSessions(): Promise<{ detail: string }> {
+  const { data } = await api.post<{ detail: string }>('/auth/me/sessions/revoke/')
+  return data
+}
+
+/** Admin: sign an account out of every session it holds. */
+export async function revokeUserSessions(userId: number): Promise<{ detail: string }> {
+  const { data } = await api.post<{ detail: string }>(`/auth/users/${userId}/revoke-sessions/`)
   return data
 }
 

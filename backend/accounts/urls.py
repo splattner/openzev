@@ -31,6 +31,12 @@ from .views_passkeys import (
     PasskeyRegisterCompleteView,
 )
 from .views_impersonation import ImpersonateParticipantView, StopImpersonationView
+from .views_security import (
+    AdminRevokeSessionsView,
+    EmailChangeConfirmView,
+    EmailChangeRequestView,
+    RevokeOwnSessionsView,
+)
 from .views_system import SystemHealthView
 
 urlpatterns = [
@@ -47,6 +53,12 @@ urlpatterns = [
     path("me/", me, name="me"),
     path("me/change-password/", change_password, name="change-password"),
     path("me/set-initial-password/", set_initial_password, name="set-initial-password"),
+    # Like the MFA routes, absent from ACCOUNTS_API_KEY_ALLOWLIST (default-deny):
+    # a key must not be able to re-point or sign out its own owner's account.
+    path("me/email-change/", EmailChangeRequestView.as_view(), name="email-change-request"),
+    path("confirm-email-change/", EmailChangeConfirmView.as_view(), name="email-change-confirm"),
+    path("me/sessions/revoke/", RevokeOwnSessionsView.as_view(), name="sessions-revoke-own"),
+    path("users/<int:pk>/revoke-sessions/", AdminRevokeSessionsView.as_view(), name="admin-sessions-revoke"),
     # Deliberately absent from ACCOUNTS_API_KEY_ALLOWLIST (default-deny): a key
     # must not be able to manage or bypass its own owner's second factor.
     path("me/mfa/", MfaStatusView.as_view(), name="mfa-status"),

@@ -19,6 +19,8 @@ export interface User {
     zev_name?: string | null
     /** Participants only: number of held memberships (from /auth/me). */
     zev_count?: number | null
+    /** From /auth/me: whether the account can re-authenticate with a password (participants and OAuth-only accounts cannot). */
+    has_usable_password?: boolean
     /** Present when this session is an impersonation session. */
     impersonated_by?: User
 }

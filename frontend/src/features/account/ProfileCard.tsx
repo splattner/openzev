@@ -5,8 +5,9 @@ import { useAuth } from '../../lib/auth'
 import { updateProfile } from '../../lib/api/auth'
 import { queryKeys } from '../../lib/api/queryKeys'
 import { useToast } from '../../lib/toast'
+import { EmailChangeForm } from './EmailChangeForm'
 
-/** The account's own name and email. The username is fixed at creation. */
+/** The account's own name, plus its email (changed through `EmailChangeForm`). The username is fixed at creation. */
 export function ProfileCard() {
     const { t } = useTranslation()
     const { user } = useAuth()
@@ -14,14 +15,12 @@ export function ProfileCard() {
     const queryClient = useQueryClient()
 
     const [form, setForm] = useState({
-        email: user?.email || '',
         first_name: user?.first_name || '',
         last_name: user?.last_name || '',
     })
 
     useEffect(() => {
         setForm({
-            email: user?.email || '',
             first_name: user?.first_name || '',
             last_name: user?.last_name || '',
         })
@@ -74,15 +73,13 @@ export function ProfileCard() {
                     <input type="text" name="last_name" value={form.last_name} onChange={handleChange} />
                 </label>
 
-                <label>
-                    <span>{t('account.email')}</span>
-                    <input type="email" name="email" value={form.email} onChange={handleChange} required />
-                </label>
-
                 <button type="submit" className="button button-primary" disabled={mutation.isPending} style={{ width: '100%' }}>
                     {mutation.isPending ? t('common.saving') : t('account.updateProfile')}
                 </button>
             </form>
+
+            <hr style={{ margin: '1.25rem 0' }} />
+            <EmailChangeForm />
         </div>
     )
 }

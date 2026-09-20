@@ -168,6 +168,8 @@ REST_FRAMEWORK = {
         # Per-ACCOUNT (not per-IP) budget on the MFA challenge exchange —
         # see accounts.throttling.AuthMfaThrottle.
         "auth_mfa": env("AUTH_MFA_THROTTLE_RATE", default="10/hour"),
+        # Per-account budget on requesting an email-address change (checks the password).
+        "auth_email_change": env("AUTH_EMAIL_CHANGE_THROTTLE_RATE", default="5/hour"),
         # Per-IP budget on the passkey authentication ceremony (begin and
         # complete both count) — bounds assertion-verification cost.
         "auth_passkey": env("AUTH_PASSKEY_THROTTLE_RATE", default="30/hour"),

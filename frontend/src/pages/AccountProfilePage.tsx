@@ -12,6 +12,7 @@ import { ApiKeysSection } from '../features/account/ApiKeysSection'
 import { LinkedAccountsCard } from '../features/account/LinkedAccountsCard'
 import { PasswordCard } from '../features/account/PasswordCard'
 import { ProfileCard } from '../features/account/ProfileCard'
+import { SessionsCard } from '../features/account/SessionsCard'
 import { TwoFactorSection } from '../features/account/TwoFactorSection'
 
 /**
@@ -101,6 +102,17 @@ export function AccountProfilePage() {
                                         title: t('account.unlinkConfirmTitle'),
                                         message: t('account.unlinkConfirmMessage', { provider }),
                                         confirmText: t('account.unlinkAccount'),
+                                        isDangerous: true,
+                                        onConfirm,
+                                    })
+                                }
+                            />
+                            <SessionsCard
+                                onRevoke={(onConfirm) =>
+                                    confirm({
+                                        title: t('account.sessions.confirmTitle'),
+                                        message: t('account.sessions.confirmMessage'),
+                                        confirmText: t('account.sessions.signOutOthers'),
                                         isDangerous: true,
                                         onConfirm,
                                     })

@@ -52,6 +52,10 @@ class User(AbstractUser):
         related_name="+",
         help_text="Default community (ZEV) opened for this user.",
     )
+    # Bumped to sign the account out everywhere: every token carries the value
+    # it was issued under and is refused once it no longer matches. See
+    # ``accounts.session_revocation`` and ADR 0022.
+    session_version = models.PositiveIntegerField(default=0, editable=False)
     objects = OpenZevUserManager()
 
     @property
@@ -61,6 +65,21 @@ class User(AbstractUser):
     @property
     def is_zev_owner(self):
         return self.role in (UserRole.ADMIN, UserRole.ZEV_OWNER) or self.is_superuser
+
+    def save(self, *args, **kwargs):
+        # A plain ``save()`` writes every column, including ``session_version``
+        # as this instance last saw it. A request that loaded the user before a
+        # revocation would then write the old value back and quietly revive the
+        # sessions that were just signed out. Revocation goes through
+        # ``session_revocation.revoke_sessions`` (an atomic UPDATE), never through
+        # a model save — so a save must never touch the column.
+        if kwargs.get("update_fields") is None and not self._state.adding and not kwargs.get("force_insert"):
+            kwargs["update_fields"] = [
+                field.name
+                for field in self._meta.concrete_fields
+                if not field.primary_key and field.name != "session_version"
+            ]
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.get_full_name() or self.username} <{self.email}>"

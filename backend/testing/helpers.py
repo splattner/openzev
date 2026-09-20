@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from rest_framework_simplejwt.tokens import RefreshToken
 
+from accounts.jwt_utils import SESSION_CLAIM
 from accounts.models import User, VatRate
 from zev.models import Participant
 
@@ -52,6 +53,10 @@ def authenticate(client, user) -> None:
     clients can authenticate without driving the full cookie-based login flow.
     """
     refresh = RefreshToken.for_user(user)
+    # As production issuance does (accounts.jwt_utils.add_custom_claims), so a
+    # test that signs the account out and authenticates again gets a token that
+    # is valid under the new session version.
+    refresh[SESSION_CLAIM] = user.session_version
     client.credentials(HTTP_AUTHORIZATION=f"Bearer {refresh.access_token}")
 
 

@@ -29,6 +29,7 @@ from .cookies import (
     clear_auth_cookies,
     set_auth_cookies,
 )
+from .jwt_utils import IMPERSONATOR_CLAIM, add_custom_claims
 from .models import User, UserRole
 from .permissions import IsAdmin
 from .serializers import UserSerializer
@@ -108,11 +109,8 @@ class ImpersonateParticipantView(APIView):
             )
 
         refresh = RefreshToken.for_user(target_user)
-        refresh["role"] = target_user.role
-        refresh["email"] = target_user.email
-        refresh["full_name"] = target_user.get_full_name()
-        refresh["must_change_password"] = target_user.must_change_password
-        refresh["impersonated_by"] = request.user.id
+        add_custom_claims(refresh, target_user)
+        refresh[IMPERSONATOR_CLAIM] = request.user.id
 
         _record(
             request,

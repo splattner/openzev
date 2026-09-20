@@ -69,6 +69,14 @@ class AuthPasskeyThrottle(AuthRateThrottle):
     scope = "auth_passkey"
 
 
+class AuthEmailChangeThrottle(UserRateThrottle):
+    """Per-account budget on asking to change the sign-in address. The request
+    checks the current password, so this also bounds password guessing by
+    someone holding a session."""
+
+    scope = "auth_email_change"
+
+
 class AuthMfaThrottle(SimpleRateThrottle):
     """Per-account budget on the MFA challenge-exchange endpoint.
 

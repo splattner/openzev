@@ -66,6 +66,41 @@ class UserSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "date_joined"]
 
 
+class SelfUserSerializer(UserSerializer):
+    """What ``PATCH /auth/me/`` may change: first name, last name and default
+    community.
+
+    The rest of the account is not the person's to edit here — the email is the
+    sign-in identifier and has its own verified flow, ``must_change_password``
+    can only be cleared by a password change, and role/``is_active`` are an
+    admin's. A payload that tries to *change* one of them is rejected with a 400
+    naming it (silently ignoring it would hide an attempted privilege change);
+    one that merely repeats the current value is accepted and ignored, so a
+    client that sends the whole object back keeps working.
+    """
+
+    PROTECTED_FIELDS = ("username", "email", "role", "must_change_password", "is_active")
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        errors = {}
+        for name in self.PROTECTED_FIELDS:
+            if name in self.initial_data and not self._same(self.initial_data[name], getattr(self.instance, name)):
+                errors[name] = ["This cannot be changed here."]
+        if errors:
+            raise serializers.ValidationError(errors)
+        return attrs
+
+    @staticmethod
+    def _same(submitted, current) -> bool:
+        return str(submitted).strip().lower() == str(current).strip().lower()
+
+    class Meta(UserSerializer.Meta):
+        read_only_fields = [
+            name for name in UserSerializer.Meta.fields if name not in ("first_name", "last_name", "preferred_zev")
+        ]
+
+
 class AdminUserSerializer(UserSerializer):
     """The admin accounts list: the account plus where it belongs and which
     second factors it has.
