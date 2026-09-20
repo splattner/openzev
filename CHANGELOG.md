@@ -1,5 +1,27 @@
 # Changelog
 
+## [1.16.0](https://github.com/splattner/openzev/compare/v1.15.0...v1.16.0) (2026-09-20)
+
+
+### Features
+
+* **account:** organise the account page into Profile, Security and API keys tabs ([#754](https://github.com/splattner/openzev/issues/754)) ([ee40e47](https://github.com/splattner/openzev/commit/ee40e47a70fdaa50c5cc631480eb967923a26790))
+* **accounts:** email security notifications for account-security changes ([#757](https://github.com/splattner/openzev/issues/757)) ([489ebc7](https://github.com/splattner/openzev/commit/489ebc7c0ae2f80f4a27032eef1ba2c4b5d108c0))
+* **accounts:** enforce the MFA policy at the API, not just the UI gate ([#759](https://github.com/splattner/openzev/issues/759)) ([762ccb0](https://github.com/splattner/openzev/commit/762ccb046a3edaecdc034118ba3b5dde001bf80c))
+* **accounts:** fix last_login tracking and add a per-account activity view ([#760](https://github.com/splattner/openzev/issues/760)) ([900deeb](https://github.com/splattner/openzev/commit/900deebec00fbf2192e0d5dae9434cda6f7bead1))
+* **accounts:** list accounts per person with their communities, move linking to Participants ([#755](https://github.com/splattner/openzev/issues/755)) ([e881d8b](https://github.com/splattner/openzev/commit/e881d8bdee6fab958a4e31f7476349d2aa227c59))
+* **accounts:** MFA crypto and audit substrate (2FA part 1 of 3) ([#749](https://github.com/splattner/openzev/issues/749)) ([2c470b3](https://github.com/splattner/openzev/commit/2c470b3f1d69041d708b086f3c5f7ab83f445229))
+* **accounts:** passkeys, MFA policy, enrolment gate and admin reset (2FA part 3 of 3) ([#752](https://github.com/splattner/openzev/issues/752)) ([7b9632f](https://github.com/splattner/openzev/commit/7b9632f90a3838f00a642a1dab6df94220bfed7f))
+* **accounts:** show MFA-policy compliance and add create/deactivate to the admin console ([#758](https://github.com/splattner/openzev/issues/758)) ([848cb44](https://github.com/splattner/openzev/commit/848cb4448f06b9aebc6919dddfd5e1ef7893233a))
+* **accounts:** TOTP enrolment and two-step login (2FA part 2 of 3) ([#751](https://github.com/splattner/openzev/issues/751)) ([6bc8cb3](https://github.com/splattner/openzev/commit/6bc8cb3b1d98ec51b5d1afa077b0b834f42a6b57))
+* **site:** add a landing page served from gh-pages ([#743](https://github.com/splattner/openzev/issues/743)) ([b1a7bcf](https://github.com/splattner/openzev/commit/b1a7bcf0f5d48250fd23e9e9c518215323b8d4d0))
+
+
+### Bug Fixes
+
+* **accounts:** challenge password logins for accounts that have a passkey ([#753](https://github.com/splattner/openzev/issues/753)) ([92cb8f8](https://github.com/splattner/openzev/commit/92cb8f8785fe59fc106f4b8a467f1b23adc7d3da))
+* **accounts:** lock down self-service profile edits and make sessions revocable ([#756](https://github.com/splattner/openzev/issues/756)) ([cd0383a](https://github.com/splattner/openzev/commit/cd0383a3129b2d33ecdcedc928d90b7240aede66))
+
 ## [1.15.0](https://github.com/splattner/openzev/compare/v1.14.0...v1.15.0) (2026-09-18)
 
 
