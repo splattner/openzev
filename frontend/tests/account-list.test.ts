@@ -33,6 +33,7 @@ const account = (over: Partial<AdminUser> = {}): AdminUser => ({
     memberships: [],
     mfa_methods: [],
     mfa_compliance: null,
+    last_login: '2026-09-01T10:00:00Z',
     ...over,
 })
 
@@ -126,15 +127,15 @@ describe('account action guards', () => {
 })
 
 describe('accountStats', () => {
-    it('counts accounts, two-factor accounts, guests and accounts needing two-factor', () => {
+    it('counts accounts, two-factor accounts, guests, accounts needing two-factor, and accounts never signed in', () => {
         const stats = accountStats([
             account({ mfa_methods: ['totp'] }),
             account({ mfa_methods: ['passkey', 'totp'], role: 'guest' }),
             account({ role: 'guest' }),
             account({ mfa_compliance: grace() }),
-            account({ mfa_compliance: overdue() }),
+            account({ mfa_compliance: overdue(), last_login: null }),
         ])
-        expect(stats).toEqual({ total: 5, withTwoFactor: 2, guests: 2, needsTwoFactor: 2 })
+        expect(stats).toEqual({ total: 5, withTwoFactor: 2, guests: 2, needsTwoFactor: 2, neverSignedIn: 1 })
     })
 })
 

@@ -3,6 +3,7 @@ import { createElement } from 'react'
 import { createRoot } from 'react-dom/client'
 import { act } from 'react'
 import { MantineProvider } from '@mantine/core'
+import { MemoryRouter } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { AuditLogsPage } from '../src/pages/AdminAuditLogsPage'
 
@@ -111,7 +112,7 @@ function mockSelection(selectedZevId: string | null) {
     })
 }
 
-function renderAuditLogs(scope: 'admin' | 'owner') {
+function renderAuditLogs(scope: 'admin' | 'owner', initialEntries: string[] = ['/']) {
     const container = document.createElement('div')
     document.body.appendChild(container)
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
@@ -120,7 +121,11 @@ function renderAuditLogs(scope: 'admin' | 'owner') {
         createElement(
             MantineProvider,
             null,
-            createElement(QueryClientProvider, { client }, createElement(AuditLogsPage, { scope })),
+            createElement(
+                MemoryRouter,
+                { initialEntries },
+                createElement(QueryClientProvider, { client }, createElement(AuditLogsPage, { scope })),
+            ),
         )
     return {
         container,
@@ -269,6 +274,39 @@ describe('audit log community scope', () => {
         await page.mount()
         expect(fetchAuditEvents).not.toHaveBeenCalled()
         expect(page.container.textContent).toContain('pages.auditLogs.empty')
+        page.unmount()
+    })
+
+    it('a deep-linked actor pre-fills the filter, is consumed once, and clears the URL', async () => {
+        mockAdmin()
+        mockSelection(null)
+        const page = renderAuditLogs('admin', ['/admin/audit?actor=42&actorUsername=alice'])
+        await page.mount()
+
+        const arg = fetchAuditEvents.mock.calls.at(-1)?.[0] as Record<string, unknown>
+        expect(arg.actor_user).toBe(42)
+
+        const selects = Array.from(page.container.querySelectorAll('select'))
+        const actorSelect = selects.find((s) => Array.from(s.options).some((o) => o.value === '42')) as HTMLSelectElement
+        expect(actorSelect).toBeTruthy()
+        expect(actorSelect.value).toBe('42')
+        expect(Array.from(actorSelect.options).find((o) => o.value === '42')?.textContent).toBe('alice')
+
+        // Consumed once: clearing filters afterward must not bring it back.
+        await click(buttonByText(page.container, 'pages.auditLogs.actions.clearFilters'))
+        const afterClear = fetchAuditEvents.mock.calls.at(-1)?.[0] as Record<string, unknown>
+        expect(afterClear.actor_user).toBeUndefined()
+        page.unmount()
+    })
+
+    it('without a deep link the actor filter starts unset', async () => {
+        mockAdmin()
+        mockSelection(null)
+        const page = renderAuditLogs('admin')
+        await page.mount()
+
+        const arg = fetchAuditEvents.mock.calls.at(-1)?.[0] as Record<string, unknown>
+        expect(arg.actor_user).toBeUndefined()
         page.unmount()
     })
 

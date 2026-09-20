@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { fetchAuditEvents, fetchAuditFilterOptions } from '../lib/api/audit'
 import { queryKeys } from '../lib/api/queryKeys'
@@ -76,12 +77,30 @@ export function AuditLogsPage({ scope, embedded = false }: AuditLogsPageProps & 
     const isAdminView = scope === 'admin'
     const canUseSearch = isAdminView && user?.role === 'admin'
     const { selectedZevId, isLoading: managedZevLoading } = useManagedZev()
+    const [searchParams, setSearchParams] = useSearchParams()
+    const [linkedActorUsername, setLinkedActorUsername] = useState<string | null>(null)
 
     useEffect(() => {
         if (isAdminView) return
         setFilters((previous) => ({ ...previous, page: 1 }))
         setSelectedEventId(null)
     }, [isAdminView, selectedZevId])
+
+    // Deep link from an account row ("View activity", AdminAccountsPage):
+    // pre-select that account as the actor filter. Consumed once so the URL
+    // does not keep re-applying it after the admin changes filters manually.
+    useEffect(() => {
+        if (!isAdminView) return
+        const actor = searchParams.get('actor')
+        if (!actor) return
+        setFilters((previous) => ({ ...previous, actorUser: actor, page: 1 }))
+        setLinkedActorUsername(searchParams.get('actorUsername'))
+        const params = new URLSearchParams(searchParams)
+        params.delete('actor')
+        params.delete('actorUsername')
+        setSearchParams(params, { replace: true })
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isAdminView])
 
     const apiFilters = useMemo<AuditEventFilters>(
         () => ({
@@ -121,6 +140,17 @@ export function AuditLogsPage({ scope, embedded = false }: AuditLogsPageProps & 
         }
         return names
     }, [optionsQuery.data])
+
+    // The actor dropdown only lists accounts the audit queryset has already
+    // seen acting — an account deep-linked here with no audit history yet
+    // (a brand-new account) would otherwise show as an unlabelled selection.
+    const actorOptions = useMemo(() => {
+        const options = optionsQuery.data?.actors ?? []
+        if (filters.actorUser && linkedActorUsername && !options.some((actor) => String(actor.id) === filters.actorUser)) {
+            return [...options, { id: Number(filters.actorUser), username: linkedActorUsername }]
+        }
+        return options
+    }, [optionsQuery.data, filters.actorUser, linkedActorUsername])
 
     const events = eventsQuery.data?.results ?? []
 
@@ -180,7 +210,7 @@ export function AuditLogsPage({ scope, embedded = false }: AuditLogsPageProps & 
                         {t('pages.auditLogs.filters.actor')}
                         <select value={filters.actorUser} onChange={(event) => updateFilter('actorUser', event.target.value)}>
                             <option value="">{t('pages.auditLogs.filters.all')}</option>
-                            {(optionsQuery.data?.actors ?? []).map((actor) => (
+                            {actorOptions.map((actor) => (
                                 <option key={actor.id} value={String(actor.id)}>
                                     {actor.username}
                                 </option>

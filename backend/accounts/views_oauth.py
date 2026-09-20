@@ -29,7 +29,7 @@ from audit.services import build_diff, record_audit_event
 
 from . import mfa
 from .cookies import set_auth_cookies
-from .jwt_utils import make_jwt_for_user
+from .jwt_utils import make_jwt_for_user, record_login
 from .throttling import AuthOAuthExchangeThrottle, AuthOAuthInitiateThrottle
 from .models import (
     OAuthExchangeCode,
@@ -523,6 +523,7 @@ def oauth_token_exchange(request):
     tokens = make_jwt_for_user(user)
     response = Response({"detail": "Login successful."})
     set_auth_cookies(request, response, access=tokens["access"], refresh=tokens["refresh"])
+    record_login(user)
     return response
 
 

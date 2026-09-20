@@ -91,6 +91,18 @@ def test_oauth_token_exchange_sets_cookies_and_consumes_code_once():
     assert second_response.data["detail"] == "Invalid or expired code."
 
 
+def test_oauth_token_exchange_stamps_last_login():
+    user = ParticipantUserFactory()
+    assert user.last_login is None
+    exchange_code = OAuthExchangeCode.objects.create(code="last-login-code", user=user)
+    client = APIClient()
+
+    client.post("/api/v1/auth/oauth/token-exchange/", {"code": exchange_code.code}, format="json")
+
+    user.refresh_from_db()
+    assert user.last_login is not None
+
+
 def test_oauth_token_exchange_rejects_expired_code_and_deletes_it():
     user = ParticipantUserFactory()
     exchange_code = OAuthExchangeCode.objects.create(code="expired-code", user=user)

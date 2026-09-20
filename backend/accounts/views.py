@@ -43,7 +43,7 @@ from .serializers import (
     WebAuthnCredentialSerializer,
 )
 from .authentication import enforce_csrf
-from .jwt_utils import SESSION_CLAIM, make_jwt_for_user
+from .jwt_utils import SESSION_CLAIM, make_jwt_for_user, record_login
 from .session_revocation import keep_current_session, revoke_sessions
 from .cookies import (
     ADMIN_ACCESS_COOKIE,
@@ -103,6 +103,7 @@ class CustomTokenObtainPairView(TokenObtainPairView):
             access=serializer.validated_data["access"],
             refresh=serializer.validated_data["refresh"],
         )
+        record_login(user)
         record_audit_event(
             request=request,
             action_category=AuditActionCategory.AUTH,
@@ -164,6 +165,7 @@ class TokenMfaView(APIView):
         tokens = make_jwt_for_user(user)
         response = Response({"detail": "Login successful."})
         set_auth_cookies(request, response, access=tokens["access"], refresh=tokens["refresh"])
+        record_login(user)
 
         record_audit_event(
             request=request,
@@ -776,6 +778,7 @@ def verify_email(request):
     tokens = make_jwt_for_user(user)
     response = Response({"detail": "Email verified."})
     set_auth_cookies(request, response, access=tokens["access"], refresh=tokens["refresh"])
+    record_login(user)
     return response
 
 

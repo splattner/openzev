@@ -1,9 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import {
-    faBan, faCheck, faCirclePlus, faEllipsis, faPen, faPlay, faRightFromBracket, faShieldHalved, faTrash, faUser, faXmark,
+    faBan, faCheck, faCirclePlus, faClockRotateLeft, faEllipsis, faPen, faPlay, faRightFromBracket, faShieldHalved, faTrash, faUser, faXmark,
 } from '@fortawesome/free-solid-svg-icons'
 import { useMemo, useState, type FormEvent } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { ActionMenu } from '../components/ActionMenu'
 import { ConfirmDialog, useConfirmDialog } from '../components/ConfirmDialog'
 import { StatCard } from '../components/StatCard'
@@ -27,6 +28,7 @@ import { formatApiError } from '../lib/api/errors'
 import { queryKeys } from '../lib/api/queryKeys'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '../lib/auth'
+import { formatDateTime, useAppSettings } from '../lib/appSettings'
 import { useToast } from '../lib/toast'
 import type { AdminUser, CreateUserInput, UserInput, UserRole } from '../types/api'
 
@@ -63,6 +65,8 @@ export function AdminAccountsPage({ embedded = false }: { embedded?: boolean }) 
     const { user: currentUser, startImpersonation, logout } = useAuth()
     const { pushToast } = useToast()
     const { t } = useTranslation()
+    const { settings } = useAppSettings()
+    const navigate = useNavigate()
     const { dialog, confirm, handleConfirm, handleCancel, isLoading: dialogLoading } = useConfirmDialog()
 
     const usersQuery = useQuery({ queryKey: queryKeys.auth.users(), queryFn: fetchUsers })
@@ -209,6 +213,14 @@ export function AdminAccountsPage({ embedded = false }: { embedded?: boolean }) 
         })
     }
 
+    function viewActivity(account: AdminUser) {
+        // The platform audit log (admin-only, same as this page), pre-filtered
+        // to this account's own actions as actor. actorUsername only fills the
+        // filter dropdown's label for an account with no prior audit history —
+        // AuditLogsPage reads and then drops both params.
+        navigate(`/admin/audit?actor=${account.id}&actorUsername=${encodeURIComponent(account.username)}`)
+    }
+
     function confirmDelete(account: AdminUser) {
         confirm({
             title: t('pages.accounts.deleteTitle'),
@@ -287,6 +299,7 @@ export function AdminAccountsPage({ embedded = false }: { embedded?: boolean }) 
                 <StatCard label={t('pages.accounts.stats.withTwoFactor')} value={stats.withTwoFactor} />
                 <StatCard label={t('pages.accounts.stats.guests')} value={stats.guests} />
                 <StatCard label={t('pages.accounts.stats.needsTwoFactor')} value={stats.needsTwoFactor} />
+                <StatCard label={t('pages.accounts.stats.neverSignedIn')} value={stats.neverSignedIn} />
             </section>
 
             <section className="card">
@@ -366,6 +379,12 @@ export function AdminAccountsPage({ embedded = false }: { embedded?: boolean }) 
                                     disabled: resetMfaMutation.isPending || dialogLoading,
                                     onClick: () => confirmResetMfa(account),
                                 },
+                                {
+                                    key: 'view-activity',
+                                    label: t('pages.accounts.viewActivity'),
+                                    icon: <FontAwesomeIcon icon={faClockRotateLeft} fixedWidth />,
+                                    onClick: () => viewActivity(account),
+                                },
                                 // Not for the admin's own row: it would sign them out too, and the
                                 // account page has "Sign out other devices" for that.
                                 ...(isSelf
@@ -422,6 +441,11 @@ export function AdminAccountsPage({ embedded = false }: { embedded?: boolean }) 
                                                 <span key={method} className="badge badge-success">{t(`pages.accounts.mfa.${method}`)}</span>
                                             ))}
                                             <AccountMfaComplianceBadge compliance={account.mfa_compliance} />
+                                        </div>
+                                        <div className="muted">
+                                            {account.last_login
+                                                ? t('pages.accounts.lastSignIn', { date: formatDateTime(account.last_login, settings) })
+                                                : t('pages.accounts.neverSignedIn')}
                                         </div>
                                     </td>
                                     <td className="actions-cell">

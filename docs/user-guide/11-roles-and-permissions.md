@@ -185,13 +185,16 @@ each:
   still has a single row. Click a chip to open that community's Participants
   page.
 - **Security** — which second factors the account has (authenticator app,
-  passkey), or *No two-factor*; plus, for an account the two-factor policy
-  names (see below), whether it is still within its grace period or overdue.
+  passkey), or *No two-factor*; whether it is still within its grace period or
+  overdue, for an account the two-factor policy names (see below); and when it
+  last signed in, or *Never signed in*.
 
 Use **Search**, **Platform role**, **Community** and **Two-factor** to narrow
 the list — the community filter finds everyone who is an owner or participant
 there, and the two-factor filter narrows to accounts that still need to set it
-up.
+up. The **Never signed in** stat at the top counts accounts nobody has ever
+signed into — useful for spotting a stale invitation or an account that can be
+cleaned up.
 
 > **Platform role vs. community membership.** The platform role (Admin, ZEV
 > Owner, Participant, Guest) belongs to the *account* and applies in every
@@ -242,6 +245,8 @@ Open **More** on an account row for:
   admin).
 - **Reset two-factor** — removes the account's passkeys, authenticator app and
   recovery codes, so someone locked out can sign in with their password again.
+- **View activity** — opens the platform audit log filtered to this account's
+  own actions.
 - **Sign out everywhere** — ends every session the account holds, on every
   browser and device, so it has to sign in again. Use it when you suspect
   someone else has access. It is recorded in the audit log and is not offered

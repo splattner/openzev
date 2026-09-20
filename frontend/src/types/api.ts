@@ -48,6 +48,8 @@ export interface AdminUser extends User {
     memberships: AccountMembership[]
     mfa_methods: Array<'totp' | 'passkey'>
     mfa_compliance: MfaCompliance | null
+    /** ISO datetime of the account's last completed sign-in (any door), or null if it has never signed in. */
+    last_login: string | null
 }
 
 /** Admin: create-account payload. No password field — the server always mints one for a console-created account. */

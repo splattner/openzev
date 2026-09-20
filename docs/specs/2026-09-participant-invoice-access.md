@@ -613,6 +613,7 @@ Two consequences that constrain the design and are not negotiable within it:
 | `test_consume_is_one_time` | Second attempt 400 |
 | `test_expired_token_is_400` | Past 15 minutes |
 | `test_magic_link_user_is_not_forced_into_password_change` | `must_change_password` false |
+| `test_consume_stamps_last_login` | `User.last_login` set after a successful consume |
 | `test_per_prefix_throttle_limits_mailbox_bombing` | Sixth request in an hour 429s |
 
 **`PublicInvoiceAuditTests`**

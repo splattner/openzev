@@ -26,7 +26,7 @@ from rest_framework.response import Response
 
 from accounts import magic_links, mfa
 from accounts.cookies import set_auth_cookies
-from accounts.jwt_utils import make_jwt_for_user
+from accounts.jwt_utils import make_jwt_for_user, record_login
 from accounts.throttling import InvoiceLinkThrottle, MagicLinkRequestThrottle
 from audit.models import AuditActionCategory, AuditEventSource, AuditEventStatus
 from audit.services import record_audit_event
@@ -282,6 +282,7 @@ def magic_link_consume(request):
     tokens = make_jwt_for_user(user)
     response = Response({"detail": "Signed in."})
     set_auth_cookies(request, response, access=tokens["access"], refresh=tokens["refresh"])
+    record_login(user)
     return response
 
 

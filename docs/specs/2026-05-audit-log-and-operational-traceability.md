@@ -461,6 +461,24 @@ UI elements:
 The page follows the same admin CRUD/table conventions used by existing admin
 pages and should reuse shared components where available.
 
+**Deep-linking an actor** (`?actor=<id>&actorUsername=<username>`, admin scope
+only): consumed once in a mount effect — sets `filters.actorUser`, remembers
+`actorUsername` in local state, then strips both params from the URL
+(`setSearchParams(..., { replace: true })`), the same consume-then-clear
+pattern the Participants page uses for `?focus=`. `actorUsername` exists only
+to label the selection when the account has no audit history yet: the actor
+`<select>`'s options come from `fetchAuditFilterOptions`, which lists only
+accounts that have actually acted on a *visible* event, so a freshly created
+or otherwise event-less account would not appear there and the dropdown would
+show no visible selection despite the filter being applied correctly. A
+synthetic `{id, username: actorUsername}` option is merged into the list
+(`actorOptions`, memoized) whenever the linked id is not already present.
+Source of the link: **View activity** on an admin accounts row
+(`AdminAccountsPage`, §6.4) — `navigate('/admin/audit?actor=<id>&actorUsername=<username>')`.
+Filters by *actor*, not *target*: "what has this account done", not "what was
+done to it" — the latter is reachable manually via the Target type/Target ID
+filters (`accounts.User` / the account's id) but has no dedicated shortcut.
+
 ### 7.2 API client functions
 
 **File:** `frontend/src/lib/api/audit.ts`

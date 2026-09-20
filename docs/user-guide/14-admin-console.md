@@ -167,6 +167,10 @@ community (ZEV) selector, actor, category, action type, status, and text
 search. Text search is available only to admin users. Events are
 read-only — there is no public write endpoint.
 
+The quickest way in is from the account itself: **View activity** on a row
+under **Platform → Accounts → Users** opens the audit log already filtered to
+what that account has done.
+
 The API is `GET /api/v1/audit/events/` (list) and
 `GET /api/v1/audit/events/{id}/` (detail). See the access spec
 [2026-05-audit-log-and-operational-traceability.md](../specs/2026-05-audit-log-and-operational-traceability.md)

@@ -311,6 +311,13 @@ class PasskeyLoginTests(TestCase):
         self.assertEqual(stored.sign_count, 1)
         self.assertIsNotNone(stored.last_used_at)
 
+    def test_successful_login_stamps_last_login(self):
+        self.assertIsNone(self.user.last_login)
+        sign_in_with(self.client, self.authenticator)
+
+        self.user.refresh_from_db()
+        self.assertIsNotNone(self.user.last_login)
+
     def test_email_hint_narrows_allow_credentials_without_revealing_accounts(self):
         known = self.client.post(AUTH_BEGIN_URL, {"email": self.user.email}, format="json").data
         unknown = self.client.post(AUTH_BEGIN_URL, {"email": "nobody@example.com"}, format="json").data

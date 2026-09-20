@@ -17,7 +17,7 @@ from audit.services import record_audit_event
 
 from . import mfa, notifications, passkeys
 from .cookies import set_auth_cookies
-from .jwt_utils import make_jwt_for_user
+from .jwt_utils import make_jwt_for_user, record_login
 from .models import User, WebAuthnCredential
 from .serializers import WebAuthnCredentialSerializer
 from .throttling import AuthPasskeyThrottle
@@ -229,6 +229,7 @@ class PasskeyAuthenticateCompleteView(APIView):
         tokens = make_jwt_for_user(user)
         response = Response({"detail": "Login successful."})
         set_auth_cookies(request, response, access=tokens["access"], refresh=tokens["refresh"])
+        record_login(user)
         _audit(
             request, "auth.login", user,
             f"Passkey login succeeded for {user.email or user.username}.",

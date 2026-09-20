@@ -355,6 +355,42 @@ Helper `accounts.jwt_utils.make_jwt_for_user(user, *, impersonated_by=None) -> d
 **Session version check:** `CookieJWTAuthentication.get_user` refuses an access token whose `sv` (a missing claim reads as `0`) differs from `user.session_version` (`401`, code `session_revoked`) — see §5.6b.
 **MFA policy enforcement:** `CookieJWTAuthentication.authenticate` also refuses (`403`) an unsafe request from an account whose role requires two-factor authentication and is past its grace period with no factor enrolled, with a short exemption list for self-service security actions and every admin action on another account excluded — see `2026-09-two-factor-authentication.md` §7.3a. Not reached by `ApiKeyAuthentication` at all.
 
+### 5.1a Last-login tracking
+
+`User.last_login` (Django's own `AbstractUser` field; no migration) is stamped
+by `accounts.jwt_utils.record_login(user)` — a thin wrapper around Django's
+own `django.contrib.auth.models.update_last_login`, the function
+`django.contrib.auth` wires to the `user_logged_in` signal for the admin site,
+which none of this project's login views raise (they return JSON, not a
+redirect through `django.contrib.auth.login()`).
+
+Called explicitly, once, at each door that actually mints a new session:
+
+- `CustomTokenObtainPairView.post` (password login, no second factor)
+- `TokenMfaView.post` (the second step of a two-step login)
+- `verify_email` (the auto-login on first verification)
+- `oauth_token_exchange`
+- `PasskeyAuthenticateCompleteView.post`
+- `invoices.views_public.magic_link_consume`
+- `zev.views_public.onboarding_consume`
+
+**Deliberately not called** from `accounts.jwt_utils.make_jwt_for_user` itself,
+even though every door above (except the plain password login, which builds
+its tokens through the serializer directly) calls it: that function also
+backs two things that are not a login and must not restamp it —
+`session_revocation.keep_current_session` (reissuing tokens under the *same*
+session after a password or email change) and impersonation (the admin signed
+in; the target did not — neither account's `last_login` changes). A failed
+password attempt, and the password-verified-but-still-awaiting-a-second-factor
+response, do not stamp it either — no session exists yet at either point.
+`set_initial_password` reissues claims after a first password is set, seconds
+after the login that got the caller there (`verify_email` or a magic/onboarding
+link); it does not call `record_login` either, for the same "not a new
+sign-in" reason.
+
+Surfaced only on `AdminUserSerializer` (§6.1); `/auth/me/`, impersonation
+responses, and the detail view do not carry it.
+
 **Token refresh:** `POST /api/v1/auth/token/refresh/` reads `openzev_refresh` cookie; CSRF via `CookieJWTAuthentication` (`SessionAuthentication.enforce_csrf` on unsafe methods) + `CsrfViewMiddleware` kept for admin/Django views. Before rotating, `CookieTokenRefreshView` also requires the refresh token's `sv` to match the account's and the account to be active; otherwise `401` and the auth cookies are cleared.
 
 **Cookie transport:** httpOnly cookies `openzev_access` / `openzev_refresh` + `csrftoken` via `django.middleware.csrf.get_token` (`CsrfViewMiddleware` sets cookie). `CSRF_TRUSTED_ORIGINS` defaults to `CORS_ALLOWED_ORIGINS`.
@@ -691,9 +727,10 @@ number of queries whatever the number of accounts (pinned by a query-count
 test). `/auth/me/`, impersonation responses and the detail view keep the plain
 `UserSerializer` and do not carry these fields.
 
-`last_login` is deliberately **not** exposed: the JWT login paths (password,
-MFA, passkey, magic link, onboarding, OAuth) do not maintain it, so it would
-report "never" for accounts that sign in every day.
+`last_login` — the account's own `User.last_login`, stamped at every genuine
+sign-in (§5.1a) and `null` for an account that has never signed in. This is
+the one added field that is not derived from a prefetched relation; it costs
+nothing extra since it is a plain column on the already-selected row.
 
 ### 6.2 User create
 
@@ -753,9 +790,9 @@ the account's role everywhere.
 - **Columns:** *Account* (display name, platform-role badge, `Inactive` badge
   when `is_active` is false, `username · email`), *Communities*
   (`AccountMemberships`), *Security* (a badge per `mfa_methods` entry or "No
-  two-factor", plus `AccountMfaComplianceBadge` when `mfa_compliance` is
-  non-null and not `"compliant"`: "2FA required · due `<date>`" for `"grace"`,
-  "2FA overdue" for `"overdue"`), *Actions*.
+  two-factor", `AccountMfaComplianceBadge` when `mfa_compliance` is non-null
+  and not `"compliant"`, and a muted "Last sign-in `<date>`" /
+  "Never signed in" line from `last_login`), *Actions*.
 - **Membership chips** read `Owner|Participant · <community>`. Selecting one
   calls `setSelectedZevId(zev)` (the shell's community switcher — which also
   saves the admin's `preferred_zev`, as any switch does) and opens
@@ -763,7 +800,8 @@ the account's role everywhere.
   owner with no participant record). Memberships are edited there, not here.
 - **Stats:** accounts, accounts with two-factor, guest accounts (the ones
   waiting to be linked), accounts the MFA policy names that have not enrolled
-  yet (`accountList.needsTwoFactor`: `"grace"` or `"overdue"`).
+  yet (`accountList.needsTwoFactor`: `"grace"` or `"overdue"`), accounts that
+  have never signed in (`last_login === null`).
 - **Filters** (`accountList.filterAccounts`, client-side): search over display
   name, username and email; platform role; community; two-factor (all accounts,
   or only those `needsTwoFactor`). The community filter matches *any*
@@ -779,11 +817,15 @@ the account's role everywhere.
 - **Actions:** *Edit* (username, email, names, **platform role** — labelled as
   such, with a hint that it applies in every community); menu: *Impersonate*
   (participant and owner accounts only — `canImpersonateAccount`), *Reset
-  two-factor*, *Sign out everywhere*, *Deactivate*/*Activate* (toggles
-  `is_active`; not offered on the admin's own row — the server refuses
-  deactivating yourself, §6.3), *Delete*. *Delete* is disabled while the
-  account belongs to any community (`canDeleteAccount`, mirroring the server's
-  guard) and is not offered for the admin's own row.
+  two-factor*, **View activity** (navigates to
+  `/admin/audit?actor=<id>&actorUsername=<username>` — the platform audit log
+  pre-filtered to this account as actor; see
+  `2026-05-audit-log-and-operational-traceability.md` §7.1), *Sign out
+  everywhere*, *Deactivate*/*Activate* (toggles `is_active`; not offered on
+  the admin's own row — the server refuses deactivating yourself, §6.3),
+  *Delete*. *Delete* is disabled while the account belongs to any community
+  (`canDeleteAccount`, mirroring the server's guard) and is not offered for
+  the admin's own row.
 - **Removed from this page:** the participant-linking *Link existing*/*Create
   account*/*Unlink* actions and the participants-without-account rows — see
   §6.5. ("Create account" there created an account *for a specific
@@ -1401,13 +1443,14 @@ lists the test classes per module (test counts are the `test_*` methods).
 |---|---|---|---|
 | `test_session_hardening.py` | 5 | 44 | Self-service profile lockdown (protected fields rejected, repeats accepted, names/preferred community still editable); session revocation (revoked/new/legacy tokens, refresh refusal, deactivation, stale-instance save cannot revive, API keys and impersonation); password change and revoke endpoints; verified email change (request/confirm, single-use, dies on password/address/deactivation/expiry, no enumeration, throttle, mail failure, API keys) |
 | `test_security_notifications.py` | 6 | 26 | Every event composes (subject, body, `{detail}` filled, admin vs. self advice, no-turn-off line); guards (no address, inactive, gone/deactivated by send time); hooked into passkey add/remove, TOTP enable/disable (not for an abandoned enrolment), recovery-code regeneration, password change (not on failure), admin MFA reset (not when nothing was removed) and admin session revocation (not for the self-service one); a broker or mail failure never fails the triggering request |
-| `test_admin_users_list.py` | 2 | 12 | Admin user list: memberships per relationship (participant, owner-who-is-also-participant merged into one, owner of several communities sorted by name), confirmed-only `mfa_methods`, fixed query count, `/auth/me/` unaffected; `mfa_compliance` (`null` outside the policy, `"grace"` before the deadline, `"overdue"` after it, `"compliant"` once enrolled regardless of the deadline, no added query per account) |
+| `test_admin_users_list.py` | 2 | 13 | Admin user list: memberships per relationship (participant, owner-who-is-also-participant merged into one, owner of several communities sorted by name), confirmed-only `mfa_methods`, `last_login` exposed and `null` before the first sign-in, fixed query count, `/auth/me/` unaffected; `mfa_compliance` (`null` outside the policy, `"grace"` before the deadline, `"overdue"` after it, `"compliant"` once enrolled regardless of the deadline, no added query per account) |
+| `test_last_login.py` | 4 | 7 | `last_login` stamped by a plain password login (not by a failed one, not by the password step of a two-step login until `/token/mfa/` completes it) and by the auto-login after email verification; not restamped by a password change or by setting your initial password moments after verifying; untouched on either side of an impersonation session |
 | `test_admin_account_actions.py` | 2 | 12 | Account creation (generated password when omitted, returned once and never re-listed, two accounts get different passwords, a supplied password is still accepted, mismatched/weak supplied passwords rejected, generated password passes the validators anyway, response carries the new id, non-admin blocked); self-deactivation guard (blocked with a field error, deactivating someone else works and is audited, reactivating your own account is unaffected, deactivating someone else still revokes their sessions) |
 | `test_api_keys.py` | 10 | 81 | Generation, hashing, auth, read-only keys, scope deny-list, audit, throttling, CRUD, admin management |
 | `test_oauth.py` | 12 | 55 | Provider listing, initiate, callback guards/redirects, link flow, social accounts, audit, `require_mfa_claim` (`OAuthMfaClaimTests`) |
 | `test_passkeys.py` | 9 | 62 | Passkey registration and passwordless sign-in against a software authenticator, MFA policy and grace arithmetic, removal guard, admin reset, RP-ID system check |
 | `test_mfa.py` | 4 | 28 | TOTP enrolment/removal/recovery codes, two-step login, MFA at the magic-link/onboarding/OAuth/impersonation/email-verification doors, per-account throttle (`SPEC-2026-09-two-factor-authentication`) |
-| `test_cookie_oauth.py` | — (6 module-level test functions) | 6 | Refresh/logout cookie handling; token exchange sets cookies and consumes codes |
+| `test_cookie_oauth.py` | — (7 module-level test functions) | 7 | Refresh/logout cookie handling; token exchange sets cookies, consumes codes, and stamps `last_login` |
 | `test_impersonation.py` | 5 | 21 | Permissions, audit, cookie round-trip, stop-impersonation |
 | `test_throttling.py` | 1 | 7 | Per-IP 429 boundaries for all six public auth write endpoints; budgets are independent |
 

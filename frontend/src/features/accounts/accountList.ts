@@ -75,5 +75,6 @@ export function accountStats(accounts: AdminUser[]) {
         // Guests are accounts not yet tied to a participant: the ones waiting to be linked.
         guests: accounts.filter((account) => account.role === 'guest').length,
         needsTwoFactor: accounts.filter(needsTwoFactor).length,
+        neverSignedIn: accounts.filter((account) => account.last_login === null).length,
     }
 }

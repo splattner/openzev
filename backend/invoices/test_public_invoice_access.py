@@ -434,6 +434,13 @@ class MagicLinkTests(PublicInvoiceTestCase):
         self.assertFalse(self.participant.user.must_change_password)
         self.assertFalse(self.participant.user.has_usable_password())
 
+    def test_consume_stamps_last_login(self):
+        self._request()
+        self.client.post(self.CONSUME_URL, {"token": self._link_token().token}, format="json")
+
+        self.participant.refresh_from_db()
+        self.assertIsNotNone(self.participant.user.last_login)
+
     def test_consuming_kills_a_leftover_password_from_before_this_behaviour(self):
         """A usable password from an account created before passwordless
         participant accounts existed must not survive a sign-in link.

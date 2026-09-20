@@ -102,6 +102,16 @@ class AdminUserListTests(TestCase):
         self.assertEqual(rows["ual_pending"]["mfa_methods"], [])
         self.assertEqual(rows["ual_none"]["mfa_methods"], [])
 
+    def test_last_login_is_exposed_and_null_before_the_first_sign_in(self):
+        make_user("ual_never", UserRole.PARTICIPANT)
+        signed_in = make_user("ual_signed_in", UserRole.PARTICIPANT)
+        signed_in.last_login = timezone.now()
+        signed_in.save(update_fields=["last_login"])
+
+        rows = self._rows()
+        self.assertIsNone(rows["ual_never"]["last_login"])
+        self.assertIsNotNone(rows["ual_signed_in"]["last_login"])
+
     def test_query_count_does_not_grow_with_the_number_of_accounts(self):
         def build(prefix, n):
             owner = make_user(f"{prefix}_owner", UserRole.ZEV_OWNER)
@@ -123,7 +133,7 @@ class AdminUserListTests(TestCase):
 
     def test_me_endpoint_does_not_carry_the_admin_only_fields(self):
         body = self.client.get("/api/v1/auth/me/").json()
-        for field in ("memberships", "mfa_methods"):
+        for field in ("memberships", "mfa_methods", "mfa_compliance", "last_login"):
             self.assertNotIn(field, body)
 
 

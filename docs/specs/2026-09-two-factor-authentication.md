@@ -716,9 +716,10 @@ provider without the requirement unaffected). TOTP tests pin the clock
 with a `totp_step` helper so replay protection never collides with a real 30-second step. The
 Passkeys, the policy, the removal guard and the admin reset shipped with PR 3 (below).
 
-**As shipped in PR 3**: `accounts/test_passkeys.py`, 62 tests, driving py_webauthn end to end
+**As shipped in PR 3**: `accounts/test_passkeys.py`, 63 tests, driving py_webauthn end to end
 through a small software authenticator (real `none` attestations, real ES256 assertions, nothing
-about the library mocked): `PasskeyRegistrationTests` (13), `PasskeyLoginTests` (14),
+about the library mocked): `PasskeyRegistrationTests` (13), `PasskeyLoginTests` (15, including that a
+successful login stamps `User.last_login`),
 `PasskeyGatesThePasswordRouteTests` (7, the passkey-gated password / magic-link routes and the recovery-code second step), `PasskeyThrottleTests` (1), `MfaPolicyTests` (11), `MfaRemovalGuardTests` (6),
 `MfaAdminResetTests` (7) and `WebAuthnRpCheckTests` (3). These replace the illustrative
 `PasskeyTests` / `MfaAdminTests` tables below and additionally cover replay of a spent ceremony,

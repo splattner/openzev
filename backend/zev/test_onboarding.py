@@ -186,6 +186,12 @@ class OnboardingConsumeViewTests(TestCase):
         event = AuditEvent.objects.filter(action_type="participant_onboarding.consumed").latest("created_at")
         self.assertEqual(event.source, AuditEventSource.ONBOARDING_LINK)
 
+    def test_stamps_last_login(self):
+        self.client.post(self.CONSUME_URL, {"prefix": self.token.prefix, "s": self.token.secret}, format="json")
+
+        self.participant.refresh_from_db()
+        self.assertIsNotNone(self.participant.user.last_login)
+
 
 class RevokeAndUnlinkTests(TestCase):
     def setUp(self):

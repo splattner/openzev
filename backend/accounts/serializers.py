@@ -180,7 +180,10 @@ class AdminUserSerializer(UserSerializer):
         return mfa.compliance_status(user, app_settings=self._app_settings, has_factor=bool(self.get_mfa_methods(user)))
 
     class Meta(UserSerializer.Meta):
-        fields = UserSerializer.Meta.fields + ["memberships", "mfa_methods", "mfa_compliance"]
+        fields = UserSerializer.Meta.fields + ["memberships", "mfa_methods", "mfa_compliance", "last_login"]
+        # This serializer is list-only (UserListCreateView.get_serializer_class
+        # never returns it for a write); read_only here is belt-and-braces.
+        read_only_fields = UserSerializer.Meta.read_only_fields + ["last_login"]
 
 
 def generate_temporary_password(length: int = 16) -> str:
