@@ -9,6 +9,7 @@ import secrets
 import pyotp
 from django.conf import settings
 from django.db import transaction
+from django.db.models import Prefetch
 from django.utils.text import slugify
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
@@ -31,7 +32,7 @@ from .models import (
     VatRate,
 )
 from .serializers import (
-    UserSerializer, UserCreateSerializer, ChangePasswordSerializer, CustomTokenObtainPairSerializer,
+    AdminUserSerializer, UserSerializer, UserCreateSerializer, ChangePasswordSerializer, CustomTokenObtainPairSerializer,
     ApiKeySerializer, ApiKeyCreateSerializer, AdminApiKeySerializer,
     AppSettingsSerializer,
     FeatureFlagSerializer,
@@ -53,6 +54,7 @@ from .throttling import AuthLoginThrottle, AuthMfaThrottle, AuthRefreshThrottle,
 from audit.models import AuditActionCategory, AuditEventStatus
 from audit.mixins import AuditedUpdateMixin
 from audit.services import build_diff, record_audit_event
+from zev.models import Participant, Zev
 
 logger = logging.getLogger(__name__)
 
@@ -251,10 +253,21 @@ class UserListCreateView(generics.ListCreateAPIView):
     permission_classes = [IsAdmin]
 
     def get_queryset(self):
-        return User.objects.all().order_by("username")
+        # Everything AdminUserSerializer reads is prefetched, so the list costs
+        # the same handful of queries for ten accounts or ten thousand.
+        return (
+            User.objects.all()
+            .select_related("totp_device")
+            .prefetch_related(
+                Prefetch("owned_zevs", queryset=Zev.objects.only("id", "name", "owner_id")),
+                Prefetch("participations", queryset=Participant.objects.select_related("zev").only("id", "user_id", "zev_id", "zev__name")),
+                "webauthn_credentials",
+            )
+            .order_by("username")
+        )
 
     def get_serializer_class(self):
-        return UserCreateSerializer if self.request.method == "POST" else UserSerializer
+        return UserCreateSerializer if self.request.method == "POST" else AdminUserSerializer
 
     def perform_create(self, serializer):
         user = serializer.save()

@@ -1,7 +1,7 @@
 from django.contrib.auth.password_validation import validate_password
 from django.contrib.auth import get_user_model
 from django.conf import settings
-from django.core.exceptions import ValidationError as DjangoValidationError
+from django.core.exceptions import ObjectDoesNotExist, ValidationError as DjangoValidationError
 from django.utils.text import slugify
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
@@ -64,6 +64,55 @@ class UserSerializer(serializers.ModelSerializer):
             "preferred_zev",
         ]
         read_only_fields = ["id", "date_joined"]
+
+
+class AdminUserSerializer(UserSerializer):
+    """The admin accounts list: the account plus where it belongs and which
+    second factors it has.
+
+    Kept apart from ``UserSerializer`` so ``/auth/me`` and impersonation, which
+    reuse that one, do not pay for (or leak) the extra relations. Every added
+    field is read-only and derived from prefetched data — see
+    ``UserListCreateView.get_queryset`` — so the list stays a fixed number of
+    queries however many accounts there are.
+    """
+
+    memberships = serializers.SerializerMethodField()
+    mfa_methods = serializers.SerializerMethodField()
+
+    def get_memberships(self, user):
+        """One entry per community the account is tied to.
+
+        ``Zev.owner`` and ``Participant.user`` are separate relations, but an
+        owner is normally also their own community's owner-participant, so the
+        two are merged per ZEV: showing "Owner · Sonnenberg" and
+        "Participant · Sonnenberg" for one person would read as two roles.
+        """
+        by_zev: dict = {}
+        for zev in user.owned_zevs.all():
+            by_zev[zev.pk] = {"zev": str(zev.pk), "zev_name": zev.name, "is_owner": True, "participant": None}
+        for participant in user.participations.all():
+            entry = by_zev.setdefault(
+                participant.zev_id,
+                {"zev": str(participant.zev_id), "zev_name": participant.zev.name, "is_owner": False, "participant": None},
+            )
+            entry["participant"] = str(participant.pk)
+        return sorted(by_zev.values(), key=lambda entry: entry["zev_name"].lower())
+
+    def get_mfa_methods(self, user):
+        methods = []
+        try:
+            device = user.totp_device
+        except ObjectDoesNotExist:
+            device = None
+        if device is not None and device.confirmed_at is not None:
+            methods.append("totp")
+        if user.webauthn_credentials.all():
+            methods.append("passkey")
+        return methods
+
+    class Meta(UserSerializer.Meta):
+        fields = UserSerializer.Meta.fields + ["memberships", "mfa_methods"]
 
 
 class UserCreateSerializer(serializers.ModelSerializer):

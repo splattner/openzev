@@ -1,31 +1,30 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faCheck, faEllipsis, faLink, faPen, faPlus, faShieldHalved, faTrash, faUser, faXmark } from '@fortawesome/free-solid-svg-icons'
+import { faCheck, faEllipsis, faPen, faShieldHalved, faTrash, faUser, faXmark } from '@fortawesome/free-solid-svg-icons'
 import { useMemo, useState, type FormEvent } from 'react'
 import { ActionMenu } from '../components/ActionMenu'
 import { ConfirmDialog, useConfirmDialog } from '../components/ConfirmDialog'
 import { StatCard } from '../components/StatCard'
 import { FormModal } from '../components/FormModal'
+import { AccountMemberships } from '../features/accounts/AccountMemberships'
 import {
-    ParticipantOnboardingNotice,
-    type ParticipantOnboardingNoticeData,
-} from '../features/participants/ParticipantOnboardingNotice'
-import {
-    fetchParticipants,
-    fetchZevs,
-    getOnboardingLink,
-    linkParticipantAccount,
-    unlinkParticipantAccount,
-} from '../lib/api/zev'
+    DEFAULT_ACCOUNT_FILTERS,
+    accountDisplayName,
+    accountStats,
+    canDeleteAccount,
+    canImpersonateAccount,
+    filterAccounts,
+    hasActiveFilters,
+    type AccountFilters,
+} from '../features/accounts/accountList'
+import { fetchZevs } from '../lib/api/zev'
 import { deleteUser, fetchUsers, resetUserMfa, updateUser } from '../lib/api/auth'
 import { formatApiError } from '../lib/api/errors'
 import { queryKeys } from '../lib/api/queryKeys'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '../lib/auth'
 import { useToast } from '../lib/toast'
-import { formatParticipantName } from '../lib/participantFormat'
-import { getTitleLabelMap } from '../lib/participantTitle'
-import type { Participant, User, UserInput } from '../types/api'
+import type { AdminUser, UserInput, UserRole } from '../types/api'
 
 const defaultEditUserForm: UserInput = {
     username: '',
@@ -36,9 +35,16 @@ const defaultEditUserForm: UserInput = {
     must_change_password: false,
 }
 
+const ROLES: UserRole[] = ['admin', 'zev_owner', 'participant', 'guest']
+
 /**
- * `embedded` drops the page header (mounted inside the admin Accounts hub
- * since phase 3; /admin/accounts stays as a deep-link alias).
+ * Every account on the platform, one row each, with the communities it belongs
+ * to. Account-level concerns live here — platform role, sign-in security,
+ * impersonation, deletion. Which participant an account is tied to is managed
+ * on that community's Participants page; the membership chips lead there.
+ *
+ * `embedded` drops the page header (mounted inside the admin Accounts hub;
+ * /admin/accounts stays as a deep-link alias).
  */
 export function AdminAccountsPage({ embedded = false }: { embedded?: boolean }) {
     const queryClient = useQueryClient()
@@ -47,62 +53,15 @@ export function AdminAccountsPage({ embedded = false }: { embedded?: boolean }) 
     const { t } = useTranslation()
     const { dialog, confirm, handleConfirm, handleCancel, isLoading: dialogLoading } = useConfirmDialog()
 
-    const titleLabelByValue = useMemo(() => getTitleLabelMap(t), [t])
-
     const usersQuery = useQuery({ queryKey: queryKeys.auth.users(), queryFn: fetchUsers })
-    const participantsQuery = useQuery({ queryKey: queryKeys.zev.participants(), queryFn: fetchParticipants })
     const zevsQuery = useQuery({ queryKey: queryKeys.zev.list(), queryFn: fetchZevs })
 
-    const [showLinkModal, setShowLinkModal] = useState(false)
-    const [linkParticipant, setLinkParticipant] = useState<Participant | null>(null)
-    const [selectedUserToLink, setSelectedUserToLink] = useState<string>('')
-    const [linkError, setLinkError] = useState<string | null>(null)
+    const [filters, setFilters] = useState<AccountFilters>(DEFAULT_ACCOUNT_FILTERS)
 
     const [showEditUserModal, setShowEditUserModal] = useState(false)
     const [editingUserId, setEditingUserId] = useState<number | null>(null)
     const [editUserForm, setEditUserForm] = useState<UserInput>(defaultEditUserForm)
     const [editUserError, setEditUserError] = useState<string | null>(null)
-
-    const [onboardingNotice, setOnboardingNotice] = useState<ParticipantOnboardingNoticeData | null>(null)
-
-    const linkMutation = useMutation({
-        mutationFn: ({ participantId, userId }: { participantId: string; userId: number }) => linkParticipantAccount(participantId, userId),
-        onSuccess: () => {
-            setShowLinkModal(false)
-            setLinkParticipant(null)
-            setSelectedUserToLink('')
-            setLinkError(null)
-            pushToast(t('pages.accounts.feedback.linkSuccess'), 'success')
-            void queryClient.invalidateQueries({ queryKey: queryKeys.zev.participants() })
-            void queryClient.invalidateQueries({ queryKey: queryKeys.auth.users() })
-        },
-        onError: (error) => setLinkError(formatApiError(error, t('pages.accounts.feedback.linkFailed'))),
-    })
-
-    const unlinkMutation = useMutation({
-        mutationFn: (participantId: string) => unlinkParticipantAccount(participantId),
-        onSuccess: () => {
-            pushToast(t('pages.accounts.feedback.unlinkSuccess'), 'success')
-            void queryClient.invalidateQueries({ queryKey: queryKeys.zev.participants() })
-            void queryClient.invalidateQueries({ queryKey: queryKeys.auth.users() })
-        },
-        onError: (error) => pushToast(formatApiError(error, t('pages.accounts.feedback.unlinkFailed')), 'error'),
-    })
-
-    const onboardingLinkMutation = useMutation({
-        mutationFn: (participantId: string) => getOnboardingLink(participantId),
-        onSuccess: (result) => {
-            setOnboardingNotice({
-                participantName: `${result.participant.first_name} ${result.participant.last_name}`,
-                onboardingUrl: result.onboarding_url,
-                message: t('pages.accounts.feedback.onboardingLinkDetail'),
-            })
-            pushToast(t('pages.accounts.feedback.createSuccess'), 'success')
-            void queryClient.invalidateQueries({ queryKey: queryKeys.zev.participants() })
-            void queryClient.invalidateQueries({ queryKey: queryKeys.auth.users() })
-        },
-        onError: (error) => pushToast(formatApiError(error, t('pages.accounts.feedback.createFailed')), 'error'),
-    })
 
     const updateUserMutation = useMutation({
         mutationFn: ({ userId, payload }: { userId: number; payload: Partial<UserInput> }) => updateUser(userId, payload),
@@ -126,7 +85,6 @@ export function AdminAccountsPage({ embedded = false }: { embedded?: boolean }) 
                 return
             }
             void queryClient.invalidateQueries({ queryKey: queryKeys.auth.users() })
-            void queryClient.invalidateQueries({ queryKey: queryKeys.zev.participants() })
         },
         onError: (error) => pushToast(formatApiError(error, t('pages.accounts.feedback.deleteFailed')), 'error'),
     })
@@ -135,11 +93,30 @@ export function AdminAccountsPage({ embedded = false }: { embedded?: boolean }) 
     // (spec 2026-09-two-factor-authentication.md, D3). Audited server-side.
     const resetMfaMutation = useMutation({
         mutationFn: (userId: number) => resetUserMfa(userId),
-        onSuccess: () => pushToast(t('pages.accounts.feedback.resetMfaSuccess'), 'success'),
+        onSuccess: () => {
+            pushToast(t('pages.accounts.feedback.resetMfaSuccess'), 'success')
+            void queryClient.invalidateQueries({ queryKey: queryKeys.auth.users() })
+        },
         onError: (error) => pushToast(formatApiError(error, t('pages.accounts.feedback.resetMfaFailed')), 'error'),
     })
 
-    function confirmResetMfa(account: User) {
+    const impersonationMutation = useMutation({
+        mutationFn: async (userId: number) => {
+            await startImpersonation(userId)
+        },
+        onSuccess: () => pushToast(t('pages.accounts.feedback.impersonationSuccess'), 'success'),
+        onError: (error) => pushToast(formatApiError(error, t('pages.accounts.feedback.impersonationFailed')), 'error'),
+    })
+
+    const accounts = usersQuery.data
+    const visibleAccounts = useMemo(() => filterAccounts(accounts ?? [], filters), [accounts, filters])
+    const stats = useMemo(() => accountStats(accounts ?? []), [accounts])
+
+    function roleLabel(role: UserRole) {
+        return t(`pages.accounts.roles.${role}` as Parameters<typeof t>[0], { defaultValue: role })
+    }
+
+    function confirmResetMfa(account: AdminUser) {
         confirm({
             title: t('pages.accounts.resetMfaTitle'),
             message: t('pages.accounts.resetMfaMessage', { username: account.username }),
@@ -152,53 +129,43 @@ export function AdminAccountsPage({ embedded = false }: { embedded?: boolean }) 
         })
     }
 
-    const impersonationMutation = useMutation({
-        mutationFn: async (participantUserId: number) => {
-            await startImpersonation(participantUserId)
-        },
-        onSuccess: () => {
-            pushToast(t('pages.accounts.feedback.impersonationSuccess'), 'success')
-        },
-        onError: (error) => pushToast(formatApiError(error, t('pages.accounts.feedback.impersonationFailed')), 'error'),
-    })
-
-    function roleLabel(role: User['role']) {
-        return t(`pages.accounts.roles.${role}` as Parameters<typeof t>[0], { defaultValue: role })
+    function confirmImpersonate(account: AdminUser) {
+        confirm({
+            title: t('pages.accounts.impersonateTitle'),
+            message: t('pages.accounts.impersonateMessage', { name: accountDisplayName(account) }),
+            confirmText: t('pages.accounts.impersonateConfirm'),
+            cancelText: t('common.cancel'),
+            onConfirm: async () => {
+                await impersonationMutation.mutateAsync(account.id)
+            },
+        })
     }
 
-    function participantName(participant: Participant) {
-        const titleLabel = participant.title ? (titleLabelByValue[participant.title as keyof typeof titleLabelByValue] ?? '') : ''
-        return formatParticipantName(participant, titleLabel)
+    function confirmDelete(account: AdminUser) {
+        confirm({
+            title: t('pages.accounts.deleteTitle'),
+            message: t('pages.accounts.deleteMessage', { username: account.username }),
+            confirmText: t('pages.accounts.deleteConfirm'),
+            cancelText: t('common.cancel'),
+            isDangerous: true,
+            onConfirm: async () => {
+                await deleteUserMutation.mutateAsync(account.id)
+            },
+        })
     }
 
-    function openLinkModal(participant: Participant) {
-        setLinkParticipant(participant)
-        setSelectedUserToLink('')
-        setLinkError(null)
-        setShowLinkModal(true)
-    }
-
-    function openEditUserModal(user: User) {
-        setEditingUserId(user.id)
+    function openEditUserModal(account: AdminUser) {
+        setEditingUserId(account.id)
         setEditUserForm({
-            username: user.username,
-            email: user.email || '',
-            first_name: user.first_name || '',
-            last_name: user.last_name || '',
-            role: user.role,
-            must_change_password: user.must_change_password,
+            username: account.username,
+            email: account.email || '',
+            first_name: account.first_name || '',
+            last_name: account.last_name || '',
+            role: account.role,
+            must_change_password: account.must_change_password,
         })
         setEditUserError(null)
         setShowEditUserModal(true)
-    }
-
-    function submitLinkAccount(event: FormEvent<HTMLFormElement>) {
-        event.preventDefault()
-        if (!linkParticipant || !selectedUserToLink) {
-            setLinkError(t('pages.accounts.validation.selectAccount'))
-            return
-        }
-        linkMutation.mutate({ participantId: linkParticipant.id, userId: Number(selectedUserToLink) })
     }
 
     function submitEditUser(event: FormEvent<HTMLFormElement>) {
@@ -209,40 +176,17 @@ export function AdminAccountsPage({ embedded = false }: { embedded?: boolean }) 
         updateUserMutation.mutate({ userId: editingUserId, payload: editUserForm })
     }
 
-    if (usersQuery.isLoading || participantsQuery.isLoading || zevsQuery.isLoading) {
+    if (usersQuery.isLoading || zevsQuery.isLoading) {
         return <div className="card">{t('pages.accounts.loading')}</div>
     }
 
-    if (usersQuery.isError || participantsQuery.isError || zevsQuery.isError) {
+    if (usersQuery.isError || zevsQuery.isError) {
         return <div className="card error-banner">{t('pages.accounts.loadFailed')}</div>
     }
 
-    const users = usersQuery.data ?? []
-    const participants = participantsQuery.data ?? []
-    const zevNameById = new Map((zevsQuery.data ?? []).map((zev) => [zev.id, zev.name]))
-    const userById = new Map(users.map((entry) => [entry.id, entry]))
-
-    const participantByUserId = new Map<number, Participant>()
-    for (const participant of participants) {
-        if (participant.user != null) {
-            participantByUserId.set(participant.user, participant)
-        }
-    }
-
-    const unlinkedAccounts = users.filter((account) => !participantByUserId.has(account.id))
-    const linkableAccounts = unlinkedAccounts.filter((account) => account.role === 'participant' || account.role === 'guest')
-    const linkedParticipantsCount = participants.filter((participant) => participant.user != null).length
-    const standaloneAccountsCount = unlinkedAccounts.length
-
-    const sortedParticipants = [...participants].sort((left, right) => {
-        const zevComparison = (zevNameById.get(left.zev) ?? '').localeCompare(zevNameById.get(right.zev) ?? '')
-        if (zevComparison !== 0) {
-            return zevComparison
-        }
-        return formatParticipantName(left).localeCompare(formatParticipantName(right))
-    })
-
-    const sortedUnlinkedAccounts = [...unlinkedAccounts].sort((left, right) => left.username.localeCompare(right.username))
+    const zevs = [...(zevsQuery.data ?? [])].sort((left, right) => left.name.localeCompare(right.name))
+    const editingSelf = editingUserId === currentUser?.id && currentUser?.role === 'admin'
+    const filtersActive = hasActiveFilters(filters)
 
     return (
         <div className="page-stack">
@@ -255,243 +199,152 @@ export function AdminAccountsPage({ embedded = false }: { embedded?: boolean }) 
             )}
 
             <section style={{ display: 'grid', gap: '1rem', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
-                <StatCard label={t('pages.accounts.stats.totalParticipants')} value={participants.length} />
-                <StatCard label={t('pages.accounts.stats.linkedParticipants')} value={linkedParticipantsCount} />
-                <StatCard label={t('pages.accounts.stats.standaloneAccounts')} value={standaloneAccountsCount} />
+                <StatCard label={t('pages.accounts.stats.total')} value={stats.total} />
+                <StatCard label={t('pages.accounts.stats.withTwoFactor')} value={stats.withTwoFactor} />
+                <StatCard label={t('pages.accounts.stats.guests')} value={stats.guests} />
             </section>
 
-            {onboardingNotice && (
-                <ParticipantOnboardingNotice notice={onboardingNotice} onDismiss={() => setOnboardingNotice(null)} />
-            )}
+            <section className="card">
+                <div className="participant-filter-grid">
+                    <label>
+                        <span>{t('pages.accounts.filters.search')}</span>
+                        <input
+                            value={filters.search}
+                            placeholder={t('pages.accounts.filters.searchPlaceholder')}
+                            onChange={(event) => setFilters((previous) => ({ ...previous, search: event.target.value }))}
+                        />
+                    </label>
+                    <label>
+                        <span>{t('pages.accounts.filters.role')}</span>
+                        <select
+                            value={filters.role}
+                            onChange={(event) => setFilters((previous) => ({ ...previous, role: event.target.value as AccountFilters['role'] }))}
+                        >
+                            <option value="all">{t('pages.accounts.filters.allRoles')}</option>
+                            {ROLES.map((role) => (
+                                <option key={role} value={role}>{roleLabel(role)}</option>
+                            ))}
+                        </select>
+                    </label>
+                    <label>
+                        <span>{t('pages.accounts.filters.community')}</span>
+                        <select
+                            value={filters.zevId}
+                            onChange={(event) => setFilters((previous) => ({ ...previous, zevId: event.target.value }))}
+                        >
+                            <option value="all">{t('pages.accounts.filters.allCommunities')}</option>
+                            {zevs.map((zev) => (
+                                <option key={zev.id} value={zev.id}>{zev.name}</option>
+                            ))}
+                        </select>
+                    </label>
+                </div>
+            </section>
 
             <div className="table-card">
                 <table>
                     <thead>
                         <tr>
-                            <th>{t('pages.accounts.col.type')}</th>
-                            <th>{t('pages.accounts.col.participant')}</th>
-                            <th>{t('pages.accounts.col.zev')}</th>
                             <th>{t('pages.accounts.col.account')}</th>
+                            <th>{t('pages.accounts.col.communities')}</th>
+                            <th>{t('pages.accounts.col.security')}</th>
                             <th>{t('pages.accounts.col.actions')}</th>
                         </tr>
                     </thead>
                     <tbody>
-                        {sortedParticipants.map((participant) => {
-                            const linkedAccount = participant.user ? userById.get(participant.user) : undefined
-                            const linkedRowActions = linkedAccount
-                                ? [
-                                    ...((linkedAccount.role === 'participant' || linkedAccount.role === 'zev_owner')
-                                        ? [{
-                                            key: 'impersonate',
-                                            label: t('pages.accounts.impersonate'),
-                                            icon: <FontAwesomeIcon icon={faUser} fixedWidth />,
-                                            disabled: impersonationMutation.isPending || dialogLoading,
-                                            onClick: () => {
-                                                const name = participantName(participant)
-                                                confirm({
-                                                    title: t('pages.accounts.impersonateTitle'),
-                                                    message: t('pages.accounts.impersonateMessage', { name }),
-                                                    confirmText: t('pages.accounts.impersonateConfirm'),
-                                                    cancelText: t('common.cancel'),
-                                                    onConfirm: async () => {
-                                                        await impersonationMutation.mutateAsync(linkedAccount.id)
-                                                    },
-                                                })
-                                            },
-                                        }]
-                                        : []),
-                                    {
-                                        key: 'reset-mfa',
-                                        label: t('pages.accounts.resetMfa'),
-                                        icon: <FontAwesomeIcon icon={faShieldHalved} fixedWidth />,
-                                        disabled: resetMfaMutation.isPending || dialogLoading,
-                                        onClick: () => confirmResetMfa(linkedAccount),
-                                    },
-                                    {
-                                        key: 'unlink',
-                                        label: t('pages.accounts.unlink'),
-                                        icon: <FontAwesomeIcon icon={faXmark} fixedWidth />,
-                                        disabled: unlinkMutation.isPending || dialogLoading,
-                                        onClick: () => {
-                                            const name = participantName(participant)
-                                            confirm({
-                                                title: t('pages.accounts.unlinkTitle'),
-                                                message: t('pages.accounts.unlinkMessage', { username: linkedAccount.username, name }),
-                                                confirmText: t('pages.accounts.unlinkConfirm'),
-                                                cancelText: t('common.cancel'),
-                                                onConfirm: async () => {
-                                                    await unlinkMutation.mutateAsync(participant.id)
-                                                },
-                                            })
-                                        },
-                                    },
-                                ]
-                                : []
+                        {visibleAccounts.map((account) => {
+                            const isSelf = account.id === currentUser?.id
+                            const menuItems = [
+                                ...(canImpersonateAccount(account)
+                                    ? [{
+                                        key: 'impersonate',
+                                        label: t('pages.accounts.impersonate'),
+                                        icon: <FontAwesomeIcon icon={faUser} fixedWidth />,
+                                        disabled: impersonationMutation.isPending || dialogLoading,
+                                        onClick: () => confirmImpersonate(account),
+                                    }]
+                                    : []),
+                                {
+                                    key: 'reset-mfa',
+                                    label: t('pages.accounts.resetMfa'),
+                                    icon: <FontAwesomeIcon icon={faShieldHalved} fixedWidth />,
+                                    disabled: resetMfaMutation.isPending || dialogLoading,
+                                    onClick: () => confirmResetMfa(account),
+                                },
+                                {
+                                    key: 'delete',
+                                    label: t('common.delete'),
+                                    icon: <FontAwesomeIcon icon={faTrash} fixedWidth />,
+                                    // A member account has to be detached from its
+                                    // communities first; the server refuses otherwise.
+                                    disabled: !canDeleteAccount(account) || deleteUserMutation.isPending || dialogLoading,
+                                    danger: true,
+                                    onClick: () => confirmDelete(account),
+                                },
+                            ]
+
                             return (
-                                <tr key={`participant-${participant.id}`}>
+                                <tr key={account.id}>
                                     <td>
-                                        <span className="badge badge-info">{t('pages.accounts.typeValues.participant')}</span>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap' }}>
+                                            <strong>{accountDisplayName(account)}</strong>
+                                            <span className="badge badge-neutral">{roleLabel(account.role)}</span>
+                                            {!account.is_active && <span className="badge badge-warning">{t('pages.accounts.inactive')}</span>}
+                                        </div>
+                                        <div className="muted">{account.username} · {account.email || '-'}</div>
                                     </td>
                                     <td>
-                                        <div>{participantName(participant)}</div>
-                                        <div className="muted">{participant.email || '-'}</div>
+                                        <AccountMemberships memberships={account.memberships} />
                                     </td>
-                                    <td>{zevNameById.get(participant.zev) ?? participant.zev}</td>
                                     <td>
-                                        {linkedAccount ? (
-                                            <>
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap' }}>
-                                                    <span>{linkedAccount.username}</span>
-                                                    <span className="badge badge-neutral">
-                                                        {roleLabel(linkedAccount.role)}
-                                                    </span>
-                                                </div>
-                                                <div className="muted">{linkedAccount.email || '-'}</div>
-                                            </>
-                                        ) : (
-                                            <span className="muted">{t('pages.accounts.noLinkedAccount')}</span>
-                                        )}
+                                        <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
+                                            {account.mfa_methods.length === 0 && (
+                                                <span className="badge badge-neutral">{t('pages.accounts.mfa.none')}</span>
+                                            )}
+                                            {account.mfa_methods.map((method) => (
+                                                <span key={method} className="badge badge-success">{t(`pages.accounts.mfa.${method}`)}</span>
+                                            ))}
+                                        </div>
                                     </td>
                                     <td className="actions-cell">
                                         <div className="actions-cell-content">
-                                            {linkedAccount ? (
-                                                <>
-                                                    <button
-                                                        className="button button-primary button-compact"
-                                                        type="button"
-                                                        onClick={() => openEditUserModal(linkedAccount)}
-                                                    >
-                                                        <FontAwesomeIcon icon={faPen} fixedWidth />
-                                                        {t('common.edit')}
-                                                    </button>
-                                                    <ActionMenu
-                                                        label={t('pages.accounts.moreActions')}
-                                                        icon={<FontAwesomeIcon icon={faEllipsis} fixedWidth />}
-                                                        items={linkedRowActions}
-                                                    />
-                                                </>
-                                            ) : (
-                                                <>
-                                                    {linkableAccounts.length > 0 && (
-                                                        <button className="button button-secondary button-compact" type="button" onClick={() => openLinkModal(participant)}>
-                                                            <FontAwesomeIcon icon={faLink} fixedWidth />
-                                                            {t('pages.accounts.linkExisting')}
-                                                        </button>
-                                                    )}
-                                                    <button
-                                                        className="button button-primary button-compact"
-                                                        type="button"
-                                                        disabled={onboardingLinkMutation.isPending}
-                                                        onClick={() => onboardingLinkMutation.mutate(participant.id)}
-                                                    >
-                                                        <FontAwesomeIcon icon={faPlus} fixedWidth />
-                                                        {t('pages.accounts.createAccount')}
-                                                    </button>
-                                                </>
-                                            )}
+                                            <button
+                                                className="button button-primary button-compact"
+                                                type="button"
+                                                onClick={() => openEditUserModal(account)}
+                                            >
+                                                <FontAwesomeIcon icon={faPen} fixedWidth />
+                                                {t('common.edit')}
+                                            </button>
+                                            <ActionMenu
+                                                label={t('pages.accounts.moreActions')}
+                                                icon={<FontAwesomeIcon icon={faEllipsis} fixedWidth />}
+                                                items={isSelf ? menuItems.filter((item) => item.key !== 'delete') : menuItems}
+                                            />
                                         </div>
                                     </td>
                                 </tr>
                             )
                         })}
 
-                        {sortedUnlinkedAccounts.map((account) => (
-                            <tr key={`account-${account.id}`}>
-                                <td>
-                                    <span className="badge badge-neutral">{t('pages.accounts.typeValues.account')}</span>
-                                </td>
-                                <td className="muted">—</td>
-                                <td className="muted">—</td>
-                                <td>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap' }}>
-                                        <span>{account.username}</span>
-                                        <span className="badge badge-neutral">
-                                            {roleLabel(account.role)}
-                                        </span>
-                                    </div>
-                                    <div className="muted">{account.email || '-'}</div>
-                                </td>
-                                <td className="actions-cell">
-                                    <div className="actions-cell-content">
-                                        <button className="button button-primary button-compact" type="button" onClick={() => openEditUserModal(account)}>
-                                            <FontAwesomeIcon icon={faPen} fixedWidth />
-                                            {t('common.edit')}
-                                        </button>
-                                        <button
-                                            className="button button-secondary button-compact"
-                                            type="button"
-                                            disabled={resetMfaMutation.isPending || dialogLoading}
-                                            onClick={() => confirmResetMfa(account)}
-                                        >
-                                            <FontAwesomeIcon icon={faShieldHalved} fixedWidth />
-                                            {t('pages.accounts.resetMfa')}
-                                        </button>
-                                        <button
-                                            className="button button-danger button-compact"
-                                            type="button"
-                                            disabled={deleteUserMutation.isPending || dialogLoading}
-                                            onClick={() => {
-                                                confirm({
-                                                    title: t('pages.accounts.deleteTitle'),
-                                                    message: t('pages.accounts.deleteMessage', { username: account.username }),
-                                                    confirmText: t('pages.accounts.deleteConfirm'),
-                                                    cancelText: t('common.cancel'),
-                                                    isDangerous: true,
-                                                    onConfirm: async () => {
-                                                        await deleteUserMutation.mutateAsync(account.id)
-                                                    },
-                                                })
-                                            }}
-                                        >
-                                            <FontAwesomeIcon icon={faTrash} fixedWidth />
-                                            {t('common.delete')}
-                                        </button>
-                                    </div>
-                                </td>
-                            </tr>
-                        ))}
-
-                        {sortedParticipants.length === 0 && sortedUnlinkedAccounts.length === 0 && (
+                        {visibleAccounts.length === 0 && (
                             <tr>
-                                <td colSpan={5}>{t('pages.accounts.noAccountsParticipants')}</td>
+                                <td colSpan={4}>
+                                    {t(filtersActive ? 'pages.accounts.noMatches' : 'pages.accounts.noAccounts')}
+                                    {filtersActive && (
+                                        <>
+                                            {' '}
+                                            <button className="button button-secondary button-compact" type="button" onClick={() => setFilters(DEFAULT_ACCOUNT_FILTERS)}>
+                                                {t('pages.accounts.filters.clear')}
+                                            </button>
+                                        </>
+                                    )}
+                                </td>
                             </tr>
                         )}
                     </tbody>
                 </table>
             </div>
-
-            <FormModal isOpen={showLinkModal} title={t('pages.accounts.linkModal.title')} onClose={() => setShowLinkModal(false)} maxWidth="560px">
-                <form onSubmit={submitLinkAccount} style={{ display: 'grid', gap: '1rem' }}>
-                    <p style={{ margin: 0 }}>
-                        {t('pages.accounts.linkModal.participant')} <strong>{linkParticipant ? participantName(linkParticipant) : '-'}</strong>
-                    </p>
-                    <label>
-                        <span>{t('pages.accounts.linkModal.existingAccount')}</span>
-                        <select value={selectedUserToLink} onChange={(event) => setSelectedUserToLink(event.target.value)} required>
-                            <option value="">{t('pages.accounts.linkModal.selectAccount')}</option>
-                            {linkableAccounts.map((account) => (
-                                <option key={account.id} value={account.id}>
-                                    {account.username} ({account.email || t('pages.accounts.linkModal.noEmail')})
-                                </option>
-                            ))}
-                        </select>
-                    </label>
-
-                    {linkError && <div className="error-banner">{linkError}</div>}
-
-                    <div className="actions-row actions-row-end actions-row-wrap">
-                        <button className="button button-secondary" type="button" onClick={() => setShowLinkModal(false)}>
-                            <FontAwesomeIcon icon={faXmark} fixedWidth />
-                            {t('common.cancel')}
-                        </button>
-                        <button className="button button-primary" type="submit" disabled={linkMutation.isPending}>
-                            <FontAwesomeIcon icon={faLink} fixedWidth />
-                            {t('pages.accounts.linkModal.linkButton')}
-                        </button>
-                    </div>
-                </form>
-            </FormModal>
-
 
             <FormModal isOpen={showEditUserModal} title={t('pages.accounts.editModal.title')} onClose={() => setShowEditUserModal(false)} maxWidth="760px">
                 <form onSubmit={submitEditUser} className="form-grid">
@@ -516,7 +369,7 @@ export function AdminAccountsPage({ embedded = false }: { embedded?: boolean }) 
                         <select
                             value={editUserForm.role}
                             onChange={(event) => setEditUserForm((previous) => ({ ...previous, role: event.target.value as UserInput['role'] }))}
-                            disabled={editingUserId === currentUser?.id && currentUser?.role === 'admin'}
+                            disabled={editingSelf}
                         >
                             <option value="participant">{t('pages.accounts.roles.participant')}</option>
                             <option value="guest">{t('pages.accounts.roles.guest')}</option>
@@ -525,11 +378,9 @@ export function AdminAccountsPage({ embedded = false }: { embedded?: boolean }) 
                         </select>
                     </label>
 
-                    {editingUserId === currentUser?.id && currentUser?.role === 'admin' && (
-                        <div className="muted" style={{ gridColumn: '1 / -1' }}>
-                            {t('pages.accounts.editModal.selfRoleNotice')}
-                        </div>
-                    )}
+                    <div className="muted" style={{ gridColumn: '1 / -1' }}>
+                        {editingSelf ? t('pages.accounts.editModal.selfRoleNotice') : t('pages.accounts.editModal.roleHint')}
+                    </div>
                     {editUserError && <div className="error-banner" style={{ gridColumn: '1 / -1' }}>{editUserError}</div>}
 
                     <div className="actions-row actions-row-end actions-row-wrap" style={{ gridColumn: '1 / -1' }}>

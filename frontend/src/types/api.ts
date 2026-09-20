@@ -23,6 +23,23 @@ export interface User {
     impersonated_by?: User
 }
 
+/** One community an account belongs to (admin accounts list). */
+export interface AccountMembership {
+    zev: string
+    zev_name: string
+    /** The account is this community's owner. */
+    is_owner: boolean
+    /** The participant record linked to the account here, if any. */
+    participant: string | null
+}
+
+/** A user as the admin accounts list returns it: the account plus where it belongs and its second factors. */
+export interface AdminUser extends User {
+    is_active: boolean
+    memberships: AccountMembership[]
+    mfa_methods: Array<'totp' | 'passkey'>
+}
+
 export interface UserInput {
     username: string
     email: string

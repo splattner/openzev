@@ -20,6 +20,7 @@ import type {
   SocialAccount,
   SystemHealth,
   TotpEnrolment,
+  AdminUser,
   User,
   UserInput,
   VatRate,
@@ -187,8 +188,8 @@ export async function updateFeatureFlag(id: number, payload: FeatureFlagInput): 
   return data
 }
 
-export async function fetchUsers(): Promise<User[]> {
-  return fetchAllPages<User>('/auth/users/')
+export async function fetchUsers(): Promise<AdminUser[]> {
+  return fetchAllPages<AdminUser>('/auth/users/')
 }
 
 export async function impersonateParticipant(userId: number): Promise<ImpersonationResult> {

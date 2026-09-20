@@ -5,6 +5,8 @@ import {
     faDownload,
     faEllipsis,
     faEnvelope,
+    faLink,
+    faLinkSlash,
     faPen,
     faPlus,
     faTrash,
@@ -38,6 +40,12 @@ type ParticipantCardsSectionProps = {
     onCopyOnboardingLink: (participantId: string) => void
     onRevokeOnboardingLink: (participantId: string) => void
     onConfirmDelete: (participant: Participant, displayName: string) => void
+    /** Admin-only: attach an existing account, or detach the linked one. */
+    canLinkAccount: boolean
+    canUnlinkAccount: boolean
+    onLinkAccount: (participant: Participant, displayName: string) => void
+    onUnlinkAccount: (participant: Participant, displayName: string) => void
+    accountActionPending: boolean
     onboardingLinkPending: boolean
     deletePendingOrDialogLoading: boolean
     /** Participant id to highlight (deep link `?focus=`), if still visible. */
@@ -69,6 +77,11 @@ export function ParticipantCardsSection({
     onCopyOnboardingLink,
     onRevokeOnboardingLink,
     onConfirmDelete,
+    canLinkAccount,
+    canUnlinkAccount,
+    onLinkAccount,
+    onUnlinkAccount,
+    accountActionPending,
     onboardingLinkPending,
     deletePendingOrDialogLoading,
     focusParticipantId,
@@ -142,6 +155,26 @@ export function ParticipantCardsSection({
                     })
                 }
 
+                // The owner's own participant is never detached from their account.
+                if (participant.user == null && canLinkAccount) {
+                    menuItems.push({
+                        key: 'link-account',
+                        label: t('pages.accounts.linkExisting'),
+                        icon: <FontAwesomeIcon icon={faLink} fixedWidth />,
+                        disabled: accountActionPending,
+                        onClick: () => onLinkAccount(participant, displayName),
+                    })
+                }
+                if (participant.user != null && !ownerRow && canUnlinkAccount) {
+                    menuItems.push({
+                        key: 'unlink-account',
+                        label: t('pages.accounts.unlink'),
+                        icon: <FontAwesomeIcon icon={faLinkSlash} fixedWidth />,
+                        disabled: accountActionPending,
+                        onClick: () => onUnlinkAccount(participant, displayName),
+                    })
+                }
+
                 if (!ownerRow) {
                     menuItems.push({
                         key: 'delete',
@@ -202,6 +235,12 @@ export function ParticipantCardsSection({
                                     <div className="participant-card-label">{t('pages.participants.section.contact')}</div>
                                     <div>{participant.email || t('pages.participants.noEmailValue')}</div>
                                     <div className="muted">{participant.phone || t('pages.participants.noPhone')}</div>
+                                </div>
+                                <div className="participant-card-section">
+                                    <div className="participant-card-label">{t('pages.participants.section.account')}</div>
+                                    {participant.account_username
+                                        ? <div>{participant.account_username}</div>
+                                        : <div className="muted">{t('pages.participants.noAccountValue')}</div>}
                                 </div>
                                 <div className="participant-card-section">
                                     <div className="participant-card-label">{t('pages.participants.section.address')}</div>

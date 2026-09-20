@@ -2461,6 +2461,44 @@ input.recurrence-chip-input {
   align-items: end;
 }
 
+/* Communities an account belongs to (admin accounts list). Chips are buttons:
+   selecting one opens that community's Participants page. */
+.account-memberships {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.account-membership-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.18rem 0.6rem;
+  border: 1px solid var(--border-default);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-body);
+  font: inherit;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.account-membership-chip:hover {
+  background: var(--brand-pale);
+  border-color: var(--brand-mid);
+}
+
+.account-membership-kind {
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
 .participant-card-list {
   display: grid;
   gap: 1rem;

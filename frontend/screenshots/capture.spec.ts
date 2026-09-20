@@ -352,7 +352,7 @@ test.describe('User Guide Screenshots', () => {
 
   // 11 — Admin Accounts
   test('11-admin-accounts', async ({ page }) => {
-    await navigateTo(page, '/admin/accounts')
+    await navigateTo(page, '/admin/accounts/users')
     await page.waitForSelector('table, .card', { timeout: 10_000 })
     await screenshotFull(page, '11-admin-accounts')
   })

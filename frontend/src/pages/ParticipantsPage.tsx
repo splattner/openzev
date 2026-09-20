@@ -9,6 +9,7 @@ import {
     type ParticipantOnboardingNoticeData,
 } from '../features/participants/ParticipantOnboardingNotice'
 import { ParticipantFormModal } from '../features/participants/ParticipantFormModal'
+import { useParticipantAccountLinking } from '../features/participants/useParticipantAccountLinking'
 import { ParticipantsMap } from '../features/participants/ParticipantsMap'
 import { ParticipantToolbar, type ParticipantReadinessFilter } from '../features/participants/ParticipantToolbar'
 import {
@@ -54,6 +55,7 @@ export function ParticipantsPage() {
     const focusField = searchParams.get('field')
     const [highlightedId, setHighlightedId] = useState<string | null>(null)
     const isManagedScope = user?.role === 'admin' || user?.role === 'zev_owner'
+    const accountLinking = useParticipantAccountLinking({ isAdmin: user?.role === 'admin', confirm })
     const { data, isLoading, isError } = useQuery({
         queryKey: queryKeys.zev.participants(selectedZevId || undefined),
         queryFn: fetchParticipants,
@@ -381,10 +383,18 @@ export function ParticipantsPage() {
                 onCopyOnboardingLink={(participantId) => copyLinkMutation.mutate(participantId)}
                 onRevokeOnboardingLink={(participantId) => revokeLinkMutation.mutate(participantId)}
                 onConfirmDelete={confirmDeleteParticipant}
+                canLinkAccount={accountLinking.canLink}
+                canUnlinkAccount={accountLinking.canUnlink}
+                onLinkAccount={accountLinking.openLink}
+                onUnlinkAccount={(participant, name) =>
+                    accountLinking.confirmUnlink(participant, name, participant.account_username ?? '')}
+                accountActionPending={accountLinking.pending || dialogLoading}
                 onboardingLinkPending={onboardingLinkPending}
                 deletePendingOrDialogLoading={deleteMutation.isPending || dialogLoading}
                 focusParticipantId={highlightedId}
             />
+
+            {accountLinking.linkModal}
 
             {dialog && (
                 <ConfirmDialog
