@@ -397,11 +397,24 @@ test.describe('User Guide Screenshots', () => {
     await screenshotFull(page, '15-admin-zevs')
   })
 
-  // 16 — Account Profile
+  // 16 — Account: one capture per tab (the tab lives in ?tab=)
   test('16-account-profile', async ({ page }) => {
-    await navigateTo(page, '/account')
-    await page.waitForSelector('form, .card', { timeout: 10_000 })
+    await navigateTo(page, '/account?tab=profile')
+    // Panels stay mounted (hidden), so wait for a *visible* card, not the first.
+    await page.locator('.card:visible').first().waitFor({ timeout: 10_000 })
     await screenshotFull(page, '16-account-profile')
+  })
+
+  test('16b-account-security', async ({ page }) => {
+    await navigateTo(page, '/account?tab=security')
+    await page.locator('.card:visible').first().waitFor({ timeout: 10_000 })
+    await screenshotFull(page, '16b-account-security')
+  })
+
+  test('16c-account-api-keys', async ({ page }) => {
+    await navigateTo(page, '/account?tab=api-keys')
+    await page.locator('.card:visible').first().waitFor({ timeout: 10_000 })
+    await screenshotFull(page, '16c-account-api-keys')
   })
 
   // 17 — Admin Invoices

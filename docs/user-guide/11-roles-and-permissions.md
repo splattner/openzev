@@ -259,6 +259,8 @@ Audit log**) and to **ZEV owners** for their own communities (scoped events,
 Every user can protect their account with a **passkey**, an **authenticator app**, or both. Set them
 up under **My Account → Security → Two-Factor Authentication**.
 
+![Account security tab](screenshots/16b-account-security.png)
+
 ### Passkeys (no password needed)
 
 A passkey lets you sign in with your fingerprint, face or device PIN — no password. It is

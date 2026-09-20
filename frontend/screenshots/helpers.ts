@@ -171,7 +171,9 @@ export async function resetHover(page: Page) {
  * its fixed point c(h) = h instead of creeping toward it.
  */
 export async function screenshotFull(page: Page, dir: string, name: string) {
-  await expect(page.locator('.skeleton-block')).toHaveCount(0, { timeout: 30_000 })
+  // Visible ones only: a hidden, kept-mounted tab panel (the account page) may
+  // hold placeholders for content that only loads once its tab is shown.
+  await expect(page.locator('.skeleton-block:visible')).toHaveCount(0, { timeout: 30_000 })
   await resetHover(page)
   const measure = () => page.evaluate(() => document.documentElement.scrollHeight)
   const resize = async (height: number) => {
@@ -207,7 +209,9 @@ export async function screenshotFull(page: Page, dir: string, name: string) {
 
 /** Take a viewport-only screenshot (no scroll) — for viewport-scoped UI like modals. */
 export async function screenshotViewport(page: Page, dir: string, name: string) {
-  await expect(page.locator('.skeleton-block')).toHaveCount(0, { timeout: 30_000 })
+  // Visible ones only: a hidden, kept-mounted tab panel (the account page) may
+  // hold placeholders for content that only loads once its tab is shown.
+  await expect(page.locator('.skeleton-block:visible')).toHaveCount(0, { timeout: 30_000 })
   await resetHover(page)
   await page.screenshot({
     path: path.join(dir, `${name}.png`),

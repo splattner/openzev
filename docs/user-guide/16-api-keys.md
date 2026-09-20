@@ -12,6 +12,8 @@ up in the audit log under its own name.
 
 ## Creating a key
 
+![Account API keys tab](screenshots/16c-account-api-keys.png)
+
 1. Open **Account → API keys**.
 2. Choose **New API key**.
 3. Give it a name describing what will use it — `nightly consumption export`
