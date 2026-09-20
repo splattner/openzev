@@ -5,12 +5,19 @@ export type AccountFilters = {
     role: UserRole | 'all'
     /** Community id, or 'all'. */
     zevId: string
+    /** 'all', or accounts the MFA policy names that have not enrolled yet (grace or overdue). */
+    mfaCompliance: 'all' | 'needsTwoFactor'
 }
 
-export const DEFAULT_ACCOUNT_FILTERS: AccountFilters = { search: '', role: 'all', zevId: 'all' }
+export const DEFAULT_ACCOUNT_FILTERS: AccountFilters = { search: '', role: 'all', zevId: 'all', mfaCompliance: 'all' }
+
+/** Whether the policy names this account and it has not enrolled yet. */
+export function needsTwoFactor(account: Pick<AdminUser, 'mfa_compliance'>): boolean {
+    return account.mfa_compliance?.status === 'grace' || account.mfa_compliance?.status === 'overdue'
+}
 
 export function hasActiveFilters(filters: AccountFilters): boolean {
-    return filters.search.trim() !== '' || filters.role !== 'all' || filters.zevId !== 'all'
+    return filters.search.trim() !== '' || filters.role !== 'all' || filters.zevId !== 'all' || filters.mfaCompliance !== 'all'
 }
 
 export function accountDisplayName(account: Pick<AdminUser, 'first_name' | 'last_name' | 'username'>): string {
@@ -29,6 +36,7 @@ export function filterAccounts(accounts: AdminUser[], filters: AccountFilters): 
     return accounts
         .filter((account) => filters.role === 'all' || account.role === filters.role)
         .filter((account) => filters.zevId === 'all' || account.memberships.some((m) => m.zev === filters.zevId))
+        .filter((account) => filters.mfaCompliance === 'all' || needsTwoFactor(account))
         .filter((account) => {
             if (!needle) return true
             return [accountDisplayName(account), account.username, account.email].some((value) =>
@@ -66,5 +74,6 @@ export function accountStats(accounts: AdminUser[]) {
         withTwoFactor: accounts.filter((account) => account.mfa_methods.length > 0).length,
         // Guests are accounts not yet tied to a participant: the ones waiting to be linked.
         guests: accounts.filter((account) => account.role === 'guest').length,
+        needsTwoFactor: accounts.filter(needsTwoFactor).length,
     }
 }

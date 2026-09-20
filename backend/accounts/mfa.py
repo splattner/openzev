@@ -117,12 +117,18 @@ def challenge_methods(user: User) -> list[str]:
     return ["totp", "recovery_code"] if has_totp(user) else ["recovery_code"]
 
 
-def policy_applies(user: User) -> bool:
-    """Whether ``AppSettings.mfa_required_roles`` names this user's role."""
-    return user.role in AppSettings.load().mfa_required_roles
+def policy_applies(user: User, *, app_settings: AppSettings | None = None) -> bool:
+    """Whether ``AppSettings.mfa_required_roles`` names this user's role.
+
+    ``app_settings`` lets a caller that already loaded the singleton (the admin
+    accounts list, computing this for every row) pass it in rather than
+    triggering one query per user.
+    """
+    app_settings = app_settings or AppSettings.load()
+    return user.role in app_settings.mfa_required_roles
 
 
-def grace_deadline(user: User):
+def grace_deadline(user: User, *, app_settings: AppSettings | None = None):
     """When enrolment stops being optional for ``user``, or ``None`` if no
     policy applies to them.
 
@@ -130,11 +136,31 @@ def grace_deadline(user: User):
     so switching the requirement on never locks out an account that already
     existed — the failure mode this deadline exists to prevent.
     """
-    app_settings = AppSettings.load()
+    app_settings = app_settings or AppSettings.load()
     if user.role not in app_settings.mfa_required_roles:
         return None
     since = max(t for t in (user.date_joined, app_settings.mfa_policy_changed_at) if t is not None)
     return since + timedelta(days=app_settings.mfa_grace_period_days)
+
+
+def compliance_status(user: User, *, app_settings: AppSettings, has_factor: bool) -> dict | None:
+    """Where ``user`` stands against the MFA policy, for the admin accounts
+    list — ``None`` when the policy does not name their role.
+
+    ``has_factor`` is passed in rather than recomputed with ``has_any_factor``:
+    the caller (``AdminUserSerializer``) already has it from prefetched
+    relations, and this function must not query.
+    """
+    deadline = grace_deadline(user, app_settings=app_settings)
+    if deadline is None:
+        return None
+    if has_factor:
+        compliance = "compliant"
+    elif timezone.now() < deadline:
+        compliance = "grace"
+    else:
+        compliance = "overdue"
+    return {"status": compliance, "deadline": deadline.isoformat()}
 
 
 def removal_blocked(user: User, *, leaving: int) -> bool:

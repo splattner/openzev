@@ -1,3 +1,6 @@
+import secrets
+import string
+
 from django.contrib.auth.password_validation import validate_password
 from django.contrib.auth import get_user_model
 from django.conf import settings
@@ -6,6 +9,7 @@ from django.utils.text import slugify
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from urllib.parse import urlparse
+from . import mfa
 from .jwt_utils import add_custom_claims
 from .models import ApiKey, AppSettings, FeatureFlag, OAuthProvider, SocialAccount, TotpDevice, User, UserRole, VatRate, WebAuthnCredential
 from zev.models import Zev
@@ -34,6 +38,21 @@ class UserSerializer(serializers.ModelSerializer):
         if not request.user.is_admin and value != self.instance.role:
             raise serializers.ValidationError("Only admins can change user roles.")
 
+        return value
+
+    def validate_is_active(self, value):
+        """An admin cannot deactivate their own account.
+
+        Deactivating revokes every session (``UserDetailView.perform_update``),
+        so doing it to yourself through the admin console would sign you out
+        mid-edit with no way back in except another administrator. There is
+        no equivalent "last active admin" case beyond this one: reaching zero
+        active admins any other way requires an *inactive* admin to act, which
+        cannot happen.
+        """
+        request = self.context.get("request")
+        if request and self.instance and not value and request.user.pk == self.instance.pk:
+            raise serializers.ValidationError("You cannot deactivate your own account.")
         return value
 
     def validate_preferred_zev(self, value):
@@ -114,6 +133,7 @@ class AdminUserSerializer(UserSerializer):
 
     memberships = serializers.SerializerMethodField()
     mfa_methods = serializers.SerializerMethodField()
+    mfa_compliance = serializers.SerializerMethodField()
 
     def get_memberships(self, user):
         """One entry per community the account is tied to.
@@ -146,25 +166,74 @@ class AdminUserSerializer(UserSerializer):
             methods.append("passkey")
         return methods
 
+    def get_mfa_compliance(self, user):
+        """Where this account stands against ``AppSettings.mfa_required_roles``,
+        or ``None`` when the policy does not name its role.
+
+        ``AppSettings`` is loaded once per request (cached on ``self``, the one
+        child serializer instance a ``many=True`` list reuses for every row —
+        see ``test_query_count_does_not_grow_with_the_number_of_accounts``), not
+        once per account.
+        """
+        if not hasattr(self, "_app_settings"):
+            self._app_settings = AppSettings.load()
+        return mfa.compliance_status(user, app_settings=self._app_settings, has_factor=bool(self.get_mfa_methods(user)))
+
     class Meta(UserSerializer.Meta):
-        fields = UserSerializer.Meta.fields + ["memberships", "mfa_methods"]
+        fields = UserSerializer.Meta.fields + ["memberships", "mfa_methods", "mfa_compliance"]
+
+
+def generate_temporary_password(length: int = 16) -> str:
+    """A random password for an account created on someone else's behalf.
+
+    Never chosen by the admin and never reused — the account must set its own
+    at first sign-in (``must_change_password``), the same escape hatch
+    ``zev.services.create_zev_with_owner_setup`` uses for a self-setup owner.
+    """
+    alphabet = string.ascii_letters + string.digits
+    return "".join(secrets.choice(alphabet) for _ in range(length))
 
 
 class UserCreateSerializer(serializers.ModelSerializer):
-    password = serializers.CharField(write_only=True, validators=[validate_password])
-    password2 = serializers.CharField(write_only=True)
+    """Admin: create an account (``POST /auth/users/``).
+
+    ``password``/``password2`` are optional. The admin console's "New account"
+    action never sends one: leaving both out makes ``create()`` generate a
+    random temporary password, returned exactly once in the response
+    (``UserListCreateView.create`` reads ``generated_password`` off this
+    serializer) — mirroring how a passkey's recovery codes or a fresh API key
+    are shown once and never stored in the clear. A caller that does supply a
+    password (existing API consumers) keeps working unchanged. Either way the
+    account is created with ``must_change_password=True``: nobody but the
+    account holder should keep a password an admin picked or generated.
+    """
+
+    password = serializers.CharField(write_only=True, required=False, allow_blank=False)
+    password2 = serializers.CharField(write_only=True, required=False, allow_blank=False)
 
     class Meta:
         model = User
-        fields = ["username", "email", "first_name", "last_name", "password", "password2", "role"]
+        fields = ["id", "username", "email", "first_name", "last_name", "password", "password2", "role"]
 
     def validate(self, attrs):
-        if attrs["password"] != attrs.pop("password2"):
-            raise serializers.ValidationError({"password": "Passwords do not match."})
+        password = attrs.pop("password", None)
+        password2 = attrs.pop("password2", None)
+        if password or password2:
+            if password != password2:
+                raise serializers.ValidationError({"password": ["Passwords do not match."]})
+            try:
+                validate_password(password)
+            except DjangoValidationError as exc:
+                raise serializers.ValidationError({"password": exc.messages}) from None
+            self.generated_password = None
+        else:
+            password = generate_temporary_password()
+            self.generated_password = password
+        attrs["password"] = password
         return attrs
 
     def create(self, validated_data):
-        return User.objects.create_user(**validated_data)
+        return User.objects.create_user(must_change_password=True, **validated_data)
 
 
 class ChangePasswordSerializer(serializers.Serializer):

@@ -672,13 +672,23 @@ request per row:
   owners of several communities routinely have several entries.
 - `mfa_methods` — `"totp"` (a *confirmed* authenticator device; an abandoned
   enrolment does not count) and/or `"passkey"`, in that order.
+- `mfa_compliance` — where the account stands against
+  `AppSettings.mfa_required_roles`, or `null` when the policy does not name its
+  role: `{ status: "compliant" | "grace" | "overdue", deadline }` (`deadline`
+  ISO datetime, from `mfa.grace_deadline`). `"compliant"` once the account holds
+  any factor, regardless of the deadline; otherwise `"grace"` before the
+  deadline and `"overdue"` after it. Computed by `mfa.compliance_status(user,
+  app_settings=..., has_factor=...)`, called with the `AppSettings` singleton
+  loaded once per request (cached on the one child serializer instance a
+  `many=True` list reuses for every row) rather than once per account — see
+  the query-count test.
 
-Both are derived from prefetched relations (`select_related("totp_device")`,
-`prefetch_related` on `owned_zevs`, `participations__zev`,
-`webauthn_credentials`), so the list costs a fixed number of queries whatever the
-number of accounts (pinned by a query-count test). `/auth/me/`, impersonation
-responses and the detail view keep the plain `UserSerializer` and do not carry
-these fields.
+Both `memberships` and `mfa_methods` are derived from prefetched relations
+(`select_related("totp_device")`, `prefetch_related` on `owned_zevs`,
+`participations__zev`, `webauthn_credentials`), so the list costs a fixed
+number of queries whatever the number of accounts (pinned by a query-count
+test). `/auth/me/`, impersonation responses and the detail view keep the plain
+`UserSerializer` and do not carry these fields.
 
 `last_login` is deliberately **not** exposed: the JWT login paths (password,
 MFA, passkey, magic link, onboarding, OAuth) do not maintain it, so it would
@@ -688,9 +698,20 @@ report "never" for accounts that sign in every day.
 
 **Endpoint:** `POST /api/v1/auth/users/` (IsAdmin)
 
-**Payload:** `{ username, email, first_name, last_name, password, password2, role }`
+**Payload:** `{ username, email, first_name, last_name, role, password?, password2? }`
 
-Admin only. Passwords must match. Created via `User.objects.create_user()`.
+Admin only. `password`/`password2` are **optional**. The admin console's "New
+account" action sends neither: `UserCreateSerializer.validate()` then generates
+a random 16-character password (`generate_temporary_password`) and stashes it
+on `self.generated_password` for the view to read — never persisted anywhere
+but the hashed column. `UserListCreateView.create()` overrides the default
+`CreateModelMixin` behaviour to add `generated_password` to the response body
+when one was generated (never present when the caller supplied their own).
+Either way `password2` must match `password` (`400` otherwise) and the account
+is created with **`must_change_password=True`**: nobody but the account holder
+should keep a password an admin picked or generated. A supplied password still
+runs through Django's validators; a generated one does not (nothing for a
+human to judge as weak) but is long enough to pass them on the next change.
 
 ### 6.3 User detail
 
@@ -699,6 +720,13 @@ Admin only. Passwords must match. Created via `User.objects.create_user()`.
 - PATCH: `UserSerializer` partial update. Role-change safety:
   - Admin cannot change own role away from admin.
   - Non-admin cannot change any role.
+  - **Deactivation safety** (`validate_is_active`): an admin cannot set
+    `is_active: false` on their **own** account (`400`) — deactivating already
+    revokes every session (`UserDetailView.perform_update`, §5.6b), so doing it
+    to yourself would sign you out mid-edit with no way back in except another
+    administrator. There is no separate "last active admin" guard: the only way
+    to reach zero active admins through `is_active` is exactly this case (a
+    non-self deactivation always leaves the acting admin active).
 - DELETE: two guards:
   1. **Last-admin guard** — blocked if the target `is_admin` and no other
      user with `role=admin` exists (→ 403 "Cannot delete the last admin
@@ -723,26 +751,43 @@ the account's role everywhere.
 
 - **Columns:** *Account* (display name, platform-role badge, `Inactive` badge
   when `is_active` is false, `username · email`), *Communities*
-  (`AccountMemberships`), *Security* (a badge per `mfa_methods` entry, or
-  "No two-factor"), *Actions*.
+  (`AccountMemberships`), *Security* (a badge per `mfa_methods` entry or "No
+  two-factor", plus `AccountMfaComplianceBadge` when `mfa_compliance` is
+  non-null and not `"compliant"`: "2FA required · due `<date>`" for `"grace"`,
+  "2FA overdue" for `"overdue"`), *Actions*.
 - **Membership chips** read `Owner|Participant · <community>`. Selecting one
   calls `setSelectedZevId(zev)` (the shell's community switcher — which also
   saves the admin's `preferred_zev`, as any switch does) and opens
   `/participants?focus=<participant>` (`/participants` when the account is an
   owner with no participant record). Memberships are edited there, not here.
 - **Stats:** accounts, accounts with two-factor, guest accounts (the ones
-  waiting to be linked).
+  waiting to be linked), accounts the MFA policy names that have not enrolled
+  yet (`accountList.needsTwoFactor`: `"grace"` or `"overdue"`).
 - **Filters** (`accountList.filterAccounts`, client-side): search over display
-  name, username and email; platform role; community. The community filter
-  matches *any* membership, owner or participant.
+  name, username and email; platform role; community; two-factor (all accounts,
+  or only those `needsTwoFactor`). The community filter matches *any*
+  membership, owner or participant.
+- **New account** (`AccountCreatedNotice` in
+  `frontend/src/features/accounts/`): a platform account not tied to any
+  community — a second admin, an API-only service account, or any account an
+  operator wants to set up ahead of use. The form asks for username, email,
+  names and platform role only; there is no password field — `createUser`
+  never sends one, so the server always generates it (§6.2). The response's
+  `generated_password` (when present) is shown once in a dismissible notice
+  with a copy button and is never requested from the server again.
 - **Actions:** *Edit* (username, email, names, **platform role** — labelled as
   such, with a hint that it applies in every community); menu: *Impersonate*
   (participant and owner accounts only — `canImpersonateAccount`), *Reset
-  two-factor*, *Delete*. *Delete* is disabled while the account belongs to any
-  community (`canDeleteAccount`, mirroring the server's guard) and is not
-  offered for the admin's own row.
-- **Removed from this page:** *Link existing*, *Create account*, *Unlink* and the
-  participants-without-account rows — see §6.5.
+  two-factor*, *Sign out everywhere*, *Deactivate*/*Activate* (toggles
+  `is_active`; not offered on the admin's own row — the server refuses
+  deactivating yourself, §6.3), *Delete*. *Delete* is disabled while the
+  account belongs to any community (`canDeleteAccount`, mirroring the server's
+  guard) and is not offered for the admin's own row.
+- **Removed from this page:** the participant-linking *Link existing*/*Create
+  account*/*Unlink* actions and the participants-without-account rows — see
+  §6.5. ("Create account" there created an account *for a specific
+  participant*; "New account" above is unrelated — a platform account with no
+  participant attached.)
 
 ### 6.5 Account linking on the Participants page (frontend)
 
@@ -1355,7 +1400,8 @@ lists the test classes per module (test counts are the `test_*` methods).
 |---|---|---|---|
 | `test_session_hardening.py` | 5 | 44 | Self-service profile lockdown (protected fields rejected, repeats accepted, names/preferred community still editable); session revocation (revoked/new/legacy tokens, refresh refusal, deactivation, stale-instance save cannot revive, API keys and impersonation); password change and revoke endpoints; verified email change (request/confirm, single-use, dies on password/address/deactivation/expiry, no enumeration, throttle, mail failure, API keys) |
 | `test_security_notifications.py` | 6 | 26 | Every event composes (subject, body, `{detail}` filled, admin vs. self advice, no-turn-off line); guards (no address, inactive, gone/deactivated by send time); hooked into passkey add/remove, TOTP enable/disable (not for an abandoned enrolment), recovery-code regeneration, password change (not on failure), admin MFA reset (not when nothing was removed) and admin session revocation (not for the self-service one); a broker or mail failure never fails the triggering request |
-| `test_admin_users_list.py` | 1 | 7 | Admin user list: memberships per relationship (participant, owner-who-is-also-participant merged into one, owner of several communities sorted by name), confirmed-only `mfa_methods`, fixed query count, `/auth/me/` unaffected |
+| `test_admin_users_list.py` | 2 | 12 | Admin user list: memberships per relationship (participant, owner-who-is-also-participant merged into one, owner of several communities sorted by name), confirmed-only `mfa_methods`, fixed query count, `/auth/me/` unaffected; `mfa_compliance` (`null` outside the policy, `"grace"` before the deadline, `"overdue"` after it, `"compliant"` once enrolled regardless of the deadline, no added query per account) |
+| `test_admin_account_actions.py` | 2 | 12 | Account creation (generated password when omitted, returned once and never re-listed, two accounts get different passwords, a supplied password is still accepted, mismatched/weak supplied passwords rejected, generated password passes the validators anyway, response carries the new id, non-admin blocked); self-deactivation guard (blocked with a field error, deactivating someone else works and is audited, reactivating your own account is unaffected, deactivating someone else still revokes their sessions) |
 | `test_api_keys.py` | 10 | 81 | Generation, hashing, auth, read-only keys, scope deny-list, audit, throttling, CRUD, admin management |
 | `test_oauth.py` | 12 | 55 | Provider listing, initiate, callback guards/redirects, link flow, social accounts, audit, `require_mfa_claim` (`OAuthMfaClaimTests`) |
 | `test_passkeys.py` | 9 | 62 | Passkey registration and passwordless sign-in against a software authenticator, MFA policy and grace arithmetic, removal guard, admin reset, RP-ID system check |

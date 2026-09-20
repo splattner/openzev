@@ -1,12 +1,16 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faCheck, faEllipsis, faPen, faRightFromBracket, faShieldHalved, faTrash, faUser, faXmark } from '@fortawesome/free-solid-svg-icons'
+import {
+    faBan, faCheck, faCirclePlus, faEllipsis, faPen, faPlay, faRightFromBracket, faShieldHalved, faTrash, faUser, faXmark,
+} from '@fortawesome/free-solid-svg-icons'
 import { useMemo, useState, type FormEvent } from 'react'
 import { ActionMenu } from '../components/ActionMenu'
 import { ConfirmDialog, useConfirmDialog } from '../components/ConfirmDialog'
 import { StatCard } from '../components/StatCard'
 import { FormModal } from '../components/FormModal'
+import { AccountCreatedNotice, type AccountCreatedNoticeData } from '../features/accounts/AccountCreatedNotice'
 import { AccountMemberships } from '../features/accounts/AccountMemberships'
+import { AccountMfaComplianceBadge } from '../features/accounts/AccountMfaComplianceBadge'
 import {
     DEFAULT_ACCOUNT_FILTERS,
     accountDisplayName,
@@ -18,13 +22,13 @@ import {
     type AccountFilters,
 } from '../features/accounts/accountList'
 import { fetchZevs } from '../lib/api/zev'
-import { deleteUser, fetchUsers, resetUserMfa, revokeUserSessions, updateUser } from '../lib/api/auth'
+import { createUser, deleteUser, fetchUsers, resetUserMfa, revokeUserSessions, updateUser } from '../lib/api/auth'
 import { formatApiError } from '../lib/api/errors'
 import { queryKeys } from '../lib/api/queryKeys'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '../lib/auth'
 import { useToast } from '../lib/toast'
-import type { AdminUser, UserInput, UserRole } from '../types/api'
+import type { AdminUser, CreateUserInput, UserInput, UserRole } from '../types/api'
 
 const defaultEditUserForm: UserInput = {
     username: '',
@@ -33,6 +37,14 @@ const defaultEditUserForm: UserInput = {
     last_name: '',
     role: 'participant',
     must_change_password: false,
+}
+
+const defaultCreateUserForm: CreateUserInput = {
+    username: '',
+    email: '',
+    first_name: '',
+    last_name: '',
+    role: 'participant',
 }
 
 const ROLES: UserRole[] = ['admin', 'zev_owner', 'participant', 'guest']
@@ -62,6 +74,24 @@ export function AdminAccountsPage({ embedded = false }: { embedded?: boolean }) 
     const [editingUserId, setEditingUserId] = useState<number | null>(null)
     const [editUserForm, setEditUserForm] = useState<UserInput>(defaultEditUserForm)
     const [editUserError, setEditUserError] = useState<string | null>(null)
+
+    const [showCreateUserModal, setShowCreateUserModal] = useState(false)
+    const [createUserForm, setCreateUserForm] = useState<CreateUserInput>(defaultCreateUserForm)
+    const [createUserError, setCreateUserError] = useState<string | null>(null)
+    const [createdNotice, setCreatedNotice] = useState<AccountCreatedNoticeData | null>(null)
+
+    const createUserMutation = useMutation({
+        mutationFn: (payload: CreateUserInput) => createUser(payload),
+        onSuccess: (created) => {
+            setShowCreateUserModal(false)
+            setCreateUserForm(defaultCreateUserForm)
+            setCreateUserError(null)
+            setCreatedNotice({ username: created.username, password: created.generated_password })
+            pushToast(t('pages.accounts.feedback.createSuccess'), 'success')
+            void queryClient.invalidateQueries({ queryKey: queryKeys.auth.users() })
+        },
+        onError: (error) => setCreateUserError(formatApiError(error, t('pages.accounts.feedback.createFailed'))),
+    })
 
     const updateUserMutation = useMutation({
         mutationFn: ({ userId, payload }: { userId: number; payload: Partial<UserInput> }) => updateUser(userId, payload),
@@ -161,6 +191,24 @@ export function AdminAccountsPage({ embedded = false }: { embedded?: boolean }) 
         })
     }
 
+    function confirmSetActive(account: AdminUser, active: boolean) {
+        if (active) {
+            // Reactivating is reversible and expected — no confirmation needed.
+            updateUserMutation.mutate({ userId: account.id, payload: { is_active: true } })
+            return
+        }
+        confirm({
+            title: t('pages.accounts.deactivateTitle'),
+            message: t('pages.accounts.deactivateMessage', { username: account.username }),
+            confirmText: t('pages.accounts.deactivateConfirm'),
+            cancelText: t('common.cancel'),
+            isDangerous: true,
+            onConfirm: async () => {
+                await updateUserMutation.mutateAsync({ userId: account.id, payload: { is_active: false } })
+            },
+        })
+    }
+
     function confirmDelete(account: AdminUser) {
         confirm({
             title: t('pages.accounts.deleteTitle'),
@@ -186,6 +234,11 @@ export function AdminAccountsPage({ embedded = false }: { embedded?: boolean }) 
         })
         setEditUserError(null)
         setShowEditUserModal(true)
+    }
+
+    function submitCreateUser(event: FormEvent<HTMLFormElement>) {
+        event.preventDefault()
+        createUserMutation.mutate(createUserForm)
     }
 
     function submitEditUser(event: FormEvent<HTMLFormElement>) {
@@ -218,10 +271,22 @@ export function AdminAccountsPage({ embedded = false }: { embedded?: boolean }) 
             </header>
             )}
 
+            <div className="actions-row actions-row-end">
+                <button className="button button-primary" type="button" onClick={() => setShowCreateUserModal(true)}>
+                    <FontAwesomeIcon icon={faCirclePlus} fixedWidth />
+                    {t('pages.accounts.createModal.openButton')}
+                </button>
+            </div>
+
+            {createdNotice && (
+                <AccountCreatedNotice notice={createdNotice} onDismiss={() => setCreatedNotice(null)} />
+            )}
+
             <section style={{ display: 'grid', gap: '1rem', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
                 <StatCard label={t('pages.accounts.stats.total')} value={stats.total} />
                 <StatCard label={t('pages.accounts.stats.withTwoFactor')} value={stats.withTwoFactor} />
                 <StatCard label={t('pages.accounts.stats.guests')} value={stats.guests} />
+                <StatCard label={t('pages.accounts.stats.needsTwoFactor')} value={stats.needsTwoFactor} />
             </section>
 
             <section className="card">
@@ -256,6 +321,16 @@ export function AdminAccountsPage({ embedded = false }: { embedded?: boolean }) 
                             {zevs.map((zev) => (
                                 <option key={zev.id} value={zev.id}>{zev.name}</option>
                             ))}
+                        </select>
+                    </label>
+                    <label>
+                        <span>{t('pages.accounts.filters.twoFactor')}</span>
+                        <select
+                            value={filters.mfaCompliance}
+                            onChange={(event) => setFilters((previous) => ({ ...previous, mfaCompliance: event.target.value as AccountFilters['mfaCompliance'] }))}
+                        >
+                            <option value="all">{t('pages.accounts.filters.twoFactorAll')}</option>
+                            <option value="needsTwoFactor">{t('pages.accounts.filters.twoFactorNeeded')}</option>
                         </select>
                     </label>
                 </div>
@@ -302,6 +377,17 @@ export function AdminAccountsPage({ embedded = false }: { embedded?: boolean }) 
                                         disabled: revokeSessionsMutation.isPending || dialogLoading,
                                         onClick: () => confirmSignOut(account),
                                     }]),
+                                // Deactivating yourself would sign you out mid-edit (the
+                                // server refuses it too); the account page's own logout covers that case.
+                                ...(isSelf
+                                    ? []
+                                    : [{
+                                        key: 'toggle-active',
+                                        label: t(account.is_active ? 'pages.accounts.deactivate' : 'pages.accounts.activate'),
+                                        icon: <FontAwesomeIcon icon={account.is_active ? faBan : faPlay} fixedWidth />,
+                                        disabled: updateUserMutation.isPending || dialogLoading,
+                                        onClick: () => confirmSetActive(account, !account.is_active),
+                                    }]),
                                 {
                                     key: 'delete',
                                     label: t('common.delete'),
@@ -335,6 +421,7 @@ export function AdminAccountsPage({ embedded = false }: { embedded?: boolean }) 
                                             {account.mfa_methods.map((method) => (
                                                 <span key={method} className="badge badge-success">{t(`pages.accounts.mfa.${method}`)}</span>
                                             ))}
+                                            <AccountMfaComplianceBadge compliance={account.mfa_compliance} />
                                         </div>
                                     </td>
                                     <td className="actions-cell">
@@ -376,6 +463,55 @@ export function AdminAccountsPage({ embedded = false }: { embedded?: boolean }) 
                     </tbody>
                 </table>
             </div>
+
+            <FormModal isOpen={showCreateUserModal} title={t('pages.accounts.createModal.title')} onClose={() => setShowCreateUserModal(false)} maxWidth="600px">
+                <form onSubmit={submitCreateUser} className="form-grid">
+                    <label>
+                        <span>{t('pages.accounts.editModal.username')}</span>
+                        <input value={createUserForm.username} onChange={(event) => setCreateUserForm((previous) => ({ ...previous, username: event.target.value }))} required />
+                    </label>
+                    <label>
+                        <span>{t('pages.accounts.editModal.email')}</span>
+                        <input type="email" value={createUserForm.email} onChange={(event) => setCreateUserForm((previous) => ({ ...previous, email: event.target.value }))} required />
+                    </label>
+                    <label>
+                        <span>{t('pages.accounts.editModal.firstName')}</span>
+                        <input value={createUserForm.first_name} onChange={(event) => setCreateUserForm((previous) => ({ ...previous, first_name: event.target.value }))} required />
+                    </label>
+                    <label>
+                        <span>{t('pages.accounts.editModal.lastName')}</span>
+                        <input value={createUserForm.last_name} onChange={(event) => setCreateUserForm((previous) => ({ ...previous, last_name: event.target.value }))} required />
+                    </label>
+                    <label>
+                        <span>{t('pages.accounts.editModal.role')}</span>
+                        <select
+                            value={createUserForm.role}
+                            onChange={(event) => setCreateUserForm((previous) => ({ ...previous, role: event.target.value as UserRole }))}
+                        >
+                            <option value="participant">{t('pages.accounts.roles.participant')}</option>
+                            <option value="guest">{t('pages.accounts.roles.guest')}</option>
+                            <option value="zev_owner">{t('pages.accounts.roles.zev_owner')}</option>
+                            <option value="admin">{t('pages.accounts.roles.admin')}</option>
+                        </select>
+                    </label>
+
+                    <div className="muted" style={{ gridColumn: '1 / -1' }}>
+                        {t('pages.accounts.createModal.passwordHint')}
+                    </div>
+                    {createUserError && <div className="error-banner" style={{ gridColumn: '1 / -1' }}>{createUserError}</div>}
+
+                    <div className="actions-row actions-row-end actions-row-wrap" style={{ gridColumn: '1 / -1' }}>
+                        <button className="button button-secondary" type="button" onClick={() => setShowCreateUserModal(false)}>
+                            <FontAwesomeIcon icon={faXmark} fixedWidth />
+                            {t('common.cancel')}
+                        </button>
+                        <button className="button button-primary" type="submit" disabled={createUserMutation.isPending}>
+                            <FontAwesomeIcon icon={faCirclePlus} fixedWidth />
+                            {t('pages.accounts.createModal.submit')}
+                        </button>
+                    </div>
+                </form>
+            </FormModal>
 
             <FormModal isOpen={showEditUserModal} title={t('pages.accounts.editModal.title')} onClose={() => setShowEditUserModal(false)} maxWidth="760px">
                 <form onSubmit={submitEditUser} className="form-grid">

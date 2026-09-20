@@ -185,10 +185,13 @@ each:
   still has a single row. Click a chip to open that community's Participants
   page.
 - **Security** — which second factors the account has (authenticator app,
-  passkey), or *No two-factor*.
+  passkey), or *No two-factor*; plus, for an account the two-factor policy
+  names (see below), whether it is still within its grace period or overdue.
 
-Use **Search**, **Platform role** and **Community** to narrow the list — the
-community filter finds everyone who is an owner or participant there.
+Use **Search**, **Platform role**, **Community** and **Two-factor** to narrow
+the list — the community filter finds everyone who is an owner or participant
+there, and the two-factor filter narrows to accounts that still need to set it
+up.
 
 > **Platform role vs. community membership.** The platform role (Admin, ZEV
 > Owner, Participant, Guest) belongs to the *account* and applies in every
@@ -203,6 +206,20 @@ community filter finds everyone who is an owner or participant there.
 4. Click **Save account**
 
 Changes take effect immediately. You cannot change your own role.
+
+### Create a New Account
+
+Click **New account** on **Platform → Accounts → Users** for an account that is
+not tied to any community — a second administrator, a service account, or any
+account you want ready before it is needed. Enter a username, email, first and
+last name, and the platform role, then click **Create account**.
+
+There is no password field: OpenZEV generates one and shows it once, with a
+**Copy password** button — share it with the account holder however you
+normally would. They set their own password the first time they sign in.
+
+To create an account **for a specific participant**, use the community's
+Participants page instead — see below.
 
 ### Give a Participant an Account
 
@@ -229,6 +246,11 @@ Open **More** on an account row for:
   browser and device, so it has to sign in again. Use it when you suspect
   someone else has access. It is recorded in the audit log and is not offered
   on your own row (use **Sign out other devices** on your account page).
+- **Deactivate** — the account can no longer sign in, and every session it
+  holds ends immediately. Its data and history are kept, and you can
+  **Activate** it again later. Not offered on your own row: OpenZEV refuses to
+  let you deactivate yourself, since it would sign you out with no way back in
+  except another administrator.
 - **Delete** — only available for accounts that do not belong to a community.
   Unlink the account from its participant first; an owner's account cannot be
   deleted while it owns a community.
@@ -326,6 +348,11 @@ two-factor authentication and set a grace period in days. Users of those roles s
 account page and a set-up screen they can postpone until the grace period ends. The period counts from
 the later of the account's creation and the day you last changed the policy, so switching it on never
 locks anyone out immediately. A user whose role requires it cannot remove their last factor.
+
+To see who has not enrolled yet, go to **Platform → Accounts → Users**: an account the policy names
+gets a badge in the Security column — "2FA required · due `<date>`" during the grace period, "2FA
+overdue" once it has passed — and the **Two-factor** filter narrows the list to exactly those
+accounts. The "Needs two-factor" stat at the top of the page counts them.
 
 Note that the set-up screen is shown by the web interface; it does not restrict scripts that call the
 API with an existing session or API key.

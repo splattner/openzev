@@ -19,7 +19,7 @@ from rest_framework.test import APIClient
 from testing.helpers import authenticate, make_user
 from zev.models import Participant, Zev
 
-from .models import TotpDevice, UserRole, WebAuthnCredential
+from .models import AppSettings, TotpDevice, UserRole, WebAuthnCredential
 
 URL = "/api/v1/auth/users/"
 
@@ -36,6 +36,12 @@ class AdminUserListTests(TestCase):
         self.admin = make_user("ual_admin", UserRole.ADMIN)
         self.client = APIClient()
         authenticate(self.client, self.admin)
+        # Pre-create the settings singleton: mfa_compliance (added later in this
+        # module) calls AppSettings.load(), whose first-ever call does an extra
+        # INSERT — leaving that for the query-count test's first GET would make
+        # its two captures see a different number of queries for a reason that
+        # has nothing to do with the number of accounts.
+        AppSettings.load()
 
     def _rows(self):
         response = self.client.get(URL)
@@ -125,3 +131,80 @@ def _fernet_key():
     from cryptography.fernet import Fernet
 
     return Fernet.generate_key().decode()
+
+
+class MfaComplianceFieldTests(TestCase):
+    """`mfa_compliance` on the admin accounts list — spec §6.1a."""
+
+    def setUp(self):
+        self.admin = make_user("mc_admin", UserRole.ADMIN)
+        self.client = APIClient()
+        authenticate(self.client, self.admin)
+        AppSettings.load()
+
+    def _rows(self):
+        response = self.client.get(URL)
+        self.assertEqual(response.status_code, 200, response.content)
+        return {row["username"]: row for row in response.json()["results"]}
+
+    def _set_policy(self, **payload):
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        from .models import AppSettings
+
+        with override_settings(MFA_ENCRYPTION_KEYS=[_fernet_key()]):
+            response = self.client.patch("/api/v1/auth/app-settings/", payload, format="json")
+        self.assertEqual(response.status_code, 200, response.content)
+        if "changed_days_ago" in payload:
+            AppSettings.objects.update(
+                mfa_policy_changed_at=timezone.now() - timedelta(days=payload["changed_days_ago"])
+            )
+
+    def test_none_when_the_policy_does_not_name_the_role(self):
+        make_user("mc_free", UserRole.PARTICIPANT)
+        self.assertIsNone(self._rows()["mc_free"]["mfa_compliance"])
+
+    def test_grace_before_the_deadline(self):
+        self._set_policy(mfa_required_roles=["participant"], mfa_grace_period_days=30)
+        make_user("mc_grace", UserRole.PARTICIPANT)
+        entry = self._rows()["mc_grace"]["mfa_compliance"]
+        self.assertEqual(entry["status"], "grace")
+        self.assertIsNotNone(entry["deadline"])
+
+    def test_overdue_once_the_grace_period_has_passed(self):
+        self._set_policy(mfa_required_roles=["participant"], mfa_grace_period_days=1, changed_days_ago=400)
+        stale = make_user("mc_overdue", UserRole.PARTICIPANT)
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        type(stale).objects.filter(pk=stale.pk).update(date_joined=timezone.now() - timedelta(days=400))
+        self.assertEqual(self._rows()["mc_overdue"]["mfa_compliance"]["status"], "overdue")
+
+    def test_compliant_once_enrolled_regardless_of_the_deadline(self):
+        self._set_policy(mfa_required_roles=["participant"], mfa_grace_period_days=1, changed_days_ago=400)
+        enrolled = make_user("mc_compliant", UserRole.PARTICIPANT)
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        type(enrolled).objects.filter(pk=enrolled.pk).update(date_joined=timezone.now() - timedelta(days=400))
+        with override_settings(MFA_ENCRYPTION_KEYS=[_fernet_key()]):
+            device = TotpDevice(user=enrolled, confirmed_at=timezone.now())
+            device.set_secret(pyotp.random_base32())
+            device.save()
+        self.assertEqual(self._rows()["mc_compliant"]["mfa_compliance"]["status"], "compliant")
+
+    def test_field_does_not_add_a_query_per_account(self):
+        self._set_policy(mfa_required_roles=["participant"], mfa_grace_period_days=30)
+        for i in range(3):
+            make_user(f"mc_q_{i}", UserRole.PARTICIPANT)
+        with CaptureQueriesContext(connection) as small:
+            self.client.get(URL)
+        for i in range(10):
+            make_user(f"mc_q_more_{i}", UserRole.PARTICIPANT)
+        with CaptureQueriesContext(connection) as large:
+            self.client.get(URL)
+        self.assertEqual(len(small), len(large))

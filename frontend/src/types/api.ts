@@ -35,11 +35,33 @@ export interface AccountMembership {
     participant: string | null
 }
 
+/** Where an account stands against `AppSettings.mfa_required_roles`; `null` when the policy does not name its role. */
+export interface MfaCompliance {
+    status: 'compliant' | 'grace' | 'overdue'
+    /** ISO datetime: when enrolment stops being optional. */
+    deadline: string
+}
+
 /** A user as the admin accounts list returns it: the account plus where it belongs and its second factors. */
 export interface AdminUser extends User {
     is_active: boolean
     memberships: AccountMembership[]
     mfa_methods: Array<'totp' | 'passkey'>
+    mfa_compliance: MfaCompliance | null
+}
+
+/** Admin: create-account payload. No password field — the server always mints one for a console-created account. */
+export interface CreateUserInput {
+    username: string
+    email: string
+    first_name: string
+    last_name: string
+    role: UserRole
+}
+
+/** Admin: create-account response. `generated_password` is present only once, in this response. */
+export interface CreatedUser extends Pick<AdminUser, 'id' | 'username' | 'email' | 'first_name' | 'last_name' | 'role'> {
+    generated_password?: string
 }
 
 export interface UserInput {
@@ -49,6 +71,7 @@ export interface UserInput {
     last_name: string
     role: UserRole
     must_change_password?: boolean
+    is_active?: boolean
 }
 
 export type ShortDateFormat = 'dd.MM.yyyy' | 'dd/MM/yyyy' | 'MM/dd/yyyy' | 'yyyy-MM-dd'

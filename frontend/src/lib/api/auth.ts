@@ -21,6 +21,8 @@ import type {
   SystemHealth,
   TotpEnrolment,
   AdminUser,
+  CreatedUser,
+  CreateUserInput,
   User,
   UserInput,
   VatRate,
@@ -190,6 +192,12 @@ export async function updateFeatureFlag(id: number, payload: FeatureFlagInput): 
 
 export async function fetchUsers(): Promise<AdminUser[]> {
   return fetchAllPages<AdminUser>('/auth/users/')
+}
+
+/** Admin: create an account. The server always generates the password (never sent by the console) and forces a change at first sign-in. */
+export async function createUser(payload: CreateUserInput): Promise<CreatedUser> {
+  const { data } = await api.post<CreatedUser>('/auth/users/', payload)
+  return data
 }
 
 export async function impersonateParticipant(userId: number): Promise<ImpersonationResult> {

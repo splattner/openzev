@@ -530,6 +530,10 @@ naming the user and what will be removed. The row also shows which factors the a
 `AdminUserSerializer.mfa_methods`) — see `2026-03-community-and-access.md` §6.4.
 An admin reset also signs the account out of every session it holds (`revoke_sessions`, ADR 0022): whoever
 was inside may have been let in by the factors that were just removed.
+The row also shows, when the policy names its role, a compliance badge — "2FA required · due
+`<date>`" during the grace period, "2FA overdue" once it has passed — and there is a "Needs setup"
+filter for exactly those accounts (`AdminUserSerializer.mfa_compliance`, `mfa.compliance_status`) —
+see `2026-03-community-and-access.md` §6.1 and §6.4.
 
 ### TypeScript types
 

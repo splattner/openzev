@@ -7,8 +7,9 @@ import {
     filterAccounts,
     hasActiveFilters,
     linkableAccounts,
+    needsTwoFactor,
 } from '../src/features/accounts/accountList'
-import type { AccountMembership, AdminUser } from '../src/types/api'
+import type { AccountMembership, AdminUser, MfaCompliance } from '../src/types/api'
 
 const member = (zev: string, over: Partial<AccountMembership> = {}): AccountMembership => ({
     zev,
@@ -31,6 +32,7 @@ const account = (over: Partial<AdminUser> = {}): AdminUser => ({
     is_active: true,
     memberships: [],
     mfa_methods: [],
+    mfa_compliance: null,
     ...over,
 })
 
@@ -68,7 +70,7 @@ describe('filterAccounts', () => {
     })
 
     it('combines filters conjunctively', () => {
-        expect(filterAccounts(all, { search: 'o', role: 'zev_owner', zevId: 'a' }).map((a) => a.username)).toEqual(['ben'])
+        expect(filterAccounts(all, { search: 'o', role: 'zev_owner', zevId: 'a', mfaCompliance: 'all' }).map((a) => a.username)).toEqual(['ben'])
     })
 
     it('falls back to the username when an account has no name', () => {
@@ -124,12 +126,36 @@ describe('account action guards', () => {
 })
 
 describe('accountStats', () => {
-    it('counts accounts, two-factor accounts and guests', () => {
+    it('counts accounts, two-factor accounts, guests and accounts needing two-factor', () => {
         const stats = accountStats([
             account({ mfa_methods: ['totp'] }),
             account({ mfa_methods: ['passkey', 'totp'], role: 'guest' }),
             account({ role: 'guest' }),
+            account({ mfa_compliance: grace() }),
+            account({ mfa_compliance: overdue() }),
         ])
-        expect(stats).toEqual({ total: 3, withTwoFactor: 2, guests: 2 })
+        expect(stats).toEqual({ total: 5, withTwoFactor: 2, guests: 2, needsTwoFactor: 2 })
+    })
+})
+
+const grace = (): MfaCompliance => ({ status: 'grace', deadline: '2026-12-01T00:00:00Z' })
+const overdue = (): MfaCompliance => ({ status: 'overdue', deadline: '2026-01-01T00:00:00Z' })
+
+describe('needsTwoFactor', () => {
+    it('is true only for an account the policy names that has not enrolled', () => {
+        expect(needsTwoFactor(account({ mfa_compliance: null }))).toBe(false)
+        expect(needsTwoFactor(account({ mfa_compliance: { status: 'compliant', deadline: '2026-01-01T00:00:00Z' } }))).toBe(false)
+        expect(needsTwoFactor(account({ mfa_compliance: grace() }))).toBe(true)
+        expect(needsTwoFactor(account({ mfa_compliance: overdue() }))).toBe(true)
+    })
+})
+
+describe('filterAccounts (two-factor compliance)', () => {
+    it('the needsTwoFactor filter keeps only grace and overdue accounts', () => {
+        const ok = account({ username: 'ok', mfa_compliance: null })
+        const late = account({ username: 'late', mfa_compliance: overdue() })
+        const soon = account({ username: 'soon', mfa_compliance: grace() })
+        const result = filterAccounts([ok, late, soon], { ...DEFAULT_ACCOUNT_FILTERS, mfaCompliance: 'needsTwoFactor' })
+        expect(result.map((a) => a.username).sort()).toEqual(['late', 'soon'])
     })
 })

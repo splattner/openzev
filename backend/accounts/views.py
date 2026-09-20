@@ -285,6 +285,19 @@ class UserListCreateView(generics.ListCreateAPIView):
     def get_serializer_class(self):
         return UserCreateSerializer if self.request.method == "POST" else AdminUserSerializer
 
+    def create(self, request, *args, **kwargs):
+        # Not the default CreateModelMixin.create(): the response also needs
+        # generated_password, which lives on the serializer instance
+        # (UserCreateSerializer.validate), not in its declared output fields.
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        data = dict(serializer.data)
+        if getattr(serializer, "generated_password", None):
+            data["generated_password"] = serializer.generated_password
+        headers = self.get_success_headers(serializer.data)
+        return Response(data, status=status.HTTP_201_CREATED, headers=headers)
+
     def perform_create(self, serializer):
         user = serializer.save()
         record_audit_event(
