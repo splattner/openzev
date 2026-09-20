@@ -226,8 +226,13 @@ class TotpDevice(models.Model):
                 return base_step + offset
         return None
 
-    def verify(self, code: str) -> bool:
+    def check_code(self, code: str) -> tuple[bool, str | None]:
         """Verify a TOTP code and record its step to prevent replay.
+
+        Returns ``(True, None)`` on success, or ``(False, reason)`` with
+        ``reason`` one of ``"invalid_code"`` (no step in the skew window
+        matched) or ``"replayed_code"`` (a step matched, but it was already
+        accepted) — the distinction the login view's audit trail needs.
 
         Locks this device's row for the check (mirrors the row-locking
         approach taken for invoice status transitions,
@@ -238,15 +243,20 @@ class TotpDevice(models.Model):
         """
         matched_step = self._matching_step(code)
         if matched_step is None:
-            return False
+            return False, "invalid_code"
         with transaction.atomic():
             locked = TotpDevice.objects.select_for_update().get(pk=self.pk)
             if locked.last_used_step is not None and matched_step <= locked.last_used_step:
-                return False
+                return False, "replayed_code"
             locked.last_used_step = matched_step
             locked.save(update_fields=["last_used_step"])
         self.last_used_step = matched_step
-        return True
+        return True, None
+
+    def verify(self, code: str) -> bool:
+        """Convenience wrapper over ``check_code`` for callers that only
+        need the boolean outcome."""
+        return self.check_code(code)[0]
 
 
 class MfaRecoveryCode(models.Model):
@@ -443,6 +453,17 @@ class OAuthProvider(models.Model):
     redirect_url = models.URLField(max_length=500, help_text="Redirect/callback URL registered in the provider app.")
     scope = models.CharField(max_length=255, default="openid email profile")
     enabled = models.BooleanField(default=True)
+    # Spec 2026-09-two-factor-authentication.md §5.4 (door 4): the IdP owns
+    # authentication, so a login via this provider is never challenged for a
+    # local TOTP factor. Opting in here instead refuses the login outright
+    # unless the provider's userinfo response names an MFA method in its
+    # ``amr`` claim (RFC 8176) — see accounts.mfa.OAUTH_MFA_AMR_VALUES.
+    # Default False: most providers never asked to send amr, so requiring it
+    # would break login for reasons the admin didn't opt into.
+    require_mfa_claim = models.BooleanField(
+        default=False,
+        help_text="Refuse login unless the provider's userinfo response names an MFA method in its amr claim.",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

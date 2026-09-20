@@ -16,6 +16,7 @@ from rest_framework.decorators import (
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
+from accounts import mfa
 from accounts.cookies import set_auth_cookies
 from accounts.jwt_utils import make_jwt_for_user
 from accounts.throttling import OnboardingLinkThrottle
@@ -70,6 +71,17 @@ def onboarding_consume(request):
             summary=f"Signed in with an onboarding link: {user.username}.",
             metadata={"token_prefix": token.prefix},
         )
+
+    if mfa.has_active_factor(user):
+        # The link stays valid either way (it is not spent by use — see the
+        # module docstring); this only gates whether it hands over a session
+        # or a challenge for one. See spec
+        # 2026-09-two-factor-authentication.md §5.4 door 6.
+        return Response({
+            "mfa_required": True,
+            "mfa_token": mfa.issue_challenge(user),
+            "methods": ["totp"],
+        })
 
     tokens = make_jwt_for_user(user)
     response = Response({

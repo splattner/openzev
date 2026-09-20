@@ -1,7 +1,22 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { fetchMe, impersonateParticipant as impersonateParticipantRequest, login as loginRequest, logout as logoutRequest, stopImpersonation as stopImpersonationRequest, updateProfile } from './api/auth'
+import {
+    fetchMe,
+    impersonateParticipant as impersonateParticipantRequest,
+    login as loginRequest,
+    logout as logoutRequest,
+    stopImpersonation as stopImpersonationRequest,
+    submitMfaChallenge,
+    updateProfile,
+} from './api/auth'
 import type { User } from '../types/api'
+
+/** Either the session is live (cookies set, `user` is the signed-in
+ * account) or the account has a second factor and `completeMfaChallenge`
+ * must be called with `mfaToken` + a code before one exists. */
+export type LoginOutcome =
+    | { status: 'authenticated'; user: User }
+    | { status: 'mfa_required'; mfaToken: string; methods: ('totp' | 'recovery_code')[] }
 
 interface AuthContextValue {
     user: User | null
@@ -9,7 +24,8 @@ interface AuthContextValue {
     isLoading: boolean
     isImpersonating: boolean
     impersonator: User | null
-    login: (email: string, password: string) => Promise<User>
+    login: (email: string, password: string) => Promise<LoginOutcome>
+    completeMfaChallenge: (mfaToken: string, code: string) => Promise<User>
     refreshUser: () => Promise<User>
     /** Persist the account's default community and refresh the cached user. */
     updatePreferredZev: (zevId: string | null) => Promise<void>
@@ -75,7 +91,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             async login(email: string, password: string) {
                 invalidatePrefSaves()
                 await resetQueryCache()
-                await loginRequest(email, password)
+                const result = await loginRequest(email, password)
+                if (result.mfaRequired) {
+                    // No session yet — nothing to load. The cache was
+                    // already reset above, which is correct either way:
+                    // whichever account completes the challenge (or none)
+                    // must not see a stale previous session's data.
+                    return { status: 'mfa_required', mfaToken: result.mfaToken, methods: result.methods }
+                }
+                const user = await loadCurrentUser()
+                return { status: 'authenticated', user }
+            },
+            async completeMfaChallenge(mfaToken: string, code: string) {
+                await submitMfaChallenge(mfaToken, code)
                 return loadCurrentUser()
             },
             refreshUser() {

@@ -11,7 +11,7 @@ import { queryKeys } from '../lib/api/queryKeys'
 export function LoginPage() {
     const { t } = useTranslation()
     const navigate = useNavigate()
-    const { login } = useAuth()
+    const { login, completeMfaChallenge } = useAuth()
     const featureFlagsQuery = useQuery({
         queryKey: queryKeys.auth.registrationEnabled(),
         queryFn: fetchRegistrationEnabled,
@@ -29,6 +29,13 @@ export function LoginPage() {
     const [error, setError] = useState<string | null>(null)
     const [loading, setLoading] = useState(false)
     const [oauthLoading, setOauthLoading] = useState<string | null>(null)
+
+    // Second step of a two-factor login (spec 2026-09-two-factor-authentication.md
+    // §5.1). Set once the password step reports mfa_required; the form below
+    // swaps to a code entry in place of the password fields.
+    const [pendingMfa, setPendingMfa] = useState<{ mfaToken: string } | null>(null)
+    const [mfaCode, setMfaCode] = useState('')
+    const [useRecoveryCode, setUseRecoveryCode] = useState(false)
 
     // Register modal state
     const [showModal, setShowModal] = useState(false)
@@ -72,13 +79,39 @@ export function LoginPage() {
         setEmail(submittedEmail)
         setPassword(submittedPassword)
         try {
-            const me = await login(submittedEmail, submittedPassword)
-            navigate(me.must_change_password ? '/account' : '/')
+            const outcome = await login(submittedEmail, submittedPassword)
+            if (outcome.status === 'mfa_required') {
+                setPendingMfa({ mfaToken: outcome.mfaToken })
+                return
+            }
+            navigate(outcome.user.must_change_password ? '/account' : '/')
         } catch {
             setError(t('auth.invalid'))
         } finally {
             setLoading(false)
         }
+    }
+
+    async function handleMfaSubmit(event: FormEvent<HTMLFormElement>) {
+        event.preventDefault()
+        if (!pendingMfa) return
+        setLoading(true)
+        setError(null)
+        try {
+            const user = await completeMfaChallenge(pendingMfa.mfaToken, mfaCode)
+            navigate(user.must_change_password ? '/account' : '/')
+        } catch {
+            setError(t(useRecoveryCode ? 'auth.mfa.invalidRecoveryCode' : 'auth.mfa.invalidCode'))
+        } finally {
+            setLoading(false)
+        }
+    }
+
+    function cancelMfaChallenge() {
+        setPendingMfa(null)
+        setMfaCode('')
+        setUseRecoveryCode(false)
+        setError(null)
     }
 
     async function handleOAuthLogin(providerSlug: string) {
@@ -118,70 +151,134 @@ export function LoginPage() {
         <div className="login-shell">
             <div className={`login-split${selfRegistrationEnabled ? '' : ' login-split-single'}`}>
                 {/* Left: sign-in card */}
-                <form className="card login-card" onSubmit={handleSubmit}>
-                    <div className="login-brand">
-                        <img
-                            src="/openzevlogo_whitebg.png"
-                            alt={t('app.title')}
-                            className="login-logo"
-                        />
-                    </div>
-                    <h1>{t('auth.welcome')}</h1>
-                    <p className="muted">{t('auth.signIn')}</p>
+                {pendingMfa ? (
+                    <form className="card login-card" onSubmit={handleMfaSubmit}>
+                        <div className="login-brand">
+                            <img
+                                src="/openzevlogo_whitebg.png"
+                                alt={t('app.title')}
+                                className="login-logo"
+                            />
+                        </div>
+                        <h1>{t('auth.mfa.title')}</h1>
+                        <p className="muted">
+                            {t(useRecoveryCode ? 'auth.mfa.enterRecoveryCode' : 'auth.mfa.enterCode')}
+                        </p>
 
-                    <label>
-                        <span>{t('auth.email')}</span>
-                        <input
-                            type="email"
-                            name="email"
-                            autoComplete="username"
-                            value={email}
-                            onChange={(e) => setEmail(e.target.value)}
-                            required
-                        />
-                    </label>
+                        <label>
+                            <span>{useRecoveryCode ? t('auth.mfa.recoveryCodeLabel') : t('auth.mfa.codeLabel')}</span>
+                            {useRecoveryCode ? (
+                                <input
+                                    type="text"
+                                    autoComplete="off"
+                                    autoFocus
+                                    value={mfaCode}
+                                    onChange={(e) => setMfaCode(e.target.value)}
+                                    placeholder="a1b2c-3d4e5"
+                                    required
+                                />
+                            ) : (
+                                <input
+                                    type="text"
+                                    inputMode="numeric"
+                                    autoComplete="one-time-code"
+                                    autoFocus
+                                    maxLength={6}
+                                    value={mfaCode}
+                                    onChange={(e) => setMfaCode(e.target.value)}
+                                    required
+                                />
+                            )}
+                        </label>
 
-                    <label>
-                        <span>{t('auth.password')}</span>
-                        <input
-                            type="password"
-                            name="password"
-                            autoComplete="current-password"
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            required
-                        />
-                    </label>
+                        {error ? <div className="error-banner">{error}</div> : null}
 
-                    {error ? <div className="error-banner">{error}</div> : null}
+                        <button className="button" type="submit" disabled={loading}>
+                            {loading ? t('common.loading') : t('auth.submit')}
+                        </button>
 
-                    <button className="button" type="submit" disabled={loading}>
-                        {loading ? t('common.loading') : t('auth.submit')}
-                    </button>
+                        <button
+                            type="button"
+                            className="button button-ghost"
+                            onClick={() => {
+                                setUseRecoveryCode((previous) => !previous)
+                                setMfaCode('')
+                                setError(null)
+                            }}
+                        >
+                            {t(useRecoveryCode ? 'auth.mfa.useCodeInstead' : 'auth.mfa.useRecoveryCodeInstead')}
+                        </button>
 
-                    {oauthProviders.length > 0 && (
-                        <>
-                            <div className="login-divider">
-                                <span>{t('auth.oauth.or')}</span>
-                            </div>
-                            <div className="oauth-provider-list">
-                                {oauthProviders.map((provider) => (
-                                    <button
-                                        key={provider.name}
-                                        type="button"
-                                        className="button button-outline oauth-provider-button"
-                                        disabled={oauthLoading !== null}
-                                        onClick={() => void handleOAuthLogin(provider.name)}
-                                    >
-                                        {oauthLoading === provider.name
-                                            ? t('common.loading')
-                                            : t('auth.oauth.loginWith', { provider: provider.display_name })}
-                                    </button>
-                                ))}
-                            </div>
-                        </>
-                    )}
-                </form>
+                        <button type="button" className="button button-ghost" onClick={cancelMfaChallenge}>
+                            {t('auth.mfa.back')}
+                        </button>
+                    </form>
+                ) : (
+                    <form className="card login-card" onSubmit={handleSubmit}>
+                        <div className="login-brand">
+                            <img
+                                src="/openzevlogo_whitebg.png"
+                                alt={t('app.title')}
+                                className="login-logo"
+                            />
+                        </div>
+                        <h1>{t('auth.welcome')}</h1>
+                        <p className="muted">{t('auth.signIn')}</p>
+
+                        <label>
+                            <span>{t('auth.email')}</span>
+                            <input
+                                type="email"
+                                name="email"
+                                autoComplete="username"
+                                value={email}
+                                onChange={(e) => setEmail(e.target.value)}
+                                required
+                            />
+                        </label>
+
+                        <label>
+                            <span>{t('auth.password')}</span>
+                            <input
+                                type="password"
+                                name="password"
+                                autoComplete="current-password"
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
+                                required
+                            />
+                        </label>
+
+                        {error ? <div className="error-banner">{error}</div> : null}
+
+                        <button className="button" type="submit" disabled={loading}>
+                            {loading ? t('common.loading') : t('auth.submit')}
+                        </button>
+
+                        {oauthProviders.length > 0 && (
+                            <>
+                                <div className="login-divider">
+                                    <span>{t('auth.oauth.or')}</span>
+                                </div>
+                                <div className="oauth-provider-list">
+                                    {oauthProviders.map((provider) => (
+                                        <button
+                                            key={provider.name}
+                                            type="button"
+                                            className="button button-outline oauth-provider-button"
+                                            disabled={oauthLoading !== null}
+                                            onClick={() => void handleOAuthLogin(provider.name)}
+                                        >
+                                            {oauthLoading === provider.name
+                                                ? t('common.loading')
+                                                : t('auth.oauth.loginWith', { provider: provider.display_name })}
+                                        </button>
+                                    ))}
+                                </div>
+                            </>
+                        )}
+                    </form>
+                )}
 
                 {/* Right: register panel */}
                 {selfRegistrationEnabled && (

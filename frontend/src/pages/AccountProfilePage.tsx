@@ -10,6 +10,7 @@ import { changePassword, deleteSocialAccount, fetchOAuthProviders, fetchSocialAc
 import { queryKeys } from '../lib/api/queryKeys'
 import { ConfirmDialog, useConfirmDialog } from '../components/ConfirmDialog'
 import { ApiKeysSection } from '../features/account/ApiKeysSection'
+import { TotpSection } from '../features/account/TotpSection'
 
 export function AccountProfilePage() {
     const { t } = useTranslation()
@@ -358,6 +359,18 @@ export function AccountProfilePage() {
                         )
                     })}
                 </div>
+
+                <TotpSection
+                    onRemove={(onConfirm) =>
+                        confirm({
+                            title: t('account.mfa.removeConfirmTitle'),
+                            message: t('account.mfa.removeConfirmMessage'),
+                            confirmText: t('account.mfa.remove'),
+                            isDangerous: true,
+                            onConfirm,
+                        })
+                    }
+                />
 
                 <ApiKeysSection
                     onRevoke={({ name, onConfirm }) =>

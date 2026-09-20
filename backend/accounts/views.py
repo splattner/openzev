@@ -6,6 +6,7 @@ from rest_framework.exceptions import AuthenticationFailed, PermissionDenied, Va
 from rest_framework.views import APIView
 import logging
 import secrets
+import pyotp
 from django.conf import settings
 from django.utils.text import slugify
 from django.contrib.auth.password_validation import validate_password
@@ -15,12 +16,15 @@ from django.utils import timezone
 from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
 from rest_framework_simplejwt.serializers import TokenRefreshSerializer
 from rest_framework_simplejwt.views import TokenObtainPairView
+from . import mfa, mfa_crypto
 from .api_keys import default_api_key_expiry, generate_key
 from .models import (
     ApiKey,
     AppSettings,
     EmailVerificationToken,
     FeatureFlag,
+    MfaRecoveryCode,
+    TotpDevice,
     User,
     UserRole,
     VatRate,
@@ -30,6 +34,7 @@ from .serializers import (
     ApiKeySerializer, ApiKeyCreateSerializer, AdminApiKeySerializer,
     AppSettingsSerializer,
     FeatureFlagSerializer,
+    TotpDeviceSerializer,
     VatRateSerializer,
 )
 from .authentication import enforce_csrf
@@ -42,7 +47,7 @@ from .cookies import (
     set_auth_cookies,
 )
 from .permissions import IsAdmin
-from .throttling import AuthLoginThrottle, AuthRefreshThrottle, AuthRegisterThrottle, AuthVerifyThrottle
+from .throttling import AuthLoginThrottle, AuthMfaThrottle, AuthRefreshThrottle, AuthRegisterThrottle, AuthVerifyThrottle
 from audit.models import AuditActionCategory, AuditEventStatus
 from audit.mixins import AuditedUpdateMixin
 from audit.services import build_diff, record_audit_event
@@ -71,6 +76,20 @@ class CustomTokenObtainPairView(TokenObtainPairView):
             self._record_login_failed(request)
             raise
 
+        user = serializer.user
+        if mfa.has_active_factor(user):
+            # Password verified, but this account has a second factor — proof
+            # of it is required before a session is minted. Not itself an
+            # audit event: this is neither a completed login nor a failure —
+            # the eventual auth.login (success) or auth.mfa.challenge_failed
+            # (failure) on /token/mfa/ covers both outcomes. See spec
+            # 2026-09-two-factor-authentication.md §5.1.
+            return Response({
+                "mfa_required": True,
+                "mfa_token": mfa.issue_challenge(user),
+                "methods": ["totp"],
+            })
+
         response = Response({"detail": "Login successful."})
         set_auth_cookies(
             request, response,
@@ -82,11 +101,12 @@ class CustomTokenObtainPairView(TokenObtainPairView):
             action_category=AuditActionCategory.AUTH,
             action_type="auth.login",
             target_type="accounts.User",
-            target=serializer.user,
-            target_id=str(serializer.user.pk),
-            target_display=serializer.user.email or serializer.user.username,
-            summary=f"Password login succeeded for {serializer.user.email or serializer.user.username}.",
-            user=serializer.user,
+            target=user,
+            target_id=str(user.pk),
+            target_display=user.email or user.username,
+            summary=f"Password login succeeded for {user.email or user.username}.",
+            user=user,
+            metadata={"method": "password"},
         )
         return response
 
@@ -105,6 +125,82 @@ class CustomTokenObtainPairView(TokenObtainPairView):
             target_display=identifier,
             summary=f"Password login failed for {identifier or '(no identifier supplied)'}.",
             status=AuditEventStatus.FAILED,
+        )
+
+
+class TokenMfaView(APIView):
+    """Second step of a two-step login: exchanges a challenge token plus a
+    TOTP or recovery code for a session.
+
+    ``AllowAny`` like ``CustomTokenObtainPairView`` — the caller has proven a
+    password moments ago, not a bearer credential this request carries.
+    """
+
+    permission_classes = [AllowAny]
+    throttle_classes = [AuthMfaThrottle]
+
+    def post(self, request, *args, **kwargs):
+        mfa_token = str(request.data.get("mfa_token") or "")
+        code = str(request.data.get("code") or "")
+
+        try:
+            user = mfa.resolve_challenge(mfa_token)
+        except mfa.MfaChallengeError as exc:
+            self._record_challenge_failed(request, reason=exc.reason)
+            return Response({"detail": "Invalid or expired code."}, status=status.HTTP_400_BAD_REQUEST)
+
+        ok, method, reason = mfa.verify_mfa_code(user, code)
+        if not ok:
+            self._record_challenge_failed(request, reason=reason, user=user)
+            return Response({"detail": "Invalid or expired code."}, status=status.HTTP_400_BAD_REQUEST)
+
+        tokens = make_jwt_for_user(user)
+        response = Response({"detail": "Login successful."})
+        set_auth_cookies(request, response, access=tokens["access"], refresh=tokens["refresh"])
+
+        record_audit_event(
+            request=request,
+            action_category=AuditActionCategory.AUTH,
+            action_type="auth.login",
+            target_type="accounts.User",
+            target=user,
+            target_id=str(user.pk),
+            target_display=user.email or user.username,
+            summary=f"Password login succeeded for {user.email or user.username}.",
+            user=user,
+            metadata={"method": "password+totp" if method == "totp" else "recovery_code"},
+        )
+        if method == "recovery_code":
+            remaining = user.mfa_recovery_codes.filter(used_at__isnull=True).count()
+            record_audit_event(
+                request=request,
+                action_category=AuditActionCategory.AUTH,
+                action_type="auth.mfa.recovery_used",
+                target_type="accounts.User",
+                target=user,
+                target_id=str(user.pk),
+                target_display=user.email or user.username,
+                summary=f"Recovery code used to sign in as {user.email or user.username}.",
+                user=user,
+                metadata={"remaining": remaining},
+            )
+        return response
+
+    def _record_challenge_failed(self, request, *, reason, user=None):
+        # Same undifferentiated-to-the-caller philosophy as
+        # CustomTokenObtainPairView._record_login_failed: the response never
+        # says which part was wrong, only the audit reason does.
+        record_audit_event(
+            request=request,
+            action_category=AuditActionCategory.AUTH,
+            action_type="auth.mfa.challenge_failed",
+            target_type="accounts.User",
+            target=user,
+            target_id=str(user.pk) if user else "",
+            target_display=(user.email or user.username) if user else "",
+            summary="MFA challenge failed" + (f" for {user.email or user.username}" if user else "") + ".",
+            status=AuditEventStatus.FAILED,
+            metadata={"reason": reason},
         )
 
 
@@ -605,6 +701,18 @@ def verify_email(request):
         changes=build_diff({"is_active": False}, {"is_active": user.is_active}, ["is_active"]),
     )
 
+    # Verification itself is final regardless of what happens next — only
+    # whether it also delivers a session depends on the account's MFA state.
+    # In practice an account reaching this line cannot yet have a factor (it
+    # was inactive until the lines above), but the code must not assume
+    # that — see spec 2026-09-two-factor-authentication.md §5.4 door 2.
+    if mfa.has_active_factor(user):
+        return Response({
+            "mfa_required": True,
+            "mfa_token": mfa.issue_challenge(user),
+            "methods": ["totp"],
+        })
+
     tokens = make_jwt_for_user(user)
     response = Response({"detail": "Email verified."})
     set_auth_cookies(request, response, access=tokens["access"], refresh=tokens["refresh"])
@@ -614,7 +722,17 @@ def verify_email(request):
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def set_initial_password(request):
-    """Set a password for a freshly verified account that has no usable password yet."""
+    """Set a password for a freshly verified account that has no usable password yet.
+
+    Spec 2026-09-two-factor-authentication.md's door table lists this as
+    door 3, "unaffected — same as email verification". It genuinely needs no
+    MFA check, but for a different reason than that entry implies: unlike
+    ``verify_email``, this is ``IsAuthenticated`` — the caller already holds
+    a valid session (minted by ``verify_email`` or a magic/onboarding link
+    moments earlier). There is no unauthenticated session-minting moment
+    here to challenge; this only refreshes an already-authenticated
+    session's JWT claims after the password write.
+    """
     new_password = request.data.get("new_password", "")
     if not new_password:
         return Response({"detail": "new_password is required."}, status=status.HTTP_400_BAD_REQUEST)
@@ -663,6 +781,162 @@ def set_initial_password(request):
     response = Response({"detail": "Password set successfully."})
     set_auth_cookies(request, response, access=tokens["access"], refresh=tokens["refresh"])
     return response
+
+
+# ── Two-factor authentication (TOTP) ───────────────────────────────────────────
+# Spec: docs/specs/2026-09-two-factor-authentication.md §5.2. Passkeys
+# (WebAuthnCredential) and the AppSettings policy fields (mfa_required_roles,
+# mfa_grace_period_days) land in a later PR — until then MfaStatusView always
+# reports an empty passkey list and no enforced requirement.
+
+
+class MfaStatusView(APIView):
+    """GET /me/mfa/ — the current user's second-factor status."""
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, *args, **kwargs):
+        device = getattr(request.user, "totp_device", None)
+        has_active_totp = device is not None and device.is_active
+        return Response({
+            "totp": TotpDeviceSerializer(device).data if device is not None else None,
+            "passkeys": [],
+            "recovery_codes_remaining": (
+                request.user.mfa_recovery_codes.filter(used_at__isnull=True).count()
+                if has_active_totp else 0
+            ),
+            "required": False,
+            "grace_until": None,
+        })
+
+
+class TotpDeviceView(APIView):
+    """POST begins enrolment (or replaces an abandoned attempt); DELETE
+    removes an active device. No GET here — MfaStatusView is the one place a
+    client reads current state from."""
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, *args, **kwargs):
+        existing = getattr(request.user, "totp_device", None)
+        if existing is not None:
+            if existing.is_active:
+                return Response(
+                    {"detail": "Two-factor authentication is already enabled. Remove it before setting up a new device."},
+                    status=status.HTTP_409_CONFLICT,
+                )
+            # An abandoned enrolment attempt (closed the tab before
+            # confirming) must not accumulate rows or block starting over.
+            existing.delete()
+
+        secret = pyotp.random_base32()
+        device = TotpDevice(user=request.user)
+        try:
+            device.set_secret(secret)
+        except mfa_crypto.MfaNotConfigured:
+            return Response(
+                {"detail": "Two-factor authentication is not available on this instance: MFA_ENCRYPTION_KEYS is not configured."},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+        device.save()
+
+        provisioning_uri = pyotp.TOTP(secret).provisioning_uri(
+            name=request.user.email or request.user.username, issuer_name="OpenZEV"
+        )
+        return Response({
+            "provisioning_uri": provisioning_uri,
+            "secret": secret,
+            "qr_svg": mfa.totp_qr_svg(provisioning_uri),
+        })
+
+    def delete(self, request, *args, **kwargs):
+        device = getattr(request.user, "totp_device", None)
+        if device is None:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+
+        # Refusing removal when a role requires a factor and no other one
+        # remains is AppSettings.mfa_required_roles's job (a later PR); any
+        # user may remove their own factor for now.
+        device.delete()
+        # A recovery code recovers into a challenge that no longer exists
+        # once no factor remains — dead weight, and re-enrolling issues a
+        # fresh set anyway.
+        MfaRecoveryCode.objects.filter(user=request.user).delete()
+
+        record_audit_event(
+            request=request,
+            action_category=AuditActionCategory.AUTH,
+            action_type="auth.mfa.removed",
+            target_type="accounts.User",
+            target=request.user,
+            target_id=str(request.user.pk),
+            target_display=request.user.email or request.user.username,
+            summary=f"Removed two-factor authentication for {request.user.email or request.user.username}.",
+            user=request.user,
+        )
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class TotpEnrolConfirmView(APIView):
+    """POST /me/mfa/totp/confirm/ — activates a pending device and issues
+    recovery codes, returned once."""
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, *args, **kwargs):
+        device = getattr(request.user, "totp_device", None)
+        if device is None or device.is_active:
+            return Response({"detail": "No pending two-factor setup to confirm."}, status=status.HTTP_400_BAD_REQUEST)
+
+        code = str(request.data.get("code") or "").strip()
+        ok, _reason = device.check_code(code)
+        if not ok:
+            return Response({"detail": "Invalid code."}, status=status.HTTP_400_BAD_REQUEST)
+
+        device.confirmed_at = timezone.now()
+        device.save(update_fields=["confirmed_at"])
+        recovery_codes = mfa.issue_recovery_codes(request.user)
+
+        record_audit_event(
+            request=request,
+            action_category=AuditActionCategory.AUTH,
+            action_type="auth.mfa.enrolled",
+            target_type="accounts.User",
+            target=request.user,
+            target_id=str(request.user.pk),
+            target_display=request.user.email or request.user.username,
+            summary=f"Enabled two-factor authentication for {request.user.email or request.user.username}.",
+            user=request.user,
+            metadata={"method": "totp"},
+        )
+        return Response({"recovery_codes": recovery_codes})
+
+
+class MfaRecoveryCodesView(APIView):
+    """POST /me/mfa/recovery-codes/ — regenerates all ten, returned once.
+    Invalidates any codes issued at confirmation or a previous regeneration."""
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, *args, **kwargs):
+        device = getattr(request.user, "totp_device", None)
+        if device is None or not device.is_active:
+            return Response({"detail": "Two-factor authentication is not enabled."}, status=status.HTTP_400_BAD_REQUEST)
+
+        recovery_codes = mfa.issue_recovery_codes(request.user)
+
+        record_audit_event(
+            request=request,
+            action_category=AuditActionCategory.AUTH,
+            action_type="auth.mfa.recovery_regenerated",
+            target_type="accounts.User",
+            target=request.user,
+            target_id=str(request.user.pk),
+            target_display=request.user.email or request.user.username,
+            summary=f"Regenerated recovery codes for {request.user.email or request.user.username}.",
+            user=request.user,
+        )
+        return Response({"recovery_codes": recovery_codes})
 
 
 class ApiKeyListCreateView(generics.ListCreateAPIView):

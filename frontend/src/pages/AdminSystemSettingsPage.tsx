@@ -44,6 +44,7 @@ const EMPTY_OAUTH_FORM: OAuthProviderConfigInput = {
     redirect_url: '',
     scope: 'openid email profile',
     enabled: true,
+    require_mfa_claim: false,
 }
 
 const TAB_ORDER: SystemSettingsTab[] = ['regional', 'features', 'oauth', 'vat']
@@ -169,6 +170,7 @@ export function AdminSystemSettingsPage() {
             redirect_url: provider.redirect_url,
             scope: provider.scope,
             enabled: provider.enabled,
+            require_mfa_claim: provider.require_mfa_claim,
         })
         setOauthFormError(null)
         setShowOAuthForm(true)
@@ -564,6 +566,17 @@ export function AdminSystemSettingsPage() {
                         }}
                         label={t('adminOAuth.fieldEnabled')}
                     />
+
+                    <Switch
+                        name="require_mfa_claim"
+                        checked={oauthForm.require_mfa_claim}
+                        onChange={(event) => {
+                            const checked = event.currentTarget.checked
+                            setOauthForm((previous) => ({ ...previous, require_mfa_claim: checked }))
+                        }}
+                        label={t('adminOAuth.fieldRequireMfaClaim')}
+                    />
+                    <small className="muted">{t('adminOAuth.fieldRequireMfaClaimHint')}</small>
 
                     {oauthFormError && <div className="error-banner">{oauthFormError}</div>}
 

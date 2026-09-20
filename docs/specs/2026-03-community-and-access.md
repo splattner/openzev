@@ -339,6 +339,8 @@ Two consequences for anything added later:
 
 **Payload:** `{ email, password }` (preferred) or `{ username, password }` (backward-compatible)
 
+**Two-factor challenge:** if the account has an *active* second factor (a confirmed `TotpDevice`), the password step returns `200 {"mfa_required": true, "mfa_token": "<signed>", "methods": ["totp", "recovery_code"]}` and sets **no** cookies. `POST /api/v1/auth/token/mfa/` `{mfa_token, code}` then completes the login (TOTP code or one-time recovery code). Magic-link consume and onboarding-link consume return the same challenge shape; the OAuth door honours an IdP `amr` claim instead (`OAuthProvider.require_mfa_claim`, default `False`). Accounts without a factor see the pre-2FA behaviour unchanged. Full contract: `2026-09-two-factor-authentication.md` §5.
+
 Helper `accounts.views._make_jwt_for_user(user) -> dict` adds custom claims (also used by `CustomTokenObtainPairSerializer` and `verify_email`/`set_initial_password`; `views_oauth._make_jwt_for_user` and impersonation use the same claims):
 
 | Claim | Value |
@@ -489,6 +491,7 @@ cookie sessions stay unthrottled:
 | Endpoint | Throttle class | Scope | Default rate (env override) |
 |---|---|---|---|
 | `POST /api/v1/auth/token/` | `AuthLoginThrottle` | `auth_login` | `40/hour` (`AUTH_LOGIN_THROTTLE_RATE`) |
+| `POST /api/v1/auth/token/mfa/` | `AuthMfaThrottle` | `auth_mfa` | `10/hour` (`AUTH_MFA_THROTTLE_RATE`), keyed on the account in the challenge token (per-IP if the token is unreadable) |
 | `POST /api/v1/auth/token/refresh/` | `AuthRefreshThrottle` | `auth_refresh` | `60/hour` (`AUTH_REFRESH_THROTTLE_RATE`) |
 | `POST /api/v1/auth/register/` | `AuthRegisterThrottle` | `auth_register` | `10/hour` (`AUTH_REGISTER_THROTTLE_RATE`) |
 | `POST /api/v1/auth/verify-email/` | `AuthVerifyThrottle` | `auth_verify` | `30/hour` (`AUTH_VERIFY_THROTTLE_RATE`) |
@@ -855,6 +858,7 @@ documented in `2026-03-invoice-lifecycle-and-communication.md` §5.6a.
 | Method | URL | Permission | Description |
 |---|---|---|---|
 | POST | `/token/` | AllowAny | JWT login (sets httpOnly cookies `openzev_access` / `openzev_refresh` + `csrftoken` via `get_token`; header `Authorization: Api-Key` is case-insensitive) |
+| POST | `/token/mfa/` | AllowAny | Complete a two-factor login: `{mfa_token, code}` (TOTP or recovery code) → sets the same cookies as `/token/` |
 | POST | `/token/refresh/` | AllowAny | JWT refresh (reads `openzev_refresh` cookie; CSRF via `CookieJWTAuthentication` + `CsrfViewMiddleware`) |
 | POST | `/register/` | AllowAny | Self-register a zev_owner account |
 | POST | `/verify-email/` | AllowAny | Consume verification token, activate user |
@@ -863,6 +867,10 @@ documented in `2026-03-invoice-lifecycle-and-communication.md` §5.6a.
 | POST | `/me/set-initial-password/` | IsAuthenticated | Set password for first time (verification flow) |
 | GET / POST | `/users/` | IsAdmin | List users / Create user |
 | GET / PATCH / DELETE | `/users/{id}/` | IsAdmin | User detail (delete blocked if linked or last admin) |
+| GET | `/me/mfa/` | IsAuthenticated | Own second-factor status: `{totp, passkeys, recovery_codes_remaining, required, grace_until}` |
+| POST / DELETE | `/me/mfa/totp/` | IsAuthenticated | Begin TOTP enrolment (`{provisioning_uri, secret, qr_svg}`, `503` without `MFA_ENCRYPTION_KEYS`) / remove the device and its recovery codes |
+| POST | `/me/mfa/totp/confirm/` | IsAuthenticated | `{code}` activates the device and returns ten recovery codes once |
+| POST | `/me/mfa/recovery-codes/` | IsAuthenticated | Regenerate the recovery codes (returned once) |
 | POST | `/users/{user_id}/impersonate/` | IsAuthenticated (admin only) | Impersonate participant/owner |
 | GET / PATCH | `/app-settings/` | IsAuthenticated (update: admin only) | Application settings singleton |
 | GET | `/system-health/` | IsAuthenticated, IsAdmin | Platform health snapshot for the admin Overview hub's System-health tab: `{database: {status, engine, size_bytes}, celery: {status, workers_responding, queue_depth, broker_configured, detail?}, mfa: {status, encryption_key_configured}, email: {status, mode, backend}, checked_at}`. Best-effort probes: DB failure and zero responding workers are `degraded`; an unavailable broker ping or an unset `MFA_ENCRYPTION_KEYS` (ADR 0021, `SPEC-2026-09-two-factor-authentication` §4.5) is `unknown` — an expected state on an instance that hasn't opted into two-factor auth, not a fault. Email reports configuration only. Broker connection and Redis socket timeouts are one second with connection retries disabled; worker replies have a one-second timeout. A dedicated Kombu mailbox publishes on that same connection without the application producer pool and with publication retries disabled. Redis depth uses passive queue declaration for the configured default queue, including its priority buckets. Optional `detail` contains only an exception class, never a raw exception message or broker credentials. |
@@ -1117,7 +1125,8 @@ lists the test classes per module (test counts are the `test_*` methods).
 | Module | Classes | Tests | Coverage |
 |---|---|---|---|
 | `test_api_keys.py` | 10 | 81 | Generation, hashing, auth, read-only keys, scope deny-list, audit, throttling, CRUD, admin management |
-| `test_oauth.py` | 9 | 50 | Provider listing, initiate, callback guards/redirects, link flow, social accounts, audit |
+| `test_oauth.py` | 12 | 55 | Provider listing, initiate, callback guards/redirects, link flow, social accounts, audit, `require_mfa_claim` (`OAuthMfaClaimTests`) |
+| `test_mfa.py` | 4 | 28 | TOTP enrolment/removal/recovery codes, two-step login, MFA at the magic-link/onboarding/OAuth/impersonation/email-verification doors, per-account throttle (`SPEC-2026-09-two-factor-authentication`) |
 | `test_cookie_oauth.py` | — (6 module-level test functions) | 6 | Refresh/logout cookie handling; token exchange sets cookies and consumes codes |
 | `test_impersonation.py` | 5 | 21 | Permissions, audit, cookie round-trip, stop-impersonation |
 | `test_throttling.py` | 1 | 7 | Per-IP 429 boundaries for all six public auth write endpoints; budgets are independent |

@@ -43,6 +43,16 @@ spec:
               {{- else }}
               value: {{ .Values.secretKey.value | quote }}
               {{- end }}
+            {{- if .Values.mfaEncryptionKeys.existingSecret.name }}
+            - name: MFA_ENCRYPTION_KEYS
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.mfaEncryptionKeys.existingSecret.name }}
+                  key: {{ .Values.mfaEncryptionKeys.existingSecret.key }}
+            {{- else if .Values.mfaEncryptionKeys.value }}
+            - name: MFA_ENCRYPTION_KEYS
+              value: {{ .Values.mfaEncryptionKeys.value | quote }}
+            {{- end }}
             - name: DATABASE_URL
               {{- if .Values.database.existingSecret.name }}
               valueFrom:

@@ -64,6 +64,30 @@ secretKey:
 
 If `secretKey.existingSecret.name` is set, it overrides `secretKey.value`.
 
+## Two-factor encryption key
+
+Two-factor (TOTP) secrets are encrypted at rest with a Fernet key that is
+deliberately independent of `SECRET_KEY` (ADR 0021). Until one is set, users
+cannot enrol a second factor and the backend logs a system-check warning.
+
+```bash
+python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+```
+
+Set it as `mfaEncryptionKeys.value`, or load it from an existing secret:
+
+```yaml
+mfaEncryptionKeys:
+  existingSecret:
+    name: openzev-mfa-secret
+    key: MFA_ENCRYPTION_KEYS
+```
+
+The value may hold several comma-separated keys, newest first: new secrets are
+encrypted with the first, and all are tried on decrypt, so a key can be rotated
+without locking anyone out. Losing every key makes enrolled authenticator apps
+unusable — back it up like `SECRET_KEY`. The key is only needed by the backend.
+
 ## Celery Beat
 
 The chart enables one Beat scheduler by default (`beat.enabled: true`) using

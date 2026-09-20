@@ -27,6 +27,7 @@ from rest_framework.response import Response
 from audit.models import AuditActionCategory, AuditEventStatus
 from audit.services import build_diff, record_audit_event
 
+from . import mfa
 from .cookies import set_auth_cookies
 from .jwt_utils import make_jwt_for_user
 from .throttling import AuthOAuthExchangeThrottle, AuthOAuthInitiateThrottle
@@ -60,6 +61,7 @@ PROVIDER_TRACKED_FIELDS = (
     "redirect_url",
     "scope",
     "enabled",
+    "require_mfa_claim",
 )
 
 
@@ -457,6 +459,21 @@ def oauth_callback(request, provider_slug: str):
             metadata={"provider": provider_slug, "reason": "account_inactive"},
         )
         return HttpResponseRedirect(f"{frontend_url}/login?oauth_error=account_inactive")
+
+    if provider.require_mfa_claim and not mfa.amr_satisfies_mfa(user_info.get("amr")):
+        # Spec 2026-09-two-factor-authentication.md §5.4 (door 4): the IdP
+        # owns authentication and this login is never challenged for a local
+        # TOTP factor — but an admin can opt this provider into requiring the
+        # IdP's own assertion that it verified a second factor.
+        _record_auth_event(
+            request,
+            action_type="oauth.login_failed",
+            summary=f"OAuth login refused for {user.email or user.username}: provider {provider_slug} did not assert a second factor.",
+            event_status=AuditEventStatus.DENIED,
+            user=user,
+            metadata={"provider": provider_slug, "reason": "mfa_claim_missing"},
+        )
+        return HttpResponseRedirect(f"{frontend_url}/login?oauth_error=mfa_claim_missing")
 
     # Issue a short-lived exchange code for the frontend to convert to JWT
     exchange_code = secrets.token_urlsafe(32)

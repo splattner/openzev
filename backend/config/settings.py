@@ -165,6 +165,9 @@ REST_FRAMEWORK = {
         "auth_verify": env("AUTH_VERIFY_THROTTLE_RATE", default="30/hour"),
         "auth_oauth_initiate": env("AUTH_OAUTH_INITIATE_THROTTLE_RATE", default="60/hour"),
         "auth_oauth_exchange": env("AUTH_OAUTH_EXCHANGE_THROTTLE_RATE", default="40/hour"),
+        # Per-ACCOUNT (not per-IP) budget on the MFA challenge exchange —
+        # see accounts.throttling.AuthMfaThrottle.
+        "auth_mfa": env("AUTH_MFA_THROTTLE_RATE", default="10/hour"),
         # Per-IP budget for the unauthenticated invoice-link endpoints. A
         # household refreshing its own bill costs a handful; a scanner walking
         # prefixes runs out long before entropy would have saved it anyway.

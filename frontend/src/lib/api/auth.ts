@@ -8,6 +8,7 @@ import type {
   FeatureFlag,
   FeatureFlagInput,
   ImpersonationResult,
+  MfaStatus,
   OAuthLoginInitiateResponse,
   OAuthProvider,
   OAuthProviderConfig,
@@ -15,6 +16,7 @@ import type {
   RegisterInput,
   SocialAccount,
   SystemHealth,
+  TotpEnrolment,
   User,
   UserInput,
   VatRate,
@@ -23,8 +25,24 @@ import type {
 import { api } from './client'
 import { fetchAllPages } from './pagination'
 
-export async function login(email: string, password: string): Promise<void> {
-  await api.post('/auth/token/', { email, password })
+/** Either a completed login (cookies already set by the backend) or a
+ * second-factor challenge to complete with submitMfaChallenge(). */
+export type LoginResult =
+  | { mfaRequired: false }
+  | { mfaRequired: true; mfaToken: string; methods: ('totp' | 'recovery_code')[] }
+
+export async function login(email: string, password: string): Promise<LoginResult> {
+  const { data } = await api.post('/auth/token/', { email, password })
+  if (data?.mfa_required) {
+    return { mfaRequired: true, mfaToken: data.mfa_token, methods: data.methods }
+  }
+  return { mfaRequired: false }
+}
+
+/** Second step of a two-factor login: exchanges the challenge token from
+ * login() plus a TOTP or recovery code for a session. */
+export async function submitMfaChallenge(mfaToken: string, code: string): Promise<void> {
+  await api.post('/auth/token/mfa/', { mfa_token: mfaToken, code })
 }
 
 export async function logout(): Promise<void> {
@@ -33,6 +51,39 @@ export async function logout(): Promise<void> {
 
 export async function fetchMe(): Promise<User> {
   const { data } = await api.get<User>('/auth/me/')
+  return data
+}
+
+// ── Two-factor authentication (TOTP) ──────────────────────────────────────
+// Passkey functions join these once WebAuthnCredential ships (spec
+// 2026-09-two-factor-authentication.md §5.2, PR 3).
+
+export async function fetchMfaStatus(): Promise<MfaStatus> {
+  const { data } = await api.get<MfaStatus>('/auth/me/mfa/')
+  return data
+}
+
+/** Begins TOTP enrolment. Returns the secret in plain text — the only time
+ * it ever is — so it can be typed into an authenticator that cannot scan a
+ * QR code. Replaces any previous unconfirmed attempt. */
+export async function beginTotpEnrolment(): Promise<TotpEnrolment> {
+  const { data } = await api.post<TotpEnrolment>('/auth/me/mfa/totp/')
+  return data
+}
+
+/** Activates the pending device and returns ten recovery codes, shown once. */
+export async function confirmTotpEnrolment(code: string): Promise<{ recovery_codes: string[] }> {
+  const { data } = await api.post<{ recovery_codes: string[] }>('/auth/me/mfa/totp/confirm/', { code })
+  return data
+}
+
+export async function removeTotp(): Promise<void> {
+  await api.delete('/auth/me/mfa/totp/')
+}
+
+/** Regenerates all ten recovery codes, returned once. Invalidates the old set. */
+export async function regenerateRecoveryCodes(): Promise<{ recovery_codes: string[] }> {
+  const { data } = await api.post<{ recovery_codes: string[] }>('/auth/me/mfa/recovery-codes/')
   return data
 }
 

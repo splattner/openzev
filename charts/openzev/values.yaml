@@ -13,6 +13,17 @@ secretKey:
     name: ""
     key: SECRET_KEY
 
+# Fernet key(s) that encrypt two-factor (TOTP) secrets at rest, comma-separated
+# newest-first so a key can be rotated without invalidating enrolments. Kept
+# separate from secretKey on purpose (ADR 0021). Empty means two-factor
+# enrolment is refused until a key is set. Generate one with:
+#   python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+mfaEncryptionKeys:
+  value: ""
+  existingSecret:
+    name: ""
+    key: MFA_ENCRYPTION_KEYS
+
 backend:
   replicaCount: 1
   image:

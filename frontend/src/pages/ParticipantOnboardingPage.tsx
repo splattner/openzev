@@ -1,11 +1,12 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 
 import { useAuth } from '../lib/auth'
 import { consumeOnboardingLink } from '../lib/api/public'
+import { submitMfaChallenge } from '../lib/api/auth'
 
-type Step = 'signing-in' | 'welcome' | 'error'
+type Step = 'signing-in' | 'mfa-required' | 'welcome' | 'error'
 
 /**
  * Land a newly (or returning) onboarded participant in their account.
@@ -15,6 +16,10 @@ type Step = 'signing-in' | 'welcome' | 'error'
  * more than once. The guard against a duplicate POST on mount is here purely
  * to avoid firing the request twice under React 18 StrictMode, not because a
  * second call would be unsafe.
+ *
+ * A participant may have enrolled in two-factor authentication (spec
+ * 2026-09-two-factor-authentication.md §5.4 door 6) — the link is still
+ * honoured, but a code is required before it hands over a session.
  */
 export function ParticipantOnboardingPage() {
     const { t } = useTranslation()
@@ -25,6 +30,10 @@ export function ParticipantOnboardingPage() {
     const { refreshUser } = useAuth()
     const [step, setStep] = useState<Step>('signing-in')
     const [zevName, setZevName] = useState('')
+    const [mfaToken, setMfaToken] = useState('')
+    const [code, setCode] = useState('')
+    const [mfaError, setMfaError] = useState<string | null>(null)
+    const [mfaLoading, setMfaLoading] = useState(false)
 
     const consumed = useRef(false)
 
@@ -37,6 +46,11 @@ export function ParticipantOnboardingPage() {
 
         consumeOnboardingLink(prefix, secret)
             .then(async (result) => {
+                if (result.mfaRequired) {
+                    setMfaToken(result.mfaToken)
+                    setStep('mfa-required')
+                    return
+                }
                 setZevName(result.zev_name)
                 await refreshUser()
                 setStep('welcome')
@@ -45,6 +59,21 @@ export function ParticipantOnboardingPage() {
             .catch(() => setStep('error'))
     }, [prefix, secret, refreshUser, navigate])
 
+    async function handleMfaSubmit(event: FormEvent<HTMLFormElement>) {
+        event.preventDefault()
+        setMfaLoading(true)
+        setMfaError(null)
+        try {
+            await submitMfaChallenge(mfaToken, code)
+            await refreshUser()
+            navigate('/', { replace: true })
+        } catch {
+            setMfaError(t('auth.mfa.invalidCode'))
+        } finally {
+            setMfaLoading(false)
+        }
+    }
+
     if (step === 'error') {
         return (
             <div className="center-screen">
@@ -52,6 +81,32 @@ export function ParticipantOnboardingPage() {
                     <h2>{t('pages.onboarding.errorTitle')}</h2>
                     <p className="muted">{t('pages.onboarding.errorBody')}</p>
                 </div>
+            </div>
+        )
+    }
+
+    if (step === 'mfa-required') {
+        return (
+            <div className="center-screen">
+                <form className="card public-invoice-card" onSubmit={handleMfaSubmit}>
+                    <h2>{t('auth.mfa.title')}</h2>
+                    <p className="muted">{t('pages.onboarding.mfaPrompt')}</p>
+                    <label>
+                        <span>{t('auth.mfa.codeLabel')}</span>
+                        <input
+                            type="text"
+                            autoComplete="one-time-code"
+                            autoFocus
+                            value={code}
+                            onChange={(e) => setCode(e.target.value)}
+                            required
+                        />
+                    </label>
+                    {mfaError && <div className="error-banner">{mfaError}</div>}
+                    <button className="button" type="submit" disabled={mfaLoading}>
+                        {mfaLoading ? t('common.loading') : t('auth.submit')}
+                    </button>
+                </form>
             </div>
         )
     }

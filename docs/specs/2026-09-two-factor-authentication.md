@@ -1,7 +1,7 @@
 # Feature Spec: Two-factor authentication — TOTP and passkeys
 
 - Spec ID: SPEC-2026-09-two-factor-authentication
-- Status: In Progress (PR 1 of 3 landed — see §10)
+- Status: In Progress (PRs 1–2 of 3 landed — see §10)
 - Scope: Major
 - Type: Feature
 - Owners: @splattner
@@ -282,6 +282,12 @@ All paths are under `/api/v1/auth/`.
 | `passkeys/authenticate/begin/` | POST | `AllowAny` | `{email?}` → WebAuthn `PublicKeyCredentialRequestOptions` with `userVerification: "required"`. Challenge cached 5 min |
 | `passkeys/authenticate/complete/` | POST | `AllowAny` | Verifies the assertion, **refusing one whose `uv` flag is false**, → sets auth cookies. **No password involved** (D1, ADR 0020) |
 
+**As shipped in PR 2.** `auth.login` carries `metadata.method` `password+totp` or `recovery_code`
+for the second-step logins; the `oauth` value listed in §5.6 is **not** emitted — OAuth sign-ins
+keep their existing `oauth.login` event, which already names the provider. `passkey` arrives with
+PR 3. `token/mfa/` returns `400` for every failure (bad, replayed or expired), each audited as
+`auth.mfa.challenge_failed` with the reason.
+
 **The challenge token** is `django.core.signing.TimestampSigner(salt="accounts.mfa.challenge")`
 over the user PK, with `max_age = MFA_CHALLENGE_TTL` (5 minutes). A signed token rather than a
 JWT deliberately: it is structurally incapable of authenticating a request, because no
@@ -298,12 +304,19 @@ server-side nonce would buy nothing and add state.
 | `me/mfa/` | GET | `IsAuthenticated` | `{totp: {...}\|null, passkeys: [...], recovery_codes_remaining: int, required: bool, grace_until: date\|null}` |
 | `me/mfa/totp/` | POST | `IsAuthenticated` | Begin enrolment. Creates an **unconfirmed** device, returns `{provisioning_uri, secret, qr_svg}`. Replaces any existing unconfirmed device |
 | `me/mfa/totp/confirm/` | POST | `IsAuthenticated` | `{code}` → sets `confirmed_at`, issues ten recovery codes, returns them **once** |
-| `me/mfa/totp/` | DELETE | `IsAuthenticated` | Removes the device. Refused with `409` if policy requires a factor and no passkey remains |
+| `me/mfa/totp/` | DELETE | `IsAuthenticated` | Removes the device **and its recovery codes**, audited as `auth.mfa.removed`. Refused with `409` if policy requires a factor and no passkey remains *(the guard lands with the policy fields in PR 3)* |
 | `me/mfa/recovery-codes/` | POST | `IsAuthenticated` | Regenerates all ten, returns them once |
 | `me/passkeys/` | GET | `IsAuthenticated` | List (`WebAuthnCredentialSerializer`) |
 | `me/passkeys/register/begin/` | POST | `IsAuthenticated` | `PublicKeyCredentialCreationOptions`; `residentKey: "preferred"`, `userVerification: "required"` (ADR 0020) |
 | `me/passkeys/register/complete/` | POST | `IsAuthenticated` | `{credential, name}` → verifies attestation, stores the credential |
 | `me/passkeys/<uuid:pk>/` | PATCH, DELETE | `IsAuthenticated` | Rename or remove own credential. Same `409` guard as TOTP removal |
+
+**As shipped in PR 2:** `me/mfa/` already has its final shape but reports `passkeys: []`,
+`required: false` and `grace_until: null` until PR 3 fills them in. `me/mfa/totp/` POST returns
+`409` while an *active* device exists (remove it first) and `503` naming `MFA_ENCRYPTION_KEYS`
+when the key is unset. `me/mfa/recovery-codes/` POST returns `409` without an active device.
+`me/mfa/totp/confirm/` audits `auth.mfa.enrolled` (`method=totp`). None of these endpoints is on
+`ACCOUNTS_API_KEY_ALLOWLIST`, so API keys are refused by default (tested).
 
 `me/mfa/totp/` POST returns the secret in plain text **once**, because the user must be able to
 type it into an authenticator that cannot scan a QR code. `qr_svg` is rendered server-side with
@@ -324,11 +337,11 @@ behalf (`2026-03-community-and-access.md`).
 
 | Door | Behaviour | Rationale |
 |---|---|---|
-| OAuth token-exchange (4) | The IdP owns authentication. If the assertion carries `amr` naming an MFA method, honour it and do **not** double-challenge. A new per-provider `OAuthProvider.require_mfa_claim` (default `False`) makes requiring that assertion opt-in | Double-challenging a user who already did WebAuthn at their IdP is friction with no security gain |
+| OAuth token-exchange (4) | The IdP owns authentication. If the assertion carries `amr` naming an MFA method, honour it and do **not** double-challenge. A new per-provider `OAuthProvider.require_mfa_claim` (default `False`, migration `0017`, editable in the admin provider form) makes requiring that assertion opt-in. The claim is read from the **userinfo** response — the codebase does not parse ID tokens — and accepted as a list or a space-separated string against the RFC 8176 method values | Double-challenging a user who already did WebAuthn at their IdP is friction with no security gain |
 | Magic link (5) | If the account has an active factor, the consume endpoint returns an MFA challenge instead of a session | MFA must not be bypassable by requesting an email |
 | Onboarding link (6) | Same as (5) | Same |
 | Email verification (2) | Unaffected in practice — reached before a factor can exist — but the code must not *assume* it, so it runs the same check | Defensive; a re-verification flow later would otherwise open a hole |
-| Initial password (3) | Same as (2) | Same |
+| Initial password (3) | `set_initial_password` is `IsAuthenticated`, so it never mints a session from an unauthenticated request; there is no moment to challenge. Documented in the view rather than enforced | The door exists for a session the user already holds |
 | Impersonation (7) | The target is **not** challenged; the admin already authenticated | The right control here is step-up on the admin's side, which is out of scope (§2) |
 
 ### 5.5 Throttling
@@ -339,6 +352,8 @@ New scope in `accounts/throttling.py` and `DEFAULT_THROTTLE_RATES`:
 |---|---|---|---|
 | `auth_mfa` | `10/hour` | The **user PK** from the challenge token | The per-account brake that `auth_login` (40/hour per IP) does not provide |
 | `auth_passkey` | `30/hour` | Source IP | Bounds assertion-verification cost |
+
+*PR 2 ships `auth_mfa` only, overridable with `AUTH_MFA_THROTTLE_RATE`; `auth_passkey` arrives with the passkey endpoints in PR 3. A challenge token that cannot be resolved falls back to per-IP keying.*
 
 `AuthMfaThrottle` keying on the account rather than the IP is the point: credential stuffing
 spread across a botnet is invisible to a per-IP budget.
@@ -390,7 +405,10 @@ WEBAUTHN_ORIGIN  = env("WEBAUTHN_ORIGIN", default="http://localhost:5173")
 A mismatch between `WEBAUTHN_RP_ID` and the served domain makes every ceremony fail with an
 opaque browser error, so the system check in §4.5 also warns when `DEBUG` is false and
 `WEBAUTHN_RP_ID` is still `localhost`. The Helm chart's values gain all three plus
-`MFA_ENCRYPTION_KEYS` (as a secret reference, never a plain value).
+`MFA_ENCRYPTION_KEYS`. **As shipped (PR 2):** `mfaEncryptionKeys.{value, existingSecret}`, wired
+to the backend deployment only (workers never touch a TOTP secret), following the `secretKey`
+pattern — a plain `value` is accepted for parity, but an `existingSecret` reference is the
+documented production route. The three WebAuthn settings follow in PR 3.
 
 **Challenge storage.** WebAuthn ceremony challenges live in the Django cache (Redis in
 production) under `mfa:webauthn:{user_pk|session_key}` with a 5-minute TTL — they are
@@ -549,6 +567,16 @@ logic in `TotpDevice.verify()` ships now) carries `TotpDeviceTests` (9) and
 `MfaRecoveryCodeTests` (2) — 11 total. `accounts/test_system_health.py` gains 2 tests for the
 `mfa` probe. 23 tests, all passing alongside the full existing suite unchanged.
 
+**As shipped in PR 2**: `accounts/test_mfa.py` carries `TotpEnrolmentTests` (14), `TotpLoginTests`
+(7), `MfaDoorTests` (5, the OAuth doors moved out) and `MfaThrottleTests` (2) — 28 tests. Beyond
+the tables below it also covers active-device re-enrolment refusal, DELETE, recovery-code
+regeneration invalidating the old set, the status endpoint, and API-key refusal. OAuth's door
+lives in `accounts/test_oauth.py` as `OAuthMfaClaimTests` (5: refused without an MFA `amr` value,
+refused with no claim at all, accepted with one, accepted as a space-separated string, and a
+provider without the requirement unaffected). TOTP tests pin the clock
+with a `totp_step` helper so replay protection never collides with a real 30-second step. The
+`MfaAdminTests`, `PasskeyTests`, policy-guard test and passkey throttle wait for PR 3.
+
 ### Backend — `accounts/test_mfa.py` (new)
 
 **`TotpEnrolmentTests`** (8 tests):
@@ -659,7 +687,7 @@ Three PRs, in order. Each is independently releasable.
 | PR | Contents | Why this boundary |
 |---|---|---|
 | 1 ✅ | `mfa_crypto.py`, `MFA_ENCRYPTION_KEYS`, system check, `TotpDevice` + `MfaRecoveryCode` models and migrations, the `auth.mfa.*` audit types | The crypto and audit substrate, with no user-visible change — reviewable on its own merits |
-| 2 | TOTP enrolment and the two-step login, the six other doors, throttling, `AccountProfilePage` security section, login challenge step | The first shippable factor |
+| 2 ✅ | TOTP enrolment and the two-step login, the six other doors, throttling, `AccountProfilePage` security section, login challenge step | The first shippable factor |
 | 3 | `WebAuthnCredential`, passkey registration and passwordless authentication, policy fields, enrolment gate, admin reset | The larger surface, once the flow it plugs into is proven |
 
 ADR 0020 should be written alongside PR 1, recording two decisions a future maintainer will

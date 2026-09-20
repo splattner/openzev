@@ -251,8 +251,31 @@ Audit log**) and to **ZEV owners** for their own communities (scoped events,
 
 **Account Security:**
 - Users should use strong passwords
-- Consider enabling multi-factor authentication (if available)
+- Turn on two-factor authentication under **My Account** (see below)
 - Don't write passwords down
+
+## Two-Factor Authentication
+
+Any user can add an authenticator app (Google Authenticator, Aegis, 1Password, …) as a second
+step at sign-in.
+
+**Turn it on:**
+1. Open **My Account** and find the **Two-factor authentication** section
+2. Click **Set up two-factor authentication**, scan the QR code with your authenticator app (or type the secret in by hand)
+3. Enter the 6-digit code the app shows to confirm
+4. Save the ten **recovery codes** shown once — each works a single time if you lose your phone
+
+**Signing in afterwards:** enter your password as usual, then the 6-digit code. Use
+**Use a recovery code instead** if you don't have your phone. The same code is asked for when you
+sign in through an emailed invoice link or onboarding link. Signing in through an external
+identity provider is unaffected unless the administrator requires the provider to assert a second
+factor.
+
+**Lost your phone and your recovery codes?** Ask an administrator to reset your second factor
+(coming with the next release); until then, an administrator cannot see or recover your secret.
+
+The server needs an encryption key (`MFA_ENCRYPTION_KEYS`, see the deployment docs) before
+anyone can enrol; without it the section shows an error naming the setting.
 
 ## Multi-ZEV Setups
 

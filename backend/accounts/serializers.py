@@ -6,7 +6,7 @@ from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from urllib.parse import urlparse
 from .jwt_utils import add_custom_claims
-from .models import ApiKey, AppSettings, FeatureFlag, OAuthProvider, SocialAccount, User, UserRole, VatRate
+from .models import ApiKey, AppSettings, FeatureFlag, OAuthProvider, SocialAccount, TotpDevice, User, UserRole, VatRate
 from zev.models import Zev
 
 
@@ -150,6 +150,16 @@ class FeatureFlagSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "name", "description", "updated_at"]
 
 
+class TotpDeviceSerializer(serializers.ModelSerializer):
+    """Never exposes ``secret`` or ``secret_encrypted`` — the secret is
+    returned separately, once, only from the enrolment-begin endpoint."""
+
+    class Meta:
+        model = TotpDevice
+        fields = ["id", "confirmed_at", "created_at"]
+        read_only_fields = fields
+
+
 class OAuthProviderSerializer(serializers.ModelSerializer):
     """Admin CRUD serializer; ``client_secret`` is write-only and a blank
     value on update leaves the stored secret untouched."""
@@ -233,7 +243,7 @@ class OAuthProviderSerializer(serializers.ModelSerializer):
             "id", "name", "display_name", "client_id", "client_secret",
             "has_client_secret",
             "authorization_url", "token_url", "userinfo_url", "redirect_url", "scope",
-            "enabled", "created_at", "updated_at",
+            "enabled", "require_mfa_claim", "created_at", "updated_at",
         ]
         read_only_fields = ["id", "created_at", "updated_at"]
 

@@ -194,6 +194,50 @@ export interface RegisterInput {
     email: string
 }
 
+/** spec 2026-09-two-factor-authentication.md §4.1 — never carries the secret. */
+export interface TotpDevice {
+    id: string
+    confirmed_at: string | null
+    created_at: string
+}
+
+/** A WebAuthn credential. Not usable yet — no route returns one until
+ * passkey registration lands — but MfaStatus's shape is stable across that
+ * PR boundary, so the type exists now. */
+export interface Passkey {
+    id: string
+    name: string
+    aaguid: string
+    transports: string[]
+    created_at: string
+    last_used_at: string | null
+}
+
+export interface MfaStatus {
+    totp: TotpDevice | null
+    passkeys: Passkey[]
+    recovery_codes_remaining: number
+    /** Always false until AppSettings.mfa_required_roles lands. */
+    required: boolean
+    grace_until: string | null
+}
+
+export interface TotpEnrolment {
+    provisioning_uri: string
+    /** Plain text, once — the user must be able to type it into an
+     * authenticator that cannot scan a QR code. */
+    secret: string
+    qr_svg: string
+}
+
+/** POST /auth/token/ returns this instead of setting cookies when the
+ * account has an active second factor. */
+export interface MfaChallenge {
+    mfa_required: true
+    mfa_token: string
+    methods: ('totp' | 'recovery_code')[]
+}
+
 export interface OAuthProvider {
     id: number
     name: string
@@ -209,6 +253,10 @@ export interface OAuthProviderConfig extends OAuthProvider {
     userinfo_url: string
     redirect_url: string
     scope: string
+    /** Spec 2026-09-two-factor-authentication.md §5.4 door 4: refuse login
+     * unless the provider's userinfo response names an MFA method in its
+     * amr claim. Opt-in; the IdP already owns authentication otherwise. */
+    require_mfa_claim: boolean
     created_at: string
     updated_at: string
 }
@@ -224,6 +272,7 @@ export interface OAuthProviderConfigInput {
     redirect_url: string
     scope: string
     enabled: boolean
+    require_mfa_claim: boolean
 }
 
 export interface SocialAccount {

@@ -2,7 +2,8 @@ from django.urls import path
 from .views import (
     AdminApiKeyDetailView, AdminApiKeyListView,
     ApiKeyDetailView, ApiKeyListCreateView,
-    CustomTokenObtainPairView, CookieTokenRefreshView, logout_view,
+    CustomTokenObtainPairView, CookieTokenRefreshView, TokenMfaView, logout_view,
+    MfaStatusView, MfaRecoveryCodesView, TotpDeviceView, TotpEnrolConfirmView,
     UserListCreateView,
     UserDetailView, me, change_password, app_settings,
     VatRateListCreateView, VatRateDetailView,
@@ -26,6 +27,7 @@ from .views_system import SystemHealthView
 urlpatterns = [
     path("token/", CustomTokenObtainPairView.as_view(), name="token_obtain_pair"),
     path("token/refresh/", CookieTokenRefreshView.as_view(), name="token_refresh"),
+    path("token/mfa/", TokenMfaView.as_view(), name="token-mfa"),
     path("logout/", logout_view, name="logout"),
     path("register/", register, name="register"),
     path("verify-email/", verify_email, name="verify-email"),
@@ -36,6 +38,12 @@ urlpatterns = [
     path("me/", me, name="me"),
     path("me/change-password/", change_password, name="change-password"),
     path("me/set-initial-password/", set_initial_password, name="set-initial-password"),
+    # Deliberately absent from ACCOUNTS_API_KEY_ALLOWLIST (default-deny): a key
+    # must not be able to manage or bypass its own owner's second factor.
+    path("me/mfa/", MfaStatusView.as_view(), name="mfa-status"),
+    path("me/mfa/totp/", TotpDeviceView.as_view(), name="mfa-totp-device"),
+    path("me/mfa/totp/confirm/", TotpEnrolConfirmView.as_view(), name="mfa-totp-confirm"),
+    path("me/mfa/recovery-codes/", MfaRecoveryCodesView.as_view(), name="mfa-recovery-codes"),
     # Deliberately absent from ACCOUNTS_API_KEY_ALLOWLIST: a key that can issue
     # or revoke keys makes revoking a leaked one pointless.
     path("me/api-keys/", ApiKeyListCreateView.as_view(), name="api-key-list-create"),

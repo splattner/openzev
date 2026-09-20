@@ -18,7 +18,11 @@ describe('consumeOnboardingLink', () => {
             prefix: 'abc123',
             s: 'sec-ret',
         })
-        expect(result).toEqual({ zev_name: 'Sonnenberg', participant_name: 'Ada Lovelace' })
+        expect(result).toEqual({
+            mfaRequired: false,
+            zev_name: 'Sonnenberg',
+            participant_name: 'Ada Lovelace',
+        })
     })
 
     it('propagates a 404 rather than translating it', async () => {

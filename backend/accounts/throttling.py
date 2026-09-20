@@ -61,6 +61,31 @@ class AuthOAuthExchangeThrottle(AuthRateThrottle):
     scope = "auth_oauth_exchange"
 
 
+class AuthMfaThrottle(SimpleRateThrottle):
+    """Per-account budget on the MFA challenge-exchange endpoint.
+
+    Keyed on the account named by the challenge token, not the caller's IP:
+    ``auth_login`` already bounds password guessing per IP, but credential
+    stuffing spread across a botnet is invisible to a per-IP budget on the
+    *second* factor — this is the brake that catches guessing one account's
+    TOTP/recovery code from many sources. Falls back to per-IP keying when
+    the token cannot be resolved at all (malformed input), so a flood of
+    garbage requests is still bounded rather than skipping throttling.
+    """
+
+    scope = "auth_mfa"
+
+    def get_cache_key(self, request, view):
+        from . import mfa
+
+        token = (request.data or {}).get("mfa_token", "")
+        try:
+            ident = str(mfa.resolve_challenge(token).pk)
+        except mfa.MfaChallengeError:
+            ident = self.get_ident(request)
+        return self.cache_format % {"scope": self.scope, "ident": ident}
+
+
 class ImportThrottle(UserRateThrottle):
     """Per-user budget for metering imports."""
 

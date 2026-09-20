@@ -55,7 +55,7 @@ def fake_provider_http(*payloads):
     return patch("urllib.request.urlopen", _urlopen)
 
 
-def make_provider(name="testidp", *, enabled=True) -> OAuthProvider:
+def make_provider(name="testidp", *, enabled=True, **overrides) -> OAuthProvider:
     return OAuthProvider.objects.create(
         name=name,
         client_id="client-id",
@@ -65,6 +65,7 @@ def make_provider(name="testidp", *, enabled=True) -> OAuthProvider:
         userinfo_url="https://idp.example/userinfo",
         redirect_url="https://app.example/callback",
         enabled=enabled,
+        **overrides,
     )
 
 
@@ -628,3 +629,77 @@ class OAuthFlowAuditTests(OAuthTestCase):
         self.assertEqual(event.status, AuditEventStatus.DENIED)
         self.assertEqual(event.target_id, str(claimer.pk))
         self.assertEqual(event.metadata_json["reason"], "already_linked_other")
+
+
+class OAuthMfaClaimTests(OAuthTestCase):
+    """Spec 2026-09-two-factor-authentication.md §5.4 door 4: the IdP owns
+    authentication, so this is opt-in per provider — the default leaves OAuth
+    completely unaffected, and only a provider explicitly configured to
+    require it is checked against its own ``amr`` claim."""
+
+    def setUp(self):
+        super().setUp()
+        self.provider.require_mfa_claim = True
+        self.provider.save(update_fields=["require_mfa_claim"])
+
+    def test_login_refused_without_an_mfa_amr_value(self):
+        user = make_user("oauth_mfa_pwd_only", UserRole.PARTICIPANT)
+        SocialAccount.objects.create(provider=self.provider, uid="uid-noamr", user=user)
+        self.start_state("s")
+
+        with fake_provider_http({"access_token": "at"}, {"sub": "uid-noamr", "email": user.email, "amr": ["pwd"]}):
+            resp = self.callback(code="c", state="s")
+
+        self.assertEqual(resp.url, f"{FRONTEND}/login?oauth_error=mfa_claim_missing")
+        event = AuditEvent.objects.get(action_type="oauth.login_failed")
+        self.assertEqual(event.status, AuditEventStatus.DENIED)
+        self.assertEqual(event.metadata_json["reason"], "mfa_claim_missing")
+        self.assertFalse(OAuthExchangeCode.objects.exists())
+
+    def test_missing_amr_claim_entirely_is_refused(self):
+        user = make_user("oauth_mfa_no_claim", UserRole.PARTICIPANT)
+        SocialAccount.objects.create(provider=self.provider, uid="uid-none", user=user)
+        self.start_state("s")
+
+        with fake_provider_http({"access_token": "at"}, {"sub": "uid-none", "email": user.email}):
+            resp = self.callback(code="c", state="s")
+
+        self.assertEqual(resp.url, f"{FRONTEND}/login?oauth_error=mfa_claim_missing")
+
+    def test_login_succeeds_with_an_mfa_amr_value(self):
+        user = make_user("oauth_mfa_satisfied", UserRole.PARTICIPANT)
+        SocialAccount.objects.create(provider=self.provider, uid="uid-amr", user=user)
+        self.start_state("s")
+
+        with fake_provider_http({"access_token": "at"}, {"sub": "uid-amr", "email": user.email, "amr": ["mfa", "pwd"]}):
+            resp = self.callback(code="c", state="s")
+
+        self.assertTrue(resp.url.startswith(f"{FRONTEND}/oauth/callback?code="))
+        self.assertTrue(OAuthExchangeCode.objects.filter(user=user).exists())
+
+    def test_amr_as_a_space_separated_string_is_also_accepted(self):
+        """Some providers send a space-separated string rather than a JSON
+        array — tolerate the OIDC-spirit-compliant shape, not just the
+        textbook one."""
+        user = make_user("oauth_mfa_string_amr", UserRole.PARTICIPANT)
+        SocialAccount.objects.create(provider=self.provider, uid="uid-str", user=user)
+        self.start_state("s")
+
+        with fake_provider_http({"access_token": "at"}, {"sub": "uid-str", "email": user.email, "amr": "pwd otp"}):
+            resp = self.callback(code="c", state="s")
+
+        self.assertTrue(resp.url.startswith(f"{FRONTEND}/oauth/callback?code="))
+
+    def test_provider_without_the_requirement_is_unaffected(self):
+        """The default (require_mfa_claim=False) is today's behaviour,
+        unchanged, regardless of what amr says or doesn't say."""
+        self.provider.require_mfa_claim = False
+        self.provider.save(update_fields=["require_mfa_claim"])
+        user = make_user("oauth_mfa_default", UserRole.PARTICIPANT)
+        SocialAccount.objects.create(provider=self.provider, uid="uid-default", user=user)
+        self.start_state("s")
+
+        with fake_provider_http({"access_token": "at"}, {"sub": "uid-default", "email": user.email}):
+            resp = self.callback(code="c", state="s")
+
+        self.assertTrue(resp.url.startswith(f"{FRONTEND}/oauth/callback?code="))

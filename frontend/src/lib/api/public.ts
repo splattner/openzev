@@ -34,9 +34,20 @@ export async function requestMagicLink(prefix: string, secret: string): Promise<
     await api.post('/public/magic-link/request/', { prefix, s: secret })
 }
 
+/** Either the link produced a session directly, or the linked account has a
+ * second factor and completing sign-in needs submitMfaChallenge() first —
+ * see spec 2026-09-two-factor-authentication.md §5.4, doors 5 and 6. */
+export type LinkConsumeResult<T extends object = object> =
+    | ({ mfaRequired: false } & T)
+    | { mfaRequired: true; mfaToken: string; methods: ('totp' | 'recovery_code')[] }
+
 /** Trade a one-time link for a session. Throws on an expired or used link. */
-export async function consumeMagicLink(token: string): Promise<void> {
-    await api.post('/public/magic-link/consume/', { token })
+export async function consumeMagicLink(token: string): Promise<LinkConsumeResult> {
+    const { data } = await api.post('/public/magic-link/consume/', { token })
+    if (data?.mfa_required) {
+        return { mfaRequired: true, mfaToken: data.mfa_token, methods: data.methods }
+    }
+    return { mfaRequired: false }
 }
 
 export interface OnboardingConsumeResult {
@@ -52,9 +63,15 @@ export interface OnboardingConsumeResult {
  * Unlike a magic link, this can be called again later — the link is not
  * spent by using it, only by being revoked.
  */
-export async function consumeOnboardingLink(prefix: string, secret: string): Promise<OnboardingConsumeResult> {
-    const { data } = await api.post<OnboardingConsumeResult>('/public/onboarding/consume/', { prefix, s: secret })
-    return data
+export async function consumeOnboardingLink(
+    prefix: string,
+    secret: string,
+): Promise<LinkConsumeResult<OnboardingConsumeResult>> {
+    const { data } = await api.post('/public/onboarding/consume/', { prefix, s: secret })
+    if (data?.mfa_required) {
+        return { mfaRequired: true, mfaToken: data.mfa_token, methods: data.methods }
+    }
+    return { mfaRequired: false, zev_name: data.zev_name, participant_name: data.participant_name }
 }
 
 export interface PublicInvoiceChart {

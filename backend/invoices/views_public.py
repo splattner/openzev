@@ -24,7 +24,7 @@ from rest_framework.decorators import (
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
-from accounts import magic_links
+from accounts import magic_links, mfa
 from accounts.cookies import set_auth_cookies
 from accounts.jwt_utils import make_jwt_for_user
 from accounts.throttling import InvoiceLinkThrottle, MagicLinkRequestThrottle
@@ -267,6 +267,17 @@ def magic_link_consume(request):
         target_display=user.username,
         summary=f"Signed in with a link from an invoice: {user.username}.",
     )
+
+    if mfa.has_active_factor(user):
+        # The link is already burned above — this only gates whether it
+        # hands over a session or a challenge for one. MFA must not be
+        # bypassable by requesting an emailed link instead of using a
+        # password. See spec 2026-09-two-factor-authentication.md §5.4 door 5.
+        return Response({
+            "mfa_required": True,
+            "mfa_token": mfa.issue_challenge(user),
+            "methods": ["totp"],
+        })
 
     tokens = make_jwt_for_user(user)
     response = Response({"detail": "Signed in."})
