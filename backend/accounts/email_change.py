@@ -13,9 +13,8 @@ password changes, or once someone else takes the address. See spec
 2026-03-community-and-access.md §5.6a.
 """
 
-import hashlib
-
 from django.core import signing
+from django.utils.crypto import salted_hmac
 
 from .models import User
 
@@ -30,10 +29,15 @@ class EmailChangeError(Exception):
 
 def _state_fingerprint(user: User) -> str:
     """Stands for "the account as it was when the link was issued": its current
-    address and password. Either changing makes the fingerprint differ, which is
-    what makes a link single-use and mortal — and folding both into one short
-    value keeps the emailed URL short."""
-    return hashlib.sha256(f"{user.email}\x00{user.password}".encode()).hexdigest()[:16]
+    address and password hash. Either changing makes the fingerprint differ,
+    which is what makes a link single-use and mortal; folding both into one short
+    value keeps the emailed URL short.
+
+    A keyed MAC (``salted_hmac``, as in Django's own password-reset tokens) rather
+    than a bare hash of the stored password hash: nothing can be recomputed from a
+    leaked token without the server's secret key.
+    """
+    return salted_hmac(SALT, f"{user.pk}\x00{user.email}\x00{user.password}").hexdigest()[:16]
 
 
 def address_in_use(email: str, *, excluding: User) -> bool:
