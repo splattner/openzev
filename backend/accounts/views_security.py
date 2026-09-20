@@ -14,7 +14,7 @@ from rest_framework.views import APIView
 from audit.models import AuditActionCategory, AuditEventStatus
 from audit.services import build_diff, record_audit_event
 
-from . import email_change, emails
+from . import email_change, emails, notifications
 from .jwt_utils import impersonator_of
 from .models import User
 from .permissions import IsAdmin
@@ -203,4 +203,5 @@ class AdminRevokeSessionsView(APIView):
             f"Signed out every session of {target.email or target.username}.",
             actor=request.user, metadata={"scope": "all"},
         )
+        notifications.notify(target, "sessions_revoked_by_admin", request=request)
         return Response({"detail": "All sessions were signed out."})

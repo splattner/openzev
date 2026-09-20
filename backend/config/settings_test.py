@@ -40,3 +40,7 @@ REST_FRAMEWORK = {
 # constants directly.
 IMPORT_MAX_ROWS = 200_000
 TRANSFER_MAX_DECOMPRESSED_MB = 500
+
+# Run Celery tasks inline: the suite has no broker, and a task that is queued
+# but never run is a notification the tests could not observe.
+CELERY_TASK_ALWAYS_EAGER = True

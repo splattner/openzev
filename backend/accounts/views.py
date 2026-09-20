@@ -20,7 +20,7 @@ from rest_framework_simplejwt.serializers import TokenRefreshSerializer
 from rest_framework_simplejwt.settings import api_settings as jwt_settings
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView
-from . import mfa, mfa_crypto
+from . import mfa, mfa_crypto, notifications
 from .api_keys import default_api_key_expiry, generate_key
 from .models import (
     ApiKey,
@@ -518,6 +518,7 @@ def change_password(request):
     )
     response = Response({"detail": "Password updated successfully."})
     keep_current_session(request, response, request.user)
+    notifications.notify(request.user, "password_changed", request=request)
     return response
 
 
@@ -914,6 +915,7 @@ class TotpDeviceView(APIView):
                 status=status.HTTP_409_CONFLICT,
             )
 
+        was_active = device.is_active
         device.delete()
         mfa.drop_recovery_codes_if_unprotected(request.user)
 
@@ -928,6 +930,10 @@ class TotpDeviceView(APIView):
             summary=f"Removed two-factor authentication for {request.user.email or request.user.username}.",
             user=request.user,
         )
+        # Discarding an enrolment that was never confirmed changes nothing about
+        # how the account is secured, so it is not worth a notice.
+        if was_active:
+            notifications.notify(request.user, "totp_removed", request=request)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
@@ -967,6 +973,7 @@ class TotpEnrolConfirmView(APIView):
             user=request.user,
             metadata={"method": "totp"},
         )
+        notifications.notify(request.user, "totp_enabled", request=request)
         return Response({"recovery_codes": recovery_codes})
 
 
@@ -993,6 +1000,7 @@ class MfaRecoveryCodesView(APIView):
             summary=f"Regenerated recovery codes for {request.user.email or request.user.username}.",
             user=request.user,
         )
+        notifications.notify(request.user, "recovery_codes_regenerated", request=request)
         return Response({"recovery_codes": recovery_codes})
 
 
@@ -1034,6 +1042,10 @@ class AdminMfaResetView(APIView):
             user=request.user,
             metadata={"removed": removed},
         )
+        # Only when there was something to remove: resetting an account with no
+        # factors changes nothing the person could act on.
+        if any(removed.values()):
+            notifications.notify(target, "mfa_reset_by_admin", request=request)
         return Response({"removed": removed})
 
 

@@ -526,6 +526,43 @@ All four new endpoints are absent from `ACCOUNTS_API_KEY_ALLOWLIST`
 Frontend: `SessionsCard` on the Security tab ("Sign out other devices"), and
 "Sign out everywhere" in the admin accounts row menu (not on the admin's own row).
 
+### 5.6c Security notification emails
+
+`accounts/notifications.py`. Every change to how an account is secured emails
+that account's own address a short, fixed notice — not an editable
+`EMAIL_TEMPLATE_DEFAULTS` entry, and it cannot be turned off (a security notice
+an admin can reword can be made to stop saying what happened).
+
+| Trigger | Event | Names |
+|---|---|---|
+| `POST /me/passkeys/register/complete/` | `passkey_added` | the passkey |
+| `DELETE /me/passkeys/{id}/` | `passkey_removed` | the passkey |
+| `POST /me/mfa/totp/confirm/` | `totp_enabled` | — |
+| `DELETE /me/mfa/totp/` (only if the device was confirmed) | `totp_removed` | — |
+| `POST /me/mfa/recovery-codes/` | `recovery_codes_regenerated` | — |
+| `POST /me/change-password/` | `password_changed` | — |
+| `DELETE /users/{id}/mfa/` (only if something was removed) | `mfa_reset_by_admin` | — |
+| `POST /users/{id}/revoke-sessions/` | `sessions_revoked_by_admin` | — |
+
+Not sent for: an abandoned (unconfirmed) TOTP enrolment either begun or
+discarded; `POST /me/sessions/revoke/` (the person's own action, on themselves);
+a `DELETE /users/{id}/mfa/` that had nothing to remove. The email-change
+confirmation and notice (`emails.py`, §5.6a) are part of that flow and are not
+`notifications.py` events.
+
+`notify(user, event, *, request=None, detail="")` is called as the last step of
+each action above, after it has already succeeded, and never raises: a
+notification failure must not turn a completed action into an error response.
+It queues `accounts.tasks.send_security_notification` (Celery; `autoretry_for`
+`OSError`/`SMTPException`, backoff, 3 retries) — a slow mail server cannot hold
+up the request. `django.conf.settings.EMAIL_TIMEOUT` (default 20s,
+`EMAIL_TIMEOUT` env var) bounds that server-side. The task re-reads the account
+by id at send time and sends nothing if it is gone, deactivated, or has no
+address by then. `compose(user, event, *, detail, when, ip)` is pure (no I/O),
+so its wording is unit-tested directly; `ip` comes from
+`request.audit_ip_address` (the audit middleware) and is omitted from the body
+when unknown.
+
 ### 5.7 Impersonation
 
 **Endpoint:** `POST /api/v1/auth/users/{user_id}/impersonate/` (IsAuthenticated)
@@ -1317,6 +1354,7 @@ lists the test classes per module (test counts are the `test_*` methods).
 | Module | Classes | Tests | Coverage |
 |---|---|---|---|
 | `test_session_hardening.py` | 5 | 44 | Self-service profile lockdown (protected fields rejected, repeats accepted, names/preferred community still editable); session revocation (revoked/new/legacy tokens, refresh refusal, deactivation, stale-instance save cannot revive, API keys and impersonation); password change and revoke endpoints; verified email change (request/confirm, single-use, dies on password/address/deactivation/expiry, no enumeration, throttle, mail failure, API keys) |
+| `test_security_notifications.py` | 6 | 26 | Every event composes (subject, body, `{detail}` filled, admin vs. self advice, no-turn-off line); guards (no address, inactive, gone/deactivated by send time); hooked into passkey add/remove, TOTP enable/disable (not for an abandoned enrolment), recovery-code regeneration, password change (not on failure), admin MFA reset (not when nothing was removed) and admin session revocation (not for the self-service one); a broker or mail failure never fails the triggering request |
 | `test_admin_users_list.py` | 1 | 7 | Admin user list: memberships per relationship (participant, owner-who-is-also-participant merged into one, owner of several communities sorted by name), confirmed-only `mfa_methods`, fixed query count, `/auth/me/` unaffected |
 | `test_api_keys.py` | 10 | 81 | Generation, hashing, auth, read-only keys, scope deny-list, audit, throttling, CRUD, admin management |
 | `test_oauth.py` | 12 | 55 | Provider listing, initiate, callback guards/redirects, link flow, social accounts, audit, `require_mfa_claim` (`OAuthMfaClaimTests`) |

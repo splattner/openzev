@@ -15,7 +15,7 @@ from rest_framework.views import APIView
 from audit.models import AuditActionCategory, AuditEventStatus
 from audit.services import record_audit_event
 
-from . import mfa, passkeys
+from . import mfa, notifications, passkeys
 from .cookies import set_auth_cookies
 from .jwt_utils import make_jwt_for_user
 from .models import User, WebAuthnCredential
@@ -121,6 +121,7 @@ class PasskeyRegisterCompleteView(APIView):
             f"Enabled a passkey for {user.email or user.username}.",
             actor=user, metadata={"method": "passkey"},
         )
+        notifications.notify(user, "passkey_added", request=request, detail=name)
         return Response(
             {"passkey": WebAuthnCredentialSerializer(stored).data, "recovery_codes": recovery_codes},
             status=status.HTTP_201_CREATED,
@@ -164,6 +165,7 @@ class PasskeyDetailView(APIView):
             f"Removed passkey '{name}' for {user.email or user.username}.",
             actor=user, metadata={"name": name},
         )
+        notifications.notify(user, "passkey_removed", request=request, detail=name)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 

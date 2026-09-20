@@ -366,6 +366,13 @@ Under **My Account → Security → Sessions**, **Sign out other devices** ends 
 one you are using. Do it if you lost a device or suspect someone else has access. There is no list
 of individual devices — the action always covers all of them.
 
+OpenZEV also emails you whenever how your account is secured changes — a passkey or authenticator
+app added or removed, recovery codes regenerated, your password changed, or an administrator
+resetting your two-factor authentication or signing you out everywhere. It always goes to your own
+address, says what happened and when, and cannot be turned off — think of it as a smoke detector for
+your account. If one of these arrives and you did not do it, change your password and check with
+your administrator.
+
 Sessions on other devices also end automatically when you:
 
 - change your password (you stay signed in on the device you used),
