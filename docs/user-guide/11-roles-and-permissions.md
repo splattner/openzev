@@ -251,13 +251,13 @@ Audit log**) and to **ZEV owners** for their own communities (scoped events,
 
 **Account Security:**
 - Users should use strong passwords
-- Turn on two-factor authentication under **My Account** (see below)
+- Turn on two-factor authentication under **My Account → Security** (see below)
 - Don't write passwords down
 
 ## Two-Factor Authentication
 
 Every user can protect their account with a **passkey**, an **authenticator app**, or both. Set them
-up under **My Account → Two-Factor Authentication**.
+up under **My Account → Security → Two-Factor Authentication**.
 
 ### Passkeys (no password needed)
 

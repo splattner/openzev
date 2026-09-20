@@ -12,8 +12,8 @@ up in the audit log under its own name.
 
 ## Creating a key
 
-1. Open **Account → Profile**.
-2. Scroll to **API Keys** and choose **New API key**.
+1. Open **Account → API keys**.
+2. Choose **New API key**.
 3. Give it a name describing what will use it — `nightly consumption export`
    beats `key 1` when you are deciding six months later whether it is still
    needed.

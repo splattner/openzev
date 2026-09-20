@@ -477,7 +477,13 @@ single-use by construction and must not outlive the ceremony.
 
 **File:** `frontend/src/pages/AccountProfilePage.tsx` · Route `/account`
 
-New **Security** section:
+**As shipped:** the page is three tabs — Profile, **Security**, API keys — with the tab in `?tab=`
+(`features/account/accountTabs.ts`). Security holds the password card, linked accounts and the
+two-factor card (`TwoFactorSection`). Panels stay mounted while hidden, because recovery codes and a
+new API key are shown once in component state and would otherwise be lost on a tab switch. The
+enrolment gate links to `/account?tab=security`.
+
+The **Security** tab's two-factor card contains:
 
 - **Passkeys** — list with nickname, created and last-used dates, a rename and a remove action,
   and an "Add a passkey" button calling `navigator.credentials.create()`.

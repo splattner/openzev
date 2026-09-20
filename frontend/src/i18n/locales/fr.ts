@@ -399,6 +399,11 @@ export const fr = {
         unlinkConfirmTitle: 'Délier le compte ?',
         unlinkConfirmMessage: 'Supprimer le lien avec {{provider}} ? Vous pouvez le rétablir à tout moment.',
         unlinkSuccess: 'Lien supprimé.',
+        tabs: {
+            profile: 'Profil',
+            security: 'Sécurité',
+            apiKeys: 'Clés API',
+        },
         mfa: {
             section: 'Authentification à deux facteurs',
             description: 'Protégez votre compte avec un code à usage unique généré par une application d\'authentification.',

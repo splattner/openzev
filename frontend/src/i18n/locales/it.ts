@@ -399,6 +399,11 @@ export const it = {
         unlinkConfirmTitle: 'Scollegare l\'account?',
         unlinkConfirmMessage: 'Rimuovere il collegamento con {{provider}}? Puoi ricrearlo in qualsiasi momento.',
         unlinkSuccess: 'Collegamento rimosso.',
+        tabs: {
+            profile: 'Profilo',
+            security: 'Sicurezza',
+            apiKeys: 'Chiavi API',
+        },
         mfa: {
             section: 'Autenticazione a due fattori',
             description: 'Proteggi il tuo account con un codice monouso generato da un\'app di autenticazione.',

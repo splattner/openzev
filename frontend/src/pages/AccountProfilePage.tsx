@@ -1,36 +1,37 @@
-import { useEffect, useState } from 'react'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useEffect } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { useSearchParams } from 'react-router-dom'
-import { Skeleton } from '@mantine/core'
-import { useReducedMotion } from '@mantine/hooks'
+import { Tabs } from '@mantine/core'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '../lib/auth'
 import { useToast } from '../lib/toast'
-import { changePassword, deleteSocialAccount, fetchOAuthProviders, fetchSocialAccounts, oauthLinkInitiate, updateProfile } from '../lib/api/auth'
 import { queryKeys } from '../lib/api/queryKeys'
 import { ConfirmDialog, useConfirmDialog } from '../components/ConfirmDialog'
+import { ACCOUNT_TABS, resolveAccountTab, type AccountTab } from '../features/account/accountTabs'
 import { ApiKeysSection } from '../features/account/ApiKeysSection'
+import { LinkedAccountsCard } from '../features/account/LinkedAccountsCard'
+import { PasswordCard } from '../features/account/PasswordCard'
+import { ProfileCard } from '../features/account/ProfileCard'
 import { TwoFactorSection } from '../features/account/TwoFactorSection'
 
+/**
+ * The signed-in user's own account, in three tabs: Profile (who you are),
+ * Security (how you sign in: password, two-factor, linked providers) and API
+ * keys (scripted access). The tab lives in `?tab=` so a link — the enrolment
+ * gate's, an OAuth return — can land on the right one.
+ */
 export function AccountProfilePage() {
     const { t } = useTranslation()
-    const animate = !useReducedMotion()
     const [searchParams, setSearchParams] = useSearchParams()
-    const { user, refreshUser } = useAuth()
+    const { user } = useAuth()
     const { pushToast } = useToast()
     const queryClient = useQueryClient()
     const { dialog, confirm, handleConfirm, handleCancel, isLoading: dialogLoading } = useConfirmDialog()
 
-    const socialAccountsQuery = useQuery({
-        queryKey: queryKeys.auth.socialAccounts(),
-        queryFn: fetchSocialAccounts,
-    })
-    const oauthProvidersQuery = useQuery({
-        queryKey: queryKeys.auth.oauthProviders(),
-        queryFn: fetchOAuthProviders,
-    })
+    const activeTab = resolveAccountTab(searchParams, { mustChangePassword: Boolean(user?.must_change_password) })
 
-    // Handle oauth_linked / oauth_error query params
+    // Handle oauth_linked / oauth_error query params (the OAuth link callback
+    // redirects here). resolveAccountTab has already opened Security for them.
     useEffect(() => {
         const linked = searchParams.get('oauth_linked')
         const oauthError = searchParams.get('oauth_error')
@@ -39,131 +40,20 @@ export function AccountProfilePage() {
             pushToast(t('account.linkSuccess'), 'success')
             const next = new URLSearchParams(searchParams)
             next.delete('oauth_linked')
+            next.set('tab', 'security')
             setSearchParams(next, { replace: true })
         } else if (oauthError) {
             pushToast(t('auth.oauth.errors.generic', { code: oauthError }), 'error')
             const next = new URLSearchParams(searchParams)
             next.delete('oauth_error')
+            next.set('tab', 'security')
             setSearchParams(next, { replace: true })
         }
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
 
-    const [profileForm, setProfileForm] = useState({
-        email: user?.email || '',
-        first_name: user?.first_name || '',
-        last_name: user?.last_name || '',
-    })
-
-    const [passwordForm, setPasswordForm] = useState({
-        oldPassword: '',
-        newPassword: '',
-        confirmPassword: '',
-    })
-
-    const [linkingProvider, setLinkingProvider] = useState<string | null>(null)
-
-    useEffect(() => {
-        setProfileForm({
-            email: user?.email || '',
-            first_name: user?.first_name || '',
-            last_name: user?.last_name || '',
-        })
-    }, [user])
-
-    const profileMutation = useMutation({
-        mutationFn: () => updateProfile(profileForm),
-        onSuccess: () => {
-            queryClient.refetchQueries({ queryKey: queryKeys.auth.me() })
-            pushToast(t('account.profileUpdatedSuccess'), 'success')
-        },
-        onError: (error: any) => {
-            const message = error.response?.data?.detail || t('common.error')
-            pushToast(message, 'error')
-        },
-    })
-
-    const passwordMutation = useMutation({
-        mutationFn: () => changePassword(passwordForm.oldPassword, passwordForm.newPassword),
-        onSuccess: async () => {
-            setPasswordForm({ oldPassword: '', newPassword: '', confirmPassword: '' })
-            await refreshUser()
-            pushToast(t('account.passwordChangedSuccess'), 'success')
-        },
-        onError: (error: any) => {
-            const message = error.response?.data?.detail || error.response?.data?.old_password?.[0] || t('common.error')
-            pushToast(message, 'error')
-        },
-    })
-
-    const unlinkMutation = useMutation({
-        mutationFn: (id: number) => deleteSocialAccount(id),
-        onSuccess: () => {
-            void queryClient.invalidateQueries({ queryKey: queryKeys.auth.socialAccounts() })
-            pushToast(t('account.unlinkSuccess'), 'success')
-        },
-        onError: () => {
-            pushToast(t('common.error'), 'error')
-        },
-    })
-
-    async function handleUnlink(id: number, displayName: string) {
-        confirm({
-            title: t('account.unlinkConfirmTitle'),
-            message: t('account.unlinkConfirmMessage', { provider: displayName }),
-            confirmText: t('account.unlinkAccount'),
-            isDangerous: true,
-            onConfirm: () => unlinkMutation.mutate(id),
-        })
-    }
-
-    async function handleLink(providerSlug: string) {
-        setLinkingProvider(providerSlug)
-        try {
-            const { redirect_url } = await oauthLinkInitiate(providerSlug)
-            window.location.assign(redirect_url)
-        } catch {
-            pushToast(t('auth.oauth.errors.initFailed'), 'error')
-            setLinkingProvider(null)
-        }
-    }
-
-    const handleProfileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const { name, value } = e.target
-        setProfileForm((prev) => ({ ...prev, [name]: value }))
-    }
-
-    const handlePasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const { name, value } = e.target
-        setPasswordForm((prev) => ({ ...prev, [name]: value }))
-    }
-
-    const handleProfileSubmit = (e: React.FormEvent) => {
-        e.preventDefault()
-        profileMutation.mutate()
-    }
-
-    const handlePasswordSubmit = (e: React.FormEvent) => {
-        e.preventDefault()
-
-        if (!passwordForm.oldPassword.trim()) {
-            pushToast(t('account.oldPasswordRequired'), 'error')
-            return
-        }
-        if (!passwordForm.newPassword.trim()) {
-            pushToast(t('account.newPasswordRequired'), 'error')
-            return
-        }
-        if (passwordForm.newPassword !== passwordForm.confirmPassword) {
-            pushToast(t('account.passwordsDoNotMatch'), 'error')
-            return
-        }
-        if (passwordForm.newPassword.length < 8) {
-            pushToast(t('account.passwordTooShort'), 'error')
-            return
-        }
-
-        passwordMutation.mutate()
+    function setActiveTab(tab: AccountTab) {
+        setSearchParams({ tab })
     }
 
     return (
@@ -180,219 +70,82 @@ export function AccountProfilePage() {
                 </div>
             )}
 
-            <div className="form-grid" style={{ gap: '2rem', maxWidth: '1000px' }}>
-                <div className="card">
-                    <h2>{t('account.profileSection')}</h2>
-                    <form onSubmit={handleProfileSubmit}>
-                        <label>
-                            <span>{t('account.username')}</span>
-                            <input
-                                type="text"
-                                value={user?.username || ''}
-                                disabled
-                                style={{ backgroundColor: 'var(--surface)', cursor: 'not-allowed' }}
+            <Tabs
+                classNames={{ root: 'app-tabs', list: 'app-tabs-list', tab: 'app-tabs-tab' }}
+                value={activeTab}
+                onChange={(value) => setActiveTab(ACCOUNT_TABS.includes(value as AccountTab) ? (value as AccountTab) : 'profile')}
+                // Panels stay mounted (hidden) on purpose: recovery codes and a freshly
+                // created API key are shown exactly once, in component state, and would
+                // be lost the moment the user clicked another tab.
+                keepMounted
+            >
+                <Tabs.List>
+                    <Tabs.Tab value="profile">{t('account.tabs.profile')}</Tabs.Tab>
+                    <Tabs.Tab value="security">{t('account.tabs.security')}</Tabs.Tab>
+                    <Tabs.Tab value="api-keys">{t('account.tabs.apiKeys')}</Tabs.Tab>
+                </Tabs.List>
+
+                <Tabs.Panel value="profile">
+                    <div style={{ maxWidth: '520px' }}>
+                        <ProfileCard />
+                    </div>
+                </Tabs.Panel>
+
+                <Tabs.Panel value="security">
+                    <div className="form-grid" style={{ gap: '2rem', maxWidth: '1000px', alignItems: 'start' }}>
+                        <div style={{ display: 'grid', gap: '2rem' }}>
+                            <PasswordCard />
+                            <LinkedAccountsCard
+                                onUnlink={({ provider, onConfirm }) =>
+                                    confirm({
+                                        title: t('account.unlinkConfirmTitle'),
+                                        message: t('account.unlinkConfirmMessage', { provider }),
+                                        confirmText: t('account.unlinkAccount'),
+                                        isDangerous: true,
+                                        onConfirm,
+                                    })
+                                }
                             />
-                            <small className="muted">
-                                {t('account.usernameReadOnly')}
-                            </small>
-                        </label>
-
-                        <label>
-                            <span>{t('account.firstName')}</span>
-                            <input
-                                type="text"
-                                name="first_name"
-                                value={profileForm.first_name}
-                                onChange={handleProfileChange}
-                            />
-                        </label>
-
-                        <label>
-                            <span>{t('account.lastName')}</span>
-                            <input
-                                type="text"
-                                name="last_name"
-                                value={profileForm.last_name}
-                                onChange={handleProfileChange}
-                            />
-                        </label>
-
-                        <label>
-                            <span>{t('account.email')}</span>
-                            <input
-                                type="email"
-                                name="email"
-                                value={profileForm.email}
-                                onChange={handleProfileChange}
-                                required
-                            />
-                        </label>
-
-                        <button
-                            type="submit"
-                            className="button button-primary"
-                            disabled={profileMutation.isPending}
-                            style={{ width: '100%' }}
-                        >
-                            {profileMutation.isPending ? t('common.saving') : t('account.updateProfile')}
-                        </button>
-                    </form>
-                </div>
-
-                <div className="card">
-                    <h2>{t('account.passwordSection')}</h2>
-                    <form onSubmit={handlePasswordSubmit}>
-                        <label>
-                            <span>{t('account.oldPassword')}</span>
-                            <input
-                                type="password"
-                                name="oldPassword"
-                                value={passwordForm.oldPassword}
-                                onChange={handlePasswordChange}
-                                placeholder={t('account.enterCurrentPassword')}
-                                required
-                            />
-                        </label>
-
-                        <label>
-                            <span>{t('account.newPassword')}</span>
-                            <input
-                                type="password"
-                                name="newPassword"
-                                value={passwordForm.newPassword}
-                                onChange={handlePasswordChange}
-                                placeholder={t('account.enterNewPassword')}
-                                required
-                            />
-                            <small className="muted">
-                                {t('account.passwordMinLength')}
-                            </small>
-                        </label>
-
-                        <label>
-                            <span>{t('account.confirmPassword')}</span>
-                            <input
-                                type="password"
-                                name="confirmPassword"
-                                value={passwordForm.confirmPassword}
-                                onChange={handlePasswordChange}
-                                placeholder={t('account.reenterNewPassword')}
-                                required
-                            />
-                        </label>
-
-                        <button
-                            type="submit"
-                            className="button button-primary"
-                            disabled={passwordMutation.isPending}
-                            style={{ width: '100%' }}
-                        >
-                            {passwordMutation.isPending ? t('common.saving') : t('account.changePassword')}
-                        </button>
-                    </form>
-                    <small className="muted" style={{ marginTop: '1rem', display: 'block' }}>
-                        {t('account.apiKeys.passwordChangeNote')}
-                    </small>
-                </div>
-                <div className="card">
-                    <h2>{t('account.linkedAccountsSection')}</h2>
-                    <p className="muted" style={{ marginBottom: '1.5rem' }}>{t('account.linkedAccountsDescription')}</p>
-
-                    {oauthProvidersQuery.isLoading && (
-                        <div style={{ display: 'grid', gap: '0.5rem' }}>
-                            <Skeleton className="skeleton-block" animate={animate} height={14} width="60%" />
-                            <Skeleton className="skeleton-block" animate={animate} height={14} width="40%" />
                         </div>
-                    )}
+                        <TwoFactorSection
+                            onRemoveTotp={(onConfirm) =>
+                                confirm({
+                                    title: t('account.mfa.removeConfirmTitle'),
+                                    message: t('account.mfa.removeConfirmMessage'),
+                                    confirmText: t('account.mfa.remove'),
+                                    isDangerous: true,
+                                    onConfirm,
+                                })
+                            }
+                            onRemovePasskey={(passkey, onConfirm) =>
+                                confirm({
+                                    title: t('account.passkeys.removeConfirmTitle'),
+                                    message: t('account.passkeys.removeConfirmMessage', { name: passkey.name }),
+                                    confirmText: t('account.mfa.remove'),
+                                    isDangerous: true,
+                                    onConfirm,
+                                })
+                            }
+                        />
+                    </div>
+                </Tabs.Panel>
 
-                    {!oauthProvidersQuery.isLoading && (oauthProvidersQuery.data ?? []).length === 0 && (
-                        <p className="muted">{t('account.noProviders')}</p>
-                    )}
-
-                    {(oauthProvidersQuery.data ?? []).map((provider) => {
-                        const linked = (socialAccountsQuery.data ?? []).find(
-                            (sa) => sa.provider_name === provider.name,
-                        )
-                        return (
-                            <div
-                                key={provider.name}
-                                style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'space-between',
-                                    padding: '0.75rem 0',
-                                    borderBottom: '1px solid var(--border)',
-                                }}
-                            >
-                                <div>
-                                    <strong>{provider.display_name}</strong>
-                                    {linked && (
-                                        <small className="muted" style={{ display: 'block' }}>
-                                            {t('account.linkedSince', {
-                                                date: new Date(linked.created_at).toLocaleDateString(),
-                                            })}
-                                        </small>
-                                    )}
-                                </div>
-                                {linked ? (
-                                    <button
-                                        type="button"
-                                        className="button button-danger button-compact"
-                                        disabled={unlinkMutation.isPending}
-                                        onClick={() => void handleUnlink(linked.id, provider.display_name)}
-                                    >
-                                        {t('account.unlinkAccount')}
-                                    </button>
-                                ) : (
-                                    <button
-                                        type="button"
-                                        className="button button-secondary button-compact"
-                                        disabled={linkingProvider !== null}
-                                        onClick={() => void handleLink(provider.name)}
-                                    >
-                                        {linkingProvider === provider.name
-                                            ? t('common.loading')
-                                            : t('account.linkAccount', { provider: provider.display_name })}
-                                    </button>
-                                )}
-                            </div>
-                        )
-                    })}
-                </div>
-
-                <TwoFactorSection
-                    onRemoveTotp={(onConfirm) =>
-                        confirm({
-                            title: t('account.mfa.removeConfirmTitle'),
-                            message: t('account.mfa.removeConfirmMessage'),
-                            confirmText: t('account.mfa.remove'),
-                            isDangerous: true,
-                            onConfirm,
-                        })
-                    }
-                    onRemovePasskey={(passkey, onConfirm) =>
-                        confirm({
-                            title: t('account.passkeys.removeConfirmTitle'),
-                            message: t('account.passkeys.removeConfirmMessage', { name: passkey.name }),
-                            confirmText: t('account.mfa.remove'),
-                            isDangerous: true,
-                            onConfirm,
-                        })
-                    }
-                />
-
-                <ApiKeysSection
-                    onRevoke={({ name, onConfirm }) =>
-                        confirm({
-                            title: t('account.apiKeys.revokeConfirmTitle'),
-                            message: t('account.apiKeys.revokeConfirmMessage', { name }),
-                            confirmText: t('account.apiKeys.revoke'),
-                            isDangerous: true,
-                            onConfirm,
-                        })
-                    }
-                />
-            </div>
+                <Tabs.Panel value="api-keys">
+                    <div style={{ maxWidth: '1000px' }}>
+                        <ApiKeysSection
+                            onRevoke={({ name, onConfirm }) =>
+                                confirm({
+                                    title: t('account.apiKeys.revokeConfirmTitle'),
+                                    message: t('account.apiKeys.revokeConfirmMessage', { name }),
+                                    confirmText: t('account.apiKeys.revoke'),
+                                    isDangerous: true,
+                                    onConfirm,
+                                })
+                            }
+                        />
+                    </div>
+                </Tabs.Panel>
+            </Tabs>
 
             {dialog && (
                 <ConfirmDialog

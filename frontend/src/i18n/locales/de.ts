@@ -399,6 +399,11 @@ export const de = {
         unlinkConfirmTitle: 'Verknüpfung aufheben?',
         unlinkConfirmMessage: 'Verknüpfung mit {{provider}} entfernen? Sie können sie jederzeit wiederherstellen.',
         unlinkSuccess: 'Verknüpfung aufgehoben.',
+        tabs: {
+            profile: 'Profil',
+            security: 'Sicherheit',
+            apiKeys: 'API-Schlüssel',
+        },
         mfa: {
             section: 'Zwei-Faktor-Authentifizierung',
             description: 'Schützen Sie Ihr Konto mit einem einmaligen Code aus einer Authenticator-App.',

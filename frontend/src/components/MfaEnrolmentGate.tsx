@@ -73,7 +73,7 @@ function MfaInterstitial({
                     <p className="muted">{t('mfaGate.graceOver')}</p>
                 )}
                 <div className="actions-row">
-                    <Link className="button button-primary" to="/account">
+                    <Link className="button button-primary" to="/account?tab=security">
                         {t('mfaGate.setUp')}
                     </Link>
                     {graceUntil ? (

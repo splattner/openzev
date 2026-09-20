@@ -733,7 +733,7 @@ On update:
 |---|---|---|
 | `/` | any authenticated | `HomePage`: `OverviewPage` for `admin` / `zev_owner`; `DashboardPage` for `participant` |
 | `/dashboard` | any authenticated | `DashboardPage` (manager title/navigation: Energy balance; participant root remains `/`) |
-| `/account` | any authenticated | `AccountProfilePage` |
+| `/account` | any authenticated | `AccountProfilePage` — tabs `profile` (default) · `security` (password, linked accounts, two-factor) · `api-keys`, chosen by `?tab=`; a forced password change and an OAuth link return open `security` (`resolveAccountTab`) |
 | `/admin` | `admin` | `AdminOverviewHubPage` (tabs = routes; default tab `overview`) |
 | `/admin/overview` · `/admin/zevs` · `/admin/invoices` · `/admin/audit` · `/admin/health` | `admin` | `AdminOverviewHubPage tab=…` (KPIs · ZEVs table · all invoices · platform audit log · System health) |
 | `/admin/audit-logs` | `admin` | alias → `/admin/audit` |

@@ -408,6 +408,11 @@ export const en = {
         unlinkConfirmTitle: 'Unlink account?',
         unlinkConfirmMessage: 'Remove the link with {{provider}}? You can re-link at any time.',
         unlinkSuccess: 'Account unlinked.',
+        tabs: {
+            profile: 'Profile',
+            security: 'Security',
+            apiKeys: 'API keys',
+        },
         mfa: {
             section: 'Two-Factor Authentication',
             description: 'Protect your account with a one-time code from an authenticator app.',
