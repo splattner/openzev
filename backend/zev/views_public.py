@@ -72,7 +72,7 @@ def onboarding_consume(request):
             metadata={"token_prefix": token.prefix},
         )
 
-    if mfa.has_active_factor(user):
+    if mfa.requires_challenge(user):
         # The link stays valid either way (it is not spent by use — see the
         # module docstring); this only gates whether it hands over a session
         # or a challenge for one. See spec
@@ -80,7 +80,7 @@ def onboarding_consume(request):
         return Response({
             "mfa_required": True,
             "mfa_token": mfa.issue_challenge(user),
-            "methods": ["totp"],
+            "methods": mfa.challenge_methods(user),
         })
 
     tokens = make_jwt_for_user(user)

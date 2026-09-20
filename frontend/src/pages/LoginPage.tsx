@@ -7,6 +7,7 @@ import { useAuth } from '../lib/auth'
 import { fetchRegistrationEnabled, fetchOAuthProviders, oauthLoginInitiate, register as apiRegister } from '../lib/api/auth'
 import { formatApiError } from '../lib/api/errors'
 import { queryKeys } from '../lib/api/queryKeys'
+import { challengeInput } from '../lib/mfaChallenge'
 import { isPasskeySupported, PasskeyCancelledError } from '../lib/webauthn'
 
 export function LoginPage() {
@@ -38,9 +39,13 @@ export function LoginPage() {
     // Second step of a two-factor login (spec 2026-09-two-factor-authentication.md
     // §5.1). Set once the password step reports mfa_required; the form below
     // swaps to a code entry in place of the password fields.
-    const [pendingMfa, setPendingMfa] = useState<{ mfaToken: string } | null>(null)
+    const [pendingMfa, setPendingMfa] = useState<{ mfaToken: string; methods: ('totp' | 'recovery_code')[] } | null>(null)
     const [mfaCode, setMfaCode] = useState('')
-    const [useRecoveryCode, setUseRecoveryCode] = useState(false)
+    const [preferRecovery, setPreferRecovery] = useState(false)
+    // A passkey-only account has no authenticator app, so the form can only
+    // take a recovery code (challengeInput decides, from what the server offered).
+    const mfaInput = challengeInput(pendingMfa?.methods ?? ['totp', 'recovery_code'], preferRecovery)
+    const useRecoveryCode = mfaInput.recovery
 
     // Register modal state
     const [showModal, setShowModal] = useState(false)
@@ -86,7 +91,7 @@ export function LoginPage() {
         try {
             const outcome = await login(submittedEmail, submittedPassword)
             if (outcome.status === 'mfa_required') {
-                setPendingMfa({ mfaToken: outcome.mfaToken })
+                setPendingMfa({ mfaToken: outcome.mfaToken, methods: outcome.methods })
                 return
             }
             navigate(outcome.user.must_change_password ? '/account' : '/')
@@ -115,7 +120,7 @@ export function LoginPage() {
     function cancelMfaChallenge() {
         setPendingMfa(null)
         setMfaCode('')
-        setUseRecoveryCode(false)
+        setPreferRecovery(false)
         setError(null)
     }
 
@@ -184,7 +189,7 @@ export function LoginPage() {
                         </div>
                         <h1>{t('auth.mfa.title')}</h1>
                         <p className="muted">
-                            {t(useRecoveryCode ? 'auth.mfa.enterRecoveryCode' : 'auth.mfa.enterCode')}
+                            {t(mfaInput.canToggle ? (useRecoveryCode ? 'auth.mfa.enterRecoveryCode' : 'auth.mfa.enterCode') : 'auth.mfa.recoveryOnlyHint')}
                         </p>
 
                         <label>
@@ -219,17 +224,30 @@ export function LoginPage() {
                             {loading ? t('common.loading') : t('auth.submit')}
                         </button>
 
-                        <button
-                            type="button"
-                            className="button button-ghost"
-                            onClick={() => {
-                                setUseRecoveryCode((previous) => !previous)
-                                setMfaCode('')
-                                setError(null)
-                            }}
-                        >
-                            {t(useRecoveryCode ? 'auth.mfa.useCodeInstead' : 'auth.mfa.useRecoveryCodeInstead')}
-                        </button>
+                        {mfaInput.canToggle && (
+                            <button
+                                type="button"
+                                className="button button-ghost"
+                                onClick={() => {
+                                    setPreferRecovery((previous) => !previous)
+                                    setMfaCode('')
+                                    setError(null)
+                                }}
+                            >
+                                {t(useRecoveryCode ? 'auth.mfa.useCodeInstead' : 'auth.mfa.useRecoveryCodeInstead')}
+                            </button>
+                        )}
+
+                        {passkeySupported && (
+                            <button
+                                type="button"
+                                className="button button-ghost"
+                                disabled={passkeyLoading}
+                                onClick={() => void handlePasskeyLogin()}
+                            >
+                                {t('auth.mfa.usePasskeyInstead')}
+                            </button>
+                        )}
 
                         <button type="button" className="button button-ghost" onClick={cancelMfaChallenge}>
                             {t('auth.mfa.back')}

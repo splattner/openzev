@@ -33,11 +33,17 @@ satisfied by a passkey *or* by TOTP.
   prove possession *and* verify the human (biometric or PIN). A credential that can be used by
   whoever holds the unlocked device is a single possession factor, and would not justify
   dropping the password.
+- **An account that has a passkey is still protected on every other route.** A password,
+  magic-link or onboarding-link login for such an account is not enough by itself: it asks for a
+  second step, exactly as it does for an account with an authenticator app. Otherwise the password
+  would remain the account's weakest link and enrolling a passkey would protect nothing against a
+  stolen one. The passkey route is the only one that never asks.
 - TOTP remains the second factor for password logins, and the fallback where a passkey is
   impractical — a shared workstation, an unsupported browser, a user who declines platform
   biometrics.
 - Recovery codes are the escape from both, and are the only credential that bypasses a
-  registered factor.
+  registered factor. They are what a passkey-only account answers the second step with (it has
+  no authenticator app to produce a code); that account can equally just use its passkey.
 - Multiple credentials per user are supported and encouraged, so a lost device is not a lockout.
 
 ## Consequences
@@ -57,6 +63,9 @@ Trade-offs:
   a second credential mitigates but does not remove this.
 - `userVerification: "required"` refuses authenticators that cannot verify a user. That is the
   intended trade: such a credential does not carry the guarantee this decision rests on.
+- A passkey-only account that loses its authenticator *and* its recovery codes cannot use the
+  password route either; only an administrator reset restores access. That is the price of not
+  leaving the password as a way around the passkey.
 - Two authentication routes to the same session means every guard added later — step-up
   re-authentication in particular — has to cover both, or it covers neither.
 

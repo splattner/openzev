@@ -10,6 +10,7 @@ import {
     resetUserMfa,
     submitMfaChallenge,
 } from '../src/lib/api/auth'
+import { challengeInput } from '../src/lib/mfaChallenge'
 import { mfaGateState } from '../src/lib/mfaGate'
 import {
     base64urlToBuffer,
@@ -178,5 +179,23 @@ describe('enrolment gate', () => {
 
     it('treats a required role with no recorded deadline as a hard gate', () => {
         expect(at({ grace_until: null })).toBe('hard')
+    })
+})
+
+describe('second-step input mode', () => {
+    it('lets an authenticator-app account switch between a code and a recovery code', () => {
+        expect(challengeInput(['totp', 'recovery_code'], false)).toEqual({ recovery: false, canToggle: true })
+        expect(challengeInput(['totp', 'recovery_code'], true)).toEqual({ recovery: true, canToggle: true })
+    })
+
+    it('offers a passkey-only account nothing but a recovery code', () => {
+        // No authenticator app means no 6-digit code to type, so the form must
+        // not show one — and there is nothing to toggle to.
+        expect(challengeInput(['recovery_code'], false)).toEqual({ recovery: true, canToggle: false })
+        expect(challengeInput(['recovery_code'], true)).toEqual({ recovery: true, canToggle: false })
+    })
+
+    it('keeps the code field for an authenticator-only offer', () => {
+        expect(challengeInput(['totp'], true)).toEqual({ recovery: false, canToggle: false })
     })
 })

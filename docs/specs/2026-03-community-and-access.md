@@ -339,7 +339,7 @@ Two consequences for anything added later:
 
 **Payload:** `{ email, password }` (preferred) or `{ username, password }` (backward-compatible)
 
-**Two-factor challenge:** if the account has an *active* second factor (a confirmed `TotpDevice`), the password step returns `200 {"mfa_required": true, "mfa_token": "<signed>", "methods": ["totp", "recovery_code"]}` and sets **no** cookies. `POST /api/v1/auth/token/mfa/` `{mfa_token, code}` then completes the login (TOTP code or one-time recovery code). Magic-link consume and onboarding-link consume return the same challenge shape; the OAuth door honours an IdP `amr` claim instead (`OAuthProvider.require_mfa_claim`, default `False`). A passkey (WebAuthn) signs in on its own via `POST /auth/passkeys/authenticate/{begin,complete}/` with no password, so it does not gate this route. Accounts without a factor see the pre-2FA behaviour unchanged. Full contract: `2026-09-two-factor-authentication.md` §5.
+**Two-factor challenge:** if the account has a second factor (a confirmed `TotpDevice` or a registered passkey), the password step returns `200 {"mfa_required": true, "mfa_token": "<signed>", "methods": ["totp", "recovery_code"]}` and sets **no** cookies. `POST /api/v1/auth/token/mfa/` `{mfa_token, code}` then completes the login (TOTP code or one-time recovery code). Magic-link consume and onboarding-link consume return the same challenge shape; the OAuth door honours an IdP `amr` claim instead (`OAuthProvider.require_mfa_claim`, default `False`). `methods` is `["recovery_code"]` for an account whose only factor is a passkey. A passkey (WebAuthn) itself signs in on its own via `POST /auth/passkeys/authenticate/{begin,complete}/` with no password and is never challenged. Accounts without a factor see the pre-2FA behaviour unchanged. Full contract: `2026-09-two-factor-authentication.md` §5.
 
 Helper `accounts.views._make_jwt_for_user(user) -> dict` adds custom claims (also used by `CustomTokenObtainPairSerializer` and `verify_email`/`set_initial_password`; `views_oauth._make_jwt_for_user` and impersonation use the same claims):
 
@@ -1132,7 +1132,7 @@ lists the test classes per module (test counts are the `test_*` methods).
 |---|---|---|---|
 | `test_api_keys.py` | 10 | 81 | Generation, hashing, auth, read-only keys, scope deny-list, audit, throttling, CRUD, admin management |
 | `test_oauth.py` | 12 | 55 | Provider listing, initiate, callback guards/redirects, link flow, social accounts, audit, `require_mfa_claim` (`OAuthMfaClaimTests`) |
-| `test_passkeys.py` | 8 | 56 | Passkey registration and passwordless sign-in against a software authenticator, MFA policy and grace arithmetic, removal guard, admin reset, RP-ID system check |
+| `test_passkeys.py` | 9 | 62 | Passkey registration and passwordless sign-in against a software authenticator, MFA policy and grace arithmetic, removal guard, admin reset, RP-ID system check |
 | `test_mfa.py` | 4 | 28 | TOTP enrolment/removal/recovery codes, two-step login, MFA at the magic-link/onboarding/OAuth/impersonation/email-verification doors, per-account throttle (`SPEC-2026-09-two-factor-authentication`) |
 | `test_cookie_oauth.py` | — (6 module-level test functions) | 6 | Refresh/logout cookie handling; token exchange sets cookies and consumes codes |
 | `test_impersonation.py` | 5 | 21 | Permissions, audit, cookie round-trip, stop-impersonation |

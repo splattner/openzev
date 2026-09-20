@@ -283,8 +283,11 @@ Afterwards, signing in with your password asks for the 6-digit code as a second 
 through an emailed invoice link or onboarding link. Signing in through an external identity provider
 is unaffected unless the administrator requires the provider to assert a second factor.
 
-> **Note:** A passkey signs you in on its own, so it does not add a code prompt to the password
-> route. If you also want your password protected by a second step, set up the authenticator app too.
+> **Note:** Adding a passkey protects your password too. Signing in with your password (or an
+> emailed link) then asks for a second step: a recovery code if you only have a passkey, or the
+> 6-digit code if you also have an authenticator app. The login page offers **Sign in with a passkey
+> instead** at that point. Keep your recovery codes somewhere safe — they are what gets you in with a
+> password if you can't use your passkey.
 
 ### Requiring it for a role (administrators)
 
@@ -299,7 +302,7 @@ API with an existing session or API key.
 
 ### Locked out?
 
-Sign in with a recovery code. If you have lost your devices and your recovery codes, ask an
+On the second step of a password sign-in, enter one of your recovery codes. If you have lost your devices and your recovery codes, ask an
 administrator: **Admin → Accounts → Reset two-factor** removes every passkey, the authenticator app
 and all recovery codes for that user, and is recorded in the audit log. An administrator can never see
 or recover your secrets, and cannot set up a factor on your behalf.

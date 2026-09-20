@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next'
 import { useAuth } from '../lib/auth'
 import { consumeOnboardingLink } from '../lib/api/public'
 import { submitMfaChallenge } from '../lib/api/auth'
+import { challengeInput } from '../lib/mfaChallenge'
 
 type Step = 'signing-in' | 'mfa-required' | 'welcome' | 'error'
 
@@ -31,6 +32,7 @@ export function ParticipantOnboardingPage() {
     const [step, setStep] = useState<Step>('signing-in')
     const [zevName, setZevName] = useState('')
     const [mfaToken, setMfaToken] = useState('')
+    const [mfaMethods, setMfaMethods] = useState<('totp' | 'recovery_code')[]>(['totp', 'recovery_code'])
     const [code, setCode] = useState('')
     const [mfaError, setMfaError] = useState<string | null>(null)
     const [mfaLoading, setMfaLoading] = useState(false)
@@ -48,6 +50,7 @@ export function ParticipantOnboardingPage() {
             .then(async (result) => {
                 if (result.mfaRequired) {
                     setMfaToken(result.mfaToken)
+                    setMfaMethods(result.methods)
                     setStep('mfa-required')
                     return
                 }
@@ -74,6 +77,9 @@ export function ParticipantOnboardingPage() {
         }
     }
 
+    // A passkey-only account can only answer with a recovery code.
+    const recoveryOnly = challengeInput(mfaMethods, false).recovery
+
     if (step === 'error') {
         return (
             <div className="center-screen">
@@ -90,12 +96,14 @@ export function ParticipantOnboardingPage() {
             <div className="center-screen">
                 <form className="card public-invoice-card" onSubmit={handleMfaSubmit}>
                     <h2>{t('auth.mfa.title')}</h2>
-                    <p className="muted">{t('pages.onboarding.mfaPrompt')}</p>
+                    <p className="muted">
+                        {t(recoveryOnly ? 'auth.mfa.recoveryOnlyHint' : 'pages.onboarding.mfaPrompt')}
+                    </p>
                     <label>
-                        <span>{t('auth.mfa.codeLabel')}</span>
+                        <span>{t(recoveryOnly ? 'auth.mfa.recoveryCodeLabel' : 'auth.mfa.codeLabel')}</span>
                         <input
                             type="text"
-                            autoComplete="one-time-code"
+                            autoComplete={recoveryOnly ? 'off' : 'one-time-code'}
                             autoFocus
                             value={code}
                             onChange={(e) => setCode(e.target.value)}

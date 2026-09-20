@@ -268,7 +268,7 @@ def magic_link_consume(request):
         summary=f"Signed in with a link from an invoice: {user.username}.",
     )
 
-    if mfa.has_active_factor(user):
+    if mfa.requires_challenge(user):
         # The link is already burned above — this only gates whether it
         # hands over a session or a challenge for one. MFA must not be
         # bypassable by requesting an emailed link instead of using a
@@ -276,7 +276,7 @@ def magic_link_consume(request):
         return Response({
             "mfa_required": True,
             "mfa_token": mfa.issue_challenge(user),
-            "methods": ["totp"],
+            "methods": mfa.challenge_methods(user),
         })
 
     tokens = make_jwt_for_user(user)

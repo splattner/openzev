@@ -70,6 +70,8 @@ export const de = {
             back: 'Zurück',
             invalidCode: 'Ungültiger oder abgelaufener Code.',
             invalidRecoveryCode: 'Ungültiger oder bereits verwendeter Wiederherstellungscode.',
+            recoveryOnlyHint: 'Ihr Konto ist mit einem Passkey geschützt. Geben Sie einen Ihrer Wiederherstellungscodes ein, um die Anmeldung abzuschliessen, oder gehen Sie zurück und verwenden Sie Ihren Passkey.',
+            usePasskeyInstead: 'Stattdessen mit Passkey anmelden',
         },
         passkey: {
             signIn: 'Mit Passkey anmelden',
@@ -416,7 +418,7 @@ export const de = {
             recoveryCodesRemaining: '{{count}} ungenutzte Wiederherstellungscodes verbleiben.',
             regenerateCodes: 'Codes neu generieren',
             recoveryCodesShownOnceTitle: 'Wiederherstellungscodes speichern',
-            recoveryCodesShownOnceBody: 'Mit diesen Codes können Sie sich anmelden, falls Sie keinen Zugriff mehr auf Ihre Authenticator-App haben. Jeder Code funktioniert einmal. Sie werden nicht erneut angezeigt.',
+            recoveryCodesShownOnceBody: 'Mit diesen Codes können Sie sich mit Ihrem Passwort anmelden, wenn Sie Ihren Passkey oder Ihre Authenticator-App nicht verwenden können. Jeder Code funktioniert nur einmal. Sie werden nicht erneut angezeigt.',
             copy: 'Kopieren',
             copied: 'Kopiert!',
             copyFailed: 'Kopieren in die Zwischenablage fehlgeschlagen.',

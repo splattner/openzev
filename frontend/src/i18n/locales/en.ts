@@ -79,6 +79,8 @@ export const en = {
             back: 'Back',
             invalidCode: 'Invalid or expired code.',
             invalidRecoveryCode: 'Invalid or already-used recovery code.',
+            recoveryOnlyHint: 'Your account is protected by a passkey. Enter one of your recovery codes to finish signing in, or go back and use your passkey.',
+            usePasskeyInstead: 'Sign in with a passkey instead',
         },
         passkey: {
             signIn: 'Sign in with a passkey',
@@ -425,7 +427,7 @@ export const en = {
             recoveryCodesRemaining: '{{count}} unused recovery codes left.',
             regenerateCodes: 'Regenerate codes',
             recoveryCodesShownOnceTitle: 'Save your recovery codes',
-            recoveryCodesShownOnceBody: 'These codes let you sign in if you lose access to your authenticator app. Each code works once. They won\'t be shown again.',
+            recoveryCodesShownOnceBody: 'These codes let you sign in with your password if you can\'t use your passkey or authenticator app. Each code works once. They won\'t be shown again.',
             copy: 'Copy',
             copied: 'Copied!',
             copyFailed: 'Could not copy to clipboard.',

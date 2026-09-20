@@ -286,7 +286,7 @@ All paths are under `/api/v1/auth/`.
 
 | Endpoint | Method | Permission | Behaviour |
 |---|---|---|---|
-| `token/` | POST | `AllowAny` | Password step. **Unchanged** when the account has no active factor. With one: returns `200` with `{"mfa_required": true, "mfa_token": "…", "methods": ["totp"]}` and sets **no** auth cookies |
+| `token/` | POST | `AllowAny` | Password step. **Unchanged** when the account has no factor. With one (TOTP or a passkey): returns `200` with `{"mfa_required": true, "mfa_token": "…", "methods": ["totp", "recovery_code"]}` (`["recovery_code"]` for a passkey-only account) and sets **no** auth cookies |
 | `token/mfa/` | POST | `AllowAny` | `{mfa_token, code}` → sets auth cookies, returns `{"detail": "Login successful."}`. `code` accepts a TOTP code or a recovery code |
 | `passkeys/authenticate/begin/` | POST | `AllowAny` | `{email?}` → WebAuthn `PublicKeyCredentialRequestOptions` with `userVerification: "required"`. Challenge cached 5 min |
 | `passkeys/authenticate/complete/` | POST | `AllowAny` | Verifies the assertion, **refusing one whose `uv` flag is false**, → sets auth cookies. **No password involved** (D1, ADR 0020) |
@@ -333,12 +333,19 @@ They are issued when the user's **first** factor is enrolled — a passkey or TO
 second factor does not replace them (its response carries `recovery_codes: []`). Regeneration works
 with any factor. They are deleted when the last factor is removed.
 
-**What gates a password login.** Only an active TOTP device does (`mfa.has_active_factor`): a passkey
-authenticates on its own and cannot answer a challenge. `mfa.has_any_factor` (TOTP or passkey) is
-what the *policy* is satisfied by. The consequence is deliberate and worth stating: an account whose
-only factor is a passkey still accepts a password-only login, exactly as ADR 0020 describes ("the
-password route is unchanged"); the same holds for the magic-link and onboarding-link doors. A user who
-wants the password route protected too adds TOTP.
+**What gates a password login.** Any factor does (`mfa.requires_challenge`, i.e. `has_any_factor`:
+an active TOTP device **or** at least one passkey). A passkey signs in on its own, but an account that
+has one must not keep a password-only way in — otherwise enrolling protects nothing against a stolen
+password (ADR 0020). The password, magic-link and onboarding-link doors therefore all return the
+challenge; only the passkey route never does. What the challenge accepts is `mfa.challenge_methods`:
+`["totp", "recovery_code"]` when the account has an authenticator app, `["recovery_code"]` for a
+passkey-only account, which has nothing to generate a code with. The login forms follow that list
+(`lib/mfaChallenge.ts`) and, for a passkey-only account, also offer "Sign in with a passkey instead".
+`has_any_factor` is also what the enrolment *policy* is satisfied by.
+
+*Earlier in this feature's delivery (PR 3 as first merged) the challenge was TOTP-only, so a
+passkey-only account still accepted a password-only login and the recovery codes issued with its
+first passkey had nowhere to be entered. That was a gap, not a decision, and is closed here.*
 
 **Passkey ceremony mechanics.** Challenges live in the Django cache for 5 minutes and are taken with
 an atomic `cache.delete`, so a ceremony completes once. Registration keys the challenge on the user
@@ -373,7 +380,7 @@ behalf (`2026-03-community-and-access.md`).
 | Door | Behaviour | Rationale |
 |---|---|---|
 | OAuth token-exchange (4) | The IdP owns authentication. If the assertion carries `amr` naming an MFA method, honour it and do **not** double-challenge. A new per-provider `OAuthProvider.require_mfa_claim` (default `False`, migration `0017`, editable in the admin provider form) makes requiring that assertion opt-in. The claim is read from the **userinfo** response — the codebase does not parse ID tokens — and accepted as a list or a space-separated string against the RFC 8176 method values | Double-challenging a user who already did WebAuthn at their IdP is friction with no security gain |
-| Magic link (5) | If the account has an active factor, the consume endpoint returns an MFA challenge instead of a session | MFA must not be bypassable by requesting an email |
+| Magic link (5) | If the account has any factor (TOTP or a passkey), the consume endpoint returns an MFA challenge instead of a session | MFA must not be bypassable by requesting an email |
 | Onboarding link (6) | Same as (5) | Same |
 | Email verification (2) | Unaffected in practice — reached before a factor can exist — but the code must not *assume* it, so it runs the same check | Defensive; a re-verification flow later would otherwise open a hole |
 | Initial password (3) | `set_initial_password` is `IsAuthenticated`, so it never mints a session from an unauthenticated request; there is no moment to challenge. Documented in the view rather than enforced | The door exists for a session the user already holds |
@@ -620,15 +627,15 @@ provider without the requirement unaffected). TOTP tests pin the clock
 with a `totp_step` helper so replay protection never collides with a real 30-second step. The
 Passkeys, the policy, the removal guard and the admin reset shipped with PR 3 (below).
 
-**As shipped in PR 3**: `accounts/test_passkeys.py`, 56 tests, driving py_webauthn end to end
+**As shipped in PR 3**: `accounts/test_passkeys.py`, 62 tests, driving py_webauthn end to end
 through a small software authenticator (real `none` attestations, real ES256 assertions, nothing
-about the library mocked): `PasskeyRegistrationTests` (13), `PasskeyLoginTests` (15),
-`PasskeyThrottleTests` (1), `MfaPolicyTests` (11), `MfaRemovalGuardTests` (6),
+about the library mocked): `PasskeyRegistrationTests` (13), `PasskeyLoginTests` (14),
+`PasskeyGatesThePasswordRouteTests` (7, the passkey-gated password / magic-link routes and the recovery-code second step), `PasskeyThrottleTests` (1), `MfaPolicyTests` (11), `MfaRemovalGuardTests` (6),
 `MfaAdminResetTests` (7) and `WebAuthnRpCheckTests` (3). These replace the illustrative
 `PasskeyTests` / `MfaAdminTests` tables below and additionally cover replay of a spent ceremony,
 wrong-origin and tampered-signature assertions, the zero-counter exemption, the grace-period
 arithmetic (including an account far older than the policy), and recovery codes surviving a second
-factor. Frontend: `tests/mfa.test.ts` (19) covers the API client, the WebAuthn bridge and the gate's
+factor. Frontend: `tests/mfa.test.ts` (22) covers the API client, the WebAuthn bridge and the gate's
 decision table (`lib/mfaGate.ts`).
 
 ### Backend — `accounts/test_mfa.py` (new)

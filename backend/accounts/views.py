@@ -79,7 +79,7 @@ class CustomTokenObtainPairView(TokenObtainPairView):
             raise
 
         user = serializer.user
-        if mfa.has_active_factor(user):
+        if mfa.requires_challenge(user):
             # Password verified, but this account has a second factor — proof
             # of it is required before a session is minted. Not itself an
             # audit event: this is neither a completed login nor a failure —
@@ -89,7 +89,7 @@ class CustomTokenObtainPairView(TokenObtainPairView):
             return Response({
                 "mfa_required": True,
                 "mfa_token": mfa.issue_challenge(user),
-                "methods": ["totp"],
+                "methods": mfa.challenge_methods(user),
             })
 
         response = Response({"detail": "Login successful."})
@@ -703,11 +703,11 @@ def verify_email(request):
     # In practice an account reaching this line cannot yet have a factor (it
     # was inactive until the lines above), but the code must not assume
     # that — see spec 2026-09-two-factor-authentication.md §5.4 door 2.
-    if mfa.has_active_factor(user):
+    if mfa.requires_challenge(user):
         return Response({
             "mfa_required": True,
             "mfa_token": mfa.issue_challenge(user),
-            "methods": ["totp"],
+            "methods": mfa.challenge_methods(user),
         })
 
     tokens = make_jwt_for_user(user)

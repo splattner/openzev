@@ -420,16 +420,92 @@ class PasskeyLoginTests(TestCase):
             resp = self.client.post(AUTH_COMPLETE_URL, body, format="json")
             self.assertEqual(resp.status_code, 400, body)
 
-    def test_a_passkey_does_not_gate_the_password_route(self):
-        # ADR 0020: a passkey authenticates on its own; the password route is
-        # gated only by TOTP. A passkey-only account signs in with a password
-        # exactly as before.
-        resp = APIClient().post(
+
+@override_settings(MFA_ENCRYPTION_KEYS=[TEST_KEY], WEBAUTHN_RP_ID=RP_ID, WEBAUTHN_ORIGIN=ORIGIN)
+class PasskeyGatesThePasswordRouteTests(TestCase):
+    """A passkey signs in on its own (ADR 0020), but an account that has one
+    must not keep a password-only way in, or enrolling protects nothing
+    against a stolen password. Every other route into a session — password,
+    magic link, onboarding link — asks for a second step, and a recovery code
+    is what a passkey-only account can answer it with."""
+
+    def setUp(self):
+        cache.clear()
+        self.user = make_user("passkey_gate_user", UserRole.ZEV_OWNER)
+        owner = APIClient()
+        auth(owner, self.user)
+        self.authenticator = SoftAuthenticator()
+        self.recovery_codes = register_passkey(owner, self.authenticator).data["recovery_codes"]
+        self.client = APIClient()
+
+    def _password_login(self):
+        return self.client.post(
             "/api/v1/auth/token/", {"email": self.user.email, "password": "pass1234"}, format="json"
         )
 
+    def test_password_login_returns_a_recovery_only_challenge(self):
+        resp = self._password_login()
+
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(resp.data["mfa_required"])
+        self.assertEqual(resp.data["methods"], ["recovery_code"])
+        self.assertNotIn("openzev_access", resp.cookies)
+
+    def test_a_recovery_code_completes_it_exactly_once(self):
+        token = self._password_login().data["mfa_token"]
+        code = self.recovery_codes[0]
+
+        first = self.client.post("/api/v1/auth/token/mfa/", {"mfa_token": token, "code": code}, format="json")
+        again = self.client.post("/api/v1/auth/token/mfa/", {"mfa_token": token, "code": code}, format="json")
+
+        self.assertEqual(first.status_code, 200)
+        self.assertIn("openzev_access", first.cookies)
+        self.assertEqual(again.status_code, 400)
+        event = AuditEvent.objects.get(action_type="auth.login", metadata_json__method="recovery_code")
+        self.assertEqual(event.actor_user_id, self.user.pk)
+
+    def test_a_totp_shaped_code_is_refused_without_an_authenticator_app(self):
+        token = self._password_login().data["mfa_token"]
+
+        resp = self.client.post("/api/v1/auth/token/mfa/", {"mfa_token": token, "code": "123456"}, format="json")
+
+        self.assertEqual(resp.status_code, 400)
+        failure = AuditEvent.objects.get(action_type="auth.mfa.challenge_failed")
+        self.assertEqual(failure.metadata_json["reason"], "invalid_code")
+
+    def test_the_challenge_offers_totp_too_once_an_authenticator_app_exists(self):
+        device = TotpDevice(user=self.user, confirmed_at=timezone.now())
+        device.set_secret("JBSWY3DPEHPK3PXP")
+        device.save()
+
+        self.assertEqual(self._password_login().data["methods"], ["totp", "recovery_code"])
+
+    def test_the_passkey_route_itself_is_never_challenged(self):
+        resp = sign_in_with(self.client, self.authenticator)
+
         self.assertEqual(resp.status_code, 200)
         self.assertNotIn("mfa_required", resp.data)
+
+    def test_magic_link_asks_for_the_second_step(self):
+        from accounts import magic_links
+
+        token = magic_links.issue(self.user)
+
+        resp = self.client.post("/api/v1/public/magic-link/consume/", {"token": token.token})
+
+        self.assertTrue(resp.data["mfa_required"])
+        self.assertEqual(resp.data["methods"], ["recovery_code"])
+        self.assertNotIn("openzev_access", resp.cookies)
+
+    def test_removing_the_last_passkey_restores_password_only_login(self):
+        owner = APIClient()
+        auth(owner, self.user)
+        owner.delete(f"{PASSKEYS_URL}{WebAuthnCredential.objects.get().pk}/")
+
+        resp = self._password_login()
+
+        self.assertNotIn("mfa_required", resp.data)
+        self.assertIn("openzev_access", resp.cookies)
 
 
 @override_settings(WEBAUTHN_RP_ID=RP_ID, WEBAUTHN_ORIGIN=ORIGIN)

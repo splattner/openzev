@@ -70,6 +70,8 @@ export const fr = {
             back: 'Retour',
             invalidCode: 'Code invalide ou expiré.',
             invalidRecoveryCode: 'Code de récupération invalide ou déjà utilisé.',
+            recoveryOnlyHint: 'Votre compte est protégé par une clé d\'accès. Saisissez l\'un de vos codes de récupération pour terminer la connexion, ou revenez en arrière et utilisez votre clé d\'accès.',
+            usePasskeyInstead: 'Se connecter avec une clé d\'accès',
         },
         passkey: {
             signIn: 'Se connecter avec une clé d\'accès',
@@ -416,7 +418,7 @@ export const fr = {
             recoveryCodesRemaining: '{{count}} codes de récupération inutilisés restants.',
             regenerateCodes: 'Régénérer les codes',
             recoveryCodesShownOnceTitle: 'Enregistrez vos codes de récupération',
-            recoveryCodesShownOnceBody: 'Ces codes vous permettent de vous connecter si vous perdez l\'accès à votre application d\'authentification. Chaque code fonctionne une seule fois. Ils ne seront plus affichés.',
+            recoveryCodesShownOnceBody: 'Ces codes vous permettent de vous connecter avec votre mot de passe si vous ne pouvez pas utiliser votre clé d\'accès ou votre application d\'authentification. Chaque code ne fonctionne qu\'une fois. Ils ne seront plus affichés.',
             copy: 'Copier',
             copied: 'Copié !',
             copyFailed: 'Impossible de copier dans le presse-papiers.',

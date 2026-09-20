@@ -82,14 +82,8 @@ def resolve_challenge(token: str) -> User:
         raise MfaChallengeError("invalid_challenge") from None
 
 
-def has_active_factor(user: User) -> bool:
-    """Whether ``user`` has a second factor that *gates a password login* —
-    i.e. one that can answer a challenge. That is TOTP only.
-
-    A passkey is deliberately not counted: it authenticates on its own and
-    replaces the password (ADR 0020), so it cannot be a second step after
-    one. See ``has_any_factor`` for "is this account protected at all".
-    """
+def has_totp(user: User) -> bool:
+    """Whether ``user`` has a confirmed authenticator-app device."""
     # A query, not ``user.totp_device``: that reverse accessor caches on the
     # instance, so right after a device is deleted it would still report one.
     return TotpDevice.objects.filter(user=user, confirmed_at__isnull=False).exists()
@@ -97,8 +91,30 @@ def has_active_factor(user: User) -> bool:
 
 def has_any_factor(user: User) -> bool:
     """Whether ``user`` has any registered factor — an active TOTP device or
-    at least one passkey. What the enrolment policy is satisfied by."""
-    return has_active_factor(user) or user.webauthn_credentials.exists()
+    at least one passkey. Both what the enrolment policy is satisfied by and
+    what makes a session-minting request other than a passkey sign-in ask for
+    a second step (``requires_challenge``)."""
+    return has_totp(user) or user.webauthn_credentials.exists()
+
+
+def requires_challenge(user: User) -> bool:
+    """Whether a password, magic-link or onboarding-link login for ``user``
+    must be completed with a second step before it mints a session.
+
+    True for any account with a factor — a passkey included. A passkey signs
+    in on its own (ADR 0020), but that is a separate, passwordless route; an
+    account that has one must not leave its *password* as a weaker way in,
+    or enrolling protects nothing against a stolen password.
+    """
+    return has_any_factor(user)
+
+
+def challenge_methods(user: User) -> list[str]:
+    """What the second step will accept: a TOTP code when the account has an
+    authenticator app, and a recovery code always (every factor earns a set —
+    see ``issue_recovery_codes``). A passkey-only account is therefore asked
+    for a recovery code, or can simply use its passkey instead."""
+    return ["totp", "recovery_code"] if has_totp(user) else ["recovery_code"]
 
 
 def policy_applies(user: User) -> bool:
@@ -134,7 +150,7 @@ def removal_blocked(user: User, *, leaving: int) -> bool:
 def factor_count(user: User) -> int:
     """How many factors the user has: one for an active TOTP device plus one
     per passkey. Only used to reason about what a removal would leave."""
-    return int(has_active_factor(user)) + user.webauthn_credentials.count()
+    return int(has_totp(user)) + user.webauthn_credentials.count()
 
 
 def drop_recovery_codes_if_unprotected(user: User) -> None:

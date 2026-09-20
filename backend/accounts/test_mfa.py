@@ -213,7 +213,7 @@ class TotpLoginTests(TestCase):
 
         self.assertEqual(resp.status_code, 200)
         self.assertTrue(resp.data["mfa_required"])
-        self.assertEqual(resp.data["methods"], ["totp"])
+        self.assertEqual(resp.data["methods"], ["totp", "recovery_code"])
         self.assertNotIn("openzev_access", resp.cookies)
         self.assertNotIn("openzev_refresh", resp.cookies)
 
@@ -356,7 +356,7 @@ class MfaDoorTests(TestCase):
 
     def test_email_verification_is_unaffected_in_practice(self):
         """An inactive account being verified for the first time cannot yet
-        have a factor, but the code path runs the same has_active_factor
+        have a factor, but the code path runs the same requires_challenge
         check regardless — this pins that it does not misfire."""
         from .models import EmailVerificationToken, User
 

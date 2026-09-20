@@ -70,6 +70,8 @@ export const it = {
             back: 'Indietro',
             invalidCode: 'Codice non valido o scaduto.',
             invalidRecoveryCode: 'Codice di recupero non valido o già utilizzato.',
+            recoveryOnlyHint: 'Il tuo account è protetto da una passkey. Inserisci uno dei codici di recupero per completare l\'accesso, oppure torna indietro e usa la passkey.',
+            usePasskeyInstead: 'Accedi invece con una passkey',
         },
         passkey: {
             signIn: 'Accedi con una passkey',
@@ -416,7 +418,7 @@ export const it = {
             recoveryCodesRemaining: '{{count}} codici di recupero inutilizzati rimasti.',
             regenerateCodes: 'Rigenera codici',
             recoveryCodesShownOnceTitle: 'Salva i tuoi codici di recupero',
-            recoveryCodesShownOnceBody: 'Questi codici ti permettono di accedere se perdi l\'accesso alla tua app di autenticazione. Ogni codice funziona una sola volta. Non verranno mostrati di nuovo.',
+            recoveryCodesShownOnceBody: 'Questi codici ti permettono di accedere con la password se non puoi usare la passkey o l\'app di autenticazione. Ogni codice funziona una sola volta. Non verranno mostrati di nuovo.',
             copy: 'Copia',
             copied: 'Copiato!',
             copyFailed: 'Impossibile copiare negli appunti.',
