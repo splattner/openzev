@@ -1840,6 +1840,23 @@ h3 {
   align-items: start;
 }
 
+.field-error {
+  color: var(--danger-600);
+  font-size: 0.85rem;
+}
+
+.imports-history-filters {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.75rem;
+}
+
+.imports-history-filters input[type="search"] {
+  flex: 1 1 12rem;
+  min-width: 0;
+}
+
 .actions-row {
   display: flex;
   gap: 0.5rem;

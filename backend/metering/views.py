@@ -1,5 +1,5 @@
 import uuid
-from datetime import date as date_type, timedelta, timezone as dt_timezone
+from datetime import date as date_type, datetime, timedelta, timezone as dt_timezone
 
 from allocation.validity import period_end_exclusive_dt, period_start_dt, period_window
 from django.db import transaction
@@ -50,10 +50,55 @@ def _validated_date(raw, field_name):
     """Parse a YYYY-MM-DD query param, or raise a 400 if it's present but malformed."""
     if not raw:
         return None
-    parsed = parse_date(raw)
+    try:
+        parsed = parse_date(raw)
+    except (TypeError, ValueError):
+        parsed = None
     if parsed is None:
         raise ValidationError({field_name: ["Must be a valid date (YYYY-MM-DD)."]})
     return parsed
+
+
+def _resolve_import_target_zev(request):
+    """Validate required zev_id for import/preview.
+
+    Returns ``(zev, reason, error_response)`` — reason is None on success and
+    one of ``missing``/``invalid``/``not_found``/``forbidden`` otherwise, so
+    callers pick audit summaries without string-matching the response payload.
+    The resolved ZEV is returned even on ``forbidden`` so denied attempts keep
+    internal audit attribution (target object + id); the 403 response itself is
+    unchanged.
+    """
+    raw = request.data.get("zev_id")
+    if not raw:
+        return None, "missing", Response({"error": "zev_id is required."}, status=status.HTTP_400_BAD_REQUEST)
+    try:
+        uuid.UUID(str(raw))
+    except (ValueError, AttributeError, TypeError):
+        return None, "invalid", Response({"error": "zev_id must be a valid UUID."}, status=status.HTTP_400_BAD_REQUEST)
+    try:
+        zev = Zev.objects.get(pk=raw)
+    except Zev.DoesNotExist:
+        return None, "not_found", Response({"error": "ZEV not found."}, status=status.HTTP_404_NOT_FOUND)
+    if not request.user.is_admin and zev.owner != request.user:
+        return zev, "forbidden", Response({"error": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
+    return zev, None, None
+
+
+def _audit_import_zev_rejection(request, *, action_type, target_type, summary, error_response, metadata, target=None, target_id="", target_display=""):
+    """Audit a rejected import/preview ZEV target; 403 maps to DENIED."""
+    record_audit_event(
+        request=request,
+        action_category=AuditActionCategory.IMPORT,
+        action_type=action_type,
+        target_type=target_type,
+        target=target,
+        target_id=target_id,
+        target_display=target_display,
+        summary=summary,
+        status=AuditEventStatus.DENIED if error_response.status_code == status.HTTP_403_FORBIDDEN else AuditEventStatus.FAILED,
+        metadata=metadata,
+    )
 
 
 class MeterReadingViewSet(ZevScopedQuerySetMixin, viewsets.ModelViewSet):
@@ -389,20 +434,29 @@ class ImportLogViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.
 
     def get_queryset(self):
         user = self.request.user
+        base = ImportLog.objects.select_related("zev", "imported_by")
         if user.is_admin:
-            return ImportLog.objects.all()
-        return ImportLog.objects.filter(Q(zev__owner=user) | Q(imported_by=user)).distinct()
+            return base.all()
+        return base.filter(Q(zev__owner=user) | Q(imported_by=user)).distinct()
 
     def _delete_import_logs(self, queryset):
-        batch_ids = set(queryset.exclude(batch_id__isnull=True).values_list("batch_id", flat=True))
-        deleted_logs = queryset.count()
-
         with transaction.atomic():
+            # Freeze and lock the selection before checking protection. Avoid
+            # locking nullable select_related joins from get_queryset().
+            selected_ids = list(queryset.values_list("pk", flat=True))
+            logs = list(ImportLog.objects.filter(pk__in=selected_ids).order_by("pk").select_for_update())
+            if any(log.rows_overwritten > 0 for log in logs):
+                raise ValidationError({
+                    "code": "overwrite_import_protected",
+                    "error": "Imports that overwrote readings cannot be deleted. No imports were deleted.",
+                })
+            batch_ids = {log.batch_id for log in logs if log.batch_id}
+            deleted_logs = len(logs)
             if batch_ids:
                 deleted_readings, _ = MeterReading.objects.filter(import_batch__in=batch_ids).delete()
             else:
                 deleted_readings = 0
-            queryset.delete()
+            ImportLog.objects.filter(pk__in=[log.pk for log in logs]).delete()
 
         return {
             "deleted_logs": deleted_logs,
@@ -426,26 +480,40 @@ class ImportLogViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.
 
     @action(detail=False, methods=["post"], url_path="bulk-delete")
     def bulk_delete(self, request):
+        """Delete import logs (and their readings) by creation date.
+
+        Period bounds are explicit UTC days: ``date_from``/``date_to`` are
+        interpreted as half-open ``[00:00Z, next-day 00:00Z)`` on
+        ``ImportLog.created_at``. History timestamps render in local time via
+        ``formatDateTime``, so the confirmation UI labels the range as UTC to
+        keep display, selection and deletion consistent.
+        """
         mode = request.data.get("mode", "all")
         queryset = self.get_queryset()
 
-        zev_id = request.data.get("zev_id")
+        zev_id = _validated_uuid(request.data.get("zev_id"), "zev_id")
         if zev_id:
             queryset = queryset.filter(zev_id=zev_id)
 
         if mode == "period":
-            date_from = parse_date(request.data.get("date_from") or "")
-            date_to = parse_date(request.data.get("date_to") or "")
+            date_from = _validated_date(request.data.get("date_from"), "date_from")
+            date_to = _validated_date(request.data.get("date_to"), "date_to")
             if not date_from or not date_to:
                 return Response({"error": "date_from and date_to are required for period deletion."}, status=status.HTTP_400_BAD_REQUEST)
             if date_to < date_from:
                 return Response({"error": "date_to must be on or after date_from."}, status=status.HTTP_400_BAD_REQUEST)
-            queryset = queryset.filter(created_at__date__gte=date_from, created_at__date__lte=date_to)
+            if date_to == date_type.max:
+                return Response({"error": "date_to must be before 9999-12-31."}, status=status.HTTP_400_BAD_REQUEST)
+            # UTC days, matching the frontend visible-count computation.
+            start = datetime.combine(date_from, datetime.min.time(), tzinfo=dt_timezone.utc)
+            end = datetime.combine(date_to + timedelta(days=1), datetime.min.time(), tzinfo=dt_timezone.utc)
+            queryset = queryset.filter(created_at__gte=start, created_at__lt=end)
         elif mode != "all":
             return Response({"error": "Unsupported deletion mode."}, status=status.HTTP_400_BAD_REQUEST)
 
         result = self._delete_import_logs(queryset)
         result["mode"] = mode
+        result["timezone"] = "UTC"
         record_audit_event(
             request=request,
             action_category=AuditActionCategory.METERING,
@@ -457,6 +525,7 @@ class ImportLogViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.
                 "zev_id": zev_id,
                 "date_from": str(request.data.get("date_from") or ""),
                 "date_to": str(request.data.get("date_to") or ""),
+                "timezone": "UTC",
                 **result,
             },
         )
@@ -494,6 +563,22 @@ class ImportView(viewsets.ViewSet):
             )
             return Response({"error": "No file provided."}, status=status.HTTP_400_BAD_REQUEST)
 
+        zev, _, error_response = _resolve_import_target_zev(request)
+        if error_response is not None:
+            raw_zev_id = str(request.data.get("zev_id") or "")
+            _audit_import_zev_rejection(
+                request,
+                action_type="import.preview_csv",
+                target_type="zev.Zev",
+                summary=f"CSV import preview rejected: {error_response.data.get('error', 'validation failed')}.",
+                error_response=error_response,
+                metadata={"filename": file.name, "error": error_response.data.get("error")},
+                target=zev,
+                target_id=str(zev.id) if zev is not None else raw_zev_id,
+                target_display=zev.name if zev is not None else raw_zev_id,
+            )
+            return error_response
+
         column_map_raw = {k: v for k, v in request.data.items() if k.startswith("col_")}
         column_map = {k[4:]: v for k, v in column_map_raw.items()} if column_map_raw else None
         has_header_raw = request.data.get("has_header", "true")
@@ -508,6 +593,7 @@ class ImportView(viewsets.ViewSet):
             payload = preview_csv(
                 file,
                 request.user,
+                zev=zev,
                 column_map=column_map,
                 timestamp_format=timestamp_format,
                 has_header=has_header,
@@ -515,6 +601,7 @@ class ImportView(viewsets.ViewSet):
                 format_profile=format_profile,
                 interval_minutes=interval_minutes,
                 values_count=values_count,
+                overwrite_existing=request.data.get("overwrite_existing", False),
             )
         except ImportFileError as exc:
             record_audit_event(
@@ -547,6 +634,7 @@ class ImportView(viewsets.ViewSet):
             summary="Generated CSV import preview.",
             metadata={
                 "filename": file.name,
+                "zev_id": str(zev.id),
                 "format_profile": format_profile,
                 # The preview succeeded, so both values are int-coercible.
                 "interval_minutes": int(interval_minutes),
@@ -570,6 +658,21 @@ class ImportView(viewsets.ViewSet):
             return Response({"error": "No file provided."}, status=status.HTTP_400_BAD_REQUEST)
 
         if source == "csv":
+            zev, _, error_response = _resolve_import_target_zev(request)
+            if error_response is not None:
+                raw_zev_id = str(request.data.get("zev_id") or "")
+                _audit_import_zev_rejection(
+                    request,
+                    action_type="import.upload",
+                    target_type="zev.Zev",
+                    summary=f"CSV import rejected: {error_response.data.get('error', 'validation failed')}.",
+                    error_response=error_response,
+                    metadata={"source": source, "filename": file.name, "error": error_response.data.get("error")},
+                    target=zev,
+                    target_id=str(zev.id) if zev is not None else raw_zev_id,
+                    target_display=zev.name if zev is not None else raw_zev_id,
+                )
+                return error_response
             column_map_raw = {k: v for k, v in request.data.items() if k.startswith("col_")}
             column_map = {k[4:]: v for k, v in column_map_raw.items()} if column_map_raw else None
             has_header_raw = request.data.get("has_header", "true")
@@ -586,6 +689,7 @@ class ImportView(viewsets.ViewSet):
                 log = import_csv(
                     file,
                     request.user,
+                    zev=zev,
                     column_map=column_map,
                     timestamp_format=timestamp_format,
                     has_header=has_header,
@@ -607,38 +711,26 @@ class ImportView(viewsets.ViewSet):
                 )
                 return Response({"error": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
         else:
-            zev_id = request.data.get("zev_id")
-            try:
-                zev = Zev.objects.get(pk=zev_id)
-            except Zev.DoesNotExist:
-                record_audit_event(
-                    request=request,
-                    action_category=AuditActionCategory.IMPORT,
+            zev, zev_reason, error_response = _resolve_import_target_zev(request)
+            if error_response is not None:
+                summary = {
+                    "missing": "SDAT-CH import failed: ZEV not selected.",
+                    "invalid": "SDAT-CH import failed: invalid ZEV id.",
+                    "not_found": "SDAT-CH import failed: ZEV not found.",
+                    "forbidden": "Denied SDAT-CH import due to tenant scope.",
+                }[zev_reason]
+                _audit_import_zev_rejection(
+                    request,
                     action_type="import.upload",
                     target_type="zev.Zev",
-                    target_id=str(zev_id or ""),
-                    target_display=str(zev_id or ""),
-                    summary="SDAT-CH import failed: ZEV not found.",
-                    status=AuditEventStatus.FAILED,
-                    metadata={"source": source, "filename": file.name},
-                )
-                return Response({"error": "ZEV not found."}, status=status.HTTP_404_NOT_FOUND)
-
-            if not request.user.is_admin and zev.owner != request.user:
-                record_audit_event(
-                    request=request,
-                    action_category=AuditActionCategory.IMPORT,
-                    action_type="import.upload",
-                    target_type="zev.Zev",
+                    summary=summary,
+                    error_response=error_response,
+                    metadata={"source": source, "filename": file.name, "error": error_response.data.get("error")},
                     target=zev,
-                    target_id=str(zev.id),
-                    target_display=zev.name,
-                    summary="Denied SDAT-CH import due to tenant scope.",
-                    status=AuditEventStatus.DENIED,
-                    metadata={"source": source, "filename": file.name},
+                    target_id=str(zev.id) if zev is not None else str(request.data.get("zev_id") or ""),
+                    target_display=zev.name if zev is not None else str(request.data.get("zev_id") or ""),
                 )
-                return Response({"error": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
-
+                return error_response
             log = import_sdatch(file, zev, request.user)
 
         record_audit_event(

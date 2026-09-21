@@ -33,7 +33,7 @@ class CsvLimitTests(TestCase):
 
     def test_file_over_size_cap_is_rejected(self):
         with mock.patch.object(csv_importer, "MAX_CSV_BYTES", 10):
-            resp = upload_csv(self.client, "big.csv", b"meter_id,timestamp,energy_kwh\n" + b"x" * 100)
+            resp = upload_csv(self.client, "big.csv", b"meter_id,timestamp,energy_kwh\n" + b"x" * 100, zev_id=str(self.zev.id))
 
         self.assertEqual(resp.status_code, 400)
         self.assertIn("too large", resp.data["error"])
@@ -41,7 +41,7 @@ class CsvLimitTests(TestCase):
     def test_file_over_row_cap_is_rejected(self):
         rows = b"".join(b"CH-X,2026-01-01T00:00:00Z,1.0\n" for _ in range(4))
         with mock.patch.object(csv_importer, "MAX_CSV_ROWS", 3):
-            resp = upload_csv(self.client, "rows.csv", b"meter_id,timestamp,energy_kwh\n" + rows)
+            resp = upload_csv(self.client, "rows.csv", b"meter_id,timestamp,energy_kwh\n" + rows, zev_id=str(self.zev.id))
 
         self.assertEqual(resp.status_code, 400)
         self.assertIn("too many rows", resp.data["error"])
@@ -51,7 +51,7 @@ class CsvLimitTests(TestCase):
         # a data row and must not consume the cap.
         rows = b"".join(b"CH-X,2026-01-01T00:00:00Z,1.0\n" for _ in range(3))
         with mock.patch.object(csv_importer, "MAX_CSV_ROWS", 3):
-            resp = upload_csv(self.client, "rows.csv", b"meter_id,timestamp,energy_kwh\n" + rows)
+            resp = upload_csv(self.client, "rows.csv", b"meter_id,timestamp,energy_kwh\n" + rows, zev_id=str(self.zev.id))
 
         self.assertEqual(resp.status_code, 201)
         self.assertEqual(resp.data["rows_total"], 3)
@@ -63,8 +63,7 @@ class CsvLimitTests(TestCase):
         with mock.patch.object(csv_importer, "MAX_CSV_ROWS", 3):
             resp = upload_csv(
                 self.client, "rows.csv", rows,
-                has_header="false", col_meter_id="0", col_timestamp="1", col_energy_kwh="2",
-            )
+                has_header="false", col_meter_id="0", col_timestamp="1", col_energy_kwh="2", zev_id=str(self.zev.id))
 
         self.assertEqual(resp.status_code, 201)
         self.assertEqual(resp.data["rows_total"], 3)
@@ -74,15 +73,14 @@ class CsvLimitTests(TestCase):
         with mock.patch.object(csv_importer, "MAX_CSV_ROWS", 3):
             resp = upload_csv(
                 self.client, "rows.csv", rows,
-                has_header="false", col_meter_id="0", col_timestamp="1", col_energy_kwh="2",
-            )
+                has_header="false", col_meter_id="0", col_timestamp="1", col_energy_kwh="2", zev_id=str(self.zev.id))
 
         self.assertEqual(resp.status_code, 400)
         self.assertIn("too many rows", resp.data["error"])
 
     def test_file_over_column_cap_is_rejected(self):
         with mock.patch.object(csv_importer, "MAX_CSV_COLUMNS", 3):
-            resp = upload_csv(self.client, "cols.csv", b"a,b,c,d\n1,2,3,4\n")
+            resp = upload_csv(self.client, "cols.csv", b"a,b,c,d\n1,2,3,4\n", zev_id=str(self.zev.id))
 
         self.assertEqual(resp.status_code, 400)
         self.assertIn("too many columns", resp.data["error"])
@@ -90,8 +88,7 @@ class CsvLimitTests(TestCase):
     def test_values_count_above_maximum_is_rejected(self):
         resp = upload_csv(
             self.client, "vc.csv", b"meter_id,date,1,2\nCH-X,2026-01-01,1,2\n",
-            format_profile="daily_15min", values_count="2000",
-        )
+            format_profile="daily_15min", values_count="2000", zev_id=str(self.zev.id))
 
         self.assertEqual(resp.status_code, 400)
         self.assertIn("values_count must be between 1 and 1440", resp.data["error"])
@@ -99,12 +96,10 @@ class CsvLimitTests(TestCase):
     def test_values_count_below_one_is_rejected_on_import_and_preview(self):
         csv_bytes = b"meter_id,date,1,2\nCH-X,2026-01-01,1,2\n"
         resp = upload_csv(
-            self.client, "vc0.csv", csv_bytes, format_profile="daily_15min", values_count="0"
-        )
+            self.client, "vc0.csv", csv_bytes, format_profile="daily_15min", values_count="0", zev_id=str(self.zev.id))
         self.assertEqual(resp.status_code, 400)
         resp = preview_csv(
-            self.client, "vc0.csv", csv_bytes, format_profile="daily_15min", values_count="0"
-        )
+            self.client, "vc0.csv", csv_bytes, format_profile="daily_15min", values_count="0", zev_id=str(self.zev.id))
         self.assertEqual(resp.status_code, 400)
 
     def test_values_count_at_maximum_is_accepted(self):
@@ -118,8 +113,7 @@ class CsvLimitTests(TestCase):
 
         resp = upload_csv(
             self.client, "vc.csv", b"meter_id,timestamp,energy_kwh\nCH-LIMIT-1,2026-01-01T00:00:00Z,1.0\n",
-            values_count="1440",
-        )
+            values_count="1440", zev_id=str(self.zev.id))
 
         self.assertEqual(resp.status_code, 201)
         self.assertEqual(MeterReading.objects.count(), 1)
@@ -127,8 +121,7 @@ class CsvLimitTests(TestCase):
     def test_non_integer_interval_or_values_count_is_rejected(self):
         resp = upload_csv(
             self.client, "vc.csv", b"meter_id,timestamp,energy_kwh\nCH-X,2026-01-01T00:00:00Z,1.0\n",
-            values_count="abc",
-        )
+            values_count="abc", zev_id=str(self.zev.id))
         self.assertEqual(resp.status_code, 400)
         self.assertIn("values_count must be an integer", resp.data["error"])
 
@@ -137,14 +130,14 @@ class CsvLimitTests(TestCase):
             f"NOPE-{i},2026-01-01T00:00:00Z,1.0\n".encode() for i in range(60)
         )
 
-        resp = upload_csv(self.client, "errs.csv", b"meter_id,timestamp,energy_kwh\n" + rows)
+        resp = upload_csv(self.client, "errs.csv", b"meter_id,timestamp,energy_kwh\n" + rows, zev_id=str(self.zev.id))
 
         self.assertEqual(resp.status_code, 201)
         errors = resp.data["errors"]
         self.assertEqual(len(errors), csv_importer.MAX_REPORTED_ERRORS + 1)
         self.assertIn("Too many errors", errors[-1]["error"])
 
-    def test_overwrite_note_cannot_push_the_error_list_past_its_cap(self):
+    def test_overwrite_note_lives_in_warnings_not_errors(self):
         MeteringPoint.objects.create(
             zev=self.zev, meter_id="CH-LIMIT-1", meter_type=MeteringPointType.CONSUMPTION
         )
@@ -152,26 +145,36 @@ class CsvLimitTests(TestCase):
         rows = b"CH-LIMIT-1,2026-01-01T00:00:00Z,1.0\n" + b"".join(
             f"NOPE-{i},2026-01-01T00:00:00Z,1.0\n".encode() for i in range(60)
         )
-        upload_csv(self.client, "ov.csv", header + rows)
-        resp = upload_csv(self.client, "ov.csv", header + rows, overwrite_existing="true")
+        upload_csv(self.client, "ov.csv", header + rows, zev_id=str(self.zev.id))
+        resp = upload_csv(self.client, "ov.csv", header + rows, overwrite_existing="true", zev_id=str(self.zev.id))
 
         self.assertEqual(resp.status_code, 201)
         errors = resp.data["errors"]
         self.assertEqual(len(errors), csv_importer.MAX_REPORTED_ERRORS + 1)
-        self.assertEqual(errors[0]["error"], "Overwrote 1 existing readings.")
         self.assertIn("Too many errors", errors[-1]["error"])
+        warnings = resp.data["warnings"]
+        self.assertEqual(len(warnings), 1)
+        self.assertEqual(warnings[0]["warning"], "Overwrote 1 existing readings.")
 
     def test_interval_minutes_below_one_is_rejected(self):
         csv_bytes = b"meter_id,date,1,2\nCH-X,2026-01-01,1,2\n"
         resp = upload_csv(
-            self.client, "iv.csv", csv_bytes, format_profile="daily_15min", interval_minutes="0"
-        )
+            self.client, "iv.csv", csv_bytes, format_profile="daily_15min", interval_minutes="0", zev_id=str(self.zev.id))
         self.assertEqual(resp.status_code, 400)
         self.assertIn("interval_minutes must be at least 1", resp.data["error"])
         resp = preview_csv(
-            self.client, "iv.csv", csv_bytes, format_profile="daily_15min", interval_minutes="0"
-        )
+            self.client, "iv.csv", csv_bytes, format_profile="daily_15min", interval_minutes="0", zev_id=str(self.zev.id))
         self.assertEqual(resp.status_code, 400)
+
+
+class BackendUploadCapTests(TestCase):
+    """Backend MAX_UPLOAD_BYTES; the frontend mirror is asserted in
+    frontend/tests/imports-samples.test.ts, not here."""
+
+    def test_upload_cap_matches_documented_50mb(self):
+        from metering.importers.limits import MAX_UPLOAD_BYTES
+
+        self.assertEqual(MAX_UPLOAD_BYTES, 50 * 1024 * 1024)
 
 
 class XlsxZipLimitTests(TestCase):
@@ -181,10 +184,11 @@ class XlsxZipLimitTests(TestCase):
         self.client = APIClient()
         self.owner = make_user("xlsx_limit_owner", UserRole.ZEV_OWNER)
         auth(self.client, self.owner)
+        self.zev = Zev.objects.create(name="XLSX Limit ZEV", owner=self.owner, zev_type="vzev", invoice_prefix="Y")
 
     def _upload(self, upload):
         return self.client.post(
-            "/api/v1/metering/import/csv/", {"file": upload}, format="multipart"
+            "/api/v1/metering/import/csv/", {"file": upload, "zev_id": str(self.zev.id)}, format="multipart"
         )
 
     def test_zip_with_too_many_members_is_rejected(self):

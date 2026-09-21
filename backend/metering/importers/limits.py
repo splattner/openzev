@@ -9,6 +9,7 @@ import re
 
 MAX_UPLOAD_BYTES = 50 * 1024 * 1024
 MAX_REPORTED_ERRORS = 50
+TRUNCATION_NOTE = f"Too many errors — showing first {MAX_REPORTED_ERRORS}; further errors truncated."
 
 # The ratio check ignores members under 1 MB decompressed: legitimate small
 # members (sparse sheets, repeated CSV headers) compress far beyond the cap.
@@ -26,12 +27,7 @@ def add_error(errors: list, payload: dict):
     if len(errors) < MAX_REPORTED_ERRORS:
         errors.append(payload)
     elif len(errors) == MAX_REPORTED_ERRORS:
-        errors.append(
-            {
-                "row": None,
-                "error": f"Too many errors — showing first {MAX_REPORTED_ERRORS}; further errors truncated.",
-            }
-        )
+        errors.append({"row": None, "error": TRUNCATION_NOTE})
 
 
 def validate_zip(zf, *, label, max_members, max_total_bytes, max_ratio, error_cls):

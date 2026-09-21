@@ -38,7 +38,7 @@ export async function bulkDeleteImportLogs(payload: {
 
 export async function uploadMeteringFile(payload: {
   source: 'csv' | 'sdatch'
-  zevId?: string
+  zevId: string
   file: File
   columnMap?: {
     meter_id?: string
@@ -56,9 +56,7 @@ export async function uploadMeteringFile(payload: {
   overwriteExisting?: boolean
 }): Promise<ImportLog> {
   const formData = new FormData()
-  if (payload.zevId) {
-    formData.append('zev_id', payload.zevId)
-  }
+  formData.append('zev_id', payload.zevId)
   formData.append('file', payload.file)
   if (payload.columnMap && payload.source === 'csv') {
     if (payload.columnMap.meter_id) formData.append('col_meter_id', payload.columnMap.meter_id)
@@ -85,6 +83,7 @@ export async function uploadMeteringFile(payload: {
 
 export async function previewCsvImport(payload: {
   file: File
+  zevId: string
   columnMap?: {
     meter_id?: string
     timestamp?: string
@@ -98,9 +97,12 @@ export async function previewCsvImport(payload: {
   timestampFormat?: string
   intervalMinutes?: number
   valuesCount?: number
+  overwriteExisting?: boolean
 }): Promise<ImportPreviewResult> {
   const formData = new FormData()
   formData.append('file', payload.file)
+  formData.append('zev_id', payload.zevId)
+  formData.append('overwrite_existing', String(payload.overwriteExisting ?? false))
   if (payload.columnMap) {
     if (payload.columnMap.meter_id) formData.append('col_meter_id', payload.columnMap.meter_id)
     if (payload.columnMap.timestamp) formData.append('col_timestamp', payload.columnMap.timestamp)

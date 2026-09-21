@@ -104,21 +104,27 @@ Ordering: `["metering_point", "timestamp"]`.
 |---|---|---|
 | `id` | `UUIDField` (PK) | Auto-generated |
 | `batch_id` | `UUIDField` | Groups this log with its readings |
-| `zev` | FK → `Zev` (`CASCADE`, nullable) | Inferred or explicit target ZEV |
+| `zev` | FK → `Zev` (`CASCADE`, nullable in DB for legacy rows) | Required target ZEV for every current import (CSV/SDAT-CH assign `zev` at creation; `null` only for pre-migration rows) |
 | `imported_by` | FK → `User` (`SET_NULL`, nullable) | User who triggered the import |
 | `source` | `ImportSource` | `csv` or `sdatch` |
 | `filename` | `CharField(255)` | Original upload filename |
 | `rows_total` | `IntegerField` | Total rows in file |
 | `rows_imported` | `IntegerField` | Successfully imported count |
+| `rows_overwritten` | `PositiveIntegerField` (default `0`) | CSV writes that replaced an existing reading (also included in `rows_imported`); nonzero protects the import from deletion |
 | `rows_skipped` | `IntegerField` | Skipped/duplicate count |
-| `errors` | `JSONField` (default `[]`) | Array of error objects; shape varies by source: CSV uses `{row, error}`, SDAT-CH uses `{meter_id?, error}` or `{error}` |
+| `errors` | `JSONField` (default `[]`) | Array of error objects: CSV uses `{row, meter_id?, error}` (`meter_id` attached whenever the row names a meter), SDAT-CH uses `{meter_id?, error}` or `{error}` |
+| `warnings` | `JSONField` (default `[]`) | Informational notes, never failures: CSV overwrite reports `{row: null, warning: "Overwrote N existing readings."}` here so success toasts stay success |
 | `created_at` | `DateTimeField` (auto) | Import timestamp |
 
-Ordering: `["-created_at"]`.
+Ordering: `["-created_at", "id"]` (matches `metering/models.py:ImportLog.Meta.ordering`).
 
-**ZEV inference:** if no explicit ZEV is provided on CSV import, the log's ZEV
-is inferred from the metering points that were actually touched.  If all
-touched meters belong to the same ZEV, that ZEV is stored; otherwise `null`.
+**ZEV assignment:** CSV import and preview require `zev_id`. `log.zev` is
+the validated target at creation (not inferred). `backend/metering/views.py:
+_resolve_import_target_zev` rejects missing (400), malformed UUID (400),
+unknown ZEV (404), or foreign-owned ZEV (403, non-admin) before parsing.
+The resolver returns the ZEV object even on 403 so denied preview/upload
+audits keep `target`/`target_id`/`zev` attribution with a DENIED status.
+Cross-ZEV meters are per-row "not found or not accessible" errors.
 
 ---
 
@@ -178,8 +184,11 @@ positional `daily_15min` interval slots are read the same way.
 | Excel sheet | The first sheet is read, regardless of which sheet was active when the workbook was saved |
 | Ragged rows | Short rows are padded; extra trailing fields are ignored |
 | Missing values | An absent cell reports "Missing …"; a whitespace-only cell reports "Empty …" |
-| Numbers | Comma decimal separators are accepted. Non-finite values (`nan`, `inf`) are rejected |
-| Timestamps | `timestamp_format` (a `strptime` string) wins if supplied and is interpreted as UTC. Otherwise ISO-8601 is parsed first, falling back to a lenient parser; naive values are assumed UTC. For `daily_15min`, non-ISO dates are parsed day-first to suit European exports |
+| Numbers | Comma decimal separators are accepted. Non-finite values (`nan`, `inf`) are rejected. Unparseable numbers report `Invalid numeric value '<input>'` rather than leaking `decimal` conversion codes. Magnitudes above `99999999.9999` kWh (the `DecimalField(max_digits=12, decimal_places=4)` bound) are rejected with an actionable error in both preview and import, so no `DataError` can escape the import transaction on PostgreSQL |
+| Timestamps | `timestamp_format` (a `strptime` string) wins if supplied and is interpreted as UTC: a parsed offset is converted to UTC (`astimezone`), never discarded — except native Excel datetime cells, which are used as-is (assumed UTC when naive, converted when aware). Otherwise ISO-8601 is parsed first, falling back to a lenient parser; naive values are assumed UTC. For `daily_15min`, non-ISO dates are parsed day-first to suit European exports |
+| Truncated daily rows | Missing interval columns or an invalid slot value reject the whole row atomically (one error, one `rows_skipped`, zero `rows_imported`); preview shares `_parse_daily_values` so both report the identical message. A row with no interval values at all is skipped with a "no interval values" error in both paths |
+| Daily duplicates / gap-fill | Without overwrite, existing slots are skipped per slot and missing slots imported: a partially duplicate row imports its new slots with no row error; a fully duplicate row (all slots in DB or earlier in the file) is skipped with one `Duplicate reading` error. Preview sets `existing_data` for partial and full duplicates without returning blocking errors. Fully existing daily rows increment `summary.rows_skipped_existing` (including intra-file duplicates tracked by the written-set); the wizard shows a localized skip notice and permits merge re-imports. With overwrite, all slots upsert and the skip count is zero while `existing_data` remains set |
+| Standard duplicates | Standard rows are interpreted by the shared `_interpret_standard_row` helper, so preview and import validate timestamps, values and directions identically. Preview prefetches existing `(metering_point, timestamp, direction)` pairs with chunked exact-timestamp queries (no range scan) and sets `existing_data` for rows matching the database or an earlier row in the same file; duplicates without overwrite increment `summary.rows_skipped_existing` without blocking errors, mirroring the daily contract. `summary.readings_existing` counts exact matching reading keys across the whole file — one per duplicate standard row, one per duplicate daily slot, including repeated writes within the file (validation failures excluded; data may change before execution) — and feeds the overwrite confirmation count |
 
 Unreadable files (wrong format, bad encoding, invalid delimiter) return **400**
 before any `ImportLog` row is created, so a failed read leaves no orphan log.
@@ -201,25 +210,28 @@ def _infer_direction_and_energy(meter_type, energy, explicit_direction=None):
 substitution, quantized to 4 decimal places.
 
 **Timestamp handling:**
-- Explicit `timestamp_format` → `strptime` + UTC.
+- Explicit `timestamp_format` → `strptime` + UTC. A parsed offset is converted to UTC (`astimezone`); naive results are stamped UTC. The format must contain `%` and capture the full calendar date: year-less formats (e.g. `%d.%m`) are rejected up front, otherwise data would silently land in 1900; day-of-year (`%Y-%j`) and week-based (`%U`/`%W`/`%V`) patterns count as month+day. The frontend `isValidTimestampFormat` mirrors this (year + (month+day | `%j` | week)). The validation probe is timezone-aware so offset-bearing formats (`%z`/`%Z`) round-trip. Unparseable timestamps report `Invalid timestamp value '<input>'` (standard) / `Invalid date value '<input>'` (daily), never dateutil internals.
 - Timezone-aware timestamps → normalized to UTC.
 - Naive timestamps → assume UTC.
-- `daily_15min` profile → date parsed to midnight UTC, then each slot offset
-  by `interval_minutes × slot_index`.
+- `daily_15min` profile → the declared calendar day wins: parse the date's
+  year/month/day and anchor it at midnight UTC, then offset each slot by
+  `interval_minutes × slot_index` (an offset-bearing value does not shift the
+  billing day).
 
 **Write modes:**
 
 | Mode | Behavior | DB operation |
 |---|---|---|
-| Default (skip) | Skip if `(metering_point, timestamp, direction)` already exists | `get_or_create` |
+| Default (skip) | Skip if `(metering_point, timestamp, direction)` already exists | Standard: `get_or_create`; daily: per-day `create` inside `transaction.atomic()` |
 | Overwrite | Update existing reading's energy value in place | `update_or_create` |
 
-Overwrite reports as a summary error: `"Overwrote N existing readings."`.
+Duplicate detection for `daily_15min` batches the day's existing `(metering_point, timestamp, direction)` pairs into one range query per contiguous block of file days (so sparse files do not query the full earliest-to-latest span), then checks in memory; slots written earlier in the same file are tracked in a written-set so intra-file duplicates report the same slot-level error. Standard rows batch existing pairs with chunked exact-timestamp `__in` queries (500 per chunk, below SQLite/PostgreSQL parameter limits) and intersect in memory. Preview uses the same `_prefetch_daily_existing` source (no earliest→latest range scan) and the same `_parse_daily_values` validator, so empty rows, missing columns and invalid numerics agree; its `existing_data` flag is day-level (any reading that day with overlapping direction) while duplicate skip notices use exact slots. The write is atomic per row for validation failures: `imported` counts only committed slots (counted after the row savepoint succeeds, so a rolled-back row contributes zero). A concurrent duplicate used to roll back the row's savepoint and report one row-level duplicate error with no partial day; the write path now retries per slot after such a collision, so surviving slots commit and only a fully collided row reports the duplicate error. Absorbed late collisions are not counted in `rows_skipped` (the row succeeded). Overwrite reports as a `warnings` note: `"Overwrote N existing readings."` (never in `errors`, so the UI success path stays success).
 
-**Meter visibility:** meters are scoped to the importing user's role:
-- `admin` → all meters.
-- `zev_owner` → only meters in owned ZEVs.
-- `participant` → no import access (blocked at view permission level).
+**Meter visibility:** meters are scoped to role **and** the validated
+target ZEV (`_meter_queryset_for_user(user, zev)`): `admin` → all meters in the
+ZEV; `zev_owner` → that ZEV when owned (403 otherwise); `participant` → no
+import access. A file with meters from multiple ZEVs imports only rows for
+the target ZEV; preview uses the same ZEV-scoped lookup.
 
 ### 4.2 SDAT-CH (ebIX XML) importer
 
@@ -245,9 +257,33 @@ Parses the Swiss SDAT-CH MeteringData XML format delivered by VNBs.
 
 ### 4.3 Preview workflow
 
-**Endpoint:** `POST /api/v1/metering/import/preview-csv/`
+**Endpoint:** `POST /api/v1/metering/import/preview-csv/` — requires
+`zev_id` (same validation as import, §3.3) and does not write data.
 
-Preview parses up to `max_rows` (default 30) rows and returns:
+**Coverage:** missing-meter counts cover the whole file as unique meter IDs,
+not rows in the first `max_rows` (display rows stay capped at 30).
+
+**Row-level validation:** preview validates every data row before display:
+missing/empty `meter_id`, missing/invalid timestamp (honoring
+`timestamp_format`), missing/invalid `energy_kwh` (including comma decimals
+and non-finite values), invalid `direction`, and for `daily_15min` missing/invalid
+date, missing interval columns, and the first failing slot's energy error —
+one error per daily row, mirroring import, so a single bad 96-slot row cannot
+burn the whole error budget. Blank `meter_id`
+cells are validation errors, not "missing meters." Fields are validated
+whether or not the meter exists — a file of unknown meters cannot hide
+errors the import would surface. Once the error list reaches
+`MAX_REPORTED_ERRORS`, row validation stops early (with the truncation
+sentinel) but the whole-file meter-ID scan continues, so summary counts stay
+exact. Errors are returned in `errors` and block `Start Import` in the
+wizard. Preview `existing_data` for `daily_15min` is otherwise unchanged.
+
+**Advisory contract:** preview is a UI aid, not a server-side gate. The wizard
+requires a fresh, clean preview before import, but the upload endpoint accepts
+direct uploads and runs the identical server-side validation — no preview
+token is required or checked.
+
+**Response shape:**
 
 ```json
 {
@@ -265,19 +301,28 @@ Preview parses up to `max_rows` (default 30) rows and returns:
   "summary": {
     "existing_metering_points": 8,
     "missing_metering_points": 2,
-    "rows_previewed": 30
+    "rows_previewed": 30,
+    "rows_skipped_existing": 0
   },
+  "missing_meter_ids": ["CH-MISSING-1", "CH-MISSING-2"],
   "errors": []
 }
 ```
 
-For `daily_15min` profile, each preview row includes `interval_minutes` and
-`values_count` instead of `energy`, and `existing_data` checks whether readings
-already exist for that day.
+- `missing_meter_ids` is the sorted distinct missing set, capped at 50
+  (truncated with +N). A meter appearing 30× counts as 1.
 
-Preview accepts the same configuration parameters as CSV import (column map,
-header, delimiter, profile, timestamp format, interval, values count) but does
-**not** write any data.
+For `daily_15min` profile, each preview row includes `interval_minutes` and
+`values_count` instead of `energy`. `existing_data` is direction-aware and
+uses one range query per contiguous block of file days: it flags any stored
+reading on the row's UTC day with a direction that row would import. It also
+flags exact duplicate slots earlier in the file. The flag remains visible in
+overwrite mode. In skip mode, fully duplicate daily rows contribute to
+`summary.rows_skipped_existing` instead of blocking errors. This count covers
+validated rows (validation stops at the error cap); it is zero for standard
+profiles, overwrite mode, and invalid configuration. New days in the same file
+remain importable without overwrite. Upload still records skipped fully
+duplicate rows in the import protocol; the preview notice is advisory.
 
 ### 4.4 Hardening and limits (C+ — 2026-08)
 
@@ -300,7 +345,7 @@ On lxml 6.1.1 the default is `resolve_entities='internal'` with a libxml2 amplif
 - `MAX_XLSX_MEMBERS 200`, `MAX_XLSX_RATIO 500:1` (XLSX is a ZIP; `openpyxl` with `read_only=True` still materializes shared strings, so the ZIP is validated before inflation). The ratio is a heuristic, deliberately loose: legitimate sparse sheets compress far beyond 100:1, and the decompressed-size sum is the hard bound. Sheet row caps are enforced *during* iteration and the column cap on *every* row, so an oversized sheet is rejected before it is materialized and a wide row cannot hide behind a narrow first row.
 - `MAX_VALUES_COUNT 1440` (values per `daily_15min` row) — prevents CPU bomb via `values_count=100000`; both `preview_csv` and `import_csv` validate `1..1440` through `_coerce_values_count`, and `interval_minutes >= 1` through `_coerce_interval_minutes`. Validation is single-layer: the coercers raise `ImportFileError` on non-integer input (no silent defaults), which the views map to a 400.
 - Streaming via `TextIOWrapper` over the uploaded file (`detach()` in a `finally` keeps the underlying upload readable on error paths); `file.read().decode` whole-file buffering removed.
-- `MAX_REPORTED_ERRORS 50` (shared across importers from `backend/metering/importers/limits.py`) — further per-row errors are truncated with a sentinel error. SDAT-CH reuses the same `add_error` helper, capping during the parse loop. The "Overwrote N existing readings" note is prepended after the loop and trimmed so the list never exceeds cap + 1 nor loses the sentinel.
+- `MAX_REPORTED_ERRORS 50` (shared across importers from `backend/metering/importers/limits.py`) — further per-row errors are truncated with a sentinel error. SDAT-CH reuses the same `add_error` helper, capping during the parse loop. The overwrite note lives in `warnings`, never in `errors`, so it cannot push the error list past its cap.
 
 **Shared limits module (`backend/metering/importers/limits.py`):**
 - `MAX_UPLOAD_BYTES 50 MB` (aliased as `MAX_CSV_BYTES`, `MAX_SDAT_BYTES`, `MAX_TRANSFER_COMPRESSED_BYTES`), `MAX_REPORTED_ERRORS 50`, the `mb()` formatter, `add_error()`, and `validate_zip()` — one ZIP validator (member count, declared decompressed sum, ratio with a 1 MB decompressed floor) used by both `_read_xlsx_table` and `open_archive`, parameterized by limits and error class. `reject_unsafe_member_path()` rejects absolute paths, `..` traversal on `/`- or `\`-separated paths, and Windows drive letters.
@@ -618,6 +663,7 @@ All import endpoints use `MultiPartParser` and `FormParser`.
 | Field | Required | Description |
 |---|---|---|
 | `file` | Yes | Upload file |
+| `zev_id` | **Yes** | Target ZEV UUID (validated before parsing; missing → 400, bad UUID → 400, unknown → 404, foreign-owned for non-admin → 403) |
 | `col_meter_id` | No | Column name/index for meter_id |
 | `col_timestamp` | No | Column name/index for timestamp |
 | `col_energy_kwh` | No | Column name/index for energy |
@@ -630,6 +676,11 @@ All import endpoints use `MultiPartParser` and `FormParser`.
 | `interval_minutes` | No | Minutes per interval (default `15`) |
 | `values_count` | No | Interval columns per row (default `96`) |
 | `overwrite_existing` | No | `true`/`false` (default `false`) |
+
+**CSV preview form fields:** same form fields as CSV import, including
+the required `zev_id` and optional `overwrite_existing` (default `false`).
+With overwrite enabled, daily duplicate rows remain valid; malformed values
+and missing meters still block the wizard.
 
 **SDAT-CH import form fields:**
 
@@ -654,12 +705,18 @@ All import endpoints use `MultiPartParser` and `FormParser`.
 - `zev_owner` → logs where `zev.owner == user` OR `imported_by == user`.
 
 **Deletion semantics:**
-- Single-log delete removes the selected `ImportLog` and all `MeterReading` rows with `import_batch == batch_id`.
+- Imports with `rows_overwritten > 0` cannot be deleted. Both endpoints return **400** with `{code: "overwrite_import_protected", error: "Imports that overwrote readings cannot be deleted. No imports were deleted."}` when any selected log is protected. The entire bulk operation is rejected without deleting any log or reading; this is not a rollback API and previous values are not restored.
+- CSV import runs in one transaction, publishing its readings and finalized overwrite count together. The successful log is created inside that transaction, so no half-finished import is ever visible or deletable. An unexpected failure rolls everything back and is then recorded as a separate failed-attempt log outside the transaction, before an `ImportFileError` propagates (400 with an actionable message, never an untraced 500). Deletion freezes the visible selection, locks its logs in primary-key order, checks protection, and deletes only that selection in one transaction.
+- Migration `0005_importlog_rows_overwritten` backfills the count from exact `Overwrote N existing readings.` notes in both legacy `errors` and newer `warnings`; other logs keep zero. The field is exposed by the import-log serializer and represented by `ImportLog.rows_overwritten: number` in TypeScript. Counts include repeated writes within the same file, so those overwrite imports are conservatively protected too.
+- The frontend disables the protected row's delete action, explains the policy in its protocol and bulk-delete dialog, and maps server rejections to the same localized message. The bulk dialog additionally lists the blocking protected imports (filename + creation time) and disables review/confirmation while any is in scope; the server stays authoritative. Correct a protected import by uploading corrected readings with overwrite enabled.
+- `ImportLog` is read-only in Django admin (no add/change/delete): deletion, with its overwrite protection and batch cleanup, happens only through the application's protected workflow. Whole-ZEV deletion still removes the community's meters, readings and logs together.
+- An unprotected single-log delete removes the selected `ImportLog` and all `MeterReading` rows with `import_batch == batch_id`.
 - Bulk delete operates on the same scoped queryset as the list endpoint.
 - Bulk delete accepts `mode = all | period`.
-- `mode = period` requires `date_from` and `date_to` and filters by `ImportLog.created_at::date` inclusively.
-- Bulk delete may additionally be narrowed with `zev_id`.
-- Delete responses return counts for both deleted logs and deleted readings.
+- `mode = period` requires `date_from` and `date_to` and filters with the half-open UTC range `[date_from 00:00Z, date_to + 1 day 00:00Z)` on `ImportLog.created_at`. History timestamps render in local time; the delete dialog labels the range as UTC so display, selection and deletion stay consistent.
+- Bulk delete validates an optional `zev_id` as a UUID before filtering. Invalid calendar dates, non-string dates, reversed ranges, and `date_to=9999-12-31` return 400 rather than overflowing the exclusive end bound.
+- History table filename/source filters are client-side only and never narrow bulk delete: the UI copy names the selected ZEV (or "all visible ZEVs" when none is selected), and the count uses the same half-open UTC instants as the backend.
+- Delete responses return counts for both deleted logs and deleted readings; bulk deletion also returns `timezone: "UTC"`; the frontend invalidates both import-log and metering queries so charts/quality refresh.
 
 ---
 
@@ -746,6 +803,11 @@ drop/duplicate readings near midnight boundaries.
 |---|---|---|
 | All model fields | Read/write | `fields = "__all__"` |
 | `id`, `created_at`, `batch_id` | Read-only | Auto-generated |
+| `zev_name` | Read-only | `zev.name`, for history/protocol display |
+| `imported_by_display` | Read-only | `get_full_name() or username or email`, for history/protocol display |
+
+The list endpoint uses `select_related("zev", "imported_by")` so the display
+fields cost no extra queries.
 
 ### 8.3 Frontend types
 
@@ -753,14 +815,16 @@ drop/duplicate readings near midnight boundaries.
 interface ImportLog {
   id: string
   batch_id?: string
-  zev?: string
+  zev?: string                   // always the validated target on import
+  zev_name?: string | null       // display field from the serializer
   imported_by?: number | null
+  imported_by_display?: string | null  // display field from the serializer
   filename: string
   rows_total?: number
   rows_imported: number
   rows_skipped: number
   source: string
-  errors?: Array<{ row: number | null; error: string }>
+  errors?: Array<{ row: number | null; error: string; meter_id?: string | null }>
   created_at: string
 }
 
@@ -780,10 +844,11 @@ interface ImportPreviewResult {
   rows_total: number
   preview_rows: ImportPreviewRow[]
   summary: {
-    existing_metering_points: number
-    missing_metering_points: number
-    rows_previewed: number
+    existing_metering_points: number  // unique meters over the whole file that exist in the target ZEV
+    missing_metering_points: number   // unique meters over the whole file that are missing in the target ZEV
+    rows_previewed: number            // display-row cap (max_rows, currently 30)
   }
+  missing_meter_ids: string[]         // sorted distinct missing IDs over the whole file, capped at 50
   errors: Array<{ row: number | null; error: string }>
 }
 
@@ -842,7 +907,7 @@ type MeteringDashboardSummary =
 
 - New import parsing rules should be backward-compatible with existing file
   formats or gated behind a new `format_profile` value.
-- Rollback of readings: filter by `import_batch` UUID and bulk-delete.
+- Removing an unprotected import deletes its currently linked readings through the import-log endpoints. Protected overwrite imports cannot be deleted; previous values have no stored version and cannot be rolled back.
 - Import logs are never automatically deleted; they serve as permanent audit
   records.
 - The preview endpoint can be used to verify a new format without any write
@@ -858,7 +923,10 @@ type MeteringDashboardSummary =
 | Timezone misalignment causing off-by-one-day errors | High | Explicit UTC boundary construction in all date queries (§7, ADR 0007) |
 | Partial import writes with mixed valid/invalid rows | Medium | Per-row error handling; failed rows are skipped; successful rows are written (§4.1) |
 | Duplicate readings inflating billing totals | High | Unique constraint `(metering_point, timestamp, direction)` + skip-existing default (§3.1) |
-| Overwrite mode silently changing billing-critical data | Medium | Overwrite requires explicit `overwrite_existing=true`; summary error reports count of overwrites |
+| Overwrite mode silently changing billing-critical data | Medium | Overwrite requires explicit `overwrite_existing=true`; `warnings` reports the count of overwrites |
+| Concurrent standard-profile duplicate | Medium | A unique-constraint `IntegrityError` is treated as the standard duplicate skip, not an uncaught 500 |
+| Overwrite has no version history | Medium | Previous values cannot be restored automatically. Overwrite imports are protected from single and bulk deletion; correct values through another overwrite import. |
+| Duplicate race errors lose exact cause | Low | Race `IntegrityError`s are currently reported using the same duplicate message as ordinary duplicates; improve classification if operational distinction is needed |
 | SDAT-CH XML format variations across VNBs | Medium | Graceful fallback for missing elements; per-meter error reporting (§4.2) |
 | Data quality severity thresholds misleading operators | Low | Deterministic integer-percent completeness with documented thresholds (§5.5) |
 
@@ -877,6 +945,16 @@ type MeteringDashboardSummary =
 | `MeteringRawDataEndpointTests` | §5.3: owner gets daily-grouped raw rows with correct direction sums; participant can read own metering point's raw data |
 | `ChartDataEndpointTests` | §5.2: direction aggregates; UTC day/month boundaries agree with raw data; hourly buckets stay distinct across both DST transitions |
 | `DataQualityStatusTests` | §5.5: owner sees gaps and severity; participant sees own meters; default 30-day range; fully assigned readings report no unassigned; holder-less meter flags every reading; assignment-gap readings flagged unassigned; overlapping windows flag only the corrupt meter (others still report) |
+
+### Backend (`metering/test_import_csv.py`, `metering/test_import_csv_characterization.py`, `metering/test_import_limits.py`)
+
+| Test module / class | Validates |
+|---|---|
+| `metering/test_import_csv.py::CsvImportTests` | §4.1/4.3/5.6/8.3: malformed CSV reported without crash; concurrent standard-profile duplicate races are skipped; timezone offset normalized (default parsing and explicit `%z` format); direct upload without preview valid (advisory contract); duplicate rows skipped; idempotent re-import; overwrite (`overwrite_existing=true`) updates in place and returns the overwrite note in `warnings` (never in `errors`); headerless positional mapping; `daily_15min` with `energy_start`/`values_count`; invalid/missing timestamp/energy handling; daily atomic rollback leaks no `imported` count on `IntegrityError`; empty daily rows skipped with an error; daily existence checks batched per contiguous file-day block (query-bound regression test); ZEV scoping (target-ZEV required, missing → 400, bad UUID → 400, unknown → 404, foreign-owned for owner → 403; admin can target any ZEV; mixed-ZEV file scoped to target with per-row errors; `log.zev` equals the requested target); preview (existing/missing meters without writing, unique counts, `missing_meter_ids` capped at 50, rows-beyond-cap still blocking, preview cap, no-write, field validation on missing-meter rows, clean invalid-number messages, single error per truncated/invalid daily row, validation stop at the error cap with whole-file coverage intact; ZEV rejections: missing → 400, bad UUID → 400, unknown → 404, foreign → 403); import (truncated daily row writes nothing and counts one skip with zero readings; CSV errors carry `meter_id` when the row names a meter); same-owner multi-ZEV scoping (a meter from the owner's other ZEV is missing/skipped when targeting the first, for both import and preview); combined row-level field errors (bad timestamp, bad energy, bad direction, blank `meter_id`, missing timestamp/energy); column-mapping failure shape (200, empty `preview_rows`, single `row: null` error); exactly-50 missing IDs with no overflow remainder; audit events recorded for foreign-ZEV preview and import rejections; invalid `timestamp_format` rejected up front on preview (200 with a `row: null` error) and import (201 log, nothing written); year-less formats rejected on preview and upload; invalid timestamps report `Invalid timestamp value` without dateutil internals; daily `existing_data` is direction-aware; `test_daily_overwrite_preview_allows_duplicates_without_writing` covers skip/overwrite parity, invalid-value rejection, unchanged readings/logs during preview, and the final overwrite |
+| `metering/test_import_csv_characterization.py` | §4.1/4.3 parsing semantics (BOM, blank lines, ragged rows, Excel first-sheet and blank rows, empty-vs-missing, comma decimals, etc.), plus ZEV-required calls (every `upload_csv`/`preview_csv` passes `zev_id`; helper injects it by default), the unique preview summary (`"existing_metering_points" == 1` not 30), atomic daily validation (truncated/invalid rows write nothing: one error, one skip, zero readings) with per-slot gap-fill for partial duplicates, native Excel datetimes bypassing `timestamp_format` (standard and daily), and `meter_id` on CSV errors |
+| `metering/test_import_limits.py::CsvLimitTests` / `XlsxZipLimitTests` / `BackendUploadCapTests` | §4.4/§8.3: size/row/col caps, `values_count`/`interval_minutes` bounds on both import and preview (with `zev_id`), error truncation with sentinel; overwrite note lives in `warnings`, XLSX ZIP limits; characterization also exercises preview with `zev_id` |
+| `metering/testing.py` | Shared `upload_csv`/`preview_csv` helpers used by all three modules (always exercise the required-`zev_id` path) |
+| `metering/test_import_logs.py::ImportLogDeletionTests` | §3.3/§5.7/§8.2: deletion/rollback plus list-payload identity (`zev_name`, `imported_by_display`, `batch_id` alongside the raw IDs); bulk delete without `zev_id` covers all visible ZEVs but never foreign ones |
 
 ### Backend (`metering/test_reading_visibility.py`)
 
@@ -898,9 +976,10 @@ day/hour/month chart buckets:
 
 | Test class | Validates |
 |---|---|
-| `CsvLimitTests` | §4.4: CSV over the size cap, row cap, or column cap is rejected with a 400 before parsing; the header row does not consume the row cap, and headerless files get the full budget; `values_count` outside `1..1440`, `interval_minutes < 1`, and non-integer `interval_minutes`/`values_count` rejected on import and preview, `values_count` at maximum accepted; per-row error list capped at 50 with a truncation sentinel, and the overwrite note cannot push it past the cap |
+| `CsvLimitTests` | §4.4: CSV over the size cap, row cap, or column cap is rejected with a 400 before parsing (CSV path requires `zev_id`); the header row does not consume the row cap, and headerless files get the full budget; `values_count` outside `1..1440`, `interval_minutes < 1`, and non-integer `interval_minutes`/`values_count` rejected on import and preview, `values_count` at maximum accepted; per-row error list capped at 50 with a truncation sentinel, and the overwrite `warnings` entry never touches the error cap |
 | `XlsxZipLimitTests` | §4.4: XLSX ZIP with too many members or a high-ratio member is rejected before openpyxl inflates it; a non-ZIP `.xlsx` is rejected; a sheet whose width appears only after the first row is rejected (column cap holds per row) |
 | `SdatchLimitTests` | §4.4: SDAT-CH file over the size cap produces an ImportLog error without parsing; the per-row error list is capped at 50 with a truncation sentinel during the parse loop |
+| `SdatchImportTests` (ZEV validation) | §4.2/5.6: SDAT-CH import rejects missing `zev_id` (400), malformed UUID (400), and unknown ZEV (404); foreign-owned ZEV → 403; admin can target any ZEV |
 
 ### Backend (`metering/test_generate_metering_data.py`)
 
@@ -920,12 +999,17 @@ day/hour/month chart buckets:
 |---|---|
 | `TransferArchiveLimitTests` | §4.4: transfer archives with traversal member paths (`/`- and `\`-separated, plus Windows drive letters), absolute paths, too many members, over the compressed or decompressed caps, or a high-ratio member are rejected; non-ZIP archives are rejected; the decompressed cap cannot drop below the documented 2M-row archive scale |
 
+Deletion policy regressions in `ImportLogDeletionTests` cover both CSV profiles, retaining the replacement when the predecessor is deleted, all-or-nothing rejection of period/all bulk deletion, backfilling legacy error/warning notes, and invalid date bounds.
+
 ### Frontend
 
-- Import wizard form fields and preview rendering
+- Import wizard: ZEV taken from the global header selector for both CSV and SDAT-CH (step 2 shows it as a disabled read-only display, not a picker; the wizard cannot advance past step 1 or load a preview without one — `selectZevFirst` hint names the header selector), file summary card with size/extension feedback (legacy `.xls` rejected with the backend guidance, 50 MB cap; Remove clears the native file input so the same file can be re-picked; switching source clears file/preview and resets to step 1), string-kept numeric config with inline range validation (`valuesCount` 1–1440, `intervalMinutes` ≥ 1, tab-aware delimiter (`\t` escape accepted, mirroring the backend), full-date timestamp preflight incl. `%Y-%j` and week formats with a weekday plus matching calendar/ISO year (the backend round-trip probe remains authoritative); preview and import stay disabled until fixed), fingerprint-guarded preview (the stamp includes overwrite mode; every file selection clears the preview even for identical metadata, and closing the wizard or replacing a file invalidates in-flight preview callbacks; stale preview table, banners, and error list are suppressed while `previewOutdated`; the stamp normalizes numeric strings so "096" equals "96" but strictly rejects non-numeric input like "96foo"), bounded `missing_meter_ids` list with a pluralized +N overflow (`andMore_one`/`andMore_other`, hidden when the count is exact) plus copy/download and a Metering Points CTA, profile-aware defaults factory `csvConfigFor(hasHeader, profile)` (headed daily resolves `meter_id/date/00:00` against the daily sample; headed standard resolves `meter_id/timestamp/energy_kwh`; switching profile or header re-derives mappings and clears the preview), error- and missing-gated Start Import, overwrite confirmation dialog (stacked above the wizard: Escape/Tab belong only to the top-most dialog; confirmation has its own dialog semantics and focus trap, and cancellation restores focus to its opener), full wizard reset on success, protocol auto-open on errors or warnings (warnings alone stay success with a success toast), single-state bulk-delete modal with an armed confirmation step, shared `CivilDateInput` selectors with explicit UTC day labels plus a UTC note, and a backend-scoped count (0 until both period dates parse; table search never narrows deletion; count uses the half-open UTC range; copy names the selected ZEV or "all visible ZEVs" when none is selected), and metering + import-log query invalidation on success and after deletion — `frontend/src/pages/ImportsPage.tsx`, covered by `frontend/tests/imports-wizard.test.ts`.
+- Import history shows localized source labels plus serializer `zev_name`/`imported_by_display`; the protocol shows ZEV, imported-by, batch ID, and per-error meter IDs. Sample files live in `frontend/public/samples/` and are linked from wizard step 1. History offers filename search and source filtering using the API values `csv` and `sdatch` with raw-value sorting (`created_at`, `filename`, `rows_total` accessors + display cells, `created_at` desc default); row actions use a compact Protocol button plus an `ActionMenu` delete. The protocol renders errors in a `DataTable` (row/meter/reason). Upload and preview map HTTP 413/429 to localized `importTooLarge`/`importThrottled` messages. `previewLoadedWithIssues` and `deleteSuccess` use `_one`/`_other` plural pairs (the latter keyed on the log count).
+- Types: `frontend/src/types/api.ts:ImportPreviewResult.missing_meter_ids: string[]` and preview `zevId` required payload in `frontend/src/lib/api/metering.ts:previewCsvImport`.
 - Chart data and raw data display
 - Dashboard summary role-differentiated behavior
 - Data quality severity indicators and gap display
+- Locale parity: every new `pages.imports.*` leaf exists in `frontend/src/i18n/locales/{en,de,fr,it}.ts` (`selectZevForCsv`, `selectZevFirst`, `previewOutdated`, `overwriteConfirm*`, `preview.missingIdsLabel`, `preview.andMore_one`, `preview.andMore_other`, `wizard.fileSummary*`/`supportedExtensions`/`sizeLimit`/`sample*`/`xlsRejected`/`fileTooLarge`/`*Invalid` config keys, `messages.fixConfigFirst`/`importSuccessWithIssues`, `preview.copy*`/`downloadMissingIds`/`createMetersCta`, `columns.zev`/`importedBy`, `protocol.zev`/`importedBy`/`batchId`/`meter`, `delete.reviewAction`/`visibleImpact`/`readingImpactUnknown`, `delete.bulkDescriptionAll`/`bulkPeriodMessageAll`/`bulkAllMessageAll`, `sdatchNoPreview`, `history.searchFilename`/`filterSource`/`allSources`, `actions.rowActions`, `messages.importTooLarge`/`importThrottled`, `messages.previewLoadedWithIssues_one`/`_other`, `messages.deleteSuccess_one`/`_other`) — `frontend/tests/locale-parity.test.ts` enforces it; `frontend/tests/dead-i18n-keys.test.ts` guards against orphaned keys (e.g. the retired stacked-confirm `bulkTitle`). Wizard behavior is covered by `frontend/tests/imports-wizard.test.ts` (gating, reset, overwrite confirm, file feedback, config validation including year-less timestamp formats, tab delimiter escape and `%Y-%j` acceptance, and overwrite-warning success, protocol auto-open, bulk-delete armed flow including the all-ZEV copy, history search/filter/sort, row action menu, 413/429 mapping); `FormModal` dialog semantics, Escape, top-most-only Escape for stacked dialogs, top-most-only Tab/Escape traps, Shift+Tab wrap from outside, confirmation focus trap + dialog semantics, focus restoration, and focus stability across re-renders with a fresh `onClose` are covered by `frontend/tests/form-modal.test.ts` and `frontend/tests/modal-stack.test.ts` (inner close returns focus to the outer dialog; background modal stays inert under a confirmation); `importUtils` stamp strictness and the timestamp-format rule are covered by `frontend/tests/imports-samples.test.ts`. The page composes `frontend/src/features/imports/` presentational components (`ImportWizardModal`, `ImportHistoryTable`, `ImportProtocolModal`, `BulkDeleteModal`) with shared config in `importUtils.ts`; repeated layout patterns use shared CSS (`.field-error`, `.imports-history-filters`, `.actions-row`).
 - Build and type checks: `npm run build`
 
 The unassigned-holder and overlapping-window warning renders are conditional
@@ -956,11 +1040,11 @@ component test infra exists).
 
 ## 13. Acceptance criteria
 
-- [ ] CSV import supports both `standard` and `daily_15min` profiles with configurable column mapping (§4.1)
-- [ ] SDAT-CH import parses Swiss ebIX XML and skips unknown metering points with per-meter errors (§4.2)
-- [ ] Preview endpoint returns row-level validation without writing data (§4.3)
-- [ ] Default write mode skips duplicates; overwrite mode is opt-in and reports count (§4.1)
-- [ ] Import log captures filename, batch ID, row counts, and per-row errors for every import (§3.3)
+- [x] CSV import supports both `standard` and `daily_15min` profiles with configurable column mapping; requires `zev_id` and scopes meters to the target ZEV intersection (§4.1, §5.6)
+- [x] SDAT-CH import parses Swiss ebIX XML and skips unknown metering points with per-meter errors; requires `zev_id` (§4.2, §5.6). No preview step: malformed/oversized files return a 201 log with errors, and the UI explains this upfront and auto-opens the protocol when the log contains errors
+- [x] Preview endpoint requires `zev_id`, returns row-level validation without writing data, covers the whole file as unique meters with bounded `missing_meter_ids`, keeps display rows capped at `max_rows`, validates fields regardless of meter existence, stops row validation at the error cap while keeping whole-file meter coverage, and reports truncated daily rows once — matching import (§4.3, §5.6). Daily import validation is atomic for truncated/invalid rows (no readings); duplicates gap-fill per slot, fully duplicate rows write no readings
+- [x] Default write mode gap-fills per slot and skips duplicates; overwrite mode is opt-in, confirmed in the UI, and reports the count in `warnings`; import `log.zev` is always the validated target (§4.1, §8.3)
+- [x] Import log captures filename, batch ID, row counts, and per-row errors for every import (§3.3)
 - [ ] Chart data endpoint returns direction-pivoted aggregates with configurable time buckets (§5.2)
 - [ ] Raw data endpoint returns daily-grouped individual readings (§5.3)
 - [ ] Dashboard summary returns role-differentiated response with correct local/grid split (§5.4)

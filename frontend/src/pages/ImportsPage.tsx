@@ -1,18 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useMemo, useState, type FormEvent } from 'react'
+import { useMemo, useRef, useState, type FormEvent } from 'react'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import {
-    faArrowLeft,
-    faArrowRight,
     faEye,
-    faMagnifyingGlass,
     faPlus,
     faTrash,
-    faUpload,
-    faXmark,
 } from '@fortawesome/free-solid-svg-icons'
 import { ConfirmDialog, useConfirmDialog } from '../components/ConfirmDialog'
-import { FormModal } from '../components/FormModal'
+import { ActionMenu } from '../components/ActionMenu'
+import type { ColumnDef, ColumnFiltersState } from '../components/DataTable'
 import {
     bulkDeleteImportLogs,
     deleteImportLog,
@@ -20,44 +16,32 @@ import {
     previewCsvImport,
     uploadMeteringFile,
 } from '../lib/api/metering'
-import {
-    fetchZevs,
-} from '../lib/api/zev'
 import { queryKeys } from '../lib/api/queryKeys'
 import { formatDateTime, useAppSettings } from '../lib/appSettings'
-import { useAuth } from '../lib/auth'
 import { useManagedZev } from '../lib/managedZev'
 import { useTranslation } from 'react-i18next'
 import { useToast } from '../lib/toast'
 import type { ImportLog, ImportPreviewResult } from '../types/api'
-import { EmptyState } from '../components/EmptyState'
 import { PageSkeleton } from '../components/PageSkeleton'
-import { DataTable } from '../components/DataTable'
-import type { ColumnDef } from '@tanstack/react-table'
-
-type CsvColumnMap = {
-    meter_id: string
-    timestamp: string
-    energy_kwh: string
-    direction: string
-    energy_start: string
-}
-
-const defaultColumnMap: CsvColumnMap = {
-    meter_id: 'meter_id',
-    timestamp: 'timestamp',
-    energy_kwh: 'energy_kwh',
-    direction: 'direction',
-    energy_start: '4',
-}
-
-function Badge({ label, ok }: { label: string; ok: boolean }) {
-    return (
-        <span className={`badge ${ok ? 'badge-success' : 'badge-danger'}`}>
-            {label}
-        </span>
-    )
-}
+import { BulkDeleteModal } from '../features/imports/BulkDeleteModal'
+import { ImportHistoryTable } from '../features/imports/ImportHistoryTable'
+import { ImportProtocolModal } from '../features/imports/ImportProtocolModal'
+import { ImportWizardModal } from '../features/imports/ImportWizardModal'
+import {
+    MAX_UPLOAD_BYTES,
+    csvConfigFor,
+    isLegacyExcel,
+    isValidDelimiter,
+    isValidTimestampFormat,
+    parsePositiveInt,
+    previewStampsEqual,
+    type CsvColumnMap,
+    type CsvFormatProfile,
+    type PreviewStamp,
+} from '../features/imports/importUtils'
+import { formatBytes } from '../lib/numbers'
+import { copyToClipboard } from '../lib/clipboard'
+import { downloadBlob } from '../lib/downloadBlob'
 
 /**
  * Metering import wizard + history log.
@@ -70,14 +54,13 @@ export function ImportsPage({ embedded = false }: { embedded?: boolean }) {
     const queryClient = useQueryClient()
     const { pushToast } = useToast()
     const { dialog, confirm, handleConfirm, handleCancel, isLoading: dialogLoading } = useConfirmDialog()
-    const { user } = useAuth()
     const { settings } = useAppSettings()
     const { selectedZevId, selectedZev } = useManagedZev()
     const { t } = useTranslation()
-    const isManagedScope = user?.role === 'admin' || user?.role === 'zev_owner'
 
-    const { data, isLoading, isError } = useQuery({ queryKey: queryKeys.metering.importLogs(), queryFn: fetchImportLogs })
-    const zevsQuery = useQuery({ queryKey: queryKeys.zev.list(), queryFn: fetchZevs })
+    const { data, isLoading, isError, error: logsError, refetch: refetchLogs } = useQuery({ queryKey: queryKeys.metering.importLogs(), queryFn: fetchImportLogs })
+    const logsErrorDetail = (logsError as { response?: { data?: { error?: string; detail?: string } } } | null)?.response?.data
+    const logsErrorMessage = logsErrorDetail?.error || logsErrorDetail?.detail || null
 
     const [wizardOpen, setWizardOpen] = useState(false)
     const [wizardStep, setWizardStep] = useState<1 | 2>(1)
@@ -85,69 +68,127 @@ export function ImportsPage({ embedded = false }: { embedded?: boolean }) {
     const [source, setSource] = useState<'csv' | 'sdatch'>('csv')
     const [file, setFile] = useState<File | null>(null)
 
-    const [zevId, setZevId] = useState('')
-
     const [hasHeader, setHasHeader] = useState(true)
     const [delimiter, setDelimiter] = useState(',')
-    const [formatProfile, setFormatProfile] = useState<'standard' | 'daily_15min'>('daily_15min')
+    const [formatProfile, setFormatProfile] = useState<CsvFormatProfile>('daily_15min')
     const [timestampFormat, setTimestampFormat] = useState('%d.%m.%Y')
-    const [intervalMinutes, setIntervalMinutes] = useState(15)
-    const [valuesCount, setValuesCount] = useState(96)
+    const [intervalMinutes, setIntervalMinutes] = useState('15')
+    const [valuesCount, setValuesCount] = useState('96')
     const [overwriteExisting, setOverwriteExisting] = useState(false)
-    const [columnMap, setColumnMap] = useState<CsvColumnMap>({
-        ...defaultColumnMap,
-        meter_id: '0',
-        timestamp: '3',
-        energy_start: '4',
-        energy_kwh: '4',
-        direction: '',
-    })
+    const [columnMap, setColumnMap] = useState<CsvColumnMap>(() => csvConfigFor(true, 'daily_15min').columnMap)
 
     const [preview, setPreview] = useState<ImportPreviewResult | null>(null)
+    const [previewStamp, setPreviewStamp] = useState<PreviewStamp | null>(null)
+    const previewReqId = useRef(0)
     const [selectedLog, setSelectedLog] = useState<ImportLog | null>(null)
     const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false)
     const [bulkDeleteMode, setBulkDeleteMode] = useState<'period' | 'all'>('period')
     const [bulkDeleteFrom, setBulkDeleteFrom] = useState('')
     const [bulkDeleteTo, setBulkDeleteTo] = useState('')
+    const [bulkDeleteArmed, setBulkDeleteArmed] = useState(false)
 
-    const scopedZevId = isManagedScope ? selectedZevId : zevId
-    const availableZevs = (zevsQuery.data ?? []).filter((zev) => !isManagedScope || !selectedZevId || zev.id === selectedZevId)
-    const importLogs = (data ?? []).filter((log) => !isManagedScope || !selectedZevId || log.zev === selectedZevId)
+    const scopedZevId = selectedZevId
+    const importLogs = useMemo(
+        () => (data ?? []).filter((log) => !selectedZevId || log.zev === selectedZevId),
+        [data, selectedZevId],
+    )
+
+    const currentStamp = useMemo<PreviewStamp | null>(() => {
+        if (!file) return null
+        return {
+            fileName: file.name,
+            fileSize: file.size,
+            lastModified: file.lastModified,
+            source,
+            zevId: scopedZevId ?? '',
+            hasHeader,
+            delimiter,
+            formatProfile,
+            timestampFormat,
+            intervalMinutes,
+            valuesCount,
+            overwriteExisting,
+            columnMap,
+        }
+    }, [file, source, scopedZevId, hasHeader, delimiter, formatProfile, timestampFormat, intervalMinutes, valuesCount, overwriteExisting, columnMap])
+
+    const previewStampMatches = previewStampsEqual(previewStamp, currentStamp)
+
+    const fileError = !file
+        ? null
+        : isLegacyExcel(file.name)
+            ? t('pages.imports.wizard.xlsRejected')
+            : file.size > MAX_UPLOAD_BYTES
+                ? t('pages.imports.wizard.fileTooLarge', { size: formatBytes(file.size), limit: formatBytes(MAX_UPLOAD_BYTES) })
+                : null
+
+    const parsedIntervalMinutes = parsePositiveInt(intervalMinutes)
+    const parsedValuesCount = parsePositiveInt(valuesCount)
+    // Bounds mirror the backend coercion in csv_importer.py.
+    const intervalMinutesError = parsedIntervalMinutes === null || parsedIntervalMinutes < 1
+        ? t('pages.imports.wizard.intervalMinutesInvalid')
+        : null
+    const valuesCountError = parsedValuesCount === null || parsedValuesCount < 1 || parsedValuesCount > 1440
+        ? t('pages.imports.wizard.valuesCountInvalid')
+        : null
+    const delimiterError = !isValidDelimiter(delimiter)
+        ? t('pages.imports.wizard.delimiterInvalid')
+        : null
+    // Client-side mirror of the backend full-date rule: a format without
+    // year/month/day (e.g. "%d.%m") passes nothing — the server rejects it.
+    // Day-of-year (%Y-%j) and week-based formats count as month+day.
+    const timestampFormatError = !isValidTimestampFormat(timestampFormat)
+        ? t('pages.imports.wizard.timestampFormatInvalid')
+        : null
+    const csvConfigErrors = [intervalMinutesError, valuesCountError, delimiterError, timestampFormatError].filter((entry) => entry !== null)
+    const csvConfigValid = csvConfigErrors.length === 0
 
     const previewMutation = useMutation({
         mutationFn: previewCsvImport,
-        onSuccess: (result) => {
-            setPreview(result)
-            if (result.errors.length > 0) {
-                pushToast(t('pages.imports.messages.previewLoadedWithIssues', { count: result.errors.length }), 'error')
-            } else {
-                pushToast(t('pages.imports.messages.previewLoaded'), 'success')
-            }
-        },
-        onError: () => pushToast(t('pages.imports.messages.previewFailed'), 'error'),
     })
+
+    function describeUploadError(error: unknown, fallback?: string): string {
+        const response = (error as { response?: { status?: number; data?: { error?: string; detail?: string } } })?.response
+        if (response?.status === 413) return t('pages.imports.messages.importTooLarge', { limit: formatBytes(MAX_UPLOAD_BYTES) })
+        if (response?.status === 429) return t('pages.imports.messages.importThrottled')
+        // `detail` is the proxy's error shape (e.g. the nginx 413 body).
+        const data = response?.data
+        return data?.error || data?.detail || fallback || t('pages.imports.messages.importFailed')
+    }
 
     const uploadMutation = useMutation({
         mutationFn: uploadMeteringFile,
         onSuccess: (result) => {
-            // SDAT-CH reports parse failures inside the ImportLog of a 201
-            // response; an import that produced nothing and logged errors is
-            // a failure, not a success toast.
-            if (result.rows_imported === 0 && (result.errors?.length ?? 0) > 0) {
-                pushToast(result.errors?.[0]?.error || t('pages.imports.messages.importFailed'), 'error')
+            const errorCount = result.errors?.length ?? 0
+            const warnings = result.warnings ?? []
+            resetWizard()
+            void queryClient.invalidateQueries({ queryKey: ['metering'] })
+            if (errorCount > 0) {
+                setSelectedLog(result)
+                pushToast(
+                    t('pages.imports.messages.importSuccessWithIssues', {
+                        imported: result.rows_imported,
+                        skipped: result.rows_skipped,
+                        count: errorCount,
+                    }),
+                    'error',
+                )
+            } else if (warnings.length > 0) {
+                setSelectedLog(result)
+                pushToast(
+                    t('pages.imports.messages.importSuccessWithOverwrites', {
+                        imported: result.rows_imported,
+                        skipped: result.rows_skipped,
+                        overwritten: result.rows_overwritten,
+                    }),
+                    'success',
+                )
             } else {
                 pushToast(t('pages.imports.messages.importSuccess', { imported: result.rows_imported, skipped: result.rows_skipped }), 'success')
             }
-            setWizardOpen(false)
-            setWizardStep(1)
-            setFile(null)
-            setPreview(null)
-            void queryClient.invalidateQueries({ queryKey: queryKeys.metering.importLogs() })
         },
         onError: (error) => {
-            // `detail` is the proxy's error shape (e.g. the nginx 413 body).
-            const data = (error as { response?: { data?: { error?: string; detail?: string } } })?.response?.data
-            pushToast(data?.error || data?.detail || t('pages.imports.messages.importFailed'), 'error')
+            pushToast(describeUploadError(error), 'error')
         },
     })
 
@@ -159,14 +200,19 @@ export function ImportsPage({ embedded = false }: { embedded?: boolean }) {
             }
             pushToast(
                 t('pages.imports.messages.deleteSuccess', {
+                    count: result.deleted_logs,
                     logs: result.deleted_logs,
                     readings: result.deleted_readings,
                 }),
                 'success',
             )
             void queryClient.invalidateQueries({ queryKey: queryKeys.metering.importLogs() })
+            void queryClient.invalidateQueries({ queryKey: ['metering'] })
         },
-        onError: () => pushToast(t('pages.imports.messages.deleteFailed'), 'error'),
+        onError: (error) => {
+            const code = (error as { response?: { data?: { code?: string } } })?.response?.data?.code
+            pushToast(t(code === 'overwrite_import_protected' ? 'pages.imports.delete.overwriteProtected' : 'pages.imports.messages.deleteFailed'), 'error')
+        },
     })
 
     const bulkDeleteMutation = useMutation({
@@ -176,26 +222,35 @@ export function ImportsPage({ embedded = false }: { embedded?: boolean }) {
             setBulkDeleteMode('period')
             setBulkDeleteFrom('')
             setBulkDeleteTo('')
+            setBulkDeleteArmed(false)
             setSelectedLog(null)
             pushToast(
                 t('pages.imports.messages.deleteSuccess', {
+                    count: result.deleted_logs,
                     logs: result.deleted_logs,
                     readings: result.deleted_readings,
                 }),
                 'success',
             )
             void queryClient.invalidateQueries({ queryKey: queryKeys.metering.importLogs() })
+            void queryClient.invalidateQueries({ queryKey: ['metering'] })
         },
-        onError: () => pushToast(t('pages.imports.messages.deleteFailed'), 'error'),
+        onError: (error) => {
+            const code = (error as { response?: { data?: { code?: string } } })?.response?.data?.code
+            pushToast(t(code === 'overwrite_import_protected' ? 'pages.imports.delete.overwriteProtected' : 'pages.imports.messages.deleteFailed'), 'error')
+        },
     })
 
-    const canGoStep2 = !!file
+    const canGoStep2 = !!file && !fileError && !!scopedZevId
     const missingMeteringPoints = preview?.summary.missing_metering_points ?? 0
+    const previewOutdated = !!preview && !previewStampMatches
+    const hasPreviewErrors = (preview?.errors?.length ?? 0) > 0
     const canStartImport = source === 'csv'
-        ? !!file && !!preview && missingMeteringPoints === 0 && !!scopedZevId
-        : !!file && !!scopedZevId
+        ? !!file && !fileError && !!preview && previewStampMatches && csvConfigValid && !hasPreviewErrors && missingMeteringPoints === 0 && !!scopedZevId
+        : !!file && !fileError && !!scopedZevId
 
     const previewRows = preview?.preview_rows ?? []
+    const [historyFilters, setHistoryFilters] = useState<ColumnFiltersState>([])
     const importLogRows = useMemo(
         () =>
             importLogs.map((log) => ({
@@ -203,6 +258,8 @@ export function ImportsPage({ embedded = false }: { embedded?: boolean }) {
                 created_display: formatDateTime(log.created_at, settings),
                 filename_display: log.filename || '-',
                 rows_total_display: log.rows_total ?? '-',
+                zev_display: log.zev_name || log.zev || '-',
+                imported_by_display: log.imported_by_display || '-',
             })),
         [importLogs, settings],
     )
@@ -210,21 +267,39 @@ export function ImportsPage({ embedded = false }: { embedded?: boolean }) {
     const importLogColumns = useMemo<ColumnDef<(typeof importLogRows)[number], unknown>[]>(
         () => [
             {
-                accessorKey: 'created_display',
+                accessorKey: 'created_at',
                 header: t('pages.imports.columns.created'),
+                cell: (ctx) => ctx.row.original.created_display,
             },
             {
                 accessorKey: 'source',
                 header: t('pages.imports.columns.source'),
+                filterFn: 'equalsString',
+                cell: (ctx) => {
+                    const raw = String(ctx.row.original.source ?? '').toLowerCase()
+                    if (raw === 'csv') return t('pages.imports.format.csv')
+                    if (raw === 'sdatch') return t('pages.imports.format.sdatch')
+                    return ctx.row.original.source
+                },
             },
             {
-                accessorKey: 'filename_display',
+                accessorKey: 'zev_display',
+                header: t('pages.imports.columns.zev'),
+            },
+            {
+                accessorKey: 'imported_by_display',
+                header: t('pages.imports.columns.importedBy'),
+            },
+            {
+                accessorKey: 'filename',
                 header: t('pages.imports.columns.filename'),
+                cell: (ctx) => ctx.row.original.filename_display,
             },
             {
-                accessorKey: 'rows_total_display',
+                accessorKey: 'rows_total',
                 header: t('pages.imports.columns.total'),
                 meta: { numeric: true },
+                cell: (ctx) => ctx.row.original.rows_total_display,
             },
             {
                 accessorKey: 'rows_imported',
@@ -241,7 +316,7 @@ export function ImportsPage({ embedded = false }: { embedded?: boolean }) {
                 header: t('pages.imports.columns.protocol'),
                 enableSorting: false,
                 cell: (ctx) => (
-                    <button type="button" className="button button-primary" onClick={() => setSelectedLog(ctx.row.original)}>
+                    <button type="button" className="button button-secondary button-compact" onClick={() => setSelectedLog(ctx.row.original)}>
                         <FontAwesomeIcon icon={faEye} fixedWidth />
                         {t('pages.imports.actions.openProtocol')}
                     </button>
@@ -252,24 +327,28 @@ export function ImportsPage({ embedded = false }: { embedded?: boolean }) {
                 header: t('pages.imports.columns.actions'),
                 enableSorting: false,
                 cell: (ctx) => (
-                    <button
-                        type="button"
-                        className="button button-danger"
-                        disabled={deleteImportMutation.isPending || dialogLoading}
-                        onClick={() => confirm({
-                            title: t('pages.imports.delete.singleTitle'),
-                            message: t('pages.imports.delete.singleMessage', {
-                                filename: ctx.row.original.filename || '-',
-                                createdAt: formatDateTime(ctx.row.original.created_at, settings),
-                            }),
-                            confirmText: t('pages.imports.delete.confirmAction'),
-                            isDangerous: true,
-                            onConfirm: () => deleteImportMutation.mutate(ctx.row.original.id),
-                        })}
-                    >
-                        <FontAwesomeIcon icon={faTrash} fixedWidth />
-                        {t('pages.imports.actions.deleteImport')}
-                    </button>
+                    <ActionMenu
+                        label={t('pages.imports.actions.rowActions')}
+                        items={[
+                            {
+                                key: 'delete',
+                                label: t('pages.imports.actions.deleteImport'),
+                                icon: <FontAwesomeIcon icon={faTrash} fixedWidth />,
+                                danger: true,
+                                disabled: deleteImportMutation.isPending || dialogLoading || ctx.row.original.rows_overwritten > 0,
+                                onClick: () => confirm({
+                                    title: t('pages.imports.delete.singleTitle'),
+                                    message: t('pages.imports.delete.singleMessage', {
+                                        filename: ctx.row.original.filename || '-',
+                                        createdAt: formatDateTime(ctx.row.original.created_at, settings),
+                                    }),
+                                    confirmText: t('pages.imports.delete.confirmAction'),
+                                    isDangerous: true,
+                                    onConfirm: () => deleteImportMutation.mutate(ctx.row.original.id),
+                                }),
+                            },
+                        ]}
+                    />
                 ),
             },
         ],
@@ -277,20 +356,22 @@ export function ImportsPage({ embedded = false }: { embedded?: boolean }) {
     )
 
     function resetWizard() {
+        previewReqId.current += 1
+        const cfg = csvConfigFor(true, 'daily_15min')
         setWizardOpen(false)
         setWizardStep(1)
         setSource('csv')
         setFile(null)
-        setZevId(isManagedScope ? selectedZevId : '')
         setHasHeader(true)
-        setDelimiter(',')
+        setDelimiter(cfg.delimiter)
         setFormatProfile('daily_15min')
         setTimestampFormat('%d.%m.%Y')
-        setIntervalMinutes(15)
-        setValuesCount(96)
+        setIntervalMinutes('15')
+        setValuesCount('96')
         setOverwriteExisting(false)
-        setColumnMap(defaultColumnMap)
+        setColumnMap(cfg.columnMap)
         setPreview(null)
+        setPreviewStamp(null)
     }
 
     function closeBulkDeleteModal() {
@@ -298,89 +379,233 @@ export function ImportsPage({ embedded = false }: { embedded?: boolean }) {
         setBulkDeleteMode('period')
         setBulkDeleteFrom('')
         setBulkDeleteTo('')
+        setBulkDeleteArmed(false)
+    }
+
+    function handleSourceChange(nextSource: 'csv' | 'sdatch') {
+        setSource(nextSource)
+        setFile(null)
+        setPreview(null)
+        setPreviewStamp(null)
+        setWizardStep(1)
+    }
+
+    function handleFormatProfileChange(nextProfile: CsvFormatProfile) {
+        setFormatProfile(nextProfile)
+        const cfg = csvConfigFor(hasHeader, nextProfile)
+        setDelimiter(cfg.delimiter)
+        setColumnMap(cfg.columnMap)
+        setPreview(null)
+        setPreviewStamp(null)
+    }
+
+    function handleRemoveFile() {
+        setFile(null)
+        setPreview(null)
+        setPreviewStamp(null)
     }
 
     function handleHasHeaderChange(nextHasHeader: boolean) {
         setHasHeader(nextHasHeader)
-        if (nextHasHeader) {
-            setDelimiter(',')
-            setColumnMap(defaultColumnMap)
+        const cfg = csvConfigFor(nextHasHeader, formatProfile)
+        setDelimiter(cfg.delimiter)
+        setColumnMap(cfg.columnMap)
+    }
+
+    function handleFileChange(event: React.ChangeEvent<HTMLInputElement>) {
+        // File metadata is not an identity: a replacement can have the same
+        // name, size and modification time but different contents.
+        previewReqId.current += 1
+        setPreview(null)
+        setPreviewStamp(null)
+        const picked = event.target.files?.[0] ?? null
+        if (picked && isLegacyExcel(picked.name)) {
+            event.target.value = ''
+            setFile(null)
+            pushToast(t('pages.imports.wizard.xlsRejected'), 'error')
             return
         }
-        setDelimiter(';')
-        setColumnMap({
-            meter_id: '0',
-            timestamp: '3',
-            energy_kwh: '4',
-            direction: '',
-            energy_start: '4',
-        })
+        setFile(picked)
     }
 
     function handleNextStep(event: FormEvent<HTMLFormElement>) {
         event.preventDefault()
-        if (!file) {
+        if (!file || fileError) {
             pushToast(t('pages.imports.messages.chooseFileFirst'), 'error')
+            return
+        }
+        if (!scopedZevId) {
+            pushToast(t('pages.imports.messages.selectZevFirst'), 'error')
             return
         }
         setWizardStep(2)
     }
 
-    function loadPreview() {
-        if (!file) {
-            pushToast(t('pages.imports.messages.chooseFileFirst'), 'error')
+    function copyMissingMeterIds() {
+        const ids = preview?.missing_meter_ids ?? []
+        if (ids.length === 0) {
+            pushToast(t('pages.imports.preview.copyMissingIdsFailed'), 'error')
             return
         }
-        previewMutation.mutate({
-            file,
-            columnMap,
-            hasHeader,
-            delimiter,
-            formatProfile,
-            timestampFormat,
-            intervalMinutes,
-            valuesCount,
+        void copyToClipboard(ids.join('\n')).then((ok) => {
+            if (ok) pushToast(t('pages.imports.preview.copiedMissingIds', { count: ids.length }), 'success')
+            else pushToast(t('pages.imports.preview.copyMissingIdsFailed'), 'error')
         })
     }
 
-    function startImport() {
-        if (!file) {
+    function downloadMissingMeterIds() {
+        const ids = preview?.missing_meter_ids ?? []
+        if (ids.length === 0) return
+        downloadBlob(new Blob([ids.join('\n')], { type: 'text/plain' }), 'missing-meter-ids.txt')
+    }
+
+    function loadPreview() {
+        if (!file || fileError) {
             pushToast(t('pages.imports.messages.chooseFileFirst'), 'error')
             return
         }
-
-        if (source === 'csv') {
-            if (!preview) {
-                pushToast(t('pages.imports.messages.loadPreviewFirst'), 'error')
-                return
-            }
-            if ((preview.summary.missing_metering_points ?? 0) > 0) {
-                pushToast(t('pages.imports.messages.createMissingMetersFirst'), 'error')
-                return
-            }
-            uploadMutation.mutate({
-                source,
-                zevId: scopedZevId,
+        if (!scopedZevId) {
+            pushToast(t('pages.imports.messages.selectZevForCsv'), 'error')
+            return
+        }
+        if (!csvConfigValid || parsedIntervalMinutes === null || parsedValuesCount === null) {
+            pushToast(t('pages.imports.messages.fixConfigFirst'), 'error')
+            return
+        }
+        const stamp = currentStamp!
+        const reqId = ++previewReqId.current
+        previewMutation.mutate(
+            {
                 file,
+                zevId: scopedZevId,
                 columnMap,
                 hasHeader,
                 delimiter,
                 formatProfile,
                 timestampFormat,
-                intervalMinutes,
-                valuesCount,
+                intervalMinutes: parsedIntervalMinutes,
+                valuesCount: parsedValuesCount,
                 overwriteExisting,
-            })
+            },
+            {
+                onSuccess: (result) => {
+                    if (reqId !== previewReqId.current) return
+                    setPreview(result)
+                    setPreviewStamp(stamp)
+                    if (result.errors.length > 0) {
+                        pushToast(t('pages.imports.messages.previewLoadedWithIssues', { count: result.errors.length }), 'error')
+                    } else {
+                        pushToast(t('pages.imports.messages.previewLoaded'), 'success')
+                    }
+                },
+                onError: (error) => {
+                    if (reqId !== previewReqId.current) return
+                    pushToast(describeUploadError(error, t('pages.imports.messages.previewFailed')), 'error')
+                },
+            },
+        )
+    }
+
+    function startImport() {
+        if (!file || fileError) {
+            pushToast(t('pages.imports.messages.chooseFileFirst'), 'error')
+            return
+        }
+        if (!scopedZevId) {
+            pushToast(t(source === 'csv' ? 'pages.imports.messages.selectZevForCsv' : 'pages.imports.messages.selectZevForSdatch'), 'error')
             return
         }
 
-        if (!scopedZevId) {
-            pushToast(t('pages.imports.messages.selectZevForSdatch'), 'error')
+        if (source === 'csv') {
+            if (!preview || !previewStampMatches) {
+                pushToast(t('pages.imports.messages.loadPreviewFirst'), 'error')
+                return
+            }
+            if (hasPreviewErrors) {
+                pushToast(t('pages.imports.messages.previewLoadedWithIssues', { count: preview.errors.length }), 'error')
+                return
+            }
+            if (preview.summary.missing_metering_points > 0) {
+                pushToast(t('pages.imports.messages.createMissingMetersFirst'), 'error')
+                return
+            }
+            if (!csvConfigValid || parsedIntervalMinutes === null || parsedValuesCount === null) {
+                pushToast(t('pages.imports.messages.fixConfigFirst'), 'error')
+                return
+            }
+            const doUpload = () =>
+                uploadMutation.mutate({
+                    source,
+                    zevId: scopedZevId,
+                    file,
+                    columnMap,
+                    hasHeader,
+                    delimiter,
+                    formatProfile,
+                    timestampFormat,
+                    intervalMinutes: parsedIntervalMinutes,
+                    valuesCount: parsedValuesCount,
+                    overwriteExisting,
+                })
+            if (overwriteExisting) {
+                const existingCount = preview?.summary.readings_existing ?? 0
+                confirm({
+                    title: t('pages.imports.wizard.overwriteConfirmTitle'),
+                    message:
+                        existingCount > 0
+                            ? t('pages.imports.wizard.overwriteConfirmMessageWithCount', {
+                                  zevName: selectedZev?.name ?? scopedZevId,
+                                  filename: file.name,
+                                  count: existingCount,
+                              })
+                            : t('pages.imports.wizard.overwriteConfirmMessage', {
+                                  zevName: selectedZev?.name ?? scopedZevId,
+                                  filename: file.name,
+                              }),
+                    confirmText: t('pages.imports.wizard.startImport'),
+                    isDangerous: true,
+                    onConfirm: doUpload,
+                })
+                return
+            }
+            doUpload()
             return
         }
 
         uploadMutation.mutate({ source, zevId: scopedZevId, file })
     }
+
+    const bulkDeleteScopeLogs = useMemo(() => {
+        if (bulkDeleteMode === 'all') return importLogs
+        // Table search/filter never narrows deletion: the scope must come
+        // from exactly the backend scope (ZEV + dates). Both sides compare
+        // instants in the same half-open UTC range.
+        if (!bulkDeleteFrom || !bulkDeleteTo) return []
+        const start = new Date(`${bulkDeleteFrom}T00:00:00Z`).getTime()
+        const end = new Date(`${bulkDeleteTo}T00:00:00Z`).getTime() + 24 * 60 * 60 * 1000
+        return importLogs.filter((log) => {
+            const createdAt = new Date(log.created_at).getTime()
+            return createdAt >= start && createdAt < end
+        })
+    }, [bulkDeleteMode, bulkDeleteFrom, bulkDeleteTo, importLogs])
+
+    const bulkDeleteVisibleCount = bulkDeleteScopeLogs.length
+
+    // A protected log in scope rejects the entire bulk operation
+    // server-side with zero deletions. Identify blockers up front (the
+    // loaded logs are the exact backend scope) and prevent a predictably
+    // rejected submission; the server stays authoritative.
+    const bulkDeleteProtectedLogs = useMemo(
+        () => bulkDeleteScopeLogs.filter((log) => (log.rows_overwritten ?? 0) > 0),
+        [bulkDeleteScopeLogs],
+    )
+    const bulkDeleteProtectedExamples = useMemo(
+        () =>
+            bulkDeleteProtectedLogs.slice(0, 5).map(
+                (log) => `${log.filename || '-'} — ${formatDateTime(log.created_at, settings)}`,
+            ),
+        [bulkDeleteProtectedLogs, settings],
+    )
 
     function submitBulkDelete() {
         if (bulkDeleteMode === 'period') {
@@ -394,20 +619,15 @@ export function ImportsPage({ embedded = false }: { embedded?: boolean }) {
             }
         }
 
-        confirm({
-            title: t('pages.imports.delete.bulkTitle'),
-            message: bulkDeleteMode === 'period'
-                ? t('pages.imports.delete.bulkPeriodMessage', { from: bulkDeleteFrom, to: bulkDeleteTo })
-                : t('pages.imports.delete.bulkAllMessage'),
-            confirmText: t('pages.imports.delete.confirmAction'),
-            isDangerous: true,
-            onConfirm: () =>
-                bulkDeleteMutation.mutate({
-                    mode: bulkDeleteMode,
-                    dateFrom: bulkDeleteMode === 'period' ? bulkDeleteFrom : undefined,
-                    dateTo: bulkDeleteMode === 'period' ? bulkDeleteTo : undefined,
-                    zevId: selectedZevId || undefined,
-                }),
+        setBulkDeleteArmed(true)
+    }
+
+    function confirmBulkDelete() {
+        bulkDeleteMutation.mutate({
+            mode: bulkDeleteMode,
+            dateFrom: bulkDeleteMode === 'period' ? bulkDeleteFrom : undefined,
+            dateTo: bulkDeleteMode === 'period' ? bulkDeleteTo : undefined,
+            zevId: selectedZevId || undefined,
         })
     }
 
@@ -423,7 +643,18 @@ export function ImportsPage({ embedded = false }: { embedded?: boolean }) {
                 <PageSkeleton variant="table" />
             </div>
         )
-    if (isError) return <div className="card error-banner">{t('pages.imports.loadFailed')}</div>
+    if (isError)
+        return (
+            <div className="card error-banner">
+                <p style={{ margin: '0 0 0.75rem' }}>
+                    {t('pages.imports.loadFailed')}
+                    {logsErrorMessage ? ` — ${logsErrorMessage}` : ''}
+                </p>
+                <button className="button button-secondary" type="button" onClick={() => refetchLogs()}>
+                    {t('common.retry')}
+                </button>
+            </div>
+        )
 
     return (
         <div className="page-stack">
@@ -441,357 +672,99 @@ export function ImportsPage({ embedded = false }: { embedded?: boolean }) {
                     <p className="muted" style={{ margin: 0 }}>{t('pages.imports.startDescription')}</p>
                 </div>
                 <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+                    <button className="button button-primary" onClick={() => setWizardOpen(true)}>
+                        <FontAwesomeIcon icon={faPlus} fixedWidth />
+                        {t('pages.imports.actions.newImport')}
+                    </button>
                     {importLogs.length > 0 && (
                         <button className="button button-danger" type="button" onClick={() => setShowBulkDeleteModal(true)}>
                             <FontAwesomeIcon icon={faTrash} fixedWidth />
                             {t('pages.imports.actions.deleteImports')}
                         </button>
                     )}
-                    <button className="button button-primary" onClick={() => setWizardOpen(true)}>
-                        <FontAwesomeIcon icon={faPlus} fixedWidth />
-                        {t('pages.imports.actions.newImport')}
-                    </button>
                 </div>
             </section>
 
-            <FormModal isOpen={wizardOpen} title={t('pages.imports.wizard.title')} onClose={resetWizard} maxWidth="1080px">
-                <div className="page-stack" style={{ gap: '0.75rem' }}>
-                    <div className="muted" style={{ fontSize: '0.9rem' }}>
-                        {t('pages.imports.wizard.step', { step: wizardStep })}
-                    </div>
-
-                    {wizardStep === 1 && (
-                        <form onSubmit={handleNextStep} className="page-stack" style={{ gap: '0.75rem' }}>
-                            <label>
-                                <span>{t('pages.imports.wizard.sourceFormat')}</span>
-                                <select value={source} onChange={(event) => setSource(event.target.value as 'csv' | 'sdatch')}>
-                                    <option value="csv">{t('pages.imports.format.csv')}</option>
-                                    <option value="sdatch">{t('pages.imports.format.sdatch')}</option>
-                                </select>
-                            </label>
-
-                            <label>
-                                <span>{t('pages.imports.wizard.sourceFile')}</span>
-                                <input
-                                    type="file"
-                                    onChange={(event) => setFile(event.target.files?.[0] ?? null)}
-                                    accept={source === 'csv' ? '.csv,.xlsx' : '.xml'}
-                                />
-                            </label>
-
-                            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.6rem' }}>
-                                <button type="button" className="button button-secondary" onClick={resetWizard}>
-                                    <FontAwesomeIcon icon={faXmark} fixedWidth />
-                                    {t('pages.imports.wizard.cancel')}
-                                </button>
-                                <button type="submit" className="button button-primary" disabled={!canGoStep2}>
-                                    <FontAwesomeIcon icon={faArrowRight} fixedWidth />
-                                    {t('pages.imports.wizard.nextConfig')}
-                                </button>
-                            </div>
-                        </form>
-                    )}
-
-                    {wizardStep === 2 && (
-                        <div className="page-stack" style={{ gap: '0.75rem' }}>
-                            {source === 'csv' ? (
-                                <>
-                                    <div className="inline-form grid grid-4">
-                                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '1.6rem' }}>
-                                            <input
-                                                type="checkbox"
-                                                checked={hasHeader}
-                                                onChange={(event) => handleHasHeaderChange(event.target.checked)}
-                                            />
-                                            <span>{t('pages.imports.wizard.hasHeader')}</span>
-                                        </label>
-                                        <label>
-                                            <span>{t('pages.imports.wizard.delimiter')}</span>
-                                            <input value={delimiter} onChange={(event) => setDelimiter(event.target.value || ',')} placeholder="," />
-                                        </label>
-                                        <label>
-                                            <span>{t('pages.imports.wizard.rowFormat')}</span>
-                                            <select
-                                                value={formatProfile}
-                                                onChange={(event) => setFormatProfile(event.target.value as 'standard' | 'daily_15min')}
-                                            >
-                                                <option value="standard">{t('pages.imports.rowFormat.standard')}</option>
-                                                <option value="daily_15min">{t('pages.imports.rowFormat.daily15min')}</option>
-                                            </select>
-                                        </label>
-                                        <label>
-                                            <span>{t('pages.imports.wizard.datetimeFormat')}</span>
-                                            <input
-                                                value={timestampFormat}
-                                                onChange={(event) => setTimestampFormat(event.target.value)}
-                                                placeholder="%d.%m.%Y"
-                                            />
-                                        </label>
-                                    </div>
-
-                                    <div className="inline-form grid grid-4">
-                                        <label>
-                                            <span>{t('pages.imports.wizard.meterIdCol')}</span>
-                                            <input
-                                                value={columnMap.meter_id}
-                                                onChange={(event) => setColumnMap((prev) => ({ ...prev, meter_id: event.target.value }))}
-                                                placeholder={hasHeader ? 'meter_id' : '0'}
-                                            />
-                                        </label>
-                                        <label>
-                                            <span>{formatProfile === 'daily_15min' ? t('pages.imports.wizard.dateCol') : t('pages.imports.wizard.timestampCol')}</span>
-                                            <input
-                                                value={columnMap.timestamp}
-                                                onChange={(event) => setColumnMap((prev) => ({ ...prev, timestamp: event.target.value }))}
-                                                placeholder={hasHeader ? 'timestamp' : '3'}
-                                            />
-                                        </label>
-
-                                        {formatProfile === 'standard' ? (
-                                            <>
-                                                <label>
-                                                    <span>{t('pages.imports.wizard.energyCol')}</span>
-                                                    <input
-                                                        value={columnMap.energy_kwh}
-                                                        onChange={(event) => setColumnMap((prev) => ({ ...prev, energy_kwh: event.target.value }))}
-                                                        placeholder={hasHeader ? 'energy_kwh' : '4'}
-                                                    />
-                                                </label>
-                                                <label>
-                                                    <span>{t('pages.imports.wizard.directionCol')}</span>
-                                                    <input
-                                                        value={columnMap.direction}
-                                                        onChange={(event) => setColumnMap((prev) => ({ ...prev, direction: event.target.value }))}
-                                                        placeholder={hasHeader ? 'direction' : '5'}
-                                                    />
-                                                </label>
-                                            </>
-                                        ) : (
-                                            <>
-                                                <label>
-                                                    <span>{t('pages.imports.wizard.firstIntervalCol')}</span>
-                                                    <input
-                                                        value={columnMap.energy_start}
-                                                        onChange={(event) => setColumnMap((prev) => ({ ...prev, energy_start: event.target.value }))}
-                                                        placeholder={hasHeader ? 'energy_start' : '4'}
-                                                    />
-                                                </label>
-                                                <label>
-                                                    <span>{t('pages.imports.wizard.intervalsPerRow')}</span>
-                                                    <input type="number" min={1} max={200} value={valuesCount} onChange={(event) => setValuesCount(Number(event.target.value || 96))} />
-                                                </label>
-                                                <label>
-                                                    <span>{t('pages.imports.wizard.minutesPerInterval')}</span>
-                                                    <input type="number" min={1} max={240} value={intervalMinutes} onChange={(event) => setIntervalMinutes(Number(event.target.value || 15))} />
-                                                </label>
-                                            </>
-                                        )}
-                                    </div>
-
-                                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                        <input
-                                            type="checkbox"
-                                            checked={overwriteExisting}
-                                            onChange={(event) => setOverwriteExisting(event.target.checked)}
-                                        />
-                                        <span>{t('pages.imports.wizard.overwriteExisting')}</span>
-                                    </label>
-
-                                    <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                                        <button type="button" className="button button-primary" onClick={loadPreview} disabled={previewMutation.isPending || !file}>
-                                            <FontAwesomeIcon icon={faMagnifyingGlass} fixedWidth />
-                                            {previewMutation.isPending ? t('pages.imports.loadingPreview') : t('pages.imports.loadPreview')}
-                                        </button>
-                                        {preview && (
-                                            <>
-                                                <Badge label={t('pages.imports.previewFound', { count: preview.summary.existing_metering_points })} ok={preview.summary.existing_metering_points > 0} />
-                                                <Badge label={t('pages.imports.previewMissing', { count: preview.summary.missing_metering_points })} ok={preview.summary.missing_metering_points === 0} />
-                                            </>
-                                        )}
-                                    </div>
-
-                                    {preview && missingMeteringPoints > 0 && (
-                                        <div className="error-banner" style={{ marginTop: '0.4rem' }}>
-                                            {t('pages.imports.previewMissingBanner', { count: missingMeteringPoints })}
-                                        </div>
-                                    )}
-
-                                    {preview?.errors?.length ? (
-                                        <div className="error-banner" style={{ marginTop: '0.4rem' }}>
-                                            <ul style={{ margin: 0, paddingLeft: '1.1rem' }}>
-                                                {preview.errors.slice(0, 8).map((entry, index) => (
-                                                    <li key={`${entry.row ?? 'general'}-${index}`}>
-                                                        {entry.row ? <>{t('pages.imports.preview.rowPrefix', { row: entry.row })} </> : ''}{entry.error}
-                                                    </li>
-                                                ))}
-                                            </ul>
-                                        </div>
-                                    ) : null}
-
-                                    {previewRows.length > 0 && (
-                                        <div style={{ maxHeight: 250, overflow: 'auto', border: '1px solid var(--border-default)', borderRadius: 6 }}>
-                                            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                                                <thead>
-                                                    <tr>
-                                                        <th style={{ textAlign: 'left', padding: '0.4rem 0.6rem' }}>{t('pages.imports.preview.row')}</th>
-                                                        <th style={{ textAlign: 'left', padding: '0.4rem 0.6rem' }}>{t('pages.imports.preview.meterId')}</th>
-                                                        <th style={{ textAlign: 'left', padding: '0.4rem 0.6rem' }}>{t('pages.imports.preview.status')}</th>
-                                                        <th style={{ textAlign: 'left', padding: '0.4rem 0.6rem' }}>{t('pages.imports.preview.timestamp')}</th>
-                                                        <th style={{ textAlign: 'left', padding: '0.4rem 0.6rem' }}>{t('pages.imports.preview.existingData')}</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    {previewRows.map((row) => (
-                                                        <tr key={`${row.row}-${row.meter_id ?? 'empty'}`} style={{ borderTop: '1px solid var(--border-default)' }}>
-                                                            <td style={{ padding: '0.4rem 0.6rem' }}>{row.row}</td>
-                                                            <td style={{ padding: '0.4rem 0.6rem' }}>{row.meter_id ?? '-'}</td>
-                                                            <td style={{ padding: '0.4rem 0.6rem' }}>
-                                                                <Badge label={row.metering_point_exists ? t('pages.imports.preview.exists') : t('pages.imports.preview.missing')} ok={row.metering_point_exists} />
-                                                            </td>
-                                                            <td style={{ padding: '0.4rem 0.6rem' }}>{row.timestamp ?? '-'}</td>
-                                                            <td style={{ padding: '0.4rem 0.6rem' }}>
-                                                                {row.existing_data == null ? '-' : row.existing_data ? t('pages.imports.preview.yes') : t('pages.imports.preview.no')}
-                                                            </td>
-                                                        </tr>
-                                                    ))}
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                    )}
-                                </>
-                            ) : (
-                                <>
-                                    <p className="muted" style={{ margin: 0 }}>
-                                        {t('pages.imports.sdatchScope')}
-                                    </p>
-                                    <label>
-                                        <span>{t('pages.imports.wizard.selectZev')}</span>
-                                        {isManagedScope ? (
-                                            <input value={selectedZev?.name ?? t('pages.imports.wizard.noZevSelected')} disabled />
-                                        ) : (
-                                            <select value={zevId} onChange={(event) => setZevId(event.target.value)}>
-                                                <option value="">{t('pages.imports.wizard.selectZev')}</option>
-                                                {availableZevs.map((zev) => (
-                                                    <option key={zev.id} value={zev.id}>{zev.name}</option>
-                                                ))}
-                                            </select>
-                                        )}
-                                    </label>
-                                </>
-                            )}
-
-                            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.6rem', marginTop: '0.4rem' }}>
-                                <button type="button" className="button button-secondary" onClick={() => setWizardStep(1)}>
-                                    <FontAwesomeIcon icon={faArrowLeft} fixedWidth />
-                                    {t('pages.imports.wizard.back')}
-                                </button>
-                                <button type="button" className="button button-primary" onClick={startImport} disabled={uploadMutation.isPending || !canStartImport}>
-                                    <FontAwesomeIcon icon={faUpload} fixedWidth />
-                                    {uploadMutation.isPending ? t('pages.imports.wizard.importing') : t('pages.imports.wizard.startImport')}
-                                </button>
-                            </div>
-                        </div>
-                    )}
-                </div>
-            </FormModal>
-
-            {importLogRows.length === 0 ? (
-                <EmptyState
-                    titleKey="pages.imports.emptyState.title"
-                    descriptionKey="pages.imports.emptyState.description"
-                    actions={[
-                        { labelKey: 'pages.imports.emptyState.createAction', onClick: () => setWizardOpen(true), variant: 'primary', icon: faPlus },
-                    ]}
-                />
-            ) : (
-                <div className="table-card" style={{ width: '100%' }}>
-                    <DataTable
-                        data={importLogRows}
-                        columns={importLogColumns}
-                        getRowId={(row) => row.id}
-                        enableSorting={false}
-                        initialPageSize={25}
-                        emptyMessage={t('pages.imports.noRows')}
-                    />
-                </div>
+            {wizardOpen && (
+                <ImportWizardModal
+                step={wizardStep}
+                source={source}
+                file={file}
+                fileError={fileError}
+                hasHeader={hasHeader}
+                delimiter={delimiter}
+                delimiterError={delimiterError}
+                formatProfile={formatProfile}
+                timestampFormat={timestampFormat}
+                timestampFormatError={timestampFormatError}
+                intervalMinutes={intervalMinutes}
+                intervalMinutesError={intervalMinutesError}
+                valuesCount={valuesCount}
+                valuesCountError={valuesCountError}
+                overwriteExisting={overwriteExisting}
+                columnMap={columnMap}
+                preview={preview}
+                previewOutdated={previewOutdated}
+                previewLoading={previewMutation.isPending}
+                missingMeteringPoints={missingMeteringPoints}
+                previewRows={previewRows}
+                scopedZevId={scopedZevId ?? ''}
+                selectedZevName={selectedZev?.name ?? null}
+                canGoStep2={canGoStep2}
+                canStartImport={canStartImport}
+                csvConfigValid={csvConfigValid}
+                uploadPending={uploadMutation.isPending}
+                onClose={resetWizard}
+                onSourceChange={handleSourceChange}
+                onFileChange={handleFileChange}
+                onRemoveFile={handleRemoveFile}
+                onHasHeaderChange={handleHasHeaderChange}
+                onDelimiterChange={setDelimiter}
+                onFormatProfileChange={handleFormatProfileChange}
+                onTimestampFormatChange={setTimestampFormat}
+                onIntervalMinutesChange={setIntervalMinutes}
+                onValuesCountChange={setValuesCount}
+                onColumnMapChange={(patch) => setColumnMap((prev) => ({ ...prev, ...patch }))}
+                onOverwriteChange={setOverwriteExisting}
+                onSubmitStep1={handleNextStep}
+                onBackToStep1={() => setWizardStep(1)}
+                onLoadPreview={loadPreview}
+                onStartImport={startImport}
+                onCopyMissingIds={copyMissingMeterIds}
+                onDownloadMissingIds={downloadMissingMeterIds}
+            />
             )}
 
-            <FormModal isOpen={showBulkDeleteModal} title={t('pages.imports.delete.bulkModalTitle')} onClose={closeBulkDeleteModal} maxWidth="640px">
-                <div className="page-stack" style={{ gap: '1rem' }}>
-                    <p className="muted" style={{ margin: 0 }}>{t('pages.imports.delete.bulkDescription')}</p>
+            <ImportHistoryTable
+                rows={importLogRows}
+                columns={importLogColumns}
+                getRowId={(row) => row.id}
+                filters={historyFilters}
+                onFiltersChange={setHistoryFilters}
+                onNewImport={() => setWizardOpen(true)}
+            />
 
-                    <label>
-                        <span>{t('pages.imports.delete.modeLabel')}</span>
-                        <select value={bulkDeleteMode} onChange={(event) => setBulkDeleteMode(event.target.value as 'period' | 'all')}>
-                            <option value="period">{t('pages.imports.delete.modePeriod')}</option>
-                            <option value="all">{t('pages.imports.delete.modeAll')}</option>
-                        </select>
-                    </label>
+            <BulkDeleteModal
+                open={showBulkDeleteModal}
+                mode={bulkDeleteMode}
+                dateFrom={bulkDeleteFrom}
+                dateTo={bulkDeleteTo}
+                armed={bulkDeleteArmed}
+                visibleCount={bulkDeleteVisibleCount}
+                protectedCount={bulkDeleteProtectedLogs.length}
+                protectedExamples={bulkDeleteProtectedExamples}
+                pending={bulkDeleteMutation.isPending}
+                zevName={selectedZev?.name ?? null}
+                onClose={closeBulkDeleteModal}
+                onModeChange={setBulkDeleteMode}
+                onDateFromChange={setBulkDeleteFrom}
+                onDateToChange={setBulkDeleteTo}
+                onReview={submitBulkDelete}
+                onBack={() => setBulkDeleteArmed(false)}
+                onConfirm={confirmBulkDelete}
+            />
 
-                    {bulkDeleteMode === 'period' && (
-                        <div className="inline-form grid grid-2">
-                            <label>
-                                <span>{t('pages.imports.delete.dateFrom')}</span>
-                                <input type="date" value={bulkDeleteFrom} onChange={(event) => setBulkDeleteFrom(event.target.value)} />
-                            </label>
-                            <label>
-                                <span>{t('pages.imports.delete.dateTo')}</span>
-                                <input type="date" value={bulkDeleteTo} onChange={(event) => setBulkDeleteTo(event.target.value)} />
-                            </label>
-                        </div>
-                    )}
-
-                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
-                        <button className="button button-secondary" type="button" onClick={closeBulkDeleteModal}>
-                            <FontAwesomeIcon icon={faXmark} fixedWidth />
-                            {t('common.cancel')}
-                        </button>
-                        <button className="button button-danger" type="button" onClick={submitBulkDelete} disabled={bulkDeleteMutation.isPending || dialogLoading}>
-                            <FontAwesomeIcon icon={faTrash} fixedWidth />
-                            {t('pages.imports.delete.confirmAction')}
-                        </button>
-                    </div>
-                </div>
-            </FormModal>
-
-            <FormModal isOpen={!!selectedLog} title={t('pages.imports.protocol.title')} onClose={() => setSelectedLog(null)}>
-                {selectedLog && (
-                    <div className="page-stack" style={{ gap: '0.75rem' }}>
-                        <div><strong>{t('pages.imports.protocol.created')}</strong> {formatDateTime(selectedLog.created_at, settings)}</div>
-                        <div><strong>{t('pages.imports.protocol.source')}</strong> {selectedLog.source}</div>
-                        <div><strong>{t('pages.imports.protocol.filename')}</strong> {selectedLog.filename || '-'}</div>
-                        <div><strong>{t('pages.imports.protocol.totalRows')}</strong> {selectedLog.rows_total ?? '-'}</div>
-                        <div><strong>{t('pages.imports.protocol.importedRows')}</strong> {selectedLog.rows_imported}</div>
-                        <div><strong>{t('pages.imports.protocol.skippedRows')}</strong> {selectedLog.rows_skipped}</div>
-
-                        <h4 style={{ marginBottom: '0.4rem' }}>{t('pages.imports.protocol.skippedReasons')}</h4>
-                        {(selectedLog.errors?.length ?? 0) === 0 ? (
-                            <p className="muted" style={{ margin: 0 }}>{t('pages.imports.protocol.noSkippedDetails')}</p>
-                        ) : (
-                            <div style={{ maxHeight: 300, overflow: 'auto', border: '1px solid var(--border-default)', borderRadius: 6 }}>
-                                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                                    <thead>
-                                        <tr>
-                                            <th style={{ textAlign: 'left', padding: '0.5rem 0.75rem' }}>{t('pages.imports.protocol.row')}</th>
-                                            <th style={{ textAlign: 'left', padding: '0.5rem 0.75rem' }}>{t('pages.imports.protocol.reason')}</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {selectedLog.errors?.map((entry, index) => (
-                                            <tr key={`${entry.row ?? 'global'}-${index}`} style={{ borderTop: '1px solid var(--border-default)' }}>
-                                                <td style={{ padding: '0.5rem 0.75rem', verticalAlign: 'top' }}>
-                                                    {entry.row ?? t('pages.imports.protocol.general')}
-                                                </td>
-                                                <td style={{ padding: '0.5rem 0.75rem' }}>{entry.error}</td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        )}
-                    </div>
-                )}
-            </FormModal>
+            <ImportProtocolModal log={selectedLog} onClose={() => setSelectedLog(null)} />
 
             {dialog && (
                 <ConfirmDialog {...dialog} isLoading={dialogLoading} onConfirm={handleConfirm} onCancel={handleCancel} />

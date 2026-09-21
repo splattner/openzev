@@ -72,8 +72,10 @@ class ImportLog(models.Model):
     filename = models.CharField(max_length=255, blank=True)
     rows_total = models.IntegerField(default=0)
     rows_imported = models.IntegerField(default=0)
+    rows_overwritten = models.PositiveIntegerField(default=0)
     rows_skipped = models.IntegerField(default=0)
     errors = models.JSONField(default=list)
+    warnings = models.JSONField(default=list)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

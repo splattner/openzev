@@ -84,6 +84,38 @@ class SdatchImportTests(TestCase):
 </Observation>
 """
 
+    def test_sdatch_without_zev_id_is_rejected(self):
+        upload = SimpleUploadedFile("no-zev.xml", self._xml(self._meter_xml("CH-SDAT-1", self._interval_xml())), content_type="application/xml")
+
+        resp = self.client.post("/api/v1/metering/import/sdatch/", {"file": upload}, format="multipart")
+
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn("zev_id", resp.data["error"])
+        self.assertEqual(MeterReading.objects.count(), 0)
+
+    def test_sdatch_with_invalid_zev_id_is_rejected(self):
+        upload = SimpleUploadedFile("bad-zev.xml", self._xml(self._meter_xml("CH-SDAT-1", self._interval_xml())), content_type="application/xml")
+
+        resp = self.client.post(
+            "/api/v1/metering/import/sdatch/", {"file": upload, "zev_id": "not-a-uuid"}, format="multipart"
+        )
+
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn("valid UUID", resp.data["error"])
+        self.assertEqual(MeterReading.objects.count(), 0)
+
+    def test_sdatch_with_unknown_zev_id_returns_404(self):
+        upload = SimpleUploadedFile("unknown-zev.xml", self._xml(self._meter_xml("CH-SDAT-1", self._interval_xml())), content_type="application/xml")
+
+        resp = self.client.post(
+            "/api/v1/metering/import/sdatch/",
+            {"file": upload, "zev_id": "00000000-0000-0000-0000-000000000000"},
+            format="multipart",
+        )
+
+        self.assertEqual(resp.status_code, 404)
+        self.assertEqual(MeterReading.objects.count(), 0)
+
     def test_malformed_sdatch_payload_is_reported_without_crash(self):
         resp = self._upload("broken.xml", b"<MeteringData><broken></MeteringData")
 

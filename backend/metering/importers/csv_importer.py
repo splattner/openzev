@@ -19,22 +19,28 @@ from decimal import Decimal, InvalidOperation
 import openpyxl
 from dateutil import parser as dateutil_parser
 from django.conf import settings
+from django.db import IntegrityError, transaction
 
 from metering.importers.limits import (
     MAX_REPORTED_ERRORS,
     MAX_UPLOAD_BYTES,
+    TRUNCATION_NOTE,
     add_error,
     mb,
     validate_zip,
 )
 from metering.models import ImportLog, ImportSource, MeterReading
-from zev.models import MeteringPoint, Zev
+from zev.models import MeteringPoint
 
 # Upload hardening limits — rationale: docs/specs/2026-03-metering-import-and-quality.md §4.4.
 MAX_CSV_BYTES = MAX_UPLOAD_BYTES
 MAX_CSV_ROWS = getattr(settings, "IMPORT_MAX_ROWS", 200_000)
 MAX_CSV_COLUMNS = 1_500
 MAX_VALUES_COUNT = 1440  # one value per minute per day
+# Timestamp __in chunk size for the standard-profile existence prefetch:
+# well below SQLite's 999 and PostgreSQL's 32767 parameter limits.
+_STANDARD_PREFETCH_CHUNK = 500
+MAX_ENERGY_KWH = Decimal("99999999.9999")  # MeterReading.energy_kwh bound (max_digits=12, decimal_places=4)
 MAX_XLSX_DECOMPRESSED_BYTES = 50 * 1024 * 1024  # decompressed budget, deliberately not aliased to MAX_UPLOAD_BYTES
 MAX_XLSX_MEMBERS = 200
 MAX_XLSX_RATIO = 500
@@ -233,6 +239,14 @@ def _cell(row, position):
     return row[position]
 
 
+def _csv_error(row_number, meter_id, error):
+    """Row error payload; meter_id is attached when the row names a meter."""
+    payload = {"row": row_number, "error": error}
+    if meter_id is not None:
+        payload["meter_id"] = meter_id
+    return payload
+
+
 def _parse_flexible(text, *, dayfirst=False):
     """Parse a date/datetime string, preferring ISO-8601 then falling back to dateutil."""
     if not dayfirst:
@@ -248,6 +262,60 @@ def _parse_datetime_utc(raw_value):
     if parsed.tzinfo is None:
         return parsed.replace(tzinfo=timezone.utc)
     return parsed.astimezone(timezone.utc)
+
+
+def _parse_row_timestamp(raw_value, timestamp_format):
+    """Parse a standard-profile timestamp cell to an aware UTC datetime."""
+    if isinstance(raw_value, datetime):
+        if raw_value.tzinfo is None:
+            return raw_value.replace(tzinfo=timezone.utc)
+        return raw_value.astimezone(timezone.utc)
+    text = "" if raw_value is None else str(raw_value).strip()
+    try:
+        if timestamp_format:
+            parsed = datetime.strptime(text, timestamp_format)
+            if parsed.tzinfo is None:
+                return parsed.replace(tzinfo=timezone.utc)
+            return parsed.astimezone(timezone.utc)
+        return _parse_datetime_utc(raw_value)
+    except (ValueError, TypeError, OverflowError):
+        preview = text[:100] + ("…" if len(text) > 100 else "")
+        raise ValueError(f"Invalid timestamp value '{preview}'.") from None
+
+
+def _interpret_standard_row(row, *, resolved_cols, timestamp_format, meter_type):
+    """Shared standard-row interpretation for preview and import.
+
+    Returns ``(timestamp, direction, energy, error)`` — error is None on
+    success, otherwise the exact user-facing message both paths report, so
+    preview and import agree on every standard row by construction.
+    """
+    raw_ts = row[resolved_cols["timestamp"]]
+    if _is_missing(raw_ts):
+        return None, None, None, "Missing timestamp value."
+    try:
+        ts = _parse_row_timestamp(raw_ts, timestamp_format)
+    except (ValueError, TypeError, OverflowError) as exc:
+        return None, None, None, str(exc)
+    try:
+        energy_raw = _parse_decimal(row[resolved_cols["energy_kwh"]])
+    except (InvalidOperation, ValueError, TypeError, OverflowError) as exc:
+        return None, None, None, str(exc)
+    explicit_direction = None
+    direction_col = resolved_cols.get("direction")
+    if direction_col is not None:
+        raw_direction = _cell(row, direction_col)
+        if not _is_missing(raw_direction):
+            explicit_direction = str(raw_direction).strip().lower()
+            if explicit_direction and explicit_direction not in {"in", "out"}:
+                return (
+                    None,
+                    None,
+                    None,
+                    f"Invalid direction '{explicit_direction}'. Expected 'in' or 'out'.",
+                )
+    direction, energy = _infer_direction_and_energy(meter_type, energy_raw, explicit_direction)
+    return ts, direction, energy, None
 
 
 def _resolve_column(table, ref):
@@ -279,11 +347,22 @@ def _parse_decimal(raw_value):
     if not value_str:
         raise InvalidOperation("Empty numeric value")
     value_str = value_str.replace(",", ".")
-    value = Decimal(value_str).quantize(Decimal("0.0001"))
+    try:
+        value = Decimal(value_str).quantize(Decimal("0.0001"))
+    except InvalidOperation:
+        # Otherwise the raw conversion code ("[<class 'decimal.ConversionSyntax'>]")
+        # leaks into user-facing error lists.
+        raise InvalidOperation(f"Invalid numeric value '{value_str}'") from None
     # Decimal happily accepts "nan"/"NaN", which would otherwise reach the
     # database as a non-finite value. ("inf" already fails in quantize.)
     if not value.is_finite():
-        raise InvalidOperation("Invalid numeric value")
+        raise InvalidOperation(f"Invalid numeric value '{value_str}'")
+    # MeterReading.energy_kwh is max_digits=12/decimal_places=4 (at most
+    # 99999999.9999). Reject larger magnitudes here — shared by preview and
+    # import — so no DataError can escape the import transaction on
+    # PostgreSQL (SQLite does not enforce the bound).
+    if abs(value) > MAX_ENERGY_KWH:
+        raise InvalidOperation(f"Numeric value '{value_str}' exceeds the maximum of 99999999.9999 kWh.")
     return value
 
 
@@ -298,12 +377,14 @@ def _infer_direction_and_energy(meter_type, energy, explicit_direction=None):
     return "in", abs(energy)
 
 
-def _meter_queryset_for_user(user):
-    qs = MeteringPoint.objects.select_related("zev")
+def _meter_queryset_for_user(user, zev):
+    qs = MeteringPoint.objects.select_related("zev").filter(zev=zev)
     if user.is_admin:
         return qs
     if user.is_zev_owner:
         return qs.filter(zev__owner=user)
+    if zev.owner_id is not None and zev.owner_id == user.id:
+        return qs
     return qs.none()
 
 
@@ -328,23 +409,42 @@ def _resolve_columns(table, col, required_keys):
     return resolved_cols, None
 
 
-def _build_day_start(raw_day, timestamp_format):
-    if timestamp_format:
-        day_dt = datetime.strptime(str(raw_day).strip(), timestamp_format)
-    else:
-        raw_day_str = str(raw_day).strip()
-        # Preserve unambiguous ISO dates; fall back to day-first parsing for
-        # European CSV exports such as 07.01.2026 or 07/01/2026.
-        iso_like = raw_day_str[:10].count("-") == 2 and raw_day_str[:4].isdigit()
-        day_dt = _parse_flexible(raw_day_str, dayfirst=not iso_like)
-    return datetime(day_dt.year, day_dt.month, day_dt.day, tzinfo=timezone.utc)
-
-
-def _infer_log_zev(touched_metering_points):
-    zev_ids = {mp.zev_id for mp in touched_metering_points}
-    if len(zev_ids) == 1:
-        return Zev.objects.filter(id=next(iter(zev_ids))).first()
+def _check_timestamp_format(timestamp_format):
+    if not timestamp_format:
+        return None
+    if "%" not in str(timestamp_format):
+        return f"Invalid timestamp format '{timestamp_format}'."
+    try:
+        fmt = str(timestamp_format)
+        # Probe with a timezone-aware datetime so offset-bearing formats
+        # (%z/%Z) round-trip instead of being rejected by an empty offset.
+        probe = datetime(2000, 1, 2, 3, 4, 5, tzinfo=timezone.utc).strftime(fmt)
+        parsed = datetime.strptime(probe, fmt)
+        # The format must capture the full calendar date: a year-less
+        # format (e.g. "%d.%m") parses to 1900 and would silently shift data.
+        if (parsed.year, parsed.month, parsed.day) != (2000, 1, 2):
+            return f"Invalid timestamp format '{timestamp_format}'."
+    except (ValueError, TypeError):
+        return f"Invalid timestamp format '{timestamp_format}'."
     return None
+
+
+def _build_day_start(raw_day, timestamp_format):
+    if isinstance(raw_day, datetime):
+        return datetime(raw_day.year, raw_day.month, raw_day.day, tzinfo=timezone.utc)
+    text = "" if raw_day is None else str(raw_day).strip()
+    try:
+        if timestamp_format:
+            day_dt = datetime.strptime(text, timestamp_format)
+        else:
+            # Preserve unambiguous ISO dates; fall back to day-first parsing for
+            # European CSV exports such as 07.01.2026 or 07/01/2026.
+            iso_like = text[:10].count("-") == 2 and text[:4].isdigit()
+            day_dt = _parse_flexible(text, dayfirst=not iso_like)
+    except (ValueError, TypeError, OverflowError):
+        preview = text[:100] + ("…" if len(text) > 100 else "")
+        raise ValueError(f"Invalid date value '{preview}'.") from None
+    return datetime(day_dt.year, day_dt.month, day_dt.day, tzinfo=timezone.utc)
 
 
 def _coerce_values_count(values_count):
@@ -391,10 +491,170 @@ def _upsert_reading(mp, ts, direction, energy, batch_id, overwrite_existing):
     return created
 
 
+def _contiguous_day_ranges(day_starts):
+    """Coalesce distinct UTC day starts into half-open [start, end) ranges."""
+    sorted_days = sorted(day_starts)
+    ranges = []
+    range_start = range_end = sorted_days[0]
+    for day in sorted_days[1:]:
+        if day == range_end + timedelta(days=1):
+            range_end = day
+        else:
+            ranges.append((range_start, range_end + timedelta(days=1)))
+            range_start = range_end = day
+    ranges.append((range_start, range_end + timedelta(days=1)))
+    return ranges
+
+
+def _parse_daily_values(row, start_pos, values_count, width):
+    """Shared daily-slot validation for preview and import.
+
+    Returns ``(values, row_error)`` where values is a list of Decimal|None
+    (None = missing slot) and row_error is a missing-column or invalid-numeric
+    message. Empty rows are NOT an error here; callers check
+    ``all(v is None)`` so preview and import agree on the empty-row message.
+    """
+    required_end = start_pos + values_count
+    if required_end > width:
+        return None, (
+            f"Missing interval column at position {width} "
+            f"(slot {width - start_pos + 1}/{values_count})."
+        )
+    values: list = []
+    for slot in range(values_count):
+        raw_energy = row[start_pos + slot]
+        if _is_missing(raw_energy) or str(raw_energy).strip() == "":
+            values.append(None)
+            continue
+        try:
+            values.append(_parse_decimal(raw_energy))
+        except (InvalidOperation, ValueError, TypeError, OverflowError) as exc:
+            return None, str(exc)
+    return values, None
+
+
+def _daily_row_directions(row, start_pos, values_count, width, meter_type):
+    """Directions a daily row would import, for direction-aware existence checks."""
+    directions: set[str] = set()
+    for slot in range(values_count):
+        col_pos = start_pos + slot
+        if col_pos >= width:
+            break
+        raw_energy = row[col_pos] if col_pos < len(row) else None
+        if _is_missing(raw_energy) or str(raw_energy).strip() == "":
+            continue
+        try:
+            energy_raw = _parse_decimal(raw_energy)
+        except InvalidOperation:
+            continue
+        direction, _ = _infer_direction_and_energy(meter_type, energy_raw)
+        directions.add(direction)
+    return directions
+
+
+def _fetch_existing_daily_set(mp_ids, min_start, max_end):
+    """One range query for daily duplicate/existing checks: (mp_id, ts, direction)."""
+    if not mp_ids or min_start is None or max_end is None:
+        return set()
+    rows = MeterReading.objects.filter(
+        metering_point_id__in=list(mp_ids),
+        timestamp__gte=min_start,
+        timestamp__lt=max_end,
+    ).values_list("metering_point_id", "timestamp", "direction")
+    return set(rows)
+
+
+def _prefetch_daily_existing(table, resolved_cols, meter_lookup, timestamp_format):
+    """Fetch existing daily readings in one query per contiguous file-day block.
+
+    Sparse files must not turn their earliest/latest dates into a large range
+    query. Rows with unresolvable meters or dates are skipped here; the main
+    loop reports them individually.
+    """
+    day_starts = set()
+    mp_ids = set()
+    for row in table.rows:
+        try:
+            raw_meter = row[resolved_cols["meter_id"]]
+            raw_day = row[resolved_cols["timestamp"]]
+        except (IndexError, TypeError):
+            continue
+        if _is_missing(raw_meter):
+            continue
+        meter_id = str(raw_meter).strip()
+        mp = meter_lookup.get(meter_id) if meter_id else None
+        if mp is None:
+            continue
+        try:
+            day_start = _build_day_start(raw_day, timestamp_format)
+        except (ValueError, TypeError, OverflowError):
+            continue
+        mp_ids.add(mp.id)
+        day_starts.add(day_start)
+    if not mp_ids or not day_starts:
+        return set()
+
+    existing = set()
+    for start, end in _contiguous_day_ranges(day_starts):
+        existing.update(_fetch_existing_daily_set(mp_ids, start, end))
+    return existing
+
+
+def _prefetch_standard_existing(table, resolved_cols, meter_lookup, timestamp_format):
+    """Fetch existing standard readings for one upload in bounded queries.
+
+    Standard rows carry exact timestamps, so candidates are matched with
+    timestamp ``__in`` filters (chunked to stay below DB parameter limits)
+    and intersected in memory against the exact ``(mp_id, ts, direction)``
+    keys. Rows with unresolvable meters or values are skipped here; the main
+    loop reports them individually.
+    """
+    mp_ids: set = set()
+    timestamps: set = set()
+    directions: set = set()
+    for row in table.rows:
+        try:
+            raw_meter = row[resolved_cols["meter_id"]]
+        except (IndexError, TypeError):
+            continue
+        if _is_missing(raw_meter):
+            continue
+        meter_id = str(raw_meter).strip()
+        mp = meter_lookup.get(meter_id) if meter_id else None
+        if mp is None:
+            continue
+        ts, direction, _, error = _interpret_standard_row(
+            row,
+            resolved_cols=resolved_cols,
+            timestamp_format=timestamp_format,
+            meter_type=mp.meter_type,
+        )
+        if error is not None:
+            continue
+        mp_ids.add(mp.id)
+        timestamps.add(ts)
+        directions.add(direction)
+    if not mp_ids or not timestamps:
+        return set()
+
+    existing = set()
+    ordered_timestamps = sorted(timestamps)
+    for chunk_start in range(0, len(ordered_timestamps), _STANDARD_PREFETCH_CHUNK):
+        chunk = ordered_timestamps[chunk_start : chunk_start + _STANDARD_PREFETCH_CHUNK]
+        rows = MeterReading.objects.filter(
+            metering_point_id__in=list(mp_ids),
+            timestamp__in=chunk,
+            direction__in=list(directions),
+        ).values_list("metering_point_id", "timestamp", "direction")
+        existing.update(rows)
+    return existing
+
+
 def preview_csv(
     file,
     user,
     *,
+    zev,
     column_map=None,
     timestamp_format=None,
     has_header=True,
@@ -403,92 +663,226 @@ def preview_csv(
     interval_minutes=15,
     values_count=96,
     max_rows=30,
+    overwrite_existing=False,
 ):
     col = {**DEFAULT_COLUMN_MAP, **(column_map or {})}
     has_header = _to_bool(has_header, default=True)
+    overwrite_existing = _to_bool(overwrite_existing, default=False)
     interval_minutes = _coerce_interval_minutes(interval_minutes)
     values_count = _coerce_values_count(values_count)
     table = _read_table(file, has_header=has_header, delimiter=delimiter)
 
     required_keys = ["meter_id", "timestamp", "energy_kwh"] if format_profile == "standard" else ["meter_id", "timestamp", "energy_start"]
     resolved_cols, column_error = _resolve_columns(table, col, required_keys)
-    if column_error:
+    format_error = _check_timestamp_format(timestamp_format)
+    if column_error or format_error:
         return {
             "rows_total": len(table.rows),
             "preview_rows": [],
-            "summary": {"existing_metering_points": 0, "missing_metering_points": 0, "rows_previewed": 0},
-            "errors": [{"row": None, "error": column_error}],
+            "summary": {"existing_metering_points": 0, "missing_metering_points": 0, "rows_previewed": 0, "rows_skipped_existing": 0, "readings_existing": 0},
+            "missing_meter_ids": [],
+            "errors": [{"row": None, "error": error} for error in (column_error, format_error) if error],
         }
 
-    meter_lookup = {mp.meter_id: mp for mp in _meter_queryset_for_user(user)}
-    preview_rows = []
-    existing_mps = 0
-    missing_mps = 0
+    meter_lookup = {mp.meter_id: mp for mp in _meter_queryset_for_user(user, zev)}
+    preview_rows: list[dict] = []
+    existing_ids: set[str] = set()
+    missing_ids: set[str] = set()
+    errors: list[dict] = []
+    meter_pos = resolved_cols["meter_id"]
+    # Bounded duplicate source for daily rows: contiguous day blocks, never a
+    # single earliest→latest range (sparse files must not load years of data).
+    # Also backs intra-file duplicate detection so preview agrees with import.
+    preexisting_daily: set = set()
+    if format_profile == "daily_15min":
+        preexisting_daily = _prefetch_daily_existing(table, resolved_cols, meter_lookup, timestamp_format)
+    # Day-level index for the existing_data flag: any reading that day with an
+    # overlapping direction warns, even when no exact slot collides (e.g. an
+    # hourly 06:00 reading vs a midnight daily slot). Exact-slot sets above
+    # still drive duplicate errors and gap-fill decisions.
+    preexisting_by_mp_dir: dict = {}
+    for mp_id, ts, direction in preexisting_daily:
+        preexisting_by_mp_dir.setdefault((mp_id, direction), []).append(ts)
+    preview_written: set = set()
+    # Exact-match duplicate source for standard rows (chunked __in query, no
+    # range scan). Backs the existing_data flag and intra-file duplicate
+    # detection so preview agrees with import for both profiles.
+    preexisting_standard: set = set()
+    if format_profile == "standard":
+        preexisting_standard = _prefetch_standard_existing(table, resolved_cols, meter_lookup, timestamp_format)
+    preview_written_standard: set = set()
 
-    for idx, row in enumerate(table.rows[:max_rows]):
+    skipped_existing = 0
+    # Exact reading keys already present (database or earlier in this file).
+    # For standard rows each duplicate is one reading; for daily rows each
+    # duplicate slot is one reading. This is the overwrite confirmation
+    # count, so it must be readings, not file rows.
+    readings_existing = 0
+    truncated = False
+    for idx, row in enumerate(table.rows):
         row_number = idx + (2 if has_header else 1)
-        meter_id = None if _is_missing(row[resolved_cols["meter_id"]]) else str(row[resolved_cols["meter_id"]]).strip()
-        mp = meter_lookup.get(meter_id or "")
-        exists = mp is not None
-        if exists:
-            existing_mps += 1
+        # Rows are padded to table width, so positional access is safe.
+        raw_meter = row[meter_pos]
+        raw_timestamp = row[resolved_cols["timestamp"]]
+        meter_id = None
+        mp = None
+        day_start = None
+        # After the error cap, keep scanning meter IDs so summary counts stay exact.
+        deep = len(errors) < MAX_REPORTED_ERRORS
+        if not deep:
+            truncated = True
+        if _is_missing(raw_meter):
+            if deep:
+                add_error(errors, _csv_error(row_number, None, "Missing meter_id value."))
+        elif not str(raw_meter).strip():
+            if deep:
+                add_error(errors, _csv_error(row_number, None, "Empty meter_id value."))
         else:
-            missing_mps += 1
-
+            meter_id = str(raw_meter).strip()
+            mp = meter_lookup.get(meter_id)
+            if mp is None:
+                missing_ids.add(meter_id)
+            else:
+                existing_ids.add(meter_id)
+        # Fields are validated whether or not the meter exists, so a file of
+        # unknown meters cannot hide errors the import would surface.
+        # Shared with import_csv via _parse_daily_values: empty rows, missing
+        # columns and invalid numerics report identically in both paths.
+        preview_existing_data = False
         if format_profile == "daily_15min":
-            date_value = None
-            existing_data = False
-            if exists and not _is_missing(row[resolved_cols["timestamp"]]):
+            if _is_missing(raw_timestamp):
+                if deep:
+                    add_error(errors, _csv_error(row_number, meter_id, "Missing date value for daily profile."))
+            elif deep:
                 try:
-                    day_start = _build_day_start(row[resolved_cols["timestamp"]], timestamp_format)
-                    day_end = day_start + timedelta(days=1)
-                    existing_data = MeterReading.objects.filter(
-                        metering_point=mp,
-                        timestamp__gte=day_start,
-                        timestamp__lt=day_end,
-                    ).exists()
-                    date_value = day_start.date().isoformat()
-                except Exception:
-                    date_value = str(row[resolved_cols["timestamp"]])
-            elif not _is_missing(row[resolved_cols["timestamp"]]):
-                date_value = str(row[resolved_cols["timestamp"]])
-
-            preview_rows.append(
-                {
-                    "row": row_number,
-                    "meter_id": meter_id,
-                    "metering_point_exists": exists,
-                    "meter_type": mp.meter_type if mp else None,
-                    "timestamp": date_value,
-                    "existing_data": existing_data,
-                    "interval_minutes": interval_minutes,
-                    "values_count": values_count,
-                }
+                    day_start = _build_day_start(raw_timestamp, timestamp_format)
+                except (ValueError, TypeError, OverflowError) as exc:
+                    add_error(errors, _csv_error(row_number, meter_id, str(exc)))
+                else:
+                    start_pos = resolved_cols["energy_start"]
+                    # Meter type only affects direction inference for the
+                    # duplicate check; numeric validation runs regardless.
+                    probe_type = mp.meter_type if mp is not None else "consumption"
+                    # Existing-data flag runs even on invalid rows (e.g.
+                    # truncated daily rows): it reflects day-level DB presence,
+                    # not validation success.
+                    if mp is not None:
+                        day_directions = _daily_row_directions(
+                            row, start_pos, values_count, table.width, probe_type
+                        )
+                        if day_directions:
+                            day_end = day_start + timedelta(days=1)
+                            preview_existing_data = any(
+                                day_start <= ts < day_end
+                                for direction in day_directions
+                                for ts in preexisting_by_mp_dir.get((mp.id, direction), ())
+                            )
+                    values, row_error = _parse_daily_values(row, start_pos, values_count, table.width)
+                    if row_error is not None:
+                        add_error(errors, _csv_error(row_number, meter_id, row_error))
+                    elif all(v is None for v in values):
+                        add_error(errors, _csv_error(row_number, meter_id, "Row contains no interval values."))
+                    elif mp is not None:
+                        slot_keys = []
+                        for slot, value in enumerate(values):
+                            if value is None:
+                                continue
+                            direction, _ = _infer_direction_and_energy(probe_type, value)
+                            ts = day_start + timedelta(minutes=interval_minutes * slot)
+                            slot_keys.append((mp.id, ts, direction))
+                        duplicates = sum(
+                            1 for key in slot_keys if key in preexisting_daily or key in preview_written
+                        )
+                        # Exact-slot matches feed the overwrite confirmation
+                        # count (readings, not rows), in both modes.
+                        readings_existing += duplicates
+                        if slot_keys:
+                            # Exact duplicates also imply day-level data.
+                            if duplicates > 0:
+                                preview_existing_data = True
+                            for key in slot_keys:
+                                if key not in preexisting_daily and key not in preview_written:
+                                    preview_written.add(key)
+                            if duplicates == len(slot_keys) and not overwrite_existing:
+                                skipped_existing += 1
+        elif deep:
+            # Shared with import_csv via _interpret_standard_row: timestamps,
+            # values and directions report identically in both paths.
+            probe_type = mp.meter_type if mp is not None else "consumption"
+            ts, direction, _, row_error = _interpret_standard_row(
+                row,
+                resolved_cols=resolved_cols,
+                timestamp_format=timestamp_format,
+                meter_type=probe_type,
             )
-            continue
+            if row_error is not None:
+                add_error(errors, _csv_error(row_number, meter_id, row_error))
+            elif mp is not None:
+                key = (mp.id, ts, direction)
+                if key in preexisting_standard or key in preview_written_standard:
+                    preview_existing_data = True
+                    # One standard row is one reading.
+                    readings_existing += 1
+                    if not overwrite_existing:
+                        skipped_existing += 1
+                else:
+                    preview_written_standard.add(key)
+        if idx < max_rows:
+            exists = mp is not None
+            if format_profile == "daily_15min":
+                date_value = None
+                candidate_day = day_start
+                if not _is_missing(raw_timestamp):
+                    try:
+                        if candidate_day is None:
+                            candidate_day = _build_day_start(raw_timestamp, timestamp_format)
+                        date_value = candidate_day.date().isoformat()
+                    except (ValueError, TypeError, OverflowError):
+                        date_value = str(raw_timestamp)
+                        candidate_day = None
+                preview_rows.append(
+                    {
+                        "row": row_number,
+                        "meter_id": meter_id,
+                        "metering_point_exists": exists,
+                        "meter_type": mp.meter_type if mp else None,
+                        "timestamp": date_value,
+                        "existing_data": preview_existing_data,
+                        "interval_minutes": interval_minutes,
+                        "values_count": values_count,
+                    }
+                )
+            else:
+                preview_rows.append(
+                    {
+                        "row": row_number,
+                        "meter_id": meter_id,
+                        "metering_point_exists": exists,
+                        "meter_type": mp.meter_type if mp else None,
+                        "timestamp": None if _is_missing(raw_timestamp) else str(raw_timestamp),
+                        "energy": None if _is_missing(row[resolved_cols["energy_kwh"]]) else str(row[resolved_cols["energy_kwh"]]),
+                        "existing_data": preview_existing_data,
+                    }
+                )
 
-        timestamp_value = None if _is_missing(row[resolved_cols["timestamp"]]) else str(row[resolved_cols["timestamp"]])
-        energy_value = None if _is_missing(row[resolved_cols["energy_kwh"]]) else str(row[resolved_cols["energy_kwh"]])
-        preview_rows.append(
-            {
-                "row": row_number,
-                "meter_id": meter_id,
-                "metering_point_exists": exists,
-                "meter_type": mp.meter_type if mp else None,
-                "timestamp": timestamp_value,
-                "energy": energy_value,
-            }
-        )
+    if truncated and len(errors) == MAX_REPORTED_ERRORS:
+        errors.append({"row": None, "error": TRUNCATION_NOTE})
 
     return {
         "rows_total": len(table.rows),
         "preview_rows": preview_rows,
         "summary": {
-            "existing_metering_points": existing_mps,
-            "missing_metering_points": missing_mps,
+            "existing_metering_points": len(existing_ids),
+            "missing_metering_points": len(missing_ids),
             "rows_previewed": len(preview_rows),
+            "rows_skipped_existing": skipped_existing,
+            # Exact matching reading keys across the whole file, including
+            # repeated writes within the file. Estimate only: data can change
+            # between preview and import. Feeds the overwrite confirmation.
+            "readings_existing": readings_existing,
         },
-        "errors": [],
+        "missing_meter_ids": sorted(missing_ids)[:MAX_REPORTED_ERRORS],
+        "errors": errors,
     }
 
 
@@ -496,6 +890,7 @@ def import_csv(
     file,
     user,
     *,
+    zev,
     column_map=None,
     timestamp_format=None,
     has_header=True,
@@ -505,7 +900,15 @@ def import_csv(
     values_count=96,
     overwrite_existing=False,
 ):
-    """Import metering readings from a CSV or Excel file and return an ImportLog instance."""
+    """Import metering readings from a CSV or Excel file and return an ImportLog instance.
+
+    The successful log is created inside the same transaction as the readings,
+    so no half-finished import is ever visible or deletable: readings and the
+    finalized log (including the overwrite count that drives deletion
+    protection) commit together. An unexpected failure rolls everything back
+    and is then recorded as a separate failed-attempt log outside the
+    transaction, before an ImportFileError propagates to the caller.
+    """
     col = {**DEFAULT_COLUMN_MAP, **(column_map or {})}
     batch_id = uuid.uuid4()
 
@@ -514,44 +917,108 @@ def import_csv(
     interval_minutes = _coerce_interval_minutes(interval_minutes)
     values_count = _coerce_values_count(values_count)
     table = _read_table(file, has_header=has_header, delimiter=delimiter)
-
-    log = ImportLog.objects.create(
-        batch_id=batch_id,
-        imported_by=user,
-        source=ImportSource.CSV,
-        filename=getattr(file, "name", "upload"),
-        rows_total=len(table.rows),
-    )
+    filename = getattr(file, "name", "upload")
 
     required_keys = ["meter_id", "timestamp", "energy_kwh"] if format_profile == "standard" else ["meter_id", "timestamp", "energy_start"]
-    resolved_cols, column_error = _resolve_columns(table, col, required_keys)
-    if column_error:
-        log.rows_imported = 0
-        log.rows_skipped = len(table.rows)
-        log.errors = [{"row": None, "error": column_error}]
-        log.save()
-        return log
 
-    meter_lookup = {mp.meter_id: mp for mp in _meter_queryset_for_user(user)}
+    try:
+        with transaction.atomic():
+            log = ImportLog.objects.create(
+                batch_id=batch_id,
+                zev=zev,
+                imported_by=user,
+                source=ImportSource.CSV,
+                filename=filename,
+                rows_total=len(table.rows),
+            )
+            resolved_cols, column_error = _resolve_columns(table, col, required_keys)
+            format_error = _check_timestamp_format(timestamp_format)
+            if column_error or format_error:
+                log.rows_imported = 0
+                log.rows_skipped = len(table.rows)
+                log.errors = [{"row": None, "error": error} for error in (column_error, format_error) if error]
+                log.save()
+                return log
+            _import_table_rows(
+                table,
+                log,
+                user,
+                zev,
+                batch_id,
+                resolved_cols,
+                timestamp_format,
+                has_header,
+                format_profile,
+                interval_minutes,
+                values_count,
+                overwrite_existing,
+            )
+            return log
+    except ImportFileError:
+        raise
+    except Exception as exc:
+        # The transaction rolled back the readings and the in-transaction log
+        # alike. Record the failed attempt as a separate log outside the
+        # transaction and report an actionable error instead of an
+        # unexplained server failure with no trace of the attempt.
+        ImportLog.objects.create(
+            batch_id=batch_id,
+            zev=zev,
+            imported_by=user,
+            source=ImportSource.CSV,
+            filename=filename,
+            rows_total=len(table.rows),
+            rows_imported=0,
+            rows_overwritten=0,
+            rows_skipped=len(table.rows),
+            errors=[{"row": None, "error": f"Import failed: {exc}"}],
+            warnings=[],
+        )
+        raise ImportFileError(f"Import failed: {exc}") from exc
+
+
+def _import_table_rows(
+    table,
+    log,
+    user,
+    zev,
+    batch_id,
+    resolved_cols,
+    timestamp_format,
+    has_header,
+    format_profile,
+    interval_minutes,
+    values_count,
+    overwrite_existing,
+):
+    """Row loop of import_csv; runs inside the import transaction."""
+    meter_lookup = {mp.meter_id: mp for mp in _meter_queryset_for_user(user, zev)}
 
     imported = 0
     skipped = 0
     overwritten = 0
-    errors = []
-    touched_metering_points = set()
+    errors: list[dict] = []
+    # Batched duplicate pre-check for daily rows (one range query per upload,
+    # not per row). Slots written earlier in this same file are tracked in
+    # written_daily so intra-file duplicates report the same slot-level error.
+    preexisting_daily: set = set()
+    written_daily: set = set()
+    if format_profile == "daily_15min" and not overwrite_existing:
+        preexisting_daily = _prefetch_daily_existing(table, resolved_cols, meter_lookup, timestamp_format)
 
     for idx, row in enumerate(table.rows):
         row_number = idx + (2 if has_header else 1)
+        meter_id = None
         try:
             if _is_missing(row[resolved_cols["meter_id"]]):
                 skipped += 1
-                add_error(errors, {"row": row_number, "error": "Missing meter_id value."})
+                add_error(errors, _csv_error(row_number, None, "Missing meter_id value."))
                 continue
 
             meter_id = str(row[resolved_cols["meter_id"]]).strip()
             if not meter_id:
                 skipped += 1
-                add_error(errors, {"row": row_number, "error": "Empty meter_id value."})
+                add_error(errors, _csv_error(row_number, None, "Empty meter_id value."))
                 continue
 
             mp = meter_lookup.get(meter_id)
@@ -559,101 +1026,157 @@ def import_csv(
                 skipped += 1
                 add_error(
                     errors,
-                    {
-                        "row": row_number,
-                        "error": f"Metering point '{meter_id}' not found or not accessible.",
-                    },
+                    _csv_error(
+                        row_number,
+                        meter_id,
+                        f"Metering point '{meter_id}' not found or not accessible.",
+                    ),
                 )
                 continue
-
-            touched_metering_points.add(mp)
 
             if format_profile == "daily_15min":
                 raw_day = row[resolved_cols["timestamp"]]
                 if _is_missing(raw_day):
                     skipped += 1
-                    add_error(errors, {"row": row_number, "error": "Missing date value for daily profile."})
+                    add_error(errors, _csv_error(row_number, meter_id, "Missing date value for daily profile."))
                     continue
 
                 day_start = _build_day_start(raw_day, timestamp_format)
                 start_pos = resolved_cols["energy_start"]
 
-                for slot in range(values_count):
-                    col_pos = start_pos + slot
-                    if col_pos >= table.width:
-                        skipped += 1
-                        add_error(
-                            errors,
-                            {
-                                "row": row_number,
-                                "error": (
-                                    f"Missing interval column at position {col_pos} "
-                                    f"(slot {slot + 1}/{values_count})."
-                                ),
-                            },
-                        )
+                # Shared validation with preview_csv: missing columns and
+                # invalid numerics reject the whole row (atomic); existing
+                # readings are skipped per slot so gap-filling keeps working
+                # without overwrite.
+                values, row_error = _parse_daily_values(row, start_pos, values_count, table.width)
+                if row_error is not None:
+                    skipped += 1
+                    add_error(errors, _csv_error(row_number, meter_id, row_error))
+                    continue
+                if all(value is None for value in values):
+                    skipped += 1
+                    add_error(errors, _csv_error(row_number, meter_id, "Row contains no interval values."))
+                    continue
+                slots: list = []
+                for slot, value in enumerate(values):
+                    if value is None:
+                        slots.append(None)
                         continue
-
-                    raw_energy = row[col_pos]
-                    if _is_missing(raw_energy) or str(raw_energy).strip() == "":
-                        continue
-
-                    energy_raw = _parse_decimal(raw_energy)
-                    direction, energy = _infer_direction_and_energy(mp.meter_type, energy_raw)
+                    direction, energy = _infer_direction_and_energy(mp.meter_type, value)
                     ts = day_start + timedelta(minutes=interval_minutes * slot)
-
-                    created = _upsert_reading(mp, ts, direction, energy, batch_id, overwrite_existing)
-                    if created:
-                        imported += 1
-                    elif overwrite_existing:
-                        overwritten += 1
-                    else:
-                        skipped += 1
-                        add_error(
-                            errors,
-                            {
-                                "row": row_number,
-                                "error": (
-                                    "Duplicate reading for metering_point + timestamp + direction "
-                                    f"(slot {slot + 1}/{values_count})."
-                                ),
-                            },
-                        )
-                continue
-
-            raw_ts = row[resolved_cols["timestamp"]]
-            if _is_missing(raw_ts):
-                skipped += 1
-                add_error(errors, {"row": row_number, "error": "Missing timestamp value."})
-                continue
-
-            if timestamp_format:
-                ts = datetime.strptime(str(raw_ts), timestamp_format).replace(tzinfo=timezone.utc)
-            elif isinstance(raw_ts, datetime):
-                ts = raw_ts if raw_ts.tzinfo else raw_ts.replace(tzinfo=timezone.utc)
-            else:
-                ts = _parse_datetime_utc(raw_ts)
-
-            energy_raw = _parse_decimal(row[resolved_cols["energy_kwh"]])
-
-            explicit_direction = None
-            direction_col = resolved_cols.get("direction")
-            if direction_col is not None:
-                raw_direction = _cell(row, direction_col)
-                if not _is_missing(raw_direction):
-                    explicit_direction = str(raw_direction).strip().lower()
-                    if explicit_direction and explicit_direction not in {"in", "out"}:
-                        skipped += 1
-                        add_error(
-                            errors,
-                            {
-                                "row": row_number,
-                                "error": f"Invalid direction '{explicit_direction}'. Expected 'in' or 'out'.",
-                            },
-                        )
+                    if not overwrite_existing and (
+                        (mp.id, ts, direction) in preexisting_daily
+                        or (mp.id, ts, direction) in written_daily
+                    ):
+                        slots.append(None)
                         continue
+                    slots.append((ts, direction, energy))
+                new_entries = [entry for entry in slots if entry is not None]
+                if not new_entries:
+                    skipped += 1
+                    add_error(
+                        errors,
+                        _csv_error(
+                            row_number,
+                            meter_id,
+                            "Duplicate reading for metering_point + timestamp + direction.",
+                        ),
+                    )
+                    continue
+                if overwrite_existing:
+                    row_imported = 0
+                    row_overwritten = 0
+                    with transaction.atomic():
+                        for entry in slots:
+                            if entry is None:
+                                continue
+                            ts, direction, energy = entry
+                            if _upsert_reading(mp, ts, direction, energy, batch_id, True):
+                                row_imported += 1
+                            else:
+                                row_overwritten += 1
+                    imported += row_imported
+                    overwritten += row_overwritten
+                else:
+                    # Fast path: one savepoint for the row, no per-slot
+                    # SELECTs — the batched prefetch above stays sufficient.
+                    # A late collision (a concurrent import winning a slot
+                    # after the prefetch) aborts the row savepoint; the
+                    # per-slot retry below then commits every slot that is
+                    # still free instead of losing the row's other new slots.
+                    # Whole-row validation rejects above stay atomic per row.
+                    row_imported = 0
+                    try:
+                        with transaction.atomic():
+                            for entry in slots:
+                                if entry is None:
+                                    continue
+                                ts, direction, energy = entry
+                                MeterReading.objects.create(
+                                    metering_point=mp,
+                                    timestamp=ts,
+                                    direction=direction,
+                                    energy_kwh=energy,
+                                    import_source=ImportSource.CSV,
+                                    import_batch=batch_id,
+                                )
+                                row_imported += 1
+                    except IntegrityError:
+                        row_imported = 0
+                        for entry in slots:
+                            if entry is None:
+                                continue
+                            ts, direction, energy = entry
+                            try:
+                                with transaction.atomic():
+                                    MeterReading.objects.create(
+                                        metering_point=mp,
+                                        timestamp=ts,
+                                        direction=direction,
+                                        energy_kwh=energy,
+                                        import_source=ImportSource.CSV,
+                                        import_batch=batch_id,
+                                    )
+                            except IntegrityError:
+                                # Absorbed late collision: the row still
+                                # succeeds with its surviving slots.
+                                continue
+                            row_imported += 1
+                            written_daily.add((mp.id, ts, direction))
+                    else:
+                        for entry in slots:
+                            if entry is not None:
+                                ts, direction, _ = entry
+                                written_daily.add((mp.id, ts, direction))
+                    if row_imported == 0:
+                        # Nothing survived (every remaining slot collided
+                        # after the prefetch): same duplicate report as a
+                        # fully existing row.
+                        skipped += 1
+                        add_error(
+                            errors,
+                            _csv_error(
+                                row_number,
+                                meter_id,
+                                "Duplicate reading for metering_point + timestamp + direction.",
+                            ),
+                        )
+                    else:
+                        imported += row_imported
+                continue
 
-            direction, energy = _infer_direction_and_energy(mp.meter_type, energy_raw, explicit_direction)
+            # Shared with preview_csv via _interpret_standard_row: timestamps,
+            # values and directions validate identically in both paths.
+            ts, direction, energy, row_error = _interpret_standard_row(
+                row,
+                resolved_cols=resolved_cols,
+                timestamp_format=timestamp_format,
+                meter_type=mp.meter_type,
+            )
+            if row_error is not None:
+                skipped += 1
+                add_error(errors, _csv_error(row_number, meter_id, row_error))
+                continue
 
             created = _upsert_reading(mp, ts, direction, energy, batch_id, overwrite_existing)
             if created:
@@ -664,25 +1187,35 @@ def import_csv(
                 skipped += 1
                 add_error(
                     errors,
-                    {
-                        "row": row_number,
-                        "error": "Duplicate reading for metering_point + timestamp + direction.",
-                    },
+                    _csv_error(
+                        row_number,
+                        meter_id,
+                        "Duplicate reading for metering_point + timestamp + direction.",
+                    ),
                 )
+        except IntegrityError:
+            # A concurrent standard-profile insert can win between the
+            # get_or_create read and insert. Treat it like any other duplicate.
+            add_error(
+                errors,
+                _csv_error(
+                    row_number,
+                    meter_id,
+                    "Duplicate reading for metering_point + timestamp + direction.",
+                ),
+            )
+            skipped += 1
         except (KeyError, InvalidOperation, TypeError, ValueError) as exc:
-            add_error(errors, {"row": row_number, "error": str(exc)})
+            add_error(errors, _csv_error(row_number, meter_id, str(exc)))
             skipped += 1
 
-    log.zev = _infer_log_zev(touched_metering_points)
     log.rows_imported = imported + overwritten
+    log.rows_overwritten = overwritten
     log.rows_skipped = skipped
+    warnings: list[dict] = []
     if overwritten > 0:
-        # Prepended after the loop, when the cap may already be reached: trim
-        # the oldest payload so the note cannot push the list past the cap or
-        # displace the truncation note (which stays last).
-        errors.insert(0, {"row": None, "error": f"Overwrote {overwritten} existing readings."})
-        if len(errors) > MAX_REPORTED_ERRORS + 1:
-            del errors[1]
+        warnings.append({"row": None, "warning": f"Overwrote {overwritten} existing readings."})
     log.errors = errors
+    log.warnings = warnings
     log.save()
     return log

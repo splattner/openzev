@@ -4,6 +4,7 @@ import {
   bulkDeleteImportLogs,
   fetchChartData,
   fetchMeteringDataQualityStatus,
+  previewCsvImport,
   uploadMeteringFile,
 } from '../src/lib/api/metering'
 import { api } from '../src/lib/api/client'
@@ -137,5 +138,17 @@ describe('metering api module', () => {
     })
 
     expect(result.id).toBe('import-1')
+  })
+
+  it.each([false, true])('sends the target and overwrite mode (%s) with the preview', async (overwriteExisting) => {
+    apiMock.onPost('/metering/import/preview-csv/').reply((config) => {
+      const formData = config.data as FormData
+      expect(formData.get('zev_id')).toBe('zev-1')
+      expect(formData.get('overwrite_existing')).toBe(String(overwriteExisting))
+      return [200, { rows_total: 0, preview_rows: [], summary: {}, missing_meter_ids: [], errors: [] }]
+    })
+
+    const file = new File(['meter,data'], 'readings.csv', { type: 'text/csv' })
+    await previewCsvImport({ file, zevId: 'zev-1', overwriteExisting })
   })
 })

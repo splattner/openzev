@@ -1,6 +1,8 @@
-import { useState, type ReactNode } from 'react'
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useToast } from '../lib/toast'
+import { Z_MODAL } from '../lib/zLayers'
+import { focusables, isTopModal, modalDepth, useModalStack } from './FormModal'
 
 interface ConfirmDialogOptions {
     title: string
@@ -61,6 +63,55 @@ export function ConfirmDialog({
     onCancel,
 }: ConfirmDialogOptions & { isLoading?: boolean; onConfirm: () => void; onCancel: () => void }) {
     const { t } = useTranslation()
+    const stackId = useModalStack()
+    const titleId = useId()
+    const dialogRef = useRef<HTMLDivElement>(null)
+    const restoreRef = useRef<HTMLElement | null>(null)
+    const onCancelRef = useRef(onCancel)
+    useEffect(() => {
+        onCancelRef.current = onCancel
+    }, [onCancel])
+    // Top-most only: Escape/Tab belong to this dialog while it sits above
+    // other modals (e.g. overwrite confirmation over the import wizard).
+    // Auto-focus keeps keyboard users inside the confirmation.
+    useEffect(() => {
+        // StrictMode replays effects while the dialog already has focus.
+        // Preserve the original opener instead of remembering the dialog itself.
+        if (document.activeElement instanceof HTMLElement && !dialogRef.current?.contains(document.activeElement)) {
+            restoreRef.current = document.activeElement
+        }
+        dialogRef.current?.focus()
+        const onKeyDown = (event: KeyboardEvent) => {
+            if (!isTopModal(stackId) || event.defaultPrevented) return
+            if (event.key === 'Escape') {
+                event.preventDefault()
+                onCancelRef.current()
+                return
+            }
+            if (event.key !== 'Tab' || !dialogRef.current) return
+            const items = focusables(dialogRef.current)
+            if (items.length === 0) return
+            const first = items[0]
+            const last = items[items.length - 1]
+            const active = document.activeElement as Node | null
+            const inside = active !== null && dialogRef.current.contains(active)
+            if (event.shiftKey && (!inside || document.activeElement === first)) {
+                event.preventDefault()
+                last.focus()
+            } else if (!event.shiftKey && (!inside || document.activeElement === last)) {
+                event.preventDefault()
+                first.focus()
+            }
+        }
+        document.addEventListener('keydown', onKeyDown)
+        return () => {
+            document.removeEventListener('keydown', onKeyDown)
+            const active = document.activeElement
+            if (active instanceof HTMLElement && active !== document.body && document.contains(active)) return
+            if (restoreRef.current && document.contains(restoreRef.current)) restoreRef.current.focus()
+        }
+    }, [stackId])
+    const depth = Math.max(0, modalDepth(stackId))
     return (
         <div
             style={{
@@ -70,20 +121,26 @@ export function ConfirmDialog({
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                zIndex: 1000,
+                zIndex: Z_MODAL + depth,
             }}
             onClick={onCancel}
         >
             <div
+                ref={dialogRef}
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby={titleId}
+                tabIndex={-1}
                 className="card"
                 style={{
                     maxWidth: '400px',
                     padding: '2rem',
                     animation: 'fadeIn 0.2s ease',
+                    outline: 'none',
                 }}
                 onClick={(e) => e.stopPropagation()}
             >
-                <h3 style={{ marginBottom: '1rem' }}>{title}</h3>
+                <h3 id={titleId} style={{ marginBottom: '1rem' }}>{title}</h3>
                 <p style={{ marginBottom: '1.5rem', color: 'var(--text-body)', lineHeight: '1.5' }}>{message}</p>
                 {children ? <div className="form-grid" style={{ marginBottom: '1.5rem' }}>{children}</div> : null}
                 <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>

@@ -1164,13 +1164,17 @@ export interface ImportLog {
     id: string
     batch_id?: string
     zev?: string
+    zev_name?: string | null
     imported_by?: number | null
+    imported_by_display?: string | null
     filename: string
     rows_total?: number
     rows_imported: number
+    rows_overwritten: number
     rows_skipped: number
     source: string
-    errors?: Array<{ row: number | null; error: string }>
+    errors?: Array<{ row: number | null; error: string; meter_id?: string | null }>
+    warnings?: Array<{ row: number | null; warning: string }>
     created_at: string
 }
 
@@ -1178,6 +1182,7 @@ export interface ImportDeletionResult {
     deleted_logs: number
     deleted_readings: number
     mode?: 'all' | 'period'
+    timezone?: 'UTC'
 }
 
 export interface ImportPreviewRow {
@@ -1199,7 +1204,10 @@ export interface ImportPreviewResult {
         existing_metering_points: number
         missing_metering_points: number
         rows_previewed: number
+        rows_skipped_existing: number
+        readings_existing: number
     }
+    missing_meter_ids: string[]
     errors: Array<{ row: number | null; error: string }>
 }
 
