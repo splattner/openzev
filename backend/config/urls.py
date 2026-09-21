@@ -18,6 +18,7 @@ urlpatterns = [
     path("api/v1/public/", include("zev.urls_public")),
     path("api/v1/audit/", include("audit.urls")),
     path("api/v1/exports/", include("exports.urls")),
+    path("api/v1/backups/", include("backups.urls")),
     path("api/v1/feasibility/", include("feasibility.urls")),
     # OpenAPI schema & docs
     path("api/schema/", SpectacularAPIView.as_view(), name="schema"),

@@ -44,3 +44,11 @@ TRANSFER_MAX_DECOMPRESSED_MB = 500
 # Run Celery tasks inline: the suite has no broker, and a task that is queued
 # but never run is a notification the tests could not observe.
 CELERY_TASK_ALWAYS_EAGER = True
+
+# Backup settings come from the environment; pin them so a developer's local
+# .env cannot change what the suite observes. Tests that need a key or S3
+# credentials override them explicitly.
+BACKUP_ENCRYPTION_KEYS = []
+BACKUP_S3_ACCESS_KEY_ID = ""
+BACKUP_S3_SECRET_ACCESS_KEY = ""
+BACKUP_WORK_DIR = ""

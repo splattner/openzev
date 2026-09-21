@@ -50,6 +50,7 @@ INSTALLED_APPS = [
     "feasibility",
     "allocation",
     "exports",
+    "backups",
 ]
 
 MIDDLEWARE = [
@@ -135,6 +136,11 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 
 MEDIA_URL = "/media/"
 MEDIA_ROOT = Path(env("MEDIA_ROOT", default=str(BASE_DIR / "media")))
+
+# Release version, recorded in backup manifests for humans. Purely
+# informational: compatibility is decided by the recorded migration state, not
+# by this string, so leaving it unset is fine.
+OPENZEV_VERSION = env("OPENZEV_VERSION", default="")
 
 # Named in transfer-archive manifests so an imported archive says which
 # instance it came from. Empty on a single-instance deployment.
@@ -312,3 +318,23 @@ EXPORT_RETENTION_HOURS = env.int("EXPORT_RETENTION_HOURS", default=24)
 # runs a grace above it). Rendering is serial per job, so this bounds how
 # long one job may occupy a worker before it is failed as stalled.
 EXPORT_RUNNER_TIMEOUT_S = env.int("EXPORT_RUNNER_TIMEOUT_S", default=1800)
+
+# ── Backups (SPEC-2026-09-backup-and-restore, ADR 0023 / 0024) ────────────────
+# Optional, rotatable keys for backup artifacts and stored destination secrets.
+# The first key encrypts; every key can decrypt. Deliberately independent of
+# MFA_ENCRYPTION_KEYS and SECRET_KEY (ADR 0024). With none set, archives are
+# written in the clear and every surface says so.
+BACKUP_ENCRYPTION_KEYS = env.list("BACKUP_ENCRYPTION_KEYS", default=[])
+
+# S3 credentials from the environment override any stored on a destination, so
+# a hardened deployment can keep them out of the database entirely.
+BACKUP_S3_ACCESS_KEY_ID = env("BACKUP_S3_ACCESS_KEY_ID", default="")
+BACKUP_S3_SECRET_ACCESS_KEY = env("BACKUP_S3_SECRET_ACCESS_KEY", default="")
+
+# Where archives are assembled before they are moved to their destination. Must
+# have room for one full archive (and a second copy while encrypting).
+BACKUP_WORK_DIR = env("BACKUP_WORK_DIR", default="")
+
+# Soft time budget for one backup run, in seconds (a hard limit runs a grace
+# above it), as EXPORT_RUNNER_TIMEOUT_S does for export jobs.
+BACKUP_RUNNER_TIMEOUT_S = env.int("BACKUP_RUNNER_TIMEOUT_S", default=10800)

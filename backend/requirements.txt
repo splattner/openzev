@@ -2,6 +2,8 @@ amqp==5.3.1
 asgiref==3.12.1
 attrs==26.1.0
 billiard==4.2.4
+boto3==1.43.98  # direct: S3-compatible backup destinations (SPEC-2026-09-backup-and-restore)
+botocore==1.43.98
 brotli==1.2.0
 cbor2==6.1.4
 celery==5.6.3
@@ -32,6 +34,7 @@ gunicorn==26.0.0
 inflection==0.5.1
 iniconfig==2.3.0
 iso3166==3.0.0
+jmespath==1.1.0
 jsonschema==4.26.0
 jsonschema-specifications==2025.9.1
 kombu==5.6.2
@@ -66,6 +69,7 @@ redis==8.1.0
 referencing==0.37.0
 rpds-py==0.30.0
 ruff==0.16.1
+s3transfer==0.19.2
 six==1.17.0
 sqlparse==0.5.5
 svgwrite==1.4.3
@@ -74,6 +78,7 @@ tinyhtml5==2.1.0
 tzdata==2026.3
 tzlocal==5.4.4
 uritemplate==4.2.0
+urllib3==2.7.0
 vine==5.1.0
 wcwidth==0.8.2
 weasyprint==70.0
