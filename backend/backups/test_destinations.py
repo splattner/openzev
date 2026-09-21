@@ -340,3 +340,35 @@ class DestinationPersistenceTests(TestCase):
         raw = bytes(BackupDestination.objects.get(pk=destination.pk).secret_access_key_encrypted)
         self.assertNotIn(b"persisted-plaintext", raw)
         self.assertTrue(crypto.decrypt_secret(raw) == "persisted-plaintext")
+
+
+class ProviderErrorCodeTests(SimpleTestCase):
+    """The provider's error ``Code`` reaches the message only if it looks like one.
+
+    An S3-compatible endpoint is operator-configured but not trusted to be
+    well-behaved: nothing it returns may be relayed to the browser verbatim.
+    """
+
+    def explain(self, code):
+        error = ClientError({"Error": {"Code": code, "Message": "ignored"}}, "PutObject")
+        return storage._explain_s3(error)
+
+    def test_an_ordinary_unrecognised_code_is_named_because_it_helps_diagnosis(self):
+        self.assertIn("SlowDown", self.explain("SlowDown"))
+
+    def test_a_code_that_is_not_shaped_like_a_code_is_never_relayed(self):
+        for hostile in (
+            "<script>alert(1)</script>",
+            "Line one\nLine two",
+            "x" * 500,
+            "Traceback (most recent call last): password=hunter2",
+            "has spaces",
+        ):
+            with self.subTest(code=hostile[:30]):
+                message = self.explain(hostile)
+                self.assertNotIn(hostile[:20], message)
+                self.assertIn("unknown error", message)
+                self.assertLess(len(message), 120)
+
+    def test_a_missing_code_is_reported_as_unknown(self):
+        self.assertIn("unknown error", self.explain(""))

@@ -121,6 +121,9 @@ class BackupDestinationTestView(APIView):
         try:
             probe_destination(destination)
         except DestinationError as exc:
+            # Deliberate: a DestinationError is never a traceback. Its message is
+            # written to be shown (see storage.py) and never carries credentials
+            # or a raw provider response; anything else is a 500, not this branch.
             return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
         return Response({"ok": True})
 
@@ -253,6 +256,8 @@ class BackupStatusView(APIView):
             key_problem = ""
         except crypto.BackupCryptoError as exc:
             # A configured-but-unusable key must be visible, not read as "no key".
+            # The message is one of the fixed sentences in crypto.py, never a
+            # traceback, and never contains key material.
             encrypted, fingerprint, key_problem = False, "", str(exc)
 
         last_ok = (

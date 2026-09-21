@@ -11,6 +11,7 @@ a raw provider response.
 from __future__ import annotations
 
 import os
+import re
 import shutil
 import uuid
 from pathlib import Path
@@ -88,6 +89,10 @@ def _probe_local(destination) -> None:
 
 # ── S3 ───────────────────────────────────────────────────────────────────────
 
+# What a real S3 error code looks like (``AccessDenied``, ``SlowDown``,
+# ``RequestTimeTooSkewed``). Anything else from the endpoint is not relayed.
+_ERROR_CODE = re.compile(r"[A-Za-z0-9_.-]{1,64}")
+
 _S3_MESSAGES = {
     "AccessDenied": "Access denied: these credentials cannot write to the bucket.",
     "NoSuchBucket": "The bucket does not exist.",
@@ -106,7 +111,13 @@ def _explain_s3(exc: Exception) -> str:
 
     if isinstance(exc, ClientError):
         code = str(exc.response.get("Error", {}).get("Code", ""))
-        return _S3_MESSAGES.get(code, f"The storage service refused the request ({code or 'unknown error'}).")
+        if code in _S3_MESSAGES:
+            return _S3_MESSAGES[code]
+        # An operator-configured endpoint is not trusted to be well-behaved, so
+        # an unrecognised code is named only if it is shaped like one. It helps
+        # diagnosis; arbitrary text from the far end has no business in a response.
+        label = code if _ERROR_CODE.fullmatch(code) else "unknown error"
+        return f"The storage service refused the request ({label})."
     if isinstance(exc, NoCredentialsError):
         return (
             "No credentials were found. Set an access key and secret, set "
