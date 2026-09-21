@@ -24,10 +24,12 @@ sections stream through ``QuerySet.iterator()`` into a compressing zip member.
 from __future__ import annotations
 
 import contextlib
+import datetime
 import hashlib
 import io
 import json
 import tempfile
+import uuid
 import zipfile
 from collections.abc import Iterable, Iterator
 from pathlib import PurePosixPath
@@ -37,6 +39,7 @@ from django.apps import apps
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core import serializers
+from django.core.serializers.json import DjangoJSONEncoder
 from django.core.files.storage import default_storage
 from django.db import connection, transaction
 from django.db.migrations.recorder import MigrationRecorder
@@ -79,6 +82,21 @@ class ArchiveError(ValueError):
 
 
 # ── writing ──────────────────────────────────────────────────────────────────
+
+class _ExactJSONEncoder(DjangoJSONEncoder):
+    """``DjangoJSONEncoder`` without its millisecond truncation of datetimes.
+
+    Django trims ``datetime`` values to three decimal places, which is right for
+    fixtures and wrong for a backup: a restored row must equal the stored one,
+    and PostgreSQL keeps microseconds.
+    """
+
+    def default(self, o):
+        if isinstance(o, datetime.datetime):
+            value = o.isoformat()
+            return value.removesuffix("+00:00") + "Z" if value.endswith("+00:00") else value
+        return super().default(o)
+
 
 class _HashingWriter(io.RawIOBase):
     """A write-only file that forwards to ``target`` and digests what passes."""
@@ -156,7 +174,9 @@ class _Writer:
             for label, instances in parts:
                 model = apps.get_model(label)
                 counted = _Counted(instances)
-                serializers.serialize("jsonl", counted, stream=text, fields=_serialized_fields(model))
+                serializers.serialize(
+                    "jsonl", counted, stream=text, fields=_serialized_fields(model), cls=_ExactJSONEncoder
+                )
                 per_model[label] = counted.count
             text.flush()
             text.detach()
@@ -426,64 +446,85 @@ def open_archive(source: BinaryIO) -> Iterator[zipfile.ZipFile]:
         yield archive
 
 
-def verify_archive(source: BinaryIO) -> dict:
-    """Check a backup end to end without restoring anything.
+def expected_sections(manifest: dict) -> list[str]:
+    """Every section member a complete backup of this manifest's scope must carry.
 
-    Every member listed in the manifest must exist with the recorded SHA-256 and
-    size, every JSON Lines section must hold the recorded number of records, the
-    manifest's per-section counts must agree with the members, and nothing may
-    be in the archive that the manifest does not vouch for. ZIP CRC32 alone is
-    not enough for an artifact that crosses a network and sits in a bucket for
-    months, hence the SHA-256 (SPEC-2026-09-backup-and-restore §8).
+    The per-member checksums prove the archive is what its manifest says; this
+    proves the manifest itself is not missing a section. Without it, an archive
+    whose ``accounts`` section was dropped from members *and* manifest would
+    verify cleanly and restore as an instance with no users.
+    """
+    names: list[str] = []
+    if manifest["scope"] == SCOPE_INSTANCE:
+        names += [f"instance/{name}.jsonl" for name, _ in INSTANCE_SECTIONS]
+        names += [f"instance/{name}.jsonl" for name, _ in UNSCOPED_SECTIONS]
+    for entry in manifest["zevs"]:
+        base = f"zevs/{entry.get('id')}"
+        names += [f"{base}/{name}.jsonl" for name, _ in ZEV_SECTIONS]
+        names.append(f"{base}/account_refs.json")
+    return names
 
-    Returns ``{"manifest", "members", "records"}``; raises ``ArchiveError`` with
-    the failures listed otherwise.
+
+def verify_open_archive(archive: zipfile.ZipFile) -> dict:
+    """``verify_archive`` for an archive that is already open (and decrypted).
+
+    Restore opens the archive once and verifies and loads from the same handle,
+    so an encrypted backup is decrypted once, not twice.
     """
     failures: list[str] = []
 
     def fail(message: str) -> None:
         failures.append(message)
 
-    with open_archive(source) as archive:
-        manifest = read_manifest(archive)
-        listed = manifest["members"]
-        present = set(archive.namelist()) - {MANIFEST_NAME}
+    manifest = read_manifest(archive)
+    listed = manifest["members"]
+    present = set(archive.namelist()) - {MANIFEST_NAME}
 
-        for name in sorted(present - set(listed)):
-            fail(f"{name}: present in the archive but not in the manifest")
+    for entry in manifest["zevs"]:
+        try:
+            uuid.UUID(str(entry.get("id")))
+        except ValueError:
+            # The id becomes part of member paths, so it must be exactly a UUID.
+            raise ArchiveError("The backup manifest names a community with an invalid id.") from None
 
-        records_seen = 0
-        for name, expected in sorted(listed.items()):
-            if name not in present:
-                fail(f"{name}: listed in the manifest but missing from the archive")
-                continue
-            digest = hashlib.sha256()
-            size = lines = 0
-            try:
-                with archive.open(name) as member:
-                    while block := member.read(_COPY_BLOCK):
-                        digest.update(block)
-                        size += len(block)
-                        if "records" in expected:
-                            lines += block.count(b"\n")
-            except (zipfile.BadZipFile, OSError) as exc:
-                fail(f"{name}: unreadable ({exc})")
-                continue
-            if digest.hexdigest() != expected.get("sha256"):
-                fail(f"{name}: checksum mismatch")
-            elif size != expected.get("bytes"):
-                fail(f"{name}: size mismatch")
-            if "records" in expected:
-                records_seen += lines
-                if lines != expected["records"]:
-                    fail(f"{name}: expected {expected['records']} records, found {lines}")
+    for name in sorted(present - set(listed)):
+        fail(f"{name}: present in the archive but not in the manifest")
+    for name in expected_sections(manifest):
+        if name not in listed:
+            fail(f"{name}: a backup of this scope must contain it, but the manifest has no such member")
 
-        for section, count in sorted(manifest["counts"].items()):
-            member = listed.get(f"{section}.jsonl")
-            if member is None:
-                fail(f"{section}: counted in the manifest but has no member")
-            elif member.get("records") != count:
-                fail(f"{section}: manifest counts {count} but the member records {member.get('records')}")
+    records_seen = 0
+    for name, expected in sorted(listed.items()):
+        if name not in present:
+            fail(f"{name}: listed in the manifest but missing from the archive")
+            continue
+        digest = hashlib.sha256()
+        size = lines = 0
+        try:
+            with archive.open(name) as member:
+                while block := member.read(_COPY_BLOCK):
+                    digest.update(block)
+                    size += len(block)
+                    if "records" in expected:
+                        lines += block.count(b"\n")
+        except (zipfile.BadZipFile, OSError) as exc:
+            fail(f"{name}: unreadable ({exc})")
+            continue
+        if digest.hexdigest() != expected.get("sha256"):
+            fail(f"{name}: checksum mismatch")
+        elif size != expected.get("bytes"):
+            fail(f"{name}: size mismatch")
+        if "records" in expected:
+            records_seen += lines
+            if lines != expected["records"]:
+                fail(f"{name}: expected {expected['records']} records, found {lines}")
+
+    for section, count in sorted(manifest["counts"].items()):
+        member = listed.get(f"{section}.jsonl")
+        if member is None:
+            fail(f"{section}: counted in the manifest but has no member")
+        elif member.get("records") != count:
+            fail(f"{section}: manifest counts {count} but the member records {member.get('records')}")
 
     if failures:
         raise ArchiveError(
@@ -492,3 +533,21 @@ def verify_archive(source: BinaryIO) -> dict:
             total_failures=len(failures),
         )
     return {"manifest": manifest, "members": len(listed), "records": records_seen}
+
+
+def verify_archive(source: BinaryIO) -> dict:
+    """Check a backup end to end without restoring anything.
+
+    Every member listed in the manifest must exist with the recorded SHA-256 and
+    size, every JSON Lines section must hold the recorded number of records, the
+    manifest's per-section counts must agree with the members, every section a
+    backup of that scope must carry is present, and nothing may be in the
+    archive that the manifest does not vouch for. ZIP CRC32 alone is not enough
+    for an artifact that crosses a network and sits in a bucket for months,
+    hence the SHA-256 (SPEC-2026-09-backup-and-restore §8).
+
+    Returns ``{"manifest", "members", "records"}``; raises ``ArchiveError`` with
+    the failures listed otherwise.
+    """
+    with open_archive(source) as archive:
+        return verify_open_archive(archive)

@@ -6,6 +6,7 @@ the coverage tests here are what keep the archive honest as the schema grows.
 """
 
 import base64
+import datetime
 import io
 import json
 import tempfile
@@ -32,7 +33,7 @@ from backups.registry import (
 )
 from invoices.models import ContractIssue, Invoice
 from metering.models import ImportLog, MeterReading
-from zev.models import Participant
+from zev.models import Participant, Zev
 from zev.test_transfer import rewrite_archive
 from zev.transfer import build_archive as build_transfer_archive
 
@@ -106,6 +107,13 @@ class ArchiveShapeTests(TestCase):
 
         readings = {row["pk"] for row in read_jsonl(self.raw, f"zevs/{alpha.pk}/readings.jsonl")}
         self.assertEqual(readings, {str(r.pk) for r in MeterReading.objects.filter(metering_point__zev=alpha)})
+
+    def test_timestamps_keep_their_microseconds(self):
+        """Django's own encoder trims to milliseconds; a restored row must equal the stored one."""
+        zev_row = read_jsonl(self.raw, f"zevs/{self.world.alpha.pk}/zev.jsonl")[0]
+        stored = Zev.objects.get(pk=self.world.alpha.pk)
+        self.assertNotEqual(stored.created_at.microsecond % 1000, 0, "fixture needs sub-millisecond precision")
+        self.assertEqual(datetime.datetime.fromisoformat(zev_row["fields"]["created_at"]), stored.created_at)
 
     def test_integer_keyed_instance_rows_keep_their_keys_too(self):
         users = {row["pk"] for row in read_jsonl(self.raw, "instance/accounts.jsonl") if row["model"] == "accounts.user"}

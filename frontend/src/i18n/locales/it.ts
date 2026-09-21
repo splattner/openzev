@@ -2423,7 +2423,7 @@ export const it = {
         },
         backups: {
             intro: 'Eseguite il backup dell\'intera istanza o di una singola comunità in una cartella locale o in uno storage compatibile con S3. Un backup contiene tutto il necessario per ricostruirla: account, impostazioni, serie di prezzi, fatture con i relativi PDF, contratti emessi e registro di audit.',
-            restoreNotice: 'Il ripristino da un backup non è ancora disponibile nell\'app. Conservate i vostri backup e verificatene uno in qualsiasi momento con {{command}}.',
+            restoreNotice: 'Un\'intera istanza si ripristina sul server con {{restoreCommand}} (aggiungete --dry-run per verificare prima). Il ripristino di una singola comunità da questa pagina non è ancora disponibile. Verificate un backup in qualsiasi momento con {{command}}.',
             status: {
                 encrypted: 'I backup sono cifrati (chiave {{fingerprint}}).',
                 unencryptedTitle: 'I backup non sono cifrati',

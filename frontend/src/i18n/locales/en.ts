@@ -2434,7 +2434,7 @@ export const en = {
         },
         backups: {
             intro: 'Back up the whole instance or a single community to a local directory or S3-compatible storage. A backup holds everything needed to rebuild it: accounts, settings, price series, invoices with their PDFs, issued contracts and the audit trail.',
-            restoreNotice: 'Restoring from a backup is not available in the app yet. Keep your backups, and check one at any time with {{command}}.',
+            restoreNotice: 'A whole instance is restored on the server with {{restoreCommand}} (add --dry-run to check first). Restoring a single community from this page is not available yet. Check a backup at any time with {{command}}.',
             status: {
                 encrypted: 'Backups are encrypted (key {{fingerprint}}).',
                 unencryptedTitle: 'Backups are not encrypted',

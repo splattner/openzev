@@ -18,7 +18,7 @@
 | Phase | Status | Notes |
 |---|---|---|
 | 1 — back up | **Implemented** | Archive writer, encryption, checksums, destinations, `BackupJob`, `openzev_backup`, `openzev_backup_verify`, admin API and `backup` tab. Sections 4.1, 4.2, 5, 6.1–6.3, 7 and 9 describe what shipped. |
-| 2 — restore the instance | Planned | §6.5. |
+| 2 — restore the instance | **Implemented** | `restore.py`, `openzev_restore --mode instance`, `storage.fetch_archive`. §6.5 describes what shipped; deviations 10–15 below. CLI only, as designed. |
 | 3 — restore one ZEV | Planned | §4.3, §6.6. |
 | 4 — operate | Planned | §6.4, retention fields, verify endpoint, staleness. |
 
@@ -29,7 +29,7 @@ match the code**; the differences and their reasons are listed in
 
 ### Deviations from the first design
 
-Made while implementing phase 1; each is reflected in the sections below.
+Made while implementing phases 1 and 2; each is reflected in the sections below.
 
 1. **Sections are JSON Lines written by Django's serializer, not hand-written field
    lists, and readings are JSON Lines too, not per-meter CSV.** Every concrete
@@ -63,6 +63,34 @@ Made while implementing phase 1; each is reflected in the sections below.
 9. **The manifest's `members` carry `records` and per-model counts** for JSON Lines
    members, so verification can check counts without the manifest having to be
    cross-referenced.
+10. **Instance restore requires the database schema to equal the archive's, and does
+    not migrate for you.** The first design said the restore would `migrate` to the
+    archive's state. Rows are loaded through the *current* models, so a code-newer
+    schema would silently drop or default columns the archive does not have. The
+    restore instead compares the applied migrations of the apps that own backed-up
+    tables (`accounts`, `audit`, `invoices`, `metering`, `tariffs`, `zev`) with the
+    manifest and refuses on any difference, in words that say which way it differs and
+    the `migrate <app> <migration>` steps that fix it. Other apps (a library
+    upgrading its own tables) do not block a restore. Restoring across a schema
+    change is therefore "restore into the old schema, then `migrate`".
+11. **`RestoreJob` is phase 3.** Instance restore is a CLI action with no row; it
+    reports on stdout and records one audit event. The model exists for the API-driven
+    per-ZEV restore.
+12. **Verification also requires every section a backup of that scope must carry**
+    (`archive.expected_sections`). Per-member checksums prove an archive is what its
+    manifest says; they cannot notice a manifest that omits `instance/accounts.jsonl`
+    together with the member. A new registry section must therefore bump
+    `FORMAT_VERSION` or be read as optional.
+13. **`--from` accepts `s3://bucket/key`** with `--endpoint-url` and `--region`,
+    authenticated from `BACKUP_S3_*` or the environment's own credentials. A fresh
+    installation has no saved destinations to name (they are not backed up).
+14. **`--dry-run` refuses exactly when the real run would**, including on a non-empty
+    instance; `--dry-run --force` reports what would be replaced. It reads and
+    deserializes every record, so a schema mismatch is found before any write.
+15. **Datetimes are serialized with full microsecond precision**
+    (`archive._ExactJSONEncoder`). Django's own JSON encoder trims to milliseconds,
+    which a round-trip test against the stored rows caught: a restored row must equal
+    the stored one. Found by the phase 2 tests, fixed in the phase 1 writer.
 
 ## 1. Problem and outcome
 
@@ -502,37 +530,78 @@ destination. `openzev_backup_verify FILE` runs `verify_archive`.
 ### 6.5 Instance restore — `manage.py openzev_restore --mode instance`
 
 ```
-manage.py openzev_restore --mode instance --from <path|s3://…> [--dry-run] [--force]
+manage.py openzev_restore --mode instance --from <path|s3://bucket/key>
+                          [--endpoint-url URL] [--region R] [--dry-run] [--force]
 ```
 
-1. **Read and verify.** Decrypt if needed; verify every member checksum and count
-   against the manifest. Any mismatch aborts before a write.
-2. **Compatibility preflight.**
-   - `kind` must be `backup`; a transfer archive is refused by name.
-   - `format_version` must be supported.
-   - `migrations`: every migration in the archive must exist in the code. A backup
-     containing migrations this code does not know is **newer than the code** and
-     is refused — that is the unsafe direction. Code newer than the backup is
-     fine; migrations run forward afterwards.
-   - `secret_fingerprints.mfa_encryption_keys`: if no configured key matches,
-     **warn loudly** and name the fingerprint. TOTP secrets in the archive will
-     not decrypt. Proceeds — recovery codes and admin reset remain as escapes
-     (ADR 0021) — but the operator learns it now, not from a locked-out user.
-3. **Empty-instance guard.** Refuse when any `Zev` or non-superuser `User` exists,
-   unless `--force`.
-4. **Load**, inside one transaction: `migrate` to the archive's state → instance
-   sections → per-ZEV sections in the transfer archive's dependency order
-   (`zev`, `participants`, `metering_points`, `tariffs`, `readings`, `invoices`)
-   → audit events. Primary keys are preserved throughout.
-5. **Restore media** into `MEDIA_ROOT`, verifying each file's checksum.
-6. **Reconcile sequences.** Integer-keyed models (`User`, `VatRate`,
-   `PdfTemplate`, `EmailTemplate`, `OAuthProvider`, `FeatureFlag`,
-   `InvoiceDynamicSourceEvidence`, `DynamicPricePoint`) keep their keys, so each
-   sequence is set past its table's maximum — otherwise the next insert collides.
-7. **Report and audit** (`source=MANAGEMENT_COMMAND`), with per-section counts.
+`backups.restore.restore_instance(source, dry_run, force, progress)` does the work;
+the command adds argument handling, the S3 download (to `BACKUP_WORK_DIR`, removed
+afterwards) and the report. Everything is checked before the first write, and every
+write is one transaction.
 
-`--dry-run` performs steps 1–3 and prints what step 4 would create, touching
-nothing.
+1. **Open and verify.** Decrypt once (to a temporary file) and run
+   `archive.verify_open_archive` on that handle: every member's SHA-256, size and
+   record count, the manifest's counts, no unvouched member, every section the scope
+   requires. Any failure aborts before a write.
+2. **Compatibility preflight** (`RestoreError`, `ArchiveError`):
+   - `kind` must be `backup` (a transfer archive is refused by name) and
+     `format_version` supported.
+   - `scope` must be `instance`; a single-community backup is refused.
+   - **Migrations** (`restore.check_migrations`): for the apps that own backed-up
+     tables, the applied set must equal the archive's. A migration the code does not
+     know → *newer version of OpenZEV* (unsafe direction, refused). One the archive
+     has but the database has not applied → *run `migrate`*. One the database has and
+     the archive lacks → *schema is newer than the backup*, naming the
+     `migrate <app> <migration>` steps back. See deviation 10.
+   - **MFA keys** (`restore.key_warnings`): when the archive holds TOTP devices and
+     none of its `secret_fingerprints.mfa_encryption_keys` is configured here, a
+     warning names the fingerprint and the consequence. It does not refuse: recovery
+     codes and an administrator reset remain (ADR 0021).
+3. **Empty-instance guard.** Refuse when any `Zev` or any non-superuser `User` exists,
+   unless `--force`. A bootstrap superuser does not count and is replaced with the
+   backup's accounts.
+4. **Load**, in one `transaction.atomic()`:
+   1. Delete every backed-up table's rows, dependants first (and `ExportJob`, whose
+      `PROTECT` foreign key to a community would otherwise block it). Rows outside
+      the backup that cascade from a deleted user or provider (tokens, `OAuthState`)
+      go with them; `BackupJob` references are nulled by their `SET_NULL`.
+   2. For each member in load order — instance sections, then each community's
+      sections in registry order, then the `unscoped_*` sections — deserialize with
+      Django's `jsonl` deserializer and insert with `bulk_create` in batches of 1000.
+      **A section may only create the models the registry assigns to it** (the
+      allow-list is the security boundary: an archive cannot write to
+      `sessions.Session` or anything else outside the registry). Each member's
+      per-model counts must equal the manifest's.
+   3. `bulk_create` runs `pre_save`, which would overwrite every `auto_now` /
+      `auto_now_add` value with the time of the restore; those flags are switched off
+      per model for the insert and put back in `finally` (`_stored_timestamps`).
+   4. Cross-check: each table holds exactly the number of rows loaded into it;
+      `connection.check_constraints()` so a dangling reference fails here, inside the
+      transaction, not at commit.
+   5. **Restore media** into storage under the exact name the `Invoice` row holds
+      (`_restore_media`): only names some restored `Invoice.pdf_file` references, each
+      re-checked as a safe relative path, an existing file at that name deleted first
+      (storage would otherwise pick a fresh name), size and SHA-256 checked while
+      copying. Files written are removed again if anything later fails.
+   6. **Reconcile sequences** for every integer-keyed model
+      (`connection.ops.sequence_reset_sql`), so the next ordinary insert cannot reuse
+      a restored id.
+5. **Audit** (after commit, best effort — a failed audit write cannot undo a finished
+   restore): `backup.instance_restored`, category `SYSTEM`, source
+   `MANAGEMENT_COMMAND`, metadata with the backup's time, instance name and version,
+   record and PDF counts, whether `--force` was used, and how many existing rows were
+   replaced. The archive's own audit trail is restored first, so this entry follows
+   it.
+6. **Report** on stdout: per-model counts, rows replaced, PDFs restored, PDFs that
+   were already missing when the backup was taken, sequences advanced; warnings on
+   stderr.
+
+Errors are user-safe: a record the schema cannot read names its section and never
+quotes a field value (those are participant names and addresses); a database
+rejection is one generic sentence, and the cause goes to the server log.
+
+`--dry-run` performs steps 1–3 and reads every record of step 4.2 (allow-list, counts,
+schema fit) without writing.
 
 ### 6.6 Per-ZEV restore — API and `--mode zev`
 
@@ -791,26 +860,53 @@ names are passed as a `{{command}}` placeholder so they are never translated.
 
 ## 9. Test plan
 
-### Backend — `backend/backups/` (215 tests, phase 1)
+### Backend — `backend/backups/` (269 tests, phases 1–2)
 
 | Module | Tests | Covers |
 |---|---|---|
 | `test_crypto.py` | 22 | Envelope round trip (multi-chunk, exact multiple, empty); **truncation, reordered chunk, flipped bit and edited header each fail authentication**; wrong key names the required fingerprint; rotation; short-key rejection; domain separation between archive and secret keys; destination-secret round trip and rotation |
-| `test_archive.py` | 53 | `ArchiveShapeTests` — manifest, every section present, every line a serialized row, **primary keys preserved** (UUID and integer), FKs are real keys, a ZEV holds only its own rows, PDFs travel byte-exact under their own ZEV, contract PDFs base64 in-row, **rows whose ZEV was deleted are in the instance scope**, account refs, credentials travel, M2M excluded, no row of an excluded model, counts match rows, **no key material in the archive**. `ZevScopeTests`. `MediaTests` — missing PDF recorded not fatal, `..` and absolute names refused, a shared file stored once. `CoverageTests` — the registry closure. `DurabilityTests`. `VerifyTests` — tampered member, missing member, injected member, disagreeing count, **transfer archive refused by kind**, unknown version, malformed manifest, not a zip, failure cap. `EncryptedArchiveTests`. `RoundTripTests` — deserializing the sections reproduces the rows with their keys |
+| `test_archive.py` | 54 | `ArchiveShapeTests` — manifest, every section present, **timestamps keep their microseconds**, every line a serialized row, **primary keys preserved** (UUID and integer), FKs are real keys, a ZEV holds only its own rows, PDFs travel byte-exact under their own ZEV, contract PDFs base64 in-row, **rows whose ZEV was deleted are in the instance scope**, account refs, credentials travel, M2M excluded, no row of an excluded model, counts match rows, **no key material in the archive**. `ZevScopeTests`. `MediaTests` — missing PDF recorded not fatal, `..` and absolute names refused, a shared file stored once. `CoverageTests` — the registry closure. `DurabilityTests`. `VerifyTests` — tampered member, missing member, injected member, disagreeing count, **transfer archive refused by kind**, unknown version, malformed manifest, not a zip, failure cap. `EncryptedArchiveTests`. `RoundTripTests` — deserializing the sections reproduces the rows with their keys |
 | `test_destinations.py` | 45 | Local and S3 validation (**path inside `MEDIA_ROOT` refused**, `..` resolved first, half a credential pair); credential precedence; boto client construction (custom endpoint → path-style and relaxed checksums; instance role passes no keys); local storage (0600, no partial file on failure, atomic); S3 upload key/SSE/location; **provider errors become safe messages that never echo the response, and an unrecognised error code is named only if it is shaped like one**; persistence |
 | `test_runner.py` | 31 | Completed job records location/size/checksum/manifest; stored archive verifies; encryption on/off; a rejected key fails the job with the reason; failures (missing destination, unwritable, **unexpected error is generic on the row and detailed only in the log**, soft time limit); **a job runs once if delivered twice; a late completion does not resurrect a failed job**; audit events; **a broken audit write does not fail a completed backup**; S3 runner; the builder is handed a file, not a buffer; the work directory is empty afterwards |
 | `test_api.py` | 42 | **Every endpoint refuses anonymous, owner and participant callers**; destination CRUD; **the secret is never returned, never in the audit log**; absent/empty/new secret semantics; 202 with enqueue after commit; **broker outage → 503 and a failed job**; validation matrix; list filters and limit; download streams, 409/410 cases, **a location outside the destination is never served**; status |
 | `test_commands.py` | 22 | `openzev_backup` (path, destination, zev by id or name, ambiguous name, refusal cases, warning on stderr when unencrypted, non-zero exit with a safe message on failure, needs no broker, audited as a management command) and `openzev_backup_verify` (good, encrypted, wrong key, corrupted, missing file) |
+| `test_restore_instance.py` | 53 | **Round trip:** every row of every backed-up table equal field for field after a wipe and restore (primary keys and timestamps included), PDFs back under the same name and bytes, encrypted round trip, the audit trail restored and the restore appended to it, a bootstrap superuser replaced, ordinary inserts after a restore. **Dry run:** writes nothing, refuses exactly when the real run would, `--force` reports what would be replaced, schema-unreadable records found. **Refusals leave the database untouched:** populated instance without `--force`, transfer archive, single-community backup, newer-version backup, unapplied migrations, schema newer than the backup (names the `migrate` steps), unrelated apps' migrations ignored. **Integrity:** corrupted member, a manifest missing a whole section, **a section cannot create a model it does not own**, an unreadable record is named without quoting its content, dangling references roll everything back. **Rollback:** a late failure undoes rows and files, a failed forced restore leaves existing data, timestamp flags restored, an audit failure does not undo a finished restore. **Media:** a file at that name is replaced not renamed, a PDF already missing at backup time is reported, **unreferenced and `..` media are not written**. MFA key warnings; sequence reset covers exactly the integer-keyed models; S3 source parsing and safe errors; the command (file, dry run, refusal, missing file, listed verification failures, S3 download, warnings on stderr) |
 
 The mutation checks run while building this (removing the traversal guard, the
 final-chunk flag, the admin permission, the `MEDIA_ROOT` guard) each turned the
 suite red.
 
-Later phases add `test_restore_instance.py` and `test_restore_zev.py`, covering the
-cases listed in §6.5 and §6.6 (identical primary keys after a round trip, sequences
-past each table's maximum, refusal of a transfer archive / unknown migrations /
-non-empty instance, no account row created, modified or deleted, `sent`/`paid`
-invoices and contract issues refused without `force`, audit rows untouched).
+Phase 3 adds `test_restore_zev.py`, covering §6.6 (no account row created, modified
+or deleted, `sent`/`paid` invoices and contract issues refused without `force`,
+audit rows untouched, safety backup, locking).
+
+Mutation checks run while building phase 2 — each turned the suite red: timestamps not
+preserved, the section allow-list off, files not removed on rollback, an existing file
+not replaced, unreferenced media allowed, the empty-instance guard off, the constraint
+check removed.
+
+#### Verification notes (phase 2, real PostgreSQL)
+
+The test suite runs on SQLite, which has no sequences to reset, and PostgreSQL
+refuses the archive writer's `SET TRANSACTION ISOLATION LEVEL` inside a `TestCase`
+transaction. The parts that only PostgreSQL can show were verified end to end on two scratch
+databases in the dev stack: `seed_demo` (2 communities, 84,000 readings, 21 invoices,
+5 PDFs attached), an **encrypted** `openzev_backup` (3.0 MB), then `migrate` on an
+empty database and `openzev_restore`.
+
+- 84,271 records restored in about 11 s including decryption; a wrong key is refused
+  naming the fingerprint.
+- An `md5` over every row of every backed-up table matched between the two databases
+  — the only difference being the audit events the two commands themselves add, and
+  the non-backup events matched too. The 5 PDFs matched by SHA-256.
+- **Without** the sequence reset, the first `User.objects.create_user` after the
+  restore raised `duplicate key value violates unique constraint "accounts_user_pkey"`;
+  with it, the new user got id 6 after a restored maximum of 5.
+- A populated instance was refused without `--force`; `--dry-run --force` reported the
+  84,272 rows it would replace; `--force` replaced them in about 12 s and removed a
+  user the backup did not contain.
+- Not verified against a real object store: the S3 source is tested with a fake client
+  only (as is the S3 destination from phase 1).
 
 ### Frontend (39 tests, phase 1)
 
@@ -818,7 +914,7 @@ invoices and contract issues refused without `force`, audit rows untouched).
   wipes a secret, a clear is explicit, switching kind clears the other kind's
   fields; target formatting; manifest reading; polling and download rules.
 - `tests/backup-settings-section.test.ts` (21) — the encryption banner in each of
-  its three states; restore-not-available notice; destination list and empty state;
+  its three states; the restore notice (server command for an instance, single-community restore not yet in the app); destination list and empty state;
   secret field disabled without a key; environment-credentials notice; create
   payload; server validation shown inside the form; start-backup rules; job list
   (download only for local archives, unencrypted badge, failed reason, details).
@@ -835,12 +931,12 @@ invoices and contract issues refused without `force`, audit rows untouched).
 - [x] A backup runs to local and/or S3-compatible storage, with a SHA-256 manifest, encrypted whenever `BACKUP_ENCRYPTION_KEYS` is set *(manual and from cron; the built-in schedule is phase 4)*
 - [x] With no key set, the backup still runs and both the CLI and the admin UI say the archive is unencrypted
 - [x] A destination secret stored in the database is encrypted at rest, never serialized, and overridden by environment credentials
-- [ ] A fresh install restores to a working instance from a backup alone — accounts, settings, templates, dynamic price series, invoice PDFs, issued contracts and the audit trail all present and linked, with primary keys preserved
+- [x] A fresh install restores to a working instance from a backup alone — accounts, settings, templates, dynamic price series, invoice PDFs, issued contracts and the audit trail all present and linked, with primary keys preserved
 - [ ] An existing install restores one ZEV to its backed-up state without touching other ZEVs, any account row, or any existing audit row — and the restore itself appears in the log
-- [ ] Both restore modes support `--dry-run` / `dry_run` reporting exactly what would change
-- [ ] Restore refuses on schema mismatch, checksum failure, wrong archive `kind`, and (without `force`) on dropping `sent`/`paid` invoices or contract issues
-- [ ] An MFA key fingerprint mismatch is reported at preflight, not discovered by a locked-out user
+- [ ] Both restore modes support `--dry-run` / `dry_run` reporting exactly what would change *(instance mode: done; per-ZEV is phase 3)*
+- [ ] Restore refuses on schema mismatch, checksum failure, wrong archive `kind`, and (without `force`) on dropping `sent`/`paid` invoices or contract issues *(instance mode: schema, checksum, kind and non-empty done; the `sent`/`paid` and contract refusals are per-ZEV, phase 3)*
+- [x] An MFA key fingerprint mismatch is reported at preflight, not discovered by a locked-out user
 - [ ] "Last successful backup" is visible to admins and goes stale loudly
 - [x] The registry coverage tests pass, so a new model or file field cannot silently stop being backed up (this replaces the field-level parity test; see *Deviations*)
-- [ ] User-guide chapter written, including a restore drill; the `12-troubleshooting.md` snippet is replaced
+- [x] User-guide chapter written, including a restore drill; the `12-troubleshooting.md` snippet is replaced *(instance restore; per-ZEV restore is added with phase 3)*
 - [ ] `ROADMAP.md` updated

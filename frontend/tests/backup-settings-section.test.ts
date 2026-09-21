@@ -132,7 +132,7 @@ describe('encryption status banner', () => {
         expect(container.querySelector('.warning-banner')).toBeNull()
     })
 
-    it('says plainly that restore is not available in the app yet', async () => {
+    it('points at the server command for restoring an instance and says single-community restore is not in the app yet', async () => {
         setup()
         expect((await render()).textContent).toContain('pages.backups.restoreNotice')
     })

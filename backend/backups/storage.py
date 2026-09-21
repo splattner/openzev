@@ -15,6 +15,7 @@ import re
 import shutil
 import uuid
 from pathlib import Path
+from types import SimpleNamespace
 
 from django.conf import settings
 
@@ -208,6 +209,41 @@ def _probe_s3(destination) -> None:
         client = s3_client(destination)
         client.put_object(Bucket=destination.bucket, Key=key, Body=b"openzev", **_s3_extra_args(destination))
         client.delete_object(Bucket=destination.bucket, Key=key)
+    except (BotoCoreError, ClientError) as exc:
+        raise DestinationError(_explain_s3(exc)) from exc
+
+
+def parse_s3_url(url: str) -> tuple[str, str]:
+    """``(bucket, key)`` of an ``s3://bucket/key`` URL; ``DestinationError`` otherwise."""
+    match = re.fullmatch(r"s3://([^/]+)/(.+)", url)
+    if not match:
+        raise DestinationError("An S3 source must look like s3://bucket/path/to/archive.zip.enc.")
+    return match.group(1), match.group(2)
+
+
+def fetch_archive(url: str, target: Path, *, endpoint_url: str = "", region: str = "") -> None:
+    """Download ``s3://bucket/key`` to ``target``.
+
+    A fresh installation has no saved destinations to name (they are instance
+    configuration, not backed up — ADR 0023), so the source is addressed
+    directly and authenticated from the environment: ``BACKUP_S3_ACCESS_KEY_ID`` /
+    ``BACKUP_S3_SECRET_ACCESS_KEY`` when set, boto3's default chain (an instance
+    role, IRSA) otherwise.
+    """
+    from boto3.s3.transfer import TransferConfig
+    from botocore.exceptions import BotoCoreError, ClientError
+
+    bucket, key = parse_s3_url(url)
+    have_keys = bool(settings.BACKUP_S3_ACCESS_KEY_ID and settings.BACKUP_S3_SECRET_ACCESS_KEY)
+    source = SimpleNamespace(
+        endpoint_url=endpoint_url,
+        region=region,
+        credential_mode="environment" if have_keys else "default",
+    )
+    try:
+        s3_client(source).download_file(
+            bucket, key, str(target), Config=TransferConfig(multipart_threshold=_S3_MULTIPART_THRESHOLD)
+        )
     except (BotoCoreError, ClientError) as exc:
         raise DestinationError(_explain_s3(exc)) from exc
 

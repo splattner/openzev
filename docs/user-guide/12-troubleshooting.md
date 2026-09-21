@@ -194,12 +194,14 @@ Common errors:
   docker compose up -d  # Fresh start
   ```
 - **Disk full:** Clean up old data or expand volume
-- **Corruption:** May need to restore from backup
+- **Corruption:** May need to restore from backup ([how](18-backups.md#restoring-an-instance))
 
 ### Database backup
 
 Use the built-in backups: they cover the database **and** the invoice PDF files,
-can be encrypted, and can be verified. See [Backups](18-backups.md).
+can be encrypted, and can be verified. See [Backups](18-backups.md). To recover
+from one — on a fresh installation, or over an existing one — see
+[Restoring an instance](18-backups.md#restoring-an-instance).
 
 A plain database dump is still useful as an additional safety net, but **it does
 not include the invoice PDFs**, which are files in the media volume

@@ -2423,7 +2423,7 @@ export const de = {
         },
         backups: {
             intro: 'Sichern Sie die ganze Instanz oder eine einzelne Gemeinschaft in ein lokales Verzeichnis oder einen S3-kompatiblen Speicher. Eine Sicherung enthält alles, was zum Wiederaufbau nötig ist: Konten, Einstellungen, Preisreihen, Rechnungen samt PDF, ausgestellte Verträge und das Audit-Protokoll.',
-            restoreNotice: 'Das Wiederherstellen aus einer Sicherung ist in der App noch nicht verfügbar. Bewahren Sie Ihre Sicherungen auf und prüfen Sie jederzeit eine davon mit {{command}}.',
+            restoreNotice: 'Eine ganze Instanz wird auf dem Server mit {{restoreCommand}} wiederhergestellt (mit --dry-run vorab prüfen). Eine einzelne Gemeinschaft lässt sich von dieser Seite aus noch nicht wiederherstellen. Prüfen Sie jederzeit eine Sicherung mit {{command}}.',
             status: {
                 encrypted: 'Sicherungen sind verschlüsselt (Schlüssel {{fingerprint}}).',
                 unencryptedTitle: 'Sicherungen sind nicht verschlüsselt',

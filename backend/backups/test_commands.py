@@ -161,6 +161,7 @@ class VerifyCommandTests(CommandTestCase):
         path = self.backup()
         out, _ = run("openzev_backup_verify", str(path))
         self.assertIn("Backup verified.", out)
+        self.assertIn("version    ", out)
         self.assertIn("Alpha, Beta", out)
         self.assertIn("encrypted  NO", out)
 

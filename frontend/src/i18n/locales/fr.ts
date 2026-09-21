@@ -2423,7 +2423,7 @@ export const fr = {
         },
         backups: {
             intro: 'Sauvegardez l\'ensemble de l\'instance ou une seule communauté vers un répertoire local ou un stockage compatible S3. Une sauvegarde contient tout ce qu\'il faut pour la reconstituer : comptes, paramètres, séries de prix, factures avec leurs PDF, contrats émis et journal d\'audit.',
-            restoreNotice: 'La restauration à partir d\'une sauvegarde n\'est pas encore disponible dans l\'application. Conservez vos sauvegardes et vérifiez-en une à tout moment avec {{command}}.',
+            restoreNotice: 'Une instance entière se restaure sur le serveur avec {{restoreCommand}} (ajoutez --dry-run pour vérifier d\'abord). La restauration d\'une seule communauté depuis cette page n\'est pas encore disponible. Vérifiez une sauvegarde à tout moment avec {{command}}.',
             status: {
                 encrypted: 'Les sauvegardes sont chiffrées (clé {{fingerprint}}).',
                 unencryptedTitle: 'Les sauvegardes ne sont pas chiffrées',

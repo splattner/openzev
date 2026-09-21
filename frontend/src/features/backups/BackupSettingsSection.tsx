@@ -38,7 +38,10 @@ export function BackupSettingsSection() {
                 ) : null}
 
                 <p className="muted" style={{ margin: 0 }}>
-                    {t('pages.backups.restoreNotice', { command: 'python manage.py openzev_backup_verify' })}
+                    {t('pages.backups.restoreNotice', {
+                        restoreCommand: 'python manage.py openzev_restore --mode instance --from <archive>',
+                        command: 'python manage.py openzev_backup_verify',
+                    })}
                 </p>
             </section>
 
