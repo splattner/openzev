@@ -297,7 +297,7 @@ PVshare Cockpit is a closed, subscription-based SaaS (CHF ~30/participant/year) 
 | Frontend management page design system (documented conventions, shared components) | `shipped` | — | [spec](specs/2026-04-frontend-management-page-design.md) |
 | UI redesign + print parity | `shipped` | — | [spec](specs/2026-08-ui-redesign-pdf-style.md), [ADR 0014](adr/0014-print-parity-and-ui-tokens.md) |
 | Backend test suite (pytest, per-app test modules) | `shipped` | — | — |
-| Production database backup / restore guidance | `idea` | `high` | No documented procedure; critical for production deployments |
+| Integrated backup and restore — scheduled encrypted backups to local/S3, whole-instance recovery, per-ZEV rollback | `planned` | `high` | [spec](specs/2026-09-backup-and-restore.md), [ADR 0023](adr/0023-backup-archives-preserve-keys.md), [ADR 0024](adr/0024-backup-encryption-key.md), #767. Replaces the `pg_dump`-only guidance, which omits `MEDIA_ROOT` |
 | Helm chart maturity (resource limits, liveness probes, secrets management) | `idea` | `medium` | Current chart is functional but minimal |
 | Observability — structured application logging and metrics endpoint | `idea` | `medium` | No Prometheus metrics or structured log format today |
 | End-to-end test suite (Playwright or similar) | `idea` | `medium` | Playwright is used for automated user-guide screenshots; no interactive end-to-end coverage of user flows yet |

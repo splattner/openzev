@@ -26,6 +26,8 @@ This directory captures key architectural decisions for OpenZEV.
 - [0020: A user-verified passkey replaces the password, rather than supplementing it](0020-passkeys-replace-the-password.md)
 - [0021: MFA secrets are encrypted under a dedicated, rotatable key, not `SECRET_KEY`](0021-mfa-secret-encryption-key.md)
 - [0022: Sessions are revoked with a per-account version counter, not a token blacklist](0022-session-revocation-by-version-counter.md)
+- [0023: Backup archives preserve primary keys and restore in place, unlike transfer archives](0023-backup-archives-preserve-keys.md)
+- [0024: Backup artifacts are encrypted under a dedicated, optional key](0024-backup-encryption-key.md)
 
 ## Conventions
 

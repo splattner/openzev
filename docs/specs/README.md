@@ -118,6 +118,7 @@ when the capability changes; do not treat them as baselines:
 ## Drafts
 
 - `2026-06-leg-billing-model.md` (Draft)
+- `2026-09-backup-and-restore.md` (Draft)
 - `2026-09-two-factor-authentication.md` (Draft) — TOTP and passkeys; extends the `auth.*` audit
   namespace shipped in 1.15.0. See [#740](https://github.com/splattner/openzev/issues/740).
 
