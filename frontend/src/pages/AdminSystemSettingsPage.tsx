@@ -29,10 +29,11 @@ import { useToast } from '../lib/toast'
 import type { DateTimeFormat, LongDateFormat, OAuthProviderConfig, OAuthProviderConfigInput, ShortDateFormat } from '../types/api'
 import { ConfirmDialog, useConfirmDialog } from '../components/ConfirmDialog'
 import { FormModal } from '../components/FormModal'
+import { BackupSettingsSection } from '../features/backups/BackupSettingsSection'
 import { MfaPolicySection } from '../features/settings/MfaPolicySection'
 import { VatSettingsSection } from '../features/settings/VatSettingsSection'
 
-type SystemSettingsTab = 'regional' | 'features' | 'oauth' | 'security' | 'vat'
+type SystemSettingsTab = 'regional' | 'features' | 'oauth' | 'security' | 'vat' | 'backup'
 
 const EMPTY_OAUTH_FORM: OAuthProviderConfigInput = {
     name: '',
@@ -48,7 +49,7 @@ const EMPTY_OAUTH_FORM: OAuthProviderConfigInput = {
     require_mfa_claim: false,
 }
 
-const TAB_ORDER: SystemSettingsTab[] = ['regional', 'features', 'oauth', 'security', 'vat']
+const TAB_ORDER: SystemSettingsTab[] = ['regional', 'features', 'oauth', 'security', 'vat', 'backup']
 
 function getValidTab(value: string | null): SystemSettingsTab {
     return TAB_ORDER.includes(value as SystemSettingsTab) ? (value as SystemSettingsTab) : 'regional'
@@ -244,6 +245,7 @@ export function AdminSystemSettingsPage() {
                     <Tabs.Tab value="oauth">{t('adminSystemSettings.tabs.oauth.label')}</Tabs.Tab>
                     <Tabs.Tab value="security">{t('adminSystemSettings.tabs.security.label')}</Tabs.Tab>
                     <Tabs.Tab value="vat">{t('adminSystemSettings.tabs.vat.label')}</Tabs.Tab>
+                    <Tabs.Tab value="backup">{t('adminSystemSettings.tabs.backup.label')}</Tabs.Tab>
                 </Tabs.List>
 
                 <Tabs.Panel value="regional">
@@ -469,6 +471,8 @@ export function AdminSystemSettingsPage() {
                 </Tabs.Panel>
 
                 <Tabs.Panel value="vat"><VatSettingsSection /></Tabs.Panel>
+
+                <Tabs.Panel value="backup"><BackupSettingsSection /></Tabs.Panel>
             </Tabs>
 
             <FormModal

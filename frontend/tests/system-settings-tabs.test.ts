@@ -38,6 +38,9 @@ vi.mock('../src/lib/appSettings', async (importOriginal) => {
 vi.mock('../src/features/settings/VatSettingsSection', () => ({
     VatSettingsSection: () => createElement('section', null, 'vat-stub'),
 }))
+vi.mock('../src/features/backups/BackupSettingsSection', () => ({
+    BackupSettingsSection: () => createElement('section', null, 'backup-stub'),
+}))
 
 function RoutedPage() {
     const location = useLocation()
@@ -86,7 +89,7 @@ describe('system settings tab strip', () => {
         expect(list).not.toBeNull()
         expect(list!.closest('section')).toBeNull()
         const tabs = container.querySelectorAll('[role="tab"]')
-        expect(tabs).toHaveLength(5)
+        expect(tabs).toHaveLength(6)
         for (const tabElement of Array.from(tabs)) {
             expect(tabElement.classList.contains('app-tabs-tab')).toBe(true)
             const panel = container.querySelector(`#${tabElement.getAttribute('aria-controls')}`)
@@ -94,7 +97,7 @@ describe('system settings tab strip', () => {
         }
         // Inactive panels render as empty shells (Mantine hides panel content
         // for inactive tabs in the test env); only the active panel has content.
-        expect(container.querySelectorAll('[role="tabpanel"]')).toHaveLength(5)
+        expect(container.querySelectorAll('[role="tabpanel"]')).toHaveLength(6)
         expect(tab(container, 'regional').hasAttribute('data-active')).toBe(true)
         expect(activePanel(container).textContent).toContain('adminSystemSettings.regional.title')
     })
@@ -110,5 +113,11 @@ describe('system settings tab strip', () => {
         const invalid = await render('/admin/system-settings?tab=bogus')
         expect(tab(invalid, 'regional').hasAttribute('data-active')).toBe(true)
         expect(activePanel(invalid).textContent).toContain('adminSystemSettings.regional.title')
+    })
+
+    it('opens the backup tab from its URL and renders its section', async () => {
+        const container = await render('/admin/system-settings?tab=backup')
+        expect(tab(container, 'backup').hasAttribute('data-active')).toBe(true)
+        expect(activePanel(container).textContent).toContain('backup-stub')
     })
 })

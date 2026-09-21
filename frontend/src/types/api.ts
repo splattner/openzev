@@ -1582,3 +1582,119 @@ export interface ExportJob {
     error_message: string
     expired: boolean
 }
+
+// ── Backups (SPEC-2026-09-backup-and-restore) ────────────────────────────────
+
+export type BackupDestinationKind = 'local' | 's3'
+/** Where an S3 destination's credentials come from, in order of precedence. */
+export type BackupCredentialMode = 'environment' | 'stored' | 'instance_role'
+export type BackupJobScope = 'instance' | 'zev'
+export type BackupJobTrigger = 'manual' | 'scheduled' | 'pre_restore'
+export type BackupJobStatus = 'queued' | 'running' | 'completed' | 'failed'
+
+export interface BackupDestination {
+    id: string
+    name: string
+    kind: BackupDestinationKind
+    enabled: boolean
+    path: string
+    bucket: string
+    prefix: string
+    region: string
+    endpoint_url: string
+    access_key_id: string
+    /** `''` disables server-side encryption for stores that lack it. */
+    server_side_encryption: string
+    credential_mode: BackupCredentialMode
+    /** The secret is never returned; this reports whether one is stored. */
+    has_secret_access_key: boolean
+    created_at: string
+    updated_at: string
+}
+
+export interface BackupDestinationInput {
+    name: string
+    kind: BackupDestinationKind
+    enabled: boolean
+    path: string
+    bucket: string
+    prefix: string
+    region: string
+    endpoint_url: string
+    access_key_id: string
+    server_side_encryption: string
+    /** Absent leaves a stored secret untouched; `''` clears it. */
+    secret_access_key?: string
+}
+
+export interface BackupManifestMedia {
+    files: number
+    bytes: number
+    /** Referenced by the database but absent from storage, so not in the archive. */
+    missing: string[]
+    unsafe: string[]
+}
+
+export interface BackupManifestZev {
+    id: string
+    name: string
+    counts: Record<string, number>
+    media: BackupManifestMedia
+}
+
+export interface BackupManifest {
+    kind: 'backup'
+    format_version: number
+    created_at: string
+    instance_name: string
+    openzev_version: string
+    scope: BackupJobScope
+    zev_id: string | null
+    counts: Record<string, number>
+    zevs: BackupManifestZev[]
+    encryption: { algorithm: string; key_fingerprint: string } | null
+}
+
+export interface BackupJob {
+    id: string
+    scope: BackupJobScope
+    zev_id: string | null
+    zev_name: string
+    trigger: BackupJobTrigger
+    destination_id: string | null
+    destination_name: string
+    status: BackupJobStatus
+    created_at: string
+    started_at: string | null
+    completed_at: string | null
+    archive_name: string
+    /** An absolute path, or `s3://bucket/key`. */
+    archive_location: string
+    archive_bytes: number | null
+    archive_sha256: string
+    encrypted: boolean
+    encryption_key_fingerprint: string
+    /** Empty until the job completes. */
+    manifest_json: BackupManifest | Record<string, never>
+    error_message: string
+}
+
+export interface BackupJobInput {
+    scope: BackupJobScope
+    zev_id?: string
+    destination_id: string
+}
+
+export interface BackupStatus {
+    /** Whether a usable encryption key is configured (not whether the last archive used it). */
+    encrypted: boolean
+    encryption_key_fingerprint: string
+    /** Set when a key is configured but unusable, so it is not mistaken for "no key". */
+    encryption_key_problem: string
+    /** S3 credentials come from the server environment and override any stored ones. */
+    environment_credentials: boolean
+    destinations_enabled: number
+    last_successful: BackupJob | null
+    last_failed: BackupJob | null
+    age_hours: number | null
+}

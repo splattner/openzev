@@ -32,6 +32,11 @@ export const queryKeys = {
   feasibility: {
     enabled: () => ['feasibility', 'enabled'] as const,
   },
+  backups: {
+    destinations: () => ['backups', 'destinations'] as const,
+    jobs: () => ['backups', 'jobs'] as const,
+    status: () => ['backups', 'status'] as const,
+  },
   invoices: {
     lists: () => ['invoices', 'list'] as const,
     list: (zevId?: string, status?: string) => ['invoices', 'list', zevId ?? 'all', status ?? 'all'] as const,
