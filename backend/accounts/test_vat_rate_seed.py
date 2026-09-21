@@ -28,6 +28,20 @@ CANONICAL = (
 )
 
 
+def _migrate_to_latest():
+    """Leave the schema fully migrated.
+
+    These tests step ``accounts`` back to a predecessor, which also unapplies
+    everything depending on later ``accounts`` migrations. Cleaning up by
+    migrating only to ``TARGET`` would leave those later columns (and every app
+    that depends on them) missing for whichever test the same worker runs next,
+    which is what made an unrelated PDF test fail intermittently under xdist.
+    """
+    executor = MigrationExecutor(connection)
+    executor.loader.build_graph()
+    executor.migrate(executor.loader.graph.leaf_nodes())
+
+
 def _predecessor_apps():
     """Historical app registry as of the migration predecessor."""
     return MigrationExecutor(connection).loader.project_state([PREDECESSOR]).apps
@@ -54,7 +68,7 @@ class SeedVatRatesMigrationTests(TransactionTestCase):
     def test_forward_migration_seeds_empty_table(self):
         executor = MigrationExecutor(connection)
         executor.migrate([PREDECESSOR])
-        self.addCleanup(executor.migrate, [TARGET])
+        self.addCleanup(_migrate_to_latest)
         apps = executor.loader.project_state([PREDECESSOR]).apps
         apps.get_model("accounts", "VatRate").objects.all().delete()
 
@@ -76,7 +90,7 @@ class SeedVatRatesMigrationTests(TransactionTestCase):
     def test_reverse_and_reapply_preserve_rates(self):
         executor = MigrationExecutor(connection)
         executor.migrate([PREDECESSOR])
-        self.addCleanup(executor.migrate, [TARGET])
+        self.addCleanup(_migrate_to_latest)
         apps = executor.loader.project_state([PREDECESSOR]).apps
         vat_rate = apps.get_model("accounts", "VatRate")
         vat_rate.objects.all().delete()
@@ -385,3 +399,18 @@ class SeededVatLookupTests(TestCase):
         clear_vat_rates()
         self.assertIsNone(VatRate.active_for_day(datetime.date(2026, 9, 11)))
         self.assertEqual(_active_vat_rate(datetime.date(2026, 9, 11)), Decimal("0"))
+
+
+class SchemaLeftFullyMigratedTests(TransactionTestCase):
+    """Runs after the migration tests above (same module, same worker).
+
+    Regression test: their cleanup used to stop at ``TARGET``, leaving later
+    ``accounts`` columns missing, so any test scheduled next on that worker
+    (xdist work-stealing makes that possible) failed to insert a user.
+    """
+
+    def test_a_user_can_still_be_created_afterwards(self):
+        from accounts.models import UserRole
+        from testing.helpers import make_user
+
+        make_user("after-the-migration-tests", UserRole.ZEV_OWNER)
