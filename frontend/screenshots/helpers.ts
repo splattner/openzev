@@ -4,9 +4,9 @@ import path from 'path'
 import { fileURLToPath } from 'url'
 
 export const BASE = process.env.SCREENSHOT_BASE_URL ?? 'http://localhost:8080'
-// The docker compose stack publishes the API on 8001 (see seed_demo's summary
-// output); 8000 is only reachable in a bare `python manage.py runserver` setup.
-export const API_BASE = process.env.SCREENSHOT_API_URL ?? 'http://localhost:8001/api/v1'
+// The default compose stack reaches the API same-origin through nginx; the dev
+// stack publishes the backend directly (override with SCREENSHOT_API_URL).
+export const API_BASE = process.env.SCREENSHOT_API_URL ?? 'http://localhost:8080/api/v1'
 export const USER = process.env.SCREENSHOT_USER ?? 'admin@openzev.local'
 export const PASS = process.env.SCREENSHOT_PASSWORD ?? 'admin1234'
 

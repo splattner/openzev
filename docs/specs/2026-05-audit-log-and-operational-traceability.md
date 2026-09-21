@@ -353,12 +353,18 @@ metadata:
 | Property | Source |
 |---|---|
 | `request.audit_request_id` | Generated UUID or upstream `X-Request-ID` |
-| `request.audit_ip_address` | Remote IP / forwarded-for handling per current deployment trust rules |
+| `request.audit_ip_address` | `config.client_ip.client_ip(request)`: `REMOTE_ADDR` when `NUM_PROXIES=0` or `X-Forwarded-For` is absent; otherwise the entry `-min(NUM_PROXIES, number of entries)` in the comma-separated header, stripped of whitespace |
 | `request.audit_user_agent` | Request header |
 | `request.audit_source` | `api` |
 
 The middleware must not persist events itself. It only prepares context for the
 audit service.
+
+IP selection follows DRF's throttle identity hop selection. Empty, invalid, or
+scoped IPv6 addresses are stored as `NULL`; scoped IPv6 is excluded because
+PostgreSQL's `inet` type cannot store zone identifiers. The default is zero
+trusted hops. Deployment values and proxy requirements are documented in
+[the chart README](../../charts/openzev/README.md#reverse-proxies-and-num_proxies).
 
 ### 6.2 Audit service API
 
@@ -711,6 +717,23 @@ create-only):
 | `test_participant_create_summary` / `test_participant_destroy_summary` | `participant.create`/`participant.delete` with `full_name` display and `zev_id` metadata |
 | `test_metering_point_create_summary` / `test_metering_point_destroy_summary` | `metering_point.create`/`metering_point.delete` with `meter_id` display; `meter_type` in create metadata only |
 | `test_metering_assignment_create_summary` / `test_metering_assignment_destroy_summary` | `metering_assignment.create`/`metering_assignment.delete` with `str(pk)` display; `metering_point_id` in create metadata only |
+
+### Backend — client-IP and proxy trust boundary
+
+Client-IP coverage lives in `backend/config/test_client_ip.py`:
+`ClientIpHelperTests` (10 tests) covers zero/one/two-hop selection, missing
+headers, short chains, malformed, empty, IPv6, and scoped addresses, plus the
+fail-closed `REMOTE_ADDR` fallback when the setting is missing;
+`ClientIpThrottleAgreementTests` (3) checks `client_ip()` agrees with DRF's
+`SimpleRateThrottle.get_ident()` at 0, 1, and 2 hops from the single
+`REST_FRAMEWORK["NUM_PROXIES"]` setting; `AuditMiddlewareIpTests` (2) checks
+middleware propagation; `AuditIpPersistenceTests` (1) checks
+malformed-address persistence as NULL. `ForwardedForThrottleTests` in
+`backend/accounts/test_throttling.py` (3) covers production zero-hop wiring
+and forwarded-header throttle buckets. `ProxyTrustBoundaryTests` in
+`backend/config/test_proxy_trust_boundary.py` (6) checks deployment
+configuration invariants, including the Helm schema constraint on
+`backend.numProxies`.
 
 ### Frontend
 

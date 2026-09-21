@@ -62,6 +62,10 @@ backend:
   # Defaults to corsAllowedOrigins when left empty.
   # Example: "https://openzev.example.com"
   csrfTrustedOrigins: ""
+  # Trusted X-Forwarded-For hops (default 0 = REMOTE_ADDR only, safe).
+  # Set to 1 only if every public path reaches the backend through one
+  # sanitising hop; see "Reverse proxies and NUM_PROXIES" in charts/openzev/README.md.
+  numProxies: 0
 
 worker:
   replicaCount: 1

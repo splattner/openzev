@@ -8,6 +8,10 @@ which avoids an extra HTTP round-trip through the login endpoint.
 
 from __future__ import annotations
 
+from contextlib import contextmanager
+
+from django.conf import settings as dj_settings
+from django.test import override_settings
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from accounts.jwt_utils import SESSION_CLAIM
@@ -67,3 +71,17 @@ def clear_vat_rates() -> None:
     fixtures, so test classes owning their VAT history clear it first.
     """
     VatRate.objects.all().delete()
+
+
+@contextmanager
+def trusted_proxies(num_proxies):
+    """Set the trusted X-Forwarded-For hop count for tests.
+
+    ``config.client_ip`` and DRF throttling both read the effective
+    ``REST_FRAMEWORK["NUM_PROXIES"]`` setting (single source of truth, wired
+    from the ``NUM_PROXIES`` env var in ``config/settings.py``), so tests
+    only need to override that one key.
+    """
+    rest_framework = {**dj_settings.REST_FRAMEWORK, "NUM_PROXIES": num_proxies}
+    with override_settings(REST_FRAMEWORK=rest_framework):
+        yield

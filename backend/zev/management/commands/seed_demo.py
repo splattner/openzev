@@ -617,7 +617,7 @@ class Command(BaseCommand):
             "Demo environment ready.",
             "",
             "Frontend: http://localhost:8080",
-            "Backend API: http://localhost:8001/api/v1",
+            "Backend API: http://localhost:8080/api/v1",
             "",
             "Accounts:",
             "  Admin:         admin@openzev.local / admin1234",

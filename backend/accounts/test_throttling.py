@@ -7,11 +7,15 @@ patch the rates onto the throttle classes, because DRF snapshots
 ``override_settings`` cannot reach it.
 """
 
+import os
+import runpy
 from unittest import mock
 
 from django.core.cache import cache
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from rest_framework.test import APIClient
+
+from config import settings as production_settings
 
 from .throttling import (
     ApiKeyRateThrottle,
@@ -26,7 +30,7 @@ from .throttling import (
 )
 from .test_api_keys import create_api_key
 from accounts.models import UserRole
-from testing.helpers import authenticate as auth, make_user
+from testing.helpers import authenticate as auth, make_user, trusted_proxies
 
 LOGIN = "/api/v1/auth/token/"
 REFRESH = "/api/v1/auth/token/refresh/"
@@ -170,3 +174,59 @@ class UploadEndpointThrottleTests(TestCase):
         for _ in range(3):
             self.assertNotEqual(client.post(IMPORT_CSV, format="multipart").status_code, 429)
         self.assertEqual(client.post(IMPORT_CSV, format="multipart").status_code, 429)
+
+
+@mock.patch.object(AuthLoginThrottle, "THROTTLE_RATES", {"auth_login": "2/hour"})
+class ForwardedForThrottleTests(TestCase):
+    """X-Forwarded-For must not let a client mint fresh throttle buckets."""
+
+    def setUp(self):
+        cache.clear()
+        self.client = APIClient()
+
+    def _login(self, **extra):
+        return self.client.post(
+            LOGIN, {"username": "nobody", "password": "wrong"}, format="json", **extra
+        )
+
+    def test_configured_zero_hops_prevents_header_spoofing(self):
+        # Load the real environment-to-DRF wiring: overriding NUM_PROXIES in
+        # REST_FRAMEWORK here would hide a regression in settings.py itself.
+        with mock.patch.dict(os.environ, {"NUM_PROXIES": "0"}):
+            configured = runpy.run_path(production_settings.__file__)
+        with override_settings(REST_FRAMEWORK=configured["REST_FRAMEWORK"]):
+            responses = [
+                self._login(
+                    REMOTE_ADDR="192.0.2.10", HTTP_X_FORWARDED_FOR=f"198.51.100.{i}"
+                )
+                for i in range(3)
+            ]
+        self.assertEqual([response.status_code for response in responses], [401, 401, 429])
+
+    def test_spoofed_xff_does_not_reset_budget_without_trusted_proxy(self):
+        with trusted_proxies(0):
+            for i in range(2):
+                response = self._login(
+                    REMOTE_ADDR="192.0.2.10", HTTP_X_FORWARDED_FOR=f"198.51.100.{i}"
+                )
+                self.assertNotEqual(response.status_code, 429)
+            response = self._login(
+                REMOTE_ADDR="192.0.2.10", HTTP_X_FORWARDED_FOR="198.51.100.99"
+            )
+            self.assertEqual(response.status_code, 429)
+
+    def test_bucket_follows_rightmost_entry_with_one_trusted_proxy(self):
+        with trusted_proxies(1):
+            for xff in ("192.0.2.1, 203.0.113.7", "192.0.2.99, 203.0.113.7"):
+                response = self._login(REMOTE_ADDR="10.0.0.1", HTTP_X_FORWARDED_FOR=xff)
+                self.assertNotEqual(response.status_code, 429)
+            # Same right-most entry behind fresh left-most garbage: same bucket.
+            response = self._login(
+                REMOTE_ADDR="10.0.0.1", HTTP_X_FORWARDED_FOR="192.0.2.123, 203.0.113.7"
+            )
+            self.assertEqual(response.status_code, 429)
+            # With one trusted hop DRF selects the right-most entry.
+            response = self._login(
+                REMOTE_ADDR="10.0.0.1", HTTP_X_FORWARDED_FOR="192.0.2.1, 203.0.113.8"
+            )
+            self.assertNotEqual(response.status_code, 429)

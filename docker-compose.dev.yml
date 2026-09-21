@@ -11,6 +11,8 @@ services:
       CORS_ALLOWED_ORIGINS: http://localhost:5173,http://localhost:8080
       CELERY_BROKER_URL: redis://redis:6379/0
       CACHE_URL: redis://redis:6379/1
+      # Backend remains directly reachable in dev; do not trust client-supplied XFF.
+      NUM_PROXIES: 0
     volumes:
       - ./backend:/app
       - backend_media:/app/media

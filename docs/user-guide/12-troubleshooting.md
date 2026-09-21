@@ -33,7 +33,9 @@ docker compose logs
 
 ### Can't Access API
 
-**Problem:** http://localhost:8001 returns error or no connection.
+**Problem:** http://localhost:8080/api/docs/ returns error or no connection.
+
+Development stack (`docker-compose.dev.yml`) uses port 8001 instead.
 
 **Checks:**
 1. Backend running? `docker compose ps`

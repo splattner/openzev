@@ -129,7 +129,9 @@ Stop it with:
 docker compose down
 ```
 
-Services: Frontend <http://localhost:8080> · Backend API <http://localhost:8001> · PostgreSQL localhost:5432 · Redis localhost:6379.
+Services: Frontend <http://localhost:8080> · Backend API <http://localhost:8080/api/v1/> · PostgreSQL localhost:5432 · Redis localhost:6379.
+
+> **Breaking local API endpoint change:** the default API is now `http://localhost:8080/api/v1/` via nginx (the backend port is no longer published). `docker-compose.dev.yml` still serves it directly on port 8001.
 
 > **Upgrading from a stack started before this change:** the Postgres data
 > directory is now pinned to `PGDATA=/var/lib/postgresql/data/pgdata` inside the
@@ -327,9 +329,11 @@ Re-running `seed_demo` refreshes the demo readings, invoices, import/email logs 
 
 ## API & Developer Docs
 
-- Swagger UI: <http://localhost:8001/api/docs/>
-- ReDoc: <http://localhost:8001/api/redoc/>
+- Swagger UI: <http://localhost:8080/api/docs/>
+- ReDoc: <http://localhost:8080/api/redoc/>
 - Base API prefix: `/api/v1/`
+
+Development stack (`docker-compose.dev.yml`) serves these directly on port 8001.
 
 ## Development Notes
 

@@ -167,6 +167,27 @@ The value is the full origin — scheme and host, no path. When left empty it
 falls back to `backend.corsAllowedOrigins`, so setting that alone is enough if
 the frontend calls the API from the same origin.
 
+### Reverse proxies and NUM_PROXIES
+
+`backend.numProxies` controls DRF's `NUM_PROXIES` setting for per-IP rate limits. Set it to the number of trusted proxy-added addresses in `X-Forwarded-For`. Set `0` unless the backend is reachable only through proxies that prevent clients from controlling the selected entry. A value that is too low groups clients into one bucket; a value that is too high can let clients evade per-IP limits.
+
+```yaml
+backend:
+  numProxies: 1  # ingress must overwrite XFF or append the actual client address
+```
+
+Count addresses retained after the last overwriting proxy, not simply the
+number of proxies. The shipped nginx configurations overwrite the header, so
+their backend uses `1` even if another proxy precedes nginx (in that case the
+identity is that upstream proxy). To preserve client identities through more
+hops, the edge must sanitise the header and subsequent trusted proxies must
+append their peer addresses. Restrict backend access to those proxies before
+enabling header trust; the chart does not enforce that network restriction.
+The chart validates `backend.numProxies` (`values.schema.json`): it must be
+an integer `>= 0` — empty, null, negative, and fractional values are rejected
+at install/upgrade time instead of crashing the backend on startup.
+Workers do not serve HTTP and do not need this setting.
+
 ## Email configuration
 
 Set email-related values under `email` in `values.yaml`:

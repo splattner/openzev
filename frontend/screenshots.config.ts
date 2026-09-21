@@ -11,7 +11,8 @@
  *
  * Environment variables (optional overrides):
  *   SCREENSHOT_BASE_URL  – default http://localhost:8080
- *   SCREENSHOT_API_URL   – default http://localhost:8001/api/v1
+ *   SCREENSHOT_API_URL   – default http://localhost:8080/api/v1
+ *                            (docker-compose.dev.yml: override with http://localhost:8001/api/v1)
  *   SCREENSHOT_USER      – default admin@openzev.local
  *   SCREENSHOT_PASSWORD   – default admin1234
  *   SCREENSHOT_CHANNEL    – optional Playwright channel override. Defaults to

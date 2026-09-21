@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "backend": {
+      "type": "object",
+      "required": ["numProxies"],
+      "properties": {
+        "numProxies": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    }
+  }
+}

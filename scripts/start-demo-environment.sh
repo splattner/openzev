@@ -53,4 +53,4 @@ echo "Seeding demo data..."
 echo
 echo "OpenZEV demo environment is ready."
 echo "Frontend: http://localhost:8080"
-echo "Backend API: http://localhost:8001/api/v1"
+echo "Backend API: http://localhost:8080/api/v1"

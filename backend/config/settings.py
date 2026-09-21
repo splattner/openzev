@@ -197,6 +197,15 @@ REST_FRAMEWORK = {
     "PAGE_SIZE": 50,
 }
 
+# Trusted X-Forwarded-For hops (0 = REMOTE_ADDR only). See
+# charts/openzev/README.md ("Reverse proxies and NUM_PROXIES").
+# Both DRF throttling and config.client_ip read the REST_FRAMEWORK key below
+# (single source of truth); the top-level name keeps the env var discoverable.
+NUM_PROXIES = env.int("NUM_PROXIES", default=0)
+if NUM_PROXIES < 0:
+    raise ImproperlyConfigured("NUM_PROXIES must be >= 0.")
+REST_FRAMEWORK["NUM_PROXIES"] = NUM_PROXIES
+
 # ── Upload hardening volume caps ──────────────────────────────────────────────
 # Rationale: docs/specs/2026-03-metering-import-and-quality.md §4.4.
 IMPORT_MAX_ROWS = env.int("IMPORT_MAX_ROWS", default=200_000)

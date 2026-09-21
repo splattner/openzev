@@ -30,7 +30,7 @@ scripts/start-demo-environment.sh
 Wait a few seconds for services to start, then access:
 
 - **Frontend (UI):** http://localhost:8080
-- **Backend API:** http://localhost:8001
+- **Backend API:** http://localhost:8080/api/v1/
 - **Database:** localhost:5432 (PostgreSQL)
 - **Message Broker:** localhost:6379 (Redis)
 
@@ -124,9 +124,11 @@ Login as a participant (Anna or Ben):
 
 OpenZEV provides a complete REST API for programmatic access:
 
-- **Swagger UI:** http://localhost:8001/api/docs/
-- **ReDoc:** http://localhost:8001/api/redoc/
-- **API Base URL:** http://localhost:8001/api/v1/
+- **Swagger UI:** http://localhost:8080/api/docs/
+- **ReDoc:** http://localhost:8080/api/redoc/
+- **API Base URL:** http://localhost:8080/api/v1/
+
+Development stack (`docker-compose.dev.yml`) serves the API directly on port 8001.
 
 The API is protected by JWT authentication. Demo credentials work for API access too.
 
@@ -142,6 +144,16 @@ Tag variants:
 - `latest` — newest published release
 - `vX.Y.Z` — specific release version
 - `main` — latest development build (may be unstable)
+
+### Reverse proxies and NUM_PROXIES
+
+`NUM_PROXIES` defaults to `0`, so direct requests cannot choose their own
+rate-limit or audit identity through `X-Forwarded-For`. The default and fullstack
+Compose stacks use `1` behind nginx and expose the API through port 8080 only.
+The development stack keeps `0` because its backend is directly accessible;
+requests through Vite may share a rate-limit bucket. For custom proxies or
+Kubernetes, follow the [proxy configuration guidance](../../charts/openzev/README.md#reverse-proxies-and-num_proxies)
+before enabling trusted hops.
 
 ## What's Next?
 

@@ -114,6 +114,8 @@ spec:
             - name: CSRF_TRUSTED_ORIGINS
               value: {{ $csrfTrustedOrigins | quote }}
             {{- end }}
+            - name: NUM_PROXIES
+              value: {{ .Values.backend.numProxies | quote }}
             {{- range $key, $value := .Values.backend.extraEnv }}
             - name: {{ $key }}
               value: {{ $value | quote }}

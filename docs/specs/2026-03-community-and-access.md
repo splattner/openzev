@@ -677,9 +677,9 @@ budget is refused with `429 Too Many Requests` before the view body runs. The
 test settings (`config/settings_test.py`) disable all scopes so the rest of the
 suite is not throttled.
 
-Limits are keyed by `REMOTE_ADDR`. Behind a reverse proxy, `NUM_PROXIES` must
-be set and the ingress must overwrite `X-Forwarded-For`, otherwise every client
-shares one IP bucket (a whole-office lockout at 10 registrations/hour).
+Limits are keyed by DRF's `SimpleRateThrottle.get_ident()` through `NUM_PROXIES` trusted hops. The audit log records the same hop via `config.client_ip.client_ip`, storing invalid or empty values as `NULL` for inet safety instead of DRF's raw-string bucket. Operator guidance is canonical in `charts/openzev/README.md` ("Reverse proxies and NUM_PROXIES").
+
+Shipped values: default `0`; production-like and fullstack compose set `1` behind overwriting nginx; dev compose keeps `0`; Helm `backend.numProxies` defaults to `0` on the backend deployment only.
 
 ---
 
@@ -1452,7 +1452,7 @@ lists the test classes per module (test counts are the `test_*` methods).
 | `test_mfa.py` | 4 | 28 | TOTP enrolment/removal/recovery codes, two-step login, MFA at the magic-link/onboarding/OAuth/impersonation/email-verification doors, per-account throttle (`SPEC-2026-09-two-factor-authentication`) |
 | `test_cookie_oauth.py` | — (7 module-level test functions) | 7 | Refresh/logout cookie handling; token exchange sets cookies, consumes codes, and stamps `last_login` |
 | `test_impersonation.py` | 5 | 21 | Permissions, audit, cookie round-trip, stop-impersonation |
-| `test_throttling.py` | 1 | 7 | Per-IP 429 boundaries for all six public auth write endpoints; budgets are independent |
+| `test_throttling.py` | 3 | 14 | Per-IP 429 boundaries for all six public auth write endpoints; budgets are independent; production settings wiring and spoofed `X-Forwarded-For` regression coverage; headers neither evade the login bucket without a trusted proxy nor escape the right-most-entry bucket with one trusted hop |
 
 **`zev/tests.py`** (14 test classes):
 
