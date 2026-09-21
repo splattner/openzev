@@ -1138,6 +1138,11 @@ On update:
    linked to a non-participant-role account. Ordinary owners cannot edit their
    own owner-linked participant record through this endpoint.
 
+When a participant has both `address_line1` and `city`, the geocode cache warm-up
+is dispatched with `transaction.on_commit()` after the participant write has
+committed. A rolled-back create or address update therefore cannot enqueue a
+task that reads uncommitted participant data.
+
 ### 8.3 Participant actions
 
 | Action | URL | Method | Permission | Description |
@@ -1645,7 +1650,7 @@ lists the test classes per module (test counts are the `test_*` methods).
 | `test_disabled_zev_scoping.py` | 5 | 27 | ZEV lifecycle phase 2 (§7.1a): creating into a disabled ZEV refused for every `scope_parent_path` model, admin exempt; PATCH/DELETE on an existing `Participant`/`MeteringPoint`/`MeteringPointAssignment` row blocked for the owner, admin exempt, reads unaffected; PATCH/DELETE on an existing `Tariff`/`TariffPeriod`/`MeterReading` row blocked the same way via `assert_target_not_disabled`, including a field unrelated to the ZEV relation (which `assert_within_scope` alone would miss); a participant loses read access to metering points, invoices and readings under a disabled ZEV while the owner keeps it; access returns in full after `enable` |
 | `test_zev_id_filter.py` | 5 | 15 | `?zev_id=` narrowing on list endpoints |
 | `test_transfer.py` | 6 | 66 | Whole-ZEV archive shape, round-trip, rejected archives, schema parity, transfer endpoints |
-| `test_geocoding.py` | 4 | 19 | Building footprint cache, warm tasks, trigger-on-save |
+| `test_geocoding.py` | 4 | 20 | Building footprint cache, warm tasks, trigger-on-save dispatches after the surrounding transaction commits |
 | `test_iban.py` | 4 | 13 | `normalize_iban`/`is_valid_iban` vectors plus shared recipient-address validation: whitespace/case normalization, MOD-97 accept/reject, blank-means-absent, and required address completeness when an IBAN is configured |
 
 ### 16.2 Frontend

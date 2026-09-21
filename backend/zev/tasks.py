@@ -2,6 +2,7 @@
 import logging
 
 from celery import shared_task
+from django.db import transaction
 
 logger = logging.getLogger(__name__)
 
@@ -32,4 +33,8 @@ def trigger_geocode_if_address_present(participant) -> None:
     calls for an unchanged address.
     """
     if participant.address_line1 and participant.city:
-        warm_participant_geocode_cache_task.delay(str(participant.pk))
+        participant_id = str(participant.pk)
+        transaction.on_commit(
+            lambda: warm_participant_geocode_cache_task.delay(participant_id),
+            robust=True,
+        )

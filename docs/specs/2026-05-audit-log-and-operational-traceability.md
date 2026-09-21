@@ -352,9 +352,9 @@ metadata:
 
 | Property | Source |
 |---|---|
-| `request.audit_request_id` | Generated UUID or upstream `X-Request-ID` |
+| `request.audit_request_id` | Upstream `X-Request-ID` only when it matches `^[A-Za-z0-9._:-]{1,64}$`; otherwise a server-generated UUID4 (never truncate a client value) |
 | `request.audit_ip_address` | `config.client_ip.client_ip(request)`: `REMOTE_ADDR` when `NUM_PROXIES=0` or `X-Forwarded-For` is absent; otherwise the entry `-min(NUM_PROXIES, number of entries)` in the comma-separated header, stripped of whitespace |
-| `request.audit_user_agent` | Request header |
+| `request.audit_user_agent` | Request header, truncated to 500 chars before save |
 | `request.audit_source` | `api` |
 
 The middleware must not persist events itself. It only prepares context for the
@@ -382,6 +382,20 @@ Required functions:
 
 `record_audit_event(...)` must accept either explicit request context or
 explicit metadata for Celery/system workflows.
+
+Invalid request context is dropped before insert (`request_id` must match
+`REQUEST_ID_PATTERN`, unparseable IPs become `NULL`, display fields are
+truncated to their column limits); database failures propagate so the
+surrounding transaction rolls back. The audit write is never silently dropped.
+
+Mixin-driven events (`AuditedUpdateMixin`, `AuditedCreateDestroyMixin` in
+`backend/audit/mixins.py`) run the model write and the audit insert inside
+one `transaction.atomic()` block, so a failing audit insert rolls back the
+mutation it describes. The update mixin reads its before-snapshot outside
+that block, so the recorded diff is best-effort under concurrent writes.
+Hand-written `record_audit_event` call sites outside
+these mixins (invoice workflow transitions, user CRUD, account link/unlink)
+are follow-up work and are not yet transactional.
 
 ### 6.3 Initial workflow coverage matrix
 
@@ -703,6 +717,23 @@ update, and impersonation-denied each emit an audit event with expected payload.
 participant update, metering delete-readings, metering point + assignment
 updates, tariff create/update, tariff period update, user update, and the
 import-without-file failure each emit the correct audit event.
+
+### Backend — `backend/audit/test_request_context.py` (14 tests)
+
+| Test | Asserts |
+|---|---|
+| `test_request_id_boundaries` | Absent/empty/65-char/space/`<`/newline `X-Request-ID` yield a server UUID; valid and 64-char values pass through (middleware level, subtests) |
+| `test_long_user_agent_is_truncated` | 600-char user agent is truncated to 500 chars |
+| `test_long_request_id_is_replaced_with_server_uuid` | 65-char `X-Request-ID` yields a server UUIDv4; response 2xx |
+| `test_missing_request_id_generates_server_uuid` | Absent `X-Request-ID` yields a server UUIDv4; response 2xx |
+| `test_invalid_forwarded_for_results_in_null_ip` | `X-Forwarded-For: notanip` with `NUM_PROXIES=1` yields `ip_address=None`; response 2xx |
+| `test_valid_request_id_and_ip_are_preserved` | Valid `X-Request-ID` / IP pass through unchanged |
+| `test_invalid_context_is_dropped_before_insert` | Overlong request ID, garbage IP, and long user agent are sanitized without a retry |
+| `test_invalid_context_succeeds_inside_atomic_block` | Sanitized insert succeeds inside `transaction.atomic()` (no `TransactionManagementError`) |
+| `test_overlong_display_fields_are_truncated` | Overlong `actor_display` / `summary` / `target_display` / `correlation_id` are capped to column limits |
+| `test_failed_audit_rolls_back_model_change` | `record_audit_event` raising `DatabaseError` rolls back the PATCH |
+| `test_create_emits_audit_event` / `test_failed_audit_rolls_back_create` | POST emits `participant.create`; audit failure rolls the create back |
+| `test_destroy_emits_audit_event` / `test_failed_audit_rolls_back_destroy` | DELETE emits `participant.delete`; audit failure rolls the delete back |
 
 ### Backend — `backend/audit/test_summary_parity.py`
 

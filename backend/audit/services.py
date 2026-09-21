@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import ipaddress
 from datetime import date, datetime
 from decimal import Decimal
 from typing import Any, Iterable
 from uuid import UUID
 
+from .constants import REQUEST_ID_PATTERN
 from .models import AuditEvent, AuditEventSource, AuditEventStatus
 
 
@@ -153,6 +155,50 @@ def snapshot_actor(user) -> dict[str, Any]:
     }
 
 
+# Column limits from ``AuditEvent``. Free-text, display, and correlation
+# fields are truncated so a long label can never cost the row; lookup
+# identifiers (``target_id`` etc.) are left intact so a violation still
+# surfaces instead of silently corrupting a reference.
+MAX_SUMMARY_LENGTH = 500
+MAX_DISPLAY_LENGTH = 255
+MAX_CORRELATION_ID_LENGTH = 64
+MAX_USER_AGENT_LENGTH = 500
+
+
+def _coerce_ip_address(value: Any) -> str | None:
+    """Return ``value`` when it fits an ``inet`` column, else ``None``.
+
+    Covers non-middleware callers (Celery, management commands) whose context
+    never passed through ``config.client_ip``. Scoped IPv6 is excluded because
+    PostgreSQL's ``inet`` type cannot store zone identifiers.
+    """
+    if value is None:
+        return None
+    candidate = str(value).strip()
+    if not candidate:
+        return None
+    try:
+        addr = ipaddress.ip_address(candidate)
+    except ValueError:
+        return None
+    if getattr(addr, "scope_id", None):
+        return None
+    return candidate
+
+
+def _sanitize_request_context(
+    request_id: Any, ip_address: Any, user_agent: Any
+) -> tuple[str | None, str | None, str]:
+    """Drop invalid request context before insert; never raise."""
+    if not isinstance(request_id, str) or not REQUEST_ID_PATTERN.fullmatch(request_id):
+        request_id = None
+    return (
+        request_id,
+        _coerce_ip_address(ip_address),
+        _truncate_text(str(user_agent or ""), limit=MAX_USER_AGENT_LENGTH),
+    )
+
+
 def record_audit_event(
     *,
     action_category: str,
@@ -205,25 +251,34 @@ def record_audit_event(
         if hasattr(potential_zev, "id"):
             resolved_zev = potential_zev
 
-    event = AuditEvent.objects.create(
+    # Invalid request context is dropped before insert; a real database
+    # failure propagates so the surrounding transaction rolls back.
+    request_id, ip_address, user_agent = _sanitize_request_context(
+        request_id, ip_address, user_agent
+    )
+
+    return AuditEvent.objects.create(
         actor_user=actor_snapshot["actor_user"],
         actor_role_snapshot=actor_snapshot["actor_role_snapshot"],
-        actor_display=actor_snapshot["actor_display"],
+        actor_display=_truncate_text(actor_snapshot["actor_display"], limit=MAX_DISPLAY_LENGTH),
         zev=resolved_zev,
         action_category=action_category,
         action_type=action_type,
         target_type=target_type,
         target_id=str(target_id or ""),
-        target_display=str(target_display or ""),
+        target_display=_truncate_text(str(target_display or ""), limit=MAX_DISPLAY_LENGTH),
         status=status,
         request_id=request_id,
-        correlation_id=correlation_id,
+        correlation_id=(
+            _truncate_text(str(correlation_id), limit=MAX_CORRELATION_ID_LENGTH)
+            if correlation_id is not None
+            else None
+        ),
         source=request_source,
         ip_address=ip_address,
         user_agent=user_agent,
-        summary=summary,
+        summary=_truncate_text(summary, limit=MAX_SUMMARY_LENGTH),
         reason=_truncate_text(reason or "", limit=2000),
         changes_json=redact_metadata(changes or {}),
         metadata_json=redact_metadata(metadata or {}),
     )
-    return event

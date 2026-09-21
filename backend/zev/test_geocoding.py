@@ -5,6 +5,7 @@ from unittest import mock
 
 import pytest
 from django.core.cache import cache
+from django.db import transaction
 
 from zev import geocoding
 from zev.tasks import trigger_geocode_if_address_present, warm_participant_geocode_cache_task
@@ -160,16 +161,36 @@ class TestWarmParticipantGeocodeCacheTask:
 
 
 class TestTriggerGeocodeIfAddressPresent:
-    def test_enqueues_when_address_present(self):
+    def test_enqueues_when_address_present(self, django_capture_on_commit_callbacks):
         participant = factories.ParticipantFactory(
             address_line1="Main Street 1", postal_code="8000", city="Zurich",
         )
-        with mock.patch("zev.tasks.warm_participant_geocode_cache_task.delay") as delay:
+        with (
+            mock.patch("zev.tasks.warm_participant_geocode_cache_task.delay") as delay,
+            django_capture_on_commit_callbacks(execute=True),
+        ):
             trigger_geocode_if_address_present(participant)
         delay.assert_called_once_with(str(participant.pk))
 
-    def test_does_not_enqueue_without_an_address(self):
+    def test_enqueues_only_after_transaction_commits(self, django_capture_on_commit_callbacks):
+        participant = factories.ParticipantFactory(
+            address_line1="Main Street 1", postal_code="8000", city="Zurich",
+        )
+        with (
+            mock.patch("zev.tasks.warm_participant_geocode_cache_task.delay") as delay,
+            django_capture_on_commit_callbacks(execute=True),
+        ):
+            with transaction.atomic():
+                trigger_geocode_if_address_present(participant)
+                delay.assert_not_called()
+            delay.assert_not_called()
+        delay.assert_called_once_with(str(participant.pk))
+
+    def test_does_not_enqueue_without_an_address(self, django_capture_on_commit_callbacks):
         participant = factories.ParticipantFactory()
-        with mock.patch("zev.tasks.warm_participant_geocode_cache_task.delay") as delay:
+        with (
+            mock.patch("zev.tasks.warm_participant_geocode_cache_task.delay") as delay,
+            django_capture_on_commit_callbacks(execute=True),
+        ):
             trigger_geocode_if_address_present(participant)
         delay.assert_not_called()

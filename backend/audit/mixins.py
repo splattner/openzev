@@ -1,6 +1,8 @@
 """DRF mixins that wire views into the audit trail."""
 from __future__ import annotations
 
+from django.db import transaction
+
 from .models import AuditEventStatus
 from .services import build_diff, build_instance_snapshot, record_audit_event
 
@@ -44,26 +46,24 @@ class AuditedUpdateMixin:
     def perform_update(self, serializer):
         tracked_fields = self.get_audit_tracked_fields(serializer)
         before = build_instance_snapshot(self.get_object(), tracked_fields)
-        # Through ``super()`` rather than ``serializer.save()``: this mixin sits
-        # in front of ``ZevScopedQuerySetMixin``, whose ``perform_update``
-        # enforces that the write stays inside the caller's own ZEV. Saving
-        # directly would step over that check.
-        super().perform_update(serializer)
-        instance = serializer.instance
-        after = build_instance_snapshot(instance, tracked_fields)
+        # Preserve downstream ZEV-scope checks; the saved object lands on serializer.instance.
+        with transaction.atomic():
+            super().perform_update(serializer)
+            instance = serializer.instance
+            after = build_instance_snapshot(instance, tracked_fields)
 
-        record_audit_event(
-            request=self.request,
-            action_category=self.audit_action_category,
-            action_type=self.audit_action_type,
-            target_type=self.audit_target_type,
-            target=instance,
-            target_id=str(instance.pk),
-            target_display=self.get_audit_target_display(instance),
-            summary=self.get_audit_summary(instance),
-            status=AuditEventStatus.SUCCESS,
-            changes=build_diff(before, after, tracked_fields),
-        )
+            record_audit_event(
+                request=self.request,
+                action_category=self.audit_action_category,
+                action_type=self.audit_action_type,
+                target_type=self.audit_target_type,
+                target=instance,
+                target_id=str(instance.pk),
+                target_display=self.get_audit_target_display(instance),
+                summary=self.get_audit_summary(instance),
+                status=AuditEventStatus.SUCCESS,
+                changes=build_diff(before, after, tracked_fields),
+            )
         return instance
 
 
@@ -106,22 +106,21 @@ class AuditedCreateDestroyMixin:
         return {}
 
     def perform_create(self, serializer):
-        # Through ``super()`` for the ZEV-scope check (see perform_update
-        # above); ``serializer.instance`` after the save, because plain
-        # DRF's perform_create returns None.
-        super().perform_create(serializer)
-        instance = serializer.instance
-        record_audit_event(
-            request=self.request,
-            action_category=self.audit_action_category,
-            action_type=self.get_audit_create_action_type(),
-            target_type=self.audit_target_type,
-            target=instance,
-            target_id=str(instance.pk),
-            target_display=self.get_audit_target_display(instance),
-            summary=self.get_audit_create_summary(instance),
-            metadata=self.get_audit_create_metadata(instance),
-        )
+        # Same routing as perform_update above; plain DRF returns None here.
+        with transaction.atomic():
+            super().perform_create(serializer)
+            instance = serializer.instance
+            record_audit_event(
+                request=self.request,
+                action_category=self.audit_action_category,
+                action_type=self.get_audit_create_action_type(),
+                target_type=self.audit_target_type,
+                target=instance,
+                target_id=str(instance.pk),
+                target_display=self.get_audit_target_display(instance),
+                summary=self.get_audit_create_summary(instance),
+                metadata=self.get_audit_create_metadata(instance),
+            )
         return instance
 
     def perform_destroy(self, instance):
@@ -129,14 +128,15 @@ class AuditedCreateDestroyMixin:
         target_display = self.get_audit_target_display(instance)
         summary = self.get_audit_destroy_summary(instance)
         metadata = self.get_audit_destroy_metadata(instance)
-        super().perform_destroy(instance)
-        record_audit_event(
-            request=self.request,
-            action_category=self.audit_action_category,
-            action_type=self.get_audit_destroy_action_type(),
-            target_type=self.audit_target_type,
-            target_id=target_id,
-            target_display=target_display,
-            summary=summary,
-            metadata=metadata,
-        )
+        with transaction.atomic():
+            super().perform_destroy(instance)
+            record_audit_event(
+                request=self.request,
+                action_category=self.audit_action_category,
+                action_type=self.get_audit_destroy_action_type(),
+                target_type=self.audit_target_type,
+                target_id=target_id,
+                target_display=target_display,
+                summary=summary,
+                metadata=metadata,
+            )
