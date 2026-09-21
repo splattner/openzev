@@ -50,6 +50,7 @@ class PermissionTests(ApiTestCase):
             ("post", f"{BASE}/jobs/"),
             ("get", f"{BASE}/jobs/{job.pk}/"),
             ("get", f"{BASE}/jobs/{job.pk}/download/"),
+            ("get", f"{BASE}/status/"),
         ]
 
     def test_every_endpoint_refuses_anonymous_callers(self):
@@ -415,3 +416,51 @@ class DownloadTests(ApiTestCase):
         self.addCleanup(outside.unlink)
         BackupJob.objects.filter(pk=job.pk).update(archive_location=f"{self.dest_dir.name}/../outside.txt")
         self.assertEqual(self.client.get(f"{BASE}/jobs/{job.pk}/download/").status_code, 410)
+
+
+class StatusTests(ApiTestCase):
+    def status(self):
+        return self.client.get(f"{BASE}/status/").data
+
+    def test_a_fresh_instance_reports_no_backups_and_no_key(self):
+        data = self.status()
+        self.assertFalse(data["encrypted"])
+        self.assertEqual(data["encryption_key_fingerprint"], "")
+        self.assertEqual((data["last_successful"], data["last_failed"], data["age_hours"]), (None, None, None))
+        self.assertEqual(data["destinations_enabled"], 0)
+
+    @override_settings(BACKUP_ENCRYPTION_KEYS=[KEY])
+    def test_a_configured_key_is_reported_by_fingerprint_never_by_value(self):
+        from backups import crypto
+
+        data = self.status()
+        self.assertTrue(data["encrypted"])
+        self.assertEqual(data["encryption_key_fingerprint"], crypto.key_fingerprint(KEY))
+        self.assertNotIn(KEY, str(data))
+
+    @override_settings(BACKUP_ENCRYPTION_KEYS=["too-short"])
+    def test_a_key_that_is_set_but_unusable_is_called_out_not_read_as_unset(self):
+        data = self.status()
+        self.assertFalse(data["encrypted"])
+        self.assertIn("shorter than", data["encryption_key_problem"])
+
+    @override_settings(BACKUP_S3_ACCESS_KEY_ID="ENV", BACKUP_S3_SECRET_ACCESS_KEY="envsecret")
+    def test_environment_credentials_are_reported_without_their_values(self):
+        data = self.status()
+        self.assertTrue(data["environment_credentials"])
+        self.assertNotIn("envsecret", str(data))
+
+    def test_last_successful_and_last_failed_and_age(self):
+        destination = self.local_destination()
+        ok = BackupJob.objects.create(destination=destination)
+        tasks.execute_backup_job(ok.pk)
+        failed = BackupJob.objects.create(destination=destination, status=BackupJobStatus.FAILED, error_message="boom")
+        data = self.status()
+        self.assertEqual(data["last_successful"]["id"], str(ok.pk))
+        self.assertEqual(data["last_failed"]["id"], str(failed.pk))
+        self.assertLess(data["age_hours"], 0.1)
+        self.assertEqual(data["destinations_enabled"], 1)
+
+    def test_disabled_destinations_are_not_counted(self):
+        self.local_destination(enabled=False)
+        self.assertEqual(self.status()["destinations_enabled"], 0)

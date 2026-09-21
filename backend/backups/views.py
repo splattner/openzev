@@ -8,8 +8,10 @@ Nothing here is ZEV-scoped: a backup spans the instance, so these views use
 import logging
 from pathlib import Path
 
+from django.conf import settings
 from django.db import transaction
 from django.http import FileResponse
+from django.utils import timezone
 from rest_framework import generics, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -18,6 +20,7 @@ from accounts.permissions import IsAdmin
 from audit.models import AuditActionCategory, AuditEventStatus
 from audit.services import build_diff, build_instance_snapshot, record_audit_event
 
+from . import crypto
 from .models import BackupDestination, BackupJob, BackupJobStatus
 from .serializers import BackupDestinationSerializer, BackupJobCreateSerializer, BackupJobSerializer
 from .storage import DestinationError, probe_destination
@@ -229,3 +232,49 @@ class BackupJobDownloadView(APIView):
             return Response({"detail": "The archive file is no longer available."}, status=status.HTTP_410_GONE)
 
         return FileResponse(resolved.open("rb"), as_attachment=True, filename=job.archive_name)
+
+
+class BackupStatusView(APIView):
+    """What the admin UI needs to say honestly whether backups are safe.
+
+    ``encrypted`` is whether a key is *configured*, not whether the last archive
+    was encrypted (each job records that itself): it drives the warning shown
+    before anyone has run a backup. ``environment_credentials`` explains why a
+    destination's stored S3 secret is being ignored. Staleness against a
+    schedule arrives with the scheduler (phase 4).
+    """
+
+    permission_classes = [IsAdmin]
+
+    def get(self, request):
+        try:
+            encrypted = crypto.encryption_configured()
+            fingerprint = crypto.active_fingerprint()
+            key_problem = ""
+        except crypto.BackupCryptoError as exc:
+            # A configured-but-unusable key must be visible, not read as "no key".
+            encrypted, fingerprint, key_problem = False, "", str(exc)
+
+        last_ok = (
+            BackupJob.objects.select_related("destination", "zev")
+            .filter(status=BackupJobStatus.COMPLETED).order_by("-completed_at").first()
+        )
+        last_failed = (
+            BackupJob.objects.select_related("destination", "zev")
+            .filter(status=BackupJobStatus.FAILED).order_by("-completed_at", "-created_at").first()
+        )
+        age_hours = (
+            round((timezone.now() - last_ok.completed_at).total_seconds() / 3600, 1) if last_ok else None
+        )
+        return Response({
+            "encrypted": encrypted,
+            "encryption_key_fingerprint": fingerprint,
+            "encryption_key_problem": key_problem,
+            "environment_credentials": bool(
+                settings.BACKUP_S3_ACCESS_KEY_ID and settings.BACKUP_S3_SECRET_ACCESS_KEY
+            ),
+            "destinations_enabled": BackupDestination.objects.filter(enabled=True).count(),
+            "last_successful": BackupJobSerializer(last_ok).data if last_ok else None,
+            "last_failed": BackupJobSerializer(last_failed).data if last_failed else None,
+            "age_hours": age_hours,
+        })
