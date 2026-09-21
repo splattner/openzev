@@ -42,7 +42,7 @@ class Command(BaseCommand):
         self.stdout.write(f"  created    {manifest['created_at']}")
         self.stdout.write(f"  instance   {manifest.get('instance_name') or '-'}")
         self.stdout.write(f"  version    {manifest.get('openzev_version') or '-'}")
-        self.stdout.write(f"  zevs       {', '.join(z['name'] for z in manifest['zevs']) or '-'}")
+        self.stdout.write(f"  zevs       {', '.join(z['name'] + ' [' + z['id'] + ']' for z in manifest['zevs']) or '-'}")
         self.stdout.write(f"  members    {result['members']}")
         self.stdout.write(f"  records    {result['records']:,}")
         encryption = manifest.get("encryption")

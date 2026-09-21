@@ -19,7 +19,7 @@
 |---|---|---|
 | 1 — back up | **Implemented** | Archive writer, encryption, checksums, destinations, `BackupJob`, `openzev_backup`, `openzev_backup_verify`, admin API and `backup` tab. Sections 4.1, 4.2, 5, 6.1–6.3, 7 and 9 describe what shipped. |
 | 2 — restore the instance | **Implemented** | `restore.py`, `openzev_restore --mode instance`, `storage.fetch_archive`. §6.5 describes what shipped; deviations 10–15 below. CLI only, as designed. |
-| 3 — restore one ZEV | Planned | §4.3, §6.6. |
+| 3 — restore one ZEV | **Implemented** | `RestoreJob`, `restore_zev.py`, `execute_restore_job`, `/api/v1/backups/restores/`, `openzev_restore --mode zev`, the *Restore a community* section. §4.3, §5 and §6.6 describe what shipped; deviations 16–23 below. |
 | 4 — operate | Planned | §6.4, retention fields, verify endpoint, staleness. |
 
 Sections describing later phases are the design to build against. **Where phase 1
@@ -29,7 +29,7 @@ match the code**; the differences and their reasons are listed in
 
 ### Deviations from the first design
 
-Made while implementing phases 1 and 2; each is reflected in the sections below.
+Made while implementing phases 1 to 3; each is reflected in the sections below.
 
 1. **Sections are JSON Lines written by Django's serializer, not hand-written field
    lists, and readings are JSON Lines too, not per-meter CSV.** Every concrete
@@ -91,6 +91,52 @@ Made while implementing phases 1 and 2; each is reflected in the sections below.
     (`archive._ExactJSONEncoder`). Django's own JSON encoder trims to milliseconds,
     which a round-trip test against the stored rows caught: a restored row must equal
     the stored one. Found by the phase 2 tests, fixed in the phase 1 writer.
+16. **`RestoreJob` has no `mode` and gains `safety_destination`.** Every row is a
+    per-ZEV restore (whole-instance restore leaves an audit event, not a row —
+    deviation 11), so a discriminator would only ever hold one value. Where the
+    safety backup is written is a real input, so it is a field: it defaults to the
+    source backup's destination and is required when the community exists and the
+    job is not a dry run.
+17. **The plan reports `{backup, current}` counts per section, not
+    create/replace/delete.** Meter readings run to millions of rows; holding their
+    keys in memory to classify each one buys nothing over "the backup has 63,264,
+    there are 0 now". What the operator needs to *decide* — which issued records
+    would be lost — is reported exactly, as conflicts.
+18. **The audit trail is not restored at all in per-ZEV mode**, rather than "restored
+    but never deleted". It is append-only, already holds everything the backup's
+    copy does, and inserting archive events into a live trail would collide with
+    them (or, for a deleted community, with the orphaned copies that survive with
+    a null community). The plan shows the section as *kept*.
+19. **The community's own row is updated in place, never deleted and recreated.**
+    Deleting it runs `SET NULL` on every audit event that names it and on every
+    account whose `preferred_zev` it is — rewriting exactly what §6.6 promises not
+    to touch. A community that does not exist is inserted.
+20. **Orphaned issued contracts are replaced by the backup's copy.** When a community
+    is deleted its `ContractIssue` rows survive with a null community; recreating it
+    would collide with them on primary key, so those the backup also holds are
+    deleted and reloaded, which relinks them. Nothing the backup lacks is touched.
+21. **Conflicts are *overridable* or *hard*.** `force` covers what the design named
+    (a sent/paid invoice or an issued contract the restore would delete) plus a
+    sent/paid invoice it would **roll back** to an earlier status
+    (`sent_invoice_reverted`). A meter id now owned by another community is **not**
+    forceable, contrary to the first design: there is no way to honour it without
+    stealing or duplicating another community's metering point. The same holds for
+    a referenced price source that no longer exists, an owner with no matching
+    account when the community must be recreated, and an export or another restore
+    in flight. **A bulk invoice generation is not detected** — it has no job row to
+    look for — and is called out in the user guide instead.
+22. **Conflicts are evaluated twice**: for the plan, and again inside the transaction
+    under `select_for_update()` on the community row, after the safety backup. The
+    safety backup can take minutes, and the world can change in them. SQLite ignores
+    row locks, so the test asserts that the lock is taken on the community row (and
+    not for a dry run).
+23. **API additions.** `GET /restores/` (a list, filterable by `zev_id`), an optional
+    `safety_destination_id`, `409` when the community already has a queued or running
+    restore, and a refused restore is a `failed` job that carries its `plan_json`, so
+    the UI can show *why*. A failed verification stores its failures in `plan_json`
+    the same way. Storage rollback is also stronger than designed: a file the restore
+    overwrites is copied aside and put back on failure (`MediaUndo`), for instance
+    restore too.
 
 ## 1. Problem and outcome
 
@@ -271,27 +317,29 @@ with retention in phase 4.
 
 ### 4.3 `RestoreJob`
 
-**Model:** `backups.models.RestoreJob`
+**Model:** `backups.models.RestoreJob` (migration `0002_restorejob`; listed in
+`EXCLUDED_MODELS`: it describes archives, it is not part of one).
 
 | Field | Type | Default | Constraints / Notes |
 |---|---|---|---|
 | `id` | `UUIDField` | `uuid4` | primary key |
-| `mode` | `CharField(10)` | `zev` | choices: `instance`, `zev`. `instance` rows are only created by the CLI |
-| `target_zev_id` | `UUIDField` | `null` | **not** a foreign key: a restore may recreate a ZEV that was deleted, so the target need not exist when the job is created |
+| `target_zev_id` | `UUIDField` | | indexed. **Not** a foreign key: a restore may recreate a community that was deleted, so the target need not exist when the job is created |
 | `target_zev_name` | `CharField(200)` | `""` | snapshot, for a readable log after deletion |
 | `source_backup` | `FK(BackupJob, SET_NULL)` | `null` | |
 | `source_description` | `CharField(500)` | `""` | for a CLI-supplied path or URI with no `BackupJob` row |
 | `dry_run` | `BooleanField` | `True` | defaults to the safe value |
-| `force` | `BooleanField` | `False` | override for the destructive-content refusals in §6.6 |
-| `status` | `CharField(20)` | `queued` | as `BackupJob` |
-| `plan_json` | `JSONField` | `dict` | the preflight plan (§6.5) |
+| `force` | `BooleanField` | `False` | override for the *overridable* conflicts of §6.6 |
+| `status` | `CharField(20)` | `queued` | `BackupJobStatus` |
+| `plan_json` | `JSONField` | `dict` | the plan (§6.6); on a refusal, the plan that refused; on a damaged archive, `{"verification_failures": [...]}` |
 | `safety_backup` | `FK(BackupJob, SET_NULL, related_name="+")` | `null` | the pre-restore backup |
-| `requester` | `FK(User, SET_NULL)` | `null` | |
+| `safety_destination` | `FK(BackupDestination, SET_NULL, related_name="+")` | `null` | where it is written |
+| `requester` | `FK(User, SET_NULL)` | `null` | `null` for the command line |
 | `created_at` / `started_at` / `completed_at` | `DateTimeField` | | |
-| `error_message` | `CharField(500)` | `""` | |
+| `error_message` | `CharField(500)` | `""` | user-safe |
 
-**Serializer:** `RestoreJobSerializer` — all fields read-only except on create,
-where `source_backup`, `target_zev_id`, `dry_run` and `force` are writable.
+**Serializer:** `RestoreJobSerializer`, read-only: the fields above plus
+`source_archive_name` and `source_created_at` (from the source backup's manifest).
+`RestoreJobCreateSerializer` validates the input (§5).
 
 ### 4.4 Settings
 
@@ -326,13 +374,19 @@ Phase 1:
 | `/api/v1/backups/jobs/{id}/download/` | GET | `FileResponse` for a completed job in a **local** destination. 409 when there is no artifact or the archive is in S3 (fetch it from the bucket); 410 when the file, or its destination, no longer exists, or when the recorded location does not resolve inside the destination's directory |
 | `/api/v1/backups/status/` | GET | `{encrypted, encryption_key_fingerprint, encryption_key_problem, environment_credentials, destinations_enabled, last_successful, last_failed, age_hours}`. `encrypted` is whether a *usable key is configured*; a configured-but-unusable key sets `encryption_key_problem` instead, so it is not read as "no key". Key value never appears |
 
+Phase 3:
+
+| Endpoint | Method | Behaviour |
+|---|---|---|
+| `/api/v1/backups/restores/` | GET | Newest first, a plain list. Filters `?zev_id=`, `?limit=` (1–100, default 25) |
+| `/api/v1/backups/restores/` | POST | `{source_backup_id, target_zev_id, dry_run (default true), force (default false), safety_destination_id?}` → 202. Persist, then enqueue on commit; a failed enqueue marks the job `failed` and returns 503. **400** for: `mode: "instance"` ("Whole-instance restore is only available as a management command."), an unknown or unfinished backup, a community the backup's manifest does not hold, an unknown or disabled safety destination, and a real restore of an existing community with nowhere to write the safety backup (the source backup's destination is the default). **409** when that community already has a queued or running restore. Audited `restore.created` on the community |
+| `/api/v1/backups/restores/{id}/` | GET | Status and `plan_json`, for polling |
+
 Later phases:
 
 | Endpoint | Method | Phase | Behaviour |
 |---|---|---|---|
 | `/api/v1/backups/jobs/{id}/verify/` | POST | 4 | Streams the artifact, decrypts if needed, checks every manifest checksum and count. 200 `{"ok": true, "members": n}` or 400 `{"detail", "failures": [...]}`. Creates nothing (the CLI `openzev_backup_verify` ships in phase 1) |
-| `/api/v1/backups/restores/` | POST | 3 | `{source_backup_id, target_zev_id, dry_run, force}` → 202. `mode` is forced to `zev`; a request naming `instance` is 400 with "Whole-instance restore is only available as a management command." |
-| `/api/v1/backups/restores/{id}/` | GET | 3 | Status and `plan_json` |
 
 `status` gains `stale` in phase 4: `age_hours > 2 × the configured schedule
 interval`, or `true` when a schedule exists and no backup has ever succeeded.
@@ -605,52 +659,91 @@ schema fit) without writing.
 
 ### 6.6 Per-ZEV restore — API and `--mode zev`
 
-The destructive one. Rules, in the order they are enforced:
+The destructive one, and the one that runs next to live data it must not disturb.
+`backups.restore_zev.restore_zev(source, zev_id, dry_run, force, safety_backup,
+exclude_job)` does the work; `backups.tasks.execute_restore_job` is its job runner
+(claim, audit, safe messages, guarded publish — as for backups), called by the Celery
+task `run_restore_job` and directly by the command. Rules, in the order enforced:
 
-1. **Preflight plan** (`plan_json`), always computed, and the whole result when
-   `dry_run`:
+1. **Open and verify** the archive (`verify_open_archive`), find the community in the
+   manifest (else "does not contain that community"), and check migrations exactly
+   as §6.5 does. An instance backup and a single-community backup both work.
+2. **Plan** (`plan_json`), always computed, and the whole result of a dry run. Facts
+   are read from the archive without loading rows (`read_facts`: invoice statuses,
+   issued-contract ids, meter ids, referenced price sources, the `account_refs`),
+   then compared with the database (`evaluate`):
 
    ```json
    {
-     "zev": {"id": "…", "name": "Sonnenhof", "exists_now": true},
-     "sections": {
-       "participants": {"create": 2, "replace": 18, "delete": 1},
-       "invoices": {"create": 0, "replace": 96, "delete": 4}
-     },
-     "accounts": {"relink": 18, "missing": ["neu@example.com"]},
-     "conflicts": [
-       {"kind": "sent_invoice_deleted", "detail": "INV-2026-041 (paid)"},
-       {"kind": "meter_id_owned_by_other_zev", "detail": "CH99…0859 → Bergblick"}
-     ],
-     "safety_backup_id": "…"
+     "zev": {"id": "…", "name": "Sonnenhof", "exists_now": true, "current_name": "Sonnenhof (renamed)"},
+     "backup": {"created_at": "…", "scope": "instance", "instance_name": "", "openzev_version": "…"},
+     "sections": {"readings": {"backup": 63264, "current": 0, "kept": false},
+                  "audit_events": {"backup": 8, "current": 8, "kept": true}},
+     "accounts": {"relink": 3, "missing": ["neu@example.com"]},
+     "media": {"files": 12, "missing": 0},
+     "conflicts": [{"kind": "sent_invoice_deleted", "detail": "TRF-00041 (paid)", "overridable": true}],
+     "blocked": true,
+     "safety_backup_id": null,
+     "restored": null
    }
    ```
 
-2. **Refuse on conflicts** unless `force`:
-   - an `Invoice` in `sent`/`paid` status that the restore would delete;
-   - a `ContractIssue` that the restore would delete — documented as *"an
-     immutable archive"*, and the participant's signed document;
-   - a `meter_id` in the archive that now belongs to a **different** ZEV
-     (`MeteringPoint.meter_id` is `unique=True` instance-wide).
-   `force` is recorded on the `RestoreJob` and named in the audit event.
-3. **Safety backup.** A `BackupJob` with `scope="zev"`, `trigger="pre_restore"`,
-   run to completion before any write, linked as `RestoreJob.safety_backup`. A
-   failed safety backup aborts the restore.
-4. **Lock.** `select_for_update()` on the `Zev` row for the duration, and refuse
-   when a bulk invoice generation or export job for that ZEV is `queued`/`running`
-   — a restore interleaved with an invoice run is corruption.
-5. **Replace**, in one transaction: delete the ZEV's current rows in reverse
-   dependency order (**excluding `AuditEvent`**), then create from the archive with
-   original primary keys, then restore that ZEV's invoice PDFs into `MEDIA_ROOT`.
-6. **Relink accounts by natural key.** `Participant.user` and `Zev.owner` resolve
-   through `User.email` (falling back to `username`). A missing account is
-   reported in `plan_json.accounts.missing` and left unlinked. **No account row is
-   created, modified, or deleted by a per-ZEV restore** — not a password hash, not
-   an MFA device, not `session_version`.
-7. **Append one audit event**, never rewrite. `action_type="zev.restored"`,
-   `zev=<target>`, metadata naming the source backup, its `created_at`, the
-   section counts and whether `force` was used. Existing audit rows — including
-   the restored ZEV's — are untouched (ADR 0023).
+3. **Refuse on conflicts.** *Overridable* (need `force`): `sent_invoice_deleted`,
+   `sent_invoice_reverted` (a sent/paid invoice whose backed-up status differs),
+   `contract_issue_deleted` (an issued contract the backup lacks — documented as *"an
+   immutable archive"*). *Hard* (never forceable): `meter_id_owned_by_other_zev`,
+   `referenced_row_missing` (a price source the backup points at that is gone),
+   `owner_not_found` (the community must be recreated and its owner has no matching
+   account), `export_in_progress`, `restore_in_progress`. Each kind lists up to 20
+   details and then "and N more". A dry run returns the plan with `blocked: true`
+   instead of failing; a real run raises `RestoreRefused` and the job fails with the
+   plan attached. See deviation 21.
+4. **Safety backup**, only for a real run of a community that exists: a `BackupJob`
+   with `scope="zev"`, `trigger="pre_restore"`, run to completion in-process before
+   any write and linked as `RestoreJob.safety_backup`, to
+   `safety_destination` (default: the source backup's). If it fails, the restore
+   fails with "The safety backup failed, so nothing was restored" and nothing was
+   written. It is the way back: a restore from it returns the community to the moment
+   before.
+5. **Lock and re-check.** In one transaction: `select_for_update()` on the `Zev` row
+   (serialising with contract issuance, which locks it too), then `evaluate` again
+   (deviation 22).
+6. **Replace**, in that transaction: delete the community's rows dependants-first —
+   **not the `Zev` row, not `AuditEvent`** — plus any orphaned issued contract the
+   backup also holds; update the `Zev` row in place or insert it; load every other
+   section with original primary keys through the same allow-list, count check and
+   timestamp handling as §6.5; `check_constraints()`; verify per-table counts; restore
+   the community's invoice PDFs under their exact names (`MediaUndo`); reconcile the
+   sequence of the one integer-keyed model in scope
+   (`InvoiceDynamicSourceEvidence`).
+7. **Relink accounts by natural key** (`resolve_accounts`, applied to every user
+   foreign key of the community's rows while loading). Each backed-up user id is
+   looked up through `account_refs.json` and matched to today's account by `email`
+   (case-insensitive), then `username`; none, or more than one, leaves the link
+   empty and is listed in `plan.accounts.missing`. The one required link, `Zev.owner`,
+   falls back to the community's current owner, and blocks a recreation with
+   `owner_not_found`. **No account row is created, modified or deleted.**
+8. **Audit, never rewrite.** `restore.created` (API), `restore.started`, then
+   `zev.restored` with metadata naming the source backup and its time, rows written
+   per model, accounts relinked and missing, the kinds of conflict overridden and the
+   safety backup; or `restore.failed` with the reason; a preview records
+   `restore.previewed`. Category `SYSTEM`; source `API`/`CELERY` or
+   `MANAGEMENT_COMMAND`. No existing event is touched (asserted by test, and by an
+   audit-row checksum on real PostgreSQL).
+
+**Command:**
+
+```
+manage.py openzev_restore --mode zev --from <path|s3://bucket/key> --zev <id|name>
+                          [--destination NAME | --path DIR] [--dry-run] [--force]
+```
+
+Creates a `RestoreJob` (`requester` null, `source_description` the path or URL) and
+runs it in-process. `--zev` is an id, or the exact name of an existing community
+(a deleted one is named by id; `openzev_backup_verify` now lists ids). A real run of
+an existing community requires `--destination` or `--path`, checked before anything
+starts. A dry run that would be refused exits non-zero; `--force` marks overridden
+conflicts as such in the output.
 
 ## 7. Frontend
 
@@ -681,11 +774,29 @@ secret alone, a typed value replaces it, `''` clears it (only on the explicit
 switch, or when an S3 destination is switched to local). Fields belonging to the
 other kind are sent empty.
 
-Later phases add the schedule editor (4), the health-panel card (4), and
-`ZevRestoreModal` (3): a two-step dialog that submits `dry_run: true`, renders the
-returned plan with conflicts highlighted, then requires the community name typed
-back before `dry_run: false`, with `force` disabled until the plan reports a
-conflict.
+Phase 3 adds `BackupRestoreSection` and `RestorePlanView` (§7.6). Phase 4 adds the
+schedule editor and the health-panel card.
+
+### 7.6 Restore a community (phase 3)
+
+`BackupRestoreSection` is the last card of the `backup` tab.
+
+| Part | Behaviour |
+|---|---|
+| Form | Backup (finished backups that hold a community) and community (those in the chosen backup's manifest). Changing either discards the current preview. **Preview restore** submits `dry_run: true` and polls the job every 3 s while it is queued or running |
+| `RestorePlanView` | Backup time and version; a table of each kind of data (`backup` vs `now`, the audit trail marked *never restored, only added to*); accounts relinked; a `warning-banner` naming accounts that would be left unlinked and one for PDFs already missing; the conflicts, each a `warning-banner` (*needs your confirmation*) or `error-banner` (*cannot be overridden*) |
+| Confirm | Shown only after a completed preview. With a hard conflict: a blocked message and **no** way forward. Otherwise a warning, the `force` switch **only if** overridable conflicts exist, the safety-backup destination **only if** the community exists (default: the backup's own), and the community's current name to be typed exactly. **Restore now** is enabled by `canStartRestore(plan, force)` **and** the typed name **and** a destination. Sends `dry_run: false`, `force`, `safety_destination_id` |
+| Outcome | Failed job: `error-banner` with the message, the refusal's plan or the archive's verification failures. Completed restore: `success-banner` with the record count and a note that the safety backup is the undo, and **every cached query is invalidated** — the restore changed data all over the app |
+| History | Recent restores: when, community, backup taken, preview or restore (*forced* badge), status and failure reason |
+
+Pure logic in `backupHelpers.ts`: `canStartRestore`, `hardConflicts`,
+`forceableConflicts`, `confirmationName`, `readPlan`, `restorableBackups`,
+`communitiesIn`, `hasActiveRestore`. Types `RestoreJob`, `RestorePlan`,
+`RestoreConflict`, `RestoreJobInput` in `types/api.ts`; `fetchRestoreJobs`,
+`fetchRestoreJob`, `createRestoreJob` in `lib/api/backups.ts`; query keys
+`backups.restores()` and `backups.restore(id)`. Strings under
+`pages.backups.restore.*`, in all four locales. Restoring the whole instance is not
+offered; the section says where it is done.
 
 ### 7.3 TypeScript types
 
@@ -860,7 +971,7 @@ names are passed as a `{{command}}` placeholder so they are never translated.
 
 ## 9. Test plan
 
-### Backend — `backend/backups/` (269 tests, phases 1–2)
+### Backend — `backend/backups/` (381 tests, phases 1–3)
 
 | Module | Tests | Covers |
 |---|---|---|
@@ -870,15 +981,23 @@ names are passed as a `{{command}}` placeholder so they are never translated.
 | `test_runner.py` | 31 | Completed job records location/size/checksum/manifest; stored archive verifies; encryption on/off; a rejected key fails the job with the reason; failures (missing destination, unwritable, **unexpected error is generic on the row and detailed only in the log**, soft time limit); **a job runs once if delivered twice; a late completion does not resurrect a failed job**; audit events; **a broken audit write does not fail a completed backup**; S3 runner; the builder is handed a file, not a buffer; the work directory is empty afterwards |
 | `test_api.py` | 42 | **Every endpoint refuses anonymous, owner and participant callers**; destination CRUD; **the secret is never returned, never in the audit log**; absent/empty/new secret semantics; 202 with enqueue after commit; **broker outage → 503 and a failed job**; validation matrix; list filters and limit; download streams, 409/410 cases, **a location outside the destination is never served**; status |
 | `test_commands.py` | 22 | `openzev_backup` (path, destination, zev by id or name, ambiguous name, refusal cases, warning on stderr when unencrypted, non-zero exit with a safe message on failure, needs no broker, audited as a management command) and `openzev_backup_verify` (good, encrypted, wrong key, corrupted, missing file) |
-| `test_restore_instance.py` | 53 | **Round trip:** every row of every backed-up table equal field for field after a wipe and restore (primary keys and timestamps included), PDFs back under the same name and bytes, encrypted round trip, the audit trail restored and the restore appended to it, a bootstrap superuser replaced, ordinary inserts after a restore. **Dry run:** writes nothing, refuses exactly when the real run would, `--force` reports what would be replaced, schema-unreadable records found. **Refusals leave the database untouched:** populated instance without `--force`, transfer archive, single-community backup, newer-version backup, unapplied migrations, schema newer than the backup (names the `migrate` steps), unrelated apps' migrations ignored. **Integrity:** corrupted member, a manifest missing a whole section, **a section cannot create a model it does not own**, an unreadable record is named without quoting its content, dangling references roll everything back. **Rollback:** a late failure undoes rows and files, a failed forced restore leaves existing data, timestamp flags restored, an audit failure does not undo a finished restore. **Media:** a file at that name is replaced not renamed, a PDF already missing at backup time is reported, **unreferenced and `..` media are not written**. MFA key warnings; sequence reset covers exactly the integer-keyed models; S3 source parsing and safe errors; the command (file, dry run, refusal, missing file, listed verification failures, S3 download, warnings on stderr) |
+| `test_restore_instance.py` | 54 | **Round trip:** every row of every backed-up table equal field for field after a wipe and restore (primary keys and timestamps included), PDFs back under the same name and bytes, encrypted round trip, the audit trail restored and the restore appended to it, a bootstrap superuser replaced, ordinary inserts after a restore. **Dry run:** writes nothing, refuses exactly when the real run would, `--force` reports what would be replaced, schema-unreadable records found. **Refusals leave the database untouched:** populated instance without `--force`, transfer archive, single-community backup, newer-version backup, unapplied migrations, schema newer than the backup (names the `migrate` steps), unrelated apps' migrations ignored. **Integrity:** corrupted member, a manifest missing a whole section, **a section cannot create a model it does not own**, an unreadable record is named without quoting its content, dangling references roll everything back. **Rollback:** a late failure undoes rows and files (**a PDF the restore overwrote is put back**), a failed forced restore leaves existing data, timestamp flags restored, an audit failure does not undo a finished restore. **Media:** a file at that name is replaced not renamed, a PDF already missing at backup time is reported, **unreferenced and `..` media are not written**. MFA key warnings; sequence reset covers exactly the integer-keyed models; S3 source parsing and safe errors; the command (file, dry run, refusal, missing file, listed verification failures, S3 download, warnings on stderr) |
+| `test_restore_zev.py` | 43 | The engine. **Replace in place:** a damaged community comes back exactly; **nothing outside it changes** (every other backed-up row identical); **no account row created, modified or deleted**; the community row is updated in place so audit events and `preferred_zev` keep pointing at it; **the audit trail is untouched and none is written**; a deleted community is recreated and its orphaned audit events stay as they were; other communities restore from the same instance backup; a single-community backup works and refuses other communities; PDFs written back; only the integer-keyed model's sequence is reset. **Accounts:** relinked by email under a new id, a missing account reported and left empty (never created), owner follows the email, a live community keeps its owner, a recreation without a findable owner refused. **Conflicts:** none on a clean restore; a sent/paid invoice deleted or rolled back and an issued contract deleted each need `force` and `force` then works; **a meter id owned by another community, a missing price source, a running export and another restore are not forceable**; a refusal changes nothing; the list is capped with "and N more". **Dry run:** plan and no writes, refusals reported not raised, missing accounts shown, no safety backup, schema misfits found without quoting content. **Safety backup:** after the plan and before the first write, a failure stops everything, not taken for a refusal or a community that does not exist, **conflicts checked again under the lock after it**. **Rollback:** late failure, overwritten PDF restored, dangling references, other communities and the trail survive. **Lock** taken on the community row, and not for a dry run |
+| `test_restore_runner.py` | 28 | The job lifecycle. A restore records its plan; **a safety backup of the damaged state is taken first, linked, and can undo the restore**; a dry run writes and backs up nothing; audited started/completed with what it did; **every earlier audit event unchanged**; a broken audit write does not undo a restore. A refused restore fails with its plan and takes no safety backup; `force` recorded and lets an overridable conflict through. A failing or missing safety destination stops before any write; an explicit destination is used; **an unexpected error is generic on the row**; soft time limit; a missing file or deleted source row; **damaged-archive failures stored in the plan**; delivered twice runs once; **a late completion does not resurrect a failed job**. Sources: encrypted with and without its key, **S3 round trip through a fake client**, a local file standing in for the job. `fetch_from_destination`: **a location outside its destination is never followed** (local, traversal, other bucket or prefix), a provider error is a safe message |
+| `test_restore_api.py` | 21 | **Every endpoint refuses anonymous, owner and participant callers**; dry run by default; the safety destination defaults to the backup's; audited on the community; **naming the whole instance is a 400, not a downgrade**; validation matrix; another community's backup cannot restore this one; a missing safety destination is a 400 for a real restore only; **409 while a restore of that community is active**; broker outage → 503 and a failed job; list order, filter, limit; detail carries the plan; an API-created job runs end to end |
+| `test_restore_zev_command.py` | 19 | `--mode zev`: restore by id and by name with a safety backup written where told; recorded as a job and audited as a management command; a saved destination; **refused up front without a place for the safety backup**; a deleted community named by id needs none; unknown and ambiguous names; a safety path inside `MEDIA_ROOT` refused; S3 source; dry run prints the plan and changes nothing; **a dry run that would be refused exits non-zero**; each problem listed with whether `force` helps, and `--force` says it overrode; missing accounts warned; argument checks |
 
 The mutation checks run while building this (removing the traversal guard, the
 final-chunk flag, the admin permission, the `MEDIA_ROOT` guard) each turned the
 suite red.
 
-Phase 3 adds `test_restore_zev.py`, covering §6.6 (no account row created, modified
-or deleted, `sent`/`paid` invoices and contract issues refused without `force`,
-audit rows untouched, safety backup, locking).
+Mutation checks run while building phase 3 — each turned the suite red: the community
+row deleted instead of updated, the audit trail restored too, accounts not relinked,
+no re-check under the lock, hard conflicts overridable by `force`, sent invoices not
+protected, orphaned contracts not replaced, the constraint check removed, the row lock
+removed (caught only by the lock test, since SQLite ignores locks); on the frontend the
+hard-conflict guard, the `force` requirement, the typed-name requirement, the cache
+refresh after a restore and the blocked state.
 
 Mutation checks run while building phase 2 — each turned the suite red: timestamps not
 preserved, the section allow-list off, files not removed on rollback, an existing file
@@ -908,7 +1027,33 @@ empty database and `openzev_restore`.
 - Not verified against a real object store: the S3 source is tested with a fake client
   only (as is the S3 destination from phase 1).
 
-### Frontend (39 tests, phase 1)
+#### Verification notes (phase 3, real PostgreSQL)
+
+Two scratch databases again (dev data untouched, dropped afterwards): `seed_demo`,
+an **encrypted** instance backup, then damage to one community — renamed, its
+63,264 readings deleted, and a **paid** invoice added that the backup never saw.
+A checksum was taken of that community's rows, of every other backed-up row, and of
+the audit rows that existed before, so the comparison is exact.
+
+- **Preview** listed the plan and the paid invoice as *needs `--force`*, and exited
+  non-zero. A real run without a safety destination was refused up front; with one
+  but without `--force`, refused with the same problem, and **no safety backup was
+  written**.
+- **`--force` restore**: 63,428 records in about 22 s including verification and the
+  safety backup. The community's rows were **checksum-identical to before the
+  damage**, **every other table identical**, and **the 12 audit rows that existed
+  before identical** (the trail then only grew).
+- **Undo**: restoring from the safety backup returned the damaged state — the paid
+  invoice, the rename and the missing readings.
+- **Recreation**: with the community deleted outright (22 audit events and one
+  issued contract left orphaned with no community), a restore by id needed no safety
+  backup, recreated it **checksum-identical**, relinked the orphaned contract, and
+  left the 22 audit events as they were.
+- Not verified against a real object store, as before; not measured beyond ~63k rows
+  per community; the row lock itself is taken (asserted) but no *concurrent* writer
+  was tried against it.
+
+### Frontend (67 tests, phases 1 and 3)
 
 - `tests/backup-helpers.test.ts` (17) — the payload contract: a blank edit never
   wipes a secret, a clear is explicit, switching kind clears the other kind's
@@ -918,6 +1063,8 @@ empty database and `openzev_restore`.
   secret field disabled without a key; environment-credentials notice; create
   payload; server validation shown inside the form; start-backup rules; job list
   (download only for local archives, unencrypted badge, failed reason, details).
+- `tests/backup-restore-helpers.test.ts` (10) — `canStartRestore` (clean, needs `force`, **never past a hard conflict**), the name to type, reading a plan, choosing a backup and community, polling.
+- `tests/backup-restore-section.test.ts` (18) — no backup, communities follow the chosen backup, the whole instance never offered; **a preview is a dry run**; unlinked accounts named; a refusal shows the reason, the conflicts and no way forward; damaged-archive failures listed; **apply needs the exact name** (case matters); the request carries the safety destination, no `force` unless asked; a chosen destination; none for a community that no longer exists; **`force` required for overridable conflicts and absent for hard ones**; a finished restore reports and refreshes every cache; changing the community resets the flow; history.
 - `tests/system-settings-tabs.test.ts` — six tabs, and `?tab=backup` opens the
   section.
 - Checks: `npm run build`, `npm run lint`, `npm run lint:style`,
@@ -932,11 +1079,11 @@ empty database and `openzev_restore`.
 - [x] With no key set, the backup still runs and both the CLI and the admin UI say the archive is unencrypted
 - [x] A destination secret stored in the database is encrypted at rest, never serialized, and overridden by environment credentials
 - [x] A fresh install restores to a working instance from a backup alone — accounts, settings, templates, dynamic price series, invoice PDFs, issued contracts and the audit trail all present and linked, with primary keys preserved
-- [ ] An existing install restores one ZEV to its backed-up state without touching other ZEVs, any account row, or any existing audit row — and the restore itself appears in the log
-- [ ] Both restore modes support `--dry-run` / `dry_run` reporting exactly what would change *(instance mode: done; per-ZEV is phase 3)*
-- [ ] Restore refuses on schema mismatch, checksum failure, wrong archive `kind`, and (without `force`) on dropping `sent`/`paid` invoices or contract issues *(instance mode: schema, checksum, kind and non-empty done; the `sent`/`paid` and contract refusals are per-ZEV, phase 3)*
+- [x] An existing install restores one ZEV to its backed-up state without touching other ZEVs, any account row, or any existing audit row — and the restore itself appears in the log
+- [x] Both restore modes support `--dry-run` / `dry_run` reporting exactly what would change
+- [x] Restore refuses on schema mismatch, checksum failure, wrong archive `kind`, and (without `force`) on dropping `sent`/`paid` invoices or contract issues
 - [x] An MFA key fingerprint mismatch is reported at preflight, not discovered by a locked-out user
 - [ ] "Last successful backup" is visible to admins and goes stale loudly
 - [x] The registry coverage tests pass, so a new model or file field cannot silently stop being backed up (this replaces the field-level parity test; see *Deviations*)
-- [x] User-guide chapter written, including a restore drill; the `12-troubleshooting.md` snippet is replaced *(instance restore; per-ZEV restore is added with phase 3)*
+- [x] User-guide chapter written, including a restore drill; the `12-troubleshooting.md` snippet is replaced 
 - [ ] `ROADMAP.md` updated

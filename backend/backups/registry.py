@@ -136,6 +136,7 @@ EXCLUDED_MODELS: dict[str, str] = {
     "exports.ExportJob": "transient; its artifact is deleted after EXPORT_RETENTION_HOURS",
     "backups.BackupDestination": "instance configuration of the backup system itself; recreated on restore",
     "backups.BackupJob": "history of other archives; must never be inside the archive it describes",
+    "backups.RestoreJob": "history of restores on this instance; describes archives, is not part of one",
     # Scheduler state. Settings-defined schedules are recreated by beat itself;
     # the one admin-editable schedule arrives with the scheduler (phase 4).
     "django_celery_beat.ClockedSchedule": "scheduler state; see PeriodicTask",

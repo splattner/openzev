@@ -201,3 +201,52 @@ class BackupJob(models.Model):
 
     def __str__(self) -> str:
         return f"{self.scope} backup {self.pk} ({self.status})"
+
+
+class RestoreJob(models.Model):
+    """One restore of a single community, and the plan it worked from.
+
+    Whole-instance restore is a command run at the shell and leaves an audit
+    event, not a row (SPEC-2026-09-backup-and-restore, deviation 11): every
+    ``RestoreJob`` is a per-ZEV restore, so there is no ``mode``.
+
+    ``target_zev_id`` is deliberately not a foreign key. A restore may recreate a
+    community that has since been deleted, so the target need not exist when the
+    job is created, and the row must keep describing it afterwards.
+    """
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+        indexes = [models.Index(fields=["status", "target_zev_id"])]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    target_zev_id = models.UUIDField(db_index=True)
+    target_zev_name = models.CharField(max_length=200, blank=True, default="")
+    source_backup = models.ForeignKey(
+        BackupJob, on_delete=models.SET_NULL, null=True, blank=True, related_name="restores",
+    )
+    # A path or URI given on the command line, where there is no BackupJob row.
+    source_description = models.CharField(max_length=500, blank=True, default="")
+    # Defaults to the safe value: creating a job never destroys anything by accident.
+    dry_run = models.BooleanField(default=True)
+    force = models.BooleanField(default=False)
+
+    status = models.CharField(max_length=20, choices=BackupJobStatus.choices, default=BackupJobStatus.QUEUED)
+    plan_json = models.JSONField(default=dict, blank=True)
+    safety_backup = models.ForeignKey(
+        BackupJob, on_delete=models.SET_NULL, null=True, blank=True, related_name="+",
+    )
+    safety_destination = models.ForeignKey(
+        BackupDestination, on_delete=models.SET_NULL, null=True, blank=True, related_name="+",
+    )
+    requester = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="restore_jobs",
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    started_at = models.DateTimeField(null=True, blank=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+    error_message = models.CharField(max_length=500, blank=True, default="")
+
+    def __str__(self) -> str:
+        return f"restore of {self.target_zev_name or self.target_zev_id} ({self.status})"

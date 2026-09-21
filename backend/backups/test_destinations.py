@@ -249,6 +249,15 @@ class FakeS3:
     def upload_file(self, filename, bucket, key, **kwargs):
         self.uploads.append({"bytes": Path(filename).read_bytes(), "bucket": bucket, "key": key, **kwargs})
 
+    def download_file(self, bucket, key, filename, **kwargs):
+        from botocore.exceptions import ClientError
+
+        for upload in reversed(self.uploads):
+            if (upload["bucket"], upload["key"]) == (bucket, key):
+                Path(filename).write_bytes(upload["bytes"])
+                return
+        raise ClientError({"Error": {"Code": "NoSuchKey", "Message": "internal detail"}}, "GetObject")
+
     def put_object(self, **kwargs):
         self.puts.append(kwargs)
 

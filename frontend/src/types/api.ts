@@ -1698,3 +1698,73 @@ export interface BackupStatus {
     last_failed: BackupJob | null
     age_hours: number | null
 }
+
+// ── Per-ZEV restore (SPEC-2026-09-backup-and-restore §6.6) ───────────────────
+
+export type RestoreConflictKind =
+    | 'sent_invoice_deleted'
+    | 'sent_invoice_reverted'
+    | 'contract_issue_deleted'
+    | 'meter_id_owned_by_other_zev'
+    | 'referenced_row_missing'
+    | 'owner_not_found'
+    | 'export_in_progress'
+    | 'restore_in_progress'
+
+export interface RestoreConflict {
+    kind: RestoreConflictKind
+    /** A business identifier or a count line ("and 5 more"), safe to show. */
+    detail: string
+    /** `true` needs `force`; `false` can never be forced past. */
+    overridable: boolean
+}
+
+export interface RestorePlanSection {
+    /** Rows in the backup. */
+    backup: number
+    /** Rows now. */
+    current: number
+    /** The audit trail: never restored, so never replaced. */
+    kept: boolean
+}
+
+export interface RestorePlan {
+    zev: { id: string; name: string; exists_now: boolean; current_name: string }
+    backup: { created_at: string; scope: BackupJobScope; instance_name: string; openzev_version: string }
+    sections: Record<string, RestorePlanSection>
+    accounts: { relink: number; missing: string[] }
+    media: { files: number; missing: number }
+    conflicts: RestoreConflict[]
+    blocked: boolean
+    safety_backup_id: string | null
+    /** Rows written per model; `null` for a preview. */
+    restored: Record<string, number> | null
+}
+
+export interface RestoreJob {
+    id: string
+    target_zev_id: string
+    target_zev_name: string
+    source_backup_id: string | null
+    source_archive_name: string
+    source_created_at: string | null
+    source_description: string
+    dry_run: boolean
+    force: boolean
+    status: BackupJobStatus
+    /** `{}` until the job finishes; the plan, or `{verification_failures}` for a damaged archive. */
+    plan_json: RestorePlan | { verification_failures?: string[] } | Record<string, never>
+    safety_backup_id: string | null
+    created_at: string
+    started_at: string | null
+    completed_at: string | null
+    error_message: string
+}
+
+export interface RestoreJobInput {
+    source_backup_id: string
+    target_zev_id: string
+    dry_run: boolean
+    force?: boolean
+    safety_destination_id?: string
+}

@@ -162,7 +162,7 @@ class VerifyCommandTests(CommandTestCase):
         out, _ = run("openzev_backup_verify", str(path))
         self.assertIn("Backup verified.", out)
         self.assertIn("version    ", out)
-        self.assertIn("Alpha, Beta", out)
+        self.assertIn(f"Alpha [{self.world.alpha.pk}], Beta [{self.world.beta.pk}]", out)
         self.assertIn("encrypted  NO", out)
 
     @override_settings(BACKUP_ENCRYPTION_KEYS=[KEY])

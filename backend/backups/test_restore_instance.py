@@ -420,6 +420,18 @@ class RollbackTests(RestoreTestCase):
         self.assertEqual(Zev.objects.count(), 0)
         self.assertFalse(any(default_storage.exists(n) for n in self.pdf_names))
 
+    def test_a_pdf_the_restore_overwrote_is_put_back_when_it_fails(self):
+        name = self.alpha_pdf
+        default_storage.delete(name)
+        default_storage.save(name, io.BytesIO(b"the pdf as it is now"))
+        with (
+            mock.patch.object(restore, "_reconcile_sequences", side_effect=IntegrityError("boom")),
+            self.assertRaises(restore.RestoreError),
+        ):
+            restore_from(self.raw, force=True)
+        with default_storage.open(name, "rb") as stored:
+            self.assertEqual(stored.read(), b"the pdf as it is now")
+
     def test_a_failed_forced_restore_leaves_the_existing_data_in_place(self):
         Zev.objects.filter(pk=self.world.beta.pk).update(name="Edited after the backup")
         edited = snapshot()

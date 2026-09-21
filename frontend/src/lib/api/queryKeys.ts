@@ -36,6 +36,8 @@ export const queryKeys = {
     destinations: () => ['backups', 'destinations'] as const,
     jobs: () => ['backups', 'jobs'] as const,
     status: () => ['backups', 'status'] as const,
+    restores: () => ['backups', 'restores'] as const,
+    restore: (id: string) => ['backups', 'restores', id] as const,
   },
   invoices: {
     lists: () => ['invoices', 'list'] as const,

@@ -17,14 +17,21 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from accounts.permissions import IsAdmin
+from zev.models import Zev
 from audit.models import AuditActionCategory, AuditEventStatus
 from audit.services import build_diff, build_instance_snapshot, record_audit_event
 
 from . import crypto
-from .models import BackupDestination, BackupJob, BackupJobStatus
-from .serializers import BackupDestinationSerializer, BackupJobCreateSerializer, BackupJobSerializer
+from .models import BackupDestination, BackupJob, BackupJobStatus, RestoreJob
+from .serializers import (
+    BackupDestinationSerializer,
+    BackupJobCreateSerializer,
+    BackupJobSerializer,
+    RestoreJobCreateSerializer,
+    RestoreJobSerializer,
+)
 from .storage import DestinationError, probe_destination
-from .tasks import ACTION_FAILED, run_backup_job
+from .tasks import ACTION_FAILED, ACTION_RESTORE_FAILED, run_backup_job, run_restore_job
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +43,7 @@ DESTINATION_TRACKED_FIELDS = (
 )
 
 _ENQUEUE_FAILED = "The backup could not be queued. Please try again."
+_RESTORE_ENQUEUE_FAILED = "The restore could not be queued. Please try again."
 
 
 def _record_destination_event(request, *, action_type, destination, summary, changes=None, metadata=None):
@@ -235,6 +243,92 @@ class BackupJobDownloadView(APIView):
             return Response({"detail": "The archive file is no longer available."}, status=status.HTTP_410_GONE)
 
         return FileResponse(resolved.open("rb"), as_attachment=True, filename=job.archive_name)
+
+
+class RestoreJobListCreateView(APIView):
+    """Per-ZEV restores: preview (``dry_run``, the default) and apply.
+
+    Admin-only, and not scoped: the community is a parameter checked against the
+    backup's own manifest. Whole-instance restore is deliberately absent.
+    """
+
+    permission_classes = [IsAdmin]
+
+    def get(self, request):
+        queryset = RestoreJob.objects.select_related("source_backup")
+        target = request.query_params.get("zev_id")
+        if target:
+            queryset = queryset.filter(target_zev_id=target)
+        try:
+            limit = max(1, min(int(request.query_params.get("limit", 25)), 100))
+        except (TypeError, ValueError):
+            limit = 25
+        return Response(RestoreJobSerializer(queryset[:limit], many=True).data)
+
+    def post(self, request):
+        serializer = RestoreJobCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        if RestoreJob.objects.filter(
+            target_zev_id=data["target_zev_id"], status__in=(BackupJobStatus.QUEUED, BackupJobStatus.RUNNING)
+        ).exists():
+            return Response(
+                {"detail": "Another restore of this community is already queued or running."},
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        job = RestoreJob.objects.create(
+            target_zev_id=data["target_zev_id"],
+            target_zev_name=data["target_name"],
+            source_backup=data["backup"],
+            dry_run=data["dry_run"],
+            force=data["force"],
+            safety_destination=data["safety_destination"],
+            requester=request.user,
+        )
+        record_audit_event(
+            request=request,
+            action_category=AuditActionCategory.SYSTEM,
+            action_type="restore.created",
+            target_type="backups.RestoreJob",
+            target=job,
+            target_id=str(job.pk),
+            target_display=f"restore of {job.target_zev_name}",
+            summary=f"{'Preview of a' if job.dry_run else 'A'} restore of {job.target_zev_name} queued.",
+            status=AuditEventStatus.QUEUED,
+            zev=Zev.objects.filter(pk=job.target_zev_id).first(),
+            metadata={"source_backup": str(data["backup"].pk), "dry_run": job.dry_run, "force": job.force},
+        )
+
+        try:
+            transaction.on_commit(lambda: run_restore_job.delay(str(job.pk)))
+        except Exception:  # noqa: BLE001
+            logger.exception("Restore job %s could not be enqueued", job.pk)
+            RestoreJob.objects.filter(pk=job.pk).update(
+                status=BackupJobStatus.FAILED, error_message=_RESTORE_ENQUEUE_FAILED
+            )
+            record_audit_event(
+                request=request,
+                action_category=AuditActionCategory.SYSTEM,
+                action_type=ACTION_RESTORE_FAILED,
+                target_type="backups.RestoreJob",
+                target=job,
+                target_id=str(job.pk),
+                summary="Restore could not be queued.",
+                status=AuditEventStatus.FAILED,
+                metadata={"error": "enqueue failed"},
+            )
+            return Response({"detail": _RESTORE_ENQUEUE_FAILED}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+
+        job = RestoreJob.objects.select_related("source_backup").get(pk=job.pk)
+        return Response(RestoreJobSerializer(job).data, status=status.HTTP_202_ACCEPTED)
+
+
+class RestoreJobDetailView(generics.RetrieveAPIView):
+    queryset = RestoreJob.objects.select_related("source_backup")
+    serializer_class = RestoreJobSerializer
+    permission_classes = [IsAdmin]
 
 
 class BackupStatusView(APIView):

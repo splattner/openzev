@@ -200,8 +200,9 @@ Common errors:
 
 Use the built-in backups: they cover the database **and** the invoice PDF files,
 can be encrypted, and can be verified. See [Backups](18-backups.md). To recover
-from one — on a fresh installation, or over an existing one — see
-[Restoring an instance](18-backups.md#restoring-an-instance).
+from one — on a fresh installation, over an existing one, or for one community
+only — see [Restoring an instance](18-backups.md#restoring-an-instance) and
+[Restoring one community](18-backups.md#restoring-one-community).
 
 A plain database dump is still useful as an additional safety net, but **it does
 not include the invoice PDFs**, which are files in the media volume

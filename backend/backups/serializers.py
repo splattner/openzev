@@ -5,7 +5,7 @@ from rest_framework import serializers
 
 from zev.models import Zev
 
-from .models import BackupDestination, BackupJob, BackupJobScope
+from .models import BackupDestination, BackupJob, BackupJobScope, BackupJobStatus, RestoreJob
 
 
 class BackupDestinationSerializer(serializers.ModelSerializer):
@@ -105,4 +105,81 @@ class BackupJobCreateSerializer(serializers.Serializer):
 
         attrs["destination"] = destination
         attrs["zev"] = zev
+        return attrs
+
+
+class RestoreJobSerializer(serializers.ModelSerializer):
+    """Read-only view of a restore and the plan it worked from."""
+
+    source_archive_name = serializers.SerializerMethodField()
+    source_created_at = serializers.SerializerMethodField()
+
+    class Meta:
+        model = RestoreJob
+        fields = [
+            "id", "target_zev_id", "target_zev_name", "source_backup_id", "source_archive_name",
+            "source_created_at", "source_description", "dry_run", "force", "status", "plan_json",
+            "safety_backup_id", "created_at", "started_at", "completed_at", "error_message",
+        ]
+        read_only_fields = fields
+
+    def get_source_archive_name(self, obj) -> str:
+        return obj.source_backup.archive_name if obj.source_backup_id else ""
+
+    def get_source_created_at(self, obj) -> str | None:
+        return (obj.source_backup.manifest_json or {}).get("created_at") if obj.source_backup_id else None
+
+
+class RestoreJobCreateSerializer(serializers.Serializer):
+    """``{source_backup_id, target_zev_id, dry_run, force, safety_destination_id}``.
+
+    ``dry_run`` defaults to true: creating a job never destroys anything unless
+    the caller says so in as many words. Whole-instance restore is not offered
+    here (ADR 0023); naming it is an error, not a silent downgrade.
+    """
+
+    mode = serializers.CharField(required=False)
+    source_backup_id = serializers.UUIDField()
+    target_zev_id = serializers.UUIDField()
+    dry_run = serializers.BooleanField(required=False, default=True)
+    force = serializers.BooleanField(required=False, default=False)
+    safety_destination_id = serializers.UUIDField(required=False, allow_null=True)
+
+    def validate_mode(self, value):
+        if value != "zev":
+            raise serializers.ValidationError("Whole-instance restore is only available as a management command.")
+        return value
+
+    def validate(self, attrs):
+        try:
+            backup = BackupJob.objects.select_related("destination").get(pk=attrs["source_backup_id"])
+        except BackupJob.DoesNotExist as exc:
+            raise serializers.ValidationError({"source_backup_id": "Backup not found."}) from exc
+        if backup.status != BackupJobStatus.COMPLETED:
+            raise serializers.ValidationError({"source_backup_id": "This backup did not complete, so it cannot be restored."})
+
+        target = str(attrs["target_zev_id"])
+        held = {z["id"]: z["name"] for z in (backup.manifest_json or {}).get("zevs", [])}
+        if target not in held:
+            raise serializers.ValidationError({"target_zev_id": "This backup does not contain that community."})
+
+        safety = None
+        exists = Zev.objects.filter(pk=attrs["target_zev_id"]).exists()
+        if attrs.get("safety_destination_id"):
+            try:
+                safety = BackupDestination.objects.get(pk=attrs["safety_destination_id"])
+            except BackupDestination.DoesNotExist as exc:
+                raise serializers.ValidationError({"safety_destination_id": "Destination not found."}) from exc
+        elif backup.destination_id:
+            safety = backup.destination
+        if safety is not None and not safety.enabled:
+            raise serializers.ValidationError({"safety_destination_id": "This destination is disabled."})
+        if not attrs["dry_run"] and exists and safety is None:
+            raise serializers.ValidationError(
+                {"safety_destination_id": "Choose where to write the safety backup taken before the restore."}
+            )
+
+        attrs["backup"] = backup
+        attrs["safety_destination"] = safety
+        attrs["target_name"] = held[target]
         return attrs

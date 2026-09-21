@@ -6,6 +6,7 @@ import { queryKeys } from '../../lib/api/queryKeys'
 import { formatDateTime, useAppSettings } from '../../lib/appSettings'
 import { BackupDestinationsSection } from './BackupDestinationsSection'
 import { BackupJobsSection } from './BackupJobsSection'
+import { BackupRestoreSection } from './BackupRestoreSection'
 
 /** The `backup` tab of System Settings: is it safe, where does it go, what has run. */
 export function BackupSettingsSection() {
@@ -75,6 +76,7 @@ export function BackupSettingsSection() {
 
             <BackupDestinationsSection status={status} />
             <BackupJobsSection />
+            <BackupRestoreSection />
         </div>
     )
 }

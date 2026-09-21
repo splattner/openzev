@@ -23,11 +23,13 @@ from __future__ import annotations
 import hashlib
 import io
 import logging
+import shutil
+import tempfile
 import zipfile
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass, field
-from typing import BinaryIO
+from typing import IO, BinaryIO
 
 from django.apps import apps
 from django.conf import settings
@@ -255,7 +257,9 @@ def _records(zf: zipfile.ZipFile, member: str, allowed: frozenset[str]) -> Itera
             yield record
 
 
-def _load_member(zf, member, allowed, expected, report, referenced_media, *, write: bool) -> None:
+def _load_member(
+    zf, member, allowed, expected, report, referenced_media, *, write: bool, transform: Callable | None = None
+) -> None:
     per_model: dict[str, int] = {}
     batch: list = []
     batch_label = ""
@@ -274,6 +278,8 @@ def _load_member(zf, member, allowed, expected, report, referenced_media, *, wri
             instance = record.object
             label = instance._meta.label
             per_model[label] = per_model.get(label, 0) + 1
+            if transform is not None:
+                transform(instance)
             if label != batch_label:
                 flush()
                 batch_label = label
@@ -316,7 +322,50 @@ class _HashingFile(File):
             yield block
 
 
-def _restore_media(zf, manifest, referenced: set[str], report: RestoreReport, written: list[str]) -> None:
+class MediaUndo:
+    """What a restore did to storage, so a failure can put it back.
+
+    Storage is not transactional. A file the restore creates is removed again; a
+    file it overwrites is copied aside first and written back, so a failed
+    restore over a live instance does not leave a PDF holding the backup's bytes
+    next to a database row that never changed.
+    """
+
+    def __init__(self) -> None:
+        self.created: list[str] = []
+        self.replaced: dict[str, IO[bytes]] = {}
+
+    def keep(self, name: str) -> None:
+        """Copy ``name`` aside before it is deleted."""
+        stash = tempfile.TemporaryFile(dir=settings.BACKUP_WORK_DIR or None)
+        with default_storage.open(name, "rb") as current:
+            shutil.copyfileobj(current, stash, _COPY_BLOCK)
+        self.replaced[name] = stash
+
+    def rollback(self) -> None:
+        for name in self.created:
+            if name in self.replaced:
+                continue
+            try:
+                default_storage.delete(name)
+            except Exception:  # noqa: BLE001 - best effort; the original error is what matters
+                logger.warning("Could not remove %s after a failed restore", name)
+        for name, stash in self.replaced.items():
+            try:
+                stash.seek(0)
+                default_storage.delete(name)
+                default_storage.save(name, File(stash))
+            except Exception:  # noqa: BLE001
+                logger.error("Could not put %s back after a failed restore", name)
+
+    def close(self) -> None:
+        for stash in self.replaced.values():
+            stash.close()
+
+
+def _restore_media(
+    zf, manifest, referenced: set[str], report: RestoreReport, undo: MediaUndo, *, only_zev: str | None = None
+) -> None:
     """Copy each invoice PDF back into storage under the exact name the database holds.
 
     Only names an ``Invoice`` row actually references are written, and each is
@@ -324,6 +373,8 @@ def _restore_media(zf, manifest, referenced: set[str], report: RestoreReport, wr
     backup, not to name where files go.
     """
     for entry in manifest["zevs"]:
+        if only_zev is not None and entry["id"] != only_zev:
+            continue
         prefix = f"zevs/{entry['id']}/media/"
         report.media_missing += len(entry.get("media", {}).get("missing", []))
         for member in sorted(name for name in manifest["members"] if name.startswith(prefix)):
@@ -331,15 +382,15 @@ def _restore_media(zf, manifest, referenced: set[str], report: RestoreReport, wr
             if name is None or name not in referenced:
                 report.media_skipped += 1
                 continue
-            existed = default_storage.exists(name)
-            if existed:
+            if default_storage.exists(name):
                 # ``save`` would pick a fresh name for a taken one; the invoice row
                 # needs this exact one.
+                undo.keep(name)
                 default_storage.delete(name)
             with zf.open(member) as source:
                 content = _HashingFile(source)
                 saved = default_storage.save(name, content)
-            written.append(saved)
+            undo.created.append(saved)
             expected = manifest["members"][member]
             if saved != name or content.sha256.hexdigest() != expected["sha256"] or content.size != expected["bytes"]:
                 raise RestoreError(f"{name} could not be restored intact.")
@@ -347,7 +398,7 @@ def _restore_media(zf, manifest, referenced: set[str], report: RestoreReport, wr
             report.media_bytes += content.size
 
 
-def _reconcile_sequences(report: RestoreReport) -> None:
+def _reconcile_sequences(report: RestoreReport, labels: list[str] | None = None) -> None:
     """Move every integer key sequence past the restored maximum.
 
     Rows arrive with their own primary keys, so the counters the database keeps
@@ -356,21 +407,13 @@ def _reconcile_sequences(report: RestoreReport) -> None:
     """
     models = [
         apps.get_model(label)
-        for label in _clear_order()
+        for label in (labels if labels is not None else _clear_order())
         if apps.get_model(label)._meta.pk.get_internal_type() in _AUTO_PK_TYPES
     ]
     with connection.cursor() as cursor:
         for statement in connection.ops.sequence_reset_sql(no_style(), models):
             cursor.execute(statement)
     report.sequences = sorted(model._meta.db_table for model in models)
-
-
-def _remove_written(names: list[str]) -> None:
-    for name in names:
-        try:
-            default_storage.delete(name)
-        except Exception:  # noqa: BLE001 - best effort; the original error is what matters
-            logger.warning("Could not remove %s after a failed restore", name)
 
 
 # ── entry point ──────────────────────────────────────────────────────────────
@@ -416,7 +459,7 @@ def restore_instance(
                 _load_member(zf, member, allowed, manifest["members"][member]["models"], report, referenced_media, write=False)
             return report
 
-        written: list[str] = []
+        undo = MediaUndo()
         try:
             with transaction.atomic():
                 _clear()
@@ -428,18 +471,20 @@ def restore_instance(
                 _verify_database_counts(report)
                 connection.check_constraints()
                 progress("Restoring invoice PDFs…")
-                _restore_media(zf, manifest, referenced_media, report, written)
+                _restore_media(zf, manifest, referenced_media, report, undo)
                 _reconcile_sequences(report)
         except (IntegrityError, DatabaseError) as exc:
             logger.exception("Restore was rejected by the database")
-            _remove_written(written)
+            undo.rollback()
             raise RestoreError(
                 "The database rejected the backup's data; nothing was restored. "
                 "The server log has the details."
             ) from exc
         except BaseException:
-            _remove_written(written)
+            undo.rollback()
             raise
+        finally:
+            undo.close()
 
     _audit(report, force=force)
     return report

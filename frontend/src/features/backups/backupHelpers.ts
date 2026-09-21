@@ -4,6 +4,9 @@ import type {
     BackupDestinationKind,
     BackupJob,
     BackupManifest,
+    RestoreConflict,
+    RestoreJob,
+    RestorePlan,
 } from '../../types/api'
 
 /** Statuses during which a job's row is still changing, so the list keeps polling. */
@@ -134,3 +137,68 @@ export function totalRecords(manifest: BackupManifest | null): number {
 export function isDownloadable(job: BackupJob): boolean {
     return job.status === 'completed' && !!job.archive_location && !job.archive_location.startsWith('s3://')
 }
+
+// ── restoring one community ──────────────────────────────────────────────────
+
+/** Backups a community can be restored from: finished, and holding at least one community. */
+export function restorableBackups(jobs: BackupJob[] | undefined): BackupJob[] {
+    return (jobs ?? []).filter((job) => job.status === 'completed' && (readManifest(job)?.zevs.length ?? 0) > 0)
+}
+
+/** The communities a backup holds, by id and name. */
+export function communitiesIn(job: BackupJob | undefined): { id: string; name: string }[] {
+    const manifest = job ? readManifest(job) : null
+    return (manifest?.zevs ?? []).map((zev) => ({ id: zev.id, name: zev.name }))
+}
+
+/** The plan a job carries, or `null` while it has none (queued, running, or failed before planning). */
+export function readPlan(job: RestoreJob | null | undefined): RestorePlan | null {
+    const plan = job?.plan_json as Partial<RestorePlan> | undefined
+    return plan && plan.zev && plan.sections && plan.conflicts ? (plan as RestorePlan) : null
+}
+
+export function hasActiveRestore(jobs: RestoreJob[] | undefined): boolean {
+    return (jobs ?? []).some((job) => job.status === 'queued' || job.status === 'running')
+}
+
+/** Problems no `force` can get past: they would damage something else. */
+export function hardConflicts(plan: RestorePlan): RestoreConflict[] {
+    return plan.conflicts.filter((c) => !c.overridable)
+}
+
+/** Problems that need the administrator to say so: issued invoices or contracts would be lost or rolled back. */
+export function forceableConflicts(plan: RestorePlan): RestoreConflict[] {
+    return plan.conflicts.filter((c) => c.overridable)
+}
+
+/**
+ * Whether a real restore may be started from a finished preview.
+ *
+ * A hard conflict always blocks. A forceable one blocks until `force` is ticked,
+ * so the choice to lose an issued invoice is a separate, deliberate act.
+ */
+export function canStartRestore(plan: RestorePlan, force: boolean): boolean {
+    if (hardConflicts(plan).length > 0) return false
+    return forceableConflicts(plan).length === 0 || force
+}
+
+/**
+ * What the administrator has to type to confirm. The community's current name if
+ * it exists (the thing being overwritten), else the backup's name for it.
+ */
+export function confirmationName(plan: RestorePlan): string {
+    return plan.zev.exists_now && plan.zev.current_name ? plan.zev.current_name : plan.zev.name
+}
+
+/** Section names in the order the backend restores them, so a table reads top-down as a dependency chain. */
+export const RESTORE_SECTION_ORDER = [
+    'zev',
+    'participants',
+    'metering_points',
+    'tariffs',
+    'readings',
+    'import_logs',
+    'invoices',
+    'contract_issues',
+    'audit_events',
+] as const

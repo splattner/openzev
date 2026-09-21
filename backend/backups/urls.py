@@ -8,6 +8,8 @@ from .views import (
     BackupJobDownloadView,
     BackupJobListCreateView,
     BackupStatusView,
+    RestoreJobDetailView,
+    RestoreJobListCreateView,
 )
 
 urlpatterns = [
@@ -17,5 +19,7 @@ urlpatterns = [
     path("jobs/", BackupJobListCreateView.as_view(), name="backup-job-list"),
     path("jobs/<uuid:pk>/", BackupJobDetailView.as_view(), name="backup-job-detail"),
     path("jobs/<uuid:pk>/download/", BackupJobDownloadView.as_view(), name="backup-job-download"),
+    path("restores/", RestoreJobListCreateView.as_view(), name="restore-job-list"),
+    path("restores/<uuid:pk>/", RestoreJobDetailView.as_view(), name="restore-job-detail"),
     path("status/", BackupStatusView.as_view(), name="backup-status"),
 ]

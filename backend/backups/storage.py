@@ -248,6 +248,42 @@ def fetch_archive(url: str, target: Path, *, endpoint_url: str = "", region: str
         raise DestinationError(_explain_s3(exc)) from exc
 
 
+def fetch_from_destination(destination, location: str, target: Path) -> None:
+    """Copy an archive a backup job wrote to ``destination`` to the local file ``target``.
+
+    ``location`` is read from the database, so it is only ever followed inside the
+    destination it names: a local path must resolve within the destination's
+    directory, an ``s3://`` location must be in its bucket under its prefix.
+    """
+    if destination is None:
+        raise DestinationError("The destination this backup was written to no longer exists.")
+    if destination.kind == "s3":
+        from boto3.s3.transfer import TransferConfig
+        from botocore.exceptions import BotoCoreError, ClientError
+
+        bucket, key = parse_s3_url(location)
+        prefix = destination.prefix.strip("/")
+        if bucket != destination.bucket or (prefix and not key.startswith(prefix + "/")):
+            raise DestinationError("This backup's location is not inside its destination.")
+        try:
+            s3_client(destination).download_file(
+                bucket, key, str(target), Config=TransferConfig(multipart_threshold=_S3_MULTIPART_THRESHOLD)
+            )
+        except (BotoCoreError, ClientError) as exc:
+            raise DestinationError(_explain_s3(exc)) from exc
+        return
+
+    try:
+        resolved = Path(location).resolve(strict=True)
+        resolved.relative_to(Path(destination.path).resolve())
+    except (FileNotFoundError, ValueError):
+        raise DestinationError("The backup file is no longer available.") from None
+    try:
+        shutil.copyfile(resolved, target)
+    except OSError:
+        raise DestinationError("The backup file could not be read.") from None
+
+
 # ── entry points ─────────────────────────────────────────────────────────────
 
 def store_archive(destination, source: Path, archive_name: str) -> str:

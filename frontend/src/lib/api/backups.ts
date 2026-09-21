@@ -4,6 +4,8 @@ import type {
     BackupJob,
     BackupJobInput,
     BackupStatus,
+    RestoreJob,
+    RestoreJobInput,
 } from '../../types/api'
 import { api } from './client'
 import { fetchAllPages } from './pagination'
@@ -53,5 +55,21 @@ export async function downloadBackupArtifact(jobId: string): Promise<Blob> {
 
 export async function fetchBackupStatus(): Promise<BackupStatus> {
     const { data } = await api.get<BackupStatus>('/backups/status/')
+    return data
+}
+
+export async function fetchRestoreJobs(): Promise<RestoreJob[]> {
+    const { data } = await api.get<RestoreJob[]>('/backups/restores/')
+    return data
+}
+
+export async function fetchRestoreJob(id: string): Promise<RestoreJob> {
+    const { data } = await api.get<RestoreJob>(`/backups/restores/${id}/`)
+    return data
+}
+
+/** Queue a restore of one community; a preview (`dry_run`) writes nothing. Resolves with the queued job. */
+export async function createRestoreJob(payload: RestoreJobInput): Promise<RestoreJob> {
+    const { data } = await api.post<RestoreJob>('/backups/restores/', payload)
     return data
 }

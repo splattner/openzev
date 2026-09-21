@@ -32,6 +32,9 @@ const api = vi.hoisted(() => ({
     testBackupDestination: vi.fn(),
     createBackupJob: vi.fn(),
     downloadBackupArtifact: vi.fn(),
+    fetchRestoreJobs: vi.fn(),
+    fetchRestoreJob: vi.fn(),
+    createRestoreJob: vi.fn(),
 }))
 vi.mock('../src/lib/api/backups', () => api)
 vi.mock('../src/lib/api/zev', () => ({
@@ -63,6 +66,7 @@ function setup({ statusData = status(), destinations = [disk], jobs = [] as Back
     api.fetchBackupStatus.mockResolvedValue(statusData)
     api.fetchBackupDestinations.mockResolvedValue(destinations)
     api.fetchBackupJobs.mockResolvedValue(jobs)
+    api.fetchRestoreJobs.mockResolvedValue([])
 }
 
 const cleanups: (() => void)[] = []

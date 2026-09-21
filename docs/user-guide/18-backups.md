@@ -4,10 +4,11 @@ Back up the whole instance, or a single community, to a local directory or to
 S3-compatible storage. Administrators manage backups under **Platform
 administration → System Settings → Backup**.
 
-> **A whole instance can be restored today, from the server's command line** — see
-> [Restoring an instance](#restoring-an-instance). Restoring a single community
-> from the app is the next step of this feature and is not available yet. Either
-> way, check your backups regularly (see [Verifying a backup](#verifying-a-backup)).
+> **Two kinds of restore.** One **community** can be brought back to the state of a
+> backup from this page — see [Restoring one community](#restoring-one-community).
+> A **whole instance** is restored from the server's command line — see
+> [Restoring an instance](#restoring-an-instance). Either way, check your backups
+> regularly (see [Verifying a backup](#verifying-a-backup)).
 
 ## What a backup contains
 
@@ -70,7 +71,11 @@ destination**.
 media directory (archives contain private data and the media directory is served
 to browsers), and it is created if it does not exist. Files are readable by the
 server's user only. In a container, mount a volume there or the backups vanish
-with the container.
+with the container. The background worker writes the archive and later reads it
+back to restore from it, and the web process serves the download, so the directory
+must be the **same storage for the worker and the web process** — a shared volume,
+not two containers each with their own copy of the path. If a restore fails with
+*the backup file is no longer available*, this is the first thing to check.
 
 **S3-compatible storage** — Amazon S3, MinIO, Garage, Wasabi, Backblaze B2 and
 similar. Give a bucket, an optional key prefix and region, and, for anything other
@@ -226,7 +231,7 @@ Take a backup of the current state first if there is any chance you want it.
 | Message says | What it means | What to do |
 |---|---|---|
 | *not a backup* | It is a community transfer archive, not a backup | Import it from the community's settings instead |
-| *single community* | It is a backup of one community | Whole-instance restore needs an instance backup |
+| *single community* | It is a backup of one community | Whole-instance restore needs an instance backup; restore that community from **Backup → Restore a community** instead |
 | *newer version of OpenZEV* | The backup was taken by a newer release than this one | Upgrade OpenZEV, then restore |
 | *has not applied migrations* | The database structure is older than the backup's | Run `python manage.py migrate` |
 | *schema is newer than the backup* | The database structure is newer than the backup's | It names the `migrate <app> <migration>` steps that bring the structure back; restore; then run `python manage.py migrate` |
@@ -240,6 +245,95 @@ Restore a recent backup into a throwaway installation once, before you need to.
 Time it, and write down which keys you needed and where they were. A restore
 drill on a quiet afternoon is how you find out that the key was only ever on the
 server that is now gone.
+
+## Restoring one community
+
+Use this when one community has gone wrong — a bad import, a wrong bulk edit, a
+deleted community — and everything else is fine. It puts **that community** back
+to the state of a backup and leaves alone:
+
+- every **other community**,
+- every **account** — no user is created, changed or deleted, not a password, not
+  a two-factor device,
+- the **audit trail** — it is never rewritten; the restore itself is added to it.
+
+It works from **Platform administration → System Settings → Backup → Restore a
+community**, and from the command line (below). You need a finished backup that
+holds the community: an instance backup holds all of them, a single-community
+backup one.
+
+### Step by step
+
+1. Choose the **backup** and the **community** in it, and press **Preview
+   restore**. Nothing is changed. The preview is computed against the live data
+   and shows, for each kind of data, how many records the backup has and how many
+   there are now. The audit trail is listed as *never restored, only added to*.
+2. **Read the problems.** They come in two kinds:
+   - *needs your confirmation* — issued records the restore would lose: a **sent or
+     paid invoice** it would delete or roll back to an earlier status, or an
+     **issued contract** it would delete. You can go ahead, on purpose, with the
+     switch that appears.
+   - *cannot be overridden* — going ahead would damage something else: a **meter
+     id** in the backup that now belongs to another community, a price source the
+     backup refers to that no longer exists, an **owner** with no matching account
+     (when the community has to be recreated), or an **export or another restore**
+     running for that community. Resolve these first, then preview again.
+3. **Choose where the safety backup goes.** Before anything is changed, the
+   community *as it is now* is backed up there. If that backup fails, nothing is
+   restored. It is the way back: restore from it to undo the restore.
+4. **Type the community's name** and press **Restore now**. The whole restore is
+   applied in one step. If anything fails, the community is exactly as it was.
+
+### How accounts are handled
+
+A backup refers to people by an internal number that means nothing elsewhere, so
+a restore looks each person up **by email address** (then username) among today's
+accounts and links them again. Someone with no matching account is listed in the
+preview and left unlinked — a restore **never creates an account**. If the
+community's owner has no matching account, an existing community keeps its
+current owner; a community that has to be recreated cannot be, until the owner's
+account exists.
+
+### What else to know
+
+- **A deleted community is recreated** with everything the backup holds. Its old
+  audit events stay in the trail as they are.
+- **Invoice PDFs** are restored under their original names. Files for invoices
+  that no longer exist are left in storage.
+- **Do not run it while invoices are being generated in bulk** for that
+  community: there is no job to detect that, so this is on you. A running annual
+  export is detected and blocks the restore.
+- The restore is recorded in **History** on the same page and in the audit trail
+  (`restore.created`, `restore.started`, `zev.restored`, or `restore.failed`).
+  A preview is recorded as `restore.previewed`.
+
+### From the command line
+
+```bash
+# What would it do? (exits non-zero if it would be refused)
+python manage.py openzev_restore --mode zev --from /var/backups/openzev/openzev-backup-….zip.enc \
+    --zev "Sonnenhof" --dry-run
+
+# Do it, with the safety backup written to a directory you name
+python manage.py openzev_restore --mode zev --from /var/backups/openzev/openzev-backup-….zip.enc \
+    --zev "Sonnenhof" --path /var/backups/openzev/safety
+```
+
+`--zev` takes the community's name or id; a **deleted** community is named by id
+(`openzev_backup_verify` lists the ids in a backup). Use `--destination NAME` for a
+saved destination instead of `--path`. `--force` goes ahead past the
+*needs your confirmation* problems. `--from` can also be an `s3://` address, as for
+[restoring an instance](#restoring-an-instance).
+
+### When it refuses
+
+| Message says | What it means | What to do |
+|---|---|---|
+| *does not contain that community* | The backup was taken of other communities | Pick another backup |
+| *would delete or roll back N issued record(s)* | Sent or paid invoices, or issued contracts, would be lost | Read them in the plan; go ahead only if you mean it |
+| *cannot be overridden* | See step 2 above | Resolve it and preview again |
+| *safety backup failed* | The safety backup could not be written | Fix the destination (**Test** it under Destinations); nothing was restored |
+| *newer version* / *migrations* | The backup was made by a different version | As for [restoring an instance](#when-the-command-refuses) |
 
 ## What a backup does not do
 
