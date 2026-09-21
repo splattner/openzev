@@ -37,6 +37,7 @@ vi.mock('../src/lib/appSettings', () => ({
     useAppSettings: () => ({ settings: {}, isLoading: false }),
     formatShortDate: (d: string) => d,
     formatDateTime: (d: string) => d,
+    toDayJsDateFormat: () => 'YYYY-MM-DD',
 }))
 
 vi.mock('../src/lib/api/audit', () => ({

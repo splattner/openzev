@@ -1,3 +1,4 @@
+import type { Ref } from 'react'
 import { DatePickerInput } from '@mantine/dates'
 import { toDayJsDateFormat, useAppSettings } from '../lib/appSettings'
 
@@ -8,6 +9,10 @@ interface CivilDateInputProps {
     /** Earliest/latest selectable civil date, as `YYYY-MM-DD`. Omit for no bound. */
     minDate?: string
     maxDate?: string
+    /** Show the clear button. Turn off for a required field that must always hold a date. */
+    clearable?: boolean
+    /** Ref to the focusable trigger, e.g. to focus the field from a deep link. */
+    inputRef?: Ref<HTMLButtonElement>
 }
 
 /**
@@ -18,7 +23,7 @@ interface CivilDateInputProps {
  * no `Date` round-trip, no timezone shift in either direction. Only the
  * visible label is formatted to the user's short date format.
  */
-export function CivilDateInput({ value, onChange, minDate, maxDate }: CivilDateInputProps) {
+export function CivilDateInput({ value, onChange, minDate, maxDate, clearable = true, inputRef }: CivilDateInputProps) {
     const { settings } = useAppSettings()
     return (
         <DatePickerInput
@@ -27,7 +32,8 @@ export function CivilDateInput({ value, onChange, minDate, maxDate }: CivilDateI
             onChange={onChange}
             minDate={minDate}
             maxDate={maxDate}
-            clearable
+            clearable={clearable}
+            ref={inputRef}
         />
     )
 }

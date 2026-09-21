@@ -1,10 +1,15 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, createElement } from 'react'
 import { createRoot } from 'react-dom/client'
 import { MantineProvider } from '@mantine/core'
 import type { Participant } from '../src/types/api'
 
 import { ParticipantFormModal } from '../src/features/participants/ParticipantFormModal'
+
+vi.mock('../src/lib/appSettings', () => ({
+  useAppSettings: () => ({ settings: {}, isLoading: false }),
+  toDayJsDateFormat: () => 'YYYY-MM-DD',
+}))
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true
 
@@ -53,11 +58,12 @@ function renderModal(focusField: 'valid_to' | null) {
   return { container, root }
 }
 
-function validToInput(container: HTMLElement): HTMLInputElement | null {
-  return container.querySelector<HTMLInputElement>('input[name="valid_to"]')
+// The date picker's focusable trigger is a button; valid_from comes first, valid_to second.
+function validToInput(container: HTMLElement): HTMLButtonElement | null {
+  return container.querySelectorAll<HTMLButtonElement>('button[data-dates-input]')[1] ?? null
 }
 
-async function waitForFocus(input: HTMLInputElement) {
+async function waitForFocus(input: HTMLElement) {
   for (let i = 0; i < 20 && document.activeElement !== input; i += 1) {
     await act(async () => {
       await new Promise((resolve) => setTimeout(resolve, 25))

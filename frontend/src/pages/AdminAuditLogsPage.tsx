@@ -7,6 +7,7 @@ import { queryKeys } from '../lib/api/queryKeys'
 import { formatDateTime, useAppSettings } from '../lib/appSettings'
 import { useAuth } from '../lib/auth'
 import { useManagedZev } from '../lib/managedZev'
+import { CivilDateInput } from '../components/CivilDateInput'
 import { AuditEventDrawer } from '../features/audit/AuditEventDrawer'
 import type { AuditActionCategory, AuditEvent, AuditEventFilters, AuditEventStatus } from '../types/api'
 
@@ -238,11 +239,11 @@ export function AuditLogsPage({ scope, embedded = false }: AuditLogsPageProps & 
                     </label>
                     <label>
                         {t('pages.auditLogs.filters.dateFrom')}
-                        <input type="date" value={filters.dateFrom} onChange={(event) => updateFilter('dateFrom', event.target.value)} />
+                        <CivilDateInput value={filters.dateFrom || null} onChange={(iso) => updateFilter('dateFrom', iso ?? '')} />
                     </label>
                     <label>
                         {t('pages.auditLogs.filters.dateTo')}
-                        <input type="date" value={filters.dateTo} onChange={(event) => updateFilter('dateTo', event.target.value)} />
+                        <CivilDateInput value={filters.dateTo || null} onChange={(iso) => updateFilter('dateTo', iso ?? '')} />
                     </label>
                 </div>
 

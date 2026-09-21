@@ -1,7 +1,8 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useEffect, useRef } from 'react'
-import { useForm } from 'react-hook-form'
+import { Controller, useForm } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
+import { CivilDateInput } from '../../components/CivilDateInput'
 import { FormModal } from '../../components/FormModal'
 import { FormModalFooter } from '../../components/FormModalFooter'
 import { TITLE_KEYS } from '../../lib/participantTitle'
@@ -41,8 +42,7 @@ export function ParticipantFormModal({
     resolver: zodResolver(participantFormSchema),
     defaultValues: defaultParticipantFormValues,
   })
-  const validToField = form.register('valid_to')
-  const validToRef = useRef<HTMLInputElement | null>(null)
+  const validToRef = useRef<HTMLButtonElement | null>(null)
 
   useEffect(() => {
     form.reset(initialParticipant ? mapParticipantToFormValues(initialParticipant) : defaultParticipantFormValues)
@@ -108,17 +108,30 @@ export function ParticipantFormModal({
         </label>
         <label>
           <span>{t('pages.participants.form.validFrom')}</span>
-          <input type="date" {...form.register('valid_from')} required />
+          <Controller
+            control={form.control}
+            name="valid_from"
+            render={({ field }) => (
+              <CivilDateInput
+                value={field.value || null}
+                onChange={(iso) => field.onChange(iso ?? '')}
+                clearable={false}
+              />
+            )}
+          />
         </label>
         <label>
           <span>{t('pages.participants.form.validTo')}</span>
-          <input
-            type="date"
-            {...validToField}
-            ref={(element) => {
-              validToRef.current = element
-              validToField.ref(element)
-            }}
+          <Controller
+            control={form.control}
+            name="valid_to"
+            render={({ field }) => (
+              <CivilDateInput
+                value={field.value || null}
+                onChange={(iso) => field.onChange(iso ?? '')}
+                inputRef={validToRef}
+              />
+            )}
           />
         </label>
         <label>

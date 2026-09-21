@@ -525,12 +525,11 @@ export function MeteringChartPage({ tab }: { tab: 'chart' | 'quality' | 'imports
 
                     {tab === 'chart' && (
                         <div
-                            className="inline-form"
+                            className="inline-form align-start"
                             style={{
                                 display: 'grid',
                                 gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
                                 gap: '1rem',
-                                alignItems: 'end',
                             }}
                         >
                             <label>
