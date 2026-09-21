@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
+import { Link } from 'react-router-dom'
 import { formatDateTime } from '../lib/appSettings'
 import { formatBytes } from '../lib/numbers'
 import { queryKeys } from '../lib/api/queryKeys'
@@ -59,7 +60,7 @@ export function AdminSystemHealthPanel() {
 
     return (
         <div className="page-stack">
-            <div className="grid grid-4">
+            <div className="grid grid-3">
                 <ProbeCard status={health.database.status} title={t('pages.adminOverview.health.database.title')}>
                     <p className="muted" style={{ margin: 0 }}>
                         {health.database.engine}
@@ -84,6 +85,26 @@ export function AdminSystemHealthPanel() {
                         {t(health.mfa.encryption_key_configured
                             ? 'pages.adminOverview.health.mfa.configured'
                             : 'pages.adminOverview.health.mfa.notConfigured')}
+                    </p>
+                </ProbeCard>
+                <ProbeCard status={health.backups.status} title={t('pages.adminOverview.health.backups.title')}>
+                    <p className="muted" style={{ margin: 0 }}>
+                        {health.backups.status === 'unknown'
+                            ? t('pages.adminOverview.health.backups.notSetUp')
+                            : health.backups.last_successful_at
+                              ? t('pages.adminOverview.health.backups.last', {
+                                    time: formatDateTime(health.backups.last_successful_at),
+                                })
+                              : t('pages.adminOverview.health.backups.never')}
+                    </p>
+                    {health.backups.stale && (
+                        <p className="muted text-error">{t('pages.adminOverview.health.backups.stale')}</p>
+                    )}
+                    {health.backups.status !== 'unknown' && health.backups.encrypted === false && (
+                        <p className="muted text-error">{t('pages.adminOverview.health.backups.unencrypted')}</p>
+                    )}
+                    <p className="muted" style={{ margin: 0 }}>
+                        <Link to="/admin/system-settings?tab=backup">{t('pages.adminOverview.health.backups.manage')}</Link>
                     </p>
                 </ProbeCard>
                 <ProbeCard status={health.email.status} title={t('pages.adminOverview.health.email.title')}>

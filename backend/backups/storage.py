@@ -284,6 +284,44 @@ def fetch_from_destination(destination, location: str, target: Path) -> None:
         raise DestinationError("The backup file could not be read.") from None
 
 
+def delete_from_destination(destination, location: str) -> bool:
+    """Delete an archive a backup job wrote to ``destination``; ``False`` if it was already gone.
+
+    Followed only inside the destination the row names, exactly as
+    ``fetch_from_destination`` does: ``location`` comes from the database, and a
+    delete is the operation where following the wrong path costs the most.
+    """
+    if destination is None:
+        raise DestinationError("The destination this backup was written to no longer exists.")
+    if destination.kind == "s3":
+        from botocore.exceptions import BotoCoreError, ClientError
+
+        bucket, key = parse_s3_url(location)
+        prefix = destination.prefix.strip("/")
+        if bucket != destination.bucket or (prefix and not key.startswith(prefix + "/")):
+            raise DestinationError("This backup's location is not inside its destination.")
+        try:
+            # S3 deletes are idempotent: a missing key is not an error, so a
+            # separate existence check would only add a race.
+            s3_client(destination).delete_object(Bucket=bucket, Key=key)
+        except (BotoCoreError, ClientError) as exc:
+            raise DestinationError(_explain_s3(exc)) from exc
+        return True
+
+    try:
+        resolved = Path(location).resolve(strict=True)
+        resolved.relative_to(Path(destination.path).resolve())
+    except FileNotFoundError:
+        return False
+    except ValueError:
+        raise DestinationError("This backup's location is not inside its destination.") from None
+    try:
+        resolved.unlink()
+    except OSError as exc:
+        raise DestinationError(f"Could not delete the backup file: {exc.strerror or 'I/O error'}.") from exc
+    return True
+
+
 # ── entry points ─────────────────────────────────────────────────────────────
 
 def store_archive(destination, source: Path, archive_name: str) -> str:

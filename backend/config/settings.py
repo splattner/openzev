@@ -302,6 +302,12 @@ CELERY_BEAT_SCHEDULE = {
     # at which a day's prices are final. Re-fetching a window
     # already stored is an idempotent upsert, so extra ticks cost only a
     # request.
+    # Retention, expiry and stalled-job recovery for backups. Also runs at the
+    # start of every backup, so a deployment without beat still cleans up.
+    "sweep-backup-artifacts": {
+        "task": "backups.tasks.sweep_backup_artifacts",
+        "schedule": 3600.0,
+    },
     "refresh-dynamic-tariff-sources": {
         "task": "tariffs.tasks.refresh_dynamic_tariff_sources",
         "schedule": 4 * 60 * 60.0,
@@ -338,3 +344,8 @@ BACKUP_WORK_DIR = env("BACKUP_WORK_DIR", default="")
 # Soft time budget for one backup run, in seconds (a hard limit runs a grace
 # above it), as EXPORT_RUNNER_TIMEOUT_S does for export jobs.
 BACKUP_RUNNER_TIMEOUT_S = env.int("BACKUP_RUNNER_TIMEOUT_S", default=10800)
+
+# A safety backup (taken before a per-ZEV restore) is the way back from that
+# restore, not a routine backup, so it expires by date instead of by count.
+# ``0`` keeps them until an administrator deletes them.
+BACKUP_SAFETY_RETENTION_DAYS = env.int("BACKUP_SAFETY_RETENTION_DAYS", default=30)

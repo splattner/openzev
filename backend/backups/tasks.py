@@ -16,6 +16,7 @@ from __future__ import annotations
 import hashlib
 import logging
 import tempfile
+from datetime import timedelta
 from pathlib import Path
 
 from billiard.exceptions import SoftTimeLimitExceeded
@@ -27,7 +28,7 @@ from django.utils.text import slugify
 from audit.models import AuditActionCategory, AuditEventSource, AuditEventStatus
 from audit.services import record_audit_event
 
-from . import archive, crypto
+from . import archive, crypto, retention
 from .models import BackupJob, BackupJobScope, BackupJobStatus, BackupJobTrigger, RestoreJob
 from .restore import RestoreError
 from .restore_zev import RestoreRefused, restore_zev
@@ -78,6 +79,27 @@ def _audit_best_effort(job, *, action_type, summary, status, source, metadata=No
         )
     except Exception:  # noqa: BLE001
         logger.exception("Backup audit event could not be recorded for job %s", job.pk)
+
+
+def _sweep_best_effort(*, steps) -> None:
+    """Run part of the sweep without ever failing the backup it rides along with."""
+    try:
+        retention.sweep(steps=steps)
+    except Exception:  # noqa: BLE001
+        logger.exception("Backup sweep (%s) failed", ", ".join(steps))
+
+
+def _expiry_for(job):
+    """A safety backup expires by date; every other backup is kept until retention or an admin removes it.
+
+    Only one written to a saved destination: a file an operator put in an ad-hoc
+    directory with ``--path`` has no destination to bound where it may be deleted
+    from, so it is left for them to manage.
+    """
+    days = int(getattr(settings, "BACKUP_SAFETY_RETENTION_DAYS", 0))
+    if job.trigger == BackupJobTrigger.PRE_RESTORE and job.destination_id and days > 0:
+        return timezone.now() + timedelta(days=days)
+    return None
 
 
 def _mark_failed(job, message: str) -> None:
@@ -141,6 +163,9 @@ def execute_backup_job(job_id, *, source: str = AuditEventSource.CELERY, destina
 
     job = BackupJob.objects.select_related("zev", "destination", "requester").get(pk=job_id)
     target = destination or job.destination
+    # Deployments without a beat process still clean up while backups run. Only
+    # expiry and stalled jobs here: retention waits until this backup exists.
+    _sweep_best_effort(steps=("expired", "stalled"))
     _audit_best_effort(
         job, action_type=ACTION_STARTED, status=AuditEventStatus.STARTED, source=source,
         summary=f"Backup started ({job.scope}).",
@@ -207,6 +232,7 @@ def execute_backup_job(job_id, *, source: str = AuditEventSource.CELERY, destina
         encryption_key_fingerprint=fingerprint,
         manifest_json=manifest,
         error_message="",
+        file_expires_at=_expiry_for(job),
     )
     if not published:
         # Someone failed the job while the archive was being built. The artifact
@@ -218,6 +244,9 @@ def execute_backup_job(job_id, *, source: str = AuditEventSource.CELERY, destina
 
     job.refresh_from_db()
     logger.info("Backup job %s completed: %s (%d bytes)", job_id, location, size)
+    # Now that a newer backup exists, older ones beyond the destination's
+    # retention can go.
+    _sweep_best_effort(steps=("retention",))
     _audit_best_effort(
         job, action_type=ACTION_COMPLETED, status=AuditEventStatus.SUCCESS, source=source,
         summary=f"Backup completed ({job.scope}, {'encrypted' if fingerprint else 'NOT encrypted'}).",
@@ -422,3 +451,138 @@ def execute_restore_job(job_id, *, source: str = AuditEventSource.CELERY, archiv
 def run_restore_job(self, job_id: str):
     """Execute one restore job (see :func:`execute_restore_job`)."""
     return execute_restore_job(job_id)
+
+
+# ── scheduling, sweeping and verifying ───────────────────────────────────────
+
+ACTION_VERIFIED = "backup.verified"
+ACTION_VERIFY_FAILED = "backup.verify_failed"
+
+_VERIFY_GENERIC = "The check could not be completed. The server log has the details."
+
+
+def enqueue_backup(job) -> None:
+    """Send a queued job to the worker; a broker outage fails the row instead of leaving it queued."""
+    try:
+        run_backup_job.delay(str(job.pk))
+    except Exception:  # noqa: BLE001
+        logger.exception("Scheduled backup job %s could not be enqueued", job.pk)
+        BackupJob.objects.filter(pk=job.pk, status=BackupJobStatus.QUEUED).update(
+            status=BackupJobStatus.FAILED, completed_at=timezone.now(),
+            error_message="The backup could not be queued. The message broker did not accept it.",
+        )
+
+
+def run_scheduled_backup() -> dict:
+    """One whole-instance backup per enabled destination, skipping any that is already busy."""
+    from .models import BackupDestination
+
+    queued, skipped = [], []
+    for destination in BackupDestination.objects.filter(enabled=True).order_by("name"):
+        busy = BackupJob.objects.filter(
+            destination=destination, scope=BackupJobScope.INSTANCE,
+            status__in=(BackupJobStatus.QUEUED, BackupJobStatus.RUNNING),
+        ).exists()
+        if busy:
+            skipped.append(destination.name)
+            continue
+        job = BackupJob.objects.create(
+            scope=BackupJobScope.INSTANCE, trigger=BackupJobTrigger.SCHEDULED, destination=destination,
+        )
+        queued.append(destination.name)
+        enqueue_backup(job)
+    return {"queued": queued, "skipped": skipped}
+
+
+@shared_task
+def scheduled_backup() -> dict:
+    """Fired by beat from the ``openzev-scheduled-backup`` periodic task."""
+    return run_scheduled_backup()
+
+
+@shared_task
+def sweep_backup_artifacts() -> dict:
+    """Hourly: expire, apply retention, and fail jobs a killed worker left behind."""
+    return retention.sweep()
+
+
+def claim_verification(job_id) -> bool:
+    """Take the claim to verify a backup; ``False`` if it is already being verified (or cannot be)."""
+    return bool(
+        BackupJob.objects.filter(
+            pk=job_id, status=BackupJobStatus.COMPLETED, artifact_deleted_at__isnull=True,
+            verify_started_at__isnull=True,
+        ).update(verify_started_at=timezone.now())
+    )
+
+
+def _sha256_of(path: Path) -> str:
+    return _digest(path)[0]
+
+
+def _verify_failures(exc: archive.ArchiveError) -> str:
+    detail = "; ".join(exc.failures[:3])
+    more = exc.total_failures - min(len(exc.failures), 3)
+    return f"{exc}" + (f" {detail}" if detail else "") + (f" (and {more} more)" if more > 0 else "")
+
+
+def execute_verify(job_id, *, source: str = AuditEventSource.CELERY) -> dict | None:
+    """Re-read a stored backup and record whether it is still intact.
+
+    Requires the claim from :func:`claim_verification`. Checks the stored bytes
+    against the checksum recorded when the file was written (catching rot at rest
+    even for an archive that cannot be decrypted here), then decrypts if needed
+    and checks every member, count and section like ``openzev_backup_verify``.
+    """
+    job = BackupJob.objects.select_related("destination", "zev").get(pk=job_id)
+    if job.verify_started_at is None:
+        return None
+    claim = job.verify_started_at
+
+    ok, message = False, _VERIFY_GENERIC
+    try:
+        with tempfile.TemporaryDirectory(dir=settings.BACKUP_WORK_DIR or None) as work:
+            path = Path(work) / "backup"
+            fetch_from_destination(job.destination, job.archive_location, path)
+            if job.archive_sha256 and _sha256_of(path) != job.archive_sha256:
+                message = "The stored file does not match the checksum recorded when it was written."
+            else:
+                with path.open("rb") as handle:
+                    result = archive.verify_archive(handle)
+                ok = True
+                message = f"Intact: {result['members']} files, {result['records']:,} records."
+    except archive.ArchiveError as exc:
+        message = _verify_failures(exc)
+    except (DestinationError, crypto.BackupCryptoError) as exc:
+        message = str(exc)
+    except Exception:
+        logger.exception("Verification of backup %s failed unexpectedly", job_id)
+
+    published = BackupJob.objects.filter(pk=job.pk, verify_started_at=claim).update(
+        verify_started_at=None, verified_at=timezone.now(), verification_ok=ok, verification_message=message[:500],
+    )
+    if not published:
+        return None
+    try:
+        record_audit_event(
+            action_category=AuditActionCategory.SYSTEM,
+            action_type=ACTION_VERIFIED if ok else ACTION_VERIFY_FAILED,
+            target_type="backups.BackupJob",
+            target=job,
+            target_id=str(job.pk),
+            target_display=job.archive_name or f"{job.scope} backup",
+            summary=f"Backup {'verified' if ok else 'failed verification'}: {message}"[:500],
+            status=AuditEventStatus.SUCCESS if ok else AuditEventStatus.FAILED,
+            zev=job.zev,
+            source=source,
+            metadata={"ok": ok},
+        )
+    except Exception:  # noqa: BLE001
+        logger.exception("Verification audit event could not be recorded for backup %s", job_id)
+    return {"ok": ok, "message": message}
+
+
+@shared_task(bind=True, soft_time_limit=_SOFT_LIMIT_S, time_limit=_HARD_LIMIT_S)
+def run_verify_job(self, job_id: str):
+    """Verify one stored backup (see :func:`execute_verify`)."""
+    return execute_verify(job_id)

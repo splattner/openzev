@@ -5,3 +5,7 @@ class BackupsConfig(AppConfig):
     default_auto_field = "django.db.models.BigAutoField"
     name = "backups"
     verbose_name = "Backups"
+
+    def ready(self):
+        # Registers system checks (@register runs at import time).
+        from . import checks  # noqa: F401

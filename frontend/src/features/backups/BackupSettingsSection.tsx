@@ -6,6 +6,7 @@ import { queryKeys } from '../../lib/api/queryKeys'
 import { formatDateTime, useAppSettings } from '../../lib/appSettings'
 import { BackupDestinationsSection } from './BackupDestinationsSection'
 import { BackupJobsSection } from './BackupJobsSection'
+import { BackupScheduleSection } from './BackupScheduleSection'
 import { BackupRestoreSection } from './BackupRestoreSection'
 
 /** The `backup` tab of System Settings: is it safe, where does it go, what has run. */
@@ -37,6 +38,20 @@ export function BackupSettingsSection() {
                         {t('pages.backups.status.encrypted', { fingerprint: status.encryption_key_fingerprint })}
                     </div>
                 ) : null}
+
+                {status?.stale && (
+                    <div className="error-banner">
+                        <strong>{t('pages.backups.status.staleTitle')}</strong>
+                        <div>
+                            {status.age_hours == null
+                                ? t('pages.backups.status.staleNever')
+                                : t('pages.backups.status.stale', {
+                                      hours: Math.round(status.age_hours),
+                                      interval: status.schedule_interval_hours ?? 0,
+                                  })}
+                        </div>
+                    </div>
+                )}
 
                 <p className="muted" style={{ margin: 0 }}>
                     {t('pages.backups.restoreNotice', {
@@ -75,6 +90,7 @@ export function BackupSettingsSection() {
             </section>
 
             <BackupDestinationsSection status={status} />
+            <BackupScheduleSection status={status} />
             <BackupJobsSection />
             <BackupRestoreSection />
         </div>

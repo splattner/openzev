@@ -2422,6 +2422,30 @@ export const de = {
             noEmailYet: 'Noch nicht gesendet',
         },
         backups: {
+            schedule: {
+                title: 'Zeitplan',
+                description: 'Die ganze Instanz automatisch auf jedes aktivierte Ziel sichern.',
+                enabled: 'Sicherungen nach Zeitplan ausführen',
+                frequency: 'Wiederholung',
+                daily: 'Täglich',
+                weekly: 'Wöchentlich',
+                weekday: 'Am',
+                time: 'Um ({{timezone}})',
+                hint: 'Läuft nur, solange der Scheduler (Beat) läuft. Ein Ziel, das noch mit der vorherigen Sicherung beschäftigt ist, wird übersprungen.',
+                lastRun: 'Letzter Lauf: {{date}}.',
+                saved: 'Zeitplan gespeichert',
+                unencrypted: 'Dieser Zeitplan schreibt jedes Mal selbständig unverschlüsselte Sicherungen: Sie enthalten Passwort-Hashes, persönliche Daten der Teilnehmenden und Rechnungen im Klartext. Setzen Sie zuerst BACKUP_ENCRYPTION_KEYS.',
+                noDestination: 'Es ist kein Ziel aktiviert, ein geplanter Lauf hätte also keinen Ort zum Schreiben.',
+                weekdays: {
+                    '0': 'Sonntag',
+                    '1': 'Montag',
+                    '2': 'Dienstag',
+                    '3': 'Mittwoch',
+                    '4': 'Donnerstag',
+                    '5': 'Freitag',
+                    '6': 'Samstag',
+                },
+            },
             intro: 'Sichern Sie die ganze Instanz oder eine einzelne Gemeinschaft in ein lokales Verzeichnis oder einen S3-kompatiblen Speicher. Eine Sicherung enthält alles, was zum Wiederaufbau nötig ist: Konten, Einstellungen, Preisreihen, Rechnungen samt PDF, ausgestellte Verträge und das Audit-Protokoll.',
             restoreNotice: 'Eine ganze Instanz wird auf dem Server mit {{restoreCommand}} wiederhergestellt (mit --dry-run vorab prüfen). Prüfen Sie jederzeit eine Sicherung mit {{command}}.',
             restore: {
@@ -2497,6 +2521,9 @@ export const de = {
                 },
             },
             status: {
+                staleTitle: 'Die Sicherungen sind im Rückstand',
+                stale: 'Die letzte Sicherung wurde vor {{hours}} Stunden abgeschlossen, der Zeitplan erwartet aber mindestens alle {{interval}} Stunden eine. Prüfen Sie, ob Worker und Scheduler (Beat) laufen und der letzte Lauf nicht fehlgeschlagen ist.',
+                staleNever: 'Ein Zeitplan ist eingeschaltet, aber es wurde noch keine Sicherung abgeschlossen. Prüfen Sie, ob Worker und Scheduler (Beat) laufen.',
                 encrypted: 'Sicherungen sind verschlüsselt (Schlüssel {{fingerprint}}).',
                 unencryptedTitle: 'Sicherungen sind nicht verschlüsselt',
                 unencrypted: 'Eine Sicherung enthält Passwort-Hashes, persönliche Daten der Teilnehmenden, Rechnungen und gespeicherte Geheimnisse in lesbarer Form. Setzen Sie BACKUP_ENCRYPTION_KEYS auf dem Server, bevor Sie Sicherungen an einem gemeinsam genutzten Ort ablegen.',
@@ -2507,11 +2534,14 @@ export const de = {
                 never: 'Nie',
             },
             destinations: {
+                keepsN: 'Neueste {{count}}',
+                keepsAll: 'Alle',
                 title: 'Ziele',
                 description: 'Wohin fertige Sicherungen geschrieben werden. Das Löschen eines Ziels löscht nie die dort bereits gespeicherten Archive.',
                 add: 'Ziel hinzufügen',
                 empty: 'Noch kein Ziel vorhanden. Fügen Sie eines hinzu, um die erste Sicherung zu erstellen.',
                 columns: {
+                    keeps: 'Behält',
                     name: 'Name',
                     type: 'Typ',
                     target: 'Ziel',
@@ -2538,6 +2568,8 @@ export const de = {
                 deleteMessage: 'Das Ziel {{name}} löschen? Dort bereits geschriebene Archive werden nicht gelöscht.',
             },
             form: {
+                retention: 'Die neuesten behalten',
+                retentionHint: 'Wie viele Sicherungen jeder Art (die ganze Instanz oder eine Gemeinschaft) hier behalten werden; ältere Dateien werden gelöscht, sobald eine neue Sicherung fertig ist. 0 behält alles.',
                 createTitle: 'Sicherungsziel hinzufügen',
                 editTitle: 'Sicherungsziel bearbeiten',
                 name: 'Name',
@@ -2564,6 +2596,29 @@ export const de = {
                 sseNone: 'Keine (für Speicher ohne Unterstützung)',
             },
             jobs: {
+                check: 'Prüfen',
+                checkQueued: 'Prüfung eingereiht.',
+                fileDeleted: 'Sicherungsdatei gelöscht.',
+                deleteFile: 'Datei löschen',
+                deleteFileTitle: 'Datei dieser Sicherung löschen?',
+                deleteFileMessage: '{{name}} wird am Ziel gelöscht. Der Eintrag bleibt in der Liste, die Sicherung kann aber nicht mehr wiederhergestellt, heruntergeladen oder geprüft werden. Das lässt sich nicht rückgängig machen.',
+                expires: 'Läuft ab am {{date}}',
+                trigger: {
+                    manual: 'Manuell',
+                    scheduled: 'Geplant',
+                    pre_restore: 'Sicherheitssicherung',
+                },
+                fileGone: {
+                    retention: 'Datei entfernt: über der Aufbewahrung',
+                    expired: 'Datei entfernt: abgelaufen',
+                    manual: 'Datei gelöscht',
+                },
+                verification: {
+                    checking: 'Wird geprüft…',
+                    never: 'Nicht geprüft',
+                    ok: 'Intakt',
+                    failed: 'Prüfung fehlgeschlagen',
+                },
                 title: 'Sicherungen',
                 description: 'Jeder Lauf schreibt ein Archiv in das gewählte Ziel. Sie können einen Lauf auch auf der Kommandozeile mit {{command}} starten.',
                 backUpNow: 'Jetzt sichern',
@@ -2577,6 +2632,7 @@ export const de = {
                 queued: 'Sicherung eingereiht.',
                 empty: 'Noch keine Sicherungen.',
                 columns: {
+                    integrity: 'Integrität',
                     created: 'Gestartet',
                     scope: 'Umfang',
                     destination: 'Ziel',
@@ -2597,6 +2653,9 @@ export const de = {
                 downloadFailed: 'Das Archiv konnte nicht heruntergeladen werden.',
             },
             details: {
+                file: 'Datei',
+                fileKept: 'Wird aufbewahrt',
+                integrity: 'Integrität',
                 title: 'Sicherungsdetails',
                 archive: 'Archiv',
                 location: 'Speicherort',
@@ -2621,6 +2680,15 @@ export const de = {
                 health: 'Systemintegrität',
             },
             health: {
+                backups: {
+                    title: 'Sicherungen',
+                    notSetUp: 'Es ist kein Sicherungsziel aktiviert.',
+                    last: 'Letzte Sicherung {{time}}',
+                    never: 'Noch keine Sicherung abgeschlossen.',
+                    stale: 'Der Zeitplan ist im Rückstand.',
+                    unencrypted: 'Sicherungen sind nicht verschlüsselt.',
+                    manage: 'Sicherungen verwalten',
+                },
                 status: {
                     ok: 'OK',
                     degraded: 'Eingeschränkt',

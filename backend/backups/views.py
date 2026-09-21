@@ -9,16 +9,15 @@ import logging
 from pathlib import Path
 
 from django.conf import settings
-from django.db import transaction
+from django.db import models, transaction
 from django.http import FileResponse
-from django.utils import timezone
 from rest_framework import generics, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from accounts.permissions import IsAdmin
 from zev.models import Zev
-from audit.models import AuditActionCategory, AuditEventStatus
+from audit.models import AuditActionCategory, AuditEventSource, AuditEventStatus
 from audit.services import build_diff, build_instance_snapshot, record_audit_event
 
 from . import crypto
@@ -27,11 +26,21 @@ from .serializers import (
     BackupDestinationSerializer,
     BackupJobCreateSerializer,
     BackupJobSerializer,
+    BackupScheduleSerializer,
     RestoreJobCreateSerializer,
     RestoreJobSerializer,
 )
+from . import retention, schedule
+from .health import backup_health, latest_jobs
 from .storage import DestinationError, probe_destination
-from .tasks import ACTION_FAILED, ACTION_RESTORE_FAILED, run_backup_job, run_restore_job
+from .tasks import (
+    ACTION_FAILED,
+    ACTION_RESTORE_FAILED,
+    claim_verification,
+    run_backup_job,
+    run_restore_job,
+    run_verify_job,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +48,7 @@ logger = logging.getLogger(__name__)
 # credential, and "rotated" is recorded as a boolean instead.
 DESTINATION_TRACKED_FIELDS = (
     "name", "kind", "enabled", "path", "bucket", "prefix", "region", "endpoint_url",
-    "access_key_id", "server_side_encryption",
+    "access_key_id", "server_side_encryption", "retention_count",
 )
 
 _ENQUEUE_FAILED = "The backup could not be queued. Please try again."
@@ -103,11 +112,31 @@ class BackupDestinationDetailView(generics.RetrieveUpdateDestroyAPIView):
             metadata={"secret_changed": bytes(destination.secret_access_key_encrypted or b"") != old_secret},
         )
 
+    def destroy(self, request, *args, **kwargs):
+        # A destination is how a backup's file is found again — to restore it, verify
+        # it, download it, or delete it. Removing one that still holds files would
+        # strand them, so it is refused until they are gone (or it is only disabled).
+        instance = self.get_object()
+        holding = BackupJob.objects.filter(destination=instance).filter(
+            models.Q(status__in=(BackupJobStatus.QUEUED, BackupJobStatus.RUNNING))
+            | models.Q(status=BackupJobStatus.COMPLETED, artifact_deleted_at__isnull=True)
+        ).count()
+        if holding:
+            return Response(
+                {
+                    "detail": (
+                        f"{holding} backup(s) are stored here or still running. Delete their files first, "
+                        "or disable this destination instead."
+                    )
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
+        return super().destroy(request, *args, **kwargs)
+
     def perform_destroy(self, instance):
         destination_id, name = str(instance.pk), instance.name
         instance.delete()
-        # Deleting a destination never deletes archives already written there;
-        # the jobs keep their recorded location.
+        # Only reachable once no file is stored here, so nothing is stranded.
         record_audit_event(
             request=self.request,
             action_category=AuditActionCategory.GOVERNANCE,
@@ -227,6 +256,9 @@ class BackupJobDownloadView(APIView):
                 status=status.HTTP_409_CONFLICT,
             )
 
+        if job.artifact_deleted_at is not None:
+            return Response({"detail": "This backup's file has been deleted."}, status=status.HTTP_410_GONE)
+
         path = Path(job.archive_location)
         # The location is written by the runner, but it is still a path read from
         # the database: only ever serve a file inside the destination it names.
@@ -331,6 +363,89 @@ class RestoreJobDetailView(generics.RetrieveAPIView):
     permission_classes = [IsAdmin]
 
 
+class BackupJobVerifyView(APIView):
+    """Re-read a stored backup and record whether it is still intact.
+
+    Asynchronous, like a backup: the check reads (and for S3 downloads) the whole
+    archive, which can take minutes. The result lands on the job row
+    (``verified_at``, ``verification_ok``, ``verification_message``), which the
+    UI already polls.
+    """
+
+    permission_classes = [IsAdmin]
+
+    def post(self, request, pk):
+        job = generics.get_object_or_404(BackupJob.objects.select_related("destination"), pk=pk)
+        if not job.artifact_available:
+            return Response(
+                {"detail": "This backup has no file to check."}, status=status.HTTP_409_CONFLICT,
+            )
+        if not claim_verification(job.pk):
+            return Response(
+                {"detail": "This backup is already being checked."}, status=status.HTTP_409_CONFLICT,
+            )
+        try:
+            transaction.on_commit(lambda: run_verify_job.delay(str(job.pk)))
+        except Exception:  # noqa: BLE001
+            logger.exception("Verification of backup %s could not be enqueued", job.pk)
+            BackupJob.objects.filter(pk=job.pk).update(verify_started_at=None)
+            return Response({"detail": "The check could not be queued. Please try again."}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+        job.refresh_from_db()
+        return Response(BackupJobSerializer(job).data, status=status.HTTP_202_ACCEPTED)
+
+
+class BackupJobArtifactView(APIView):
+    """Delete a backup's file (the row stays, so the history does)."""
+
+    permission_classes = [IsAdmin]
+
+    def delete(self, request, pk):
+        job = generics.get_object_or_404(BackupJob.objects.select_related("destination", "zev"), pk=pk)
+        if not job.artifact_available:
+            return Response({"detail": "This backup has no file to delete."}, status=status.HTTP_409_CONFLICT)
+        if retention.is_in_use(job):
+            return Response(
+                {"detail": "A restore or a check is using this backup right now."}, status=status.HTTP_409_CONFLICT,
+            )
+        try:
+            retention.delete_artifact(job, reason=retention.REASON_MANUAL, source=AuditEventSource.API, user=request.user)
+        except DestinationError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_502_BAD_GATEWAY)
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class BackupScheduleView(APIView):
+    """The built-in schedule. A change is a governance decision: it decides when data leaves the instance."""
+
+    permission_classes = [IsAdmin]
+
+    def get(self, request):
+        return Response(BackupScheduleSerializer(schedule.get_schedule()).data)
+
+    def put(self, request):
+        serializer = BackupScheduleSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        before = schedule.get_schedule()
+        after = schedule.set_schedule(
+            enabled=data["enabled"], frequency=data["frequency"], hour=data["hour"], minute=data["minute"],
+            day_of_week=data["day_of_week"],
+        )
+        fields = ("enabled", "frequency", "hour", "minute", "day_of_week")
+        record_audit_event(
+            request=request,
+            action_category=AuditActionCategory.GOVERNANCE,
+            action_type="backup_schedule.update",
+            target_type="backups.BackupSchedule",
+            target_id=schedule.TASK_NAME,
+            target_display="Backup schedule",
+            summary="Backup schedule " + ("enabled" if after["enabled"] else "disabled") + ".",
+            changes=build_diff({k: before[k] for k in fields}, {k: after[k] for k in fields}, fields),
+            metadata={"timezone": after["timezone"]},
+        )
+        return Response(BackupScheduleSerializer(after).data)
+
+
 class BackupStatusView(APIView):
     """What the admin UI needs to say honestly whether backups are safe.
 
@@ -354,17 +469,8 @@ class BackupStatusView(APIView):
             # traceback, and never contains key material.
             encrypted, fingerprint, key_problem = False, "", str(exc)
 
-        last_ok = (
-            BackupJob.objects.select_related("destination", "zev")
-            .filter(status=BackupJobStatus.COMPLETED).order_by("-completed_at").first()
-        )
-        last_failed = (
-            BackupJob.objects.select_related("destination", "zev")
-            .filter(status=BackupJobStatus.FAILED).order_by("-completed_at", "-created_at").first()
-        )
-        age_hours = (
-            round((timezone.now() - last_ok.completed_at).total_seconds() / 3600, 1) if last_ok else None
-        )
+        last_ok, last_failed = latest_jobs()
+        health = backup_health()
         return Response({
             "encrypted": encrypted,
             "encryption_key_fingerprint": fingerprint,
@@ -372,8 +478,11 @@ class BackupStatusView(APIView):
             "environment_credentials": bool(
                 settings.BACKUP_S3_ACCESS_KEY_ID and settings.BACKUP_S3_SECRET_ACCESS_KEY
             ),
-            "destinations_enabled": BackupDestination.objects.filter(enabled=True).count(),
+            "destinations_enabled": health["destinations_enabled"],
             "last_successful": BackupJobSerializer(last_ok).data if last_ok else None,
             "last_failed": BackupJobSerializer(last_failed).data if last_failed else None,
-            "age_hours": age_hours,
+            "age_hours": health["age_hours"],
+            "stale": health["stale"],
+            "schedule_enabled": health["schedule_enabled"],
+            "schedule_interval_hours": health["schedule_interval_hours"],
         })

@@ -138,5 +138,9 @@ Trade-offs:
 - Destination credentials (S3 access keys) are a different secret with a different
   lifetime and are not covered here; their storage rules are in
   [SPEC-2026-09-backup-and-restore](../specs/2026-09-backup-and-restore.md) §4.2.
-- A Django system check should warn when a scheduled backup is configured with no
-  encryption key, mirroring `accounts/checks.py` for `MFA_ENCRYPTION_KEYS`.
+- A Django system check warns when a scheduled backup is configured with no
+  encryption key (`backups.W001`, in `backups/checks.py`). It is tagged `database`,
+  since the schedule lives in the database, so it runs under `manage.py check
+  --database default` and not in an ordinary `check`.
+- Whether a *remote* destination should refuse to run without a key is still open;
+  encryption remains optional and loud.

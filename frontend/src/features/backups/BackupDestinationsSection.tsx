@@ -159,6 +159,7 @@ export function BackupDestinationsSection({ status }: { status: BackupStatus | u
                                 <th>{t('pages.backups.destinations.columns.type')}</th>
                                 <th>{t('pages.backups.destinations.columns.target')}</th>
                                 <th>{t('pages.backups.destinations.columns.credentials')}</th>
+                                <th>{t('pages.backups.destinations.columns.keeps')}</th>
                                 <th>{t('pages.backups.destinations.columns.status')}</th>
                                 <th>{t('common.actions')}</th>
                             </tr>
@@ -173,6 +174,11 @@ export function BackupDestinationsSection({ status }: { status: BackupStatus | u
                                         {destination.kind === 's3'
                                             ? t(`pages.backups.destinations.credentialMode.${destination.credential_mode}`)
                                             : '—'}
+                                    </td>
+                                    <td>
+                                        {destination.retention_count > 0
+                                            ? t('pages.backups.destinations.keepsN', { count: destination.retention_count })
+                                            : t('pages.backups.destinations.keepsAll')}
                                     </td>
                                     <td>
                                         <span className={`badge ${destination.enabled ? 'badge-success' : 'badge-neutral'}`}>
@@ -360,6 +366,19 @@ export function BackupDestinationsSection({ status }: { status: BackupStatus | u
                             </label>
                         </>
                     )}
+
+                    <label>
+                        <span>{t('pages.backups.form.retention')}</span>
+                        <input
+                            type="number"
+                            min={0}
+                            step={1}
+                            inputMode="numeric"
+                            value={form.retention_count}
+                            onChange={(event) => update('retention_count', event.target.value)}
+                        />
+                        <small className="muted">{t('pages.backups.form.retentionHint')}</small>
+                    </label>
 
                     <Switch
                         checked={form.enabled}

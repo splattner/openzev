@@ -60,6 +60,12 @@ class BackupDestination(models.Model):
     secret_access_key_encrypted = models.BinaryField(blank=True, default=b"")
     server_side_encryption = models.CharField(max_length=20, blank=True, default="AES256")
 
+    # How many finished backups of each kind (the whole instance, or one
+    # community) to keep here; the sweep deletes older ones. ``0`` keeps
+    # everything, so retention is something an administrator turns on, never a
+    # default that deletes backups on its own.
+    retention_count = models.PositiveIntegerField(default=0)
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -199,8 +205,28 @@ class BackupJob(models.Model):
     manifest_json = models.JSONField(default=dict, blank=True)
     error_message = models.CharField(max_length=500, blank=True, default="")
 
+    # ── retention (SPEC §6.4) ────────────────────────────────────────────────
+    # Only a safety backup expires by date; other backups are kept until the
+    # destination's ``retention_count`` or an administrator removes them. The row
+    # outlives its file, so the history stays readable.
+    file_expires_at = models.DateTimeField(null=True, blank=True)
+    artifact_deleted_at = models.DateTimeField(null=True, blank=True)
+    artifact_deleted_reason = models.CharField(max_length=10, blank=True, default="")
+
+    # ── verification: the latest re-read of the stored file ──────────────────
+    # ``verify_started_at`` is the claim while a verification runs.
+    verify_started_at = models.DateTimeField(null=True, blank=True)
+    verified_at = models.DateTimeField(null=True, blank=True)
+    verification_ok = models.BooleanField(null=True, blank=True)
+    verification_message = models.CharField(max_length=500, blank=True, default="")
+
     def __str__(self) -> str:
         return f"{self.scope} backup {self.pk} ({self.status})"
+
+    @property
+    def artifact_available(self) -> bool:
+        """A finished backup whose file has not been deleted."""
+        return self.status == BackupJobStatus.COMPLETED and self.artifact_deleted_at is None
 
 
 class RestoreJob(models.Model):

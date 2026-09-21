@@ -128,6 +128,16 @@ export interface SystemHealth {
         mode: 'smtp' | 'console' | 'memory' | 'other'
         backend: string
     }
+    /** Is the instance protected by a recent backup? "unknown": no destination is enabled. */
+    backups: {
+        status: SystemHealthStatus
+        destinations_enabled?: number
+        schedule_enabled?: boolean
+        last_successful_at?: string | null
+        age_hours?: number | null
+        stale?: boolean
+        encrypted?: boolean
+    }
     checked_at: string
 }
 
@@ -1605,6 +1615,8 @@ export interface BackupDestination {
     access_key_id: string
     /** `''` disables server-side encryption for stores that lack it. */
     server_side_encryption: string
+    /** How many backups of each kind to keep here; `0` keeps them all. */
+    retention_count: number
     credential_mode: BackupCredentialMode
     /** The secret is never returned; this reports whether one is stored. */
     has_secret_access_key: boolean
@@ -1623,6 +1635,7 @@ export interface BackupDestinationInput {
     endpoint_url: string
     access_key_id: string
     server_side_encryption: string
+    retention_count: number
     /** Absent leaves a stored secret untouched; `''` clears it. */
     secret_access_key?: string
 }
@@ -1677,6 +1690,19 @@ export interface BackupJob {
     /** Empty until the job completes. */
     manifest_json: BackupManifest | Record<string, never>
     error_message: string
+    /** Only a safety backup expires by date. */
+    file_expires_at: string | null
+    /** The row outlives its file; set once retention, expiry or an administrator removed it. */
+    artifact_deleted_at: string | null
+    artifact_deleted_reason: '' | 'retention' | 'expired' | 'manual'
+    /** A finished backup whose file has not been deleted. */
+    artifact_available: boolean
+    /** A check of the stored file is running. */
+    verifying: boolean
+    verified_at: string | null
+    /** `null`: never checked. */
+    verification_ok: boolean | null
+    verification_message: string
 }
 
 export interface BackupJobInput {
@@ -1697,7 +1723,28 @@ export interface BackupStatus {
     last_successful: BackupJob | null
     last_failed: BackupJob | null
     age_hours: number | null
+    /** The schedule has fallen behind: no backup for twice its interval (or ever). */
+    stale: boolean
+    schedule_enabled: boolean
+    schedule_interval_hours: number | null
 }
+
+export type BackupScheduleFrequency = 'daily' | 'weekly'
+
+export interface BackupSchedule {
+    enabled: boolean
+    frequency: BackupScheduleFrequency
+    hour: number
+    minute: number
+    /** Cron numbering: 0 is Sunday. Only meaningful when weekly. */
+    day_of_week: number
+    /** The server's time zone, which `hour` and `minute` are in. */
+    timezone: string
+    interval_hours: number
+    last_run_at: string | null
+}
+
+export type BackupScheduleInput = Pick<BackupSchedule, 'enabled' | 'frequency' | 'hour' | 'minute' | 'day_of_week'>
 
 // ── Per-ZEV restore (SPEC-2026-09-backup-and-restore §6.6) ───────────────────
 

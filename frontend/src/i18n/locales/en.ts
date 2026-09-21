@@ -2433,6 +2433,30 @@ export const en = {
             noEmailYet: 'Not sent yet',
         },
         backups: {
+            schedule: {
+                title: 'Schedule',
+                description: 'Back up the whole instance automatically, to every enabled destination.',
+                enabled: 'Run backups on a schedule',
+                frequency: 'Repeat',
+                daily: 'Every day',
+                weekly: 'Every week',
+                weekday: 'On',
+                time: 'At ({{timezone}})',
+                hint: 'Runs only while the scheduler (beat) is running. A destination that is still busy with the previous backup is skipped.',
+                lastRun: 'Last run: {{date}}.',
+                saved: 'Schedule saved',
+                unencrypted: 'This schedule will write unencrypted backups by itself, every time: they contain password hashes, participants\' personal data and invoices in the clear. Set BACKUP_ENCRYPTION_KEYS first.',
+                noDestination: 'There is no enabled destination, so a scheduled run would have nowhere to write.',
+                weekdays: {
+                    '0': 'Sunday',
+                    '1': 'Monday',
+                    '2': 'Tuesday',
+                    '3': 'Wednesday',
+                    '4': 'Thursday',
+                    '5': 'Friday',
+                    '6': 'Saturday',
+                },
+            },
             intro: 'Back up the whole instance or a single community to a local directory or S3-compatible storage. A backup holds everything needed to rebuild it: accounts, settings, price series, invoices with their PDFs, issued contracts and the audit trail.',
             restoreNotice: 'A whole instance is restored on the server with {{restoreCommand}} (add --dry-run to check first). Check a backup at any time with {{command}}.',
             restore: {
@@ -2508,6 +2532,9 @@ export const en = {
                 },
             },
             status: {
+                staleTitle: 'Backups have fallen behind',
+                stale: 'The last backup finished {{hours}} hours ago, but the schedule expects one at least every {{interval}} hours. Check that the worker and the scheduler (beat) are running and that the last run did not fail.',
+                staleNever: 'A schedule is switched on, but no backup has finished yet. Check that the worker and the scheduler (beat) are running.',
                 encrypted: 'Backups are encrypted (key {{fingerprint}}).',
                 unencryptedTitle: 'Backups are not encrypted',
                 unencrypted: 'A backup contains password hashes, participants\' personal data, invoices and stored secrets in readable form. Set BACKUP_ENCRYPTION_KEYS on the server before storing backups anywhere shared.',
@@ -2518,11 +2545,14 @@ export const en = {
                 never: 'Never',
             },
             destinations: {
+                keepsN: 'Latest {{count}}',
+                keepsAll: 'All',
                 title: 'Destinations',
                 description: 'Where finished backups are written. Deleting a destination never deletes archives already stored there.',
                 add: 'Add destination',
                 empty: 'No destination yet. Add one to take your first backup.',
                 columns: {
+                    keeps: 'Keeps',
                     name: 'Name',
                     type: 'Type',
                     target: 'Target',
@@ -2549,6 +2579,8 @@ export const en = {
                 deleteMessage: 'Delete the destination {{name}}? Archives already written there are not deleted.',
             },
             form: {
+                retention: 'Keep the latest',
+                retentionHint: 'How many backups of each kind (the whole instance, or one community) to keep here; older files are deleted after a new backup finishes. 0 keeps everything.',
                 createTitle: 'Add backup destination',
                 editTitle: 'Edit backup destination',
                 name: 'Name',
@@ -2575,6 +2607,29 @@ export const en = {
                 sseNone: 'None (for stores that do not support it)',
             },
             jobs: {
+                check: 'Check',
+                checkQueued: 'Check queued.',
+                fileDeleted: 'Backup file deleted.',
+                deleteFile: 'Delete file',
+                deleteFileTitle: 'Delete this backup\'s file?',
+                deleteFileMessage: '{{name}} will be deleted from its destination. The entry stays in the list, but the backup can no longer be restored, downloaded or checked. This cannot be undone.',
+                expires: 'Expires {{date}}',
+                trigger: {
+                    manual: 'Manual',
+                    scheduled: 'Scheduled',
+                    pre_restore: 'Safety backup',
+                },
+                fileGone: {
+                    retention: 'File removed: beyond retention',
+                    expired: 'File removed: expired',
+                    manual: 'File deleted',
+                },
+                verification: {
+                    checking: 'Checking…',
+                    never: 'Not checked',
+                    ok: 'Intact',
+                    failed: 'Check failed',
+                },
                 title: 'Backups',
                 description: 'Each run writes one archive to the chosen destination. You can also run one from the command line with {{command}}.',
                 backUpNow: 'Back up now',
@@ -2588,6 +2643,7 @@ export const en = {
                 queued: 'Backup queued.',
                 empty: 'No backups yet.',
                 columns: {
+                    integrity: 'Integrity',
                     created: 'Started',
                     scope: 'Scope',
                     destination: 'Destination',
@@ -2608,6 +2664,9 @@ export const en = {
                 downloadFailed: 'The archive could not be downloaded.',
             },
             details: {
+                file: 'File',
+                fileKept: 'Kept',
+                integrity: 'Integrity',
                 title: 'Backup details',
                 archive: 'Archive',
                 location: 'Location',
@@ -2632,6 +2691,15 @@ export const en = {
                 health: 'System health',
             },
             health: {
+                backups: {
+                    title: 'Backups',
+                    notSetUp: 'No backup destination is enabled.',
+                    last: 'Last backup {{time}}',
+                    never: 'No backup has finished yet.',
+                    stale: 'The schedule has fallen behind.',
+                    unencrypted: 'Backups are not encrypted.',
+                    manage: 'Manage backups',
+                },
                 status: {
                     ok: 'OK',
                     degraded: 'Degraded',

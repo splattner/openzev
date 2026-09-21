@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MantineProvider } from '@mantine/core'
 import { BackupSettingsSection } from '../src/features/backups/BackupSettingsSection'
-import type { BackupDestination, BackupJob, BackupStatus } from '../src/types/api'
+import type { BackupDestination, BackupJob, BackupSchedule, BackupStatus } from '../src/types/api'
 
 // `t` returns the key, so assertions read as "this message is shown".
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }))
@@ -35,6 +35,10 @@ const api = vi.hoisted(() => ({
     fetchRestoreJobs: vi.fn(),
     fetchRestoreJob: vi.fn(),
     createRestoreJob: vi.fn(),
+    fetchBackupSchedule: vi.fn(),
+    updateBackupSchedule: vi.fn(),
+    verifyBackupJob: vi.fn(),
+    deleteBackupArtifact: vi.fn(),
 }))
 vi.mock('../src/lib/api/backups', () => api)
 vi.mock('../src/lib/api/zev', () => ({
@@ -45,12 +49,13 @@ vi.mock('../src/lib/downloadBlob', () => ({ downloadBlob }))
 
 const status = (overrides: Partial<BackupStatus> = {}): BackupStatus => ({
     encrypted: true, encryption_key_fingerprint: 'abc123', encryption_key_problem: '', environment_credentials: false,
-    destinations_enabled: 1, last_successful: null, last_failed: null, age_hours: null, ...overrides,
+    destinations_enabled: 1, last_successful: null, last_failed: null, age_hours: null, stale: false,
+    schedule_enabled: false, schedule_interval_hours: null, ...overrides,
 })
 
 const disk: BackupDestination = {
     id: 'd-disk', name: 'nightly-disk', kind: 'local', enabled: true, path: '/var/backups/openzev', bucket: '', prefix: '',
-    region: '', endpoint_url: '', access_key_id: '', server_side_encryption: 'AES256', credential_mode: 'instance_role',
+    region: '', endpoint_url: '', access_key_id: '', server_side_encryption: 'AES256', retention_count: 0, credential_mode: 'instance_role',
     has_secret_access_key: false, created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z',
 }
 
@@ -59,7 +64,13 @@ const completed = (overrides: Partial<BackupJob> = {}): BackupJob => ({
     destination_name: 'nightly-disk', status: 'completed', created_at: '2026-09-21T04:00:00Z',
     started_at: '2026-09-21T04:00:00Z', completed_at: '2026-09-21T04:01:00Z', archive_name: 'openzev-backup-1.zip',
     archive_location: '/var/backups/openzev/openzev-backup-1.zip', archive_bytes: 2048, archive_sha256: 'deadbeef',
-    encrypted: true, encryption_key_fingerprint: 'abc123', manifest_json: {}, error_message: '', ...overrides,
+    encrypted: true, encryption_key_fingerprint: 'abc123', manifest_json: {}, error_message: '',
+    artifact_available: true, file_expires_at: null, artifact_deleted_at: null, artifact_deleted_reason: '', verifying: false, verified_at: null, verification_ok: null, verification_message: '', ...overrides,
+})
+
+const schedule = (overrides: Partial<BackupSchedule> = {}): BackupSchedule => ({
+    enabled: false, frequency: 'daily', hour: 2, minute: 0, day_of_week: 0, timezone: 'Europe/Zurich', interval_hours: 24,
+    last_run_at: null, ...overrides,
 })
 
 function setup({ statusData = status(), destinations = [disk], jobs = [] as BackupJob[] } = {}) {
@@ -67,6 +78,7 @@ function setup({ statusData = status(), destinations = [disk], jobs = [] as Back
     api.fetchBackupDestinations.mockResolvedValue(destinations)
     api.fetchBackupJobs.mockResolvedValue(jobs)
     api.fetchRestoreJobs.mockResolvedValue([])
+    api.fetchBackupSchedule.mockResolvedValue(schedule())
 }
 
 const cleanups: (() => void)[] = []

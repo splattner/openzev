@@ -2422,6 +2422,30 @@ export const it = {
             noEmailYet: 'Non ancora inviata',
         },
         backups: {
+            schedule: {
+                title: 'Pianificazione',
+                description: 'Esegue automaticamente il backup dell\'intera istanza su ogni destinazione attiva.',
+                enabled: 'Esegui i backup secondo una pianificazione',
+                frequency: 'Ripetizione',
+                daily: 'Ogni giorno',
+                weekly: 'Ogni settimana',
+                weekday: 'Il',
+                time: 'Alle ({{timezone}})',
+                hint: 'Viene eseguita solo se lo scheduler (beat) è attivo. Una destinazione ancora occupata dal backup precedente viene saltata.',
+                lastRun: 'Ultima esecuzione: {{date}}.',
+                saved: 'Pianificazione salvata',
+                unencrypted: 'Questa pianificazione scriverà da sola backup non cifrati, ogni volta: contengono hash delle password, dati personali dei partecipanti e fatture in chiaro. Impostate prima BACKUP_ENCRYPTION_KEYS.',
+                noDestination: 'Nessuna destinazione è attiva, quindi un\'esecuzione pianificata non avrebbe dove scrivere.',
+                weekdays: {
+                    '0': 'Domenica',
+                    '1': 'Lunedì',
+                    '2': 'Martedì',
+                    '3': 'Mercoledì',
+                    '4': 'Giovedì',
+                    '5': 'Venerdì',
+                    '6': 'Sabato',
+                },
+            },
             intro: 'Eseguite il backup dell\'intera istanza o di una singola comunità in una cartella locale o in uno storage compatibile con S3. Un backup contiene tutto il necessario per ricostruirla: account, impostazioni, serie di prezzi, fatture con i relativi PDF, contratti emessi e registro di audit.',
             restoreNotice: 'Un\'intera istanza si ripristina sul server con {{restoreCommand}} (aggiungete --dry-run per verificare prima). Verificate un backup in qualsiasi momento con {{command}}.',
             restore: {
@@ -2497,6 +2521,9 @@ export const it = {
                 },
             },
             status: {
+                staleTitle: 'I backup sono in ritardo',
+                stale: 'L\'ultimo backup si è concluso {{hours}} ore fa, ma la pianificazione ne prevede uno almeno ogni {{interval}} ore. Verificate che il worker e lo scheduler (beat) siano attivi e che l\'ultima esecuzione non sia fallita.',
+                staleNever: 'Una pianificazione è attiva, ma nessun backup è ancora concluso. Verificate che il worker e lo scheduler (beat) siano attivi.',
                 encrypted: 'I backup sono cifrati (chiave {{fingerprint}}).',
                 unencryptedTitle: 'I backup non sono cifrati',
                 unencrypted: 'Un backup contiene hash delle password, dati personali dei partecipanti, fatture e segreti memorizzati in forma leggibile. Impostate BACKUP_ENCRYPTION_KEYS sul server prima di salvare i backup in un luogo condiviso.',
@@ -2507,11 +2534,14 @@ export const it = {
                 never: 'Mai',
             },
             destinations: {
+                keepsN: 'Ultimi {{count}}',
+                keepsAll: 'Tutti',
                 title: 'Destinazioni',
                 description: 'Dove vengono scritti i backup completati. Eliminare una destinazione non elimina mai gli archivi già salvati al suo interno.',
                 add: 'Aggiungi destinazione',
                 empty: 'Nessuna destinazione per ora. Aggiungetene una per eseguire il primo backup.',
                 columns: {
+                    keeps: 'Conserva',
                     name: 'Nome',
                     type: 'Tipo',
                     target: 'Destinazione',
@@ -2538,6 +2568,8 @@ export const it = {
                 deleteMessage: 'Eliminare la destinazione {{name}}? Gli archivi già scritti al suo interno non vengono eliminati.',
             },
             form: {
+                retention: 'Conserva gli ultimi',
+                retentionHint: 'Quanti backup di ogni tipo (l\'intera istanza o una comunità) conservare qui; i file più vecchi vengono eliminati quando un nuovo backup è concluso. 0 conserva tutto.',
                 createTitle: 'Aggiungi destinazione di backup',
                 editTitle: 'Modifica destinazione di backup',
                 name: 'Nome',
@@ -2564,6 +2596,29 @@ export const it = {
                 sseNone: 'Nessuna (per storage che non la supportano)',
             },
             jobs: {
+                check: 'Verifica',
+                checkQueued: 'Verifica in coda.',
+                fileDeleted: 'File di backup eliminato.',
+                deleteFile: 'Elimina file',
+                deleteFileTitle: 'Eliminare il file di questo backup?',
+                deleteFileMessage: '{{name}} verrà eliminato dalla sua destinazione. La voce resta nell\'elenco, ma il backup non può più essere ripristinato, scaricato né verificato. L\'operazione non è reversibile.',
+                expires: 'Scade il {{date}}',
+                trigger: {
+                    manual: 'Manuale',
+                    scheduled: 'Pianificato',
+                    pre_restore: 'Backup di sicurezza',
+                },
+                fileGone: {
+                    retention: 'File rimosso: oltre la conservazione',
+                    expired: 'File rimosso: scaduto',
+                    manual: 'File eliminato',
+                },
+                verification: {
+                    checking: 'Verifica in corso…',
+                    never: 'Non verificato',
+                    ok: 'Integro',
+                    failed: 'Verifica non riuscita',
+                },
                 title: 'Backup',
                 description: 'Ogni esecuzione scrive un archivio nella destinazione scelta. Potete anche avviarne una dalla riga di comando con {{command}}.',
                 backUpNow: 'Esegui backup ora',
@@ -2577,6 +2632,7 @@ export const it = {
                 queued: 'Backup messo in coda.',
                 empty: 'Ancora nessun backup.',
                 columns: {
+                    integrity: 'Integrità',
                     created: 'Avviato',
                     scope: 'Ambito',
                     destination: 'Destinazione',
@@ -2597,6 +2653,9 @@ export const it = {
                 downloadFailed: 'Non è stato possibile scaricare l\'archivio.',
             },
             details: {
+                file: 'File',
+                fileKept: 'Conservato',
+                integrity: 'Integrità',
                 title: 'Dettagli del backup',
                 archive: 'Archivio',
                 location: 'Posizione',
@@ -2621,6 +2680,15 @@ export const it = {
                 health: 'Stato del sistema',
             },
             health: {
+                backups: {
+                    title: 'Backup',
+                    notSetUp: 'Nessuna destinazione di backup è attiva.',
+                    last: 'Ultimo backup {{time}}',
+                    never: 'Nessun backup ancora concluso.',
+                    stale: 'La pianificazione è in ritardo.',
+                    unencrypted: 'I backup non sono cifrati.',
+                    manage: 'Gestisci i backup',
+                },
                 status: {
                     ok: 'OK',
                     degraded: 'Degradato',

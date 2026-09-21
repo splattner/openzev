@@ -2422,6 +2422,30 @@ export const fr = {
             noEmailYet: 'Pas encore envoyé',
         },
         backups: {
+            schedule: {
+                title: 'Calendrier',
+                description: 'Sauvegarder automatiquement toute l\'instance vers chaque destination activée.',
+                enabled: 'Exécuter les sauvegardes selon un calendrier',
+                frequency: 'Répétition',
+                daily: 'Chaque jour',
+                weekly: 'Chaque semaine',
+                weekday: 'Le',
+                time: 'À ({{timezone}})',
+                hint: 'Ne s\'exécute que si le planificateur (beat) fonctionne. Une destination encore occupée par la sauvegarde précédente est ignorée.',
+                lastRun: 'Dernière exécution : {{date}}.',
+                saved: 'Calendrier enregistré',
+                unencrypted: 'Ce calendrier écrira lui-même des sauvegardes non chiffrées, à chaque fois : elles contiennent les empreintes de mots de passe, les données personnelles des participants et les factures en clair. Définissez d\'abord BACKUP_ENCRYPTION_KEYS.',
+                noDestination: 'Aucune destination n\'est activée : une exécution planifiée n\'aurait nulle part où écrire.',
+                weekdays: {
+                    '0': 'Dimanche',
+                    '1': 'Lundi',
+                    '2': 'Mardi',
+                    '3': 'Mercredi',
+                    '4': 'Jeudi',
+                    '5': 'Vendredi',
+                    '6': 'Samedi',
+                },
+            },
             intro: 'Sauvegardez l\'ensemble de l\'instance ou une seule communauté vers un répertoire local ou un stockage compatible S3. Une sauvegarde contient tout ce qu\'il faut pour la reconstituer : comptes, paramètres, séries de prix, factures avec leurs PDF, contrats émis et journal d\'audit.',
             restoreNotice: 'Une instance entière se restaure sur le serveur avec {{restoreCommand}} (ajoutez --dry-run pour vérifier d\'abord). Vérifiez une sauvegarde à tout moment avec {{command}}.',
             restore: {
@@ -2497,6 +2521,9 @@ export const fr = {
                 },
             },
             status: {
+                staleTitle: 'Les sauvegardes ont pris du retard',
+                stale: 'La dernière sauvegarde s\'est terminée il y a {{hours}} heures, alors que le calendrier en attend une au moins toutes les {{interval}} heures. Vérifiez que le worker et le planificateur (beat) fonctionnent et que la dernière exécution n\'a pas échoué.',
+                staleNever: 'Un calendrier est activé, mais aucune sauvegarde n\'est encore terminée. Vérifiez que le worker et le planificateur (beat) fonctionnent.',
                 encrypted: 'Les sauvegardes sont chiffrées (clé {{fingerprint}}).',
                 unencryptedTitle: 'Les sauvegardes ne sont pas chiffrées',
                 unencrypted: 'Une sauvegarde contient des empreintes de mots de passe, les données personnelles des participants, des factures et des secrets enregistrés, en clair. Définissez BACKUP_ENCRYPTION_KEYS sur le serveur avant de stocker des sauvegardes dans un emplacement partagé.',
@@ -2507,11 +2534,14 @@ export const fr = {
                 never: 'Jamais',
             },
             destinations: {
+                keepsN: 'Dernières {{count}}',
+                keepsAll: 'Toutes',
                 title: 'Destinations',
                 description: 'Où les sauvegardes terminées sont écrites. Supprimer une destination ne supprime jamais les archives qui y sont déjà stockées.',
                 add: 'Ajouter une destination',
                 empty: 'Aucune destination pour l\'instant. Ajoutez-en une pour effectuer votre première sauvegarde.',
                 columns: {
+                    keeps: 'Conserve',
                     name: 'Nom',
                     type: 'Type',
                     target: 'Cible',
@@ -2538,6 +2568,8 @@ export const fr = {
                 deleteMessage: 'Supprimer la destination {{name}} ? Les archives qui y sont déjà écrites ne sont pas supprimées.',
             },
             form: {
+                retention: 'Conserver les dernières',
+                retentionHint: 'Nombre de sauvegardes de chaque type (toute l\'instance, ou une communauté) conservées ici ; les fichiers plus anciens sont supprimés une fois une nouvelle sauvegarde terminée. 0 conserve tout.',
                 createTitle: 'Ajouter une destination de sauvegarde',
                 editTitle: 'Modifier la destination de sauvegarde',
                 name: 'Nom',
@@ -2564,6 +2596,29 @@ export const fr = {
                 sseNone: 'Aucun (pour les stockages qui ne le prennent pas en charge)',
             },
             jobs: {
+                check: 'Vérifier',
+                checkQueued: 'Vérification planifiée.',
+                fileDeleted: 'Fichier de sauvegarde supprimé.',
+                deleteFile: 'Supprimer le fichier',
+                deleteFileTitle: 'Supprimer le fichier de cette sauvegarde ?',
+                deleteFileMessage: '{{name}} sera supprimé de sa destination. L\'entrée reste dans la liste, mais la sauvegarde ne peut plus être restaurée, téléchargée ni vérifiée. Cette action est irréversible.',
+                expires: 'Expire le {{date}}',
+                trigger: {
+                    manual: 'Manuelle',
+                    scheduled: 'Planifiée',
+                    pre_restore: 'Sauvegarde de sécurité',
+                },
+                fileGone: {
+                    retention: 'Fichier supprimé : au-delà de la rétention',
+                    expired: 'Fichier supprimé : expiré',
+                    manual: 'Fichier supprimé',
+                },
+                verification: {
+                    checking: 'Vérification…',
+                    never: 'Non vérifiée',
+                    ok: 'Intacte',
+                    failed: 'Vérification échouée',
+                },
                 title: 'Sauvegardes',
                 description: 'Chaque exécution écrit une archive vers la destination choisie. Vous pouvez aussi en lancer une en ligne de commande avec {{command}}.',
                 backUpNow: 'Sauvegarder maintenant',
@@ -2577,6 +2632,7 @@ export const fr = {
                 queued: 'Sauvegarde mise en file d\'attente.',
                 empty: 'Aucune sauvegarde pour l\'instant.',
                 columns: {
+                    integrity: 'Intégrité',
                     created: 'Démarrée',
                     scope: 'Portée',
                     destination: 'Destination',
@@ -2597,6 +2653,9 @@ export const fr = {
                 downloadFailed: 'L\'archive n\'a pas pu être téléchargée.',
             },
             details: {
+                file: 'Fichier',
+                fileKept: 'Conservé',
+                integrity: 'Intégrité',
                 title: 'Détails de la sauvegarde',
                 archive: 'Archive',
                 location: 'Emplacement',
@@ -2621,6 +2680,15 @@ export const fr = {
                 health: 'État du système',
             },
             health: {
+                backups: {
+                    title: 'Sauvegardes',
+                    notSetUp: 'Aucune destination de sauvegarde n\'est activée.',
+                    last: 'Dernière sauvegarde {{time}}',
+                    never: 'Aucune sauvegarde terminée pour l\'instant.',
+                    stale: 'Le calendrier a pris du retard.',
+                    unencrypted: 'Les sauvegardes ne sont pas chiffrées.',
+                    manage: 'Gérer les sauvegardes',
+                },
                 status: {
                     ok: 'OK',
                     degraded: 'Dégradé',

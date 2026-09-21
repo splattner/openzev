@@ -16,7 +16,7 @@ import type { BackupDestination, BackupJob, BackupManifest } from '../src/types/
 const s3Destination: BackupDestination = {
     id: 'd1', name: 'cloud', kind: 's3', enabled: true, path: '', bucket: 'openzev', prefix: 'prod/',
     region: 'eu-central-1', endpoint_url: 'https://minio.internal:9000', access_key_id: 'AKIA',
-    server_side_encryption: 'AES256', credential_mode: 'stored', has_secret_access_key: true,
+    server_side_encryption: 'AES256', retention_count: 0, credential_mode: 'stored', has_secret_access_key: true,
     created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z',
 }
 
@@ -40,6 +40,8 @@ const job = (overrides: Partial<BackupJob> = {}): BackupJob => ({
     destination_name: 'disk', status: 'completed', created_at: '2026-09-21T04:00:00Z', started_at: null,
     completed_at: null, archive_name: 'a.zip', archive_location: '/backups/a.zip', archive_bytes: 10,
     archive_sha256: 'abc', encrypted: false, encryption_key_fingerprint: '', manifest_json: {}, error_message: '',
+    file_expires_at: null, artifact_deleted_at: null, artifact_deleted_reason: '', artifact_available: true, verifying: false,
+    verified_at: null, verification_ok: null, verification_message: '',
     ...overrides,
 })
 
@@ -134,7 +136,9 @@ describe('job helpers', () => {
     it('offers a download only for a finished local archive — S3 objects are fetched from the bucket', () => {
         expect(isDownloadable(job())).toBe(true)
         expect(isDownloadable(job({ archive_location: 's3://b/a.zip' }))).toBe(false)
-        expect(isDownloadable(job({ status: 'running', archive_location: '' }))).toBe(false)
-        expect(isDownloadable(job({ status: 'failed' }))).toBe(false)
+        expect(isDownloadable(job({ status: 'running', archive_location: '', artifact_available: false }))).toBe(false)
+        expect(isDownloadable(job({ status: 'failed', artifact_available: false }))).toBe(false)
+        // The row outlives its file: a deleted backup has nothing to download.
+        expect(isDownloadable(job({ artifact_available: false, artifact_deleted_at: '2026-09-22T00:00:00Z' }))).toBe(false)
     })
 })

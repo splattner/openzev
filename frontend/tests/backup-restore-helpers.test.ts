@@ -31,6 +31,7 @@ const backup = (overrides: Partial<BackupJob> = {}): BackupJob => ({
     id: 'b1', scope: 'instance', zev_id: null, zev_name: '', trigger: 'manual', destination_id: 'd1', destination_name: 'disk',
     status: 'completed', created_at: '', started_at: null, completed_at: null, archive_name: '', archive_location: '',
     archive_bytes: null, archive_sha256: '', encrypted: false, encryption_key_fingerprint: '', error_message: '',
+    artifact_available: true, file_expires_at: null, artifact_deleted_at: null, artifact_deleted_reason: '', verifying: false, verified_at: null, verification_ok: null, verification_message: '',
     manifest_json: {
         kind: 'backup', format_version: 1, created_at: '', instance_name: '', openzev_version: '', scope: 'instance', zev_id: null,
         migrations: {}, counts: {}, members: {}, encryption: null, secret_fingerprints: {},
@@ -94,9 +95,10 @@ describe('reading a job\'s plan', () => {
 
 describe('choosing what to restore from', () => {
     it('offers finished backups that hold a community, and lists the communities', () => {
-        const failed = backup({ id: 'b2', status: 'failed' })
+        const failed = backup({ id: 'b2', status: 'failed', artifact_available: false })
+        const deleted = backup({ id: 'b4', artifact_available: false, artifact_deleted_at: '2026-09-22T00:00:00Z' })
         const empty = backup({ id: 'b3', manifest_json: {} })
-        expect(restorableBackups([backup(), failed, empty]).map((j) => j.id)).toEqual(['b1'])
+        expect(restorableBackups([backup(), failed, empty, deleted]).map((j) => j.id)).toEqual(['b1'])
         expect(communitiesIn(backup())).toEqual([{ id: 'z1', name: 'Sonnenhof' }, { id: 'z2', name: 'Bergblick' }])
         expect(communitiesIn(undefined)).toEqual([])
         expect(restorableBackups(undefined)).toEqual([])

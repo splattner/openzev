@@ -28,12 +28,17 @@ class BackupDestinationSerializer(serializers.ModelSerializer):
         fields = [
             "id", "name", "kind", "enabled", "path", "bucket", "prefix", "region", "endpoint_url",
             "access_key_id", "secret_access_key", "has_secret_access_key", "server_side_encryption",
-            "credential_mode", "created_at", "updated_at",
+            "retention_count", "credential_mode", "created_at", "updated_at",
         ]
         read_only_fields = ["id", "credential_mode", "created_at", "updated_at"]
 
     def get_has_secret_access_key(self, obj) -> bool:
         return obj.has_stored_secret
+
+    def validate_retention_count(self, value):
+        if value > 10_000:
+            raise serializers.ValidationError("Keep at most 10000 backups, or 0 to keep them all.")
+        return value
 
     def validate(self, attrs):
         attrs = super().validate(attrs)
@@ -68,9 +73,17 @@ class BackupJobSerializer(serializers.ModelSerializer):
             "id", "scope", "zev_id", "zev_name", "trigger", "destination_id", "destination_name", "status",
             "created_at", "started_at", "completed_at", "archive_name", "archive_location",
             "archive_bytes", "archive_sha256", "encrypted", "encryption_key_fingerprint",
-            "manifest_json", "error_message",
+            "manifest_json", "error_message", "file_expires_at", "artifact_deleted_at",
+            "artifact_deleted_reason", "artifact_available", "verifying", "verified_at",
+            "verification_ok", "verification_message",
         ]
         read_only_fields = fields
+
+    artifact_available = serializers.BooleanField(read_only=True)
+    verifying = serializers.SerializerMethodField()
+
+    def get_verifying(self, obj) -> bool:
+        return obj.verify_started_at is not None
 
     def get_destination_name(self, obj) -> str:
         return obj.destination.name if obj.destination_id else ""
@@ -157,6 +170,8 @@ class RestoreJobCreateSerializer(serializers.Serializer):
             raise serializers.ValidationError({"source_backup_id": "Backup not found."}) from exc
         if backup.status != BackupJobStatus.COMPLETED:
             raise serializers.ValidationError({"source_backup_id": "This backup did not complete, so it cannot be restored."})
+        if backup.artifact_deleted_at is not None:
+            raise serializers.ValidationError({"source_backup_id": "This backup's file has been deleted, so it cannot be restored."})
 
         target = str(attrs["target_zev_id"])
         held = {z["id"]: z["name"] for z in (backup.manifest_json or {}).get("zevs", [])}
@@ -183,3 +198,17 @@ class RestoreJobCreateSerializer(serializers.Serializer):
         attrs["safety_destination"] = safety
         attrs["target_name"] = held[target]
         return attrs
+
+
+class BackupScheduleSerializer(serializers.Serializer):
+    """The built-in schedule: daily or weekly, at a time of day (in the server's time zone)."""
+
+    enabled = serializers.BooleanField()
+    frequency = serializers.ChoiceField(choices=["daily", "weekly"])
+    hour = serializers.IntegerField(min_value=0, max_value=23)
+    minute = serializers.IntegerField(min_value=0, max_value=59)
+    # Cron numbering: 0 is Sunday.
+    day_of_week = serializers.IntegerField(min_value=0, max_value=6, required=False, default=0)
+    timezone = serializers.CharField(read_only=True)
+    interval_hours = serializers.IntegerField(read_only=True)
+    last_run_at = serializers.DateTimeField(read_only=True, allow_null=True)

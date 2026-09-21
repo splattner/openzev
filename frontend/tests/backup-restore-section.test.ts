@@ -33,7 +33,7 @@ vi.mock('../src/lib/api/backups', () => api)
 
 const disk: BackupDestination = {
     id: 'd-disk', name: 'nightly-disk', kind: 'local', enabled: true, path: '/var/backups/openzev', bucket: '', prefix: '',
-    region: '', endpoint_url: '', access_key_id: '', server_side_encryption: 'AES256', credential_mode: 'instance_role',
+    region: '', endpoint_url: '', access_key_id: '', server_side_encryption: 'AES256', retention_count: 0, credential_mode: 'instance_role',
     has_secret_access_key: false, created_at: '', updated_at: '',
 }
 const other: BackupDestination = { ...disk, id: 'd-other', name: 'offsite' }
@@ -44,6 +44,7 @@ const backup = (overrides: Partial<BackupJob> = {}): BackupJob => ({
     destination_name: 'nightly-disk', status: 'completed', created_at: '2026-09-21T04:00:00Z', started_at: null,
     completed_at: '2026-09-21T04:01:00Z', archive_name: 'a.zip', archive_location: '/var/backups/a.zip', archive_bytes: 1,
     archive_sha256: '', encrypted: false, encryption_key_fingerprint: '', error_message: '',
+    artifact_available: true, file_expires_at: null, artifact_deleted_at: null, artifact_deleted_reason: '', verifying: false, verified_at: null, verification_ok: null, verification_message: '',
     manifest_json: {
         kind: 'backup', scope: 'instance', zevs: [zevEntry('z1', 'Sonnenhof'), zevEntry('z2', 'Bergblick')], counts: {},
     } as unknown as BackupJob['manifest_json'],
@@ -138,7 +139,7 @@ async function preview(container: Element, finished: RestoreJob = job()) {
 
 describe('choosing what to restore', () => {
     it('says so when there is no finished backup, and offers no form', async () => {
-        setup({ backups: [backup({ status: 'failed' })] })
+        setup({ backups: [backup({ status: 'failed', artifact_available: false })] })
         const container = await render()
         expect(container.textContent).toContain('pages.backups.restore.noBackups')
         expect(button(container, 'pages.backups.restore.preview')).toBeUndefined()

@@ -8,7 +8,8 @@ administration → System Settings → Backup**.
 > backup from this page — see [Restoring one community](#restoring-one-community).
 > A **whole instance** is restored from the server's command line — see
 > [Restoring an instance](#restoring-an-instance). Either way, check your backups
-> regularly (see [Verifying a backup](#verifying-a-backup)).
+> regularly (see [Verifying a backup](#verifying-a-backup)), and let them run by
+> themselves (see [Scheduling and keeping backups](#scheduling-and-keeping-backups)).
 
 ## What a backup contains
 
@@ -125,15 +126,95 @@ server's temporary directory — set `BACKUP_WORK_DIR` to put it elsewhere.
 
 A backup you have never checked is a hope, not a backup.
 
+**From the app:** press **Check** on a backup. It reads the stored file again — from
+the local directory, or by downloading it from S3 — and records the result on the
+backup: *Intact* with the date, or *Check failed* with the reason. It checks that the
+bytes are the ones written (against the checksum recorded at the time, which catches
+a file that decayed on disk or was tampered with even if you cannot decrypt it),
+then decrypts it and checks every part, that nothing has been added or removed, and
+that every section a backup must contain is there. It changes nothing.
+
+**From the command line**, for a copy of a file:
+
 ```bash
 python manage.py openzev_backup_verify /var/backups/openzev/openzev-backup-….zip.enc
 ```
 
-This re-reads the whole file — decrypting it if needed — and checks every part
-against the checksums recorded when it was made, that nothing has been added or
-removed, and that record counts match. It changes nothing. Run it on a copy that
-has been through the same path you would use in an emergency (downloaded from the
-bucket, copied off the server) to catch problems in transit as well as at rest.
+Run it on a copy that has been through the same path you would use in an emergency
+(downloaded from the bucket, copied off the server) to catch problems in transit as
+well as at rest.
+
+## Scheduling and keeping backups
+
+### The schedule
+
+**Backup → Schedule** turns on automatic backups: every day or every week, at a time
+of day in the server's time zone (shown next to the field). Each run backs up the
+**whole instance to every enabled destination**; a destination that is still busy with
+the previous backup is skipped, not queued up behind it.
+
+Two things have to be true for it to run at all, and the page says both:
+
+- **The scheduler (beat) has to be running** next to the worker. Without it the
+  schedule is saved but nothing fires. The backup page and the *System health* tab go
+  red if it stops working — see below.
+- **Set `BACKUP_ENCRYPTION_KEYS` first.** A schedule without a key writes unencrypted
+  archives, unattended, every time. The page warns while a schedule is on with no key,
+  and `python manage.py check --database default` reports it as `backups.W001`.
+
+Changes take effect without a restart.
+
+### Retention: how many to keep
+
+Every destination has **Keep the latest**. Set it to `7` and, after each new backup
+finishes, the destination keeps the seven newest backups of each kind — the whole
+instance, and each community separately — and deletes the files of older ones.
+
+- **The default is `0`: keep everything.** Nothing is ever deleted unless you turn
+  this on.
+- Deletion happens *after* a new backup has finished, never before, so a destination
+  set to keep one backup is never left with none.
+- The newest backup of each kind is never deleted, and neither is one that a restore
+  or a check is reading right now.
+- A deleted backup **stays in the list** as history ("File removed: beyond
+  retention"), but can no longer be restored, downloaded or checked.
+- Backups written with `--path` (no saved destination) are yours to manage: OpenZEV
+  does not know that directory's bounds, so it never deletes from it.
+
+To see what a setting *would* delete before trusting it:
+
+```bash
+python manage.py openzev_backup_sweep --dry-run
+```
+
+The same clean-up runs every hour on its own, and at the start and end of each backup.
+Run `openzev_backup_sweep` from cron if you have no scheduler.
+
+**Safety backups** — the backup of a community taken just before restoring it — are
+not routine backups, so retention never counts them. They **expire after 30 days**
+(`BACKUP_SAFETY_RETENTION_DAYS`; `0` keeps them). Until then, restoring from one
+undoes the restore.
+
+### Deleting a file yourself
+
+**Delete file** on a backup removes its file from the destination (after asking) and
+keeps the entry. It refuses while a restore or a check is using the backup. A
+destination that still holds backup files cannot be deleted — delete their files
+first, or just disable it.
+
+### Is it working? Staleness
+
+The backup page and **Overview → System health** show whether the instance is
+actually protected. With a schedule on, backups are **stale** when the last finished
+whole-instance backup is older than **twice the schedule's interval** — one missed
+run is tolerated, two are a problem — or when none has ever finished. The health card
+is also red when the last run failed after the last success, or when a destination is
+enabled but nothing has ever succeeded; it is grey ("not set up") when no destination
+is enabled at all.
+
+Only whole-instance backups count. A backup of one community does not protect the
+instance, and a safety backup is the way back from a restore, so neither can make the
+instance look freshly backed up.
 
 ## Restoring an instance
 
@@ -342,8 +423,11 @@ saved destination instead of `--path`. `--force` goes ahead past the
   sets how much you can lose. If you need finer recovery than that, use your
   database's own point-in-time recovery (WAL archiving with pgBackRest or wal-g) *in
   addition*.
-- **Scheduling and automatic clean-up are not built in yet.** Run
-  `openzev_backup` from cron for now, and delete old archives yourself.
+- **It is not a substitute for testing a restore.** *Intact* means the file is
+  complete and unchanged, not that you know how to use it. See
+  [Practise it](#practise-it).
+- **The schedule and retention are instance settings, not part of a backup.** After a
+  whole-instance restore, add the destinations and switch the schedule on again.
 
 ## Settings reference
 
@@ -352,4 +436,5 @@ saved destination instead of `--path`. `--force` goes ahead past the
 | `BACKUP_ENCRYPTION_KEYS` | Comma-separated keys, at least 32 characters each. First encrypts, all decrypt. Optional but strongly recommended. |
 | `BACKUP_S3_ACCESS_KEY_ID`, `BACKUP_S3_SECRET_ACCESS_KEY` | S3 credentials from the environment; override any stored on a destination. |
 | `BACKUP_WORK_DIR` | Where archives are assembled before being stored. Needs room for one full archive. |
-| `BACKUP_RUNNER_TIMEOUT_S` | Time budget for one backup run. Default 10800 (3 hours). |
+| `BACKUP_RUNNER_TIMEOUT_S` | Time budget for one backup run. Default 10800 (3 hours). A job still `running` well past this is failed by the sweep. |
+| `BACKUP_SAFETY_RETENTION_DAYS` | How long a safety backup (taken before restoring a community) is kept. Default 30; `0` keeps them until deleted. |

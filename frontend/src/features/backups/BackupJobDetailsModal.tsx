@@ -3,7 +3,7 @@ import { FormModal } from '../../components/FormModal'
 import { formatDateTime, useAppSettings } from '../../lib/appSettings'
 import { formatBytes, formatNumber } from '../../lib/numbers'
 import type { BackupJob } from '../../types/api'
-import { countMissingMedia, readManifest, totalRecords } from './backupHelpers'
+import { countMissingMedia, fileGone, readManifest, totalRecords, verificationState } from './backupHelpers'
 
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
     return (
@@ -44,6 +44,22 @@ export function BackupJobDetailsModal({ job, onClose }: { job: BackupJob | null;
                     <Row label={t('pages.backups.details.finished')}>{formatDateTime(job.completed_at, settings)}</Row>
                     {manifest && (
                         <Row label={t('pages.backups.details.records')}>{formatNumber(totalRecords(manifest))}</Row>
+                    )}
+                    <Row label={t('pages.backups.details.file')}>
+                        {fileGone(job)
+                            ? t(`pages.backups.jobs.fileGone.${job.artifact_deleted_reason || 'manual'}`)
+                            : job.file_expires_at
+                              ? t('pages.backups.jobs.expires', { date: formatDateTime(job.file_expires_at, settings) })
+                              : t('pages.backups.details.fileKept')}
+                    </Row>
+                    {!fileGone(job) && (
+                        <Row label={t('pages.backups.details.integrity')}>
+                            {verificationState(job) === 'never'
+                                ? t('pages.backups.jobs.verification.never')
+                                : verificationState(job) === 'checking'
+                                  ? t('pages.backups.jobs.verification.checking')
+                                  : `${t(`pages.backups.jobs.verification.${verificationState(job)}`)} · ${formatDateTime(job.verified_at, settings)}${job.verification_message ? ` — ${job.verification_message}` : ''}`}
+                        </Row>
                     )}
                 </dl>
 

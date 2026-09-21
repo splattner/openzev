@@ -6,6 +6,7 @@ from pathlib import Path
 from unittest import mock
 
 from django.test import TestCase, override_settings
+from django.utils import timezone
 from rest_framework.test import APIClient
 
 from accounts.models import UserRole
@@ -194,15 +195,37 @@ class DestinationCrudTests(ApiTestCase):
         self.assertEqual(response.status_code, 200, response.content)
         self.assertEqual(response.data["credential_mode"], "instance_role")
 
-    def test_delete_removes_the_destination_but_keeps_the_jobs_and_their_locations(self):
+    def test_delete_removes_an_unused_destination_but_keeps_the_history_and_locations(self):
         destination = self.local_destination()
         job = BackupJob.objects.create(
             destination=destination, status=BackupJobStatus.COMPLETED, archive_location="/backups/a.zip",
+            artifact_deleted_at=timezone.now(),
         )
         self.assertEqual(self.client.delete(f"{BASE}/destinations/{destination.pk}/").status_code, 204)
         job.refresh_from_db()
         self.assertIsNone(job.destination)
         self.assertEqual(job.archive_location, "/backups/a.zip")
+
+    def test_a_destination_that_still_holds_a_backup_file_cannot_be_deleted(self):
+        """It is how the file is found again — to restore, verify, download or delete it."""
+        destination = self.local_destination()
+        BackupJob.objects.create(
+            destination=destination, status=BackupJobStatus.COMPLETED, archive_location="/backups/a.zip",
+        )
+        response = self.client.delete(f"{BASE}/destinations/{destination.pk}/")
+        self.assertEqual(response.status_code, 409)
+        self.assertIn("1 backup(s)", response.data["detail"])
+        self.assertTrue(BackupDestination.objects.filter(pk=destination.pk).exists())
+
+    def test_a_destination_with_a_running_backup_cannot_be_deleted(self):
+        destination = self.local_destination()
+        BackupJob.objects.create(destination=destination, status=BackupJobStatus.RUNNING)
+        self.assertEqual(self.client.delete(f"{BASE}/destinations/{destination.pk}/").status_code, 409)
+
+    def test_failed_backups_do_not_hold_a_destination(self):
+        destination = self.local_destination()
+        BackupJob.objects.create(destination=destination, status=BackupJobStatus.FAILED)
+        self.assertEqual(self.client.delete(f"{BASE}/destinations/{destination.pk}/").status_code, 204)
 
     def test_the_test_endpoint_reports_a_working_destination(self):
         destination = self.local_destination()
@@ -449,6 +472,18 @@ class StatusTests(ApiTestCase):
         data = self.status()
         self.assertTrue(data["environment_credentials"])
         self.assertNotIn("envsecret", str(data))
+
+    def test_a_safety_backup_or_a_community_backup_does_not_make_the_instance_look_backed_up(self):
+        destination = self.local_destination()
+        safety = BackupJob.objects.create(
+            destination=destination, scope="zev", zev=self.world.alpha, trigger="pre_restore",
+        )
+        tasks.execute_backup_job(safety.pk)
+        community = BackupJob.objects.create(destination=destination, scope="zev", zev=self.world.beta)
+        tasks.execute_backup_job(community.pk)
+        data = self.status()
+        self.assertIsNone(data["last_successful"])
+        self.assertIsNone(data["age_hours"])
 
     def test_last_successful_and_last_failed_and_age(self):
         destination = self.local_destination()

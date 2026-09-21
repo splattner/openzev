@@ -187,6 +187,30 @@ def _probe_email() -> dict:
     }
 
 
+def _probe_backups() -> dict:
+    """Is the instance protected by a recent backup? See ``backups.health``.
+
+    "unknown" when no backup destination is enabled (backups are not set up, which
+    is a state, not a fault); "degraded" when the schedule has fallen behind, the
+    last run failed after the last success, or nothing has ever succeeded.
+    """
+    try:
+        from backups.health import backup_health
+
+        health = backup_health()
+    except Exception:  # noqa: BLE001 — any probe failure degrades, never 500s
+        return {"status": "unknown"}
+    return {
+        "status": health["status"],
+        "destinations_enabled": health["destinations_enabled"],
+        "schedule_enabled": health["schedule_enabled"],
+        "last_successful_at": health["last_successful_at"],
+        "age_hours": health["age_hours"],
+        "stale": health["stale"],
+        "encrypted": health["encrypted"],
+    }
+
+
 class SystemHealthView(APIView):
     """Snapshot of platform health for the admin System health tab.
 
@@ -203,6 +227,7 @@ class SystemHealthView(APIView):
                 "celery": _probe_celery(),
                 "mfa": _probe_mfa(),
                 "email": _probe_email(),
+                "backups": _probe_backups(),
                 "checked_at": datetime.now(timezone.utc).isoformat(),
             }
         )

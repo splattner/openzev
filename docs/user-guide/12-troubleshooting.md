@@ -204,6 +204,14 @@ from one — on a fresh installation, over an existing one, or for one community
 only — see [Restoring an instance](18-backups.md#restoring-an-instance) and
 [Restoring one community](18-backups.md#restoring-one-community).
 
+If the backup page says **backups have fallen behind**, check in this order: is the
+Celery **worker** running (Overview → System health)? Is the **scheduler (beat)**
+running? Did the last run fail (the reason is on the failed row)? Is the destination
+reachable (**Test** it)? If a backup or restore fails with *the backup file is no
+longer available*, the worker and the web process are not looking at the same local
+directory: use a shared volume, or an S3 destination. See
+[Scheduling and keeping backups](18-backups.md#scheduling-and-keeping-backups).
+
 A plain database dump is still useful as an additional safety net, but **it does
 not include the invoice PDFs**, which are files in the media volume
 (`backend_media`), not database rows. Back that volume up as well, or a restore

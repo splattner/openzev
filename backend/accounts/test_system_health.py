@@ -56,11 +56,12 @@ def test_system_health_returns_probe_snapshot(admin_client):
 
     assert response.status_code == 200
     body = response.json()
-    assert set(body) == {"database", "celery", "mfa", "email", "checked_at"}
+    assert set(body) == {"database", "celery", "mfa", "email", "backups", "checked_at"}
     _assert_probe_shape(body["database"])
     _assert_probe_shape(body["celery"])
     _assert_probe_shape(body["mfa"])
     _assert_probe_shape(body["email"])
+    _assert_probe_shape(body["backups"])
     # Configuration facts the tab renders directly.
     assert body["database"]["engine"]
     assert body["database"]["status"] == "ok"

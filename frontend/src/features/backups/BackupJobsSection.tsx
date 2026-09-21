@@ -1,13 +1,15 @@
 import { useEffect, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faCircleInfo, faDownload, faPlay } from '@fortawesome/free-solid-svg-icons'
+import { faCircleInfo, faDownload, faPlay, faShieldHalved, faTrash } from '@fortawesome/free-solid-svg-icons'
 import { useTranslation } from 'react-i18next'
 import {
     createBackupJob,
+    deleteBackupArtifact,
     downloadBackupArtifact,
     fetchBackupDestinations,
     fetchBackupJobs,
+    verifyBackupJob,
 } from '../../lib/api/backups'
 import { formatApiError } from '../../lib/api/errors'
 import { queryKeys } from '../../lib/api/queryKeys'
@@ -16,9 +18,10 @@ import { formatDateTime, useAppSettings } from '../../lib/appSettings'
 import { downloadBlob } from '../../lib/downloadBlob'
 import { formatBytes } from '../../lib/numbers'
 import { useToast } from '../../lib/toast'
+import { ConfirmDialog, useConfirmDialog } from '../../components/ConfirmDialog'
 import type { BackupJob, BackupJobScope, BackupJobStatus } from '../../types/api'
 import { BackupJobDetailsModal } from './BackupJobDetailsModal'
-import { hasActiveJob, isDownloadable } from './backupHelpers'
+import { fileGone, hasActiveJob, hasFile, isDownloadable, verificationState } from './backupHelpers'
 
 const POLL_MS = 3000
 
@@ -34,6 +37,7 @@ export function BackupJobsSection() {
     const { settings } = useAppSettings()
     const queryClient = useQueryClient()
     const { pushToast } = useToast()
+    const { dialog, confirm, handleConfirm, handleCancel, isLoading: dialogLoading } = useConfirmDialog()
 
     const [scope, setScope] = useState<BackupJobScope>('instance')
     const [zevId, setZevId] = useState('')
@@ -86,6 +90,33 @@ export function BackupJobsSection() {
         },
         onError: (error) => pushToast(formatApiError(error), 'error'),
     })
+
+    const verifyMutation = useMutation({
+        mutationFn: (job: BackupJob) => verifyBackupJob(job.id),
+        onSuccess: () => {
+            void queryClient.invalidateQueries({ queryKey: queryKeys.backups.jobs() })
+            pushToast(t('pages.backups.jobs.checkQueued'), 'success')
+        },
+        onError: (error) => pushToast(formatApiError(error), 'error'),
+    })
+
+    const deleteFileMutation = useMutation({
+        mutationFn: (job: BackupJob) => deleteBackupArtifact(job.id),
+        onSuccess: () => {
+            void queryClient.invalidateQueries({ queryKey: queryKeys.backups.jobs() })
+            pushToast(t('pages.backups.jobs.fileDeleted'), 'success')
+        },
+        onError: (error) => pushToast(formatApiError(error), 'error'),
+    })
+
+    const askToDeleteFile = (job: BackupJob) =>
+        confirm({
+            title: t('pages.backups.jobs.deleteFileTitle'),
+            message: t('pages.backups.jobs.deleteFileMessage', { name: job.archive_name }),
+            confirmText: t('pages.backups.jobs.deleteFile'),
+            isDangerous: true,
+            onConfirm: () => deleteFileMutation.mutateAsync(job),
+        })
 
     const downloadMutation = useMutation({
         mutationFn: async (job: BackupJob) => downloadBlob(await downloadBackupArtifact(job.id), job.archive_name),
@@ -172,6 +203,7 @@ export function BackupJobsSection() {
                                 <th>{t('pages.backups.jobs.columns.status')}</th>
                                 <th>{t('pages.backups.jobs.columns.size')}</th>
                                 <th>{t('pages.backups.jobs.columns.encryption')}</th>
+                                <th>{t('pages.backups.jobs.columns.integrity')}</th>
                                 <th>{t('common.actions')}</th>
                             </tr>
                         </thead>
@@ -183,12 +215,27 @@ export function BackupJobsSection() {
                                         {job.scope === 'zev'
                                             ? job.zev_name || t('pages.backups.jobs.scopeZev')
                                             : t('pages.backups.jobs.scopeInstance')}
+                                        {job.trigger !== 'manual' && (
+                                            <span className="badge badge-neutral" style={{ marginLeft: '0.4rem' }}>
+                                                {t(`pages.backups.jobs.trigger.${job.trigger}`)}
+                                            </span>
+                                        )}
                                     </td>
                                     <td>{job.destination_name || '—'}</td>
                                     <td>
                                         <span className={`badge ${STATUS_BADGE[job.status]}`}>
                                             {t(`pages.backups.jobs.status.${job.status}`)}
                                         </span>
+                                        {fileGone(job) && (
+                                            <div className="muted" style={{ marginTop: '0.25rem' }}>
+                                                {t(`pages.backups.jobs.fileGone.${job.artifact_deleted_reason || 'manual'}`)}
+                                            </div>
+                                        )}
+                                        {hasFile(job) && job.file_expires_at && (
+                                            <div className="muted" style={{ marginTop: '0.25rem' }}>
+                                                {t('pages.backups.jobs.expires', { date: formatDateTime(job.file_expires_at, settings) })}
+                                            </div>
+                                        )}
                                         {job.status === 'failed' && job.error_message && (
                                             <div className="muted" style={{ marginTop: '0.25rem', maxWidth: '28rem' }}>
                                                 {job.error_message}
@@ -207,6 +254,13 @@ export function BackupJobsSection() {
                                             '—'
                                         )}
                                     </td>
+                                    <td>
+                                        {job.status !== 'completed' || fileGone(job) ? (
+                                            '—'
+                                        ) : (
+                                            <VerificationBadge job={job} />
+                                        )}
+                                    </td>
                                     <td className="actions-cell">
                                         <div className="actions-cell-content">
                                             {job.status === 'completed' && (
@@ -217,6 +271,17 @@ export function BackupJobsSection() {
                                                 >
                                                     <FontAwesomeIcon icon={faCircleInfo} fixedWidth />
                                                     {t('pages.backups.jobs.details')}
+                                                </button>
+                                            )}
+                                            {hasFile(job) && (
+                                                <button
+                                                    type="button"
+                                                    className="button button-secondary button-compact"
+                                                    disabled={job.verifying || verifyMutation.isPending}
+                                                    onClick={() => verifyMutation.mutate(job)}
+                                                >
+                                                    <FontAwesomeIcon icon={faShieldHalved} fixedWidth />
+                                                    {t('pages.backups.jobs.check')}
                                                 </button>
                                             )}
                                             {isDownloadable(job) && (
@@ -230,6 +295,16 @@ export function BackupJobsSection() {
                                                     {t('pages.backups.jobs.download')}
                                                 </button>
                                             )}
+                                            {hasFile(job) && (
+                                                <button
+                                                    type="button"
+                                                    className="button button-secondary button-compact"
+                                                    onClick={() => askToDeleteFile(job)}
+                                                >
+                                                    <FontAwesomeIcon icon={faTrash} fixedWidth />
+                                                    {t('pages.backups.jobs.deleteFile')}
+                                                </button>
+                                            )}
                                         </div>
                                     </td>
                                 </tr>
@@ -240,6 +315,39 @@ export function BackupJobsSection() {
             )}
 
             <BackupJobDetailsModal job={detailJob} onClose={() => setDetailJob(null)} />
+
+            {dialog && (
+                <ConfirmDialog
+                    title={dialog.title}
+                    message={dialog.message}
+                    confirmText={dialog.confirmText}
+                    isDangerous={dialog.isDangerous}
+                    isLoading={dialogLoading}
+                    onConfirm={handleConfirm}
+                    onCancel={handleCancel}
+                />
+            )}
         </section>
+    )
+}
+
+/** The result of the last check of a backup's stored file. A failure names why. */
+function VerificationBadge({ job }: { job: BackupJob }) {
+    const { t } = useTranslation()
+    const { settings } = useAppSettings()
+    const state = verificationState(job)
+
+    if (state === 'checking') return <span className="badge badge-info">{t('pages.backups.jobs.verification.checking')}</span>
+    if (state === 'never') return <span className="badge badge-neutral">{t('pages.backups.jobs.verification.never')}</span>
+    return (
+        <>
+            <span className={`badge ${state === 'ok' ? 'badge-success' : 'badge-danger'}`}>
+                {t(`pages.backups.jobs.verification.${state}`)}
+            </span>
+            <div className="muted" style={{ marginTop: '0.25rem', maxWidth: '20rem', overflowWrap: 'anywhere' }}>
+                {job.verified_at ? formatDateTime(job.verified_at, settings) : ''}
+                {state === 'failed' && job.verification_message && <div>{job.verification_message}</div>}
+            </div>
+        </>
     )
 }

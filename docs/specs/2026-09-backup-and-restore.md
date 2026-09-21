@@ -1,7 +1,7 @@
 # Feature Spec: Integrated Backup and Restore
 
 - Spec ID: SPEC-2026-09-backup-and-restore
-- Status: In Progress (phase 1 implemented)
+- Status: Implemented (phases 1–4)
 - Scope: Major
 - Type: Feature
 - Owners: splattner
@@ -20,7 +20,7 @@
 | 1 — back up | **Implemented** | Archive writer, encryption, checksums, destinations, `BackupJob`, `openzev_backup`, `openzev_backup_verify`, admin API and `backup` tab. Sections 4.1, 4.2, 5, 6.1–6.3, 7 and 9 describe what shipped. |
 | 2 — restore the instance | **Implemented** | `restore.py`, `openzev_restore --mode instance`, `storage.fetch_archive`. §6.5 describes what shipped; deviations 10–15 below. CLI only, as designed. |
 | 3 — restore one ZEV | **Implemented** | `RestoreJob`, `restore_zev.py`, `execute_restore_job`, `/api/v1/backups/restores/`, `openzev_restore --mode zev`, the *Restore a community* section. §4.3, §5 and §6.6 describe what shipped; deviations 16–23 below. |
-| 4 — operate | Planned | §6.4, retention fields, verify endpoint, staleness. |
+| 4 — operate | **Implemented** | `schedule.py`, `retention.py`, `health.py`, `scheduled_backup` / `sweep_backup_artifacts` / `run_verify_job`, `openzev_backup_sweep`, `backups.W001`, the schedule, verify, delete-file and retention UI, and the health-panel card. §4.1, §4.2, §5, §6.4 and §7.7 describe what shipped; deviations 24–32 below. |
 
 Sections describing later phases are the design to build against. **Where phase 1
 differs from the design first written here, this document has been corrected to
@@ -29,7 +29,7 @@ match the code**; the differences and their reasons are listed in
 
 ### Deviations from the first design
 
-Made while implementing phases 1 to 3; each is reflected in the sections below.
+Made while implementing phases 1 to 4; each is reflected in the sections below.
 
 1. **Sections are JSON Lines written by Django's serializer, not hand-written field
    lists, and readings are JSON Lines too, not per-meter CSV.** Every concrete
@@ -42,11 +42,15 @@ Made while implementing phases 1 to 3; each is reflected in the sections below.
    This replaces `BackupSchemaParityTests` and `FIELDS_EXCLUDED_FROM_BACKUP`.
 2. **`ExportJob` is not backed up** (the first design said its rows travel). Its
    artifact is deleted after 24 h, so a restored row would point at nothing.
-3. **`django_celery_beat` schedules are not backed up yet.** Settings-defined
-   schedules are recreated by beat itself; the one admin-editable schedule arrives
-   with the scheduler in phase 4, and its restore will be designed then.
+3. **`django_celery_beat` schedules are not backed up, and the backup schedule is
+   deliberately one of them.** Settings-defined schedules are recreated by beat
+   itself. The admin-editable backup schedule (phase 4) is instance configuration like
+   `BackupDestination`: it describes this installation's environment, so after a
+   whole-instance restore the destinations are added and the schedule switched on
+   again (the user guide says so).
 4. **Retention (`retention_count`), expiry (`file_expires_at`, `expired`), the
-   sweep, and the `409` when deleting a used destination are phase 4.** Nothing in
+   sweep, and the `409` when deleting a used destination are phase 4** *(shipped
+   there; see deviations 24–32)*. Nothing in
    phase 1 deletes an archive, so there is nothing to retain or expire, and
    deleting a destination never touches archives already written.
 5. **Destination changes are audited as `GOVERNANCE`**, not `SYSTEM`, matching
@@ -137,6 +141,66 @@ Made while implementing phases 1 to 3; each is reflected in the sections below.
     the same way. Storage rollback is also stronger than designed: a file the restore
     overwrites is copied aside and put back on failure (`MediaUndo`), for instance
     restore too.
+24. **The schedule is created when it is first saved, not by a migration.** It is
+    beat's own `PeriodicTask` (`openzev-scheduled-backup`) with a `CrontabSchedule`, as
+    designed, but a fresh installation has nothing to create, and a disabled task gives
+    beat nothing to run. Reading it before then returns the defaults, switched off.
+    It is exposed as *daily or weekly, at a time of day* (in `settings.TIME_ZONE`)
+    through `GET`/`PUT /api/v1/backups/schedule/`, audited `backup_schedule.update`
+    (`GOVERNANCE`, with a diff), and saved through `save()` so beat notices without a
+    restart. Beat's database scheduler loads a crontab task only shortly before it is
+    due, so it is absent from the scheduler's list most of the day — not a fault.
+25. **Verification is asynchronous.** `POST /jobs/{id}/verify/` returns `202` and the
+    result lands on the job (`verified_at`, `verification_ok`, `verification_message`,
+    with `verify_started_at` as the claim and `verifying` in the serializer), rather
+    than the request streaming a multi-gigabyte archive to answer `200`/`400`. It first
+    compares the stored bytes with the SHA-256 recorded when they were written — which
+    catches rot even where the archive cannot be decrypted — then runs
+    `verify_archive`. A second request while one runs is `409`.
+26. **Retention is opt-in and shaped to fail towards keeping a file.**
+    `retention_count` defaults to `0` (keep everything). It counts the newest N
+    *finished, undeleted* backups per destination **per kind** (whole instance, or each
+    community) and never counts safety backups. It runs *after* a backup completes,
+    never before — otherwise a destination set to keep one backup is empty while its
+    replacement is being written — and never deletes a backup a queued or running
+    restore, or a verification, is reading. Only a safety backup expires by date
+    (`BACKUP_SAFETY_RETENTION_DAYS`, default 30, sets `file_expires_at` when it
+    completes), and only when written to a saved destination: one written with
+    `--path` has no destination bounding where a delete may reach, so it is left for
+    its operator. A destination that cannot be reached is logged and counted; the
+    others are still swept.
+27. **A deleted file is `artifact_deleted_at` + `artifact_deleted_reason`
+    (`retention`, `expired`, `manual`), not an `expired` property**, plus
+    `artifact_available` (a finished backup whose file is not deleted). `DELETE
+    /jobs/{id}/artifact/` was added so an administrator can remove a file — without it
+    the `409` on deleting a destination that still holds files would be a dead end.
+    Download, verify, delete and restore-from all refuse a deleted file.
+    `storage.delete_from_destination` follows a location only inside the destination
+    it names, exactly as `fetch_from_destination` does.
+28. **"Last backup" means the last finished whole-instance backup that was not a safety
+    backup** (`health.routine_backups`). A community-only backup does not protect the
+    instance and a safety backup is the way back from a restore; letting either
+    freshen it would be the failure this exists to prevent. This narrows phase 1's
+    `last_successful` and `age_hours`, which counted any finished job. `GET /status/`
+    gains `stale`, `schedule_enabled` and `schedule_interval_hours`.
+29. **The health probe reports `unknown` for "no destination enabled"** (not set up is
+    a state, not a fault), **`degraded`** for a stale schedule, a failure after the last
+    success, or nothing ever having succeeded, and `ok` otherwise. Its payload names no
+    destination and no path.
+30. **`backups.W001` is a database-tagged system check** (it runs under `manage.py
+    check --database default`, since an ordinary check must not need a database),
+    warning when a schedule is on and no `BACKUP_ENCRYPTION_KEYS` is set (ADR 0024).
+31. **`manage.py openzev_backup_sweep [--dry-run]`** applies retention, expiry and
+    stalled-job recovery from cron where there is no beat, and previews what a
+    retention setting would delete. The sweep runs hourly on beat, `expired` +
+    `stalled` at the start of each backup, and `retention` at its end. A job left
+    `queued` for four hours, or `running` past `BACKUP_RUNNER_TIMEOUT_S` plus 15
+    minutes, is failed with a safe message; the same goes for restores and for a
+    verification claim nobody released.
+32. **The remaining open question of ADR 0024 stays open**: whether a *remote*
+    destination should refuse to run without an encryption key. Encryption remains
+    optional, and loud (the schedule warning, `backups.W001`, the health card's
+    unencrypted note, the banner and the per-job badge).
 
 ## 1. Problem and outcome
 
@@ -251,6 +315,7 @@ New app `backups`, added to `INSTALLED_APPS` after `exports`.
 | `access_key_id` | `CharField(128)` | `""` | `s3`; not a secret, stored in clear |
 | `secret_access_key_encrypted` | `BinaryField` | `b""` | `s3`; Fernet ciphertext under `BACKUP_ENCRYPTION_KEYS`. Never serialized |
 | `server_side_encryption` | `CharField(20)` | `AES256` | `s3`; `""` disables, `aws:kms` supported |
+| `retention_count` | `PositiveIntegerField` | `0` | how many finished backups of each kind to keep here; `0` keeps everything (§6.4). Serializer: 0–10000 |
 | `created_at` / `updated_at` | `DateTimeField` | auto | |
 
 **Properties and methods**
@@ -306,10 +371,17 @@ New app `backups`, added to `INSTALLED_APPS` after `exports`.
 | `encryption_key_fingerprint` | `CharField(16)` | `""` | first 16 hex of SHA-256 of the active key |
 | `manifest_json` | `JSONField` | `dict` | the manifest, so the UI reports contents without fetching the archive |
 | `error_message` | `CharField(500)` | `""` | user-safe summary only |
+| `file_expires_at` | `DateTimeField` | `null` | set at completion for a safety backup on a saved destination only |
+| `artifact_deleted_at` | `DateTimeField` | `null` | the row outlives its file |
+| `artifact_deleted_reason` | `CharField(10)` | `""` | `retention`, `expired`, `manual` |
+| `verify_started_at` | `DateTimeField` | `null` | the claim while a check runs |
+| `verified_at` | `DateTimeField` | `null` | latest check with a verdict |
+| `verification_ok` | `BooleanField` | `null` | `null`: never checked |
+| `verification_message` | `CharField(500)` | `""` | user-safe |
 
 `Meta.ordering = ["-created_at", "-id"]`; indexes on `("status", "started_at")`
-and `("scope", "created_at")`. `file_expires_at` and an `expired` property arrive
-with retention in phase 4.
+and `("scope", "created_at")`. Property `artifact_available`: `status == completed`
+and `artifact_deleted_at is None`.
 
 **Serializer:** `BackupJobSerializer` — all fields above except `destination`,
 `requester` and `trigger`'s display, plus `zev_id`, `zev_name` and
@@ -352,6 +424,7 @@ Added to `backend/config/settings.py`:
 | `BACKUP_S3_SECRET_ACCESS_KEY` | `env` | `""` | Overrides every stored S3 credential |
 | `BACKUP_WORK_DIR` | `env` | `""` (the system temp directory) | Where archives are assembled. Must have room for one full archive, and for a second copy while encrypting (the plaintext is deleted before the upload) |
 | `BACKUP_RUNNER_TIMEOUT_S` | `env.int` | `10800` | Soft limit; hard limit a grace above, as `EXPORT_RUNNER_TIMEOUT_S` |
+| `BACKUP_SAFETY_RETENTION_DAYS` | `env.int` | `30` | How long a safety backup (taken before a per-ZEV restore) is kept; `0` keeps it until deleted |
 | `OPENZEV_VERSION` | `env` | `""` | Release version recorded in manifests for humans; compatibility is decided by the migration state, so leaving it unset is fine |
 
 ## 5. API contracts
@@ -382,14 +455,33 @@ Phase 3:
 | `/api/v1/backups/restores/` | POST | `{source_backup_id, target_zev_id, dry_run (default true), force (default false), safety_destination_id?}` → 202. Persist, then enqueue on commit; a failed enqueue marks the job `failed` and returns 503. **400** for: `mode: "instance"` ("Whole-instance restore is only available as a management command."), an unknown or unfinished backup, a community the backup's manifest does not hold, an unknown or disabled safety destination, and a real restore of an existing community with nowhere to write the safety backup (the source backup's destination is the default). **409** when that community already has a queued or running restore. Audited `restore.created` on the community |
 | `/api/v1/backups/restores/{id}/` | GET | Status and `plan_json`, for polling |
 
-Later phases:
+Phase 4:
+
+| Endpoint | Method | Behaviour |
+|---|---|---|
+| `/api/v1/backups/schedule/` | GET | The schedule: `{enabled, frequency (daily/weekly), hour, minute, day_of_week (0 = Sunday), timezone, interval_hours, last_run_at}`; the defaults, off, until one is saved |
+| `/api/v1/backups/schedule/` | PUT | Save it. 400 for an hour outside 0–23, a minute outside 0–59, an unknown frequency, a day outside 0–6. Audited `backup_schedule.update` (`GOVERNANCE`, with a diff) |
+| `/api/v1/backups/jobs/{id}/verify/` | POST | 202 with the job (`verifying: true`); the result appears on the row (deviation 25). **409** when the backup has no file or is already being checked; 503 (claim released) on a broker outage |
+| `/api/v1/backups/jobs/{id}/artifact/` | DELETE | Delete the file, keep the row. 204; **409** when there is no file or a restore or check is using it; 502 with a safe message when the destination is unreachable. Audited `backup.artifact_deleted` (reason `manual`, the acting user) |
+
+`DELETE /destinations/{id}/` is `409` while any backup there is queued, running, or
+still has its file. `GET /jobs/` and `/jobs/{id}/` gain `file_expires_at`,
+`artifact_deleted_at`, `artifact_deleted_reason`, `artifact_available`, `verifying`,
+`verified_at`, `verification_ok`, `verification_message`; destinations gain
+`retention_count`. `GET /download/` is `410` for a deleted file; creating a restore
+from one is `400`. `GET /status/` gains `stale`, `schedule_enabled`,
+`schedule_interval_hours`, and narrows `last_successful` / `age_hours` (deviation 28).
+`GET /api/v1/auth/system-health/` gains a `backups` probe (deviation 29).
+
+Superseded design (kept for the record):
 
 | Endpoint | Method | Phase | Behaviour |
 |---|---|---|---|
 | `/api/v1/backups/jobs/{id}/verify/` | POST | 4 | Streams the artifact, decrypts if needed, checks every manifest checksum and count. 200 `{"ok": true, "members": n}` or 400 `{"detail", "failures": [...]}`. Creates nothing (the CLI `openzev_backup_verify` ships in phase 1) |
 
 `status` gains `stale` in phase 4: `age_hours > 2 × the configured schedule
-interval`, or `true` when a schedule exists and no backup has ever succeeded.
+interval`, or `true` when a schedule exists and no backup has ever succeeded
+(implemented as designed; see `backups.health`).
 
 ## 6. Async and integration behavior
 
@@ -568,18 +660,35 @@ destination. `openzev_backup_verify FILE` runs `verify_archive`.
 
 ### 6.4 Scheduling and retention
 
-- `backups.tasks.scheduled_backup` runs from a `django_celery_beat` `PeriodicTask`
-  named `openzev-scheduled-backup`, created disabled on migration. The admin UI
-  edits its crontab, so the schedule is data, not a settings constant.
-- It creates one `BackupJob` per enabled destination with `trigger="scheduled"`,
-  and skips a destination that already has a `queued`/`running` job.
-- `backups.tasks.sweep_backup_artifacts` runs hourly on the beat schedule and
-  opportunistically at the start of each backup run (as `sweep_export_jobs` does,
-  so deployments without a beat process still clean up):
-  - deletes artifacts past `file_expires_at`;
-  - enforces `BackupDestination.retention_count`, newest kept;
-  - fails a `running` job whose worker died, past the hard limit plus a grace.
-  Rows are retained after their artifact is deleted, so the history stays readable.
+- **Schedule** (`backups.schedule`): beat's `PeriodicTask` `openzev-scheduled-backup`
+  → `backups.tasks.scheduled_backup`, created on first save (deviation 24).
+  `run_scheduled_backup` creates one whole-instance `BackupJob` per **enabled
+  destination** with `trigger="scheduled"`, skips a destination that already has a
+  `queued`/`running` instance job, and enqueues each; a broker outage fails that
+  row with a safe message instead of leaving it queued.
+- **Sweep** (`backups.retention.sweep(steps, dry_run)`), as the beat task
+  `sweep_backup_artifacts` every hour (`CELERY_BEAT_SCHEDULE`), at the start of
+  every backup (`expired`, `stalled` — never `retention`), at the end of every
+  completed backup (`retention`), and from `openzev_backup_sweep`:
+  - **expired** — finished backups past `file_expires_at`, with a saved destination;
+  - **retention** — for each destination with `retention_count > 0`, the newest N
+    finished, undeleted, non-safety backups per (scope, community) are kept and older
+    ones deleted (deviation 26);
+  - **stalled** — `queued` for over four hours or `running` past
+    `BACKUP_RUNNER_TIMEOUT_S` + 15 minutes → `failed`, for backups and restores, and a
+    verification claim nobody released is cleared with a failed result.
+  Deleting is `retention.delete_artifact`: remove the file inside its destination
+  (`storage.delete_from_destination`), set `artifact_deleted_at`/`_reason` (the row
+  stays), audit `backup.artifact_deleted` (`SYSTEM`, with the reason and location).
+  It skips anything a queued or running restore or a verification is reading. A file
+  already gone still marks the row deleted. Failures are per row and counted, never
+  raised; the report is `{expired, retention, stalled, errors, dry_run}`.
+- **Verification** (`tasks.claim_verification`, `execute_verify`, `run_verify_job`):
+  claim with a guarded update, copy the artifact to `BACKUP_WORK_DIR`, compare its
+  SHA-256 with `archive_sha256`, then `verify_archive`; publish only if the claim is
+  still the one taken. Audited `backup.verified` / `backup.verify_failed`.
+- **Health** (`backups.health`): `backup_health()` is the one answer behind the
+  backup tab's *stale* banner and the health panel's card (deviations 28, 29).
 
 ### 6.5 Instance restore — `manage.py openzev_restore --mode instance`
 
@@ -952,6 +1061,24 @@ All strings under `pages.backups.*` (plus `adminSystemSettings.tabs.backup.label
 `frontend/src/i18n/locales/{de,en,fr,it}.ts`; no hardcoded user-facing text. Command
 names are passed as a `{{command}}` placeholder so they are never translated.
 
+### 7.7 Operating backups (phase 4)
+
+| Part | Behaviour |
+|---|---|
+| `BackupScheduleSection` | Enable switch; *daily* / *weekly* (with a weekday); a time (`<input type="time">`, labelled with the server's time zone); the last run. **Save** is enabled only when the form is valid and differs from what is saved. A `warning-banner` while enabled and no encryption key is set, and another when no destination is enabled; a note that nothing runs unless the scheduler is |
+| Stale banner (`BackupSettingsSection`) | An `error-banner` when `status.stale`: how many hours ago the last backup finished against the schedule's interval, or that none has yet |
+| Destination form and table | *Keep the latest* (a number; blank or `0` keeps everything) and a *Keeps* column |
+| Job list | A *Scheduled* / *Safety backup* badge; **Check** (disabled while a check runs; polling continues while `verifying`); an *Integrity* column (*Not checked*, *Checking…*, *Intact* + date, *Check failed* + reason); **Delete file** behind a `ConfirmDialog`; for a backup with no file, "File removed: beyond retention / expired" and no actions; the expiry of a safety backup |
+| Restore section | Only backups whose file still exists are offered |
+| `AdminSystemHealthPanel` | A *Backups* card: not set up (`unknown`), the last backup's time, *the schedule has fallen behind*, *not encrypted*, and a link to the backup tab; the grid is three columns wide |
+
+Pure logic in `backupHelpers.ts`: `buildSchedulePayload` (a valid `HH:MM`; the weekday
+only for weekly), `scheduleChanged`, `scheduleToForm`, `parseRetention`,
+`verificationState`, `fileGone`, `hasFile`. Types `BackupSchedule`,
+`BackupScheduleInput`, the new `BackupJob` and `BackupStatus` fields and
+`SystemHealth.backups`; API `fetchBackupSchedule`, `updateBackupSchedule`,
+`verifyBackupJob`, `deleteBackupArtifact`; query key `backups.schedule()`.
+
 ## 8. Risks and mitigations
 
 | Risk | Impact | Mitigation |
@@ -971,7 +1098,7 @@ names are passed as a `{{command}}` placeholder so they are never translated.
 
 ## 9. Test plan
 
-### Backend — `backend/backups/` (381 tests, phases 1–3)
+### Backend — `backend/backups/` (508 tests, phases 1–4)
 
 | Module | Tests | Covers |
 |---|---|---|
@@ -979,17 +1106,31 @@ names are passed as a `{{command}}` placeholder so they are never translated.
 | `test_archive.py` | 54 | `ArchiveShapeTests` — manifest, every section present, **timestamps keep their microseconds**, every line a serialized row, **primary keys preserved** (UUID and integer), FKs are real keys, a ZEV holds only its own rows, PDFs travel byte-exact under their own ZEV, contract PDFs base64 in-row, **rows whose ZEV was deleted are in the instance scope**, account refs, credentials travel, M2M excluded, no row of an excluded model, counts match rows, **no key material in the archive**. `ZevScopeTests`. `MediaTests` — missing PDF recorded not fatal, `..` and absolute names refused, a shared file stored once. `CoverageTests` — the registry closure. `DurabilityTests`. `VerifyTests` — tampered member, missing member, injected member, disagreeing count, **transfer archive refused by kind**, unknown version, malformed manifest, not a zip, failure cap. `EncryptedArchiveTests`. `RoundTripTests` — deserializing the sections reproduces the rows with their keys |
 | `test_destinations.py` | 45 | Local and S3 validation (**path inside `MEDIA_ROOT` refused**, `..` resolved first, half a credential pair); credential precedence; boto client construction (custom endpoint → path-style and relaxed checksums; instance role passes no keys); local storage (0600, no partial file on failure, atomic); S3 upload key/SSE/location; **provider errors become safe messages that never echo the response, and an unrecognised error code is named only if it is shaped like one**; persistence |
 | `test_runner.py` | 31 | Completed job records location/size/checksum/manifest; stored archive verifies; encryption on/off; a rejected key fails the job with the reason; failures (missing destination, unwritable, **unexpected error is generic on the row and detailed only in the log**, soft time limit); **a job runs once if delivered twice; a late completion does not resurrect a failed job**; audit events; **a broken audit write does not fail a completed backup**; S3 runner; the builder is handed a file, not a buffer; the work directory is empty afterwards |
-| `test_api.py` | 42 | **Every endpoint refuses anonymous, owner and participant callers**; destination CRUD; **the secret is never returned, never in the audit log**; absent/empty/new secret semantics; 202 with enqueue after commit; **broker outage → 503 and a failed job**; validation matrix; list filters and limit; download streams, 409/410 cases, **a location outside the destination is never served**; status |
+| `test_api.py` | 46 | (phase 4: **a destination that still holds a backup file, or a running backup, cannot be deleted**; failed backups do not hold one; a safety or community backup does not make the instance look backed up.) **Every endpoint refuses anonymous, owner and participant callers**; destination CRUD; **the secret is never returned, never in the audit log**; absent/empty/new secret semantics; 202 with enqueue after commit; **broker outage → 503 and a failed job**; validation matrix; list filters and limit; download streams, 409/410 cases, **a location outside the destination is never served**; status |
 | `test_commands.py` | 22 | `openzev_backup` (path, destination, zev by id or name, ambiguous name, refusal cases, warning on stderr when unencrypted, non-zero exit with a safe message on failure, needs no broker, audited as a management command) and `openzev_backup_verify` (good, encrypted, wrong key, corrupted, missing file) |
 | `test_restore_instance.py` | 54 | **Round trip:** every row of every backed-up table equal field for field after a wipe and restore (primary keys and timestamps included), PDFs back under the same name and bytes, encrypted round trip, the audit trail restored and the restore appended to it, a bootstrap superuser replaced, ordinary inserts after a restore. **Dry run:** writes nothing, refuses exactly when the real run would, `--force` reports what would be replaced, schema-unreadable records found. **Refusals leave the database untouched:** populated instance without `--force`, transfer archive, single-community backup, newer-version backup, unapplied migrations, schema newer than the backup (names the `migrate` steps), unrelated apps' migrations ignored. **Integrity:** corrupted member, a manifest missing a whole section, **a section cannot create a model it does not own**, an unreadable record is named without quoting its content, dangling references roll everything back. **Rollback:** a late failure undoes rows and files (**a PDF the restore overwrote is put back**), a failed forced restore leaves existing data, timestamp flags restored, an audit failure does not undo a finished restore. **Media:** a file at that name is replaced not renamed, a PDF already missing at backup time is reported, **unreferenced and `..` media are not written**. MFA key warnings; sequence reset covers exactly the integer-keyed models; S3 source parsing and safe errors; the command (file, dry run, refusal, missing file, listed verification failures, S3 download, warnings on stderr) |
 | `test_restore_zev.py` | 43 | The engine. **Replace in place:** a damaged community comes back exactly; **nothing outside it changes** (every other backed-up row identical); **no account row created, modified or deleted**; the community row is updated in place so audit events and `preferred_zev` keep pointing at it; **the audit trail is untouched and none is written**; a deleted community is recreated and its orphaned audit events stay as they were; other communities restore from the same instance backup; a single-community backup works and refuses other communities; PDFs written back; only the integer-keyed model's sequence is reset. **Accounts:** relinked by email under a new id, a missing account reported and left empty (never created), owner follows the email, a live community keeps its owner, a recreation without a findable owner refused. **Conflicts:** none on a clean restore; a sent/paid invoice deleted or rolled back and an issued contract deleted each need `force` and `force` then works; **a meter id owned by another community, a missing price source, a running export and another restore are not forceable**; a refusal changes nothing; the list is capped with "and N more". **Dry run:** plan and no writes, refusals reported not raised, missing accounts shown, no safety backup, schema misfits found without quoting content. **Safety backup:** after the plan and before the first write, a failure stops everything, not taken for a refusal or a community that does not exist, **conflicts checked again under the lock after it**. **Rollback:** late failure, overwritten PDF restored, dangling references, other communities and the trail survive. **Lock** taken on the community row, and not for a dry run |
 | `test_restore_runner.py` | 28 | The job lifecycle. A restore records its plan; **a safety backup of the damaged state is taken first, linked, and can undo the restore**; a dry run writes and backs up nothing; audited started/completed with what it did; **every earlier audit event unchanged**; a broken audit write does not undo a restore. A refused restore fails with its plan and takes no safety backup; `force` recorded and lets an overridable conflict through. A failing or missing safety destination stops before any write; an explicit destination is used; **an unexpected error is generic on the row**; soft time limit; a missing file or deleted source row; **damaged-archive failures stored in the plan**; delivered twice runs once; **a late completion does not resurrect a failed job**. Sources: encrypted with and without its key, **S3 round trip through a fake client**, a local file standing in for the job. `fetch_from_destination`: **a location outside its destination is never followed** (local, traversal, other bucket or prefix), a provider error is a safe message |
 | `test_restore_api.py` | 21 | **Every endpoint refuses anonymous, owner and participant callers**; dry run by default; the safety destination defaults to the backup's; audited on the community; **naming the whole instance is a 400, not a downgrade**; validation matrix; another community's backup cannot restore this one; a missing safety destination is a 400 for a real restore only; **409 while a restore of that community is active**; broker outage → 503 and a failed job; list order, filter, limit; detail carries the plan; an API-created job runs end to end |
 | `test_restore_zev_command.py` | 19 | `--mode zev`: restore by id and by name with a safety backup written where told; recorded as a job and audited as a management command; a saved destination; **refused up front without a place for the safety backup**; a deleted community named by id needs none; unknown and ambiguous names; a safety path inside `MEDIA_ROOT` refused; S3 source; dry run prints the plan and changes nothing; **a dry run that would be refused exits non-zero**; each problem listed with whether `force` helps, and `--force` says it overrode; missing accounts warned; argument checks |
+| `test_retention.py` | 44 | **Retention:** nothing deleted unless switched on; the newest N kept per destination; the row outlives its file and says why; **the newest is never deleted, even at one**; **each kind counted separately** so a community backup cannot evict the instance backup; **safety backups never counted**; failed/running jobs ignored; destinations independent; **a backup a restore or a check is reading is not deleted**; dry run deletes nothing; audited with reason and location. **Expiry:** a safety backup gets one, no other does, `0` days disables it, an expired one goes and an unexpired one does not, **one on an ad-hoc `--path` or with its destination deleted is left alone without an error**. **Robustness:** a file already gone is recorded as deleted; a missing destination raises and leaves the row; **one unreachable destination does not stop the others**; an unexpected error is contained and counted; a broken audit write does not undo a deletion. **Storage guards:** a location outside its destination, a traversal, another bucket or prefix are never followed; S3 delete; provider errors are safe messages. **With backups:** **retention runs after the new backup exists, never before**; the start-of-run sweep only expires and recovers; a failing sweep never fails the backup. **Stalled jobs:** running past the limit, queued for hours, restores too, dead verification claims, dry run. The `openzev_backup_sweep` command |
+| `test_schedule.py` | 27 | Reads as off before anything is saved; saving creates the periodic task; weekly and its interval; a second save edits the one task; shared crontabs; **a save notifies beat**. Scheduled run: one instance backup per enabled destination, **a busy destination skipped**, a community backup in flight does not block, nowhere to write, **a broker outage fails the row visibly**. API: **every endpoint refuses anonymous, owner and participant callers**, defaults, save, validation, **audited as governance with a diff**, the status reports the schedule and staleness. **`backups.W001`:** warns for a schedule without a key, silent with a key / disabled / without `--database`, wired into `check`, tolerant of an unmigrated database |
+| `test_verify.py` | 33 | An intact backup is recorded; **a file that rotted at rest fails on the recorded checksum**; a right-checksum, wrong-content file lists what is wrong (capped, "and N more"); not a zip; missing file; encrypted with and without the key; **an unexpected error is generic on the row**; no claim, nothing runs; **a result never overwrites a claim someone else holds**; no copy left behind; audited either way. Claim: one check at a time, none for an unfinished backup or a deleted file. API: 202, 409 while running / without a file, 503 releases the claim, the result on the job, 404. **Delete file:** deletes, keeps the row, audits who; a deleted backup can no longer be downloaded, verified, deleted or restored from; **not while a restore or a check uses it**; 502 with a safe message; **a destination can be deleted only once its files are gone**; owners and participants refused. Retention setting: default, set and audited, bounds, on create |
+| `test_health.py` | 19 | **Staleness:** never without a schedule, fresh within twice the interval, **one missed run tolerated and two not**, the weekly yardstick, never-run is stale, disabled is not, **a safety or community backup does not freshen it**. **Status mapping:** not set up is `unknown`, unused is `degraded`, recent success `ok`, **a failure after the last success `degraded`**, an old failure forgiven, encryption reported. The health endpoint carries the probe, **names no destination or path**, and a failing probe degrades to `unknown` |
 
 The mutation checks run while building this (removing the traversal guard, the
 final-chunk flag, the admin permission, the `MEDIA_ROOT` guard) each turned the
 suite red.
+
+Mutation checks run while building phase 4 — each turned the suite red: retention keeping
+one fewer, restores not protecting their source backup, kinds not counted separately,
+safety backups counted, retention running before the backup, the storage delete guard
+removed, staleness measured against one interval instead of two, the destination-delete
+refusal removed, dead verification claims not cleared, a failure after a success
+ignored, the safety-backup expiry not set, the checksum comparison skipped in verify; on
+the frontend a deleted file still downloadable or restorable, the weekday sent for a
+daily schedule, the stale banner, deleting without asking, the health card ignoring
+staleness.
 
 Mutation checks run while building phase 3 — each turned the suite red: the community
 row deleted instead of updated, the audit trail restored too, accounts not relinked,
@@ -1053,7 +1194,45 @@ the audit rows that existed before, so the comparison is exact.
   per community; the row lock itself is taken (asserted) but no *concurrent* writer
   was tried against it.
 
-### Frontend (67 tests, phases 1 and 3)
+#### Verification notes (phase 4, real PostgreSQL)
+
+A scratch database again (dev data untouched apart from what is listed under the UI
+check below), `seed_demo`, and `.delay()` mocked so the shared broker handed nothing to
+the dev worker.
+
+- **The schedule** saved as a `PeriodicTask` and `CrontabSchedule` in `Europe/Zurich`;
+  **beat was notified** (`PeriodicTasks.last_change` moved); a real `DatabaseScheduler`
+  **loaded the entry** when it was due within the coming minute, showed the right task
+  and next run, and **dropped it when the schedule was disabled**. (It does not list a
+  daily 02:00 task at other times: the scheduler loads crontab tasks only shortly
+  before they are due — the same reason `celery.backend_cleanup` is absent then.)
+- **Retention 2, four scheduled runs**: the files on disk went 1, 2, 2, 2; the four rows
+  stayed, two marked `retention`.
+- **Verify** returned *Intact: 29 files, 84,278 records*; after a byte-level corruption
+  it failed on *the stored file does not match the checksum recorded when it was
+  written*. **Health** was `ok` and fresh, then `degraded` and stale at 60 h on a daily
+  schedule. A `running` job started five hours earlier was failed by the sweep.
+- **A per-ZEV restore's safety backup expired**: 30 days ahead; forced into the past,
+  `openzev_backup_sweep --dry-run` named it and left the file, the real sweep deleted
+  it, and the row stayed (`completed`, reason `expired`, `artifact_available: false`).
+- **`manage.py check --database default`** reported `backups.W001` for a schedule with
+  no key.
+- **A bug found by doing this**: a safety backup written with `--path` has no saved
+  destination, so the sweep could not resolve where its file may live and errored on it
+  every hour. Such a backup now gets no expiry and the sweep skips anything without a
+  destination (deviation 26). Regression tests cover both.
+- **UI in the dev stack** at 1280 px and 400 px, driven through the worker: the
+  schedule card, the job list with **Check** (a real check ran, and its result appeared
+  on the row), the file-removed history row, and the health card; no console errors,
+  no horizontal overflow. The throwaway admin, destination, jobs, audit events and
+  periodic task were removed afterwards. Two of my clicks and one snippet landed on a
+  backup that belonged to someone else on that instance (a real S3 destination): a
+  read-only check was run against it and recorded on its row; the row and the two audit
+  events were reset.
+- Not verified against a real object store, as before; the beat process itself was not
+  left running to watch a schedule fire.
+
+### Frontend (106 tests, phases 1, 3 and 4)
 
 - `tests/backup-helpers.test.ts` (17) — the payload contract: a blank edit never
   wipes a secret, a clear is explicit, switching kind clears the other kind's
@@ -1065,6 +1244,9 @@ the audit rows that existed before, so the comparison is exact.
   (download only for local archives, unencrypted badge, failed reason, details).
 - `tests/backup-restore-helpers.test.ts` (10) — `canStartRestore` (clean, needs `force`, **never past a hard conflict**), the name to type, reading a plan, choosing a backup and community, polling.
 - `tests/backup-restore-section.test.ts` (18) — no backup, communities follow the chosen backup, the whole instance never offered; **a preview is a dry run**; unlinked accounts named; a refusal shows the reason, the conflicts and no way forward; damaged-archive failures listed; **apply needs the exact name** (case matters); the request carries the safety destination, no `force` unless asked; a chosen destination; none for a community that no longer exists; **`force` required for overridable conflicts and absent for hard ones**; a finished restore reports and refreshes every cache; changing the community resets the flow; history.
+- `tests/backup-operate-helpers.test.ts` (12) — the schedule form (HH:MM with leading zeros, the request, **the weekday only for weekly**, invalid times refused, a change reported only when the server would store a difference), retention parsing (blank/zero/negative/junk keep everything) and its place in the payload, the four verification states, a finished backup without a file, polling while a check runs.
+- `tests/backup-operate.test.ts` (22) — the schedule (shows what is saved, **Save disabled until something changes**, the request and status refresh, the weekday only when weekly, an invalid time cannot be saved, the unencrypted and no-destination warnings, the server's error); the stale banner (and the never-run wording, and absent when current); **Check** (queued, disabled while running, results and the reason a check failed); **Delete file asks first and does nothing on no**; a deleted backup is history with no actions; trigger badges and expiry; a deleted backup is not offered for restore; retention listed and sent.
+- `tests/system-health-backups.test.ts` (5) — the health card: not set up is a state, the last backup and the link, **degraded when the schedule has fallen behind**, never-run, and the unencrypted note only when set up.
 - `tests/system-settings-tabs.test.ts` — six tabs, and `?tab=backup` opens the
   section.
 - Checks: `npm run build`, `npm run lint`, `npm run lint:style`,
@@ -1075,7 +1257,7 @@ the audit rows that existed before, so the comparison is exact.
 
 ### Acceptance criteria
 
-- [x] A backup runs to local and/or S3-compatible storage, with a SHA-256 manifest, encrypted whenever `BACKUP_ENCRYPTION_KEYS` is set *(manual and from cron; the built-in schedule is phase 4)*
+- [x] A backup runs to local and/or S3-compatible storage, with a SHA-256 manifest, encrypted whenever `BACKUP_ENCRYPTION_KEYS` is set *(manually, from cron, and from the built-in schedule)*
 - [x] With no key set, the backup still runs and both the CLI and the admin UI say the archive is unencrypted
 - [x] A destination secret stored in the database is encrypted at rest, never serialized, and overridden by environment credentials
 - [x] A fresh install restores to a working instance from a backup alone — accounts, settings, templates, dynamic price series, invoice PDFs, issued contracts and the audit trail all present and linked, with primary keys preserved
@@ -1083,7 +1265,7 @@ the audit rows that existed before, so the comparison is exact.
 - [x] Both restore modes support `--dry-run` / `dry_run` reporting exactly what would change
 - [x] Restore refuses on schema mismatch, checksum failure, wrong archive `kind`, and (without `force`) on dropping `sent`/`paid` invoices or contract issues
 - [x] An MFA key fingerprint mismatch is reported at preflight, not discovered by a locked-out user
-- [ ] "Last successful backup" is visible to admins and goes stale loudly
+- [x] "Last successful backup" is visible to admins and goes stale loudly
 - [x] The registry coverage tests pass, so a new model or file field cannot silently stop being backed up (this replaces the field-level parity test; see *Deviations*)
 - [x] User-guide chapter written, including a restore drill; the `12-troubleshooting.md` snippet is replaced 
-- [ ] `ROADMAP.md` updated
+- [x] `ROADMAP.md` updated

@@ -3,6 +3,8 @@ import type {
     BackupDestinationInput,
     BackupJob,
     BackupJobInput,
+    BackupSchedule,
+    BackupScheduleInput,
     BackupStatus,
     RestoreJob,
     RestoreJobInput,
@@ -72,4 +74,25 @@ export async function fetchRestoreJob(id: string): Promise<RestoreJob> {
 export async function createRestoreJob(payload: RestoreJobInput): Promise<RestoreJob> {
     const { data } = await api.post<RestoreJob>('/backups/restores/', payload)
     return data
+}
+
+export async function fetchBackupSchedule(): Promise<BackupSchedule> {
+    const { data } = await api.get<BackupSchedule>('/backups/schedule/')
+    return data
+}
+
+export async function updateBackupSchedule(payload: BackupScheduleInput): Promise<BackupSchedule> {
+    const { data } = await api.put<BackupSchedule>('/backups/schedule/', payload)
+    return data
+}
+
+/** Queue a check of the stored file; the result appears on the job. */
+export async function verifyBackupJob(id: string): Promise<BackupJob> {
+    const { data } = await api.post<BackupJob>(`/backups/jobs/${id}/verify/`)
+    return data
+}
+
+/** Delete a backup's file. The row stays, so the history does. */
+export async function deleteBackupArtifact(id: string): Promise<void> {
+    await api.delete(`/backups/jobs/${id}/artifact/`)
 }
