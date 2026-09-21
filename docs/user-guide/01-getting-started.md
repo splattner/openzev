@@ -196,5 +196,5 @@ OpenZEV is built for personal use and self-hosting by tinkerers who enjoy runnin
 Before using in production:
 - Test thoroughly with sample data
 - Verify all calculations match your tariff agreements
-- Set up regular backups of your database
+- Set up regular backups of your database **and** the invoice PDF files — see [Backups](18-backups.md)
 - Review user roles and access controls

@@ -15,6 +15,8 @@ export with just the Tariffs section selected does what that used to do.
 - **Starting a new community from an existing one** — export the tariffs and the
   metering-point layout, import them, then add participants by hand.
 
+**It is not a backup.** For that, see [Backups](18-backups.md).
+
 **It is not a disaster-recovery restore.** An import always creates a *new* ZEV
 with new internal identifiers, so anything referring to the old ones — audit log
 entries, bookmarked links, references held by other systems — does not follow.

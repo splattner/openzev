@@ -33,6 +33,7 @@ Welcome to the OpenZEV user documentation. This guide covers everything you need
 
 - **[Platform Administration](14-admin-console.md)** — ZEV management, accounts, regional settings, VAT, PDF templates, email templates, feature flags — grouped in the sidebar under **Platform**
 - **[ZEV Export and Import](17-zev-transfer.md)** — Move a whole community between instances as an archive
+- **[Backups](18-backups.md)** — Back up the instance or one community to local or S3 storage, encrypted and verifiable
 
 ## Automation
 

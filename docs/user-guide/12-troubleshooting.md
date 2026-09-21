@@ -198,13 +198,19 @@ Common errors:
 
 ### Database backup
 
-To backup PostgreSQL:
+Use the built-in backups: they cover the database **and** the invoice PDF files,
+can be encrypted, and can be verified. See [Backups](18-backups.md).
+
+A plain database dump is still useful as an additional safety net, but **it does
+not include the invoice PDFs**, which are files in the media volume
+(`backend_media`), not database rows. Back that volume up as well, or a restore
+leaves every invoice pointing at a document that is not there.
 
 ```bash
 docker compose exec db pg_dump -U openzev openzev > backup_$(date +%Y%m%d).sql
 ```
 
-To restore:
+To restore a dump:
 
 ```bash
 docker compose exec -T db psql -U openzev openzev < backup_YYYYMMDD.sql

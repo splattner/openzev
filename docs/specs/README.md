@@ -61,6 +61,7 @@ Baseline specs describe the current implementation. They must be kept in sync:
 | AppSettings, VatRate, admin dashboard, PDF template, ZEV config | `2026-03-admin-governance-and-settings.md` |
 | Audit events, scoped visibility, redaction | `2026-05-audit-log-and-operational-traceability.md` |
 | Whole-ZEV export/import archive | `2026-08-zev-transfer-archive.md` |
+| Backups: archive format, encryption, destinations, restore | `2026-09-backup-and-restore.md` |
 | Contract PDF design, shared PDF design base | `2026-08-contract-pdf-redesign.md` |
 | UI design system, shared tokens, print parity, PDF previews | `2026-08-ui-redesign-pdf-style.md` |
 | Navigation regroup, canonical routes, scope-aware shell, workflow hubs | `2026-03-community-and-access.md` |
@@ -118,7 +119,7 @@ when the capability changes; do not treat them as baselines:
 ## Drafts
 
 - `2026-06-leg-billing-model.md` (Draft)
-- `2026-09-backup-and-restore.md` (Draft)
+- `2026-09-backup-and-restore.md` (In Progress — phase 1, taking and verifying backups, implemented)
 - `2026-09-two-factor-authentication.md` (Draft) — TOTP and passkeys; extends the `auth.*` audit
   namespace shipped in 1.15.0. See [#740](https://github.com/splattner/openzev/issues/740).
 

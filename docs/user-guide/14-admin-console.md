@@ -10,7 +10,7 @@ The Platform group has four entries (hubs with tabs-as-routes):
 - **Overview** (`/admin`) — KPIs · ZEVs · All invoices · Dynamic price sources · Platform audit log · System health
 - **Accounts** (`/admin/accounts`) — Users · API keys
 - **Templates** (`/admin/templates`) — PDF templates · Email templates
-- **System Settings** (`/admin/system-settings`) — Regional · Features · OAuth · VAT
+- **System Settings** (`/admin/system-settings`) — Regional · Features · OAuth · Security · VAT · Backup
 
 Legacy routes (`/admin/zevs`, `/admin/invoices`, `/admin/audit-logs`,
 `/admin/api-keys`, `/admin/pdf-templates`, `/admin/email-templates`) redirect
@@ -105,6 +105,8 @@ one.
 
 Regional display settings, feature flags, OAuth providers, and VAT rates are consolidated
 under **Platform → System Settings**.
+
+Backups are configured in **Platform → System Settings → Backup**; see [Backups](18-backups.md).
 
 ### Regional
 

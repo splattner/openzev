@@ -63,9 +63,10 @@ semantics**, sharing the transfer archive's substrate but not its importer.
   on a whole-instance restore, and the restore reconciles database sequences
   afterwards.
 - **Shared substrate, separate runners.** Backup reuses the transfer archive's
-  conventions — ZIP container, `manifest.json` with per-section counts, streaming
-  per-meter reading CSVs, the `MAX_REPORTED_ERRORS` collector — and implements its
-  own writer and restore runners in a new `backups` app. The transfer importer is
+  conventions — ZIP container, `manifest.json` with per-section counts, streamed
+  sections (JSON Lines rather than per-meter CSV, so restore is Django's own
+  deserializer), the `MAX_REPORTED_ERRORS` collector — and implements its own
+  writer and restore runners in a new `backups` app. The transfer importer is
   not extended, subclassed, or parameterised into doing restores.
 - **Two restore modes, deliberately different in kind:**
   - *Instance restore* reproduces the whole instance onto an empty one. It is

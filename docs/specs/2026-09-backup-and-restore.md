@@ -1,7 +1,7 @@
 # Feature Spec: Integrated Backup and Restore
 
 - Spec ID: SPEC-2026-09-backup-and-restore
-- Status: Draft
+- Status: In Progress (phase 1 implemented)
 - Scope: Major
 - Type: Feature
 - Owners: splattner
@@ -13,11 +13,56 @@
 
 ---
 
-> **This spec describes work that has not been implemented.** Field lists,
-> endpoints and test names are the design to build against, not a record of
-> what exists. Test counts are planned counts. Once shipped, this becomes the
-> baseline spec for the `backups` app and is maintained under the rules in
-> [`README.md`](README.md).
+## Implementation status
+
+| Phase | Status | Notes |
+|---|---|---|
+| 1 — back up | **Implemented** | Archive writer, encryption, checksums, destinations, `BackupJob`, `openzev_backup`, `openzev_backup_verify`, admin API and `backup` tab. Sections 4.1, 4.2, 5, 6.1–6.3, 7 and 9 describe what shipped. |
+| 2 — restore the instance | Planned | §6.5. |
+| 3 — restore one ZEV | Planned | §4.3, §6.6. |
+| 4 — operate | Planned | §6.4, retention fields, verify endpoint, staleness. |
+
+Sections describing later phases are the design to build against. **Where phase 1
+differs from the design first written here, this document has been corrected to
+match the code**; the differences and their reasons are listed in
+[Deviations from the first design](#deviations-from-the-first-design).
+
+### Deviations from the first design
+
+Made while implementing phase 1; each is reflected in the sections below.
+
+1. **Sections are JSON Lines written by Django's serializer, not hand-written field
+   lists, and readings are JSON Lines too, not per-meter CSV.** Every concrete
+   column is serialized (`{"model", "pk", "fields"}`), so a new field is backed up the
+   moment it exists and cannot be forgotten, and restore is Django's own
+   `deserialize` — including `Decimal`, UUID, timestamp and binary columns. The
+   guard that mattered moved up a level: a model can still be forgotten, so a
+   coverage test fails when an installed model is neither in a section nor in
+   `EXCLUDED_MODELS` with a reason (and another when a `FileField` is not copied).
+   This replaces `BackupSchemaParityTests` and `FIELDS_EXCLUDED_FROM_BACKUP`.
+2. **`ExportJob` is not backed up** (the first design said its rows travel). Its
+   artifact is deleted after 24 h, so a restored row would point at nothing.
+3. **`django_celery_beat` schedules are not backed up yet.** Settings-defined
+   schedules are recreated by beat itself; the one admin-editable schedule arrives
+   with the scheduler in phase 4, and its restore will be designed then.
+4. **Retention (`retention_count`), expiry (`file_expires_at`, `expired`), the
+   sweep, and the `409` when deleting a used destination are phase 4.** Nothing in
+   phase 1 deletes an archive, so there is nothing to retain or expire, and
+   deleting a destination never touches archives already written.
+5. **Destination changes are audited as `GOVERNANCE`**, not `SYSTEM`, matching
+   OAuth provider changes: repointing a destination decides where the instance's
+   data goes. Backup runs remain `SYSTEM`.
+6. **Every archive carries `zevs/<id>/account_refs.json`.** A ZEV-scoped archive —
+   which is what a pre-restore safety backup is — otherwise has no way to say who
+   a referenced user id was, and per-ZEV restore relinks accounts by natural key.
+7. **Rows with a null ZEV are written to `instance/unscoped_*.jsonl`.**
+   `ContractIssue`, `AuditEvent` and `ImportLog` survive their ZEV's deletion on
+   purpose; without these sections an instance backup would drop them.
+8. **`GET /status/` ships in phase 1**, in the shape of §5, because the admin UI
+   needs to know whether a key is configured before anyone has run a backup.
+9. **The manifest's `members` carry `records` and per-model counts** for JSON Lines
+   members, so verification can check counts without the manifest having to be
+   cross-referenced.
 
 ## 1. Problem and outcome
 
@@ -132,7 +177,6 @@ New app `backups`, added to `INSTALLED_APPS` after `exports`.
 | `access_key_id` | `CharField(128)` | `""` | `s3`; not a secret, stored in clear |
 | `secret_access_key_encrypted` | `BinaryField` | `b""` | `s3`; Fernet ciphertext under `BACKUP_ENCRYPTION_KEYS`. Never serialized |
 | `server_side_encryption` | `CharField(20)` | `AES256` | `s3`; `""` disables, `aws:kms` supported |
-| `retention_count` | `PositiveIntegerField` | `7` | artifacts kept at this destination; `0` = keep all |
 | `created_at` / `updated_at` | `DateTimeField` | auto | |
 
 **Properties and methods**
@@ -157,7 +201,7 @@ New app `backups`, added to `INSTALLED_APPS` after `exports`.
 
 **Serializer:** `BackupDestinationSerializer` — fields: `id`, `name`, `kind`,
 `enabled`, `path`, `bucket`, `prefix`, `region`, `endpoint_url`,
-`access_key_id`, `server_side_encryption`, `retention_count`, `credential_mode`,
+`access_key_id`, `server_side_encryption`, `credential_mode`,
 `has_secret_access_key`, `created_at`, `updated_at`
 (read-only: `id`, `credential_mode`, `has_secret_access_key`, `created_at`,
 `updated_at`). `secret_access_key` is **write-only** and absent from responses;
@@ -188,14 +232,14 @@ New app `backups`, added to `INSTALLED_APPS` after `exports`.
 | `encryption_key_fingerprint` | `CharField(16)` | `""` | first 16 hex of SHA-256 of the active key |
 | `manifest_json` | `JSONField` | `dict` | the manifest, so the UI reports contents without fetching the archive |
 | `error_message` | `CharField(500)` | `""` | user-safe summary only |
-| `file_expires_at` | `DateTimeField` | `null` | set at completion, so later retention changes do not expire existing artifacts |
 
 `Meta.ordering = ["-created_at", "-id"]`; indexes on `("status", "started_at")`
-and `("scope", "created_at")`. `expired` is a computed property, as on
-`ExportJob`.
+and `("scope", "created_at")`. `file_expires_at` and an `expired` property arrive
+with retention in phase 4.
 
-**Serializer:** `BackupJobSerializer` — all fields above plus `expired` and
-`destination_name`, all read-only.
+**Serializer:** `BackupJobSerializer` — all fields above except `destination`,
+`requester` and `trigger`'s display, plus `zev_id`, `zev_name` and
+`destination_name`, all read-only. `requester` is deliberately not exposed.
 
 ### 4.3 `RestoreJob`
 
@@ -230,76 +274,90 @@ Added to `backend/config/settings.py`:
 | `BACKUP_ENCRYPTION_KEYS` | `env.list` | `[]` | Artifact encryption and destination-secret encryption (ADR 0024) |
 | `BACKUP_S3_ACCESS_KEY_ID` | `env` | `""` | Overrides every stored S3 credential |
 | `BACKUP_S3_SECRET_ACCESS_KEY` | `env` | `""` | Overrides every stored S3 credential |
-| `BACKUP_WORK_DIR` | `env` | `tempfile.gettempdir()` | Where archives are assembled. Must have room for a full archive |
+| `BACKUP_WORK_DIR` | `env` | `""` (the system temp directory) | Where archives are assembled. Must have room for one full archive, and for a second copy while encrypting (the plaintext is deleted before the upload) |
 | `BACKUP_RUNNER_TIMEOUT_S` | `env.int` | `10800` | Soft limit; hard limit a grace above, as `EXPORT_RUNNER_TIMEOUT_S` |
-| `BACKUP_LOCAL_RETENTION_DAYS` | `env.int` | `30` | Retention for artifacts staged in `MEDIA_ROOT` awaiting upload |
+| `OPENZEV_VERSION` | `env` | `""` | Release version recorded in manifests for humans; compatibility is decided by the migration state, so leaving it unset is fine |
 
 ## 5. API contracts
 
 Registered as `path("api/v1/backups/", include("backups.urls"))` in
-`config/urls.py`. Every endpoint is `[IsAuthenticated, IsAdmin]`.
+`config/urls.py`. Every endpoint is `[IsAdmin]` (`accounts.permissions.IsAdmin`).
+
+Phase 1:
 
 | Endpoint | Method | Behaviour |
 |---|---|---|
-| `/api/v1/backups/destinations/` | GET | List destinations, `name` ascending |
-| `/api/v1/backups/destinations/` | POST | Create. 400 on `clean()` failure — including "a secret cannot be stored without `BACKUP_ENCRYPTION_KEYS`" and "path resolves inside MEDIA_ROOT" |
-| `/api/v1/backups/destinations/{id}/` | PATCH | Update. An absent `secret_access_key` leaves the stored one intact; `""` clears it |
-| `/api/v1/backups/destinations/{id}/` | DELETE | 409 when a `BackupJob` still references it and its artifact has not expired |
-| `/api/v1/backups/destinations/{id}/test/` | POST | Writes and deletes a small probe object. `{"ok": true}` or 400 `{"detail"}` with a safe message. Never echoes credentials |
-| `/api/v1/backups/jobs/` | GET | Newest first. Filters: `?scope=`, `?status=`, `?limit=` (≤100) |
-| `/api/v1/backups/jobs/` | POST | `{scope, zev_id?, destination_id}` → 202 with the job. Persist, then enqueue after commit. A failed enqueue marks the job `failed` and returns 503 — never a 202 for a job that will not run (ADR 0017) |
+| `/api/v1/backups/destinations/` | GET | Destinations by `name`, in the project's standard `PageNumberPagination` envelope (the frontend reads it with `fetchAllPages`) |
+| `/api/v1/backups/destinations/` | POST | Create. 400 with per-field errors from `clean()` — including "a secret cannot be stored without `BACKUP_ENCRYPTION_KEYS`" and "path resolves inside MEDIA_ROOT". Audited `backup_destination.create` (GOVERNANCE) |
+| `/api/v1/backups/destinations/{id}/` | GET, PATCH | An absent `secret_access_key` leaves the stored one intact; `""` clears it. Audited `backup_destination.update` with a diff over the tracked fields (never the secret) and `secret_changed` in metadata |
+| `/api/v1/backups/destinations/{id}/` | DELETE | 204. Existing archives are not touched and jobs keep their recorded location. Audited `backup_destination.delete` |
+| `/api/v1/backups/destinations/{id}/test/` | POST | Writes and deletes a small probe object. `{"ok": true}` or 400 `{"detail"}` with a safe message; never echoes credentials or a raw provider response |
+| `/api/v1/backups/jobs/` | GET | Newest first, a plain list. Filters `?scope=`, `?status=`, `?limit=` (1–100, default 25) |
+| `/api/v1/backups/jobs/` | POST | `{scope, zev_id?, destination_id}` → 202 with the job. Persist, then enqueue on commit; a failed enqueue marks the job `failed` and returns 503 — never a 202 for a job that will not run (ADR 0017). 400 for an unknown or disabled destination, a `zev` scope without a ZEV, an `instance` scope with one, or an unknown ZEV |
 | `/api/v1/backups/jobs/{id}/` | GET | Status, for polling |
-| `/api/v1/backups/jobs/{id}/download/` | GET | `FileResponse` for a `local` destination whose artifact has not expired; 409 for `s3` (fetch it from the bucket) and 410 when expired |
-| `/api/v1/backups/jobs/{id}/verify/` | POST | Streams the artifact, decrypts if needed, checks every manifest checksum and count. 200 `{"ok": true, "members": n}` or 400 `{"detail", "failures": [...]}`. Creates nothing |
-| `/api/v1/backups/restores/` | POST | `{source_backup_id, target_zev_id, dry_run, force}` → 202. `mode` is forced to `zev`; a request naming `instance` is 400 with "Whole-instance restore is only available as a management command." |
-| `/api/v1/backups/restores/{id}/` | GET | Status and `plan_json` |
-| `/api/v1/backups/status/` | GET | `{last_successful: BackupJob \| null, last_failed: BackupJob \| null, age_hours: number \| null, stale: boolean, encrypted: boolean, destinations_enabled: number}` — feeds the health card |
+| `/api/v1/backups/jobs/{id}/download/` | GET | `FileResponse` for a completed job in a **local** destination. 409 when there is no artifact or the archive is in S3 (fetch it from the bucket); 410 when the file, or its destination, no longer exists, or when the recorded location does not resolve inside the destination's directory |
+| `/api/v1/backups/status/` | GET | `{encrypted, encryption_key_fingerprint, encryption_key_problem, environment_credentials, destinations_enabled, last_successful, last_failed, age_hours}`. `encrypted` is whether a *usable key is configured*; a configured-but-unusable key sets `encryption_key_problem` instead, so it is not read as "no key". Key value never appears |
 
-`stale` is `age_hours > 2 × the configured schedule interval`, or `true` when a
-schedule exists and no backup has ever succeeded.
+Later phases:
+
+| Endpoint | Method | Phase | Behaviour |
+|---|---|---|---|
+| `/api/v1/backups/jobs/{id}/verify/` | POST | 4 | Streams the artifact, decrypts if needed, checks every manifest checksum and count. 200 `{"ok": true, "members": n}` or 400 `{"detail", "failures": [...]}`. Creates nothing (the CLI `openzev_backup_verify` ships in phase 1) |
+| `/api/v1/backups/restores/` | POST | 3 | `{source_backup_id, target_zev_id, dry_run, force}` → 202. `mode` is forced to `zev`; a request naming `instance` is 400 with "Whole-instance restore is only available as a management command." |
+| `/api/v1/backups/restores/{id}/` | GET | 3 | Status and `plan_json` |
+
+`status` gains `stale` in phase 4: `age_hours > 2 × the configured schedule
+interval`, or `true` when a schedule exists and no backup has ever succeeded.
 
 ## 6. Async and integration behavior
 
 ### 6.1 Archive format
 
 `kind: "backup"`, `format_version: 1`, independent of the transfer archive's
-version sequence (ADR 0023). ZIP container:
+version sequence (ADR 0023). A ZIP of JSON Lines sections
+(`backend/backups/archive.py`):
 
 ```
 manifest.json
-instance/
-  accounts.json            User, ApiKey, TotpDevice, MfaRecoveryCode,
-                           WebAuthnCredential, SocialAccount
-  app_settings.json        AppSettings (singleton), FeatureFlag, VatRate
-  oauth_providers.json     OAuthProvider
-  templates.json           PdfTemplate, EmailTemplate
-  dynamic_sources.json     DynamicTariffSource
-  dynamic_prices/<source_id>.csv    DynamicPricePoint, streamed
-  periodic_tasks.json      django_celery_beat schedules
-zevs/<zev_uuid>/
-  zev.json                 Zev (single object)
-  participants.json        Participant + ParticipantOnboardingToken
-  metering_points.json     MeteringPoint with nested assignments
-  tariffs.json             Tariff with nested TariffPeriod
-  invoices.json            Invoice + items + dynamic evidence
-  contract_issues.json     ContractIssue, pdf base64-encoded
-  email_logs.json          EmailLog
-  import_logs.json         ImportLog
-  invoice_access_tokens.json
-  audit_events.json        AuditEvent for this ZEV
-  readings/<meter>-<digest>.csv     MeterReading, streamed, one file per meter
-  media/invoices/pdf/<filename>     the actual PDF bytes
+instance/<section>.jsonl           app_settings, oauth_providers, templates,
+                                   dynamic_sources, dynamic_prices, accounts
+instance/unscoped_*.jsonl          audit_events, contract_issues, import_logs
+                                   whose ZEV is null
+zevs/<zev id>/<section>.jsonl      zev, participants, metering_points, tariffs,
+                                   readings, import_logs, invoices,
+                                   contract_issues, audit_events
+zevs/<zev id>/account_refs.json    {"users": [{"id", "username", "email"}]}
+zevs/<zev id>/media/<name>         that community's invoice PDFs
 ```
 
-Reading member names reuse the transfer archive's collision-safe scheme:
-`<sanitised meter id>-<sha1(meter_id)[:8]>.csv`, with anything outside
-`[A-Za-z0-9_.-]` replaced by `_`. The digest is what keeps `A/B` and `A_B` in
-separate members.
+The section → model mapping is `backend/backups/registry.py` (`INSTANCE_SECTIONS`,
+`UNSCOPED_SECTIONS`, `ZEV_SECTIONS`, each `ZevPart` naming its ORM lookup to the
+ZEV and its write order). Section order is a correctness constraint for restore:
+parents before the rows that point at them.
 
-**Key preservation.** Every JSON row carries its real primary key under `"id"`,
-and every foreign key is written as the referenced row's real key. This is the
-central difference from the transfer schema, which omits ids precisely so the
-importer can mint new ones.
+**Every line is Django's own serialization of one row** —
+`{"model": "zev.participant", "pk": "<uuid>", "fields": {...}}` — written with
+`serializers.serialize("jsonl", ...)` and an explicit `fields=` list of every
+concrete column (`_serialized_fields`). Primary keys and foreign keys are the real
+values. This is the property that separates a backup from a transfer archive. Many
+to many fields (`User.groups`, `User.user_permissions`) are deliberately not
+serialized: nothing in the application uses them and their target ids are not
+stable across instances. `BinaryField`s (`ContractIssue.pdf`,
+`TotpDevice.secret_encrypted`) travel base64-encoded inside the row.
+
+Sections stream through `QuerySet.iterator(chunk_size=2000)` into a compressing
+zip member (`force_zip64=True`, since the size is unknown when the header is
+written); a `_HashingWriter` digests and counts bytes as they pass. Nothing holds a
+whole section in memory.
+
+**Media.** For each `MEDIA_FIELDS` entry — today `invoices.Invoice.pdf_file` — the
+file is copied from `default_storage` into the ZEV's `media/` directory under its
+storage name. A name that is absolute or contains `..` is refused (it is read from
+the database, and an archive member must not be able to name a place outside its
+own directory); a file the database references but storage no longer has is
+recorded, not fatal — refusing to back up because an old PDF is already gone would
+make the instance's other data less safe. A file named by two rows is stored once.
+Both cases appear in the ZEV's `media` summary in the manifest.
 
 **`manifest.json`:**
 
@@ -307,86 +365,124 @@ importer can mint new ones.
 {
   "kind": "backup",
   "format_version": 1,
-  "created_at": "2026-09-21T04:12:00+02:00",
+  "created_at": "2026-09-21T14:24:49+02:00",
   "instance_name": "openzev-prod",
   "openzev_version": "1.16.0",
   "scope": "instance",
+  "zev_id": null,
   "migrations": {"zev": ["0001_initial", "..."], "invoices": ["..."]},
-  "sections": ["instance/accounts", "zevs/<uuid>/invoices", "..."],
-  "counts": {"instance/accounts": 42, "zevs/<uuid>/readings": 1051200},
-  "members": {"instance/accounts.json": {"sha256": "…", "bytes": 18422}},
-  "zevs": [{"id": "…", "name": "Sonnenhof", "counts": {"invoices": 96}}],
+  "counts": {"instance/accounts": 42, "zevs/<id>/readings": 1051200},
+  "members": {
+    "instance/accounts.jsonl": {"sha256": "…", "bytes": 18422, "records": 42,
+                                "models": {"accounts.User": 3, "accounts.ApiKey": 1}},
+    "zevs/<id>/media/invoices/pdf/a.pdf": {"sha256": "…", "bytes": 91230}
+  },
+  "zevs": [{"id": "…", "name": "Sonnenhof",
+            "counts": {"invoices": 96},
+            "media": {"files": 96, "bytes": 8765432, "missing": [], "unsafe": []}}],
   "encryption": {"algorithm": "AES-256-GCM", "key_fingerprint": "a1b2c3d4e5f60718"},
-  "secret_fingerprints": {
-    "mfa_encryption_keys": ["9f8e7d6c5b4a3928"],
-    "secret_key": "1122334455667788"
-  }
+  "secret_fingerprints": {"mfa_encryption_keys": ["9f8e7d6c5b4a3928"], "secret_key": "1122334455667788"}
 }
 ```
 
-`migrations` is the authoritative compatibility signal — `openzev_version` is
-informational and may be empty, since the release version is not currently
-available to the backend at runtime.
+`openzev_version` comes from the optional `OPENZEV_VERSION` setting and is
+informational and may be empty. `migrations` is the authoritative compatibility
+signal. `encryption` records the fingerprint the caller *will* encrypt under: the
+envelope wraps the finished ZIP, so the manifest inside cannot learn it afterwards.
+The manifest is written last so `counts` and `members` are what was actually
+produced.
 
-**Excluded by design** (short-lived; restoring them is worse than not):
-`EmailVerificationToken`, `MagicLinkToken`, `OAuthState`, `OAuthExchangeCode`,
-Django sessions, Celery broker state, and `ExportJob` artifacts (the rows travel,
-the files do not).
+**Excluded by design** (`EXCLUDED_MODELS`, each with a reason): the short-lived
+`EmailVerificationToken`, `MagicLinkToken`, `OAuthState`, `OAuthExchangeCode`;
+`exports.ExportJob` (its artifact expires after a day) and the `backups` models
+themselves; `django_celery_beat` scheduler state; and framework tables
+(`admin.LogEntry`, `auth.Permission`, `auth.Group`, `contenttypes.ContentType`,
+`sessions.Session`).
 
-**Schema parity.** `BackupSchemaParityTests` asserts each section's field list
-equals its model's concrete fields minus an explicit
-`FIELDS_EXCLUDED_FROM_BACKUP` set, the same guard
-`SchemaParityTests` provides for the transfer archive. Without it, a new model
-field silently stops being backed up.
+**Completeness is enforced by tests, not by field lists.** `CoverageTests` fail
+when an installed model is neither backed up nor excluded with a reason, when a
+listed model no longer exists, when a model is both, when a backed-up model gains
+a `FileField` that is not in `MEDIA_FIELDS`, and when a ZEV lookup does not resolve.
+
+**Verification (`verify_archive`).** Opens the archive (decrypting to a temporary
+file first when it is encrypted), then checks that every manifest member exists
+with the recorded SHA-256 and size, that every JSON Lines member holds the recorded
+number of records, that `counts` agrees with the members, and that nothing is
+present that the manifest does not vouch for. Failures are collected (first
+`MAX_REPORTED_ERRORS` = 50, true total counted alongside) and raised as
+`ArchiveError`. `read_manifest` structurally validates the manifest first and
+refuses a transfer archive by `kind`, naming where transfer archives belong.
 
 ### 6.2 Encryption envelope
 
-Applied to the assembled ZIP as a whole stream, so manifest checksums describe
-plaintext members (ADR 0024).
+Implemented in `backend/backups/crypto.py`; applied to the assembled ZIP as a
+stream, so manifest checksums describe plaintext members (ADR 0024).
 
 ```
-"OZBK1"                       5-byte magic
-<uint32 header length><header JSON>
-  {"algorithm": "AES-256-GCM", "key_fingerprint": "...",
-   "chunk_size": 1048576, "nonce_prefix": "<8 hex bytes>"}
-<chunk>*                      each: <uint32 length><ciphertext><16-byte tag>
+b"OZBK1"                            5-byte magic
+<uint32 header length><header>      JSON: algorithm, key_fingerprint,
+                                    chunk_size, nonce_prefix (4 random bytes, hex)
+(<uint32 length><ciphertext+tag>)*  one per chunk, 1 MiB by default
 ```
 
-- The AES key is `HKDF-SHA256(raw_key, info=b"openzev-backup-archive-v1")`, giving
-  domain separation from the same key's Fernet use for destination secrets.
-- Nonce per chunk = 4-byte random prefix ‖ 8-byte big-endian counter, so nonces
-  are unique within an archive.
-- Each chunk's AAD includes its counter and a final-chunk flag, so reordering or
-  truncation fails authentication rather than yielding a short archive.
-- Decryption tries each configured key whose fingerprint matches, then fails with
-  a message naming the fingerprint the archive needs.
+- A key is any string of at least 32 characters (`MIN_KEY_LENGTH`); shorter is
+  `BackupKeyRejected`. The AES key is `HKDF-SHA256(key, info=b"openzev-backup-archive-v1")`.
+  Destination secrets use Fernet over a key derived with a *different* HKDF `info`
+  (`openzev-backup-destination-secret-v1`), so one configured string cannot produce
+  the same key for both purposes.
+- Nonce per chunk = 4-byte random prefix ‖ 8-byte big-endian counter.
+- Each chunk's associated data is `sha256(header) ‖ counter ‖ final-flag`. Editing
+  the header, reordering chunks, or dropping the last chunk therefore fails
+  authentication rather than yielding a shorter archive. The encryptor reads one
+  chunk ahead so the last non-empty chunk is marked final; an empty source still
+  yields one empty final chunk.
+- The decryptor bounds every read (`header ≤ 64 KiB`, `ciphertext ≤ chunk_size + 16`,
+  `chunk_size ≤ 64 MiB`) so a hostile header cannot demand unbounded memory.
+- Decryption selects the configured key whose fingerprint matches; none matching is
+  `BackupKeyMissing`, whose message names the fingerprint the archive needs.
 
-### 6.3 Backup runner — `backups.tasks.run_backup_job`
+### 6.3 Backup runner — `backups.tasks`
 
-Soft time limit `BACKUP_RUNNER_TIMEOUT_S`, hard limit a 900 s grace above, matching
-`exports.tasks.run_export_job`.
+`execute_backup_job(job_id, *, source, destination=None)` does the work and is
+called by the Celery task `run_backup_job` (soft time limit
+`BACKUP_RUNNER_TIMEOUT_S`, hard limit a 900 s grace above, as for exports) and
+directly by `manage.py openzev_backup`, which must work with no broker.
 
-1. Claim the job (`status=running`, `started_at`), audit `backup.started`.
-2. Open `transaction.atomic(durable=True)` and, on PostgreSQL, `SET TRANSACTION
-   ISOLATION LEVEL REPEATABLE READ` — the transfer exporter's reasoning applies
-   unchanged: sections are read over minutes, and READ COMMITTED would produce an
-   archive of a state that never existed.
-3. Write members into a `NamedTemporaryFile` in `BACKUP_WORK_DIR`, hashing each
-   member as it is written. **Never into memory** — `ExportResult.payload: bytes`
-   is exactly what this must not copy.
-4. Stream readings and dynamic prices with `queryset.iterator()`, chunked.
-5. Write `manifest.json` last, with the counts actually produced.
-6. Encrypt to a second temp file when a key is configured.
-7. Upload: `shutil.move` for `local`; `boto3` `upload_file` for `s3` (multipart is
-   automatic above the threshold), with `ServerSideEncryption` when configured.
-8. Record `archive_*`, `manifest_json`, `encrypted`, `encryption_key_fingerprint`,
-   `file_expires_at`; `status=completed`; audit `backup.completed` with counts.
-9. On `SoftTimeLimitExceeded` or any exception: `status=failed`, a user-safe
-   `error_message`, audit `backup.failed`, the detail to the log. Temp files are
-   removed in a `finally`.
+1. **Claim** with a single `UPDATE … WHERE status='queued'`; a lost claim returns
+   `None` (duplicate delivery runs the job once). Audit `backup.started`.
+2. Resolve the destination (`destination` override, then the job's) and the active
+   key fingerprint.
+3. In a `TemporaryDirectory(dir=BACKUP_WORK_DIR)`, call
+   `archive.build_archive` into a file — **never a buffer**. It runs in one
+   `atomic(durable=True)` block, with `SET TRANSACTION ISOLATION LEVEL REPEATABLE
+   READ` on PostgreSQL: sections are read over minutes, and READ COMMITTED would
+   produce an archive of a state that never existed. `durable=True` makes it the
+   outermost transaction, so called inside another it fails loudly.
+4. When a key is set, encrypt to a second file and delete the plaintext (the
+   peak-disk moment), then digest the stored file (SHA-256 and size).
+5. `storage.store_archive` — local: copy to a `.partial` name, `chmod 0600`, atomic
+   rename; S3: boto3 `upload_file` (multipart above 64 MiB) with the configured
+   `ServerSideEncryption`. The archive name is
+   `openzev-backup-<label>-<YYYYMMDD-HHMMSS>-<job id[:8]>.zip[.enc]`.
+6. **Publish** with an `UPDATE … WHERE status='running'`: a job someone already
+   failed is not resurrected by a late completion. Audit `backup.completed` with
+   counts, size, destination, location and whether it was encrypted — never
+   contents.
+7. **Failure.** `SoftTimeLimitExceeded` → `failed` with a time-limit message, then
+   re-raised. `DestinationError` and `BackupCryptoError` carry messages written to
+   be shown and are stored as the row's `error_message`. Anything else stores a
+   generic message and logs the traceback — the detail never reaches the row or the
+   audit log. The temporary directory is removed on every path.
 
-Audit is best-effort via the `_audit_best_effort` pattern — a failed audit write
-must never turn a completed backup into an error.
+Audit is best-effort (`_audit_best_effort`): a failed audit write neither fails a
+completed backup nor masks the exception a failed one is about to raise.
+
+**CLI.** `openzev_backup (--destination NAME | --path DIR) [--zev ID|NAME]`
+creates a `BackupJob`, runs it in-process with `source=MANAGEMENT_COMMAND`, prints
+the location, size, SHA-256 and encryption status, warns on standard error before
+starting when no key is set, and exits non-zero (`CommandError`) on failure with the
+row's safe message. `--path` writes to an ad-hoc local directory with no saved
+destination. `openzev_backup_verify FILE` runs `verify_archive`.
 
 ### 6.4 Scheduling and retention
 
@@ -493,36 +589,42 @@ The destructive one. Rules, in the order they are enforced:
 
 **File:** `frontend/src/pages/AdminSystemSettingsPage.tsx`
 
-- `SystemSettingsTab` becomes
-  `'regional' | 'features' | 'oauth' | 'security' | 'vat' | 'backup'`, appended to
-  `TAB_ORDER`; `?tab=backup` selects it.
-- The panel delegates to three sections, as `vat` delegates to
-  `VatSettingsSection`.
+`SystemSettingsTab` is
+`'regional' | 'features' | 'oauth' | 'security' | 'vat' | 'backup'`, appended to
+`TAB_ORDER`; `?tab=backup` selects it. The panel renders `BackupSettingsSection`,
+as `vat` renders `VatSettingsSection`. The route is already behind
+`ProtectedRoute allowedRoles={['admin']}`.
 
-### 7.2 Sections
+### 7.2 Components (phase 1)
 
-| Component | File | Contents |
-|---|---|---|
-| `BackupDestinationsSection` | `frontend/src/features/backups/BackupDestinationsSection.tsx` | Destination table (name, kind, target, credential mode, encrypted, retention), create/edit modal, **Test** button. The secret field is blank on edit and only sent when filled, mirroring the OAuth provider form |
-| `BackupScheduleSection` | `frontend/src/features/backups/BackupScheduleSection.tsx` | Enable/disable, crontab fields, next run time, destination selection |
-| `BackupJobsSection` | `frontend/src/features/backups/BackupJobsSection.tsx` | **Back up now**, `DataTable` of jobs (created, scope, destination, status, size, encrypted, expiry), per-row Download / Verify / **Restore a community** |
-| `ZevRestoreModal` | `frontend/src/features/backups/ZevRestoreModal.tsx` | Two-step: (1) pick the ZEV from `manifest_json.zevs`, submit `dry_run: true`, render the returned plan as an impact table with conflicts highlighted; (2) typed confirmation of the ZEV name, then `dry_run: false`. `force` is a separate checkbox, disabled until the plan reports a conflict |
+All under `frontend/src/features/backups/`.
 
-An **unencrypted** destination is rendered with a warning badge, not a neutral
-label (ADR 0024).
+| Component | Contents |
+|---|---|
+| `BackupSettingsSection` | Composes the tab. An intro; the **encryption banner** — `error-banner` when `encryption_key_problem` is set, `warning-banner` when no key is configured, `info-banner` (with the key fingerprint) when one is; a note that restore is not available in the app yet; `StatCard`s for last successful / last failed backup and enabled destinations |
+| `BackupDestinationsSection` | Destination table (name, type, target, credential mode, status) with **Test**, **Edit**, **Delete** (`ConfirmDialog`), and a `FormModal` form. The secret input is disabled, with the reason, when no encryption key is configured; blank on edit; a "remove the stored secret" switch appears only when one is stored; an info banner notes when environment credentials override the form. Kind is fixed on edit |
+| `BackupJobsSection` | **Back up now** (scope, community, destination) and the job table with status and encryption badges, **Details** (completed) and **Download** (completed, local archives only). Polls every 3 s only while a job is queued or running, and refreshes the status query when work finishes |
+| `BackupJobDetailsModal` | Archive name, location, size, SHA-256, encryption, timestamps, record count, per-community table, a warning when invoice PDFs were missing from storage, and a note when the archive is in object storage |
+| `backupHelpers.ts` | Pure logic: `buildDestinationPayload`, `destinationTarget`, `readManifest`, `hasActiveJob`, `isDownloadable`, … |
 
-### 7.3 Health card
+`buildDestinationPayload` follows the API's secret contract: absent leaves a stored
+secret alone, a typed value replaces it, `''` clears it (only on the explicit
+switch, or when an S3 destination is switched to local). Fields belonging to the
+other kind are sent empty.
 
-**File:** `frontend/src/pages/AdminSystemHealthPanel.tsx` — a "Last successful
-backup" card reading `/api/v1/backups/status/`: relative age, destination, and a
-warning state when `stale` or when no backup has ever succeeded.
+Later phases add the schedule editor (4), the health-panel card (4), and
+`ZevRestoreModal` (3): a two-step dialog that submits `dry_run: true`, renders the
+returned plan with conflicts highlighted, then requires the community name typed
+back before `dry_run: false`, with `force` disabled until the plan reports a
+conflict.
 
-### 7.4 TypeScript types
+### 7.3 TypeScript types
 
 **File:** `frontend/src/types/api.ts`
 
 ```typescript
 export type BackupDestinationKind = 'local' | 's3'
+/** Where an S3 destination's credentials come from, in order of precedence. */
 export type BackupCredentialMode = 'environment' | 'stored' | 'instance_role'
 export type BackupJobScope = 'instance' | 'zev'
 export type BackupJobTrigger = 'manual' | 'scheduled' | 'pre_restore'
@@ -539,8 +641,8 @@ export interface BackupDestination {
     region: string
     endpoint_url: string
     access_key_id: string
+    /** `''` disables server-side encryption for stores that lack it. */
     server_side_encryption: string
-    retention_count: number
     credential_mode: BackupCredentialMode
     /** The secret is never returned; this reports whether one is stored. */
     has_secret_access_key: boolean
@@ -548,33 +650,34 @@ export interface BackupDestination {
     updated_at: string
 }
 
-export interface BackupJob {
-    id: string
-    scope: BackupJobScope
-    zev_id: string | null
-    trigger: BackupJobTrigger
-    destination_id: string | null
-    destination_name: string
-    status: BackupJobStatus
-    created_at: string
-    started_at: string | null
-    completed_at: string | null
-    archive_name: string
-    archive_location: string
-    archive_bytes: number | null
-    archive_sha256: string
-    encrypted: boolean
-    encryption_key_fingerprint: string
-    manifest_json: BackupManifest | Record<string, never>
-    error_message: string
-    file_expires_at: string | null
-    expired: boolean
+export interface BackupDestinationInput {
+    name: string
+    kind: BackupDestinationKind
+    enabled: boolean
+    path: string
+    bucket: string
+    prefix: string
+    region: string
+    endpoint_url: string
+    access_key_id: string
+    server_side_encryption: string
+    /** Absent leaves a stored secret untouched; `''` clears it. */
+    secret_access_key?: string
+}
+
+export interface BackupManifestMedia {
+    files: number
+    bytes: number
+    /** Referenced by the database but absent from storage, so not in the archive. */
+    missing: string[]
+    unsafe: string[]
 }
 
 export interface BackupManifestZev {
     id: string
     name: string
     counts: Record<string, number>
+    media: BackupManifestMedia
 }
 
 export interface BackupManifest {
@@ -584,73 +687,73 @@ export interface BackupManifest {
     instance_name: string
     openzev_version: string
     scope: BackupJobScope
+    zev_id: string | null
     counts: Record<string, number>
     zevs: BackupManifestZev[]
     encryption: { algorithm: string; key_fingerprint: string } | null
 }
 
-export interface RestorePlanSection {
-    create: number
-    replace: number
-    delete: number
-}
-
-export interface RestorePlanConflict {
-    kind: string
-    detail: string
-}
-
-export interface RestoreJob {
+export interface BackupJob {
     id: string
-    mode: BackupJobScope
-    target_zev_id: string | null
-    target_zev_name: string
-    source_backup_id: string | null
-    dry_run: boolean
-    force: boolean
+    scope: BackupJobScope
+    zev_id: string | null
+    zev_name: string
+    trigger: BackupJobTrigger
+    destination_id: string | null
+    destination_name: string
     status: BackupJobStatus
-    plan_json: {
-        zev?: { id: string; name: string; exists_now: boolean }
-        sections?: Record<string, RestorePlanSection>
-        accounts?: { relink: number; missing: string[] }
-        conflicts?: RestorePlanConflict[]
-        safety_backup_id?: string
-    }
-    safety_backup_id: string | null
     created_at: string
     started_at: string | null
     completed_at: string | null
+    archive_name: string
+    /** An absolute path, or `s3://bucket/key`. */
+    archive_location: string
+    archive_bytes: number | null
+    archive_sha256: string
+    encrypted: boolean
+    encryption_key_fingerprint: string
+    /** Empty until the job completes. */
+    manifest_json: BackupManifest | Record<string, never>
     error_message: string
 }
 
+export interface BackupJobInput {
+    scope: BackupJobScope
+    zev_id?: string
+    destination_id: string
+}
+
 export interface BackupStatus {
+    /** Whether a usable encryption key is configured (not whether the last archive used it). */
+    encrypted: boolean
+    encryption_key_fingerprint: string
+    /** Set when a key is configured but unusable, so it is not mistaken for "no key". */
+    encryption_key_problem: string
+    /** S3 credentials come from the server environment and override any stored ones. */
+    environment_credentials: boolean
+    destinations_enabled: number
     last_successful: BackupJob | null
     last_failed: BackupJob | null
     age_hours: number | null
-    stale: boolean
-    encrypted: boolean
-    destinations_enabled: number
 }
 ```
 
-### 7.5 API client and query keys
+Restore types (`RestoreJob`, `RestorePlan…`) arrive with phase 3.
+
+### 7.4 API client and query keys
 
 **File:** `frontend/src/lib/api/backups.ts`
 
 | Function | Method | Endpoint |
 |---|---|---|
-| `fetchBackupDestinations()` | GET | `/backups/destinations/` |
+| `fetchBackupDestinations()` | GET (all pages) | `/backups/destinations/` |
 | `createBackupDestination(input)` | POST | `/backups/destinations/` |
 | `updateBackupDestination(id, input)` | PATCH | `/backups/destinations/{id}/` |
 | `deleteBackupDestination(id)` | DELETE | `/backups/destinations/{id}/` |
 | `testBackupDestination(id)` | POST | `/backups/destinations/{id}/test/` |
-| `fetchBackupJobs(params?)` | GET | `/backups/jobs/` |
+| `fetchBackupJobs()` | GET | `/backups/jobs/` |
 | `createBackupJob(input)` | POST | `/backups/jobs/` |
-| `fetchBackupJob(id)` | GET | `/backups/jobs/{id}/` |
-| `downloadBackupArtifact(id)` | GET | `/backups/jobs/{id}/download/` (blob) |
-| `verifyBackupArtifact(id)` | POST | `/backups/jobs/{id}/verify/` |
-| `createRestoreJob(input)` | POST | `/backups/restores/` |
-| `fetchRestoreJob(id)` | GET | `/backups/restores/{id}/` |
+| `downloadBackupArtifact(id)` | GET (blob) | `/backups/jobs/{id}/download/` |
 | `fetchBackupStatus()` | GET | `/backups/status/` |
 
 **File:** `frontend/src/lib/api/queryKeys.ts`
@@ -658,23 +761,16 @@ export interface BackupStatus {
 ```typescript
 backups: {
     destinations: () => ['backups', 'destinations'] as const,
-    jobs: (scope?: string, status?: string) =>
-        ['backups', 'jobs', scope ?? 'all', status ?? 'all'] as const,
-    job: (id: string) => ['backups', 'job', id] as const,
-    restore: (id: string) => ['backups', 'restore', id] as const,
+    jobs: () => ['backups', 'jobs'] as const,
     status: () => ['backups', 'status'] as const,
 },
 ```
 
-Running or queued jobs poll their detail key; completing invalidates
-`backups.jobs()` and `backups.status()`.
+### 7.5 i18n
 
-### 7.6 i18n
-
-All strings under `pages.backups.*` in
-`frontend/src/i18n/locales/{de,en,fr,it}.ts`. No hardcoded user-facing text.
-The confirmation copy must name the community and state that current data will be
-replaced.
+All strings under `pages.backups.*` (plus `adminSystemSettings.tabs.backup.label`) in
+`frontend/src/i18n/locales/{de,en,fr,it}.ts`; no hardcoded user-facing text. Command
+names are passed as a `{{command}}` placeholder so they are never translated.
 
 ## 8. Risks and mitigations
 
@@ -689,113 +785,62 @@ replaced.
 | Scale — millions of readings, multi-GB archives | High | Temp-file assembly, `iterator()` streaming, multipart upload; never `bytes` in memory |
 | A long repeatable-read snapshot pins a connection and delays vacuum | Medium | Already flagged for the transfer exporter at the 2M-row scale; the backup runs off-request on a worker, and the schedule should target quiet hours |
 | Corrupt or truncated archive passes as valid | Medium | Per-member SHA-256 in the manifest — ZIP CRC32 alone is too weak for an artifact that crosses a network and sits in a bucket for months — plus authenticated chunk ordering and a final-chunk flag |
-| A model field is added and silently stops being backed up | Medium | `BackupSchemaParityTests`, mirroring the transfer archive's guard |
+| A model is added, or a model gains a file field, and silently stops being backed up | Medium | Fields cannot be forgotten (every concrete column is serialized). Whole models and file fields can, so `CoverageTests` fail until each is backed up or excluded with a reason |
 | Restoring a backup restores a credential set — an attacker who plants one gains accounts | Critical | Instance restore is CLI-only (host access required); per-ZEV restore never touches accounts; every restore is audited |
 | Sequence collision after an instance restore | Medium | Explicit sequence reconciliation for every integer-keyed model (§6.5 step 6), asserted by test |
 
 ## 9. Test plan
 
-### Backend — `backend/backups/`
+### Backend — `backend/backups/` (212 tests, phase 1)
 
-**`test_destinations.py` — `BackupDestinationTests`** (planned, 12):
+| Module | Tests | Covers |
+|---|---|---|
+| `test_crypto.py` | 22 | Envelope round trip (multi-chunk, exact multiple, empty); **truncation, reordered chunk, flipped bit and edited header each fail authentication**; wrong key names the required fingerprint; rotation; short-key rejection; domain separation between archive and secret keys; destination-secret round trip and rotation |
+| `test_archive.py` | 53 | `ArchiveShapeTests` — manifest, every section present, every line a serialized row, **primary keys preserved** (UUID and integer), FKs are real keys, a ZEV holds only its own rows, PDFs travel byte-exact under their own ZEV, contract PDFs base64 in-row, **rows whose ZEV was deleted are in the instance scope**, account refs, credentials travel, M2M excluded, no row of an excluded model, counts match rows, **no key material in the archive**. `ZevScopeTests`. `MediaTests` — missing PDF recorded not fatal, `..` and absolute names refused, a shared file stored once. `CoverageTests` — the registry closure. `DurabilityTests`. `VerifyTests` — tampered member, missing member, injected member, disagreeing count, **transfer archive refused by kind**, unknown version, malformed manifest, not a zip, failure cap. `EncryptedArchiveTests`. `RoundTripTests` — deserializing the sections reproduces the rows with their keys |
+| `test_destinations.py` | 42 | Local and S3 validation (**path inside `MEDIA_ROOT` refused**, `..` resolved first, half a credential pair); credential precedence; boto client construction (custom endpoint → path-style and relaxed checksums; instance role passes no keys); local storage (0600, no partial file on failure, atomic); S3 upload key/SSE/location; **provider errors become safe messages that never echo the response**; persistence |
+| `test_runner.py` | 31 | Completed job records location/size/checksum/manifest; stored archive verifies; encryption on/off; a rejected key fails the job with the reason; failures (missing destination, unwritable, **unexpected error is generic on the row and detailed only in the log**, soft time limit); **a job runs once if delivered twice; a late completion does not resurrect a failed job**; audit events; **a broken audit write does not fail a completed backup**; S3 runner; the builder is handed a file, not a buffer; the work directory is empty afterwards |
+| `test_api.py` | 42 | **Every endpoint refuses anonymous, owner and participant callers**; destination CRUD; **the secret is never returned, never in the audit log**; absent/empty/new secret semantics; 202 with enqueue after commit; **broker outage → 503 and a failed job**; validation matrix; list filters and limit; download streams, 409/410 cases, **a location outside the destination is never served**; status |
+| `test_commands.py` | 22 | `openzev_backup` (path, destination, zev by id or name, ambiguous name, refusal cases, warning on stderr when unencrypted, non-zero exit with a safe message on failure, needs no broker, audited as a management command) and `openzev_backup_verify` (good, encrypted, wrong key, corrupted, missing file) |
 
-| Test | Asserts |
-|---|---|
-| `test_local_destination_requires_a_path` | `clean()` rejects an empty path |
-| `test_local_path_inside_media_root_is_rejected` | An archive cannot be written where media is served |
-| `test_s3_destination_requires_a_bucket` | `clean()` rejects an empty bucket |
-| `test_kind_specific_fields_are_mutually_exclusive` | S3 fields on a `local` row are rejected, and the reverse |
-| `test_storing_a_secret_without_an_encryption_key_is_rejected` | `set_secret_access_key` raises when `BACKUP_ENCRYPTION_KEYS` is empty |
-| `test_secret_round_trips_through_encryption` | `secret_access_key` returns what was set; the column holds ciphertext |
-| `test_environment_credentials_take_precedence_over_stored` | `credential_mode == "environment"` when both are present |
-| `test_instance_role_when_no_credentials_anywhere` | `credential_mode == "instance_role"` |
-| `test_serializer_never_returns_the_secret` | Response has `has_secret_access_key`, no `secret_access_key` |
-| `test_patch_without_a_secret_keeps_the_stored_one` | Absent field is not a clear |
-| `test_patch_with_an_empty_secret_clears_it` | `""` clears |
-| `test_delete_refused_while_an_unexpired_artifact_references_it` | 409 |
+The mutation checks run while building this (removing the traversal guard, the
+final-chunk flag, the admin permission, the `MEDIA_ROOT` guard) each turned the
+suite red.
 
-**`test_archive.py` — `ArchiveShapeTests`** (planned, 14): manifest present and
-well-formed; one CSV per meter; collision-safe member names; a meter id with a
-path separator cannot escape `readings/`; primary keys are preserved in every
-section; invoice PDFs travel as media members; `ContractIssue.pdf` travels
-base64-encoded; instance sections present for a `scope="instance"` archive and
-absent for `scope="zev"`; excluded models are absent; manifest counts equal the
-rows written; per-member SHA-256 matches; `secret_fingerprints` present and no
-key material anywhere in the archive; `kind == "backup"`.
+Later phases add `test_restore_instance.py` and `test_restore_zev.py`, covering the
+cases listed in §6.5 and §6.6 (identical primary keys after a round trip, sequences
+past each table's maximum, refusal of a transfer archive / unknown migrations /
+non-empty instance, no account row created, modified or deleted, `sent`/`paid`
+invoices and contract issues refused without `force`, audit rows untouched).
 
-**`test_archive.py` — `EncryptionEnvelopeTests`** (planned, 8): round-trips a
-multi-chunk archive; a truncated archive fails authentication; a reordered chunk
-fails; the wrong key is refused with the required fingerprint named; an archive
-written with an old key still decrypts after rotation; no key configured produces
-a readable ZIP; `encrypted`/`encryption_key_fingerprint` recorded on the job;
-memory stays bounded for an archive larger than the chunk size.
+### Frontend (39 tests, phase 1)
 
-**`test_archive.py` — `BackupSchemaParityTests`** (planned, 2):
-`test_field_lists_match_their_models_exactly` over every section/model pair; and
-`test_reading_csv_columns_exist_on_the_reading_model`.
-
-**`test_backup_runner.py` — `BackupRunnerTests`** (planned, 10): a completed job
-records location, size, checksum and manifest; a failed enqueue marks the job
-`failed` and never leaves it `queued`; a soft time limit is recorded as a clean
-failure; temp files are removed on both paths; readings stream rather than
-materialise; the runner refuses to run inside an outer transaction (the
-`durable=True` guard); audit events fire for started/completed/failed; an audit
-failure does not fail the job; the sweep deletes expired artifacts and keeps
-`retention_count`; the sweep fails a job whose worker died.
-
-**`test_restore_instance.py` — `InstanceRestoreTests`** (planned, 12): a full
-round trip reproduces every section with identical primary keys; invoice PDFs are
-back on disk; the audit trail is restored; sequences are past each table's
-maximum, and a subsequent insert succeeds; a transfer archive is refused by
-`kind`; an unknown `format_version` is refused; a backup with unknown migrations
-is refused; a backup older than the code is accepted and migrated forward; a
-non-empty instance is refused without `--force`; an MFA fingerprint mismatch warns
-and names the fingerprint; a checksum mismatch aborts before any write;
-`--dry-run` creates nothing.
-
-**`test_restore_zev.py` — `ZevRestoreTests`** (planned, 16): the plan reports
-create/replace/delete per section; `dry_run` changes nothing; a ZEV is returned to
-its archived state; other ZEVs are untouched; **no account row is created,
-modified or deleted**; participants relink by email; a missing account is reported
-and left unlinked; a `sent` invoice that would be deleted is refused without
-`force`; a `paid` invoice likewise; a `ContractIssue` likewise; `force` proceeds
-and is recorded in the audit event; a meter id owned by another ZEV is refused; a
-safety backup is created before any write and linked; a failed safety backup
-aborts the restore; existing audit rows survive, including the restored ZEV's; one
-`zev.restored` event is appended.
-
-**`test_api.py` — `BackupApiTests`** (planned, 14): every endpoint is admin-only
-(403 for `zev_owner`, `participant`, anonymous); job creation returns 202 and
-enqueues after commit; a broker failure returns 503; download serves a local
-artifact and 409s an S3 one; an expired artifact returns 410; verify reports
-failures without creating anything; a restore request naming `mode: "instance"`
-is refused with the CLI message; `/status/` reports staleness.
-
-Planned total: **88 backend tests** across seven modules.
-
-### Frontend
-
-- Unit tests (`npm run test:unit`):
-  `frontend/tests/backup-destination-form.test.ts` — the secret field is blank on
-  edit, omitted when untouched, and sent when filled;
-  `frontend/tests/zev-restore-modal.test.ts` — the confirm button stays disabled
-  until the typed name matches, `force` is disabled until the plan reports a
-  conflict, and a plan with conflicts renders them.
-- Build and type checks: `npm run build`, `npm run lint`, `npm run lint:style`,
-  `node ../scripts/check-frontend-hex.mjs`.
-- Manual: the `backup` tab at a ~400 px viewport.
+- `tests/backup-helpers.test.ts` (17) — the payload contract: a blank edit never
+  wipes a secret, a clear is explicit, switching kind clears the other kind's
+  fields; target formatting; manifest reading; polling and download rules.
+- `tests/backup-settings-section.test.ts` (21) — the encryption banner in each of
+  its three states; restore-not-available notice; destination list and empty state;
+  secret field disabled without a key; environment-credentials notice; create
+  payload; server validation shown inside the form; start-backup rules; job list
+  (download only for local archives, unencrypted badge, failed reason, details).
+- `tests/system-settings-tabs.test.ts` — six tabs, and `?tab=backup` opens the
+  section.
+- Checks: `npm run build`, `npm run lint`, `npm run lint:style`,
+  `node ../scripts/check-frontend-hex.mjs`, and the dead-i18n-key and locale-parity
+  tests.
+- Verified in the running dev stack at 1280 px and 400 px against a real backup on
+  PostgreSQL: no console errors, no horizontal overflow.
 
 ### Acceptance criteria
 
-- [ ] A scheduled backup runs unattended to local and/or S3-compatible storage, with a SHA-256 manifest, encrypted whenever `BACKUP_ENCRYPTION_KEYS` is set
-- [ ] With no key set, the backup still runs and both the CLI and the admin UI say the archive is unencrypted
-- [ ] A destination secret stored in the database is encrypted at rest, never serialized, and overridden by environment credentials
+- [x] A backup runs to local and/or S3-compatible storage, with a SHA-256 manifest, encrypted whenever `BACKUP_ENCRYPTION_KEYS` is set *(manual and from cron; the built-in schedule is phase 4)*
+- [x] With no key set, the backup still runs and both the CLI and the admin UI say the archive is unencrypted
+- [x] A destination secret stored in the database is encrypted at rest, never serialized, and overridden by environment credentials
 - [ ] A fresh install restores to a working instance from a backup alone — accounts, settings, templates, dynamic price series, invoice PDFs, issued contracts and the audit trail all present and linked, with primary keys preserved
 - [ ] An existing install restores one ZEV to its backed-up state without touching other ZEVs, any account row, or any existing audit row — and the restore itself appears in the log
 - [ ] Both restore modes support `--dry-run` / `dry_run` reporting exactly what would change
 - [ ] Restore refuses on schema mismatch, checksum failure, wrong archive `kind`, and (without `force`) on dropping `sent`/`paid` invoices or contract issues
 - [ ] An MFA key fingerprint mismatch is reported at preflight, not discovered by a locked-out user
 - [ ] "Last successful backup" is visible to admins and goes stale loudly
-- [ ] `BackupSchemaParityTests` passes, so a new model field cannot silently stop being backed up
+- [x] The registry coverage tests pass, so a new model or file field cannot silently stop being backed up (this replaces the field-level parity test; see *Deviations*)
 - [ ] User-guide chapter written, including a restore drill; the `12-troubleshooting.md` snippet is replaced
 - [ ] `ROADMAP.md` updated
