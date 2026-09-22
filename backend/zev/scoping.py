@@ -172,6 +172,50 @@ class ZevScopedQuerySetMixin:
                 {field: ["This ZEV is disabled. Ask an admin to re-enable it first."]}
             )
 
+    def _zev_of(self, instance):
+        """The ``Zev`` an existing instance currently belongs to, via
+        ``zev_lookup``.
+
+        Unlike ``resolve_scope_zev`` (which reads a *payload*, and only sees
+        a ZEV when the write names it), this walks the instance already in
+        the database — the ZEV a ``PATCH`` that leaves the relation alone
+        still writes into, or the ZEV a ``DELETE`` removes a row from.
+        """
+        if not self.zev_lookup:
+            return instance
+        target = instance
+        for attribute in self.zev_lookup.split("__"):
+            if target is None:
+                return None
+            target = getattr(target, attribute, None)
+        return target
+
+    def assert_target_not_disabled(self, instance):
+        """Refuse a write to an *existing* row under a disabled ZEV, admin
+        exempt.
+
+        The existing-row counterpart of ``assert_within_scope``'s disabled
+        check: that one only fires when the payload names the ZEV relation,
+        so a ``PATCH`` editing some other field of a row already sitting
+        under a disabled ZEV would otherwise sail through untouched. This is
+        what gives ``Tariff``/``TariffPeriod``/``MeterReading`` the
+        object-level protection ``BaseZevScopedPermission.
+        has_object_permission`` already gives ``Participant``/
+        ``MeteringPoint``/``MeteringPointAssignment``/``Zev`` — those four
+        don't use this mixin's ``perform_update``/``perform_destroy`` to get
+        it, since they have that permission class instead, so this check is
+        redundant-but-harmless for them. ``Invoice`` needed a separate fix
+        (see ``invoices.views._deny_if_zev_disabled``): it barely uses these
+        two methods at all, mutating almost entirely through custom actions.
+        """
+        if self.request.user.is_admin:
+            return
+        zev = self._zev_of(instance)
+        if zev is not None and zev.disabled_at is not None:
+            raise serializers.ValidationError(
+                {"detail": "This ZEV is disabled. Ask an admin to re-enable it first."}
+            )
+
     def perform_create(self, serializer):
         self.assert_within_scope(serializer.validated_data)
         super().perform_create(serializer)
@@ -179,5 +223,10 @@ class ZevScopedQuerySetMixin:
 
     def perform_update(self, serializer):
         self.assert_within_scope(serializer.validated_data)
+        self.assert_target_not_disabled(serializer.instance)
         super().perform_update(serializer)
         return serializer.instance
+
+    def perform_destroy(self, instance):
+        self.assert_target_not_disabled(instance)
+        super().perform_destroy(instance)

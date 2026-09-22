@@ -170,6 +170,10 @@ class TariffViewSet(AuditedUpdateMixin, ZevScopedQuerySetMixin, viewsets.ModelVi
         )
 
     def perform_destroy(self, instance):
+        # Fully overrides ZevScopedQuerySetMixin.perform_destroy (calls
+        # instance.delete() directly below, not super()), so its disabled-ZEV
+        # check needs repeating here rather than being inherited.
+        self.assert_target_not_disabled(instance)
         # Preserve the billed-tariff workflow guard; frozen provenance is
         # retained independently of the tariff row.
         if instance.dynamic_source_id and tariff_has_dynamic_billing_evidence(
@@ -465,6 +469,10 @@ class TariffPeriodViewSet(AuditedUpdateMixin, ZevScopedQuerySetMixin, viewsets.M
         )
 
     def perform_destroy(self, instance):
+        # Same as TariffViewSet.perform_destroy above: this fully overrides
+        # the mixin's version instead of calling super(), so it needs its own
+        # copy of the disabled-ZEV check.
+        self.assert_target_not_disabled(instance)
         period_id = str(instance.pk)
         period_type = instance.period_type
         tariff_name = instance.tariff.name

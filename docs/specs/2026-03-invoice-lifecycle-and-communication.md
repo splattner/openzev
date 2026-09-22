@@ -218,19 +218,25 @@ All invoice endpoints are routed under `/api/v1/invoices/invoices/` via a DRF `G
 |---|---|---|---|---|
 | `POST` | `/invoices/generate/` | `IsZevOwnerOrAdmin` | `{participant_id, period_start, period_end}` | `201` with invoice JSON; `400` with the underlying error if allocation fails (`AllocationError`, e.g. overlapping assignment windows), or if the participant's ZEV is disabled — non-admin only, ZEV lifecycle phase 2 (§4.5 of `2026-03-community-and-access.md`; this view resolves the participant directly rather than through `ZevScopedQuerySetMixin`, so it carries its own copy of that rule); `409` if locked, or a structured `{code: "dynamic_price_gap", tariff_id, tariff_name, source_id, missing_at, error}` when a fetched series does not cover a reading; invalid source configurations return `409` with `code: "invalid_dynamic_tariff"`, tariff/source ids, tariff name and error |
 | `POST` | `/invoices/generate-all/` | `IsZevOwnerOrAdmin` | `{zev_id, period_start, period_end}` | Same disabled-ZEV `400` as `generate/` above, non-admin only; `409` with the same structured dynamic gap/configuration error as single generation when the synchronous coverage/configuration preflight fails; otherwise `202` with `{detail, queued: true, participant_count}` — generation runs asynchronously via Celery (`generate_zev_invoices_task`); per-participant failures (e.g. locked invoices) are isolated — the batch continues, and the audit event (`source = celery`) reports generated/failed counts plus per-participant errors |
-| `POST` | `/invoices/generate-pdfs-all/` | `IsZevOwnerOrAdmin` | `{zev_id, period_start, period_end}` | `202` with `{detail, queued: true, invoice_count}` — PDF rendering runs asynchronously via Celery (`generate_zev_pdfs_task`) |
+| `POST` | `/invoices/generate-pdfs-all/` | `IsZevOwnerOrAdmin` | `{zev_id, period_start, period_end}` | Same disabled-ZEV `400` as the others (via `_get_period_invoices(require_active=True)`, non-admin only); `202` with `{detail, queued: true, invoice_count}` — PDF rendering runs asynchronously via Celery (`generate_zev_pdfs_task`) |
 
-**Not covered by the disabled-ZEV check above:** every action that operates
-on an *existing* invoice rather than creating one — `send-email`,
-`approve`/`mark-sent`/`mark-paid`/`cancel`, `retry-email`, `generate-pdf`,
-and the batch variants built on `_get_period_invoices` (`approve-all`,
-`send-all`, `generate-pdfs-all`, `download-pdfs`) — can still be performed
-by the ZEV's owner while it is disabled. This is the same gap
-`2026-03-community-and-access.md` §4.3 documents for
-`Tariff`/`TariffPeriod`/`MeterReading`: `IsZevOwnerOrAdmin` has no
-`has_object_permission` to extend the way `BaseZevScopedPermission` does for
-`Participant`/`MeteringPoint`, so only the create-time paths (`generate`,
-`generate-all`) are closed so far.
+**Disabled-ZEV coverage on the remaining actions** (ZEV lifecycle phase 2
+follow-up — `invoices.views._deny_if_zev_disabled`, an audited `400` for the
+owner, admin exempt): `DELETE /invoices/{id}/`, `generate-pdf`, `send-email`,
+`retry-email`, and `approve`/`mark-sent`/`mark-paid`/`cancel` (all four route
+through the shared `_perform_status_transition`) are all blocked. Deliberately
+exempt: `revoke-access` (revoking reduces exposure, so a disabled ZEV should
+not stand in the way of it) and both PDF reads — `GET /invoices/{id}/pdf/`
+and `download-pdfs` (`_get_period_invoices(require_active=False)`) — since the
+owner keeps read access everywhere, same as every other disabled-ZEV rule.
+`IsZevOwnerOrAdmin` has no `has_object_permission` the way
+`BaseZevScopedPermission` gives `Participant`/`MeteringPoint`
+(`2026-03-community-and-access.md` §4.3), so each of these carries its own
+check rather than inheriting one — unlike `Tariff`/`TariffPeriod`/
+`MeterReading`, which get the equivalent existing-row protection centrally
+from `ZevScopedQuerySetMixin.assert_target_not_disabled` (§4.5 of that spec)
+since their generic `PATCH`/`DELETE` actually go through
+`perform_update`/`perform_destroy`.
 
 Bulk preflight runs after ZEV authorization. It validates all applicable dynamic
 source configurations and requires stored coverage only at reading timestamps

@@ -14,13 +14,16 @@ Three layers, each covered by its own class:
   ``_exclude_disabled_zev``): invisible, not merely read-only — the same as a
   ZEV the participant was never part of.
 
-Deliberately not covered here, and not yet fixed: Tariff/TariffPeriod/
-Invoice/MeterReading use ``IsZevOwnerOrAdmin``, which has no
-``has_object_permission``, so an owner can still PATCH/DELETE an *existing*
-row of those models under their own disabled ZEV. Only creating new ones is
-blocked for those four (assert_within_scope covers every model with a
-``scope_parent_path``). See the comment above
-``BaseZevScopedPermission.has_object_permission``.
+A fourth class covers the follow-up that closed the remaining gap:
+``Tariff``/``TariffPeriod``/``MeterReading`` use ``IsZevOwnerOrAdmin``, which
+has no ``has_object_permission``, so they don't get existing-row protection
+the way ``Participant``/``MeteringPoint``/``MeteringPointAssignment`` do.
+Instead, ``ZevScopedQuerySetMixin.assert_target_not_disabled`` — called from
+``perform_update``/``perform_destroy``, which those three viewsets' generic
+PATCH/DELETE do go through — closes it centrally. ``Invoice`` needed a
+separate fix instead (barely uses those two methods at all): see
+``invoices/test_disabled_zev_invoice_generation.py`` and
+``invoices.views._deny_if_zev_disabled``.
 """
 from datetime import date
 
@@ -77,6 +80,9 @@ class _OwnerAndParticipant(TestCase):
         )
         self.reading = MeterReading.objects.create(
             metering_point=self.meter, timestamp="2026-01-15T12:00:00Z", energy_kwh="1.5000",
+        )
+        self.tariff_period = TariffPeriod.objects.create(
+            tariff=self.tariff, price_chf_per_kwh="0.25000",
         )
         self.invoice = make_invoice(self.zev, self.participant)
 
@@ -144,11 +150,15 @@ class CreateIntoDisabledZevTests(_OwnerAndParticipant):
         self.assertRefused(response, "zev")
 
     def test_owner_cannot_create_a_tariff_period(self):
+        # The fixture already gives self.tariff one period (self.tariff_period
+        # — added for the existing-row write tests further down), so the
+        # assertion is "count unchanged", not "none exist".
+        before = TariffPeriod.objects.filter(tariff=self.tariff).count()
         response = self.owner_client.post(TARIFF_PERIODS, {
             "tariff": str(self.tariff.id), "period_type": "flat", "price_chf_per_kwh": "0.20",
         }, format="json")
         self.assertRefused(response, "tariff")
-        self.assertFalse(TariffPeriod.objects.filter(tariff=self.tariff).exists())
+        self.assertEqual(TariffPeriod.objects.filter(tariff=self.tariff).count(), before)
 
     def test_owner_cannot_create_a_reading(self):
         response = self.owner_client.post(READINGS, {
@@ -202,6 +212,64 @@ class WriteExistingRowInDisabledZevTests(_OwnerAndParticipant):
             f"{METERING_POINTS}{self.meter.id}/",
             f"{ASSIGNMENTS}{self.assignment.id}/",
         ):
+            self.assertEqual(self.owner_client.get(url).status_code, 200, url)
+
+
+class WriteExistingTariffAndReadingRowTests(_OwnerAndParticipant):
+    """The follow-up fix: assert_target_not_disabled, reached from
+    ZevScopedQuerySetMixin.perform_update/perform_destroy, closes the
+    existing-row gap for Tariff/TariffPeriod/MeterReading — the three models
+    that don't get it from BaseZevScopedPermission."""
+
+    def setUp(self):
+        super().setUp()
+        self._disable()
+
+    def test_owner_cannot_patch_tariff(self):
+        response = self.owner_client.patch(
+            f"{TARIFFS}{self.tariff.id}/", {"name": "Renamed Tariff"}, format="json",
+        )
+        self.assertEqual(response.status_code, 400, response.content)
+        self.assertIn("disabled", str(response.json()).lower())
+
+    def test_owner_cannot_delete_tariff(self):
+        response = self.owner_client.delete(f"{TARIFFS}{self.tariff.id}/")
+        self.assertEqual(response.status_code, 400, response.content)
+        self.assertTrue(Tariff.objects.filter(pk=self.tariff.pk).exists())
+
+    def test_owner_cannot_patch_tariff_period(self):
+        response = self.owner_client.patch(
+            f"{TARIFF_PERIODS}{self.tariff_period.id}/", {"price_chf_per_kwh": "0.30000"}, format="json",
+        )
+        self.assertEqual(response.status_code, 400, response.content)
+
+    def test_owner_cannot_delete_reading(self):
+        response = self.owner_client.delete(f"{READINGS}{self.reading.id}/")
+        self.assertEqual(response.status_code, 400, response.content)
+        self.assertTrue(MeterReading.objects.filter(pk=self.reading.pk).exists())
+
+    def test_admin_can_still_patch_tariff(self):
+        response = self.admin_client.patch(
+            f"{TARIFFS}{self.tariff.id}/", {"name": "Renamed Tariff"}, format="json",
+        )
+        self.assertEqual(response.status_code, 200, response.content)
+
+    def test_admin_can_still_delete_reading(self):
+        response = self.admin_client.delete(f"{READINGS}{self.reading.id}/")
+        self.assertEqual(response.status_code, 204, response.content)
+
+    def test_owner_cannot_patch_even_a_field_unrelated_to_the_relation(self):
+        """assert_within_scope alone would miss this: the payload never
+        names the tariff/zev relation, only assert_target_not_disabled
+        (keyed off the row already in the database) catches it."""
+        response = self.owner_client.patch(
+            f"{TARIFF_PERIODS}{self.tariff_period.id}/",
+            {"label": "Peak"}, format="json",
+        )
+        self.assertEqual(response.status_code, 400, response.content)
+
+    def test_owner_read_access_is_unaffected(self):
+        for url in (f"{TARIFFS}{self.tariff.id}/", f"{READINGS}{self.reading.id}/"):
             self.assertEqual(self.owner_client.get(url).status_code, 200, url)
 
 

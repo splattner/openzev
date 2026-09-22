@@ -63,6 +63,36 @@ def _record_invoice_event(*, invoice: Invoice | None = None, target_id: str = ""
     )
 
 
+def _deny_if_zev_disabled(request, invoice: Invoice, *, action_type: str, denied_verb: str):
+    """Block a write to an *existing* invoice under a disabled ZEV, admin
+    exempt — audited denial, or ``None`` to let the caller proceed.
+
+    Invoice's write actions are all custom (``generate``/``generate-all`` got
+    their own check in ZEV lifecycle phase 2's invoice-generation follow-up;
+    ``IsZevOwnerOrAdmin`` has no ``has_object_permission`` the way
+    ``BaseZevScopedPermission`` gives ``Participant``/``MeteringPoint`` — see
+    ``2026-03-community-and-access.md`` §4.3), so unlike those two models this
+    needs its own check at every remaining write site rather than one
+    inherited from a shared mixin. Deliberately not applied to
+    ``revoke_access`` (reducing exposure is fine on a disabled ZEV) or
+    ``download_pdf``/``download_pdfs`` (reads — the owner keeps read access
+    everywhere, same as every other disabled-ZEV rule).
+    """
+    if request.user.is_admin or invoice.zev.disabled_at is None:
+        return None
+    _record_invoice_event(
+        request=request,
+        action_type=action_type,
+        summary=f"Denied {denied_verb} for {_invoice_target_display(invoice)}: ZEV is disabled.",
+        status=AuditEventStatus.DENIED,
+        invoice=invoice,
+    )
+    return Response(
+        {"error": "This ZEV is disabled. Ask an admin to re-enable it first."},
+        status=status.HTTP_400_BAD_REQUEST,
+    )
+
+
 class InvoiceViewSet(
     ZevScopedQuerySetMixin,
     mixins.ListModelMixin,
@@ -166,6 +196,9 @@ class InvoiceViewSet(
                 invoice=invoice,
             )
             return Response({"error": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
+        denial = _deny_if_zev_disabled(request, invoice, action_type="invoice.delete", denied_verb="invoice deletion")
+        if denial is not None:
+            return denial
         if not request.user.is_admin and not can_delete_invoice(invoice):
             _record_invoice_event(
                 request=request,
@@ -419,6 +452,9 @@ class InvoiceViewSet(
         previous attempt did.
         """
         invoice = self.get_object()
+        denial = _deny_if_zev_disabled(request, invoice, action_type="invoice.generate_pdf", denied_verb="PDF generation")
+        if denial is not None:
+            return denial
         try:
             save_invoice_pdf(invoice)
         except Exception as exc:
@@ -449,6 +485,9 @@ class InvoiceViewSet(
     def send_email(self, request, pk=None):
         """Queue an invoice PDF email to the participant."""
         invoice = self.get_object()
+        denial = _deny_if_zev_disabled(request, invoice, action_type="invoice.send_email", denied_verb="email send")
+        if denial is not None:
+            return denial
         recipient = request.data.get("email") or invoice.participant.email
         if not recipient:
             _record_invoice_event(
@@ -519,6 +558,9 @@ class InvoiceViewSet(
         share identically.
         """
         invoice = self.get_object()
+        denial = _deny_if_zev_disabled(request, invoice, action_type=action_type, denied_verb=denied_verb)
+        if denial is not None:
+            return denial
         try:
             before = workflow_fn(invoice)
         except InvoiceWorkflowError as exc:
@@ -592,6 +634,9 @@ class InvoiceViewSet(
     def retry_email(self, request, pk=None, email_log_id=None):
         """Retry sending a failed invoice email."""
         invoice = self.get_object()
+        denial = _deny_if_zev_disabled(request, invoice, action_type="invoice.retry_email", denied_verb="email retry")
+        if denial is not None:
+            return denial
         try:
             email_log = EmailLog.objects.get(pk=email_log_id, invoice=invoice)
         except EmailLog.DoesNotExist:
@@ -630,8 +675,15 @@ class InvoiceViewSet(
 
     # ── Batch operations ────────────────────────────────────────────────
 
-    def _get_period_invoices(self, request):
-        """Helper: resolve ZEV and period invoices from request data, with permission check."""
+    def _get_period_invoices(self, request, *, require_active=True):
+        """Helper: resolve ZEV and period invoices from request data, with permission check.
+
+        ``require_active=False`` is for the one read-only caller
+        (download-pdfs): the owner keeps read access to a disabled ZEV's
+        invoices, same as everywhere else (ZEV lifecycle phase 2) — only the
+        write actions built on this (approve-all, send-all,
+        generate-pdfs-all) need the disabled ZEV blocked.
+        """
         s = GenerateZevInvoicesSerializer(data=request.data)
         s.is_valid(raise_exception=True)
         try:
@@ -641,6 +693,12 @@ class InvoiceViewSet(
 
         if not request.user.is_admin and zev.owner != request.user:
             return None, None, Response({"error": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
+
+        if require_active and not request.user.is_admin and zev.disabled_at is not None:
+            return None, None, Response(
+                {"error": "This ZEV is disabled. Ask an admin to re-enable it first."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         invoices = Invoice.objects.filter(
             zev=zev,
@@ -742,7 +800,7 @@ class InvoiceViewSet(
             permission_classes=[IsAuthenticated, IsZevOwnerOrAdmin])
     def download_pdfs(self, request):
         """Download all period PDFs as a single ZIP file."""
-        _zev, invoices, error = self._get_period_invoices(request)
+        _zev, invoices, error = self._get_period_invoices(request, require_active=False)
         if error:
             return error
 
