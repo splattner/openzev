@@ -109,6 +109,10 @@ All end-user documentation has been moved to `docs/user-guide/` and organized by
 - Energy allocation and billing details: [docs/user-guide/08-billing-allocation-explained.md](docs/user-guide/08-billing-allocation-explained.md)
 - vZEV feasibility calculator: [docs/user-guide/13-feasibility-calculator.md](docs/user-guide/13-feasibility-calculator.md)
 
+## Security
+
+Report vulnerabilities privately (see [SECURITY.md](SECURITY.md)).
+
 ## Quick Start (Docker)
 
 Start the full stack and seed a reusable demo environment in one command:
@@ -270,7 +274,7 @@ python manage.py createsuperuser
 
 ### 2) Frontend
 
-Use the Node version pinned in `.node-version` (currently 24.20.0).
+Use the Node version pinned in `.node-version` (currently 24.21.0).
 
 ```bash
 cd frontend
