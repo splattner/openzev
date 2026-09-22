@@ -19,6 +19,7 @@ from allocation.validity import period_window
 from metering.models import MeterReading
 from . import onboarding
 from .models import Zev, Participant, MeteringPoint, MeteringPointAssignment
+from .purge import ZevPurgeError, purge_zev
 from .scoping import ZevScopedQuerySetMixin
 from .serializers import (
     GridOperatorListSerializer,
@@ -85,6 +86,9 @@ class ZevViewSet(ZevScopedQuerySetMixin, viewsets.ModelViewSet):
         # enable reverses disable and is deliberately admin-only, unlike
         # disable itself — an owner cannot re-enable their own ZEV.
         if self.action == "enable":
+            return [IsAuthenticated(), IsAdmin()]
+        # purge is irreversible and admin-only, same as enable.
+        if self.action == "purge":
             return [IsAuthenticated(), IsAdmin()]
         return super().get_permissions()
 
@@ -234,6 +238,50 @@ class ZevViewSet(ZevScopedQuerySetMixin, viewsets.ModelViewSet):
             summary=f"Enabled ZEV {zev.name}.",
         )
         return Response(ZevDetailSerializer(zev, context=self.get_serializer_context()).data)
+
+    @action(detail=True, methods=["post"], url_path="purge")
+    def purge(self, request, pk=None):
+        """Permanently delete a disabled ZEV and everything under it.
+
+        Admin only, irreversible — the ZEV lifecycle's terminal transition
+        (``disabled -> gone``). Requires ``{"confirm_name": "<exact name>"}``
+        in the body, the same friction typing out a destructive SQL
+        statement by hand would carry. See ``zev.purge`` for what is deleted,
+        what survives (``SET_NULL``), and what is deliberately not done yet
+        (an automatic pre-purge safety backup).
+        """
+        zev = self.get_object()
+        confirm_name = (request.data.get("confirm_name") or "").strip()
+        if confirm_name != zev.name:
+            return Response(
+                {"error": "Type the ZEV's exact name to confirm this irreversible action."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            result = purge_zev(zev)
+        except ZevPurgeError as exc:
+            return Response({"error": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+        self._record_audit_best_effort(
+            request,
+            action_category=AuditActionCategory.GOVERNANCE,
+            action_type="zev.purge",
+            target_type="zev.Zev",
+            target_id=result.zev_id,
+            target_display=result.zev_name,
+            summary=f"Purged ZEV {result.zev_name}: {result.deleted_counts}.",
+            metadata={
+                "deleted_counts": result.deleted_counts,
+                "media_files_deleted": result.media_files_deleted,
+            },
+            status=AuditEventStatus.SUCCESS,
+        )
+        return Response({
+            "detail": f"ZEV {result.zev_name} permanently deleted.",
+            "deleted_counts": result.deleted_counts,
+            "media_files_deleted": result.media_files_deleted,
+        })
 
     def perform_destroy(self, instance):
         # ``ZevManagementPermission`` restricts DELETE to admins, same as

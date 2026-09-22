@@ -1971,6 +1971,12 @@ export const de = {
             enableTitle: 'ZEV aktivieren',
             enableMessage: '"{{name}}" wieder aktivieren? Teilnehmende erhalten wieder Zugriff, und die verantwortliche Person kann sie wieder verwalten.',
             enableConfirm: 'ZEV aktivieren',
+            purge: 'Endgültig löschen',
+            purgeTitle: 'ZEV endgültig löschen',
+            purgeMessage: 'Dies löscht "{{name}}" und alles darunter endgültig — Teilnehmende, Zählpunkte, Zählerstände, Tarife und Rechnungen. Dies kann nicht rückgängig gemacht werden.',
+            purgeConfirm: 'Endgültig löschen',
+            purgeConfirmLabel: 'Geben Sie "{{name}}" ein, um zu bestätigen.',
+            purgeFailed: 'ZEV konnte nicht gelöscht werden.',
             wizard: {
                 titleStep: 'ZEV erstellen · Schritt {{step}} von 4',
                 titleDone: 'ZEV erfolgreich erstellt',

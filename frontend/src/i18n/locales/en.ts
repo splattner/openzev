@@ -1982,6 +1982,12 @@ export const en = {
             enableTitle: 'Enable ZEV',
             enableMessage: 'Re-enable "{{name}}"? Participants regain access and its owner can manage it again.',
             enableConfirm: 'Enable ZEV',
+            purge: 'Purge',
+            purgeTitle: 'Permanently delete ZEV',
+            purgeMessage: 'This permanently deletes "{{name}}" and everything under it — participants, metering points, readings, tariffs and invoices. This cannot be undone.',
+            purgeConfirm: 'Permanently delete',
+            purgeConfirmLabel: 'Type "{{name}}" to confirm.',
+            purgeFailed: 'Failed to delete the ZEV.',
             wizard: {
                 titleStep: 'Create ZEV · Step {{step}} of 4',
                 titleDone: 'ZEV created successfully',

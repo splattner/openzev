@@ -55,6 +55,22 @@ export async function enableZev(id: string): Promise<Zev> {
   return data
 }
 
+export interface ZevPurgeResult {
+  detail: string
+  deleted_counts: Record<string, number>
+  media_files_deleted: number
+}
+
+/**
+ * Permanently delete a disabled ZEV and everything under it. Admin only,
+ * irreversible. `confirmName` must match the ZEV's exact name, the same
+ * friction the backend requires.
+ */
+export async function purgeZev(id: string, confirmName: string): Promise<ZevPurgeResult> {
+  const { data } = await api.post<ZevPurgeResult>(`/zev/zevs/${id}/purge/`, { confirm_name: confirmName })
+  return data
+}
+
 export async function fetchParticipants(): Promise<Participant[]> {
   return fetchAllPages<Participant>('/zev/participants/')
 }

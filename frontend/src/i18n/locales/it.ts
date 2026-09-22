@@ -1971,6 +1971,12 @@ export const it = {
             enableTitle: 'Attiva RCP',
             enableMessage: 'Riattivare "{{name}}"? I partecipanti riottengono l\'accesso e la persona responsabile può di nuovo gestirlo.',
             enableConfirm: 'Attiva RCP',
+            purge: 'Elimina definitivamente',
+            purgeTitle: 'Elimina definitivamente il RCP',
+            purgeMessage: 'Questa azione elimina definitivamente "{{name}}" e tutto ciò che contiene — partecipanti, punti di misura, letture, tariffe e fatture. Non può essere annullata.',
+            purgeConfirm: 'Elimina definitivamente',
+            purgeConfirmLabel: 'Digita "{{name}}" per confermare.',
+            purgeFailed: 'Impossibile eliminare il RCP.',
             wizard: {
                 titleStep: 'Crea RCP · Passaggio {{step}} di 4',
                 titleDone: 'RCP creato con successo',

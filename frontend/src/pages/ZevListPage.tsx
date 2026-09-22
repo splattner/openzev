@@ -11,6 +11,7 @@ import {
     faPen,
     faPlay,
     faPlus,
+    faSkullCrossbones,
     faTrash,
     faUpload,
     faUser,
@@ -24,7 +25,7 @@ import { ZevImportModal } from '../features/zev/ZevImportModal'
 import { formatShortDate, useAppSettings } from '../lib/appSettings'
 import { useAuth } from '../lib/auth'
 import { FormModal } from '../components/FormModal'
-import { createZevWithOwner, deleteZev, disableZev, enableZev, fetchParticipants, fetchZevs, updateZev } from '../lib/api/zev'
+import { createZevWithOwner, deleteZev, disableZev, enableZev, fetchParticipants, fetchZevs, purgeZev, updateZev } from '../lib/api/zev'
 import { fetchUsers } from '../lib/api/auth'
 import { formatApiError } from '../lib/api/errors'
 import { queryKeys } from '../lib/api/queryKeys'
@@ -131,6 +132,9 @@ export function ZevListPage({ embedded = false }: { embedded?: boolean }) {
     const [ownerTargetZev, setOwnerTargetZev] = useState<Zev | null>(null)
     const [newOwnerId, setNewOwnerId] = useState<string>('')
     const createSubmittedRef = useRef(false)
+    const [purgeTarget, setPurgeTarget] = useState<Zev | null>(null)
+    const [purgeConfirmation, setPurgeConfirmation] = useState('')
+    const [purgeError, setPurgeError] = useState<string | null>(null)
 
     const createMutation = useMutation({
         mutationFn: createZevWithOwner,
@@ -176,6 +180,23 @@ export function ZevListPage({ embedded = false }: { embedded?: boolean }) {
             void queryClient.invalidateQueries({ queryKey: queryKeys.zev.list() })
         },
     })
+
+    const purgeMutation = useMutation({
+        mutationFn: () => purgeZev(purgeTarget!.id, purgeConfirmation),
+        onSuccess: () => {
+            setPurgeTarget(null)
+            setPurgeConfirmation('')
+            setPurgeError(null)
+            void queryClient.invalidateQueries({ queryKey: queryKeys.zev.list() })
+        },
+        onError: (error) => setPurgeError(formatApiError(error, t('pages.zevs.purgeFailed'))),
+    })
+
+    function closePurgeDialog() {
+        setPurgeTarget(null)
+        setPurgeConfirmation('')
+        setPurgeError(null)
+    }
 
     const assignOwnerMutation = useMutation({
         mutationFn: ({ id, owner }: { id: string; owner: number }) => updateZev(id, { owner }),
@@ -993,6 +1014,29 @@ export function ZevListPage({ embedded = false }: { embedded?: boolean }) {
                 />
             )}
 
+            {purgeTarget && (
+                <ConfirmDialog
+                    title={t('pages.zevs.purgeTitle')}
+                    message={t('pages.zevs.purgeMessage', { name: purgeTarget.name })}
+                    confirmText={t('pages.zevs.purgeConfirm')}
+                    isDangerous
+                    isLoading={purgeMutation.isPending}
+                    confirmDisabled={purgeConfirmation.trim() !== purgeTarget.name.trim()}
+                    onCancel={closePurgeDialog}
+                    onConfirm={() => purgeMutation.mutate()}
+                >
+                    <label style={{ gridColumn: '1 / -1' }}>
+                        <span>{t('pages.zevs.purgeConfirmLabel', { name: purgeTarget.name })}</span>
+                        <input
+                            value={purgeConfirmation}
+                            onChange={(event) => setPurgeConfirmation(event.target.value)}
+                            required
+                        />
+                    </label>
+                    {purgeError && <div className="error-banner" style={{ gridColumn: '1 / -1' }}>{purgeError}</div>}
+                </ConfirmDialog>
+            )}
+
             {!data || data.length === 0 ? (
                 <EmptyState
                     titleKey="pages.zevs.emptyState.title"
@@ -1067,7 +1111,7 @@ export function ZevListPage({ embedded = false }: { embedded?: boolean }) {
                                                 {t('pages.zevs.setOwner')}
                                             </button>
                                         )}
-                                        {zev.disabled_at ? (
+                                        {zev.disabled_at && (
                                             <button
                                                 className="button button-secondary button-compact"
                                                 type="button"
@@ -1082,7 +1126,18 @@ export function ZevListPage({ embedded = false }: { embedded?: boolean }) {
                                                 <FontAwesomeIcon icon={faPlay} fixedWidth />
                                                 {t('pages.zevs.enable')}
                                             </button>
-                                        ) : (
+                                        )}
+                                        {zev.disabled_at && (
+                                            <button
+                                                className="button button-danger button-compact"
+                                                type="button"
+                                                onClick={() => { setPurgeTarget(zev); setPurgeConfirmation(''); setPurgeError(null) }}
+                                            >
+                                                <FontAwesomeIcon icon={faSkullCrossbones} fixedWidth />
+                                                {t('pages.zevs.purge')}
+                                            </button>
+                                        )}
+                                        {!zev.disabled_at && (
                                             <button
                                                 className="button button-secondary button-compact"
                                                 type="button"

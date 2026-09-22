@@ -1023,6 +1023,55 @@ disabled. Records `zev.enable`.
 who disables their only community is not permanently locked out of creating a
 replacement through that endpoint.
 
+### 7.1b Purge (ZEV lifecycle, phase 4)
+
+The terminal transition (`active → disabled → gone`). Implemented in
+`zev.purge.purge_zev()`, called from `POST /api/v1/zev/zevs/{id}/purge/`
+(`IsAdmin`, via the same `get_permissions()` override as `enable` — the
+owner cannot self-serve this either). Body: `{"confirm_name": "<exact ZEV
+name>"}`; a mismatch is `400` and nothing is touched. Refuses (`400`,
+`ZevPurgeError`) unless the ZEV is already disabled — purge is never a
+shortcut from active.
+
+**What is deleted.** Every model that hangs off a ZEV is `CASCADE` from
+`Zev` directly or from a row that is itself `CASCADE` from it —
+`Participant` (→ `MeteringPointAssignment`, `ParticipantOnboardingToken`),
+`MeteringPoint` (→ `MeterReading`, `MeteringPointAssignment`), `Tariff`
+(→ `TariffPeriod`), `metering.ImportLog` — so Django's delete collector
+walks all of that from one `zev.delete()`. Two relations are `PROTECT`
+instead and are deleted explicitly first, in their own step:
+`invoices.Invoice` (whose own `CASCADE` children —
+`InvoiceItem`/`InvoiceDynamicSourceEvidence`/`InvoiceAccessToken`/
+`EmailLog` — then follow automatically) and `exports.ExportJob`. Everything
+runs inside one `transaction.atomic()` block.
+
+**What survives**, via `SET_NULL`: `audit.AuditEvent.zev`,
+`invoices.ContractIssue.zev`/`.participant`, `backups.BackupJob.zev`,
+`accounts.User.preferred_zev`. `ContractIssue` is documented as an immutable
+archive; the audit trail (including the `zev.purge` event itself) is the
+record that the purge happened, not something the purge should erase.
+
+**Media files.** `Invoice.pdf_file` and `ExportJob.result_file` are not
+touched by `on_delete` at all — Django never deletes `FileField` bytes on
+row delete — so their storage paths are collected before the transaction
+and the files removed from storage only after it commits (a rolled-back
+transaction must not have already destroyed files a rollback cannot bring
+back).
+
+**Response:** `{"detail", "deleted_counts": {export_jobs, invoices,
+participants, metering_points, tariffs}, "media_files_deleted"}`. Records
+`zev.purge` (category `governance`) the same way `zev.delete` does — by
+`target_id`/`target_display` only, no `target=`/`zev=`, since the row is
+already gone — with the same counts in `metadata`.
+
+**Deliberately not done**, tracked on the ZEV lifecycle issue: an automatic
+pre-purge safety backup. The backups feature already takes one before a
+per-ZEV *restore* (`backups.tasks._take_safety_backup`), but that helper is
+shaped around a `RestoreJob` and a configured `BackupDestination` — wiring
+an equivalent into this synchronous request/response flow is its own piece
+of work. An admin who wants that safety net today can export a transfer
+archive or run `openzev_backup` before purging. No frontend UI yet either.
+
 ### 7.2 Create-with-owner wizard
 
 **Endpoint:** `POST /api/v1/zev/zevs/create-with-owner/` (admin only)
@@ -1346,8 +1395,9 @@ documented in `2026-03-invoice-lifecycle-and-communication.md` §5.6a.
 | GET / PATCH / PUT / DELETE | `/zevs/{id}/` | IsAuthenticated, ZevManagementPermission (delete: admin only; write on a disabled ZEV: admin only) | ZEV detail (retrieve uses ZevDetailSerializer with nested participants) |
 | POST | `/zevs/create-with-owner/` | IsAuthenticated, ZevManagementPermission (admin only) | Wizard: create ZEV + owner + metering points |
 | POST | `/zevs/self-setup/` | IsAuthenticated | Self-setup: create ZEV for self-registered owner |
-| POST | `/zevs/{id}/disable/` | IsAuthenticated, BaseZevScopedPermission (owner of that ZEV, or admin) | Disable a ZEV — reversible, touches nothing else (§7.1a) |
+| POST | `/zevs/{id}/disable/` | IsAuthenticated, ZevDisablePermission (owner of that ZEV, or admin) | Disable a ZEV — reversible, touches nothing else (§7.1a) |
 | POST | `/zevs/{id}/enable/` | IsAuthenticated, IsAdmin | Re-enable a disabled ZEV — admin only (§7.1a) |
+| POST | `/zevs/{id}/purge/` | IsAuthenticated, IsAdmin | Permanently delete a disabled ZEV and everything under it — irreversible, admin only (§7.1b) |
 | GET | `/grid-operators/` | IsAuthenticated | The official ElCom grid-operator list for the ZEV form picker — static reference data, **unpaginated** (see §3.4a) |
 | GET / POST | `/participants/` | IsAuthenticated, BaseZevScopedPermission | List/create participants |
 | GET / PATCH / PUT / DELETE | `/participants/{id}/` | IsAuthenticated, BaseZevScopedPermission | Participant detail |
@@ -1643,6 +1693,7 @@ lists the test classes per module (test counts are the `test_*` methods).
 | `test_write_scoping.py` | 5 | 20 | Write scoping: foreign create refused, move-via-PATCH refused, legit writes and admin bypass still work, audit retained; a ZEV owner cannot DELETE their own or another ZEV (admin-only, audited) |
 | `test_disable_enable.py` | 4 | 17 | ZEV lifecycle phase 1: owner/admin can disable, only admin can enable, both audited, guarded against double-disable/double-enable; a disabled ZEV is read-only to its owner (admin can still write); the self-setup "already have a ZEV" guard excludes disabled ZEVs |
 | `test_disabled_zev_scoping.py` | 5 | 27 | ZEV lifecycle phase 2 (§7.1a): creating into a disabled ZEV refused for every `scope_parent_path` model, admin exempt; PATCH/DELETE on an existing `Participant`/`MeteringPoint`/`MeteringPointAssignment` row blocked for the owner, admin exempt, reads unaffected; PATCH/DELETE on an existing `Tariff`/`TariffPeriod`/`MeterReading` row blocked the same way via `assert_target_not_disabled`, including a field unrelated to the ZEV relation (which `assert_within_scope` alone would miss); a participant loses read access to metering points, invoices and readings under a disabled ZEV while the owner keeps it; access returns in full after `enable` |
+| `test_purge.py` | 3 | 8 | ZEV lifecycle phase 4 (§7.1b): refuses an active ZEV; a full purge deletes the ZEV and every `CASCADE` child (including both `PROTECT` relations, `Invoice` and `ExportJob`) and removes their media files from storage; `SET_NULL` rows (`AuditEvent`, `ContractIssue`, `BackupJob`) survive with their ZEV link cleared; the endpoint is admin-only, requires the exact ZEV name, refuses an active ZEV, and is audited |
 | `test_zev_id_filter.py` | 5 | 15 | `?zev_id=` narrowing on list endpoints |
 | `test_transfer.py` | 6 | 66 | Whole-ZEV archive shape, round-trip, rejected archives, schema parity, transfer endpoints |
 | `test_geocoding.py` | 4 | 19 | Building footprint cache, warm tasks, trigger-on-save |

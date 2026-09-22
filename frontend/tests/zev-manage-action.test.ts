@@ -51,6 +51,7 @@ vi.mock('../src/lib/api/zev', () => ({
     deleteZev: vi.fn(),
     disableZev: vi.fn(),
     enableZev: vi.fn(),
+    purgeZev: vi.fn(),
 }))
 
 vi.mock('../src/lib/api/auth', () => ({
