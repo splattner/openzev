@@ -46,6 +46,11 @@ EMAIL_HOST_PASSWORD=your-app-password
 DEFAULT_FROM_EMAIL=openzev@example.com
 ```
 
+When `DEBUG=False`, `manage.py check` rejects the console backend and an SMTP
+configuration without `EMAIL_HOST` or `DEFAULT_FROM_EMAIL`. The production
+template includes these variables so mail delivery cannot silently fall back to
+container logs.
+
 After changing email settings, restart the backend and Celery worker:
 
 ```bash

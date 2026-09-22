@@ -445,12 +445,13 @@ WEBAUTHN_ORIGIN  = env("WEBAUTHN_ORIGIN", default="http://localhost:5173")
 ```
 
 A mismatch between `WEBAUTHN_RP_ID` and the served domain makes every ceremony fail with an
-opaque browser error, so the system check in §4.5 also warns when `DEBUG` is false and
-`WEBAUTHN_RP_ID` is still `localhost`. The Helm chart's values gain all three plus
+opaque browser error. The system check in §4.5 warns when `DEBUG` is false and either setting
+is empty, development-only, or not a public HTTPS origin; the production configuration check
+also rejects those values with `accounts.E008`/`accounts.E009`. The Helm chart's values gain all three plus
 `MFA_ENCRYPTION_KEYS`. **As shipped (PR 2):** `mfaEncryptionKeys.{value, existingSecret}`, wired
 to the backend deployment only (workers never touch a TOTP secret), following the `secretKey`
 pattern — a plain `value` is accepted for parity, but an `existingSecret` reference is the
-documented production route. The three WebAuthn settings ship as `webauthn.{rpId, rpName, origin}` (each optional; the backend defaults to `localhost`), and `manage.py check` gains `accounts.W002` when `DEBUG` is off and the RP ID is still `localhost`.
+documented production route. The three WebAuthn settings ship as `webauthn.{rpId, rpName, origin}` (each optional; the backend defaults to development values), and `manage.py check` gains `accounts.W002` when `DEBUG` is off and the RP ID/origin are not configured for a public HTTPS origin.
 
 **Challenge storage.** WebAuthn ceremony challenges live in the Django cache (Redis in
 production) under `mfa:webauthn:{user_pk|session_key}` with a 5-minute TTL — they are
@@ -687,7 +688,7 @@ user-facing text, per AGENTS.md.
 | `MFA_ENCRYPTION_KEYS` lost or not backed up | **High** — every TOTP secret becomes undecryptable | Enrolment refused when unset; system check + system-health warning; documented as a backup-critical secret; recovery codes and admin reset remain as escapes |
 | Encrypting under `SECRET_KEY` instead | High — routine key rotation mass-locks users out | Rejected by design (§4.5); a dedicated, independently rotatable key set |
 | Admins locked out on upgrade when policy is enabled | High | Grace period (default 14 days) plus a dismissible interstitial; enforcement only after `grace_until` |
-| `WEBAUTHN_RP_ID` misconfigured | Medium — all passkey ceremonies fail opaquely | System check warns when `DEBUG=False` and RP ID is `localhost`; documented in the Helm values |
+| `WEBAUTHN_RP_ID` or `WEBAUTHN_ORIGIN` missing/misconfigured | Medium — all passkey ceremonies fail opaquely | System check warns and the production configuration check rejects empty/development values; documented in the Helm values |
 | TOTP code replayed within its window | Medium | `last_used_step` written under a row lock (§4.1) |
 | Cloned authenticator | Medium | `sign_count` regression detection, audited as `DENIED` (§4.2) |
 | Audit log becomes an account-enumeration oracle | Medium | Failures are undifferentiated, exactly as `auth.login_failed` already is (PR #741) |
@@ -716,12 +717,12 @@ provider without the requirement unaffected). TOTP tests pin the clock
 with a `totp_step` helper so replay protection never collides with a real 30-second step. The
 Passkeys, the policy, the removal guard and the admin reset shipped with PR 3 (below).
 
-**As shipped in PR 3**: `accounts/test_passkeys.py`, 63 tests, driving py_webauthn end to end
+**As shipped in PR 3**: `accounts/test_passkeys.py`, 64 tests, driving py_webauthn end to end
 through a small software authenticator (real `none` attestations, real ES256 assertions, nothing
 about the library mocked): `PasskeyRegistrationTests` (13), `PasskeyLoginTests` (15, including that a
 successful login stamps `User.last_login`),
 `PasskeyGatesThePasswordRouteTests` (7, the passkey-gated password / magic-link routes and the recovery-code second step), `PasskeyThrottleTests` (1), `MfaPolicyTests` (11), `MfaRemovalGuardTests` (6),
-`MfaAdminResetTests` (7) and `WebAuthnRpCheckTests` (3). These replace the illustrative
+`MfaAdminResetTests` (7) and `WebAuthnRpCheckTests` (4). These replace the illustrative
 `PasskeyTests` / `MfaAdminTests` tables below and additionally cover replay of a spent ceremony,
 wrong-origin and tampered-signature assertions, the zero-counter exemption, the grace-period
 arithmetic (including an account far older than the policy), and recovery codes surviving a second

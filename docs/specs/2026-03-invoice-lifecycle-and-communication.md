@@ -486,6 +486,18 @@ in generate, generate-all, and period-overview.
 
 ## 7. Email delivery
 
+### 7.0 Transport configuration
+
+Email uses Django's configured `EMAIL_BACKEND`. Development defaults to the
+console backend so messages are visible in logs. A `DEBUG=False` deployment
+must use a real delivery backend; the production configuration check rejects
+the console backend and incomplete SMTP settings (`EMAIL_HOST` or
+`DEFAULT_FROM_EMAIL` missing). The self-hosting template provides
+`EMAIL_BACKEND`, `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_USE_TLS`, SMTP credentials,
+`EMAIL_TIMEOUT`, and `DEFAULT_FROM_EMAIL`; operators must fill in the SMTP
+server and sender before relying on registration, onboarding, invoice, or
+security notification mail.
+
 ### 7.1 Email template resolution
 
 Email subjects and bodies resolve through a three-tier fallback chain:

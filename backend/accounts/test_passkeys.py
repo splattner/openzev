@@ -803,10 +803,14 @@ class WebAuthnRpCheckTests(TestCase):
     def test_warns_when_production_still_uses_the_development_rp_id(self):
         self.assertEqual(self._ids(), ["accounts.W002"])
 
+    @override_settings(DEBUG=False, WEBAUTHN_RP_ID="", WEBAUTHN_ORIGIN="")
+    def test_warns_when_production_passkey_settings_are_empty(self):
+        self.assertEqual(self._ids(), ["accounts.W002"])
+
     @override_settings(DEBUG=True, WEBAUTHN_RP_ID="localhost")
     def test_silent_under_debug(self):
         self.assertEqual(self._ids(), [])
 
-    @override_settings(DEBUG=False, WEBAUTHN_RP_ID="zev.example.ch")
+    @override_settings(DEBUG=False, WEBAUTHN_RP_ID="zev.example.ch", WEBAUTHN_ORIGIN="https://zev.example.ch")
     def test_silent_once_configured(self):
         self.assertEqual(self._ids(), [])

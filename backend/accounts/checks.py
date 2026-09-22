@@ -10,7 +10,41 @@ from django.conf import settings
 from django.core.checks import Error, Tags, Warning, register
 
 LOOPBACK_HOSTS = {"localhost", "127.0.0.1", "[::1]", "::1"}
-FRONTEND_LOOPBACK_HOSTS = {"localhost", "127.0.0.1", "::1"}
+
+
+def _is_public_https_origin(value):
+    """Return whether value is a scheme/host-only public HTTPS origin."""
+    try:
+        parsed = urlparse(str(value).strip())
+        hostname = (parsed.hostname or "").lower()
+    except ValueError:
+        return False
+    return bool(
+        parsed.scheme.lower() == "https"
+        and parsed.netloc
+        and hostname
+        and hostname not in LOOPBACK_HOSTS
+        and parsed.username is None
+        and parsed.password is None
+        and parsed.path in {"", "/"}
+        and not parsed.params
+        and not parsed.query
+        and not parsed.fragment
+    )
+
+
+def _is_public_rp_id(value):
+    """Return whether value is a non-loopback WebAuthn relying-party ID."""
+    raw = str(value).strip()
+    if not raw or "://" in raw or any(char in raw for char in "/?#@"):
+        return False
+    try:
+        parsed = urlparse(f"//{raw}")
+        hostname = (parsed.hostname or "").lower()
+        port = parsed.port
+    except ValueError:
+        return False
+    return bool(hostname and hostname not in LOOPBACK_HOSTS and port is None and "*" not in raw)
 
 
 @register(Tags.security)
@@ -42,20 +76,23 @@ def mfa_key_configured(app_configs, **kwargs):
 
 @register(Tags.security)
 def webauthn_rp_configured(app_configs, **kwargs):
-    """Warn when passkeys would be served under the development RP ID.
+    """Warn when passkeys are not configured for a public HTTPS origin.
 
-    A relying-party ID that does not match the domain the browser sees makes
-    every WebAuthn ceremony fail with an opaque error the user cannot act on,
-    so the operator is told here, once, instead. Skipped under DEBUG, where
-    ``localhost`` is exactly right.
+    A relying-party ID or origin that does not match the domain the browser
+    sees makes every WebAuthn ceremony fail with an opaque error the user
+    cannot act on, so the operator is told here, once, instead. Skipped under
+    DEBUG, where localhost is exactly right.
     """
-    if settings.DEBUG or settings.WEBAUTHN_RP_ID != "localhost":
+    if settings.DEBUG or (
+        _is_public_rp_id(settings.WEBAUTHN_RP_ID)
+        and _is_public_https_origin(settings.WEBAUTHN_ORIGIN)
+    ):
         return []
     return [
         Warning(
-            "WEBAUTHN_RP_ID is still 'localhost'. Passkey registration and "
-            "sign-in will fail for users on any other domain.",
-            hint="Set WEBAUTHN_RP_ID to the domain users open OpenZEV on, and WEBAUTHN_ORIGIN to its full origin.",
+            "WEBAUTHN_RP_ID and WEBAUTHN_ORIGIN are not configured for a "
+            "public HTTPS origin. Passkey registration and sign-in will fail.",
+            hint="Set WEBAUTHN_RP_ID to the domain users open OpenZEV on, and WEBAUTHN_ORIGIN to its full HTTPS origin.",
             id="accounts.W002",
         )
     ]
@@ -78,13 +115,70 @@ def production_hosts_configured(app_configs, **kwargs):
             )
         )
     frontend_url = str(settings.FRONTEND_URL).strip()
-    hostname = (urlparse(frontend_url if "://" in frontend_url else f"//{frontend_url}").hostname or "").lower()
-    if not frontend_url or hostname in FRONTEND_LOOPBACK_HOSTS:
+    if not _is_public_https_origin(frontend_url):
         errors.append(
             Error(
-                "FRONTEND_URL must not use a development origin in production.",
-                hint="Set FRONTEND_URL to the public base URL of the frontend.",
+                "FRONTEND_URL must be a public HTTPS origin in production.",
+                hint="Set FRONTEND_URL to the public HTTPS base URL of the frontend.",
                 id="accounts.E004",
+            )
+        )
+    return errors
+
+
+@register(Tags.security)
+def production_configuration_configured(app_configs, **kwargs):
+    """Reject incomplete security and email settings when ``DEBUG=False``."""
+    if settings.DEBUG:
+        return []
+    errors = []
+
+    csrf_origins = [str(origin).strip() for origin in settings.CSRF_TRUSTED_ORIGINS if str(origin).strip()]
+    if not csrf_origins or any(not _is_public_https_origin(origin) for origin in csrf_origins):
+        errors.append(
+            Error(
+                "CSRF_TRUSTED_ORIGINS must contain a public HTTPS origin in production.",
+                hint="Set it to the HTTPS origin users open OpenZEV on, even for same-origin deployments.",
+                id="accounts.E005",
+            )
+        )
+
+    email_backend = str(settings.EMAIL_BACKEND).strip()
+    console_backend = "django.core.mail.backends.console.EmailBackend"
+    smtp_backend = "django.core.mail.backends.smtp.EmailBackend"
+    if email_backend == console_backend:
+        errors.append(
+            Error(
+                "The console email backend must not be used in production.",
+                hint="Configure EMAIL_BACKEND for SMTP or another real delivery backend.",
+                id="accounts.E006",
+            )
+        )
+    elif email_backend == smtp_backend and (
+        not str(settings.EMAIL_HOST).strip() or not str(settings.DEFAULT_FROM_EMAIL).strip()
+    ):
+        errors.append(
+            Error(
+                "SMTP production email requires EMAIL_HOST and DEFAULT_FROM_EMAIL.",
+                hint="Configure the SMTP server and sender address in backend/.env.",
+                id="accounts.E007",
+            )
+        )
+
+    if not _is_public_rp_id(settings.WEBAUTHN_RP_ID):
+        errors.append(
+            Error(
+                "WEBAUTHN_RP_ID must be a public relying-party domain in production.",
+                hint="Set it to the bare domain users open OpenZEV on, without a scheme or port.",
+                id="accounts.E008",
+            )
+        )
+    if not _is_public_https_origin(settings.WEBAUTHN_ORIGIN):
+        errors.append(
+            Error(
+                "WEBAUTHN_ORIGIN must be a public HTTPS origin in production.",
+                hint="Set it to the full HTTPS origin where the frontend is served.",
+                id="accounts.E009",
             )
         )
     return errors

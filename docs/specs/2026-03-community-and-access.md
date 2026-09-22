@@ -436,7 +436,9 @@ responses, and the detail view do not carry it.
 
 **Token refresh:** `POST /api/v1/auth/token/refresh/` reads `openzev_refresh` cookie; CSRF via `CookieJWTAuthentication` (`SessionAuthentication.enforce_csrf` on unsafe methods) + `CsrfViewMiddleware` kept for admin/Django views. Before rotating, `CookieTokenRefreshView` also requires the refresh token's `sv` to match the account's and the account to be active; otherwise `401` and the auth cookies are cleared.
 
-**Cookie transport:** httpOnly cookies `openzev_access` / `openzev_refresh` + `csrftoken` via `django.middleware.csrf.get_token` (`CsrfViewMiddleware` sets cookie). `CSRF_TRUSTED_ORIGINS` defaults to `CORS_ALLOWED_ORIGINS`.
+**Cookie transport:** httpOnly cookies `openzev_access` / `openzev_refresh` + `csrftoken` via `django.middleware.csrf.get_token` (`CsrfViewMiddleware` sets cookie). `CSRF_TRUSTED_ORIGINS` defaults to `CORS_ALLOWED_ORIGINS` in development. A `DEBUG=False` deployment must instead provide at least one public HTTPS trusted origin; `accounts.E005` rejects an empty or insecure list so HTTPS cookie sessions do not depend on an unverified deployment assumption.
+
+**Production configuration checks:** `accounts.checks.production_hosts_configured` rejects empty, wildcard, or loopback-only `ALLOWED_HOSTS` (`accounts.E003`) and requires `FRONTEND_URL` to be a public HTTPS origin (`accounts.E004`). `production_configuration_configured` rejects the console email backend and incomplete SMTP settings (`accounts.E006`/`E007`), and rejects empty or development WebAuthn relying-party settings (`accounts.E008`/`E009`). These checks are skipped when `DEBUG=True`, which is the development `.env.example` mode.
 
 **Frontend:** `frontend/src/lib/api/client.ts` `api = axios.create({withCredentials:true, xsrfCookieName:'csrftoken', xsrfHeaderName:'X-CSRFToken'})` scoped to instance (no `axios.defaults`).
 
@@ -720,7 +722,7 @@ budget is refused with `429 Too Many Requests` before the view body runs. The
 test settings (`config/settings_test.py`) disable all scopes so the rest of the
 suite is not throttled.
 
-Limits are keyed by DRF's `SimpleRateThrottle.get_ident()` through `NUM_PROXIES` trusted hops. The audit log records the same hop via `config.client_ip.client_ip`, storing invalid or empty values as `NULL` for inet safety instead of DRF's raw-string bucket. Operator guidance is canonical in `charts/openzev/README.md` ("Reverse proxies and NUM_PROXIES").
+Limits are keyed by DRF's `SimpleRateThrottle.get_ident()` through `NUM_PROXIES` trusted hops. The audit log records the same hop via `config.client_ip.client_ip`, storing invalid or empty values as `NULL` for inet safety instead of DRF's raw-string bucket. The shipped nginx configurations overwrite `X-Forwarded-For`; with `NUM_PROXIES=1`, an outer proxy's address is therefore the attributed identity. Preserving the original client address requires a deliberately sanitised, append-preserving proxy chain and a matching hop count. Operator guidance is canonical in `charts/openzev/README.md` ("Reverse proxies and NUM_PROXIES").
 
 Shipped values: default `0`; production-like and fullstack compose set `1` behind overwriting nginx; dev compose keeps `0`; Helm `backend.numProxies` defaults to `0` on the backend deployment only.
 
@@ -1565,11 +1567,19 @@ lists the test classes per module (test counts are the `test_*` methods).
 | `test_admin_account_actions.py` | 2 | 12 | Account creation (generated password when omitted, returned once and never re-listed, two accounts get different passwords, a supplied password is still accepted, mismatched/weak supplied passwords rejected, generated password passes the validators anyway, response carries the new id, non-admin blocked); self-deactivation guard (blocked with a field error, deactivating someone else works and is audited, reactivating your own account is unaffected, deactivating someone else still revokes their sessions) |
 | `test_api_keys.py` | 10 | 81 | Generation, hashing, auth, read-only keys, scope deny-list, audit, throttling, CRUD, admin management |
 | `test_oauth.py` | 12 | 55 | Provider listing, initiate, callback guards/redirects, link flow, social accounts, audit, `require_mfa_claim` (`OAuthMfaClaimTests`) |
-| `test_passkeys.py` | 9 | 62 | Passkey registration and passwordless sign-in against a software authenticator, MFA policy and grace arithmetic, removal guard, admin reset, RP-ID system check |
+| `test_passkeys.py` | 9 | 64 | Passkey registration and passwordless sign-in against a software authenticator, MFA policy and grace arithmetic, removal guard, admin reset, RP-ID/origin system checks |
 | `test_mfa.py` | 4 | 28 | TOTP enrolment/removal/recovery codes, two-step login, MFA at the magic-link/onboarding/OAuth/impersonation/email-verification doors, per-account throttle (`SPEC-2026-09-two-factor-authentication`) |
 | `test_cookie_oauth.py` | — (7 module-level test functions) | 7 | Refresh/logout cookie handling; token exchange sets cookies, consumes codes, and stamps `last_login` |
 | `test_impersonation.py` | 5 | 21 | Permissions, audit, cookie round-trip, stop-impersonation |
 | `test_throttling.py` | 3 | 14 | Per-IP 429 boundaries for all six public auth write endpoints; budgets are independent; production settings wiring and spoofed `X-Forwarded-For` regression coverage; headers neither evade the login bucket without a trusted proxy nor escape the right-most-entry bucket with one trusted hop |
+
+**`config/test_settings_guards.py`** (3 test classes, 22 tests):
+
+| Class | Tests | Description |
+|---|---:|---|
+| `ValidateSecretKeyTests` | 4 | Rejects empty and placeholder production keys while allowing them in development |
+| `ProductionHostsCheckTests` | 11 | Rejects unsafe hosts and frontend origins; accepts a complete production configuration; preserves distinct system-check IDs |
+| `ProductionConfigurationCheckTests` / `SeedDemoGuardTests` | 7 | Rejects empty/insecure CSRF origins, console or incomplete SMTP mail, and empty WebAuthn settings; refuses demo seeding in production |
 
 **`zev/tests.py`** (14 test classes):
 

@@ -60,6 +60,10 @@ is reachable from the host; the backend is not published and is reachable only
 through the frontend's `/api/` proxy, while PostgreSQL and Redis talk over the
 compose network only.
 
+Configure the SMTP settings and sender address in `backend/.env` before using
+registration, onboarding, invoice, or security emails; see the [Email
+Configuration guide](10-email-configuration.md).
+
 > **HTTPS is required for public access.** With `DEBUG=False` the auth and
 > CSRF cookies are `Secure`, so browsers only send them over HTTPS — plain
 > HTTP works for local loopback testing, but a public domain needs TLS
@@ -68,6 +72,12 @@ compose network only.
 > `FRONTEND_URL` to the public `https://` origin (even when
 > `CORS_ALLOWED_ORIGINS` stays empty for same-origin deployments), and open
 > the app at that `https://` URL.
+
+The shipped nginx sanitizes `X-Forwarded-For` and the production stack keeps
+`NUM_PROXIES=1`. If another proxy sits in front of it, audit and rate-limit
+identity is therefore the immediate outer-proxy address; do not increase
+`NUM_PROXIES` unless the entire proxy chain is deliberately sanitized and
+configured to preserve client addresses.
 
 > **`/media/` is never web-served in production** — invoice files are served
 > only through authenticated API endpoints.
