@@ -14,6 +14,7 @@ from math import exp, pi, sin
 from typing import Callable, NamedTuple
 
 from django.contrib.auth import get_user_model
+from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 from django.db.models import Sum
@@ -273,6 +274,8 @@ class Command(BaseCommand):
 
     @transaction.atomic
     def handle(self, *args, **options):
+        if not settings.DEBUG:
+            raise CommandError("seed_demo creates demo users with known passwords and is only available when DEBUG=True.")
         # Seed relative to today so the period the UI opens on always has data.
         # A fixed window silently goes stale: once today moves past it, the
         # dashboard, charts and invoice pages all render empty.

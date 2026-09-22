@@ -111,27 +111,68 @@ All end-user documentation has been moved to `docs/user-guide/` and organized by
 
 ## Quick Start (Docker)
 
+### Local development and demo
+
 Start the full stack and seed a reusable demo environment in one command:
 
 ```bash
 scripts/start-demo-environment.sh
 ```
 
-Or start the stack without demo data:
+The script creates `backend/.env` from `backend/.env.example` (development
+defaults, `DEBUG=True`) when it does not exist yet, then starts the default
+stack and runs `seed_demo`. It refuses to run when `backend/.env` disables
+`DEBUG` (a production configuration) instead of seeding it. For day-to-day frontend/backend development with
+live reload instead, use the dev stack:
 
 ```bash
-docker compose up -d --build
+docker compose -f docker-compose.dev.yml up -d --build
 ```
 
 Stop it with:
 
 ```bash
-docker compose down
+docker compose -f docker-compose.dev.yml down
 ```
 
-Services: Frontend <http://localhost:8080> · Backend API <http://localhost:8080/api/v1/> · PostgreSQL localhost:5432 · Redis localhost:6379.
+Services: Frontend <http://localhost:8080> · Backend API <http://localhost:8080/api/v1/> · PostgreSQL and Redis internal to the compose network.
 
 > **Breaking local API endpoint change:** the default API is now `http://localhost:8080/api/v1/` via nginx (the backend port is no longer published). `docker-compose.dev.yml` still serves it directly on port 8001.
+
+### Self-hosting
+
+For a production-like deployment, copy the production template and configure
+it for this host (leave `CORS_ALLOWED_ORIGINS` empty for same-origin
+deployments where nginx proxies `/api/`):
+
+```bash
+cp backend/.env.production.example backend/.env
+```
+
+Then start without demo data:
+
+```bash
+docker compose up -d --build
+```
+
+The stack requires `backend/.env` before starting. Only the frontend (`8080`)
+is reachable from the host; the backend is not published and is reachable only
+through the frontend's `/api/` proxy, while PostgreSQL and Redis talk over the
+compose network only.
+
+> **HTTPS is required for public access.** With `DEBUG=False` the auth and
+> CSRF cookies are `Secure`, so browsers only send them over HTTPS — plain
+> HTTP works for local loopback testing, but a public domain needs TLS
+> termination (e.g. a reverse proxy in front of port `8080`). Set
+> `ALLOWED_HOSTS` to the public hostname, `CSRF_TRUSTED_ORIGINS` and
+> `FRONTEND_URL` to the public `https://` origin (even when
+> `CORS_ALLOWED_ORIGINS` stays empty for same-origin deployments), and open
+> the app at that `https://` URL.
+
+> **`/media/` is never web-served in production** — invoice files are served
+> only through authenticated API endpoints.
+
+Services: Frontend <http://localhost:8080> · Backend API <http://localhost:8080/api/v1/> (via nginx).
 
 > **Upgrading from a stack started before this change:** the Postgres data
 > directory is now pinned to `PGDATA=/var/lib/postgresql/data/pgdata` inside the
@@ -157,9 +198,11 @@ For a step-by-step walkthrough — roles, exploring each interface, demo account
 
 ## Optional: Fullstack Container Mode
 
-For a single application container (frontend + backend together), use:
+For a single application container (frontend + backend together), first copy
+and fill the production checklist as above, then use:
 
 ```bash
+cp backend/.env.production.example backend/.env
 docker compose -f docker-compose.fullstack.yml up -d --build
 ```
 

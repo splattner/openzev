@@ -2508,6 +2508,7 @@ class SeedDemoAuditResetTests(TestCase):
 				self.assertTrue(AuditEvent.objects.filter(pk=event.pk).exists())
 
 
+@override_settings(DEBUG=True)
 class SeedDemoEndToEndTests(TestCase):
 	"""The whole ``seed_demo`` command must run on a small deterministic window
 	and re-run identically — the integration check none of the helper-level

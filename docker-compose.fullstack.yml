@@ -1,3 +1,5 @@
+# Single-container self-hosting stack. Requires backend/.env — see README "Self-hosting".
+# Only 8080 is published; db/redis talk over the compose network.
 services:
   app:
     build:
@@ -6,11 +8,11 @@ services:
       args:
         VITE_API_BASE_URL: /api/v1
     env_file:
-      - backend/.env.example
+      - backend/.env
     environment:
       DATABASE_URL: postgres://openzev:openzev@db:5432/openzev
       CELERY_BROKER_URL: redis://redis:6379/0
-      CORS_ALLOWED_ORIGINS: http://localhost:8080
+      CACHE_URL: redis://redis:6379/1
       # One trusted proxy hop: the fullstack nginx overwrites X-Forwarded-For.
       NUM_PROXIES: 1
     depends_on:
@@ -27,12 +29,12 @@ services:
       dockerfile: backend/Dockerfile
     command: celery -A config worker -l info
     env_file:
-      - backend/.env.example
+      - backend/.env
     environment:
       DATABASE_URL: postgres://openzev:openzev@db:5432/openzev
       CELERY_BROKER_URL: redis://redis:6379/0
+      CACHE_URL: redis://redis:6379/1
     volumes:
-      - ./backend:/app
       - backend_media:/app/media
     depends_on:
       - app
@@ -44,7 +46,7 @@ services:
       dockerfile: backend/Dockerfile
     command: celery -A config beat -l info --scheduler django_celery_beat.schedulers:DatabaseScheduler
     env_file:
-      - backend/.env.example
+      - backend/.env
     environment:
       DATABASE_URL: postgres://openzev:openzev@db:5432/openzev
       CELERY_BROKER_URL: redis://redis:6379/0
@@ -64,11 +66,10 @@ services:
     environment:
       POSTGRES_DB: openzev
       POSTGRES_USER: openzev
+      # Fixed password is deliberate — this port is never published.
       POSTGRES_PASSWORD: openzev
       # Keep in step with docker-compose.yml — see the note there.
       PGDATA: /var/lib/postgresql/data/pgdata
-    ports:
-      - "5432:5432"
     volumes:
       # Same mount path as docker-compose.yml: the volume is shared, and a
       # differing path silently gives this stack its own cluster (#492).
@@ -76,8 +77,6 @@ services:
 
   redis:
     image: redis:8-alpine
-    ports:
-      - "6379:6379"
 
 volumes:
   postgres_data:

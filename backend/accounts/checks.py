@@ -4,8 +4,13 @@ Imported for its side effect (the ``@register`` decorators run at import
 time) from ``AccountsConfig.ready()``, the same pattern used for ``schema``.
 """
 
+from urllib.parse import urlparse
+
 from django.conf import settings
-from django.core.checks import Tags, Warning, register
+from django.core.checks import Error, Tags, Warning, register
+
+LOOPBACK_HOSTS = {"localhost", "127.0.0.1", "[::1]", "::1"}
+FRONTEND_LOOPBACK_HOSTS = {"localhost", "127.0.0.1", "::1"}
 
 
 @register(Tags.security)
@@ -54,3 +59,32 @@ def webauthn_rp_configured(app_configs, **kwargs):
             id="accounts.W002",
         )
     ]
+
+
+@register(Tags.security)
+def production_hosts_configured(app_configs, **kwargs):
+    """Reject development host/origin defaults when ``DEBUG=False``."""
+    if settings.DEBUG:
+        return []
+    errors = []
+    hosts = [h.strip().lower() for h in settings.ALLOWED_HOSTS if h.strip()]
+    if "*" in hosts or not hosts or set(hosts) <= LOOPBACK_HOSTS:
+        errors.append(
+            Error(
+                "ALLOWED_HOSTS must not use development defaults in production.",
+                hint="Set ALLOWED_HOSTS to the public hostname(s) of this instance. "
+                '"*" disables Host header validation and must not be used.',
+                id="accounts.E003",
+            )
+        )
+    frontend_url = str(settings.FRONTEND_URL).strip()
+    hostname = (urlparse(frontend_url if "://" in frontend_url else f"//{frontend_url}").hostname or "").lower()
+    if not frontend_url or hostname in FRONTEND_LOOPBACK_HOSTS:
+        errors.append(
+            Error(
+                "FRONTEND_URL must not use a development origin in production.",
+                hint="Set FRONTEND_URL to the public base URL of the frontend.",
+                id="accounts.E004",
+            )
+        )
+    return errors

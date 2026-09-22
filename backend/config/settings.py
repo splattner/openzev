@@ -13,18 +13,24 @@ env = environ.Env(
 )
 environ.Env.read_env(BASE_DIR / ".env")
 
-SECRET_KEY = env("SECRET_KEY", default="change-me-in-production-use-a-long-random-string")
+_INSECURE_SECRET_KEY = "change-me-in-production-use-a-long-random-string"
+
+SECRET_KEY = env("SECRET_KEY", default=_INSECURE_SECRET_KEY)
 DEBUG = env("DEBUG")
 ALLOWED_HOSTS = env.list("ALLOWED_HOSTS", default=["localhost", "127.0.0.1"])
 
-# Fail fast if the insecure placeholder reaches a DEBUG=False deployment.
-_INSECURE_SECRET_KEY = "change-me-in-production-use-a-long-random-string"  # default above, .env.example & Helm
-if not DEBUG and SECRET_KEY == _INSECURE_SECRET_KEY:
-    raise ImproperlyConfigured(
-        "SECRET_KEY is an insecure placeholder; generate a long random key "
-        '(e.g. python -c "import secrets; print(secrets.token_urlsafe(64))") '
-        "and set it in the environment when DEBUG=False."
-    )
+
+def validate_secret_key(debug: bool, secret_key: str) -> None:
+    """Raise if ``secret_key`` is unsafe for a production (``DEBUG=False``) deployment."""
+    if not debug and (not secret_key or secret_key == _INSECURE_SECRET_KEY):
+        raise ImproperlyConfigured(
+            "SECRET_KEY is missing or an insecure placeholder; generate a long random key "
+            '(e.g. python -c "import secrets; print(secrets.token_urlsafe(64))") '
+            "and set it in the environment when DEBUG=False."
+        )
+
+
+validate_secret_key(DEBUG, SECRET_KEY)
 
 # ── Applications ─────────────────────────────────────────────────────────────
 INSTALLED_APPS = [

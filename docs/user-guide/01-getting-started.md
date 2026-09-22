@@ -12,39 +12,73 @@ This guide covers installation, quick setup, and first-time use of OpenZEV.
 
 OpenZEV is designed to run in Docker for easy setup and deployment.
 
-### Default Setup (Recommended)
+### Demo and local development
 
-Keep frontend, backend, and worker separated for cleaner scaling and easier operations:
-
-```bash
-cd /path/to/openzev
-docker compose up -d --build
-```
-
-To start the stack and seed the full demo dataset in one step:
+Keep frontend, backend, and worker separated for cleaner scaling and easier operations. To start the stack and seed the full demo dataset in one step:
 
 ```bash
 scripts/start-demo-environment.sh
 ```
 
-Wait a few seconds for services to start, then access:
-
-- **Frontend (UI):** http://localhost:8080
-- **Backend API:** http://localhost:8080/api/v1/
-- **Database:** localhost:5432 (PostgreSQL)
-- **Message Broker:** localhost:6379 (Redis)
-
-To stop:
+The script creates `backend/.env` from `backend/.env.example` (development
+defaults) when it does not exist yet, and refuses to run when `backend/.env`
+disables `DEBUG` (a production configuration) instead of seeding it.
+For day-to-day development with live
+reload, use the dev stack instead:
 
 ```bash
-docker compose down
+cd /path/to/openzev
+docker compose -f docker-compose.dev.yml up -d --build
 ```
+
+Wait a few seconds for services to start, then access:
+
+- **Frontend (UI):** http://localhost:8080 (dev stack: http://localhost:5173)
+- **Backend API:** http://localhost:8080/api/v1/ (dev stack: http://localhost:8001)
+- **Database:** localhost:5432 (PostgreSQL, dev stack only)
+- **Message Broker:** localhost:6379 (Redis, dev stack only)
+
+To stop the dev stack:
+
+```bash
+docker compose -f docker-compose.dev.yml down
+```
+
+### Self-hosting
+
+For a production-like deployment, copy the production template and configure
+it for this host (leave `CORS_ALLOWED_ORIGINS` empty for same-origin
+deployments where nginx proxies `/api/`):
+
+```bash
+cp backend/.env.production.example backend/.env
+docker compose up -d --build
+```
+
+The stack requires `backend/.env` before starting. Only the frontend (`8080`)
+is reachable from the host; the backend is not published and is reachable only
+through the frontend's `/api/` proxy, while PostgreSQL and Redis talk over the
+compose network only.
+
+> **HTTPS is required for public access.** With `DEBUG=False` the auth and
+> CSRF cookies are `Secure`, so browsers only send them over HTTPS — plain
+> HTTP works for local loopback testing, but a public domain needs TLS
+> termination (e.g. a reverse proxy in front of port `8080`). Set
+> `ALLOWED_HOSTS` to the public hostname, `CSRF_TRUSTED_ORIGINS` and
+> `FRONTEND_URL` to the public `https://` origin (even when
+> `CORS_ALLOWED_ORIGINS` stays empty for same-origin deployments), and open
+> the app at that `https://` URL.
+
+> **`/media/` is never web-served in production** — invoice files are served
+> only through authenticated API endpoints.
 
 ### Fullstack Container Mode (Single Container)
 
-If you prefer running frontend and backend in a single container:
+If you prefer running frontend and backend in a single container, copy and
+fill the production checklist as above, then run:
 
 ```bash
+cp backend/.env.production.example backend/.env
 docker compose -f docker-compose.fullstack.yml up -d --build
 docker compose -f docker-compose.fullstack.yml down
 ```

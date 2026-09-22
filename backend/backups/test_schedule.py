@@ -227,9 +227,11 @@ class UnencryptedScheduleWarningTests(TestCase):
         self.assertEqual(self.check(databases=None), [])
 
     def test_it_is_wired_into_manage_py_check(self):
+        # Isolate the backup warning from the accounts.E003/E004 production guard.
         schedule.set_schedule(enabled=True, frequency="daily", hour=2, minute=0, day_of_week=0)
         err = StringIO()
-        call_command("check", "--database", "default", stdout=StringIO(), stderr=err)
+        with override_settings(DEBUG=True):
+            call_command("check", "--database", "default", stdout=StringIO(), stderr=err)
         self.assertIn("backups.W001", err.getvalue())
 
     def test_unmigrated_database_does_not_break_the_check(self):

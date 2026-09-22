@@ -32,6 +32,15 @@ else
 fi
 
 echo "Using compose command: $COMPOSE_CMD_RESOLVED"
+# The demo needs dev defaults: refuse a production .env rather than seeding it.
+if [ ! -f "$ROOT_DIR/backend/.env" ]; then
+    echo "Creating backend/.env from backend/.env.example (development defaults)..."
+    cp "$ROOT_DIR/backend/.env.example" "$ROOT_DIR/backend/.env"
+elif grep -Eqi '^[[:space:]]*(export[[:space:]]+)?DEBUG[[:space:]]*=[[:space:]]*["'"'"']?(false|0|no|off)["'"'"']?[[:space:]]*(#.*)?$' "$ROOT_DIR/backend/.env"; then
+    echo "Refusing: backend/.env has DEBUG=False (production). The demo stack needs" >&2
+    echo "development defaults — back up and remove backend/.env, or set DEBUG=True." >&2
+    exit 1
+fi
 echo "Starting OpenZEV demo stack..."
 (cd "$ROOT_DIR" && sh -lc "$COMPOSE_CMD_RESOLVED up -d --build")
 
