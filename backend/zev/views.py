@@ -36,6 +36,7 @@ from .permissions import (
     BaseZevScopedPermission,
     MeteringPointAssignmentPermission,
     MeteringPointPermission,
+    ZevDisablePermission,
     ZevManagementPermission,
 )
 from .grid_operators import load_grid_operators, grid_operators_for_postal_code
@@ -75,9 +76,12 @@ class ZevViewSet(ZevScopedQuerySetMixin, viewsets.ModelViewSet):
         # disable is a POST too, but not a creation — ZevManagementPermission
         # would otherwise sweep it into its admin-only POST rule. Object-level
         # ownership (admin, or the ZEV's own owner) is enforced by
-        # get_object() via BaseZevScopedPermission.has_object_permission.
+        # get_object() via ZevDisablePermission.has_object_permission — a
+        # variant of BaseZevScopedPermission without its disabled-ZEV write
+        # block, which would otherwise turn "already disabled" from this
+        # view's own 400 into a 403 from the permission layer instead.
         if self.action == "disable":
-            return [IsAuthenticated(), BaseZevScopedPermission()]
+            return [IsAuthenticated(), ZevDisablePermission()]
         # enable reverses disable and is deliberately admin-only, unlike
         # disable itself — an owner cannot re-enable their own ZEV.
         if self.action == "enable":

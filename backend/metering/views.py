@@ -76,7 +76,10 @@ class MeterReadingViewSet(ZevScopedQuerySetMixin, viewsets.ModelViewSet):
             participant__user=user,
             valid_from__lte=reading_day,
         ).filter(Q(valid_to__isnull=True) | Q(valid_to__gte=reading_day))
-        return qs.filter(Exists(assignments))
+        # This branch fully replaces the base implementation rather than
+        # extending it, so the disabled-ZEV exclusion it would otherwise give
+        # participants for free has to be applied here explicitly too.
+        return self._exclude_disabled_zev(qs.filter(Exists(assignments)))
 
     def get_queryset(self):
         return self.scope_queryset(MeterReading.objects.select_related("metering_point__zev"))

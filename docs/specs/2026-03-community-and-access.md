@@ -259,10 +259,27 @@ Defined in `accounts/permissions.py` and `zev/permissions.py`.
 1. `admin` → allow.
 2. Resolve `zev` from the object graph (Zev, Participant, MeteringPoint,
    MeteringPointAssignment).
-3. `zev_owner` and `zev.owner == user` → allow.
-4. If `allow_participant_safe_methods` and method is safe → allow if
+3. **Disabled ZEV, non-safe method** → deny unless `admin` (checked before the
+   ownership rule below, so it also blocks the object's own owner). Read-only
+   surfaces a disabled ZEV to everyone the ownership/participant rules would
+   otherwise admit; only `admin` may still write to it (ZEV lifecycle phase
+   2 — see §7.1a). Not covered here: `Tariff`/`TariffPeriod`/`Invoice`/
+   `MeterReading` use `IsZevOwnerOrAdmin`, which has no
+   `has_object_permission`, so an existing row of those models under a
+   disabled ZEV can still be edited by its owner (creating a *new* one is
+   still blocked — see §4.5's `assert_within_scope`, which covers every
+   model with a `scope_parent_path` regardless of permission class).
+4. `zev_owner` and `zev.owner == user` → allow.
+5. If `allow_participant_safe_methods` and method is safe → allow if
    `zev.participants.filter(user=user).exists()`.
-5. Else → deny.
+6. Else → deny.
+
+`ZevViewSet.disable` deliberately does **not** go through this rule: its
+permission is `ZevDisablePermission`, an ownership-only variant without step
+3, so calling `disable` on an already-disabled ZEV is a `400` ("already
+disabled") from the view rather than a `403` from the permission layer —
+the caller is not being denied permission to touch their own ZEV, the
+request is just redundant.
 
 ### 4.4 Read scoping and the `zev_id` filter (`ZevScopedQuerySetMixin`)
 
@@ -287,6 +304,19 @@ one. The empty path denotes `ZevViewSet`, whose model *is* the ZEV.
 
 The filter can only narrow: it adds a conjunctive `filter()` to the
 already-role-scoped queryset, so it is not a route to another tenant's data.
+
+**Disabled ZEV, participant branch (ZEV lifecycle phase 2):** the
+`participant_filter` branch of `_scope_by_role` also excludes rows whose ZEV
+is disabled (`_exclude_disabled_zev`, keyed off `zev_lookup`, the same
+derived path `_narrow_by_zev_id` uses) — a disabled ZEV is invisible to its
+participants, not merely read-only the way it is to its owner (§4.3, §7.1a).
+The `zev_owner`/`admin` branches are untouched: the owner keeps read access
+to their own disabled ZEV's rows everywhere `zev_owner_filter` reaches, and
+writes to them are what `has_object_permission` (§4.3) and
+`assert_within_scope` (below) block instead. `MeterReadingViewSet` overrides
+`_scope_by_role` outright for its participant branch (assignment-window
+matching, not a plain filter) and calls `_exclude_disabled_zev` directly on
+its result.
 
 ### 4.5 Write scoping (`ZevScopedQuerySetMixin`)
 
@@ -316,8 +346,18 @@ from a write payload to the ZEV the row would belong to.
 1. Resolve the target ZEV via `scope_parent_path`. Not present in the payload
    (a `PATCH` that leaves the relation alone) → nothing to check, allow.
 2. `admin` → allow.
-3. `zev.owner == user` → allow.
-4. Else → `ValidationError` on the relation field (HTTP 400).
+3. `zev.owner != user` → `ValidationError` on the relation field (HTTP 400).
+4. `zev.disabled_at is not None` → `ValidationError` on the relation field,
+   a different message ("This ZEV is disabled…") (ZEV lifecycle phase 2).
+   This is the create-time counterpart of `has_object_permission`'s
+   disabled-ZEV rule (§4.3) — DRF never consults object permissions on
+   create, which is the reason this whole mixin exists, so the same rule
+   needs its own check here. It runs for every viewset in the
+   `scope_parent_path` table above, independent of which permission class
+   that viewset uses — this is what closes the create-side of the gap
+   `has_object_permission` leaves open for `Tariff`/`TariffPeriod`/
+   `Invoice`/`MeterReading` (§4.3 point 3).
+5. Else → allow.
 
 Rejection is a field validation error rather than a permission denial so it
 reads like DRF's other related-field errors and names the offending field
@@ -897,21 +937,20 @@ uses `ZevDetailSerializer` which nests `participants` (via
 - If previous owner no longer owns any ZEV and is not superuser → demote to
   `participant`.
 
-### 7.1a Disable and enable (ZEV lifecycle, phase 1)
+### 7.1a Disable and enable (ZEV lifecycle, phases 1–2)
 
 Disable is retirement, not deletion: nothing under the ZEV is touched, and it
-is reversible via `enable`. This is the first landed slice of the ZEV
-lifecycle issue's three-state model (`active → disabled → gone`) — the state
-and its two entry points only. Not yet done, tracked on that issue: cutting
-off participant/owner reads of `Participant`/`MeteringPoint`/`Tariff`/
-`Invoice` rows under a disabled ZEV; the public unauthenticated routes
-(invoice access links, onboarding links) rejecting a disabled ZEV; the
-dynamic-tariff/invoice Celery tasks skipping one; the admin purge; and any
-frontend UI — nothing calls either action yet, so this is API-only and inert.
+is reversible via `enable`. This is the ZEV lifecycle issue's three-state
+model (`active → disabled → gone`) — the state, its two entry points, and (as
+of phase 2) cutting off access to what is under a disabled ZEV. Still not
+done, tracked on that issue: the dynamic-tariff/invoice Celery tasks skipping
+a disabled ZEV; the admin purge; and any frontend UI — nothing calls either
+action yet, so this remains API-only.
 
 **`POST /api/v1/zev/zevs/{id}/disable/`** — the ZEV's owner, or an admin.
-Permission is `BaseZevScopedPermission` (not `ZevManagementPermission`, which
-would otherwise sweep this POST into its admin-only rule) via a
+Permission is `ZevDisablePermission` (not `ZevManagementPermission`, which
+would otherwise sweep this POST into its admin-only rule, and deliberately
+not the ordinary `BaseZevScopedPermission` either — see §4.3) via a
 `get_permissions()` override keyed on `self.action`. Body: `{"reason": "..."}`
 (optional, defaults to `""`). Sets `disabled_at = now()`, `disabled_by =
 request.user`, `disabled_reason = reason`; `400` if already disabled. Returns
@@ -922,6 +961,30 @@ the updated `ZevDetailSerializer` representation. Records `zev.disable`
 `get_permissions()` override) — the owner cannot self-serve this. Clears
 `disabled_at`/`disabled_by`/`disabled_reason`; `400` if not currently
 disabled. Records `zev.enable`.
+
+**Access cutoff (phase 2):** once disabled —
+
+- A participant loses read access to everything under that ZEV that
+  `ZevScopedQuerySetMixin` scopes for them: metering points, invoices, and
+  readings via the metering `raw-data`/`chart-data` actions (§4.4). Not
+  `Participant`/`MeteringPointAssignment` rows specifically — a participant
+  already gets `403` from every method on those two regardless of ZEV state
+  (§12.1), so there was nothing for this change to alter there.
+- The owner keeps read access everywhere (`zev_owner_filter` is untouched by
+  the disabled-ZEV rules) but loses write access to `Zev`/`Participant`/
+  `MeteringPoint`/`MeteringPointAssignment` rows (`has_object_permission`,
+  §4.3) and to creating any new row under the ZEV, on every ZEV-scoped model
+  (`assert_within_scope`, §4.5). Editing an *existing* `Tariff`/
+  `TariffPeriod`/`Invoice`/`MeterReading` row is not yet blocked — see §4.3
+  point 3.
+- The public unauthenticated routes reject a disabled ZEV exactly like their
+  existing "not valid" cases, so a bearer of an old link cannot tell a
+  disabled ZEV apart from a wrong secret or an opted-out one:
+  `invoices.access_tokens.resolve()` (invoice QR links, and the magic-link
+  request/consume flow built on it — see
+  `2026-09-participant-invoice-access.md`) and `zev.onboarding.resolve()`
+  (onboarding links — see `2026-09-participant-onboarding-link.md`) both
+  return `None` for a disabled ZEV's token, same as every other failure.
 
 **Self-setup guard, updated:** `self_setup`'s "you already have a ZEV" check
 (§7.3) now excludes disabled ZEVs (`disabled_at__isnull=True`), so an owner
@@ -1547,6 +1610,7 @@ lists the test classes per module (test counts are the `test_*` methods).
 | `test_scoping.py` | 1 | 4 | `ZevScopedQuerySetMixin` read scoping by role |
 | `test_write_scoping.py` | 5 | 20 | Write scoping: foreign create refused, move-via-PATCH refused, legit writes and admin bypass still work, audit retained; a ZEV owner cannot DELETE their own or another ZEV (admin-only, audited) |
 | `test_disable_enable.py` | 4 | 17 | ZEV lifecycle phase 1: owner/admin can disable, only admin can enable, both audited, guarded against double-disable/double-enable; a disabled ZEV is read-only to its owner (admin can still write); the self-setup "already have a ZEV" guard excludes disabled ZEVs |
+| `test_disabled_zev_scoping.py` | 4 | 19 | ZEV lifecycle phase 2 (§7.1a): creating into a disabled ZEV refused for every `scope_parent_path` model, admin exempt; PATCH/DELETE on an existing `Participant`/`MeteringPoint`/`MeteringPointAssignment` row blocked for the owner, admin exempt, reads unaffected; a participant loses read access to metering points, invoices and readings under a disabled ZEV while the owner keeps it; access returns in full after `enable` |
 | `test_zev_id_filter.py` | 5 | 15 | `?zev_id=` narrowing on list endpoints |
 | `test_transfer.py` | 6 | 66 | Whole-ZEV archive shape, round-trip, rejected archives, schema parity, transfer endpoints |
 | `test_geocoding.py` | 4 | 19 | Building footprint cache, warm tasks, trigger-on-save |

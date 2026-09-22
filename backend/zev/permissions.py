@@ -19,6 +19,18 @@ class BaseZevScopedPermission(BasePermission):
         zev = self._get_zev(obj)
         if zev is None:
             return False
+        # A disabled ZEV is inert: its owner keeps read-only access to
+        # whatever is under it (to check status, or pull the transfer
+        # archive) but writing to it again takes an admin — through
+        # ZevViewSet.enable or, later, a purge. This is the create-time
+        # counterpart of ZevScopedQuerySetMixin.assert_within_scope, which
+        # covers the same rule on POST (DRF never calls has_object_permission
+        # there). Not yet covered here: Tariff/TariffPeriod/Invoice/
+        # MeterReading use IsZevOwnerOrAdmin, not this class, so an existing
+        # row under those models can still be edited by its owner while its
+        # ZEV is disabled — tracked on the ZEV lifecycle issue.
+        if zev.disabled_at is not None and request.method not in SAFE_METHODS:
+            return user.is_admin
         if user.is_zev_owner and zev.owner == user:
             return True
         if self.allow_participant_safe_methods and request.method in SAFE_METHODS:
@@ -54,19 +66,29 @@ class ZevManagementPermission(BaseZevScopedPermission):
             return request.user.is_admin
         return True
 
+    # has_object_permission's disabled-ZEV write block is inherited from
+    # BaseZevScopedPermission unchanged — a Zev object resolves to itself via
+    # _get_zev, so the same rule that protects a Participant/MeteringPoint
+    # row under a disabled ZEV also protects the Zev row itself.
+
+
+class ZevDisablePermission(BaseZevScopedPermission):
+    """Ownership only — deliberately without the inherited disabled-ZEV write
+    block.
+
+    ``disable``'s whole job is to act on a ZEV regardless of its current
+    state: calling it on an already-disabled ZEV is a 400 ("already
+    disabled") from the view, not a 403 from here. An owner is not being
+    denied permission to touch their own ZEV; the request is just redundant,
+    and the object-permission layer should not pre-empt that distinction.
+    """
+
     def has_object_permission(self, request, view, obj):
-        if not super().has_object_permission(request, view, obj):
-            return False
-        # A disabled ZEV is inert: its owner keeps read-only access (to check
-        # its status or pull the transfer archive) but writing to it again
-        # takes an admin — through ``enable`` (its own permission override,
-        # not this class) or, later, a purge. Without this, a plain PATCH
-        # through the default serializer would let an owner edit — or even
-        # silently re-enable, once the field stops being read-only-by-luck —
-        # a ZEV they just disabled.
-        if getattr(obj, "disabled_at", None) is not None and request.method not in SAFE_METHODS:
-            return request.user.is_admin
-        return True
+        user = request.user
+        if user.is_admin:
+            return True
+        zev = self._get_zev(obj)
+        return zev is not None and user.is_zev_owner and zev.owner == user
 
 
 class MeteringPointPermission(BaseZevScopedPermission):

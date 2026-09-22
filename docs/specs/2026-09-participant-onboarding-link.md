@@ -227,6 +227,12 @@ acceptable because:
 - an operator who suspects a link has leaked has an explicit, one-click way
   to kill it, discoverable from the same row that shows its status.
 
+A disabled ZEV is one more kill switch, not one this spec originally
+anticipated: `onboarding.resolve()` returns `None` for a disabled ZEV's
+token, same as an unknown prefix or a wrong secret, so `onboarding_consume`
+answers `404` indistinguishably from every other failure (ZEV lifecycle
+phase 2 — see `2026-03-community-and-access.md` §7.1a).
+
 ## 9. Deferred / open
 
 - **Returning without the link.** Phase 1 does not yet add "set a password"

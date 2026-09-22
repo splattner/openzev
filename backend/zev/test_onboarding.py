@@ -8,6 +8,7 @@ from datetime import date
 
 from django.core import mail
 from django.test import TestCase
+from django.utils import timezone
 from rest_framework.test import APIClient
 
 from accounts.models import UserRole
@@ -46,6 +47,13 @@ class OnboardingTokenServiceTests(TestCase):
     def test_resolve_rejects_a_revoked_token(self):
         token = onboarding.get_or_create_for_participant(self.participant)
         onboarding.revoke(token)
+
+        self.assertIsNone(onboarding.resolve(token.prefix, token.secret))
+
+    def test_resolve_rejects_a_disabled_zev(self):
+        token = onboarding.get_or_create_for_participant(self.participant)
+        self.zev.disabled_at = timezone.now()
+        self.zev.save()
 
         self.assertIsNone(onboarding.resolve(token.prefix, token.secret))
 
@@ -171,6 +179,16 @@ class OnboardingConsumeViewTests(TestCase):
 
     def test_revoked_link_is_a_404(self):
         onboarding.revoke(self.token)
+
+        resp = self.client.post(
+            self.CONSUME_URL, {"prefix": self.token.prefix, "s": self.token.secret}, format="json",
+        )
+
+        self.assertEqual(resp.status_code, 404)
+
+    def test_disabled_zev_link_is_a_404(self):
+        self.zev.disabled_at = timezone.now()
+        self.zev.save()
 
         resp = self.client.post(
             self.CONSUME_URL, {"prefix": self.token.prefix, "s": self.token.secret}, format="json",

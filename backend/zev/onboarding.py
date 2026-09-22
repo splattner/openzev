@@ -62,7 +62,9 @@ def resolve(prefix: str, secret: str) -> ParticipantOnboardingToken | None:
     Every failure looks the same, for the same reason
     ``access_tokens.resolve`` gives: distinguishing "unknown link" from "wrong
     secret" is the one signal that would make walking the keyspace worth
-    starting.
+    starting — and a disabled ZEV must not answer differently from either of
+    those, or the link would tell its bearer something about the community's
+    current state.
     """
     if not prefix or not secret:
         return None
@@ -76,6 +78,8 @@ def resolve(prefix: str, secret: str) -> ParticipantOnboardingToken | None:
     if token is None:
         return None
     if not hmac.compare_digest(token.secret, secret):
+        return None
+    if token.participant.zev.disabled_at is not None:
         return None
     return token
 

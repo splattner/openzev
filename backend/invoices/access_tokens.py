@@ -71,9 +71,11 @@ def resolve(prefix: str, secret: str) -> InvoiceAccessToken | None:
     """The active token for ``prefix`` whose secret matches, else ``None``.
 
     Returns ``None`` for every failure — unknown prefix, revoked token, wrong
-    secret, and a ZEV that has not opted in. The caller turns all of them into
-    the same 404: distinguishing "no such invoice" from "wrong secret" tells a
-    scanner which prefixes exist.
+    secret, a ZEV that has not opted in, and a disabled ZEV. The caller turns
+    all of them into the same 404: distinguishing "no such invoice" from
+    "wrong secret" tells a scanner which prefixes exist, and a disabled ZEV
+    that answered differently from "not opted in" would tell a bearer of an
+    old link something about the community's current state.
     """
     if not prefix or not secret:
         return None
@@ -91,6 +93,8 @@ def resolve(prefix: str, secret: str) -> InvoiceAccessToken | None:
     if not hmac.compare_digest(token.secret, secret):
         return None
     if not token.invoice.zev.participant_invoice_access:
+        return None
+    if token.invoice.zev.disabled_at is not None:
         return None
     return token
 

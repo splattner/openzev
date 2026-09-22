@@ -234,8 +234,8 @@ depends on.
 
 | Status | When |
 |---|---|
-| 200 | Token found, not revoked, secret matches, ZEV opted in |
-| 404 | Unknown prefix, revoked token, secret mismatch, or ZEV not opted in |
+| 200 | Token found, not revoked, secret matches, ZEV opted in, ZEV not disabled |
+| 404 | Unknown prefix, revoked token, secret mismatch, ZEV not opted in, or ZEV disabled (ZEV lifecycle phase 2 — `access_tokens.resolve()`; the same indistinguishable-404 argument as the other cases applies, so a bearer of an old link cannot tell a disabled ZEV apart from any other failure) |
 
 `language` is the ZEV's `invoice_language`, and it is **not a reader
 preference**: the line items were written in it by the billing engine and the
@@ -639,6 +639,8 @@ Pure mapping only: the URL builder produces `/i/<prefix>?s=<secret>`, and the
       requester never names that address
 - [x] A magic-link user reaches the participant portal without ever setting a password
 - [x] A ZEV that has not opted in prints no QR and serves no public route
+- [x] A disabled ZEV serves no public route either, indistinguishably from
+      every other failure (ZEV lifecycle phase 2)
 - [x] No migration opts an existing ZEV in
 - [x] An owner or admin can actually revoke a printed link, from the UI (#602)
 - [x] The sign-in mail is editable where operators look for it, and a bad edit

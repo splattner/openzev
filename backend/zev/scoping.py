@@ -68,13 +68,31 @@ class ZevScopedQuerySetMixin:
         if user.is_admin:
             return qs
         if user.is_zev_owner:
+            # Deliberately not excluding a disabled ZEV here: its owner keeps
+            # read-only visibility of it (has_object_permission blocks their
+            # writes; assert_within_scope blocks their creates). Only the
+            # participant branch below makes a disabled ZEV disappear
+            # entirely — see _exclude_disabled_zev.
             return qs.filter(**{self.zev_owner_filter: user})
         if self.participant_filter is None:
             return qs.none()
-        qs = qs.filter(**{self.participant_filter: user})
+        qs = self._exclude_disabled_zev(qs.filter(**{self.participant_filter: user}))
         if self.participant_distinct:
             qs = qs.distinct()
         return qs
+
+    def _exclude_disabled_zev(self, qs):
+        """Narrow ``qs`` to rows whose ZEV is not disabled.
+
+        Only ever applied to the participant branch of ``_scope_by_role``: a
+        disabled ZEV is not merely read-only to a participant the way it is
+        to its owner, it is invisible — the same as a ZEV they were never
+        part of. A viewset whose participant scoping fully overrides
+        ``_scope_by_role`` (``MeterReadingViewSet``, for its assignment-window
+        query) calls this directly instead.
+        """
+        lookup = f"{self.zev_lookup}__disabled_at" if self.zev_lookup else "disabled_at"
+        return qs.filter(**{f"{lookup}__isnull": True})
 
     @property
     def zev_lookup(self) -> str:
@@ -124,23 +142,35 @@ class ZevScopedQuerySetMixin:
         return target
 
     def assert_within_scope(self, validated_data):
-        """Refuse a write that would land the object in someone else's ZEV.
+        """Refuse a write that would land the object in someone else's ZEV,
+        or in a disabled one.
 
         Raised as a field validation error rather than a permission denial so
         it reads like the rest of DRF's related-field errors, and so the
         response says which field was wrong without describing the ZEV behind
         it.
+
+        The disabled-ZEV rule has to live here too, not just in
+        ``has_object_permission``: DRF never consults object permissions on
+        create, which is the whole reason this write-scoping mixin exists —
+        this is that check's create-time counterpart, for the same owner who
+        would be refused a PATCH on an existing row in the same ZEV.
         """
         target_zev = self.resolve_scope_zev(validated_data)
         if target_zev is None:
             return
         user = self.request.user
-        if user.is_admin or target_zev.owner_id == user.pk:
+        if user.is_admin:
             return
         field = self.scope_parent_path[0]
-        raise serializers.ValidationError(
-            {field: ["You do not have access to the ZEV this would belong to."]}
-        )
+        if target_zev.owner_id != user.pk:
+            raise serializers.ValidationError(
+                {field: ["You do not have access to the ZEV this would belong to."]}
+            )
+        if target_zev.disabled_at is not None:
+            raise serializers.ValidationError(
+                {field: ["This ZEV is disabled. Ask an admin to re-enable it first."]}
+            )
 
     def perform_create(self, serializer):
         self.assert_within_scope(serializer.validated_data)

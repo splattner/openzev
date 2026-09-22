@@ -86,6 +86,25 @@ class PublicInvoiceAccessTests(PublicInvoiceTestCase):
         self.zev.save()
         self.assertEqual(self._get().status_code, 404)
 
+    def test_disabled_zev_is_404_indistinguishable_from_not_opted_in(self):
+        """A bearer of an old link must not learn the ZEV was disabled."""
+        self.zev.disabled_at = timezone.now()
+        self.zev.save()
+        disabled = self._get()
+        self.zev.disabled_at = None
+        self.zev.participant_invoice_access = False
+        self.zev.save()
+        not_opted_in = self._get()
+
+        self.assertEqual(disabled.status_code, 404)
+        self.assertEqual(disabled.json(), not_opted_in.json())
+
+    def test_disabled_zev_pdf_link_is_404(self):
+        self.zev.disabled_at = timezone.now()
+        self.zev.save()
+        resp = self._get(url=PUBLIC_PDF_URL)
+        self.assertEqual(resp.status_code, 404)
+
     def test_no_session_is_created(self):
         """The endpoint authenticates nobody; it resolves a bearer to one row."""
         self._get()
@@ -375,6 +394,15 @@ class MagicLinkTests(PublicInvoiceTestCase):
 
         self.participant.email = ""
         self.participant.save()
+
+        self.assertEqual(self._request().status_code, 202)
+        self.assertEqual(mail.outbox, [])
+
+    def test_a_disabled_zev_is_still_202_but_sends_nothing(self):
+        from django.core import mail
+
+        self.zev.disabled_at = timezone.now()
+        self.zev.save()
 
         self.assertEqual(self._request().status_code, 202)
         self.assertEqual(mail.outbox, [])
