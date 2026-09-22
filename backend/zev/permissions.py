@@ -39,10 +39,18 @@ class BaseZevScopedPermission(BasePermission):
 
 
 class ZevManagementPermission(BaseZevScopedPermission):
+    # POST creates a ZEV (or imports an archive, which creates one) —
+    # admin-only, same as ``ZevViewSet.create``. DELETE is the same
+    # irreversibility class: ``ZevViewSet`` has no ``destroy`` override, so
+    # without this a ZEV owner's object-level match in
+    # ``has_object_permission`` would let them hard-delete their own
+    # community straight through DRF's default ``DestroyModelMixin``.
+    ADMIN_ONLY_METHODS = frozenset({"POST", "DELETE"})
+
     def has_permission(self, request, view):
         if not super().has_permission(request, view):
             return False
-        if request.method == "POST":
+        if request.method in self.ADMIN_ONLY_METHODS:
             return request.user.is_admin
         return True
 

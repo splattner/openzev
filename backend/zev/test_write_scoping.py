@@ -234,6 +234,39 @@ class LegitimateWritesStillWorkTests(_TwoCommunities):
         self.assertEqual(self.victim_zev.participants.count(), 2)
 
 
+ZEVS = "/api/v1/zev/zevs/"
+
+
+class ZevDeletePermissionTests(_TwoCommunities):
+    """``ZevViewSet`` has no ``destroy`` override, so without an admin-only
+    check in ``ZevManagementPermission`` DRF's default ``DestroyModelMixin``
+    plus the owner-matches-object rule in ``has_object_permission`` let a ZEV
+    owner hard-delete their own community — cascading away every participant,
+    metering point and reading in it. DELETE must be as admin-only as POST.
+    """
+
+    def test_owner_cannot_delete_their_own_zev(self):
+        response = self.client.delete(f"{ZEVS}{self.attacker_zev.id}/")
+        self.assertEqual(response.status_code, 403, response.content)
+        self.assertTrue(Zev.objects.filter(pk=self.attacker_zev.id).exists())
+
+    def test_owner_cannot_delete_another_zev(self):
+        response = self.client.delete(f"{ZEVS}{self.victim_zev.id}/")
+        self.assertEqual(response.status_code, 403, response.content)
+        self.assertTrue(Zev.objects.filter(pk=self.victim_zev.id).exists())
+
+    def test_admin_can_delete_a_zev_and_it_is_audited(self):
+        from audit.models import AuditEvent
+
+        admin_client = APIClient()
+        auth(admin_client, self.admin)
+        response = admin_client.delete(f"{ZEVS}{self.attacker_zev.id}/")
+        self.assertEqual(response.status_code, 204, response.content)
+        self.assertFalse(Zev.objects.filter(pk=self.attacker_zev.id).exists())
+        event = AuditEvent.objects.filter(action_type="zev.delete").latest("created_at")
+        self.assertEqual(event.target_display, "Attacker ZEV")
+
+
 class AuditTrailStillRecordedTests(_TwoCommunities):
     """``AuditedUpdateMixin`` now saves through ``super()``; the diff it records
     must survive that change."""

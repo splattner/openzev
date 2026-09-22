@@ -143,6 +143,28 @@ class ZevViewSet(ZevScopedQuerySetMixin, viewsets.ModelViewSet):
         )
         return Response(result, status=status.HTTP_201_CREATED)
 
+    def perform_destroy(self, instance):
+        # ``ZevManagementPermission`` restricts DELETE to admins, same as
+        # POST — a ZEV owner must not be able to hard-delete their own
+        # community (nor, through cascading FKs, every participant, metering
+        # point and reading in it) through the default ``DestroyModelMixin``.
+        # No purge guardrails yet (dependency-ordered cleanup, media file
+        # removal, pre-delete backup — see the ZEV lifecycle issue); this is
+        # only closing the permission hole, deliberately as its own change.
+        target_id = str(instance.pk)
+        target_display = instance.name
+        super().perform_destroy(instance)
+        self._record_audit_best_effort(
+            self.request,
+            action_category=AuditActionCategory.GOVERNANCE,
+            action_type="zev.delete",
+            target_type="zev.Zev",
+            target_id=target_id,
+            target_display=target_display,
+            summary=f"Deleted ZEV {target_display}.",
+            status=AuditEventStatus.SUCCESS,
+        )
+
     # ── Transfer: whole-ZEV export and import ──────────────────────────────
     #
     # Who may do what follows the rules already in force rather than inventing
@@ -169,18 +191,19 @@ class ZevViewSet(ZevScopedQuerySetMixin, viewsets.ModelViewSet):
             }
         )
 
-    def _record_transfer_audit(self, request, **kwargs):
-        """Record a transfer audit event without failing the operation.
+    def _record_audit_best_effort(self, request, **kwargs):
+        """Record an audit event without failing an already-completed operation.
 
-        On import the ZEV is already committed by the time this runs, and on
-        export the archive is already built — an audit failure must not turn a
-        completed transfer into an error (or, worse, into a duplicate import
-        when the client retries what looked like a failure).
+        On import the ZEV is already committed by the time this runs, on
+        export the archive is already built, and on delete the row is already
+        gone — an audit failure must not turn a completed operation into an
+        error (or, worse for import, into a duplicate when the client retries
+        what looked like a failure).
         """
         try:
             record_audit_event(request=request, **kwargs)
         except Exception:  # noqa: BLE001 - the audit is a log line, not the operation
-            logger.exception("Failed to record transfer audit event")
+            logger.exception("Failed to record audit event")
 
     @action(detail=True, methods=["get"], url_path="export")
     def export_archive(self, request, pk=None):
@@ -203,7 +226,7 @@ class ZevViewSet(ZevScopedQuerySetMixin, viewsets.ModelViewSet):
             )
         except ValueError as exc:
             buffer.close()
-            self._record_transfer_audit(
+            self._record_audit_best_effort(
                 request,
                 action_category=AuditActionCategory.GOVERNANCE,
                 action_type="zev.export",
@@ -218,7 +241,7 @@ class ZevViewSet(ZevScopedQuerySetMixin, viewsets.ModelViewSet):
             return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 
         buffer.seek(0)
-        self._record_transfer_audit(
+        self._record_audit_best_effort(
             request,
             action_category=AuditActionCategory.GOVERNANCE,
             action_type="zev.export",
@@ -281,7 +304,7 @@ class ZevViewSet(ZevScopedQuerySetMixin, viewsets.ModelViewSet):
         name_override = (request.data.get("name") or "").strip()
 
         def _failed(summary, payload, http_status=status.HTTP_400_BAD_REQUEST):
-            self._record_transfer_audit(
+            self._record_audit_best_effort(
                 request,
                 action_category=AuditActionCategory.IMPORT,
                 action_type="zev.import",
@@ -312,7 +335,7 @@ class ZevViewSet(ZevScopedQuerySetMixin, viewsets.ModelViewSet):
         except (ArchiveError, ValueError) as exc:
             return _failed(f"ZEV import failed: {exc}", {"detail": str(exc)})
 
-        self._record_transfer_audit(
+        self._record_audit_best_effort(
             request,
             action_category=AuditActionCategory.IMPORT,
             action_type="zev.import",
