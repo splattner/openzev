@@ -52,7 +52,6 @@ vi.mock('../src/lib/api/zev', async (importOriginal) => ({
     fetchGridOperators: () => Promise.resolve({ operators: [], source: '', cube: '', licence: '', period: '', fetched_on: '' }),
     createZevWithOwner: (...args: unknown[]) => createZevWithOwnerMock(...args),
     updateZev: vi.fn(),
-    deleteZev: vi.fn(),
 }))
 
 vi.mock('../src/lib/api/auth', () => ({

@@ -243,7 +243,7 @@ Defined in `accounts/permissions.py` and `zev/permissions.py`.
 | `IsAdmin` | `accounts` | `user.is_authenticated AND user.is_admin` |
 | `IsZevOwnerOrAdmin` | `accounts` | `user.is_authenticated AND (user.is_zev_owner OR user.is_admin)` |
 | `BaseZevScopedPermission` | `zev` | Base class for ZEV-tenant-aware permissions; checks `has_permission` (role gate) and `has_object_permission` (ZEV ownership check) |
-| `ZevManagementPermission` | `zev` | Extends `BaseZevScopedPermission`; POST and DELETE restricted to admin only; write methods on an already-disabled ZEV also require admin (`has_object_permission`) |
+| `ZevManagementPermission` | `zev` | Extends `BaseZevScopedPermission`; POST restricted to admin only (DELETE is not a supported method on `ZevViewSet` at all); write methods on an already-disabled ZEV also require admin (`has_object_permission`) |
 | `MeteringPointPermission` | `zev` | Extends `BaseZevScopedPermission`; `allow_participant_safe_methods = True` |
 | `MeteringPointAssignmentPermission` | `zev` | Extends `BaseZevScopedPermission`; no participant safe-method override |
 
@@ -934,13 +934,16 @@ participants (`ParticipantCardsSection`, `useParticipantAccountLinking`,
 **Create (POST):** admin only (enforced in `create()` and
 `ZevManagementPermission.has_permission`).
 
-**Delete (DELETE):** admin only (`ZevManagementPermission.has_permission`).
-Hard delete, with no dependency-ordered cleanup or media-file removal yet — see
-the ZEV lifecycle issue for the planned admin purge. Its `perform_destroy`
-records an audited `zev.delete` event (category `governance`) after the row
-is gone, using the same best-effort helper as transfer export/import
-(`_record_audit_best_effort`) so an audit failure cannot turn an
-already-completed delete into an error response.
+**Delete (DELETE): not a supported method.** `ZevViewSet.http_method_names`
+excludes `delete`, so any `DELETE /api/v1/zev/zevs/{id}/` gets a `405`
+regardless of caller — including an admin. This used to be an admin-only hard
+delete (`ZevManagementPermission.has_permission`), but a bare
+`instance.delete()` collides with `Invoice.zev`'s `on_delete=PROTECT` the
+moment a ZEV has any invoice, and it skipped the disable-first safety step
+the lifecycle (§7.1a) is built around. The only supported way to permanently
+remove a ZEV is disable, then the admin-only `purge` action (§7.1b), which
+deletes the `PROTECT`-guarded rows in the right order and requires
+confirming the ZEV's exact name.
 
 **Disabled ZEVs are read-only to non-admins** (`ZevManagementPermission.
 has_object_permission`): any non-safe method on a ZEV whose `disabled_at` is
@@ -1705,7 +1708,7 @@ lists the test classes per module (test counts are the `test_*` methods).
 | Module | Classes | Tests | Coverage |
 |---|---|---|---|
 | `test_scoping.py` | 1 | 4 | `ZevScopedQuerySetMixin` read scoping by role |
-| `test_write_scoping.py` | 5 | 20 | Write scoping: foreign create refused, move-via-PATCH refused, legit writes and admin bypass still work, audit retained; a ZEV owner cannot DELETE their own or another ZEV (admin-only, audited) |
+| `test_write_scoping.py` | 5 | 19 | Write scoping: foreign create refused, move-via-PATCH refused, legit writes and admin bypass still work, audit retained; DELETE on a ZEV is `405` for every role, since the only supported removal path is disable then purge |
 | `test_disable_enable.py` | 4 | 17 | ZEV lifecycle phase 1: owner/admin can disable, only admin can enable, both audited, guarded against double-disable/double-enable; a disabled ZEV is read-only to its owner (admin can still write); the self-setup "already have a ZEV" guard excludes disabled ZEVs |
 | `test_disabled_zev_scoping.py` | 5 | 27 | ZEV lifecycle phase 2 (§7.1a): creating into a disabled ZEV refused for every `scope_parent_path` model, admin exempt; PATCH/DELETE on an existing `Participant`/`MeteringPoint`/`MeteringPointAssignment` row blocked for the owner, admin exempt, reads unaffected; PATCH/DELETE on an existing `Tariff`/`TariffPeriod`/`MeterReading` row blocked the same way via `assert_target_not_disabled`, including a field unrelated to the ZEV relation (which `assert_within_scope` alone would miss); a participant loses read access to metering points, invoices and readings under a disabled ZEV while the owner keeps it; access returns in full after `enable` |
 | `test_purge.py` | 3 | 8 | ZEV lifecycle phase 4 (§7.1b): refuses an active ZEV; a full purge deletes the ZEV and every `CASCADE` child (including both `PROTECT` relations, `Invoice` and `ExportJob`) and removes their media files from storage; `SET_NULL` rows (`AuditEvent`, `ContractIssue`, `BackupJob`) survive with their ZEV link cleared; the endpoint is admin-only, requires the exact ZEV name, refuses an active ZEV, and is audited |

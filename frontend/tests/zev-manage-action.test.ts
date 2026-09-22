@@ -48,7 +48,6 @@ vi.mock('../src/lib/api/zev', () => ({
     fetchParticipants: () => Promise.resolve([]),
     createZevWithOwner: vi.fn(),
     updateZev: vi.fn(),
-    deleteZev: vi.fn(),
     disableZev: vi.fn(),
     enableZev: vi.fn(),
     purgeZev: vi.fn(),

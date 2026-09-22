@@ -237,34 +237,28 @@ class LegitimateWritesStillWorkTests(_TwoCommunities):
 ZEVS = "/api/v1/zev/zevs/"
 
 
-class ZevDeletePermissionTests(_TwoCommunities):
-    """``ZevViewSet`` has no ``destroy`` override, so without an admin-only
-    check in ``ZevManagementPermission`` DRF's default ``DestroyModelMixin``
-    plus the owner-matches-object rule in ``has_object_permission`` let a ZEV
-    owner hard-delete their own community — cascading away every participant,
-    metering point and reading in it. DELETE must be as admin-only as POST.
+class ZevDeleteMethodNotAllowedTests(_TwoCommunities):
+    """``ZevViewSet`` has no DELETE at all (``http_method_names`` excludes
+    it) — a bare ``instance.delete()`` collides with ``Invoice.zev``'s
+    ``on_delete=PROTECT`` the moment a ZEV has any invoice (see
+    ``zev/purge.py``), and it would skip the disable-first safety step the
+    lifecycle is built around. The only supported path to permanently
+    remove a ZEV is disable, then purge — this used to be an admin-only
+    DELETE instead, which is why these cases assert 405 for every role,
+    not just non-admins.
     """
 
-    def test_owner_cannot_delete_their_own_zev(self):
+    def test_owner_gets_method_not_allowed(self):
         response = self.client.delete(f"{ZEVS}{self.attacker_zev.id}/")
-        self.assertEqual(response.status_code, 403, response.content)
+        self.assertEqual(response.status_code, 405, response.content)
         self.assertTrue(Zev.objects.filter(pk=self.attacker_zev.id).exists())
 
-    def test_owner_cannot_delete_another_zev(self):
-        response = self.client.delete(f"{ZEVS}{self.victim_zev.id}/")
-        self.assertEqual(response.status_code, 403, response.content)
-        self.assertTrue(Zev.objects.filter(pk=self.victim_zev.id).exists())
-
-    def test_admin_can_delete_a_zev_and_it_is_audited(self):
-        from audit.models import AuditEvent
-
+    def test_admin_gets_method_not_allowed(self):
         admin_client = APIClient()
         auth(admin_client, self.admin)
         response = admin_client.delete(f"{ZEVS}{self.attacker_zev.id}/")
-        self.assertEqual(response.status_code, 204, response.content)
-        self.assertFalse(Zev.objects.filter(pk=self.attacker_zev.id).exists())
-        event = AuditEvent.objects.filter(action_type="zev.delete").latest("created_at")
-        self.assertEqual(event.target_display, "Attacker ZEV")
+        self.assertEqual(response.status_code, 405, response.content)
+        self.assertTrue(Zev.objects.filter(pk=self.attacker_zev.id).exists())
 
 
 class AuditTrailStillRecordedTests(_TwoCommunities):

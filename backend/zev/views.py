@@ -69,6 +69,14 @@ class ZevViewSet(ZevScopedQuerySetMixin, viewsets.ModelViewSet):
     zev_owner_filter = "owner"
     participant_filter = "participants__user"
     participant_distinct = True
+    # No DELETE: a bare instance.delete() collides with Invoice.zev's
+    # on_delete=PROTECT the moment a ZEV has any invoice (see zev/purge.py's
+    # docstring), and it also skips the disable-first safety step the
+    # lifecycle is built around. The only supported path to permanently
+    # remove a ZEV is disable, then the ``purge`` action below, which deletes
+    # the PROTECT-guarded rows in the right order and requires typing the
+    # ZEV's name back to confirm.
+    http_method_names = [name for name in viewsets.ModelViewSet.http_method_names if name != "delete"]
 
     def get_permissions(self):
         # self_setup is a POST by non-admins — skip ZevManagementPermission
@@ -282,28 +290,6 @@ class ZevViewSet(ZevScopedQuerySetMixin, viewsets.ModelViewSet):
             "deleted_counts": result.deleted_counts,
             "media_files_deleted": result.media_files_deleted,
         })
-
-    def perform_destroy(self, instance):
-        # ``ZevManagementPermission`` restricts DELETE to admins, same as
-        # POST — a ZEV owner must not be able to hard-delete their own
-        # community (nor, through cascading FKs, every participant, metering
-        # point and reading in it) through the default ``DestroyModelMixin``.
-        # No purge guardrails yet (dependency-ordered cleanup, media file
-        # removal, pre-delete backup — see the ZEV lifecycle issue); this is
-        # only closing the permission hole, deliberately as its own change.
-        target_id = str(instance.pk)
-        target_display = instance.name
-        super().perform_destroy(instance)
-        self._record_audit_best_effort(
-            self.request,
-            action_category=AuditActionCategory.GOVERNANCE,
-            action_type="zev.delete",
-            target_type="zev.Zev",
-            target_id=target_id,
-            target_display=target_display,
-            summary=f"Deleted ZEV {target_display}.",
-            status=AuditEventStatus.SUCCESS,
-        )
 
     # ── Transfer: whole-ZEV export and import ──────────────────────────────
     #

@@ -25,7 +25,7 @@ import { ZevImportModal } from '../features/zev/ZevImportModal'
 import { formatShortDate, useAppSettings } from '../lib/appSettings'
 import { useAuth } from '../lib/auth'
 import { FormModal } from '../components/FormModal'
-import { createZevWithOwner, deleteZev, disableZev, enableZev, fetchParticipants, fetchZevs, purgeZev, updateZev } from '../lib/api/zev'
+import { createZevWithOwner, disableZev, enableZev, fetchParticipants, fetchZevs, purgeZev, updateZev } from '../lib/api/zev'
 import { fetchUsers } from '../lib/api/auth'
 import { formatApiError } from '../lib/api/errors'
 import { queryKeys } from '../lib/api/queryKeys'
@@ -158,13 +158,6 @@ export function ZevListPage({ embedded = false }: { embedded?: boolean }) {
             void queryClient.invalidateQueries({ queryKey: queryKeys.zev.list() })
         },
         onError: (error) => setEditError(formatApiError(error, t('pages.zevs.messages.updateFailed'))),
-    })
-
-    const deleteMutation = useMutation({
-        mutationFn: deleteZev,
-        onSuccess: () => {
-            void queryClient.invalidateQueries({ queryKey: queryKeys.zev.list() })
-        },
     })
 
     const disableMutation = useMutation({
@@ -1154,16 +1147,6 @@ export function ZevListPage({ embedded = false }: { embedded?: boolean }) {
                                                 {t('pages.zevs.disable')}
                                             </button>
                                         )}
-                                        <button className="button button-danger button-compact" type="button" disabled={deleteMutation.isPending || dialogLoading} onClick={() => confirm({
-                                            title: t('pages.zevs.deleteTitle'),
-                                            message: t('pages.zevs.deleteMessage', { name: zev.name }),
-                                            confirmText: t('pages.zevs.deleteConfirm'),
-                                            isDangerous: true,
-                                            onConfirm: () => deleteMutation.mutate(zev.id),
-                                        })}>
-                                            <FontAwesomeIcon icon={faTrash} fixedWidth />
-                                            {t('common.delete')}
-                                        </button>
                                     </div>
                                 </td>
                             </tr>

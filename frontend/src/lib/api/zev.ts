@@ -39,10 +39,6 @@ export async function updateZev(id: string, payload: Partial<ZevInput>): Promise
   return data
 }
 
-export async function deleteZev(id: string): Promise<void> {
-  await api.delete(`/zev/zevs/${id}/`)
-}
-
 /** Disable a ZEV — reversible, touches nothing under it. The ZEV's own owner or an admin may call this. */
 export async function disableZev(id: string, reason?: string): Promise<Zev> {
   const { data } = await api.post<Zev>(`/zev/zevs/${id}/disable/`, { reason: reason ?? '' })
