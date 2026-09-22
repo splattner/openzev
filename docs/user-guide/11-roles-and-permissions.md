@@ -415,7 +415,8 @@ Sessions on other devices also end automatically when you:
 - confirm an email change, or
 - have your two-factor authentication reset by an administrator, or your account deactivated.
 
-Signing out on one device (**Log out**) only ends that browser's session. API keys are separate
+**Logout** in the user menu signs the account out on every device, including
+the one you are using — you will have to sign back in everywhere. API keys are separate
 credentials and stay valid — see [API keys](16-api-keys.md).
 
 ## Multi-ZEV Setups

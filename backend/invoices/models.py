@@ -248,9 +248,9 @@ DEFAULT_ONBOARDING_EMAIL_BODY = (
     "{inviter_name} added you as a participant of {zev_name} on OpenZEV. "
     "Use the link below to access your account — no password needed:\n\n"
     "{link_url}\n\n"
-    "You can use this link again whenever you want to check your statements "
-    "or consumption. If you would rather sign in with a password, you can "
-    "set one after opening the link.\n\n"
+    "This link is valid until {expiry_date} and you can reuse it until then "
+    "to check your statements or consumption. If you would rather sign in "
+    "with a password, you can set one after opening the link.\n\n"
     "Best regards,\nOpenZEV"
 )
 

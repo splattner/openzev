@@ -315,22 +315,13 @@ class Participant(models.Model):
 
 
 class ParticipantOnboardingToken(models.Model):
-    """A bearer link that signs a participant into their own account.
+    """A reusable per-participant bearer link, valid for 30 days.
 
-    Shaped after ``invoices.InvoiceAccessToken`` rather than
-    ``accounts.MagicLinkToken``: it is per-participant, reusable, and has no
-    expiry. A one-shot token would solve "get them in once" and reopen "get
-    them in the second time" a step later — the participant would have no
-    password and no invoice to scan yet, exactly where they started. Letting
-    the same link keep working (or fail loudly once revoked) means the mail
-    the operator sent can double as the participant's way back in until they
-    choose to set a password of their own.
-
-    Prefix and secret are stored in clear for the same reason
-    ``InvoiceAccessToken.secret`` is: an operator or a database backup that can
-    already read this row can already read the participant's name, address and
-    every invoice attached to them, so hashing the secret would not shrink
-    that blast radius. Revocation, not secrecy of storage, is the control.
+    Lets the mailed link double as the participant's way back in until they
+    set a password of their own, which revokes it. Prefix and secret are
+    stored in clear for the same reason ``InvoiceAccessToken.secret`` is:
+    whoever can read this row can already read the participant it protects,
+    so revocation — not secrecy of storage — is the control.
     """
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -342,16 +333,30 @@ class ParticipantOnboardingToken(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     revoked_at = models.DateTimeField(null=True, blank=True)
     last_used_at = models.DateTimeField(null=True, blank=True)
+    expires_at = models.DateTimeField()
 
     class Meta:
         ordering = ["-created_at", "id"]
+        constraints = [
+            # One usable link per participant: concurrent copy/send requests
+            # must serialize on this rather than minting two live links.
+            models.UniqueConstraint(
+                fields=["participant"],
+                condition=models.Q(revoked_at__isnull=True),
+                name="one_unrevoked_onboarding_token_per_participant",
+            ),
+        ]
 
     def __str__(self):
         return f"{self.prefix} ({self.participant.full_name})"
 
     @property
+    def is_expired(self) -> bool:
+        return self.expires_at <= timezone.now()
+
+    @property
     def is_active(self) -> bool:
-        return self.revoked_at is None
+        return self.revoked_at is None and not self.is_expired
 
 
 class MeteringPointType(models.TextChoices):

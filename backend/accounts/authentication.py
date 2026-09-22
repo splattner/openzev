@@ -6,7 +6,8 @@ from rest_framework.permissions import SAFE_METHODS
 from rest_framework_simplejwt.authentication import JWTAuthentication
 
 from .api_keys import split_key, verify_secret
-from .jwt_utils import IMPERSONATOR_CLAIM, SESSION_CLAIM
+from .jwt_utils import IMPERSONATOR_CLAIM
+from .session_revocation import is_session_current
 
 ACCESS_COOKIE = "openzev_access"
 
@@ -24,7 +25,7 @@ class CookieJWTAuthentication(JWTAuthentication):
         # Tokens minted before the claim existed carry none, which reads as 0 —
         # the value every account starts at, so they stay valid until the first
         # revocation and never after it.
-        if validated_token.get(SESSION_CLAIM, 0) != user.session_version:
+        if not is_session_current(validated_token, user):
             raise exceptions.AuthenticationFailed("This session has been signed out.", code="session_revoked")
         return user
 

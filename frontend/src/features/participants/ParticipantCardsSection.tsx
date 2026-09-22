@@ -61,7 +61,7 @@ function participantValidityBadgeClass(state: ParticipantValidityState): string 
 function onboardingStatusBadgeClass(status: Participant['onboarding_status']): string {
     if (status === 'active') return 'badge badge-success'
     if (status === 'sent') return 'badge badge-info'
-    if (status === 'revoked') return 'badge badge-warning'
+    if (status === 'revoked' || status === 'expired') return 'badge badge-warning'
     return 'badge badge-neutral'
 }
 
@@ -202,6 +202,20 @@ export function ParticipantCardsSection({
                                     <span className={onboardingStatusBadgeClass(participant.onboarding_status)}>
                                         {t(`pages.participants.onboardingStatus.${participant.onboarding_status ?? 'not_sent'}`)}
                                     </span>
+                                    {participant.onboarding_link_expires_at
+                                        && (participant.onboarding_status === 'sent'
+                                            || participant.onboarding_status === 'active'
+                                            || participant.onboarding_status === 'expired') && (
+                                        <span className="muted">
+                                            {participant.onboarding_status === 'expired'
+                                                ? t('pages.participants.onboardingLinkExpiredOn', {
+                                                    date: formatShortDate(participant.onboarding_link_expires_at, settings),
+                                                })
+                                                : t('pages.participants.onboardingLinkExpires', {
+                                                    date: formatShortDate(participant.onboarding_link_expires_at, settings),
+                                                })}
+                                        </span>
+                                    )}
                                     {warnings.length > 0 && (
                                         <span className="badge badge-warning">
                                             <FontAwesomeIcon icon={faTriangleExclamation} fixedWidth />

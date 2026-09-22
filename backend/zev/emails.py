@@ -13,7 +13,15 @@ from django.core.mail import EmailMessage
 logger = logging.getLogger(__name__)
 
 
-def send_onboarding_email(participant, inviter_name: str, link_url: str) -> None:
+def format_expiry_date(expires_at) -> str:
+    """Readable expiry for the mailed link, in ``AppSettings.date_format_short``."""
+    from accounts.models import AppSettings
+    from invoices.dates import format_date_value
+
+    return format_date_value(expires_at, AppSettings.load().date_format_short)
+
+
+def send_onboarding_email(participant, inviter_name: str, link_url: str, expires_at) -> None:
     """Email the onboarding link to the address on the participant's record.
 
     Not localized by the ZEV's ``invoice_language`` — this mail predates any
@@ -33,6 +41,7 @@ def send_onboarding_email(participant, inviter_name: str, link_url: str) -> None
         "inviter_name": inviter_name,
         "zev_name": participant.zev.name,
         "link_url": link_url,
+        "expiry_date": format_expiry_date(expires_at),
     }
 
     def _render(template: str, fallback: str) -> str:

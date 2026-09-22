@@ -727,7 +727,7 @@ class ParticipantViewSet(AuditedCreateDestroyMixin, AuditedUpdateMixin, ZevScope
         by some other channel needs no address on file.
         """
         participant = self.get_object()
-        onboarding_url = get_participant_onboarding_link(participant)
+        onboarding_url, live_token = get_participant_onboarding_link(participant)
         record_audit_event(
             request=request,
             action_category=AuditActionCategory.PARTICIPANT,
@@ -739,13 +739,17 @@ class ParticipantViewSet(AuditedCreateDestroyMixin, AuditedUpdateMixin, ZevScope
             summary=f"Created an onboarding link for participant {participant.full_name}.",
         )
         serializer = self.get_serializer(participant)
-        return Response({"onboarding_url": onboarding_url, "participant": serializer.data})
+        return Response({
+            "onboarding_url": onboarding_url,
+            "onboarding_expires_at": live_token.expires_at,
+            "participant": serializer.data,
+        })
 
     @action(detail=True, methods=["post"], url_path="send-onboarding-link")
     def send_onboarding_link(self, request, pk=None):
         participant = self.get_object()
         try:
-            onboarding_url = send_participant_onboarding_link(participant, request.user)
+            onboarding_url, live_token = send_participant_onboarding_link(participant, request.user)
         except ValueError as exc:
             record_audit_event(
                 request=request,
@@ -774,6 +778,7 @@ class ParticipantViewSet(AuditedCreateDestroyMixin, AuditedUpdateMixin, ZevScope
             {
                 "detail": f"Onboarding email sent to {participant.email}.",
                 "onboarding_url": onboarding_url,
+                "onboarding_expires_at": live_token.expires_at,
             },
             status=status.HTTP_200_OK,
         )

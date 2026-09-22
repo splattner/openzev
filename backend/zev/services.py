@@ -2,12 +2,16 @@ from __future__ import annotations
 
 import secrets
 import string
+from typing import TYPE_CHECKING
 
 from django.contrib.auth import get_user_model
 from django.db import transaction
 from django.utils.text import slugify
 
 from accounts.models import UserRole
+
+if TYPE_CHECKING:
+    from .models import ParticipantOnboardingToken
 
 User = get_user_model()
 
@@ -122,13 +126,13 @@ def ensure_participant_account(participant):
 
 
 @transaction.atomic
-def send_participant_onboarding_link(participant, invited_by) -> str:
+def send_participant_onboarding_link(participant, invited_by) -> tuple[str, ParticipantOnboardingToken]:
     """Ensure an account and onboarding link exist, and email the link.
 
-    Returns the URL, so the caller can also show or copy it — useful as a
-    fallback if the mail never arrives. Raises ``ValueError`` when the
-    participant has no address to send to, same guard the flow it replaced
-    used.
+    Returns the URL and the token it was built from, so the caller reports
+    the expiry of exactly the link it hands out. Raises ``ValueError`` when
+    the participant has no address to send to, same guard the flow it
+    replaced used.
     """
     from . import onboarding
     from .emails import send_onboarding_email
@@ -141,24 +145,25 @@ def send_participant_onboarding_link(participant, invited_by) -> str:
     link_url = onboarding.public_url(token)
 
     inviter_name = invited_by.get_full_name() or invited_by.username
-    send_onboarding_email(participant, inviter_name, link_url)
-    return link_url
+    send_onboarding_email(participant, inviter_name, link_url, token.expires_at)
+    return link_url, token
 
 
 @transaction.atomic
-def get_participant_onboarding_link(participant) -> str:
+def get_participant_onboarding_link(participant) -> tuple[str, ParticipantOnboardingToken]:
     """Ensure an account and onboarding link exist, without emailing it.
 
-    Used by the "copy onboarding link" action: an operator handing the link
-    over in person or by some channel other than email, and by the admin
-    console's account-linking action, which historically did not require an
-    email address either.
+    Returns the URL and the token it was built from, so the caller reports
+    the expiry of exactly the link it hands out. Used by the "copy onboarding
+    link" action: an operator handing the link over in person or by some
+    channel other than email, and by the admin console's account-linking
+    action, which historically did not require an email address either.
     """
     from . import onboarding
 
     ensure_participant_account(participant)
     token = onboarding.get_or_create_for_participant(participant)
-    return onboarding.public_url(token)
+    return onboarding.public_url(token), token
 
 
 @transaction.atomic

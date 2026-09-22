@@ -9,6 +9,7 @@ import type {
   ParticipantInput,
   ParticipantOnboardingLinkResult,
   SelfSetupZevInput,
+  SendOnboardingLinkResult,
   Zev,
   ZevInput,
   ZevWizardInput,
@@ -86,8 +87,8 @@ export async function deleteParticipant(id: string): Promise<void> {
 }
 
 /** Email the onboarding link to the address on the participant's record. */
-export async function sendOnboardingLink(id: string): Promise<{ detail: string; onboarding_url: string }> {
-  const { data } = await api.post<{ detail: string; onboarding_url: string }>(`/zev/participants/${id}/send-onboarding-link/`)
+export async function sendOnboardingLink(id: string): Promise<SendOnboardingLinkResult> {
+  const { data } = await api.post<SendOnboardingLinkResult>(`/zev/participants/${id}/send-onboarding-link/`)
   return data
 }
 

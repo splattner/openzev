@@ -15,7 +15,16 @@ affected.
 from django.db.models import F
 
 from .cookies import set_auth_cookies
-from .jwt_utils import impersonator_of, make_jwt_for_user
+from .jwt_utils import SESSION_CLAIM, impersonator_of, make_jwt_for_user
+
+
+def is_session_current(token, user) -> bool:
+    """True when ``token`` was issued in ``user``'s current session.
+
+    Single place for the ``SESSION_CLAIM`` check. ``is_active`` stays at the
+    call sites (simplejwt's rule for access tokens, explicit filter elsewhere).
+    """
+    return token.get(SESSION_CLAIM, 0) == user.session_version
 
 
 def revoke_sessions(user) -> None:

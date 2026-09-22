@@ -7,7 +7,7 @@ new participant joins, before any bill exists to scan a QR from.
 
 Unlike a magic link, this token is not consumed. See
 ``ParticipantOnboardingToken`` for why it is shaped as a reusable, revocable
-bearer credential instead.
+bearer credential with a bounded lifetime instead.
 """
 import hmac
 import secrets
@@ -15,7 +15,7 @@ from datetime import timedelta
 from urllib.parse import quote
 
 from django.conf import settings
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.utils import timezone
 
 from .models import Participant, ParticipantOnboardingToken
@@ -27,10 +27,33 @@ SECRET_BYTES = 32
 # should not write a row per visit, mirroring access_tokens.USE_RECORD_INTERVAL.
 USE_RECORD_INTERVAL = timedelta(hours=1)
 
+# Freshly minted links stay usable for 30 days.
+ONBOARDING_LINK_LIFETIME = timedelta(days=30)
+
+
+def default_expires_at(now=None):
+    """When a token minted right now stops working."""
+    return (now or timezone.now()) + ONBOARDING_LINK_LIFETIME
+
 
 def generate() -> tuple[str, str]:
     """Return ``(prefix, secret)``."""
     return secrets.token_hex(PREFIX_BYTES), secrets.token_urlsafe(SECRET_BYTES)
+
+
+def active_for_participant(participant: Participant):
+    """Unrevoked links for ``participant``, live or expired."""
+    return participant.onboarding_tokens.filter(revoked_at__isnull=True)
+
+
+def revoke_active_for_user(user) -> int:
+    """Revoke every unrevoked link on all participants linked to ``user``.
+
+    Single UPDATE; returns the revoked count for the audit metadata.
+    """
+    return ParticipantOnboardingToken.objects.filter(
+        participant__user=user, revoked_at__isnull=True
+    ).update(revoked_at=timezone.now())
 
 
 def get_or_create_for_participant(participant: Participant) -> ParticipantOnboardingToken:
@@ -39,15 +62,37 @@ def get_or_create_for_participant(participant: Participant) -> ParticipantOnboar
     Get-or-create, not create: sending the link twice (or copying it after
     already having emailed it) must return the same link rather than silently
     invalidating the one already sitting in an inbox.
-    """
-    existing = participant.onboarding_tokens.filter(revoked_at__isnull=True).first()
-    if existing is not None:
-        return existing
 
-    prefix, secret = generate()
-    return ParticipantOnboardingToken.objects.create(
-        participant=participant, prefix=prefix, secret=secret,
-    )
+    An expired token is revoked and replaced (new secret), never extended.
+
+    Concurrent copy/send requests serialize on the participant row: the loser
+    waits for the winner's commit, then returns the winner's link. The partial
+    unique constraint stays as the backstop; a mint that still fails with no
+    live winner is retried once before surfacing.
+    """
+    attempts = 2
+    while True:
+        try:
+            with transaction.atomic():
+                locked = Participant.objects.select_for_update().get(pk=participant.pk)
+                existing = active_for_participant(locked).first()
+                if existing is not None and not existing.is_expired:
+                    return existing
+                if existing is not None:
+                    # Same savepoint as the mint: a failed insert rolls this back.
+                    revoke(existing)
+                prefix, secret = generate()
+                return ParticipantOnboardingToken.objects.create(
+                    participant=locked, prefix=prefix, secret=secret,
+                    expires_at=default_expires_at(),
+                )
+        except IntegrityError:
+            winner = active_for_participant(participant).first()
+            if winner is not None and not winner.is_expired:
+                return winner
+            attempts -= 1
+            if attempts <= 0:
+                raise
 
 
 def public_url(token: ParticipantOnboardingToken) -> str:
@@ -77,9 +122,11 @@ def resolve(prefix: str, secret: str) -> ParticipantOnboardingToken | None:
     )
     if token is None:
         return None
+    # Compare first: checking the secret before expiry keeps wrong-secret
+    # and expired links indistinguishable by timing.
     if not hmac.compare_digest(token.secret, secret):
         return None
-    if token.participant.zev.disabled_at is not None:
+    if token.is_expired or token.participant.zev.disabled_at is not None:
         return None
     return token
 
@@ -112,14 +159,13 @@ def revoke(token: ParticipantOnboardingToken) -> None:
     token.save(update_fields=["revoked_at"])
 
 
-def revoke_active_for_participant(participant: Participant) -> None:
-    """Revoke whatever active link exists for ``participant``, if any.
+def revoke_active_for_participant(participant: Participant) -> int:
+    """Revoke every unrevoked link for ``participant``, live or expired.
 
-    Called from ``unlink-account``: detaching the account must also kill the
-    link, or the participant it was emailed to can simply click it again and
-    land back in a freshly recreated account — unlinking would not have cut
-    anything.
+    Returns how many rows were revoked. Called from ``unlink-account`` and
+    the password doors: detaching the account (or giving it a password) must
+    also kill the link, or the mailed bearer credential keeps working.
     """
-    participant.onboarding_tokens.filter(revoked_at__isnull=True).update(
+    return active_for_participant(participant).update(
         revoked_at=timezone.now()
     )

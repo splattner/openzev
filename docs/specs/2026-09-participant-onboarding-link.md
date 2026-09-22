@@ -35,8 +35,10 @@ remembers by the next billing period.
 **Outcome:** a participant account is never issued a real password by any of
 these three paths any more. Instead, each produces (or reuses) a per-participant
 bearer link — clicking it signs the participant in, creating the account
-lazily if needed. The link is reusable and revocable rather than one-shot, so
-it doubles as the participant's ordinary way back in, not just their first one.
+lazily if needed. The link is reusable within a 30-day lifetime
+(`zev.onboarding.ONBOARDING_LINK_LIFETIME`) and revocable rather than one-shot, so
+it doubles as the participant's ordinary way back in, not just their first one,
+without leaving an immortal credential behind.
 
 ## 2. Scope
 
@@ -44,7 +46,7 @@ it doubles as the participant's ordinary way back in, not just their first one.
 
 | Area | Details |
 |---|---|
-| Backend — model | `zev.ParticipantOnboardingToken`: per-participant, reusable, revocable bearer link |
+| Backend — model | `zev.ParticipantOnboardingToken`: per-participant, reusable bearer link with a 30-day expiry |
 | Backend — service | `zev.onboarding`: generate/resolve/revoke, mirrors `invoices.access_tokens` |
 | Backend — service | `zev.services.ensure_participant_account` rewritten to never mint a usable password for a participant-role account |
 | Backend — service | `send_participant_onboarding_link` (emails), `get_participant_onboarding_link` (does not) |
@@ -118,15 +120,36 @@ class ParticipantOnboardingToken(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     revoked_at = models.DateTimeField(null=True, blank=True)
     last_used_at = models.DateTimeField(null=True, blank=True)
+    expires_at = models.DateTimeField()
+
+    class Meta:
+        ordering = ["-created_at", "id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["participant"],
+                condition=models.Q(revoked_at__isnull=True),
+                name="one_unrevoked_onboarding_token_per_participant",
+            ),
+        ]
 ```
 
+**Lifetime.** A freshly minted token expires 30 days out
+(`zev.onboarding.ONBOARDING_LINK_LIFETIME`). Migration `0028` backfills
+outstanding rows with `created_at + 30d` in one statement and then makes the
+column non-nullable, so every row carries an expiry and no code path can mint
+an immortal link. Migration `0029` adds a partial unique constraint (one
+unrevoked link per participant) after revoking older duplicates, so rows
+minted by the earlier race-prone implementation cannot fail the upgrade.
+
 Shaped after `invoices.InvoiceAccessToken`, not `accounts.MagicLinkToken`:
-**reusable and no expiry**, rather than one-shot and 15 minutes. A one-shot
+**reusable within its lifetime**, rather than one-shot and 15 minutes. A one-shot
 token solves "get the participant in once" and reopens "get them in the
 second time" a step later — on their next visit they have no password and no
-invoice to scan, exactly where they started. A reusable link, killed only by
-explicit revocation, is what lets the same emailed link double as the
-participant's ordinary way back in. `prefix`/`secret` are stored in clear for
+invoice to scan, exactly where they started. A reusable link, killed by
+explicit revocation, by expiry, or once the participant sets their own
+password (`POST /auth/me/set-initial-password/` revokes the account's links),
+is what lets the same emailed link double as the participant's ordinary way
+back in. `prefix`/`secret` are stored in clear for
 the same reason `InvoiceAccessToken.secret` is (see that model's docstring):
 whoever can already read this row can already read the participant it
 protects, and `accounts.MagicLinkToken` — which grants a full session, not
@@ -172,11 +195,35 @@ from the old action: without it, detaching the account would not actually cut
 access — whoever holds the emailed link could click it again and land in a
 freshly recreated account.
 
+`set-initial-password` (`POST /auth/me/set-initial-password/`) and
+`change-password` (`POST /auth/me/change-password/`) revoke the account's
+onboarding links as well (audited as `onboarding_links_revoked` metadata on
+`password.set_initial` / `password.change`): the link's purpose is fulfilled
+once a password exists, so a leaked mail must not stay a live bearer
+credential afterwards.
+
+`zev.onboarding.resolve(prefix, secret)` compares the secret first and returns
+`None` for an expired token exactly as for a revoked one (same 404 on consume —
+see the enumeration comment in `invoices/views_public.py`).
+`get_or_create_for_participant`
+revokes an expired active token and mints a fresh one (new secret, never an
+extension), so "copy onboarding link" / "resend" always hands out a live link.
+Concurrent copy/send requests are serialized by the partial unique constraint
+(one unrevoked link per participant): the loser returns the winner's link
+rather than minting a second live one.
+
 `ParticipantSerializer` gains a computed `onboarding_status` field —
-`not_sent` / `sent` / `active` / `revoked` — read from the participant's most
+`not_sent` / `sent` / `active` / `revoked` / `expired` — read from the participant's most
 recent token, not from whether an account exists (one is created eagerly by
 every save regardless of whether anyone has been invited yet, so its mere
 existence says nothing about progress).
+It also carries `onboarding_link_expires_at` (ISO datetime of the latest
+non-revoked link — present even when that link has already expired, so the
+operator sees *when* it died — `null` only when no link was ever sent or the
+latest was revoked), and the `onboarding-link` /
+`send-onboarding-link` responses carry a top-level `onboarding_expires_at`
+alongside `onboarding_url`, which the Participants page shows under the link
+(`pages.participants.onboardingLinkExpires`).
 
 ## 6. Frontend
 
@@ -186,7 +233,10 @@ existence says nothing about progress).
   invalid or revoked."
 - Participants page: the single "Send Invitation" action is replaced by three
   — send (disabled without an email), copy, and revoke (shown only once a
-  link has been sent). A badge shows `onboarding_status` on every card.
+  link has been sent). A badge shows `onboarding_status` on every card,
+  with the latest non-revoked link's expiry beside it (`sent`/`active`:
+  "expires on"; `expired`: "expired on") so the operator sees when a dead
+  link died without reopening the notice.
 - `ParticipantOnboardingNotice` replaces `ParticipantCredentialsNotice`
   (deleted): shows the link with a copy button instead of a
   username/password pair, used identically from both the Participants page
@@ -215,9 +265,10 @@ account-enumeration risk rather than merely mitigating it (same property
 `docs/specs/2026-09-participant-invoice-access.md` §9 relies on for tier 2).
 
 The reusability trade-off is deliberate and stated plainly rather than
-glossed over: unlike a magic link, this credential does not expire and is not
-spent by use. Its only kill switch is explicit revocation
-(`revoke-onboarding-link`, or implicitly via `unlink-account`). This is judged
+glossed over: unlike a magic link, this credential is not spent by use. Its
+kill switches are explicit revocation (`revoke-onboarding-link`, or implicitly
+via `unlink-account`), a 30-day expiry, and
+setting a password (both password doors revoke the account's links). This is judged
 acceptable because:
 
 - it is scoped to exactly one participant's data, same ceiling an ordinary
@@ -254,7 +305,11 @@ phase 2 — see `2026-03-community-and-access.md` §7.1a).
 
 Backend: `zev/test_onboarding.py` (token service get-or-create/resolve/revoke,
 the public consume endpoint including reusability and audit source, revoke
-and unlink interaction, `onboarding_status` transitions) plus updated
+and unlink interaction, `onboarding_status` transitions, plus `OnboardingExpiryTests`:
+30-day expiry on new tokens, non-nullable column, expired → 404 and `expired`
+status, expired active token rotated with a new prefix on copy/resend,
+response URL and expiry belonging to the same token, and both password doors
+revoking the link) plus updated
 coverage in `zev/tests.py` for the create/send/link actions, including the
 owner-vs-admin password-preservation case in
 `test_onboarding_link_preserves_privileged_roles_and_promotes_guests`

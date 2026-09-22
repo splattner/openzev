@@ -201,6 +201,163 @@ class SessionRevocationTests(TestCase):
         self.assertEqual(_bearer(access).get(ME).status_code, 401)
 
 
+class LogoutRevokesSessionsTests(TestCase):
+    LOGOUT = "/api/v1/auth/logout/"
+
+    def setUp(self):
+        self.user = make_user("lo_user", UserRole.PARTICIPANT)
+
+    def _cookie_client(self, session):
+        client = APIClient()
+        client.cookies["openzev_access"] = session["access"]
+        client.cookies["openzev_refresh"] = session["refresh"]
+        return client
+
+    def test_logout_rejects_the_old_refresh_and_access_tokens(self):
+        session = _session(self.user)
+
+        response = self._cookie_client(session).post(self.LOGOUT)
+
+        self.assertEqual(response.status_code, 200)
+        access_resp = _bearer(session["access"]).get(ME)
+        self.assertEqual(access_resp.status_code, 401)
+        refresh_client = APIClient()
+        refresh_client.cookies["openzev_refresh"] = session["refresh"]
+        self.assertEqual(refresh_client.post(REFRESH).status_code, 401)
+
+    def test_logout_signs_out_every_other_device_too(self):
+        this_device = _session(self.user)
+        other_device = _session(self.user)
+
+        self._cookie_client(this_device).post(self.LOGOUT)
+
+        self.assertEqual(_bearer(other_device["access"]).get(ME).status_code, 401)
+
+    def test_logout_is_audited(self):
+        session = _session(self.user)
+
+        self._cookie_client(session).post(self.LOGOUT)
+
+        event = AuditEvent.objects.get(action_type="auth.logout")
+        self.assertEqual(event.actor_user_id, self.user.pk)
+
+    def test_logout_with_no_session_still_clears_cookies(self):
+        client = APIClient()
+        client.cookies["openzev_access"] = "token"
+        client.cookies["openzev_refresh"] = "token"
+
+        response = client.post(self.LOGOUT)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.cookies["openzev_access"].value, "")
+        self.assertEqual(response.cookies["openzev_refresh"].value, "")
+        self.assertFalse(AuditEvent.objects.filter(action_type="auth.logout").exists())
+
+    def test_stale_refresh_cookie_revokes_nothing(self):
+        stale = _session(self.user)
+        self._cookie_client(stale).post(self.LOGOUT)
+        self.user.refresh_from_db()
+        fresh = _session(self.user)
+        audits = AuditEvent.objects.filter(action_type="auth.logout").count()
+        self.assertEqual(audits, 1)
+
+        replay = APIClient()
+        replay.cookies["openzev_access"] = stale["access"]
+        replay.cookies["openzev_refresh"] = stale["refresh"]
+        response = replay.post(self.LOGOUT)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(_bearer(fresh["access"]).get(ME).status_code, 200)
+        self.assertEqual(
+            AuditEvent.objects.filter(action_type="auth.logout").count(), audits
+        )
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.session_version, 1)
+
+    def test_stale_access_cookie_revokes_nothing(self):
+        stale = _session(self.user)
+        self._cookie_client(stale).post(self.LOGOUT)
+        self.user.refresh_from_db()
+        fresh = _session(self.user)
+        audits = AuditEvent.objects.filter(action_type="auth.logout").count()
+
+        replay = APIClient()
+        replay.cookies["openzev_access"] = stale["access"]
+        response = replay.post(self.LOGOUT)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(_bearer(fresh["access"]).get(ME).status_code, 200)
+        self.assertEqual(
+            AuditEvent.objects.filter(action_type="auth.logout").count(), audits
+        )
+
+    def test_valid_refresh_with_bad_access_still_revokes(self):
+        session = _session(self.user)
+        client = APIClient()
+        client.cookies["openzev_access"] = "token"
+        client.cookies["openzev_refresh"] = session["refresh"]
+
+        response = client.post(self.LOGOUT)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(_bearer(session["access"]).get(ME).status_code, 401)
+        self.assertTrue(AuditEvent.objects.filter(action_type="auth.logout").exists())
+
+    def test_logout_without_csrf_changes_nothing(self):
+        session = _session(self.user)
+        client = APIClient(enforce_csrf_checks=True)
+        client.cookies["openzev_access"] = session["access"]
+        client.cookies["openzev_refresh"] = session["refresh"]
+
+        response = client.post(self.LOGOUT)
+
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(_bearer(session["access"]).get(ME).status_code, 200)
+        self.assertFalse(AuditEvent.objects.filter(action_type="auth.logout").exists())
+
+    def test_logout_with_csrf_still_revokes(self):
+        import secrets
+
+        session = _session(self.user)
+        csrf_token = secrets.token_hex(32)
+        client = APIClient(enforce_csrf_checks=True)
+        client.cookies["openzev_access"] = session["access"]
+        client.cookies["openzev_refresh"] = session["refresh"]
+        client.cookies["csrftoken"] = csrf_token
+
+        response = client.post(self.LOGOUT, HTTP_X_CSRFTOKEN=csrf_token)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(_bearer(session["access"]).get(ME).status_code, 401)
+        self.assertTrue(AuditEvent.objects.filter(action_type="auth.logout").exists())
+
+    def test_logout_during_impersonation_revokes_the_target_not_the_admin(self):
+        admin = make_user("lo_imp_admin", UserRole.ADMIN)
+        admin_session = _session(admin)
+        admin_client = APIClient()
+        authenticate(admin_client, admin)
+        impersonation = admin_client.post(f"/api/v1/auth/users/{self.user.pk}/impersonate/")
+        self.assertEqual(impersonation.status_code, 200)
+        impersonated_access = impersonation.cookies["openzev_access"].value
+        impersonated_refresh = impersonation.cookies["openzev_refresh"].value
+        self.assertEqual(_bearer(impersonated_access).get(ME).status_code, 200)
+
+        logout_client = APIClient()
+        logout_client.cookies["openzev_access"] = impersonated_access
+        logout_client.cookies["openzev_refresh"] = impersonated_refresh
+        logout_client.cookies["openzev_admin_access"] = "token"
+        logout_client.cookies["openzev_admin_refresh"] = "token"
+        response = logout_client.post(self.LOGOUT)
+
+        self.assertEqual(response.status_code, 200)
+        # The impersonated account is signed out everywhere, while the admin
+        # behind the impersonation keeps their sessions (this tab still loses
+        # the parked backup cookies, so it signs in again).
+        self.assertEqual(_bearer(impersonated_access).get(ME).status_code, 401)
+        self.assertEqual(_bearer(admin_session["access"]).get(ME).status_code, 200)
+        self.assertEqual(response.cookies["openzev_admin_access"].value, "")
+
+
 class PasswordChangeRevokesSessionsTests(TestCase):
     def setUp(self):
         self.user = make_user("pc_user", UserRole.ZEV_OWNER)

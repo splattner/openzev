@@ -10,10 +10,11 @@ a deleted community.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
 
 from django.core.files.base import ContentFile
+from django.utils import timezone
 
 from accounts.models import FeatureFlag, OAuthProvider, UserRole, VatRate
 from audit.models import AuditActionCategory, AuditEvent
@@ -59,7 +60,10 @@ def build_world() -> World:
 
     EmailLog.objects.create(invoice=invoice, recipient="alice@example.com", subject="Invoice", status="sent")
     InvoiceAccessToken.objects.create(invoice=invoice, prefix="acc-alpha", secret="s" * 32)
-    ParticipantOnboardingToken.objects.create(participant=alice, prefix="onb-alpha", secret="o" * 32)
+    ParticipantOnboardingToken.objects.create(
+        participant=alice, prefix="onb-alpha", secret="o" * 32,
+        expires_at=timezone.now() + timedelta(days=30),
+    )
     ImportLog.objects.create(zev=alpha, imported_by=owner, source="csv", filename="alpha.csv", rows_total=3)
     ContractIssue.objects.create(
         zev=alpha, participant=alice, version=1, document_number="C-ALPHA-1", language="de",

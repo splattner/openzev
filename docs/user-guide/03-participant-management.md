@@ -51,8 +51,14 @@ Participants **cannot**:
 - Create tariffs or invoices
 
 Each participant card shows the **Account** it is linked to, or *No account
-yet*. Open **More** on a card to send or copy the participant's onboarding link
-(which creates the account). Administrators can also **Link existing** — attach
+yet*, plus an onboarding status badge (*Not invited*, *Invited*, *Active*,
+*Revoked*, *Expired*). While a link is live — or after it has expired — the
+card also shows its expiry date beside the badge, so you can see when a dead
+link died without resending it. Open **More** on a card to send or copy the participant's onboarding link
+(which creates the account). The link stays usable for 30 days and can be
+reused within that time — copying or resending it hands out the same link,
+unless it has expired, in which case a fresh one is issued automatically. Once
+the participant sets their own password, the link is revoked. Administrators can also **Link existing** — attach
 a guest or participant account that is not yet linked to anyone — or **Unlink**
 the current one. Platform → Accounts lists every account and which communities
 it belongs to; see [Roles and Permissions](11-roles-and-permissions.md).

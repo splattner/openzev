@@ -506,7 +506,7 @@ password. Otherwise returns 400 ("Use the change-password endpoint instead.").
 
 **Flow:**
 1. Validate password via Django password validators.
-2. Set password, clear `must_change_password` flag, and revoke the account's other sessions (`revoke_sessions`, §5.6b).
+2. Set password, clear `must_change_password` flag, revoke the account's other sessions (`revoke_sessions`, §5.6b), and revoke the account's onboarding links (`zev.onboarding.revoke_active_for_participant` — the link's stated purpose, "until they choose to set a password", is fulfilled, so a leaked mail must not stay a live bearer credential).
 3. Issue fresh JWT via `accounts.jwt_utils.make_jwt_for_user(user)` set as httpOnly cookies `openzev_access` / `openzev_refresh` (+ `csrftoken` via `get_token`) so updated claims take effect.
 
 ### 5.5 Password change
@@ -515,7 +515,7 @@ password. Otherwise returns 400 ("Use the change-password endpoint instead.").
 
 **Payload:** `{ old_password, new_password }`
 
-Validates old password, sets new password, clears `must_change_password`, then **signs the account out of every other session** (`revoke_sessions`, §5.6b): whoever knew the old password, or held a stolen session, must not stay signed in. The response carries a fresh token pair under the new session version, so the caller stays signed in (an impersonation session stays an impersonation session). API keys are not revoked — they are separate credentials.
+Validates old password, sets new password, clears `must_change_password`, then **signs the account out of every other session** (`revoke_sessions`, §5.6b) and revokes the account's onboarding links: whoever knew the old password, or held a stolen session, must not stay signed in. The response carries a fresh token pair under the new session version, so the caller stays signed in (an impersonation session stays an impersonation session). API keys are not revoked — they are separate credentials.
 
 ### 5.6 Profile (me)
 
@@ -620,8 +620,9 @@ explicit one:
 | Admin deactivates an account (`PATCH /users/{id}/` `is_active: false`) | sessions end — so reactivating later does not bring back unexpired tokens |
 | `POST /api/v1/auth/me/sessions/revoke/` (IsAuthenticated; `403` while impersonating) | other sessions end; caller keeps theirs; audited `auth.sessions.revoked` (`scope: others`) |
 | `POST /api/v1/auth/users/{id}/revoke-sessions/` (IsAdmin; `400` for the admin's own account) | all of the target's sessions end; audited `auth.sessions.revoked` (`scope: all`, admin as actor) |
+| `POST /api/v1/auth/logout/` (AllowAny; CSRF-enforced, unauthenticated by design so it still clears cookies when the access token is already expired — the user is resolved from the refresh cookie instead) | **all** of the caller's sessions end, on every device; audited `auth.logout` (`scope: all`). Only a token from a currently valid session revokes; stale tokens just clear cookies. During impersonation this revokes the *impersonated* account (the main cookies hold its tokens), never the admin parked in the backup cookies — the event's actor is the impersonated account. |
 
-Not revoked by design: logout (it ends *this* browser only), API keys, an
+Not revoked by design: API keys, an
 outstanding MFA challenge token. There is no per-device list: a counter can say
 "everything before now is dead", not "this one device" (ADR 0022).
 
@@ -630,6 +631,8 @@ All four new endpoints are absent from `ACCOUNTS_API_KEY_ALLOWLIST`
 
 Frontend: `SessionsCard` on the Security tab ("Sign out other devices"), and
 "Sign out everywhere" in the admin accounts row menu (not on the admin's own row).
+Explicit logout ("Logout" in the user menu) signs out everywhere by design —
+the 7-day refresh token would otherwise survive it.
 
 ### 5.6c Security notification emails
 

@@ -123,23 +123,39 @@ class ParticipantSerializer(serializers.ModelSerializer):
     has_metering_point_assignment = serializers.SerializerMethodField()
     building_footprint = serializers.SerializerMethodField()
     onboarding_status = serializers.SerializerMethodField()
+    onboarding_link_expires_at = serializers.SerializerMethodField()
+
+    def _latest_token(self, obj):
+        if "_onboarding_token_cache" not in obj.__dict__:
+            obj._onboarding_token_cache = (
+                obj.onboarding_tokens.order_by("-created_at", "id").first()
+            )
+        return obj._onboarding_token_cache
 
     def get_onboarding_status(self, obj):
-        """One of ``not_sent`` / ``sent`` / ``active`` / ``revoked``.
+        """One of ``not_sent`` / ``sent`` / ``active`` / ``revoked`` / ``expired``.
 
-        Read from the participant's most recent onboarding link, not from
-        whether an account exists — an account is created eagerly (see
-        ``ensure_participant_account``) whether or not anyone has actually
-        been invited yet, so its mere existence says nothing about progress.
+        Read from the participant's most recent onboarding link: an account
+        is created eagerly whether or not anyone was invited yet, so its
+        mere existence says nothing about progress.
         """
-        token = obj.onboarding_tokens.order_by("-created_at").first()
+        token = self._latest_token(obj)
         if token is None:
             return "not_sent"
         if token.revoked_at is not None:
             return "revoked"
+        if token.is_expired:
+            return "expired"
         if token.last_used_at is not None:
             return "active"
         return "sent"
+
+    def get_onboarding_link_expires_at(self, obj):
+        """Expiry of the most recent onboarding link, if not revoked."""
+        token = self._latest_token(obj)
+        if token is None or token.revoked_at is not None:
+            return None
+        return token.expires_at
 
     def get_building_footprint(self, obj):
         return get_cached_building_footprint(obj.address_line1, obj.postal_code, obj.city)
@@ -191,6 +207,7 @@ class ParticipantSerializer(serializers.ModelSerializer):
             "user",
             "account_username",
             "onboarding_status",
+            "onboarding_link_expires_at",
             "full_name",
             "title",
             "first_name",
@@ -216,6 +233,7 @@ class ParticipantSerializer(serializers.ModelSerializer):
             "user",
             "account_username",
             "onboarding_status",
+            "onboarding_link_expires_at",
             "full_name",
             "metering_points",
             "has_metering_point_assignment",

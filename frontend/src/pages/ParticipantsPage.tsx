@@ -115,6 +115,7 @@ export function ParticipantsPage() {
             setOnboardingNotice({
                 participantName: participantDisplayName(participantId),
                 onboardingUrl: result.onboarding_url,
+                onboardingExpiresAt: result.onboarding_expires_at,
                 message: t('pages.participants.messages.onboardingLinkSentDetail'),
             })
             void queryClient.invalidateQueries({ queryKey: queryKeys.zev.participants(selectedZevId || undefined) })
@@ -128,6 +129,7 @@ export function ParticipantsPage() {
             setOnboardingNotice({
                 participantName: participantDisplayName(participantId),
                 onboardingUrl: result.onboarding_url,
+                onboardingExpiresAt: result.onboarding_expires_at,
                 message: t('pages.participants.messages.onboardingLinkCopiedDetail'),
             })
             void queryClient.invalidateQueries({ queryKey: queryKeys.zev.participants(selectedZevId || undefined) })

@@ -18,7 +18,7 @@ from django.utils import timezone
 from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
 from rest_framework_simplejwt.serializers import TokenRefreshSerializer
 from rest_framework_simplejwt.settings import api_settings as jwt_settings
-from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework_simplejwt.tokens import AccessToken, RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView
 from . import mfa, mfa_crypto, notifications
 from .api_keys import default_api_key_expiry, generate_key
@@ -43,9 +43,10 @@ from .serializers import (
     WebAuthnCredentialSerializer,
 )
 from .authentication import enforce_csrf
-from .jwt_utils import SESSION_CLAIM, make_jwt_for_user, record_login
-from .session_revocation import keep_current_session, revoke_sessions
+from .jwt_utils import make_jwt_for_user, record_login
+from .session_revocation import is_session_current, keep_current_session, revoke_sessions
 from .cookies import (
+    ACCESS_COOKIE,
     ADMIN_ACCESS_COOKIE,
     ADMIN_REFRESH_COOKIE,
     REFRESH_COOKIE,
@@ -57,6 +58,7 @@ from .throttling import AuthLoginThrottle, AuthMfaThrottle, AuthRefreshThrottle,
 from audit.models import AuditActionCategory, AuditEventStatus
 from audit.mixins import AuditedUpdateMixin
 from audit.services import build_diff, record_audit_event
+from zev import onboarding as zev_onboarding
 from zev.models import Participant, Zev
 
 logger = logging.getLogger(__name__)
@@ -249,8 +251,12 @@ class CookieTokenRefreshView(APIView):
         rejects one request later — and would work again if the account were
         reactivated."""
         token = RefreshToken(refresh_token)
-        user = User.objects.filter(pk=token[jwt_settings.USER_ID_CLAIM], is_active=True).first()
-        if user is None or token.get(SESSION_CLAIM, 0) != user.session_version:
+        try:
+            user_id = token[jwt_settings.USER_ID_CLAIM]
+        except KeyError:
+            raise TokenError("Session has been signed out.")
+        user = User.objects.filter(pk=user_id, is_active=True).first()
+        if user is None or not is_session_current(token, user):
             raise TokenError("Session has been signed out.")
 
 
@@ -258,12 +264,57 @@ class CookieTokenRefreshView(APIView):
 @permission_classes([AllowAny])
 @authentication_classes([])
 def logout_view(request):
-    """Clear auth cookies and end the session, even if the access cookie is expired."""
+    """Clear auth cookies and sign the account out everywhere.
+
+    Unauthenticated so expired access still clears cookies; the user is
+    resolved from the refresh cookie first, then access. During impersonation
+    the main cookies hold the impersonated user's tokens, so they are
+    revoked — never the admin in the backup cookies.
+    """
+    enforce_csrf(request)
+    user = _user_for_logout(request)
+    if user is not None:
+        revoke_sessions(user)
+        record_audit_event(
+            request=request,
+            action_category=AuditActionCategory.AUTH,
+            action_type="auth.logout",
+            target_type="accounts.User",
+            target=user,
+            target_id=str(user.pk),
+            target_display=user.email or user.username,
+            summary=f"Logged out {user.email or user.username} everywhere.",
+            user=user,
+            metadata={"scope": "all"},
+        )
     response = Response({"detail": "Logged out."})
     clear_auth_cookies(response)
     # Also clear any active impersonation cookies
     clear_auth_cookies(response, access_cookie=ADMIN_ACCESS_COOKIE, refresh_cookie=ADMIN_REFRESH_COOKIE)
     return response
+
+
+def _user_for_logout(request):
+    """The user behind a currently valid cookie token, if any.
+
+    Refresh first, then access. Stale tokens resolve to ``None``: logout
+    still clears cookies, it just revokes nothing.
+    """
+    for raw, token_cls in (
+        (request.COOKIES.get(REFRESH_COOKIE), RefreshToken),
+        (request.COOKIES.get(ACCESS_COOKIE), AccessToken),
+    ):
+        if not raw:
+            continue
+        try:
+            token = token_cls(raw)
+            user_id = token[jwt_settings.USER_ID_CLAIM]
+        except (TokenError, KeyError):
+            continue
+        user = User.objects.filter(pk=user_id, is_active=True).first()
+        if user is not None and is_session_current(token, user):
+            return user
+    return None
 
 
 class UserListCreateView(generics.ListCreateAPIView):
@@ -521,6 +572,7 @@ def change_password(request):
     # A new password ends every other session — someone who knew the old one
     # (or held a stolen session) must not stay signed in. This session carries on.
     revoke_sessions(request.user)
+    links_revoked = zev_onboarding.revoke_active_for_user(request.user)
     record_audit_event(
         request=request,
         action_category=AuditActionCategory.AUTH,
@@ -530,6 +582,7 @@ def change_password(request):
         target_id=str(request.user.pk),
         target_display=request.user.email or request.user.username,
         summary="Changed account password.",
+        metadata={"onboarding_links_revoked": links_revoked},
     )
     response = Response({"detail": "Password updated successfully."})
     keep_current_session(request, response, request.user)
@@ -828,6 +881,9 @@ def set_initial_password(request):
     user.save(update_fields=["password", "must_change_password"])
     revoke_sessions(user)
 
+    # The link's purpose is fulfilled once a password exists.
+    links_revoked = zev_onboarding.revoke_active_for_user(user)
+
     record_audit_event(
         request=request,
         action_category=AuditActionCategory.AUTH,
@@ -838,6 +894,7 @@ def set_initial_password(request):
         target_display=user.email or user.username,
         summary="Set initial password and completed first-login requirement.",
         changes=build_diff({"must_change_password": True}, {"must_change_password": False}, ["must_change_password"]),
+        metadata={"onboarding_links_revoked": links_revoked},
     )
 
     # Issue fresh tokens so the updated claims (must_change_password=False) take effect

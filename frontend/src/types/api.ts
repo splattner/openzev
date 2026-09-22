@@ -435,7 +435,7 @@ export interface ParticipantBuildingFootprint {
     coordinates: number[][][] | number[][][][]
 }
 
-export type ParticipantOnboardingStatus = 'not_sent' | 'sent' | 'active' | 'revoked'
+export type ParticipantOnboardingStatus = 'not_sent' | 'sent' | 'active' | 'revoked' | 'expired'
 
 export interface Participant {
     id: string
@@ -443,6 +443,8 @@ export interface Participant {
     user: number | null
     account_username?: string | null
     onboarding_status?: ParticipantOnboardingStatus
+    /** ISO datetime of the latest non-revoked onboarding link, even when expired; null when never sent or revoked. */
+    onboarding_link_expires_at?: string | null
     title?: 'mr' | 'mrs' | 'ms' | 'dr' | 'prof' | ''
     first_name: string
     last_name: string
@@ -463,7 +465,16 @@ export interface Participant {
 
 export interface ParticipantOnboardingLinkResult {
     onboarding_url: string
+    /** ISO datetime when the link in onboarding_url expires (always a live link). */
+    onboarding_expires_at: string
     participant: Participant
+}
+
+export interface SendOnboardingLinkResult {
+    detail: string
+    onboarding_url: string
+    /** ISO datetime when the link in onboarding_url expires (always a live link). */
+    onboarding_expires_at: string
 }
 
 export interface ParticipantInput {

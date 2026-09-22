@@ -2,7 +2,7 @@
 lifecycle. See ``zev.purge`` for exactly what is deleted, what survives via
 ``SET_NULL``, and what is deliberately not done yet (a pre-purge backup).
 """
-from datetime import date
+from datetime import date, timedelta
 
 from django.core.files.base import ContentFile
 from django.test import TestCase
@@ -47,6 +47,7 @@ class _FullyWiredZev(TestCase):
         )
         self.onboarding_token = ParticipantOnboardingToken.objects.create(
             participant=self.participant, prefix="purgeprefix", secret="s3cr3t",
+            expires_at=timezone.now() + timedelta(days=30),
         )
         self.meter = MeteringPoint.objects.create(
             zev=self.zev, meter_id="PURGE-METER", meter_type=MeteringPointType.CONSUMPTION,
