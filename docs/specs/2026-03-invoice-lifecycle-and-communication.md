@@ -216,9 +216,21 @@ All invoice endpoints are routed under `/api/v1/invoices/invoices/` via a DRF `G
 
 | Method | URL | Permission | Payload | Response |
 |---|---|---|---|---|
-| `POST` | `/invoices/generate/` | `IsZevOwnerOrAdmin` | `{participant_id, period_start, period_end}` | `201` with invoice JSON; `400` with the underlying error if allocation fails (`AllocationError`, e.g. overlapping assignment windows); `409` if locked, or a structured `{code: "dynamic_price_gap", tariff_id, tariff_name, source_id, missing_at, error}` when a fetched series does not cover a reading; invalid source configurations return `409` with `code: "invalid_dynamic_tariff"`, tariff/source ids, tariff name and error |
-| `POST` | `/invoices/generate-all/` | `IsZevOwnerOrAdmin` | `{zev_id, period_start, period_end}` | `409` with the same structured dynamic gap/configuration error as single generation when the synchronous coverage/configuration preflight fails; otherwise `202` with `{detail, queued: true, participant_count}` — generation runs asynchronously via Celery (`generate_zev_invoices_task`); per-participant failures (e.g. locked invoices) are isolated — the batch continues, and the audit event (`source = celery`) reports generated/failed counts plus per-participant errors |
+| `POST` | `/invoices/generate/` | `IsZevOwnerOrAdmin` | `{participant_id, period_start, period_end}` | `201` with invoice JSON; `400` with the underlying error if allocation fails (`AllocationError`, e.g. overlapping assignment windows), or if the participant's ZEV is disabled — non-admin only, ZEV lifecycle phase 2 (§4.5 of `2026-03-community-and-access.md`; this view resolves the participant directly rather than through `ZevScopedQuerySetMixin`, so it carries its own copy of that rule); `409` if locked, or a structured `{code: "dynamic_price_gap", tariff_id, tariff_name, source_id, missing_at, error}` when a fetched series does not cover a reading; invalid source configurations return `409` with `code: "invalid_dynamic_tariff"`, tariff/source ids, tariff name and error |
+| `POST` | `/invoices/generate-all/` | `IsZevOwnerOrAdmin` | `{zev_id, period_start, period_end}` | Same disabled-ZEV `400` as `generate/` above, non-admin only; `409` with the same structured dynamic gap/configuration error as single generation when the synchronous coverage/configuration preflight fails; otherwise `202` with `{detail, queued: true, participant_count}` — generation runs asynchronously via Celery (`generate_zev_invoices_task`); per-participant failures (e.g. locked invoices) are isolated — the batch continues, and the audit event (`source = celery`) reports generated/failed counts plus per-participant errors |
 | `POST` | `/invoices/generate-pdfs-all/` | `IsZevOwnerOrAdmin` | `{zev_id, period_start, period_end}` | `202` with `{detail, queued: true, invoice_count}` — PDF rendering runs asynchronously via Celery (`generate_zev_pdfs_task`) |
+
+**Not covered by the disabled-ZEV check above:** every action that operates
+on an *existing* invoice rather than creating one — `send-email`,
+`approve`/`mark-sent`/`mark-paid`/`cancel`, `retry-email`, `generate-pdf`,
+and the batch variants built on `_get_period_invoices` (`approve-all`,
+`send-all`, `generate-pdfs-all`, `download-pdfs`) — can still be performed
+by the ZEV's owner while it is disabled. This is the same gap
+`2026-03-community-and-access.md` §4.3 documents for
+`Tariff`/`TariffPeriod`/`MeterReading`: `IsZevOwnerOrAdmin` has no
+`has_object_permission` to extend the way `BaseZevScopedPermission` does for
+`Participant`/`MeteringPoint`, so only the create-time paths (`generate`,
+`generate-all`) are closed so far.
 
 Bulk preflight runs after ZEV authorization. It validates all applicable dynamic
 source configurations and requires stored coverage only at reading timestamps
@@ -935,6 +947,7 @@ the cockpit readiness and attention caches.
 | `tests.py` | `InvoiceBillingIntegrationTests` | §5.2: end-to-end generation via API with metering data; allocation failures reported as 400, not the 409 duplicate-invoice message |
 | `test_workflow.py` | `InvoiceWorkflowTests` | §4.2: approve draft ✓, approve non-draft ✗, mark-sent from approved ✓, mark-sent from draft ✗, mark-paid from sent ✓, mark-paid from draft ✗, cancel from draft/approved/sent ✓, cancel from paid ✗, cancel already-cancelled ✗ |
 | `test_workflow.py` | `InvoiceEngineGuardTests` | §4.4: regenerate approved/paid → 409, regenerate draft/cancelled → success |
+| `test_disabled_zev_invoice_generation.py` | `GenerateSingleInvoiceTests`, `GenerateAllInvoicesTests` | §5.2: ZEV lifecycle phase 2 — `generate`/`generate-all` refuse a disabled ZEV for its owner (400, no invoice created / no task queued) but not for an admin |
 | `test_workflow.py` | `StaleInstanceConcurrencyTests` | §5.3 concurrency (#572): a stale-in-memory `cancel_invoice`/`approve_invoice`/`mark_invoice_sent` cannot undo a transition another already-loaded instance committed first (a `paid` invoice survives a stale cancel, a `cancelled` one survives a stale mark-sent/approve); a stale `record_email_delivery` never raises and never resurrects a status past cancellation, but still records `sent_at` and reports the row's real prior status; a second stale cancel is reported as "already cancelled", not the original status |
 | `test_workflow.py` | `test_concurrent_cancel_and_mark_paid_serialize_on_the_row_lock` (PostgreSQL only — CI's "Verify PostgreSQL retention and concurrency" step) | §5.3 concurrency (#572): two genuinely overlapping transactions — one holding the invoice row lock, the other running real `mark_invoice_paid` — serialize on that lock (verified via `pg_blocking_pids`) rather than racing; the second sees the first's committed `cancelled` status and correctly refuses |
 | `test_period_overview.py` | `InvoicePeriodOverviewTests` | §5.5: metering completeness, missing-day detection, partial-assignment windows, no-assignment exclusion, cross-ZEV permission denial |

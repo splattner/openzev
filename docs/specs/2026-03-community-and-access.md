@@ -985,6 +985,14 @@ disabled. Records `zev.enable`.
   `2026-09-participant-invoice-access.md`) and `zev.onboarding.resolve()`
   (onboarding links — see `2026-09-participant-onboarding-link.md`) both
   return `None` for a disabled ZEV's token, same as every other failure.
+- Generating a new invoice for a disabled ZEV — `POST /invoices/generate/`
+  and `/invoices/generate-all/` — is refused (`400`, non-admin only). These
+  two bypass `ZevScopedQuerySetMixin` entirely (a direct `Participant`/`Zev`
+  lookup, not a `ModelViewSet` create), so `assert_within_scope` never
+  reaches them; each carries its own copy of the same rule instead. See
+  `2026-03-invoice-lifecycle-and-communication.md` §5.2 for what this does
+  and does not cover — every action on an *already-existing* invoice is the
+  same open gap as §4.3 point 3.
 
 **Self-setup guard, updated:** `self_setup`'s "you already have a ZEV" check
 (§7.3) now excludes disabled ZEVs (`disabled_at__isnull=True`), so an owner

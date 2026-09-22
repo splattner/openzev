@@ -206,6 +206,17 @@ class InvoiceViewSet(
         if not request.user.is_admin and participant.zev.owner != request.user:
             return Response({"error": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
 
+        # A new invoice is a create, the same class of write assert_within_scope
+        # blocks for every other ZEV-scoped model — but this action bypasses
+        # that mixin entirely (a direct Participant lookup, not a ModelViewSet
+        # create), so the same rule needs its own check here (ZEV lifecycle
+        # phase 2 follow-up).
+        if not request.user.is_admin and participant.zev.disabled_at is not None:
+            return Response(
+                {"error": "This ZEV is disabled. Ask an admin to re-enable it first."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         try:
             invoice = generate_invoice(
                 participant,
@@ -293,6 +304,14 @@ class InvoiceViewSet(
 
         if not request.user.is_admin and zev.owner != request.user:
             return Response({"error": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
+
+        # Same create-time rule as generate() above — batch invoice creation
+        # for a disabled ZEV, blocked for everyone but an admin.
+        if not request.user.is_admin and zev.disabled_at is not None:
+            return Response(
+                {"error": "This ZEV is disabled. Ask an admin to re-enable it first."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         period_start = s.validated_data["period_start"]
         period_end = s.validated_data["period_end"]
