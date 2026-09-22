@@ -565,6 +565,7 @@ export const en = {
             tariffs: "Tariffs",
             readings: "Meter readings",
             invoices: "Invoices",
+            invoice_pdfs: "Invoice PDFs",
         },
     },
     pages: {

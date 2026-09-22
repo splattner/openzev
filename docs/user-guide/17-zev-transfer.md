@@ -11,7 +11,8 @@ export with just the Tariffs section selected does what that used to do.
 - **Taking a copy off the instance** — an archive is a readable record of a
   community. The default export captures the structure (settings, participants,
   metering points and tariffs); tick readings and invoices for a full copy
-  including billing history.
+  including billing history, and invoice PDFs too if you need the original
+  issued documents rather than a reprint.
 - **Starting a new community from an existing one** — export the tariffs and the
   metering-point layout, import them, then add participants by hand.
 
@@ -28,9 +29,9 @@ added later, but today an import is a copy.
 1. Open **Setup → Settings → Export / transfer** for the community.
 2. Scroll to **Export ZEV** and click **Export ZEV**.
 3. Pick the sections you want. The **structure sections are pre-ticked** — ZEV
-   settings, participants, metering points and tariffs — and readings and
-   invoices start unticked, because they are the bulk of the file and can take a
-   while to stream.
+   settings, participants, metering points and tariffs — and readings,
+   invoices and invoice PDFs start unticked, because they are the bulk of the
+   file and can take a while to stream.
 4. Click **Download archive**.
 
 You get a file named `openzev-export-<community>-<date>.zip`.
@@ -51,11 +52,13 @@ You get a file named `openzev-export-<community>-<date>.zip`.
 | **Tariffs** | Every tariff, all its versions, and their price bands |
 | **Meter readings** | Every reading, as one CSV per meter |
 | **Invoices** | Invoices and their line items |
+| **Invoice PDFs** | The original rendered document for every invoice that has one — needs Invoices |
 
 Some sections need others. Assignments point at participants, readings point at
-metering points, and invoices point at participants — so the dialog greys out a
-section whose prerequisite is unticked and tells you what it needs. You cannot
-build an archive that could not be imported.
+metering points, invoices point at participants, and invoice PDFs point at
+invoices — so the dialog greys out a section whose prerequisite is unticked and
+tells you what it needs. You cannot build an archive that could not be
+imported.
 
 **Participant invoice access does not travel.** An imported ZEV always arrives
 with **Participant QR code on the invoice** switched off, whatever the exporting
@@ -70,10 +73,13 @@ history can travel without the pricing structure and vice versa.
 
 - **User accounts.** Participants are exported without any link to a login, so an
   archive can never grant anybody access to anything.
-- **Generated invoice PDFs.** They are regenerable from the invoice data. Note
-  that a regenerated PDF uses *today's* template, so it will not be byte-identical
-  to the document the participant received — if you have a retention obligation
-  for the original documents, keep them separately.
+- **Generated invoice PDFs — unless you explicitly tick Invoice PDFs.** Left
+  unticked, an imported invoice reports "not generated" until one is next
+  rendered, and that render uses *today's* template — it will not be
+  byte-identical to the document the participant received. If you have a
+  retention obligation for the original documents (or are retiring the
+  community and want to keep exactly what was issued), tick the section and
+  the original bytes travel with the archive instead.
 - **Email and PDF templates** stored in the admin console. These are
   instance-wide customisations rather than ZEV data. The per-ZEV invoice email
   template and contract notes *do* travel, in the ZEV settings section.
@@ -177,6 +183,7 @@ openzev-export-demo-community-2026-08-04.zip
   tariffs.json           versions and price bands
   invoices.json          invoices and line items
   readings/<meter>.csv   one file per meter (name includes a short checksum)
+  invoices/pdf/<invoice>.pdf   one file per invoice that has a rendered PDF, if ticked
 ```
 
 Readings use the same column layout the

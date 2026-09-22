@@ -26,10 +26,11 @@ import zipfile
 from decimal import Decimal, InvalidOperation
 
 from django.core.exceptions import ValidationError as DjangoValidationError
+from django.core.files.base import ContentFile
 from django.conf import settings
 from django.db import DataError, IntegrityError, transaction
 
-from invoices.models import Invoice, InvoiceItem, InvoiceDynamicSourceEvidence
+from invoices.models import Invoice, InvoiceItem, InvoiceDynamicSourceEvidence, InvoicePdfStatus
 from tariffs.dynamic.evidence import lock_sources, record_invoice_evidence
 from metering.importers.csv_importer import _parse_datetime_utc, _parse_decimal
 from metering.importers.limits import (
@@ -48,6 +49,7 @@ from zev.models import MeteringPoint, MeteringPointAssignment, Participant, VatM
 
 logger = logging.getLogger(__name__)
 
+from .export import pdf_member_name
 from .schema import (
     ASSIGNMENT_FIELDS,
     DYNAMIC_SOURCE_FIELDS,
@@ -58,6 +60,7 @@ from .schema import (
     PARTICIPANT_FIELDS,
     READINGS_DIR,
     SECTION_FILES,
+    SECTION_INVOICE_PDFS,
     SECTION_INVOICES,
     SECTION_METERING_POINTS,
     SECTION_PARTICIPANTS,
@@ -591,6 +594,38 @@ def _trailing_number(invoice_number):
     return int(tail) if tail else 0
 
 
+def _import_invoice_pdfs(archive, zev):
+    """Restore issued PDFs onto the invoices ``_import_invoices`` just created.
+
+    A second pass rather than folded into ``_import_invoices``: PDF bytes are
+    looked up by the deterministic ``pdf_member_name(invoice_number)`` (same
+    function the exporter used to write them, recomputed rather than read from
+    a manifest — see that function's docstring), which only exists once the
+    invoice row — and its ``invoice_number`` — is committed. Invoices that
+    failed validation in the first pass are simply absent from this query, so
+    they are silently skipped here rather than double-reported.
+
+    ``pdf_file``/``pdf_status`` are written with a targeted ``update()``
+    rather than ``invoice.save()``, the same reason ``pdf.save_invoice_pdf``
+    does: nothing else about the row should move.
+    """
+    written = 0
+    names = set(archive.namelist())
+    for invoice in Invoice.objects.filter(zev=zev).only("id", "invoice_number"):
+        member = pdf_member_name(invoice.invoice_number)
+        if member not in names:
+            continue
+        with archive.open(member) as source:
+            data = source.read()
+        filename = f"invoice_{invoice.invoice_number}.pdf"
+        invoice.pdf_file.save(filename, ContentFile(data), save=False)
+        Invoice.objects.filter(pk=invoice.pk).update(
+            pdf_file=invoice.pdf_file.name, pdf_status=InvoicePdfStatus.READY,
+        )
+        written += 1
+    return written
+
+
 # ── Readings ───────────────────────────────────────────────────────────────
 
 _VALID_DIRECTIONS = {value for value, _ in ReadingDirection.choices}
@@ -875,6 +910,9 @@ def _run_import(archive, manifest, sections, *, owner, name_override, collector,
         if next_counter != zev.invoice_counter:
             zev.invoice_counter = next_counter
             zev.save(update_fields=["invoice_counter"])
+
+        if SECTION_INVOICE_PDFS in sections:
+            summary["counts"][SECTION_INVOICE_PDFS] = _import_invoice_pdfs(archive, zev)
 
     _verify_manifest_counts(manifest, summary, collector)
 

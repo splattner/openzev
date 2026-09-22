@@ -32,12 +32,14 @@ from .schema import (
     FORMAT_VERSION,
     INVOICE_FIELDS,
     INVOICE_ITEM_FIELDS,
+    INVOICE_PDFS_DIR,
     MANIFEST_NAME,
     METERING_POINT_FIELDS,
     PARTICIPANT_FIELDS,
     READING_CSV_COLUMNS,
     READINGS_DIR,
     SECTION_FILES,
+    SECTION_INVOICE_PDFS,
     SECTION_INVOICES,
     SECTION_METERING_POINTS,
     SECTION_PARTICIPANTS,
@@ -81,6 +83,21 @@ def _reading_csv_name(meter_id):
     safe = "".join(char if char.isalnum() or char in "-_." else "_" for char in meter_id)
     digest = hashlib.sha1(meter_id.encode("utf-8")).hexdigest()[:8]
     return f"{READINGS_DIR}/{safe or 'meter'}-{digest}.csv"
+
+
+def pdf_member_name(invoice_number):
+    """A ZIP member name derived from an invoice number, same construction as
+    ``_reading_csv_name`` and for the same reason: ``invoice_prefix`` is free
+    text, so two distinct numbers can sanitise to the same string, and a
+    binary PDF has no internal field the importer could use to notice a
+    collision the way a reading CSV's own rows do. The importer recomputes
+    this from the same ``invoice_number`` rather than reading it from a
+    manifest — deterministic on both sides, so nothing needs to be stored
+    twice.
+    """
+    safe = "".join(char if char.isalnum() or char in "-_." else "_" for char in invoice_number)
+    digest = hashlib.sha1(invoice_number.encode("utf-8")).hexdigest()[:8]
+    return f"{INVOICE_PDFS_DIR}/{safe or 'invoice'}-{digest}.pdf"
 
 
 def _export_zev(zev):
@@ -220,6 +237,26 @@ def _write_readings(archive, zev):
     return counts
 
 
+def _write_invoice_pdfs(archive, zev):
+    """Copy every issued invoice's stored PDF bytes into the archive.
+
+    Only invoices that actually have a rendered document contribute a
+    member — an invoice with none simply has no corresponding file, the same
+    "absence means absence" rule ``_write_readings`` uses a header-only file
+    to avoid needing for CSVs (a PDF has no header row to write instead).
+    Returns the count written, for the manifest.
+    """
+    written = 0
+    for invoice in (
+        Invoice.objects.filter(zev=zev).exclude(pdf_file="").exclude(pdf_file__isnull=True)
+        .order_by("invoice_number")
+    ):
+        with invoice.pdf_file.open("rb") as source:
+            archive.writestr(pdf_member_name(invoice.invoice_number), source.read())
+        written += 1
+    return written
+
+
 def build_archive(zev, sections, fileobj, *, instance_name=""):
     """Write a transfer archive for ``zev`` into ``fileobj``.
 
@@ -286,6 +323,9 @@ def _write_archive(zev, sections, fileobj, *, instance_name=""):
             invoices = _export_invoices(zev)
             counts[SECTION_INVOICES] = len(invoices)
             archive.writestr(SECTION_FILES[SECTION_INVOICES], _dump(invoices))
+
+        if SECTION_INVOICE_PDFS in sections:
+            counts[SECTION_INVOICE_PDFS] = _write_invoice_pdfs(archive, zev)
 
         # Written last so its counts are the ones actually produced.
         manifest = {

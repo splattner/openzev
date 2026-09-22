@@ -24,7 +24,7 @@ type ZevExportModalProps = {
 // for minutes), so opting into the data sections should be deliberate. Derived
 // from the section list so a section added to the backend still ends up in the
 // default selection unless it is explicitly a data section.
-const DATA_SECTIONS: TransferSectionName[] = ['readings', 'invoices']
+const DATA_SECTIONS: TransferSectionName[] = ['readings', 'invoices', 'invoice_pdfs']
 const INITIAL_SELECTION: TransferSectionName[] = DEFAULT_SECTIONS.map(
   (section) => section.name,
 ).filter((name) => !DATA_SECTIONS.includes(name))

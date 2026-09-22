@@ -38,7 +38,6 @@ copy, not an in-place restore (see `docs/user-guide/17-zev-transfer.md`).
   validated by the ZIP container itself).
 - In-place restore; audit events / import logs do not travel.
 - Account references (`owner`, participant `user` link) — never exported.
-- Generated invoice PDFs — regenerable, deliberately not archived.
 - Email/PDF templates from the admin console (instance-wide, not ZEV data).
 
 ## 3. Actors, permissions, and ZEV scope
@@ -108,12 +107,13 @@ commit — a failed audit must not cause a duplicate import on client retry).
 
 ## 6. Archive format (`backend/zev/transfer/schema.py`)
 
-`FORMAT_VERSION = 2`, `SUPPORTED_FORMAT_VERSIONS = {1, 2}`. Version 2 adds
-`enabled` and the explicit `empty_on_not_found` setting to source descriptors,
-plus frozen invoice-to-source evidence. The earlier provider-neutral fields
-(`api_version`, `request_mode`, `query_tariff_type`, `supports_range`) already
-existed in version 1. Older importers must reject version 2 rather than lose
-configuration or provenance.
+`FORMAT_VERSION = 3`, `SUPPORTED_FORMAT_VERSIONS = {1, 2, 3}`. Version 3 adds
+the opt-in `invoice_pdfs` section (issued invoice documents — see below).
+Version 2 adds `enabled` and the explicit `empty_on_not_found` setting to
+source descriptors, plus frozen invoice-to-source evidence. The earlier
+provider-neutral fields (`api_version`, `request_mode`, `query_tariff_type`,
+`supports_range`) already existed in version 1. Older importers must reject a
+newer version rather than lose configuration, provenance or documents.
 The current importer continues to accept version 1 static archives and legacy
 adapter-based dynamic descriptors. A version this instance does not read is
 refused outright (`ArchiveError`, a `ValueError` subclass).
@@ -121,7 +121,7 @@ refused outright (`ArchiveError`, a `ValueError` subclass).
 Sections (order = write and import order, a correctness constraint):
 
 ```python
-SECTIONS = ("zev", "participants", "metering_points", "tariffs", "readings", "invoices")
+SECTIONS = ("zev", "participants", "metering_points", "tariffs", "readings", "invoices", "invoice_pdfs")
 SECTION_DEPENDENCIES = {
     "zev": (),
     "participants": (),
@@ -129,6 +129,7 @@ SECTION_DEPENDENCIES = {
     "tariffs": (),
     "readings": ("metering_points",),
     "invoices": ("participants",),          # deliberately NOT tariffs
+    "invoice_pdfs": ("invoices",),          # a PDF means nothing without its invoice
 }
 ```
 
@@ -149,6 +150,7 @@ openzev-export-<community>-<date>.zip
                            "dynamic_evidence": [{"dynamic_source": {<DYNAMIC_SOURCE_FIELDS>},
                              "tariff_id_snapshot", "evidence_from", "evidence_to"}]}]
   readings/<meter>.csv   one file per meter
+  invoices/pdf/<invoice_number>.pdf   one file per invoice that has a rendered PDF
 ```
 
 Field lists (`ZEV_FIELDS`, `PARTICIPANT_FIELDS`, `METERING_POINT_FIELDS`,
@@ -158,11 +160,37 @@ version, not a mirror of the serializers. `owner` (Zev) and `user` (Participant)
 are absent by design; imported participants arrive unlinked. `disabled_at`/
 `disabled_by`/`disabled_reason` (Zev) are absent for the same reason plus one
 more: `disabled_by` is an account reference, and an import always creates a
-new, active ZEV, so disabled state has nothing to carry across to. `pdf_file`
-is absent from `INVOICE_FIELDS`. `READING_CSV_COLUMNS = ("meter_id", "timestamp",
+new, active ZEV, so disabled state has nothing to carry across to. `pdf_file`/
+`pdf_status` are absent from `INVOICE_FIELDS` regardless of format version —
+the document travels, when it does, through the separate `invoice_pdfs`
+section as raw bytes keyed by `invoice_number`, not as fields on the JSON
+record (see below). `READING_CSV_COLUMNS = ("meter_id", "timestamp",
 "energy_kwh", "direction", "resolution", "import_source")` — the same layout the
 normal CSV metering import reads, plus `resolution`/`import_source` so nothing is
 lost in a round trip.
+
+**Invoice PDFs (`invoice_pdfs`, format version 3+).** Opt-in and dependent on
+`invoices`: without a rendered document an invoice contributes no member (the
+same "absence means absence" rule readings expresses with a header-only CSV —
+a PDF has no header to write instead). The frontend export dialog excludes it
+from the structure-only default selection alongside `readings` and `invoices`
+— it is the bulk of a zip in bytes even when small in row count. On import,
+each PDF is attached to its invoice with a targeted `pdf_file`/`pdf_status
+= ready` update (the same narrow write `pdf.save_invoice_pdf` uses), not a
+full `invoice.save()`. Importing an archive without this section leaves an
+imported invoice reporting "not generated", same as version ≤2 always did — a
+regenerated PDF uses today's template, which is why retaining the original
+bytes needed its own section rather than letting the next render stand in.
+
+**PDF member names**: `invoices/pdf/<sanitised>-<digest>.pdf`, built by
+`pdf_member_name()` with the exact same construction as reading member names
+below (`invoice_number` in place of `meter_id`) and for the same reason —
+`invoice_prefix` is free text, so two distinct numbers can sanitise to the
+same string, and a binary PDF (unlike a reading CSV's self-describing rows)
+has no internal field the importer could use to notice a collision. The
+importer recomputes the member name from each imported invoice's own
+`invoice_number` rather than reading a mapping from the manifest —
+deterministic on both sides, so nothing needs to be stored twice.
 
 Dynamic sources match on `(url, api_version, tariff_type, tariff_name)`.
 Existing sources retain their settings; descriptor mismatches are logged and
@@ -235,6 +263,12 @@ Reading export streams `queryset.iterator()` in `_write_readings`, chunked rows
 of `READING_CSV_COLUMNS`, one member per meter (header-only file when a meter
 has no readings).
 
+`_write_invoice_pdfs` (invoices with a non-empty `pdf_file`, ordered by
+`invoice_number`) reads each stored file and writes its bytes to
+`pdf_member_name(invoice.invoice_number)`, one at a time — individually small
+compared to a reading CSV, so no chunked/streaming treatment is needed the
+way readings require.
+
 ## 8. Import behavior (`backend/zev/transfer/importer.py`)
 
 - `open_archive` → `read_manifest` (member read through `_read_member`, which
@@ -275,6 +309,14 @@ has no readings).
   response.
 - `_import_invoices` returns the highest numeric tail (`_trailing_number`) of
   imported invoice numbers; the ZEV counter is set past it.
+- `_import_invoice_pdfs` runs as a second pass after `_import_invoices`, once
+  every invoice row (and its now-known `invoice_number`) is committed — a PDF
+  has no field of its own to validate against, so it is simply looked up by
+  `pdf_member_name(invoice.invoice_number)` and attached, or skipped if that
+  member is absent. An invoice that failed validation in the first pass is
+  absent from this query entirely, so it is silently skipped here rather than
+  double-reported. `_verify_manifest_counts` still catches a member the
+  manifest declared but the archive does not actually contain (§6).
 - The importing admin becomes `owner` of the new ZEV; `name_override` renames it.
 
 ## 9. Frontend
@@ -287,11 +329,12 @@ has no readings).
   mounted while closed, so `selected` is reset back to the structure-only
   default on every open (a `useEffect` keyed on `isOpen`).
 - `INITIAL_SELECTION = ['zev', 'participants', 'metering_points', 'tariffs']` —
-  **structure-only by default**; readings and invoices are the bulk of a zip
-  (and readings alone can stream for minutes), so opting into data sections is
-  deliberate. All boxes still selectable via `toggleSection` (which pulls
-  prerequisites in and drops dependents, `frontend/src/features/zev/
-  transferSections.ts`).
+  **structure-only by default**; readings, invoices and invoice PDFs are the
+  bulk of a zip (and readings alone can stream for minutes), so opting into
+  data sections is deliberate (`DATA_SECTIONS = ['readings', 'invoices',
+  'invoice_pdfs']`). All boxes still selectable via `toggleSection` (which
+  pulls prerequisites in and drops dependents, `frontend/src/features/zev/
+  transferSections.ts`) — ticking `invoice_pdfs` pulls `invoices` in with it.
 - `exportZevArchive(zevId, selected)` → blob download
   `t('zevTransfer.exportSuccess')` toast; 400 bodies arrive as blobs and are
   read with `readBlobError`.
@@ -339,7 +382,8 @@ still_get_separate_members`).
 
 **`RoundTripTests`**: every section arrives; assignments follow the right
 participant; participants arrive unlinked; readings keep resolution and values;
-tariff periods round-trip; invoice items travel but PDFs do not; the counter is
+tariff periods round-trip; invoice items travel (PDFs only when `invoice_pdfs`
+is explicitly selected — see `test_transfer_invoice_pdfs.py`); the counter is
 pushed past imported numbering; readings are recorded as an import log;
 importing twice collides on meter ids; a structure-only archive can be imported
 twice; a subset can be imported from a full archive; a name override renames the
@@ -379,6 +423,24 @@ zev_owner cannot import; import reports every failure in the body; import
 without a file says so; import accepts repeated-sections fields; export accepts
 repeated-sections query params; inspect returns the manifest without creating
 anything; inspect refuses a non-archive.
+
+### Backend — `backend/zev/test_transfer_invoice_pdfs.py` (format version 3)
+
+`FormatVersionTests`: `FORMAT_VERSION == 3`; `SUPPORTED_FORMAT_VERSIONS ==
+{1, 2, 3}`; `invoice_pdfs` is a known section depending on `invoices`.
+`MemberNamingTests`: `pdf_member_name` is deterministic and collision-safe
+(same construction as reading member names), stays under `invoices/pdf/`.
+`RoundTripTests`: a PDF travels when `invoice_pdfs` is selected and does not
+when it is not (with `pdf_status` reflecting each case); an invoice with no
+PDF contributes no member and is unaffected; selecting `invoice_pdfs` without
+`invoices` is refused by `check_dependencies`; a version-1/2-shaped archive
+(no `invoices/pdf/` members) still imports cleanly — the backward-compatibility
+case the whole opt-in design exists to preserve. `ManifestVerificationTests`:
+a PDF member dropped from an otherwise-correct archive is caught by
+`_verify_manifest_counts` as a declared-vs-produced mismatch, not silently
+imported as zero. `TransferEndpointInvoicePdfTests`: `transfer-sections` lists
+`invoice_pdfs`; a real export request with it selected contains the PDF
+member, exercised through the view, not just the library functions.
 
 ### Frontend
 

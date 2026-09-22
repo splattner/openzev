@@ -1531,7 +1531,7 @@ export interface VseTariffImportResult {
     errors: Array<{ name: string; error: string }>
 }
 
-export type TransferSectionName = 'zev' | 'participants' | 'metering_points' | 'tariffs' | 'readings' | 'invoices'
+export type TransferSectionName = 'zev' | 'participants' | 'metering_points' | 'tariffs' | 'readings' | 'invoices' | 'invoice_pdfs'
 
 export interface ZevArchiveImportResult {
     zev_id: string

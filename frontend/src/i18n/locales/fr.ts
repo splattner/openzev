@@ -556,6 +556,7 @@ export const fr = {
             tariffs: "Tarifs",
             readings: "Relevés de compteur",
             invoices: "Factures",
+            invoice_pdfs: "PDF des factures",
         },
     },
     pages: {

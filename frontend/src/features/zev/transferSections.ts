@@ -28,6 +28,7 @@ export const DEFAULT_SECTIONS: TransferSection[] = [
   { name: 'tariffs', requires: [] },
   { name: 'readings', requires: ['metering_points'] },
   { name: 'invoices', requires: ['participants'] },
+  { name: 'invoice_pdfs', requires: ['invoices'] },
 ]
 
 /** True when every prerequisite of `section` is currently selected. */

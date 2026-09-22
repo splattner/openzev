@@ -556,6 +556,7 @@ export const it = {
             tariffs: "Tariffe",
             readings: "Letture del contatore",
             invoices: "Fatture",
+            invoice_pdfs: "PDF delle fatture",
         },
     },
     pages: {

@@ -11,15 +11,18 @@ break every archive already sitting on someone's disk.
 """
 
 # Bumped whenever the archive layout changes in a way an older importer cannot
-# read. Version 2 adds enabled/empty_on_not_found source settings and frozen
-# invoice-to-source provenance. Version 1 remains readable for static exports and legacy
-# adapter-based dynamic descriptors. An archive naming a version that is not
-# listed here is rejected outright rather than imported half-understood.
-FORMAT_VERSION = 2
-SUPPORTED_FORMAT_VERSIONS = frozenset({1, 2})
+# read. Version 3 adds the invoice_pdfs section (issued invoice documents,
+# opt-in — see SECTION_INVOICE_PDFS). Version 2 adds enabled/empty_on_not_found
+# source settings and frozen invoice-to-source provenance. Version 1 remains
+# readable for static exports and legacy adapter-based dynamic descriptors. An
+# archive naming a version that is not listed here is rejected outright rather
+# than imported half-understood.
+FORMAT_VERSION = 3
+SUPPORTED_FORMAT_VERSIONS = frozenset({1, 2, 3})
 
 MANIFEST_NAME = "manifest.json"
 READINGS_DIR = "readings"
+INVOICE_PDFS_DIR = "invoices/pdf"
 
 SECTION_ZEV = "zev"
 SECTION_PARTICIPANTS = "participants"
@@ -27,11 +30,13 @@ SECTION_METERING_POINTS = "metering_points"
 SECTION_TARIFFS = "tariffs"
 SECTION_READINGS = "readings"
 SECTION_INVOICES = "invoices"
+SECTION_INVOICE_PDFS = "invoice_pdfs"
 
 # Ordered: this is also the order in which sections are written and imported,
 # and ordering is a correctness constraint, not presentation. Participants must
 # exist before the assignments that point at them, metering points before their
-# readings, participants before the invoices billed to them.
+# readings, participants before the invoices billed to them, invoices before
+# their PDFs.
 SECTIONS = (
     SECTION_ZEV,
     SECTION_PARTICIPANTS,
@@ -39,6 +44,7 @@ SECTIONS = (
     SECTION_TARIFFS,
     SECTION_READINGS,
     SECTION_INVOICES,
+    SECTION_INVOICE_PDFS,
 )
 
 # What a section cannot be imported without. These mirror actual foreign keys,
@@ -47,6 +53,8 @@ SECTIONS = (
 #   * assignments live inside the metering-point section and point at participants
 #   * readings point at metering points
 #   * invoices point at participants
+#   * invoice PDFs point at invoices (by invoice_number, not a foreign key —
+#     see _pdf_member_name in export.py/importer.py)
 #
 # Invoices deliberately do *not* depend on tariffs. ``InvoiceItem`` stores
 # ``tariff_category`` as a value, not a foreign key — an invoice is a finished
@@ -60,6 +68,7 @@ SECTION_DEPENDENCIES = {
     SECTION_TARIFFS: (),
     SECTION_READINGS: (SECTION_METERING_POINTS,),
     SECTION_INVOICES: (SECTION_PARTICIPANTS,),
+    SECTION_INVOICE_PDFS: (SECTION_INVOICES,),
 }
 
 # The file each section occupies inside the archive. ``readings`` is absent
@@ -196,9 +205,14 @@ TARIFF_PERIOD_FIELDS = (
     "label",
 )
 
-# The rendered document stays behind: ``pdf_file`` is not in the archive, so
-# neither is ``pdf_status``. An imported invoice reports "not generated"
-# and gets a document when one is next rendered on the new instance.
+# ``pdf_file``/``pdf_status`` are absent from this field list regardless: the
+# document travels, when it travels at all, through the separate opt-in
+# ``invoice_pdfs`` section (SECTION_INVOICE_PDFS) as raw bytes keyed by
+# ``invoice_number``, not as fields on this JSON record. Without that section
+# selected, an imported invoice reports "not generated" and gets a document
+# when one is next rendered on the new instance — a regenerated PDF uses
+# today's template, which is why retaining the original bytes needed its own
+# section rather than just letting the next render stand in for it.
 INVOICE_FIELDS = (
     "invoice_number",
     "period_start",
