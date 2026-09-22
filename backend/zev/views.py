@@ -14,7 +14,7 @@ from rest_framework.views import APIView
 from drf_spectacular.utils import extend_schema
 from accounts.permissions import IsAdmin
 from accounts.throttling import ApiKeyRateThrottle, TransferArchiveThrottle
-from accounts.models import User, UserRole
+from accounts.models import FeatureFlag, User, UserRole
 from allocation.validity import period_window
 from metering.models import MeterReading
 from . import onboarding
@@ -975,3 +975,24 @@ class GridOperatorSuggestionView(APIView):
         postal_code = request.query_params.get("postal_code", "")
         operators = grid_operators_for_postal_code(postal_code)
         return Response(GridOperatorSuggestionSerializer({"operators": operators}).data)
+
+
+class ParticipantGeocodingEnabledView(APIView):
+    """Whether ``FeatureFlag.PARTICIPANT_GEOCODING_ENABLED`` is on, for any
+    authenticated user.
+
+    Mirrors ``feasibility.views.feasibility_calculator_enabled``: a minimal
+    boolean the frontend uses to decide whether to render the participant
+    map section at all, rather than rendering it and letting it come up
+    empty. That distinction matters here specifically — unlike the
+    feasibility calculator, a cached building footprint can still exist from
+    before the flag was turned off (``get_cached_building_footprint`` never
+    calls Nominatim and so is deliberately not gated, see ``zev.geocoding``),
+    so without this check the map would keep showing old data on a disabled
+    instance instead of visibly reflecting the setting.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        return Response({"enabled": FeatureFlag.is_enabled(FeatureFlag.PARTICIPANT_GEOCODING_ENABLED)})

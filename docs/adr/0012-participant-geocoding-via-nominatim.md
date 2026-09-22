@@ -53,3 +53,7 @@ Trade-offs:
 ## Notes
 
 Nominatim's public server also disallows bulk/heavy automated use. The chosen trigger (geocode only on participant create/update, cache-checked first) keeps normal usage well within that even for large ZEVs; if OpenZEV ever adds bulk participant import with addresses, that path should also warm the cache one participant at a time (already true of the `geocode_participants` backfill command) rather than importing straight into a burst of cache-miss lookups.
+
+### Addendum (2026-09): opt-in via feature flag
+
+This decision shipped with geocoding always on for every instance with participant addresses, which sends those addresses to a public third-party API with no way for an operator to opt out (#796). `FeatureFlag.PARTICIPANT_GEOCODING_ENABLED` now gates it, **default off** — an operator turns it on explicitly (Admin → System Settings → Features) once they've decided that transfer is acceptable for their deployment. The flag is checked in `zev/geocoding.py::warm_geocode_cache`, the single choke point both the Celery task and the `geocode_participants` backfill command go through, and (redundantly, to avoid enqueuing dead work) in `zev/tasks.py::trigger_geocode_if_address_present`. `get_cached_building_footprint` (the read path used at API serialization time) stays ungated — it never calls Nominatim regardless of the flag, so there's nothing there to disable.

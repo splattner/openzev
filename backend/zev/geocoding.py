@@ -11,6 +11,20 @@ Nominatim is asked for the actual OSM way/relation geometry
 (``polygon_geojson=1``), not just its bounding box — a building is a polygon
 with angled edges, not an axis-aligned rectangle, and the bounding box alone
 would misrepresent it.
+
+Gated by ``FeatureFlag.PARTICIPANT_GEOCODING_ENABLED`` (off by default): this
+is the one place in the codebase that sends a participant's address to a
+third party, so it needs an explicit opt-in rather than being on by default
+(see #796). ``warm_geocode_cache`` is the single choke point both real
+callers (the Celery task and the ``geocode_participants`` management
+command) go through, so the flag is checked there rather than in
+``geocode_building_footprint`` itself — checking it there instead would
+have the disabled state permanently mis-cache as "no building found" for
+``NEGATIVE_CACHE_TIMEOUT_SECONDS`` after every address. Reading an
+already-cached footprint (``get_cached_building_footprint``) is not gated:
+it never calls Nominatim, so there is nothing left to disable there, and a
+cached footprint fetched while the flag was on stays valid until its normal
+TTL.
 """
 from __future__ import annotations
 
@@ -24,6 +38,8 @@ import urllib.request
 
 from django.conf import settings
 from django.core.cache import cache
+
+from accounts.models import FeatureFlag
 
 logger = logging.getLogger(__name__)
 
@@ -124,7 +140,15 @@ def geocode_building_footprint(address_line1: str, postal_code: str, city: str) 
 
 
 def warm_geocode_cache(address_line1: str, postal_code: str, city: str) -> None:
-    """Populate the cache for this address if it isn't already cached (hit or miss)."""
+    """Populate the cache for this address if it isn't already cached (hit or miss).
+
+    A no-op while ``FeatureFlag.PARTICIPANT_GEOCODING_ENABLED`` is off — see
+    the module docstring for why the flag is checked here and not inside
+    ``geocode_building_footprint``.
+    """
+    if not FeatureFlag.is_enabled(FeatureFlag.PARTICIPANT_GEOCODING_ENABLED):
+        return
+
     key = _cache_key(address_line1, postal_code, city)
     if cache.get(key) is not None:
         return

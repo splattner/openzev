@@ -177,7 +177,8 @@ PVshare Cockpit is a closed, subscription-based SaaS (CHF ~30/participant/year) 
 | Auto-create user account on participant creation | `shipped` | — | Passwordless since #712 — activated only via an onboarding link |
 | Participant contract PDF (metering points, tariffs, billing interval, notes) | `shipped` | — | Versioned contract snapshots on download (PR #443); [spec](specs/2026-08-contract-pdf-redesign.md) |
 | Participant status indicator | `shipped` | — | — |
-| Participant location map (OpenStreetMap building outlines, geocoded from address) | `shipped` | — | [ADR 0012](adr/0012-participant-geocoding-via-nominatim.md) |
+| Participant location map (OpenStreetMap building outlines, geocoded from address) | `shipped` | — | [ADR 0012](adr/0012-participant-geocoding-via-nominatim.md); geocoding is opt-in (`FeatureFlag.PARTICIPANT_GEOCODING_ENABLED`, default off), #796 |
+| Configurable map tile server / operator privacy notice for the participant map | `idea` | `medium` | Remaining parts of #796 — tiles still load from `tile.openstreetmap.org` unconditionally, and there's no privacy-notice surface for `/join` and `/i/` public pages |
 | `MeteringPoint` CRUD (consumption, production, bidirectional types) | `shipped` | — | [spec](specs/2026-03-metering-point-management.md) |
 | Assignment-only validity model (`MeteringPointAssignment` with date range) | `shipped` | — | [ADR 0009](adr/0009-remove-direct-meteringpoint-participant-fk.md) |
 | Community-allocated metering points (common-area meter split by `allocation_weight`) | `shipped` | — | [spec](specs/2026-08-shared-metering-points.md), #387 |

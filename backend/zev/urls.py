@@ -3,6 +3,7 @@ from rest_framework.routers import DefaultRouter
 from .views import (
     GridOperatorListView,
     GridOperatorSuggestionView,
+    ParticipantGeocodingEnabledView,
     ZevViewSet,
     ParticipantViewSet,
     MeteringPointViewSet,
@@ -18,4 +19,9 @@ router.register("metering-point-assignments", MeteringPointAssignmentViewSet, ba
 urlpatterns = [
     path("grid-operators/", GridOperatorListView.as_view(), name="grid-operator-list"),
     path("grid-operators/suggest/", GridOperatorSuggestionView.as_view(), name="grid-operator-suggest"),
+    path(
+        "participants/geocoding-enabled/",
+        ParticipantGeocodingEnabledView.as_view(),
+        name="participant-geocoding-enabled",
+    ),
 ] + router.urls

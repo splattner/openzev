@@ -16,6 +16,7 @@ import {
     createParticipant,
     deleteParticipant,
     downloadParticipantContractPdf,
+    fetchParticipantGeocodingEnabled,
     fetchParticipants,
     fetchZevs,
     getOnboardingLink,
@@ -61,6 +62,14 @@ export function ParticipantsPage() {
         queryFn: fetchParticipants,
     })
     const zevsQuery = useQuery({ queryKey: queryKeys.zev.list(), queryFn: fetchZevs })
+    // Off by default (#796) — the map section renders only once this is
+    // confirmed true, rather than rendering with no data while loading or on
+    // error, since a cached building footprint from before the flag was
+    // turned off could otherwise still surface on a disabled instance.
+    const geocodingEnabledQuery = useQuery({
+        queryKey: queryKeys.zev.participantGeocodingEnabled(),
+        queryFn: fetchParticipantGeocodingEnabled,
+    })
     const [editingId, setEditingId] = useState<string | null>(null)
     const [showModal, setShowModal] = useState(false)
     const [searchTerm, setSearchTerm] = useState('')
@@ -359,17 +368,19 @@ export function ParticipantsPage() {
                 focusField={modalFocusField}
             />
 
-            <section className="card">
-                <h3 style={{ marginTop: 0 }}>{t('pages.participants.map.title')}</h3>
-                <ParticipantsMap
-                    participants={participantCards.map((entry) => ({
-                        id: entry.participant.id,
-                        displayName: entry.displayName,
-                        address: entry.address,
-                        buildingFootprint: entry.participant.building_footprint,
-                    }))}
-                />
-            </section>
+            {geocodingEnabledQuery.data === true && (
+                <section className="card">
+                    <h3 style={{ marginTop: 0 }}>{t('pages.participants.map.title')}</h3>
+                    <ParticipantsMap
+                        participants={participantCards.map((entry) => ({
+                            id: entry.participant.id,
+                            displayName: entry.displayName,
+                            address: entry.address,
+                            buildingFootprint: entry.participant.building_footprint,
+                        }))}
+                    />
+                </section>
+            )}
 
             <ParticipantCardsSection
                 participantCards={participantCards}

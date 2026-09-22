@@ -127,6 +127,18 @@ export async function downloadParticipantContractPdf(participantId: string, file
   downloadBlob(response.data as Blob, filename)
 }
 
+/**
+ * Whether `FeatureFlag.PARTICIPANT_GEOCODING_ENABLED` is on — checked by any
+ * authenticated role, mirroring `fetchFeasibilityCalculatorEnabled`. Off by
+ * default; the participant map section is not rendered at all when this is
+ * false, rather than rendered empty, since a previously cached building
+ * footprint can still exist from before the flag was turned off (see #796).
+ */
+export async function fetchParticipantGeocodingEnabled(): Promise<boolean> {
+  const { data } = await api.get<{ enabled: boolean }>('/zev/participants/geocoding-enabled/')
+  return data.enabled
+}
+
 export async function fetchGridOperators(): Promise<GridOperatorList> {
   const { data } = await api.get<GridOperatorList>('/zev/grid-operators/')
   return data

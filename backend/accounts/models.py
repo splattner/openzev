@@ -460,6 +460,7 @@ class FeatureFlag(models.Model):
 
     ZEV_SELF_REGISTRATION_ENABLED = "zev_self_registration_enabled"
     FEASIBILITY_CALCULATOR_ENABLED = "feasibility_calculator_enabled"
+    PARTICIPANT_GEOCODING_ENABLED = "participant_geocoding_enabled"
 
     name = models.CharField(max_length=100, unique=True)
     description = models.CharField(max_length=255, blank=True, default="")
@@ -660,4 +661,13 @@ FeatureFlag.register(
     FeatureFlag.FEASIBILITY_CALCULATOR_ENABLED,
     default=False,
     description="Show the feasibility calculator in navigation and allow its API to be used.",
+)
+FeatureFlag.register(
+    FeatureFlag.PARTICIPANT_GEOCODING_ENABLED,
+    default=False,
+    description=(
+        "Send participant addresses to the public OpenStreetMap Nominatim API to look up "
+        "building footprints for the participant map (ADR 0012). Off by default because it "
+        "transfers address data to a third-party service."
+    ),
 )

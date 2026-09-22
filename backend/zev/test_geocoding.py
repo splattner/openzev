@@ -7,6 +7,7 @@ import pytest
 from django.core.cache import cache
 from django.db import transaction
 
+from accounts.models import FeatureFlag
 from zev import geocoding
 from zev.tasks import trigger_geocode_if_address_present, warm_participant_geocode_cache_task
 from testing import factories
@@ -19,6 +20,17 @@ def clear_cache():
     cache.clear()
     yield
     cache.clear()
+
+
+@pytest.fixture(autouse=True)
+def geocoding_enabled():
+    # Off by default (#796) — this module is specifically about the geocoding
+    # subsystem's behavior, so turn it on here and let
+    # TestParticipantGeocodingFeatureFlag below cover the off state.
+    FeatureFlag.objects.update_or_create(
+        name=FeatureFlag.PARTICIPANT_GEOCODING_ENABLED, defaults={"enabled": True}
+    )
+    yield
 
 
 _A_POLYGON = {
@@ -194,3 +206,50 @@ class TestTriggerGeocodeIfAddressPresent:
         ):
             trigger_geocode_if_address_present(participant)
         delay.assert_not_called()
+
+
+class TestParticipantGeocodingFeatureFlag:
+    """``FeatureFlag.PARTICIPANT_GEOCODING_ENABLED`` is off by default (#796):
+    no participant address should reach Nominatim, and no cache warm-up
+    should be enqueued, until an admin turns it on.
+    """
+
+    @pytest.fixture(autouse=True)
+    def geocoding_disabled(self):
+        FeatureFlag.objects.update_or_create(
+            name=FeatureFlag.PARTICIPANT_GEOCODING_ENABLED, defaults={"enabled": False}
+        )
+        yield
+
+    def test_flag_defaults_to_off(self):
+        FeatureFlag.objects.filter(name=FeatureFlag.PARTICIPANT_GEOCODING_ENABLED).delete()
+        assert FeatureFlag.is_enabled(FeatureFlag.PARTICIPANT_GEOCODING_ENABLED) is False
+
+    def test_warm_geocode_cache_is_a_noop_and_never_calls_nominatim(self):
+        with mock.patch("zev.geocoding.geocode_building_footprint") as geocode:
+            geocoding.warm_geocode_cache("Main Street 1", "8000", "Zurich")
+
+        geocode.assert_not_called()
+        assert geocoding.get_cached_building_footprint("Main Street 1", "8000", "Zurich") is None
+
+    def test_does_not_enqueue_even_with_an_address(self, django_capture_on_commit_callbacks):
+        participant = factories.ParticipantFactory(
+            address_line1="Main Street 1", postal_code="8000", city="Zurich",
+        )
+        with (
+            mock.patch("zev.tasks.warm_participant_geocode_cache_task.delay") as delay,
+            django_capture_on_commit_callbacks(execute=True),
+        ):
+            trigger_geocode_if_address_present(participant)
+        delay.assert_not_called()
+
+    def test_enabling_the_flag_unblocks_new_lookups(self):
+        with mock.patch("zev.geocoding.geocode_building_footprint", return_value=_A_POLYGON) as geocode:
+            geocoding.warm_geocode_cache("Main Street 1", "8000", "Zurich")
+        geocode.assert_not_called()
+
+        FeatureFlag.objects.filter(name=FeatureFlag.PARTICIPANT_GEOCODING_ENABLED).update(enabled=True)
+
+        with mock.patch("zev.geocoding.geocode_building_footprint", return_value=_A_POLYGON) as geocode:
+            geocoding.warm_geocode_cache("Main Street 1", "8000", "Zurich")
+        geocode.assert_called_once_with("Main Street 1", "8000", "Zurich")

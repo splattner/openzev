@@ -30,8 +30,17 @@ def trigger_geocode_if_address_present(participant) -> None:
 
     Safe to call unconditionally on every create/update: the task itself is a
     no-op once the address is cached, so this never causes repeated Nominatim
-    calls for an unchanged address.
+    calls for an unchanged address. Also a no-op while
+    ``FeatureFlag.PARTICIPANT_GEOCODING_ENABLED`` is off — checked here too
+    (on top of the check inside ``warm_geocode_cache``) purely so a disabled
+    instance doesn't churn the Celery queue with tasks that would just return
+    immediately.
     """
+    from accounts.models import FeatureFlag
+
+    if not FeatureFlag.is_enabled(FeatureFlag.PARTICIPANT_GEOCODING_ENABLED):
+        return
+
     if participant.address_line1 and participant.city:
         participant_id = str(participant.pk)
         transaction.on_commit(
