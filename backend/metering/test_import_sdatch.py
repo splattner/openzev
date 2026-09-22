@@ -6,6 +6,7 @@ from unittest import mock
 
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
+from django.utils import timezone as django_timezone
 from rest_framework.test import APIClient
 
 from accounts.models import UserRole
@@ -236,6 +237,45 @@ class SdatchImportTests(TestCase):
         xml = self._xml(self._meter_xml("CH-ADMIN-SDAT", self._interval_xml(observations=self._observation_xml("1.0000"))))
 
         resp = self._upload("admin.xml", xml, zev=self.other_zev)
+
+        self.assertEqual(resp.status_code, 201)
+        self.assertEqual(resp.data["rows_imported"], 1)
+        self.assertTrue(MeterReading.objects.filter(metering_point=admin_meter).exists())
+
+    def test_owner_cannot_import_sdatch_into_disabled_zev(self):
+        self.zev.disabled_at = django_timezone.now()
+        self.zev.save(update_fields=["disabled_at"])
+        xml = self._xml(
+            self._meter_xml(
+                "CH-SDAT-1",
+                self._interval_xml(observations=self._observation_xml("1.0000")),
+            )
+        )
+
+        resp = self._upload("disabled-zev.xml", xml)
+
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn("This ZEV is disabled", resp.data["error"])
+        self.assertFalse(MeterReading.objects.exists())
+        self.assertFalse(ImportLog.objects.exists())
+
+    def test_admin_can_import_sdatch_into_disabled_zev(self):
+        admin_meter = MeteringPoint.objects.create(
+            zev=self.other_zev,
+            meter_id="CH-ADMIN-DISABLED-SDAT",
+            meter_type=MeteringPointType.CONSUMPTION,
+        )
+        self.other_zev.disabled_at = django_timezone.now()
+        self.other_zev.save(update_fields=["disabled_at"])
+        auth(self.client, self.admin)
+        xml = self._xml(
+            self._meter_xml(
+                "CH-ADMIN-DISABLED-SDAT",
+                self._interval_xml(observations=self._observation_xml("1.0000")),
+            )
+        )
+
+        resp = self._upload("admin-disabled-zev.xml", xml, zev=self.other_zev)
 
         self.assertEqual(resp.status_code, 201)
         self.assertEqual(resp.data["rows_imported"], 1)

@@ -59,15 +59,15 @@ def _validated_date(raw, field_name):
     return parsed
 
 
-def _resolve_import_target_zev(request):
+def _resolve_import_target_zev(request, *, for_write):
     """Validate required zev_id for import/preview.
 
     Returns ``(zev, reason, error_response)`` — reason is None on success and
-    one of ``missing``/``invalid``/``not_found``/``forbidden`` otherwise, so
-    callers pick audit summaries without string-matching the response payload.
-    The resolved ZEV is returned even on ``forbidden`` so denied attempts keep
-    internal audit attribution (target object + id); the 403 response itself is
-    unchanged.
+    one of ``missing``/``invalid``/``not_found``/``forbidden``/``disabled``
+    otherwise, so callers pick audit summaries without string-matching the
+    response payload.
+    The resolved ZEV is returned on ``forbidden`` and ``disabled`` so rejected
+    attempts keep internal audit attribution (target object + id).
     """
     raw = request.data.get("zev_id")
     if not raw:
@@ -82,6 +82,15 @@ def _resolve_import_target_zev(request):
         return None, "not_found", Response({"error": "ZEV not found."}, status=status.HTTP_404_NOT_FOUND)
     if not request.user.is_admin and zev.owner != request.user:
         return zev, "forbidden", Response({"error": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
+    if for_write and not request.user.is_admin and zev.disabled_at is not None:
+        return (
+            zev,
+            "disabled",
+            Response(
+                {"error": "This ZEV is disabled. Ask an admin to re-enable it first."},
+                status=status.HTTP_400_BAD_REQUEST,
+            ),
+        )
     return zev, None, None
 
 
@@ -563,7 +572,7 @@ class ImportView(viewsets.ViewSet):
             )
             return Response({"error": "No file provided."}, status=status.HTTP_400_BAD_REQUEST)
 
-        zev, _, error_response = _resolve_import_target_zev(request)
+        zev, _, error_response = _resolve_import_target_zev(request, for_write=False)
         if error_response is not None:
             raw_zev_id = str(request.data.get("zev_id") or "")
             _audit_import_zev_rejection(
@@ -658,7 +667,7 @@ class ImportView(viewsets.ViewSet):
             return Response({"error": "No file provided."}, status=status.HTTP_400_BAD_REQUEST)
 
         if source == "csv":
-            zev, _, error_response = _resolve_import_target_zev(request)
+            zev, _, error_response = _resolve_import_target_zev(request, for_write=True)
             if error_response is not None:
                 raw_zev_id = str(request.data.get("zev_id") or "")
                 _audit_import_zev_rejection(
@@ -711,13 +720,14 @@ class ImportView(viewsets.ViewSet):
                 )
                 return Response({"error": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
         else:
-            zev, zev_reason, error_response = _resolve_import_target_zev(request)
+            zev, zev_reason, error_response = _resolve_import_target_zev(request, for_write=True)
             if error_response is not None:
                 summary = {
                     "missing": "SDAT-CH import failed: ZEV not selected.",
                     "invalid": "SDAT-CH import failed: invalid ZEV id.",
                     "not_found": "SDAT-CH import failed: ZEV not found.",
                     "forbidden": "Denied SDAT-CH import due to tenant scope.",
+                    "disabled": "SDAT-CH import failed: ZEV is disabled.",
                 }[zev_reason]
                 _audit_import_zev_rejection(
                     request,

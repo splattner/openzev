@@ -7,6 +7,7 @@ from unittest import mock
 from django.db import IntegrityError, connection
 from django.test import TestCase
 from django.test.utils import CaptureQueriesContext
+from django.utils import timezone as django_timezone
 from rest_framework.test import APIClient
 
 from accounts.models import UserRole
@@ -685,6 +686,56 @@ class CsvImportTests(TestCase):
         self.assertEqual(resp.data["rows_imported"], 1)
         log = ImportLog.objects.get(id=resp.data["id"])
         self.assertEqual(log.zev, self.other_zev)
+
+    def test_owner_cannot_import_into_disabled_zev(self):
+        self.zev.disabled_at = django_timezone.now()
+        self.zev.save(update_fields=["disabled_at"])
+        csv_bytes = (
+            b"meter_id,timestamp,energy_kwh,direction\n"
+            b"CH-IMPORT-1,2026-01-15T00:00:00Z,1.0000,in\n"
+        )
+
+        resp = upload_csv(self.client, "disabled-zev.csv", csv_bytes, zev_id=self.zev_id)
+
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn("This ZEV is disabled", resp.data["error"])
+        self.assertFalse(MeterReading.objects.exists())
+        self.assertFalse(ImportLog.objects.exists())
+
+    def test_admin_can_import_into_disabled_zev(self):
+        self.other_zev.disabled_at = django_timezone.now()
+        self.other_zev.save(update_fields=["disabled_at"])
+        admin_client = APIClient()
+        auth(admin_client, make_user("csv_disabled_zev_admin", UserRole.ADMIN))
+        csv_bytes = (
+            b"meter_id,timestamp,energy_kwh,direction\n"
+            b"CH-IMPORT-OTHER,2026-01-15T00:00:00Z,1.0000,in\n"
+        )
+
+        resp = upload_csv(
+            admin_client,
+            "admin-disabled-zev.csv",
+            csv_bytes,
+            zev_id=str(self.other_zev.id),
+        )
+
+        self.assertEqual(resp.status_code, 201)
+        self.assertEqual(resp.data["rows_imported"], 1)
+        self.assertTrue(MeterReading.objects.filter(metering_point=self.other_metering_point).exists())
+
+    def test_owner_can_preview_for_disabled_zev(self):
+        self.zev.disabled_at = django_timezone.now()
+        self.zev.save(update_fields=["disabled_at"])
+        csv_bytes = (
+            b"meter_id,timestamp,energy_kwh,direction\n"
+            b"CH-IMPORT-1,2026-01-15T00:00:00Z,1.0000,in\n"
+        )
+
+        resp = preview_csv(self.client, "disabled-zev.csv", csv_bytes, zev_id=self.zev_id)
+
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.data["summary"]["existing_metering_points"], 1)
+        self.assertFalse(MeterReading.objects.exists())
 
     def test_preview_without_zev_id_is_rejected(self):
         csv_bytes = (

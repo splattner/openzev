@@ -14,6 +14,10 @@ column mapping and a preview (no data written yet), then confirm the import.
 SDAT-CH has **no preview step**: the file imports directly and an import
 protocol opens automatically when anything was skipped or failed. Every import creates a protocol accessible from the import history.
 
+A disabled ZEV is read-only for its owner: CSV preview remains available, but
+CSV/Excel and SDAT-CH imports are rejected until an administrator re-enables
+the ZEV. Administrators may still import into a disabled ZEV.
+
 ![Imports page](screenshots/09-imports.png)
 
 ## CSV/Excel Import
