@@ -110,6 +110,9 @@ Extends `AbstractUser` (Django `accounts.models`).
 | `grid_operator_elcom_id` | `PositiveIntegerField`, null | ElCom operator id when the name was picked from the official list; null when typed |
 | `tariff_source_url` | `URLField(500)`, blank | Where this operator publishes its machine-readable tariffs (Art. 7b StromVV); used by the tariff import — see `2026-09-vse-tariff-import.md` |
 | `billing_interval` | `CharField(20)` | `monthly`, `quarterly`, `semi_annual`, `annual` |
+| `disabled_at` | `DateTimeField`, null, indexed | Set when the ZEV is disabled (retired, not deleted); `null` = active. Read-only on `ZevSerializer` — only `disable`/`enable` may change it (§7.1a) |
+| `disabled_by` | FK → `User` (`SET_NULL`), null | Who disabled it (owner or admin); `related_name="+"` |
+| `disabled_reason` | `CharField(500)`, blank | Free-text reason passed to `disable` |
 | `created_at` | `DateTimeField` (auto) | |
 | `updated_at` | `DateTimeField` (auto) | |
 
@@ -240,7 +243,7 @@ Defined in `accounts/permissions.py` and `zev/permissions.py`.
 | `IsAdmin` | `accounts` | `user.is_authenticated AND user.is_admin` |
 | `IsZevOwnerOrAdmin` | `accounts` | `user.is_authenticated AND (user.is_zev_owner OR user.is_admin)` |
 | `BaseZevScopedPermission` | `zev` | Base class for ZEV-tenant-aware permissions; checks `has_permission` (role gate) and `has_object_permission` (ZEV ownership check) |
-| `ZevManagementPermission` | `zev` | Extends `BaseZevScopedPermission`; POST restricted to admin only |
+| `ZevManagementPermission` | `zev` | Extends `BaseZevScopedPermission`; POST and DELETE restricted to admin only; write methods on an already-disabled ZEV also require admin (`has_object_permission`) |
 | `MeteringPointPermission` | `zev` | Extends `BaseZevScopedPermission`; `allow_participant_safe_methods = True` |
 | `MeteringPointAssignmentPermission` | `zev` | Extends `BaseZevScopedPermission`; no participant safe-method override |
 
@@ -866,8 +869,25 @@ participants (`ParticipantCardsSection`, `useParticipantAccountLinking`,
 **Create (POST):** admin only (enforced in `create()` and
 `ZevManagementPermission.has_permission`).
 
-**Serializer:** `ZevSerializer` (all fields). Retrieve uses `ZevDetailSerializer`
-which nests `participants` (via `ParticipantSerializer`, many=True, read-only).
+**Delete (DELETE):** admin only (`ZevManagementPermission.has_permission`).
+Hard delete, with no dependency-ordered cleanup or media-file removal yet — see
+the ZEV lifecycle issue for the planned admin purge. Its `perform_destroy`
+records an audited `zev.delete` event (category `governance`) after the row
+is gone, using the same best-effort helper as transfer export/import
+(`_record_audit_best_effort`) so an audit failure cannot turn an
+already-completed delete into an error response.
+
+**Disabled ZEVs are read-only to non-admins** (`ZevManagementPermission.
+has_object_permission`): any non-safe method on a ZEV whose `disabled_at` is
+set is rejected unless the caller is an admin. The owner still sees it (their
+`owner == user` queryset scope is unaffected by `disabled_at`) but cannot
+write to it — not even re-clear `disabled_at` itself, since that field is
+read-only on `ZevSerializer` regardless of disabled state.
+
+**Serializer:** `ZevSerializer` (all fields except `disabled_at`/
+`disabled_by`/`disabled_reason`, which are read-only — see §7.1a). Retrieve
+uses `ZevDetailSerializer` which nests `participants` (via
+`ParticipantSerializer`, many=True, read-only).
 
 **Owner assignment on create:** if `owner` not in validated data, defaults to
 `request.user`.
@@ -876,6 +896,37 @@ which nests `participants` (via `ParticipantSerializer`, many=True, read-only).
 - If new owner is not already admin or zev_owner → promote to `zev_owner`.
 - If previous owner no longer owns any ZEV and is not superuser → demote to
   `participant`.
+
+### 7.1a Disable and enable (ZEV lifecycle, phase 1)
+
+Disable is retirement, not deletion: nothing under the ZEV is touched, and it
+is reversible via `enable`. This is the first landed slice of the ZEV
+lifecycle issue's three-state model (`active → disabled → gone`) — the state
+and its two entry points only. Not yet done, tracked on that issue: cutting
+off participant/owner reads of `Participant`/`MeteringPoint`/`Tariff`/
+`Invoice` rows under a disabled ZEV; the public unauthenticated routes
+(invoice access links, onboarding links) rejecting a disabled ZEV; the
+dynamic-tariff/invoice Celery tasks skipping one; the admin purge; and any
+frontend UI — nothing calls either action yet, so this is API-only and inert.
+
+**`POST /api/v1/zev/zevs/{id}/disable/`** — the ZEV's owner, or an admin.
+Permission is `BaseZevScopedPermission` (not `ZevManagementPermission`, which
+would otherwise sweep this POST into its admin-only rule) via a
+`get_permissions()` override keyed on `self.action`. Body: `{"reason": "..."}`
+(optional, defaults to `""`). Sets `disabled_at = now()`, `disabled_by =
+request.user`, `disabled_reason = reason`; `400` if already disabled. Returns
+the updated `ZevDetailSerializer` representation. Records `zev.disable`
+(category `governance`), with `metadata.reason` when a reason was given.
+
+**`POST /api/v1/zev/zevs/{id}/enable/`** — admin only (`IsAdmin`, via the same
+`get_permissions()` override) — the owner cannot self-serve this. Clears
+`disabled_at`/`disabled_by`/`disabled_reason`; `400` if not currently
+disabled. Records `zev.enable`.
+
+**Self-setup guard, updated:** `self_setup`'s "you already have a ZEV" check
+(§7.3) now excludes disabled ZEVs (`disabled_at__isnull=True`), so an owner
+who disables their only community is not permanently locked out of creating a
+replacement through that endpoint.
 
 ### 7.2 Create-with-owner wizard
 
@@ -948,7 +999,8 @@ IBAN requires `owner_address_line1`, `owner_postal_code`, and `owner_city`.
 
 **Guards:**
 - User must be `zev_owner`.
-- User must not already own a ZEV.
+- User must not already own an *active* ZEV (a disabled one does not count —
+  see §7.1a).
 
 **Service:** `create_zev_for_existing_owner()` → creates Zev + Participant.
 
@@ -1196,9 +1248,11 @@ documented in `2026-03-invoice-lifecycle-and-communication.md` §5.6a.
 | Method | URL | Permission | Description |
 |---|---|---|---|
 | GET / POST | `/zevs/` | IsAuthenticated, ZevManagementPermission (create: admin only) | List/create ZEVs |
-| GET / PATCH / PUT / DELETE | `/zevs/{id}/` | IsAuthenticated, ZevManagementPermission | ZEV detail (retrieve uses ZevDetailSerializer with nested participants) |
+| GET / PATCH / PUT / DELETE | `/zevs/{id}/` | IsAuthenticated, ZevManagementPermission (delete: admin only; write on a disabled ZEV: admin only) | ZEV detail (retrieve uses ZevDetailSerializer with nested participants) |
 | POST | `/zevs/create-with-owner/` | IsAuthenticated, ZevManagementPermission (admin only) | Wizard: create ZEV + owner + metering points |
 | POST | `/zevs/self-setup/` | IsAuthenticated | Self-setup: create ZEV for self-registered owner |
+| POST | `/zevs/{id}/disable/` | IsAuthenticated, BaseZevScopedPermission (owner of that ZEV, or admin) | Disable a ZEV — reversible, touches nothing else (§7.1a) |
+| POST | `/zevs/{id}/enable/` | IsAuthenticated, IsAdmin | Re-enable a disabled ZEV — admin only (§7.1a) |
 | GET | `/grid-operators/` | IsAuthenticated | The official ElCom grid-operator list for the ZEV form picker — static reference data, **unpaginated** (see §3.4a) |
 | GET / POST | `/participants/` | IsAuthenticated, BaseZevScopedPermission | List/create participants |
 | GET / PATCH / PUT / DELETE | `/participants/{id}/` | IsAuthenticated, BaseZevScopedPermission | Participant detail |
@@ -1403,7 +1457,7 @@ interface ParticipantAccountCreateResult { participant: Participant; account: Us
 
 | Model | Admin class | Key config |
 |---|---|---|
-| `Zev` | `ZevAdmin` | ParticipantInline. List: name, zev_type, owner, billing_interval. Filter: zev_type, billing_interval. Search: name, grid_operator |
+| `Zev` | `ZevAdmin` | ParticipantInline. List: name, zev_type, owner, billing_interval, disabled_at. Filter: zev_type, billing_interval, disabled_at. Search: name, grid_operator |
 | `Participant` | `ParticipantAdmin` | MeteringPointAssignmentInline. List: full_name, zev, email, validity. Filter: zev. Search: name, email |
 | `MeteringPoint` | `MeteringPointAdmin` | List: meter_id, zev, meter_type, is_active. Filter: meter_type, is_active. Search: meter_id |
 
@@ -1491,7 +1545,8 @@ lists the test classes per module (test counts are the `test_*` methods).
 | Module | Classes | Tests | Coverage |
 |---|---|---|---|
 | `test_scoping.py` | 1 | 4 | `ZevScopedQuerySetMixin` read scoping by role |
-| `test_write_scoping.py` | 4 | 17 | Write scoping: foreign create refused, move-via-PATCH refused, legit writes and admin bypass still work, audit retained |
+| `test_write_scoping.py` | 5 | 20 | Write scoping: foreign create refused, move-via-PATCH refused, legit writes and admin bypass still work, audit retained; a ZEV owner cannot DELETE their own or another ZEV (admin-only, audited) |
+| `test_disable_enable.py` | 4 | 17 | ZEV lifecycle phase 1: owner/admin can disable, only admin can enable, both audited, guarded against double-disable/double-enable; a disabled ZEV is read-only to its owner (admin can still write); the self-setup "already have a ZEV" guard excludes disabled ZEVs |
 | `test_zev_id_filter.py` | 5 | 15 | `?zev_id=` narrowing on list endpoints |
 | `test_transfer.py` | 6 | 66 | Whole-ZEV archive shape, round-trip, rejected archives, schema parity, transfer endpoints |
 | `test_geocoding.py` | 4 | 19 | Building footprint cache, warm tasks, trigger-on-save |

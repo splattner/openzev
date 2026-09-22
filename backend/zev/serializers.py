@@ -335,7 +335,14 @@ class ZevSerializer(BankIbanValidationMixin, serializers.ModelSerializer):
     class Meta:
         model = Zev
         fields = "__all__"
-        read_only_fields = ["id", "created_at", "updated_at"]
+        # disabled_at/disabled_by/disabled_reason are read-only here so a
+        # PATCH cannot re-enable a ZEV (or disable one) outside
+        # ZevViewSet.disable/enable, which carry the admin-only rule on
+        # enable that a writable field on this serializer would bypass.
+        read_only_fields = [
+            "id", "created_at", "updated_at",
+            "disabled_at", "disabled_by", "disabled_reason",
+        ]
         extra_kwargs = {
             "owner": {"required": False},
         }

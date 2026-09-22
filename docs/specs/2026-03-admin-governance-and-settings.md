@@ -165,7 +165,7 @@ DEFAULT_EMAIL_BODY_TEMPLATE = (
 - Atomically increments `invoice_counter` using `Zev.objects.filter(pk=self.pk).update(invoice_counter=F("invoice_counter") + 1)`.
 - Calls `self.refresh_from_db()` after increment.
 
-**Serializer:** `ZevSerializer` — `fields = "__all__"`, read-only: `id`, `created_at`, `updated_at`. `owner` is optional and defaults to `request.user`. Owner changes auto-promote/demote role (ZEV_OWNER ↔ PARTICIPANT).
+**Serializer:** `ZevSerializer` — `fields = "__all__"`, read-only: `id`, `created_at`, `updated_at`, `disabled_at`, `disabled_by`, `disabled_reason` (the last three change only through `ZevViewSet.disable`/`enable` — see `2026-03-community-and-access.md` §7.1a). `owner` is optional and defaults to `request.user`. Owner changes auto-promote/demote role (ZEV_OWNER ↔ PARTICIPANT).
 
 ---
 

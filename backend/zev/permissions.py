@@ -54,6 +54,20 @@ class ZevManagementPermission(BaseZevScopedPermission):
             return request.user.is_admin
         return True
 
+    def has_object_permission(self, request, view, obj):
+        if not super().has_object_permission(request, view, obj):
+            return False
+        # A disabled ZEV is inert: its owner keeps read-only access (to check
+        # its status or pull the transfer archive) but writing to it again
+        # takes an admin — through ``enable`` (its own permission override,
+        # not this class) or, later, a purge. Without this, a plain PATCH
+        # through the default serializer would let an owner edit — or even
+        # silently re-enable, once the field stops being read-only-by-luck —
+        # a ZEV they just disabled.
+        if getattr(obj, "disabled_at", None) is not None and request.method not in SAFE_METHODS:
+            return request.user.is_admin
+        return True
+
 
 class MeteringPointPermission(BaseZevScopedPermission):
     allow_participant_safe_methods = True

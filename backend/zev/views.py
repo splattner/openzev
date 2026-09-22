@@ -72,9 +72,25 @@ class ZevViewSet(ZevScopedQuerySetMixin, viewsets.ModelViewSet):
         # self_setup is a POST by non-admins — skip ZevManagementPermission
         if self.action == "self_setup":
             return [IsAuthenticated()]
+        # disable is a POST too, but not a creation — ZevManagementPermission
+        # would otherwise sweep it into its admin-only POST rule. Object-level
+        # ownership (admin, or the ZEV's own owner) is enforced by
+        # get_object() via BaseZevScopedPermission.has_object_permission.
+        if self.action == "disable":
+            return [IsAuthenticated(), BaseZevScopedPermission()]
+        # enable reverses disable and is deliberately admin-only, unlike
+        # disable itself — an owner cannot re-enable their own ZEV.
+        if self.action == "enable":
+            return [IsAuthenticated(), IsAdmin()]
         return super().get_permissions()
 
     def get_queryset(self):
+        # No disabled-state filtering needed here: ZevManagementPermission
+        # already blocks participants from every method on this viewset
+        # regardless of a ZEV's state, and the owner-scoped queryset
+        # (ZevScopedQuerySetMixin, ``zev_owner_filter = "owner"``) already
+        # includes a disabled ZEV for its own owner — which is what gives the
+        # owner read-only visibility of it (see has_object_permission).
         return self.scope_queryset(Zev.objects.all())
 
     def get_serializer_class(self):
@@ -105,7 +121,11 @@ class ZevViewSet(ZevScopedQuerySetMixin, viewsets.ModelViewSet):
         user = request.user
         if not user.is_zev_owner:
             return Response({"detail": "Only ZEV owners can use this endpoint."}, status=status.HTTP_403_FORBIDDEN)
-        if Zev.objects.filter(owner=user).exists():
+        # Excludes disabled ZEVs: without this, an owner who disables their
+        # only community would be permanently locked out of ever creating a
+        # replacement through this endpoint — the guard exists to stop a
+        # second *active* community, not to freeze the owner out forever.
+        if Zev.objects.filter(owner=user, disabled_at__isnull=True).exists():
             return Response({"detail": "You already have a ZEV."}, status=status.HTTP_400_BAD_REQUEST)
 
         address_fields = (
@@ -142,6 +162,74 @@ class ZevViewSet(ZevScopedQuerySetMixin, viewsets.ModelViewSet):
             participant_data=participant_data,
         )
         return Response(result, status=status.HTTP_201_CREATED)
+
+    # ── Lifecycle: disable and enable ───────────────────────────────────────
+    #
+    # Disable is not delete: nothing under the ZEV is touched, and it is
+    # reversible. It is the first half of the ZEV lifecycle issue — this
+    # change lands the state and its two safe entry points only. Still open,
+    # tracked on the issue and deliberately not done here: participants and
+    # non-owner reads of Participant/MeteringPoint/Tariff/Invoice rows under a
+    # disabled ZEV are not yet cut off; the public unauthenticated routes
+    # (invoice access links, onboarding links) do not yet reject a disabled
+    # ZEV; and the dynamic-tariff/invoice Celery tasks do not yet skip one.
+    # Nothing in the frontend calls either action yet, so this is inert until
+    # those follow-ups (and the UI) ship.
+
+    @action(detail=True, methods=["post"], url_path="disable")
+    def disable(self, request, pk=None):
+        """Disable this ZEV. Its owner or an admin may do this."""
+        zev = self.get_object()
+        if zev.disabled_at is not None:
+            return Response({"detail": "This ZEV is already disabled."}, status=status.HTTP_400_BAD_REQUEST)
+
+        reason = (request.data.get("reason") or "").strip()
+        zev.disabled_at = dj_timezone.now()
+        zev.disabled_by = request.user
+        zev.disabled_reason = reason
+        zev.save(update_fields=["disabled_at", "disabled_by", "disabled_reason"])
+
+        summary = f"Disabled ZEV {zev.name}."
+        if reason:
+            summary += f" Reason: {reason}"
+        self._record_audit_best_effort(
+            request,
+            action_category=AuditActionCategory.GOVERNANCE,
+            action_type="zev.disable",
+            target_type="zev.Zev",
+            target=zev,
+            target_id=str(zev.id),
+            target_display=zev.name,
+            zev=zev,
+            summary=summary,
+            metadata={"reason": reason} if reason else {},
+        )
+        return Response(ZevDetailSerializer(zev, context=self.get_serializer_context()).data)
+
+    @action(detail=True, methods=["post"], url_path="enable")
+    def enable(self, request, pk=None):
+        """Re-enable a disabled ZEV. Admin-only — its owner cannot self-serve this."""
+        zev = self.get_object()
+        if zev.disabled_at is None:
+            return Response({"detail": "This ZEV is not disabled."}, status=status.HTTP_400_BAD_REQUEST)
+
+        zev.disabled_at = None
+        zev.disabled_by = None
+        zev.disabled_reason = ""
+        zev.save(update_fields=["disabled_at", "disabled_by", "disabled_reason"])
+
+        self._record_audit_best_effort(
+            request,
+            action_category=AuditActionCategory.GOVERNANCE,
+            action_type="zev.enable",
+            target_type="zev.Zev",
+            target=zev,
+            target_id=str(zev.id),
+            target_display=zev.name,
+            zev=zev,
+            summary=f"Enabled ZEV {zev.name}.",
+        )
+        return Response(ZevDetailSerializer(zev, context=self.get_serializer_context()).data)
 
     def perform_destroy(self, instance):
         # ``ZevManagementPermission`` restricts DELETE to admins, same as

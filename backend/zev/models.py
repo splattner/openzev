@@ -178,6 +178,25 @@ class Zev(models.Model):
         blank=True,
         help_text="Additional agreements shown in the participation contract PDF.",
     )
+    # A retired ZEV, not a deleted one: nothing under it is touched. A
+    # timestamp rather than a boolean because *when* is what retention, the
+    # admin list and the audit trail all need, and it is the field a future
+    # purge guardrail keys off ("disabled for at least N days"). Null means
+    # active. Never set directly through ``ZevSerializer`` (see its
+    # ``read_only_fields``) — only through ``ZevViewSet.disable``/``enable``,
+    # so the admin-only rule on ``enable`` cannot be bypassed with a PATCH.
+    disabled_at = models.DateTimeField(
+        null=True, blank=True, db_index=True,
+        help_text="When this ZEV was disabled. Null means active.",
+    )
+    disabled_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name="+",
+        help_text="Who disabled this ZEV (its owner or an admin).",
+    )
+    disabled_reason = models.CharField(max_length=500, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -186,6 +205,10 @@ class Zev(models.Model):
 
     def __str__(self):
         return f"{self.name} ({self.get_zev_type_display()})"
+
+    @property
+    def is_disabled(self) -> bool:
+        return self.disabled_at is not None
 
     def clean(self):
         if self.bank_iban:

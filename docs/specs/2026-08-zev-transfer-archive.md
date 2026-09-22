@@ -155,8 +155,11 @@ Field lists (`ZEV_FIELDS`, `PARTICIPANT_FIELDS`, `METERING_POINT_FIELDS`,
 `ASSIGNMENT_FIELDS`, `TARIFF_FIELDS`, `TARIFF_PERIOD_FIELDS`, `INVOICE_FIELDS`,
 `INVOICE_ITEM_FIELDS`, `DYNAMIC_SOURCE_FIELDS`) are hand-written in `schema.py` — a file format with a
 version, not a mirror of the serializers. `owner` (Zev) and `user` (Participant)
-are absent by design; imported participants arrive unlinked. `pdf_file` is absent
-from `INVOICE_FIELDS`. `READING_CSV_COLUMNS = ("meter_id", "timestamp",
+are absent by design; imported participants arrive unlinked. `disabled_at`/
+`disabled_by`/`disabled_reason` (Zev) are absent for the same reason plus one
+more: `disabled_by` is an account reference, and an import always creates a
+new, active ZEV, so disabled state has nothing to carry across to. `pdf_file`
+is absent from `INVOICE_FIELDS`. `READING_CSV_COLUMNS = ("meter_id", "timestamp",
 "energy_kwh", "direction", "resolution", "import_source")` — the same layout the
 normal CSV metering import reads, plus `resolution`/`import_source` so nothing is
 lost in a round trip.

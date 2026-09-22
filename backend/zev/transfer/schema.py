@@ -83,6 +83,12 @@ SECTION_FILES = {
 # invoice data to anyone holding a link, so letting it ride in on an archive
 # would be an import granting access — the one thing the rule above forbids.
 # It arrives off, and an operator turns it on for the instance they run.
+#
+# ``disabled_at``/``disabled_by``/``disabled_reason`` are absent for two
+# reasons at once: ``disabled_by`` is an account reference (the rule above),
+# and an import always creates a new, active ZEV — carrying disabled state
+# across would hand the new owner a community that is inert on arrival for a
+# reason that happened to a different ZEV on a different instance.
 
 ZEV_FIELDS = (
     "name",
