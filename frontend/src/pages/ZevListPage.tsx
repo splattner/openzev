@@ -5,9 +5,11 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import {
     faArrowLeft,
     faArrowRight,
+    faBan,
     faCheck,
     faCopy,
     faPen,
+    faPlay,
     faPlus,
     faTrash,
     faUpload,
@@ -22,7 +24,7 @@ import { ZevImportModal } from '../features/zev/ZevImportModal'
 import { formatShortDate, useAppSettings } from '../lib/appSettings'
 import { useAuth } from '../lib/auth'
 import { FormModal } from '../components/FormModal'
-import { createZevWithOwner, deleteZev, fetchParticipants, fetchZevs, updateZev } from '../lib/api/zev'
+import { createZevWithOwner, deleteZev, disableZev, enableZev, fetchParticipants, fetchZevs, updateZev } from '../lib/api/zev'
 import { fetchUsers } from '../lib/api/auth'
 import { formatApiError } from '../lib/api/errors'
 import { queryKeys } from '../lib/api/queryKeys'
@@ -156,6 +158,20 @@ export function ZevListPage({ embedded = false }: { embedded?: boolean }) {
 
     const deleteMutation = useMutation({
         mutationFn: deleteZev,
+        onSuccess: () => {
+            void queryClient.invalidateQueries({ queryKey: queryKeys.zev.list() })
+        },
+    })
+
+    const disableMutation = useMutation({
+        mutationFn: (id: string) => disableZev(id),
+        onSuccess: () => {
+            void queryClient.invalidateQueries({ queryKey: queryKeys.zev.list() })
+        },
+    })
+
+    const enableMutation = useMutation({
+        mutationFn: enableZev,
         onSuccess: () => {
             void queryClient.invalidateQueries({ queryKey: queryKeys.zev.list() })
         },
@@ -1014,6 +1030,14 @@ export function ZevListPage({ embedded = false }: { embedded?: boolean }) {
                                                 {t('pages.zevs.setupIncomplete')}
                                             </span>
                                         )}
+                                        {zev.disabled_at && (
+                                            <span
+                                                className="badge badge-danger"
+                                                title={t('pages.zevs.disabledSince', { date: formatShortDate(zev.disabled_at, settings) })}
+                                            >
+                                                {t('pages.zevs.disabledBadge')}
+                                            </span>
+                                        )}
                                     </div>
                                 </td>
                                 <td>{ownerNameById.get(zev.owner) ?? (user?.id === zev.owner ? user.username : zev.owner)}</td>
@@ -1041,6 +1065,38 @@ export function ZevListPage({ embedded = false }: { embedded?: boolean }) {
                                             <button className="button button-secondary button-compact" type="button" onClick={() => openOwnerModal(zev)}>
                                                 <FontAwesomeIcon icon={faUser} fixedWidth />
                                                 {t('pages.zevs.setOwner')}
+                                            </button>
+                                        )}
+                                        {zev.disabled_at ? (
+                                            <button
+                                                className="button button-secondary button-compact"
+                                                type="button"
+                                                disabled={enableMutation.isPending || dialogLoading}
+                                                onClick={() => confirm({
+                                                    title: t('pages.zevs.enableTitle'),
+                                                    message: t('pages.zevs.enableMessage', { name: zev.name }),
+                                                    confirmText: t('pages.zevs.enableConfirm'),
+                                                    onConfirm: () => enableMutation.mutate(zev.id),
+                                                })}
+                                            >
+                                                <FontAwesomeIcon icon={faPlay} fixedWidth />
+                                                {t('pages.zevs.enable')}
+                                            </button>
+                                        ) : (
+                                            <button
+                                                className="button button-secondary button-compact"
+                                                type="button"
+                                                disabled={disableMutation.isPending || dialogLoading}
+                                                onClick={() => confirm({
+                                                    title: t('pages.zevs.disableTitle'),
+                                                    message: t('pages.zevs.disableMessage', { name: zev.name }),
+                                                    confirmText: t('pages.zevs.disableConfirm'),
+                                                    isDangerous: true,
+                                                    onConfirm: () => disableMutation.mutate(zev.id),
+                                                })}
+                                            >
+                                                <FontAwesomeIcon icon={faBan} fixedWidth />
+                                                {t('pages.zevs.disable')}
                                             </button>
                                         )}
                                         <button className="button button-danger button-compact" type="button" disabled={deleteMutation.isPending || dialogLoading} onClick={() => confirm({

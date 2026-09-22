@@ -2,16 +2,19 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useState, type FormEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faDownload } from '@fortawesome/free-solid-svg-icons'
+import { faBan, faDownload, faPlay, faTriangleExclamation } from '@fortawesome/free-solid-svg-icons'
 import { Tabs } from '@mantine/core'
 import { useNavigate, useParams } from 'react-router-dom'
+import { ConfirmDialog, useConfirmDialog } from '../components/ConfirmDialog'
 import { PageSkeleton } from '../components/PageSkeleton'
 import { ZevEmailTemplateFields } from '../components/ZevEmailTemplateFields'
 import { ZevGeneralSettingsFields } from '../components/ZevGeneralSettingsFields'
 import { ZevExportModal } from '../features/zev/ZevExportModal'
-import { updateZev } from '../lib/api/zev'
+import { disableZev, enableZev, updateZev } from '../lib/api/zev'
 import { formatApiError } from '../lib/api/errors'
 import { queryKeys } from '../lib/api/queryKeys'
+import { formatShortDate, useAppSettings } from '../lib/appSettings'
+import { useAuth } from '../lib/auth'
 import { useManagedZev } from '../lib/managedZev'
 import { getDefaultZevForm, mapZevToForm } from '../lib/zevForm'
 import { useToast } from '../lib/toast'
@@ -47,11 +50,22 @@ export function ZevSettingsPage({ tab = 'general' }: { tab?: ZevSettingsTab }) {
     const navigate = useNavigate()
     const queryClient = useQueryClient()
     const { pushToast } = useToast()
+    const { user } = useAuth()
+    const { settings } = useAppSettings()
     const { selectedZev, selectedZevId, isLoading } = useManagedZev()
+    const { dialog, confirm, handleConfirm, handleCancel, isLoading: dialogLoading } = useConfirmDialog()
 
     const [form, setForm] = useState<ZevInput>(getDefaultZevForm())
     const [error, setError] = useState<string | null>(null)
     const [showExportModal, setShowExportModal] = useState(false)
+
+    const isAdmin = user?.role === 'admin'
+    const isDisabled = Boolean(selectedZev?.disabled_at)
+    // The owner keeps read access to a disabled ZEV but loses write access
+    // (backend: BaseZevScopedPermission.has_object_permission) — an admin
+    // can still edit. Mirrored here only to grey out the forms; the backend
+    // enforces it regardless.
+    const readOnly = isDisabled && !isAdmin
 
     useEffect(() => {
         if (!selectedZev) {
@@ -73,6 +87,26 @@ export function ZevSettingsPage({ tab = 'general' }: { tab?: ZevSettingsTab }) {
         },
         onError: (mutationError) =>
             setError(formatApiError(mutationError, t('pages.zevSettings.updateFailed'))),
+    })
+
+    const disableMutation = useMutation({
+        mutationFn: () => disableZev(selectedZevId),
+        onSuccess: () => {
+            pushToast(t('pages.zevSettings.lifecycle.disableSuccess'), 'success')
+            void queryClient.invalidateQueries({ queryKey: queryKeys.zev.list() })
+        },
+        onError: (mutationError) =>
+            pushToast(formatApiError(mutationError, t('pages.zevSettings.lifecycle.disableFailed')), 'error'),
+    })
+
+    const enableMutation = useMutation({
+        mutationFn: () => enableZev(selectedZevId),
+        onSuccess: () => {
+            pushToast(t('pages.zevSettings.lifecycle.enableSuccess'), 'success')
+            void queryClient.invalidateQueries({ queryKey: queryKeys.zev.list() })
+        },
+        onError: (mutationError) =>
+            pushToast(formatApiError(mutationError, t('pages.zevSettings.lifecycle.enableFailed')), 'error'),
     })
 
     function submit(event: FormEvent<HTMLFormElement>) {
@@ -103,6 +137,36 @@ export function ZevSettingsPage({ tab = 'general' }: { tab?: ZevSettingsTab }) {
                 <p className="muted">{t('pages.zevSettings.description')}</p>
             </header>
 
+            {isDisabled && (
+                <div className="warning-banner" role="alert" style={{ display: 'grid', gap: '0.35rem', maxWidth: '1000px' }}>
+                    <strong>
+                        <FontAwesomeIcon icon={faTriangleExclamation} fixedWidth style={{ marginRight: '0.4rem' }} />
+                        {t('pages.zevSettings.lifecycle.bannerTitle')}
+                    </strong>
+                    <p style={{ margin: 0 }}>
+                        {t('pages.zevSettings.lifecycle.bannerBody', {
+                            date: selectedZev?.disabled_at ? formatShortDate(selectedZev.disabled_at, settings) : '',
+                        })}
+                        {selectedZev?.disabled_reason ? ` ${t('pages.zevSettings.lifecycle.bannerReason', { reason: selectedZev.disabled_reason })}` : ''}
+                        {' '}
+                        {isAdmin ? t('pages.zevSettings.lifecycle.bannerAdminHint') : t('pages.zevSettings.lifecycle.bannerReadOnly')}
+                    </p>
+                    {isAdmin && (
+                        <div className="actions-row" style={{ marginTop: '0.15rem' }}>
+                            <button
+                                className="button button-secondary button-compact"
+                                type="button"
+                                disabled={enableMutation.isPending}
+                                onClick={() => enableMutation.mutate()}
+                            >
+                                <FontAwesomeIcon icon={faPlay} fixedWidth />
+                                {t('pages.zevSettings.lifecycle.enableAction')}
+                            </button>
+                        </div>
+                    )}
+                </div>
+            )}
+
             <Tabs
                 classNames={{ root: 'app-tabs', list: 'app-tabs-list', tab: 'app-tabs-tab' }}
                 value={tab}
@@ -130,7 +194,7 @@ export function ZevSettingsPage({ tab = 'general' }: { tab?: ZevSettingsTab }) {
                             {error && <div className="error-banner grid-span-full">{error}</div>}
 
                             <div className="actions-row grid-span-full">
-                                <button className="button button-primary" type="submit" disabled={updateMutation.isPending}>
+                                <button className="button button-primary" type="submit" disabled={updateMutation.isPending || readOnly}>
                                     {t('pages.zevSettings.saveSettings')}
                                 </button>
                             </div>
@@ -151,7 +215,7 @@ export function ZevSettingsPage({ tab = 'general' }: { tab?: ZevSettingsTab }) {
                             {error && <div className="error-banner grid-span-full">{error}</div>}
 
                             <div className="actions-row grid-span-full">
-                                <button className="button button-primary" type="submit" disabled={updateMutation.isPending}>
+                                <button className="button button-primary" type="submit" disabled={updateMutation.isPending || readOnly}>
                                     {t('pages.zevSettings.saveSettings')}
                                 </button>
                             </div>
@@ -183,7 +247,7 @@ export function ZevSettingsPage({ tab = 'general' }: { tab?: ZevSettingsTab }) {
                             {error && <div className="error-banner">{error}</div>}
 
                             <div className="actions-row">
-                                <button className="button button-primary" type="submit" disabled={updateMutation.isPending}>
+                                <button className="button button-primary" type="submit" disabled={updateMutation.isPending || readOnly}>
                                     {t('pages.zevSettings.saveEmailTemplate')}
                                 </button>
                             </div>
@@ -217,8 +281,45 @@ export function ZevSettingsPage({ tab = 'general' }: { tab?: ZevSettingsTab }) {
                             </button>
                         </div>
                     </section>
+
+                    {!isDisabled && (
+                        <section className="card page-stack">
+                            <div>
+                                <h3 style={{ marginTop: 0 }}>{t('pages.zevSettings.lifecycle.disableSectionTitle')}</h3>
+                                <p className="muted" style={{ margin: 0 }}>
+                                    {t('pages.zevSettings.lifecycle.disableSectionDescription')}
+                                </p>
+                            </div>
+                            <div className="actions-row">
+                                <button
+                                    className="button button-danger"
+                                    type="button"
+                                    disabled={disableMutation.isPending || dialogLoading}
+                                    onClick={() => confirm({
+                                        title: t('pages.zevSettings.lifecycle.disableTitle'),
+                                        message: t('pages.zevSettings.lifecycle.disableMessage', { name: selectedZev.name }),
+                                        confirmText: t('pages.zevSettings.lifecycle.disableConfirm'),
+                                        isDangerous: true,
+                                        onConfirm: () => disableMutation.mutate(),
+                                    })}
+                                >
+                                    <FontAwesomeIcon icon={faBan} fixedWidth />
+                                    {t('pages.zevSettings.lifecycle.disableAction')}
+                                </button>
+                            </div>
+                        </section>
+                    )}
                 </Tabs.Panel>
             </Tabs>
+
+            {dialog && (
+                <ConfirmDialog
+                    {...dialog}
+                    isLoading={dialogLoading}
+                    onConfirm={handleConfirm}
+                    onCancel={handleCancel}
+                />
+            )}
 
             <ZevExportModal
                 isOpen={showExportModal}

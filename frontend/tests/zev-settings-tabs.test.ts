@@ -25,7 +25,11 @@ vi.mock('../src/lib/managedZev', () => ({
     useManagedZev: () => ({ selectedZevId: mocks.zev.id, selectedZev: mocks.zev, isLoading: false }),
 }))
 vi.mock('../src/lib/toast', () => ({ useToast: () => ({ pushToast: vi.fn() }) }))
-vi.mock('../src/lib/api/zev', () => ({ updateZev: mocks.update }))
+vi.mock('../src/lib/appSettings', () => ({
+    useAppSettings: () => ({ settings: {} }),
+    formatShortDate: (d: string) => d,
+}))
+vi.mock('../src/lib/api/zev', () => ({ updateZev: mocks.update, disableZev: vi.fn(), enableZev: vi.fn() }))
 vi.mock('../src/features/zev/ZevExportModal', () => ({ ZevExportModal: () => null }))
 vi.mock('../src/pages/AdminAuditLogsPage', () => ({ AuditLogsPage: () => createElement('div', null, 'audit') }))
 vi.mock('../src/components/ZevGeneralSettingsFields', () => ({

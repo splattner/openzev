@@ -195,6 +195,10 @@ export interface Zev {
     email_body_template?: string
     local_tariff_notes?: string
     additional_contract_notes?: string
+    /** Set when disabled (retired, not deleted); null means active. */
+    disabled_at?: string | null
+    disabled_by?: number | null
+    disabled_reason?: string
 }
 
 export interface ZevInput {

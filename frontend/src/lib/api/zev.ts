@@ -43,6 +43,18 @@ export async function deleteZev(id: string): Promise<void> {
   await api.delete(`/zev/zevs/${id}/`)
 }
 
+/** Disable a ZEV — reversible, touches nothing under it. The ZEV's own owner or an admin may call this. */
+export async function disableZev(id: string, reason?: string): Promise<Zev> {
+  const { data } = await api.post<Zev>(`/zev/zevs/${id}/disable/`, { reason: reason ?? '' })
+  return data
+}
+
+/** Re-enable a disabled ZEV. Admin only — its owner cannot self-serve this. */
+export async function enableZev(id: string): Promise<Zev> {
+  const { data } = await api.post<Zev>(`/zev/zevs/${id}/enable/`)
+  return data
+}
+
 export async function fetchParticipants(): Promise<Participant[]> {
   return fetchAllPages<Participant>('/zev/participants/')
 }
