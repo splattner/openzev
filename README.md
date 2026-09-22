@@ -274,7 +274,7 @@ python manage.py createsuperuser
 
 ### 2) Frontend
 
-Use the Node version pinned in `.node-version` (currently 24.21.0).
+Use the Node version pinned in `.node-version` (currently 24.20.0).
 
 ```bash
 cd frontend

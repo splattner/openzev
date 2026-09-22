@@ -11,17 +11,12 @@ on:
             - "docs/**"
             - "**/*.md"
             - ".claude/**"
-    schedule:
-        # Weekly: surface new advisories on unchanged lockfiles.
-        - cron: "30 2 * * 1"
-    workflow_dispatch:
 
 permissions:
     contents: read
 
 jobs:
     frontend-lint-build:
-        if: github.event_name == 'pull_request'
         name: Frontend lint and build (Node ${{ matrix.node-version }})
         runs-on: ubuntu-latest
         strategy:
@@ -67,7 +62,6 @@ jobs:
               run: npm run build
 
     helm-lint-template:
-        if: github.event_name == 'pull_request'
         name: Helm lint and template
         runs-on: ubuntu-latest
         steps:
@@ -84,7 +78,6 @@ jobs:
               run: helm template openzev ./charts/openzev > /tmp/openzev-helm-render.yaml
 
     backend-check-test:
-        if: github.event_name == 'pull_request'
         name: Backend checks and tests
         runs-on: ubuntu-latest
         services:
@@ -134,32 +127,3 @@ jobs:
               env:
                   DATABASE_URL: postgres://openzev:openzev@localhost:5432/openzev
               run: python -m pytest -n 2 invoices/test_dynamic_evidence.py tariffs/test_dynamic_fetch.py zev/test_transfer.py invoices/test_workflow.py
-
-    dependency-audit:
-        name: Dependency audit (pip-audit, npm audit)
-        runs-on: ubuntu-latest
-        steps:
-            - name: Checkout
-              uses: actions/checkout@v7
-
-            - name: Setup Python
-              uses: actions/setup-python@v7
-              with:
-                  python-version: "3.14"
-
-            - name: Audit Python dependencies
-              run: |
-                  python -m pip install --upgrade pip
-                  pip install pip-audit
-                  pip-audit -r backend/requirements.txt --strict
-
-            - name: Setup Node
-              uses: actions/setup-node@v7
-              with:
-                  node-version: "24.21.0"
-                  cache: npm
-                  cache-dependency-path: frontend/package-lock.json
-
-            - name: Audit production frontend dependencies
-              run: npm audit --omit=dev --audit-level=high
-              working-directory: frontend

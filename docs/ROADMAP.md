@@ -303,5 +303,5 @@ PVshare Cockpit is a closed, subscription-based SaaS (CHF ~30/participant/year) 
 | End-to-end test suite (Playwright or similar) | `idea` | `medium` | Playwright is used for automated user-guide screenshots; no interactive end-to-end coverage of user flows yet |
 | Frontend component-level unit tests | `shipped` | — | `npm run test:unit` (Vitest) covers API helpers, reducers and page-level logic |
 | Rate limiting on sensitive API endpoints | `shipped` | — | Auth per IP, imports + transfer-import per user, invoice links per IP/link, API keys budgeted — `DEFAULT_THROTTLE_RATES` in `backend/config/settings.py` |
-| Automated security dependency scanning (pip-audit, npm audit) | `shipped` | — | CI audit (PR + weekly); Dependabot alerts require enabling the upstream repository setting (see [SECURITY.md](../SECURITY.md)) |
+| Automated security dependency scanning (Dependabot / Snyk) | `idea` | `low` | Renovate is configured for updates; no security-focused CVE scanning |
 | Multi-region or multi-instance deployment guidance | `deferred` | — | Single-instance model assumed; stateful session and Celery design would need review |
