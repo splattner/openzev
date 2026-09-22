@@ -101,7 +101,9 @@ webauthn:
 ```
 
 Left empty, the backend uses `localhost`, which only works for local
-development; with `DEBUG` off, `manage.py check` warns (`accounts.W002`).
+development; with `DEBUG` off, `manage.py check` fails (`accounts.E008` and
+`accounts.E009`), so a production deployment must set both. A non-empty value
+that is not a public HTTPS origin only warns (`accounts.W002`).
 Changing `rpId` later orphans every passkey registered under the old one.
 Passkeys need no encryption key — only TOTP does.
 
@@ -150,7 +152,9 @@ backend:
   allowedHosts: "openzev.example.com"
 ```
 
-If this is missing, Django may reject requests with `400 Bad Request`.
+If this is missing, Django may reject requests with `400 Bad Request`. With
+`DEBUG` off it is mandatory: `manage.py check` fails (`accounts.E003`) unless
+it names a non-development host.
 
 ### Trusted origins
 
@@ -165,7 +169,9 @@ backend:
 
 The value is the full origin — scheme and host, no path. When left empty it
 falls back to `backend.corsAllowedOrigins`, so setting that alone is enough if
-the frontend calls the API from the same origin.
+the frontend calls the API from the same origin. With `DEBUG` off, leave
+neither empty: `manage.py check` fails (`accounts.E005`) unless the effective
+origins are public HTTPS.
 
 ### Reverse proxies and NUM_PROXIES
 
@@ -201,7 +207,12 @@ Set email-related values under `email` in `values.yaml`:
 
 Set frontend base URL used by backend-generated links and redirects at top-level:
 
-- `frontendUrl`
+- `frontendUrl` (with `DEBUG` off it must be a public HTTPS origin —
+  `accounts.E004`)
+
+The chart default email backend is the console backend, which only prints
+mail to the container log: with `DEBUG` off, `manage.py check` fails
+(`accounts.E006`) until a real delivery backend such as SMTP is configured.
 
 `EMAIL_HOST_PASSWORD` can be loaded from an existing secret:
 
@@ -227,11 +238,21 @@ redis:
 
 ## Example values
 
-A complete production-oriented example covering external database and Redis,
-secrets, email, and ingress:
+A complete production-oriented example covering the required Django host,
+trusted-origin and passkey settings, external database and Redis, secrets,
+email, and ingress. This block is kept in sync with the `DEBUG=False`
+production system checks by `backend/config/test_helm_example.py`:
 
 ```yaml
 frontendUrl: https://openzev.example.com
+
+backend:
+  allowedHosts: "openzev.example.com"
+  csrfTrustedOrigins: "https://openzev.example.com"
+
+webauthn:
+  rpId: openzev.example.com
+  origin: https://openzev.example.com
 
 database:
   existingSecret:

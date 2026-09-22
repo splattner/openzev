@@ -1,0 +1,64 @@
+name: Chart example values
+
+# The chart README documents a "complete production-oriented" values example,
+# but pr-quality.yml ignores *.md-only changes, so an edit to that example would
+# otherwise run no checks at all. This job maps the example onto the DEBUG=False
+# production system checks and renders the chart with it.
+on:
+    pull_request:
+        branches: [main]
+        paths:
+            - "charts/**"
+            - "backend/config/test_helm_example.py"
+            - ".github/workflows/chart-example.yml"
+
+permissions:
+    contents: read
+
+jobs:
+    production-example:
+        name: Example values pass production checks
+        runs-on: ubuntu-latest
+        defaults:
+            run:
+                working-directory: backend
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v7
+
+            - name: Setup Python
+              uses: actions/setup-python@v7
+              with:
+                  python-version: "3.14"
+                  cache: pip
+                  cache-dependency-path: backend/requirements.txt
+
+            - name: Install dependencies
+              run: |
+                  python -m pip install --upgrade pip
+                  pip install -r requirements.txt
+
+            - name: Create .env from example
+              run: cp .env.example .env
+
+            - name: Map README example onto production system checks
+              run: python -m pytest config/test_helm_example.py -n 0
+
+            - name: Setup Helm
+              uses: azure/setup-helm@v5
+
+            - name: Render chart with the documented example
+              working-directory: ${{ github.workspace }}
+              run: |
+                  python - <<'PY'
+                  import pathlib
+                  import re
+
+                  text = pathlib.Path("charts/openzev/README.md").read_text(encoding="utf-8")
+                  section = text.split("## Example values", 1)[1]
+                  match = re.search(r"```yaml\n(.*?)```", section, re.S)
+                  assert match, "no yaml example block under '## Example values'"
+                  pathlib.Path("/tmp/openzev-example.yaml").write_text(match.group(1), encoding="utf-8")
+                  PY
+                  helm lint ./charts/openzev
+                  helm template openzev ./charts/openzev -f /tmp/openzev-example.yaml > /dev/null
