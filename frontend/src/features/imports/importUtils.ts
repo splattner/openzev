@@ -1,3 +1,5 @@
+import type { ImportPreviewResult } from '../../types/api'
+
 export type CsvColumnMap = {
     meter_id: string
     timestamp: string
@@ -54,10 +56,10 @@ export function csvConfigFor(
         : { delimiter: ';', columnMap: { ...standardHeaderlessColumnMap } }
 }
 
+export type StampFile = { name: string; size: number; lastModified: number }
+
 export type PreviewStamp = {
-    fileName: string
-    fileSize: number
-    lastModified: number
+    files: StampFile[]
     source: string
     zevId: string
     hasHeader: boolean
@@ -68,6 +70,33 @@ export type PreviewStamp = {
     valuesCount: string
     overwriteExisting: boolean
     columnMap: CsvColumnMap
+}
+
+export function stampFilesOf(files: File[]): StampFile[] {
+    return files.map((file) => ({ name: file.name, size: file.size, lastModified: file.lastModified }))
+}
+
+/** Preview outcome of one selected file: a result, or why the request failed. */
+export type FilePreview = {
+    fileName: string
+    preview: ImportPreviewResult | null
+    error: string | null
+}
+
+/**
+ * Meters missing across all previewed files. The backend lists at most a
+ * capped number of ids per file, so ids are unioned (a meter missing from
+ * several files counts once) and each file's truncated remainder is added on.
+ */
+export function aggregateMissingMeters(previews: FilePreview[]): { count: number; ids: string[] } {
+    const ids = new Set<string>()
+    let overflow = 0
+    for (const { preview } of previews) {
+        if (!preview) continue
+        preview.missing_meter_ids.forEach((id) => ids.add(id))
+        overflow += Math.max(0, preview.summary.missing_metering_points - preview.missing_meter_ids.length)
+    }
+    return { count: ids.size + overflow, ids: Array.from(ids) }
 }
 
 export function previewStampsEqual(a: PreviewStamp | null, b: PreviewStamp | null): boolean {

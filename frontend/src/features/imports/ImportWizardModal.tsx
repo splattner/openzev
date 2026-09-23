@@ -10,8 +10,7 @@ import { useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { FormModal } from '../../components/FormModal'
-import type { ImportPreviewResult, ImportPreviewRow } from '../../types/api'
-import { MAX_UPLOAD_BYTES, type CsvColumnMap, type CsvFormatProfile } from './importUtils'
+import { MAX_UPLOAD_BYTES, type CsvColumnMap, type CsvFormatProfile, type FilePreview } from './importUtils'
 import { formatBytes } from '../../lib/numbers'
 
 /**
@@ -44,8 +43,9 @@ export type FormatProfile = CsvFormatProfile
 export interface ImportWizardModalProps {
     step: 1 | 2
     source: ImportSource
-    file: File | null
-    fileError: string | null
+    files: File[]
+    /** One entry per file, aligned with `files`; null when the file is fine. */
+    fileErrors: Array<string | null>
     hasHeader: boolean
     delimiter: string
     delimiterError: string | null
@@ -58,11 +58,12 @@ export interface ImportWizardModalProps {
     valuesCountError: string | null
     overwriteExisting: boolean
     columnMap: CsvColumnMap
-    preview: ImportPreviewResult | null
+    previews: FilePreview[]
+    /** Meter ids missing across all previewed files. */
+    missingMeterIds: string[]
     previewOutdated: boolean
     previewLoading: boolean
     missingMeteringPoints: number
-    previewRows: ImportPreviewRow[]
     scopedZevId: string
     selectedZevName: string | null
     canGoStep2: boolean
@@ -72,7 +73,7 @@ export interface ImportWizardModalProps {
     onClose: () => void
     onSourceChange: (source: ImportSource) => void
     onFileChange: (event: React.ChangeEvent<HTMLInputElement>) => void
-    onRemoveFile: () => void
+    onRemoveFile: (index: number) => void
     onHasHeaderChange: (value: boolean) => void
     onDelimiterChange: (value: string) => void
     onFormatProfileChange: (profile: FormatProfile) => void
@@ -89,24 +90,99 @@ export interface ImportWizardModalProps {
     onDownloadMissingIds: () => void
 }
 
+function FilePreviewBlock({ entry, heading }: { entry: FilePreview; heading: boolean }) {
+    const { t } = useTranslation()
+    const { preview } = entry
+    const rows = preview?.preview_rows ?? []
+    return (
+        <div className="page-stack" style={{ gap: '0.5rem' }}>
+            {heading && <strong>{entry.fileName}</strong>}
+            {entry.error && (
+                <div className="error-banner">{entry.error}</div>
+            )}
+            {preview && (
+                <>
+                    <div className="actions-row actions-row-wrap">
+                        <Badge label={t('pages.imports.previewFound', { count: preview.summary.existing_metering_points })} ok={preview.summary.existing_metering_points > 0} />
+                        <Badge label={t('pages.imports.previewMissing', { count: preview.summary.missing_metering_points })} ok={preview.summary.missing_metering_points === 0} />
+                    </div>
+
+                    {preview.summary.rows_skipped_existing > 0 && (
+                        <p className="warning-banner">
+                            {t('pages.imports.preview.existingRowsSkipped', { count: preview.summary.rows_skipped_existing })}
+                        </p>
+                    )}
+
+                    {preview.errors.length > 0 && (
+                        <div className="error-banner">
+                            <ul style={{ margin: 0, paddingLeft: '1.1rem' }}>
+                                {preview.errors.slice(0, 8).map((error, index) => (
+                                    <li key={`${error.row ?? 'general'}-${index}`}>
+                                        {error.row ? <>{t('pages.imports.preview.rowPrefix', { row: error.row })} </> : ''}{error.error}
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                    )}
+
+                    {rows.length > 0 && (
+                        <div style={{ maxHeight: 250, overflow: 'auto', border: '1px solid var(--border-default)', borderRadius: 6 }}>
+                            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                                <thead>
+                                    <tr>
+                                        <th style={{ textAlign: 'left', padding: '0.4rem 0.6rem' }}>{t('pages.imports.preview.row')}</th>
+                                        <th style={{ textAlign: 'left', padding: '0.4rem 0.6rem' }}>{t('pages.imports.preview.meterId')}</th>
+                                        <th style={{ textAlign: 'left', padding: '0.4rem 0.6rem' }}>{t('pages.imports.preview.status')}</th>
+                                        <th style={{ textAlign: 'left', padding: '0.4rem 0.6rem' }}>{t('pages.imports.preview.timestamp')}</th>
+                                        <th style={{ textAlign: 'left', padding: '0.4rem 0.6rem' }}>{t('pages.imports.preview.direction')}</th>
+                                        <th style={{ textAlign: 'left', padding: '0.4rem 0.6rem' }}>{t('pages.imports.preview.existingData')}</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {rows.map((row) => (
+                                        <tr key={`${row.row}-${row.meter_id ?? 'empty'}`} style={{ borderTop: '1px solid var(--border-default)' }}>
+                                            <td style={{ padding: '0.4rem 0.6rem' }}>{row.row}</td>
+                                            <td style={{ padding: '0.4rem 0.6rem' }}>{row.meter_id ?? '-'}</td>
+                                            <td style={{ padding: '0.4rem 0.6rem' }}>
+                                                <Badge label={row.metering_point_exists ? t('pages.imports.preview.exists') : t('pages.imports.preview.missing')} ok={row.metering_point_exists} />
+                                            </td>
+                                            <td style={{ padding: '0.4rem 0.6rem' }}>{row.timestamp ?? '-'}</td>
+                                            <td style={{ padding: '0.4rem 0.6rem' }}>{formatDirections(row.directions, t)}</td>
+                                            <td style={{ padding: '0.4rem 0.6rem' }}>
+                                                {row.existing_data == null ? '-' : row.existing_data ? t('pages.imports.preview.yes') : t('pages.imports.preview.no')}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+                </>
+            )}
+        </div>
+    )
+}
+
 export function ImportWizardModal(props: ImportWizardModalProps) {
     const { t } = useTranslation()
     const fileInputRef = useRef<HTMLInputElement>(null)
     // The native file input keeps its value after removal: clear it so
-    // picking the same file again fires a change event.
+    // picking the same files again fires a change event.
     useEffect(() => {
-        if (!props.file && fileInputRef.current) {
+        if (props.files.length === 0 && fileInputRef.current) {
             fileInputRef.current.value = ''
         }
-    }, [props.file])
+    }, [props.files])
     const {
-        step, source, file, fileError, hasHeader, delimiter, delimiterError,
+        step, source, files, fileErrors, hasHeader, delimiter, delimiterError,
         formatProfile, timestampFormat, timestampFormatError, intervalMinutes,
         intervalMinutesError, valuesCount, valuesCountError, overwriteExisting,
-        columnMap, preview, previewOutdated, previewLoading, missingMeteringPoints,
-        previewRows, scopedZevId, selectedZevName, canGoStep2, canStartImport,
+        columnMap, previews, missingMeterIds, previewOutdated, previewLoading, missingMeteringPoints,
+        scopedZevId, selectedZevName, canGoStep2, canStartImport,
         csvConfigValid, uploadPending,
     } = props
+
+    const showPreview = previews.length > 0 && !previewOutdated
 
     return (
         <FormModal isOpen={true} title={t('pages.imports.wizard.title')} onClose={props.onClose} maxWidth="1080px">
@@ -130,6 +206,7 @@ export function ImportWizardModal(props: ImportWizardModalProps) {
                             <input
                                 ref={fileInputRef}
                                 type="file"
+                                multiple
                                 onChange={props.onFileChange}
                                 accept={source === 'csv' ? '.csv,.xlsx' : '.xml'}
                             />
@@ -148,8 +225,8 @@ export function ImportWizardModal(props: ImportWizardModalProps) {
                                 <a href="/samples/daily-15min-profile.csv" download>{t('pages.imports.wizard.sampleDaily')}</a>
                             </p>
                         )}
-                        {file && (
-                            <div className="card" style={{ padding: '0.6rem 0.8rem' }}>
+                        {files.map((file, index) => (
+                            <div key={`${file.name}-${file.size}-${file.lastModified}-${index}`} className="card" style={{ padding: '0.6rem 0.8rem' }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
                                     <div>
                                         <div><strong>{file.name}</strong></div>
@@ -157,17 +234,22 @@ export function ImportWizardModal(props: ImportWizardModalProps) {
                                             {formatBytes(file.size)} · {source === 'csv' ? t('pages.imports.format.csv') : t('pages.imports.format.sdatch')}
                                         </div>
                                     </div>
-                                    <button type="button" className="button button-secondary" onClick={props.onRemoveFile}>
+                                    <button type="button" className="button button-secondary" onClick={() => props.onRemoveFile(index)}>
                                         <FontAwesomeIcon icon={faXmark} fixedWidth />
                                         {t('pages.imports.wizard.removeFile')}
                                     </button>
                                 </div>
-                                {fileError && (
+                                {fileErrors[index] && (
                                     <p className="field-error" style={{ margin: '0.4rem 0 0' }}>
-                                        {fileError}
+                                        {fileErrors[index]}
                                     </p>
                                 )}
                             </div>
+                        ))}
+                        {files.length > 1 && (
+                            <p className="muted" style={{ margin: 0, fontSize: '0.85rem' }}>
+                                {t('pages.imports.wizard.sameSettingsHint', { count: files.length })}
+                            </p>
                         )}
 
                         <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.6rem' }}>
@@ -325,17 +407,11 @@ export function ImportWizardModal(props: ImportWizardModalProps) {
                                         type="button"
                                         className="button button-primary"
                                         onClick={props.onLoadPreview}
-                                            disabled={previewLoading || !file || !!fileError || !scopedZevId || !csvConfigValid}
+                                            disabled={previewLoading || files.length === 0 || fileErrors.some((entry) => entry !== null) || !scopedZevId || !csvConfigValid}
                                     >
                                         <FontAwesomeIcon icon={faMagnifyingGlass} fixedWidth />
                                         {previewLoading ? t('pages.imports.loadingPreview') : t('pages.imports.loadPreview')}
                                     </button>
-                                    {preview && !previewOutdated && (
-                                        <>
-                                            <Badge label={t('pages.imports.previewFound', { count: preview.summary.existing_metering_points })} ok={preview.summary.existing_metering_points > 0} />
-                                            <Badge label={t('pages.imports.previewMissing', { count: preview.summary.missing_metering_points })} ok={preview.summary.missing_metering_points === 0} />
-                                        </>
-                                    )}
                                 </div>
 
                                 {previewOutdated && (
@@ -344,15 +420,15 @@ export function ImportWizardModal(props: ImportWizardModalProps) {
                                     </div>
                                 )}
 
-                                {preview && !previewOutdated && missingMeteringPoints > 0 && (
+                                {showPreview && missingMeteringPoints > 0 && (
                                     <div className="error-banner" style={{ marginTop: '0.4rem' }}>
                                         <div>{t('pages.imports.previewMissingBanner', { count: missingMeteringPoints })}</div>
-                                        {preview.missing_meter_ids.length > 0 && (
+                                        {missingMeterIds.length > 0 && (
                                             <div style={{ marginTop: '0.4rem', fontSize: '0.85rem' }}>
                                                 <strong>{t('pages.imports.preview.missingIdsLabel')}</strong>{' '}
-                                                {preview.missing_meter_ids.join(', ')}
-                                                {missingMeteringPoints > preview.missing_meter_ids.length && (
-                                                    <span> {t('pages.imports.preview.andMore', { count: missingMeteringPoints - preview.missing_meter_ids.length })}</span>
+                                                {missingMeterIds.join(', ')}
+                                                {missingMeteringPoints > missingMeterIds.length && (
+                                                    <span> {t('pages.imports.preview.andMore', { count: missingMeteringPoints - missingMeterIds.length })}</span>
                                                 )}
                                             </div>
                                         )}
@@ -370,56 +446,9 @@ export function ImportWizardModal(props: ImportWizardModalProps) {
                                     </div>
                                 )}
 
-                                {preview && !previewOutdated && preview.summary.rows_skipped_existing > 0 && (
-                                    <p className="warning-banner">
-                                        {t('pages.imports.preview.existingRowsSkipped', { count: preview.summary.rows_skipped_existing })}
-                                    </p>
-                                )}
-
-                                {preview && !previewOutdated && preview.errors.length > 0 && (
-                                    <div className="error-banner" style={{ marginTop: '0.4rem' }}>
-                                        <ul style={{ margin: 0, paddingLeft: '1.1rem' }}>
-                                            {preview.errors.slice(0, 8).map((entry, index) => (
-                                                <li key={`${entry.row ?? 'general'}-${index}`}>
-                                                    {entry.row ? <>{t('pages.imports.preview.rowPrefix', { row: entry.row })} </> : ''}{entry.error}
-                                                </li>
-                                            ))}
-                                        </ul>
-                                    </div>
-                                )}
-
-                                {previewRows.length > 0 && !previewOutdated && (
-                                    <div style={{ maxHeight: 250, overflow: 'auto', border: '1px solid var(--border-default)', borderRadius: 6 }}>
-                                        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                                            <thead>
-                                                <tr>
-                                                    <th style={{ textAlign: 'left', padding: '0.4rem 0.6rem' }}>{t('pages.imports.preview.row')}</th>
-                                                    <th style={{ textAlign: 'left', padding: '0.4rem 0.6rem' }}>{t('pages.imports.preview.meterId')}</th>
-                                                    <th style={{ textAlign: 'left', padding: '0.4rem 0.6rem' }}>{t('pages.imports.preview.status')}</th>
-                                                    <th style={{ textAlign: 'left', padding: '0.4rem 0.6rem' }}>{t('pages.imports.preview.timestamp')}</th>
-                                                    <th style={{ textAlign: 'left', padding: '0.4rem 0.6rem' }}>{t('pages.imports.preview.direction')}</th>
-                                                    <th style={{ textAlign: 'left', padding: '0.4rem 0.6rem' }}>{t('pages.imports.preview.existingData')}</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {previewRows.map((row) => (
-                                                    <tr key={`${row.row}-${row.meter_id ?? 'empty'}`} style={{ borderTop: '1px solid var(--border-default)' }}>
-                                                        <td style={{ padding: '0.4rem 0.6rem' }}>{row.row}</td>
-                                                        <td style={{ padding: '0.4rem 0.6rem' }}>{row.meter_id ?? '-'}</td>
-                                                        <td style={{ padding: '0.4rem 0.6rem' }}>
-                                                            <Badge label={row.metering_point_exists ? t('pages.imports.preview.exists') : t('pages.imports.preview.missing')} ok={row.metering_point_exists} />
-                                                        </td>
-                                                        <td style={{ padding: '0.4rem 0.6rem' }}>{row.timestamp ?? '-'}</td>
-                                                        <td style={{ padding: '0.4rem 0.6rem' }}>{formatDirections(row.directions, t)}</td>
-                                                        <td style={{ padding: '0.4rem 0.6rem' }}>
-                                                            {row.existing_data == null ? '-' : row.existing_data ? t('pages.imports.preview.yes') : t('pages.imports.preview.no')}
-                                                        </td>
-                                                    </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                )}
+                                {showPreview && previews.map((entry, index) => (
+                                    <FilePreviewBlock key={`${entry.fileName}-${index}`} entry={entry} heading={previews.length > 1} />
+                                ))}
                             </>
                         ) : (
                             <>

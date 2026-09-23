@@ -77,9 +77,7 @@ describe('import sample files', () => {
 
     it('preview stamp ignores numeric string padding ("096" vs "96")', () => {
         const base = {
-            fileName: 'a.csv',
-            fileSize: 10,
-            lastModified: 1,
+            files: [{ name: 'a.csv', size: 10, lastModified: 1 }],
             source: 'csv',
             zevId: 'z1',
             hasHeader: true,
@@ -97,9 +95,7 @@ describe('import sample files', () => {
 
     it('preview stamp invalidates on non-numeric config ("96foo" vs "96")', () => {
         const base = {
-            fileName: 'a.csv',
-            fileSize: 10,
-            lastModified: 1,
+            files: [{ name: 'a.csv', size: 10, lastModified: 1 }],
             source: 'csv',
             zevId: 'z1',
             hasHeader: true,
@@ -147,9 +143,7 @@ describe('import sample files', () => {
 
     it('preview stamp treats tab escape and literal tab as equal', () => {
         const base = {
-            fileName: 'a.csv',
-            fileSize: 10,
-            lastModified: 1,
+            files: [{ name: 'a.csv', size: 10, lastModified: 1 }],
             source: 'csv',
             zevId: 'z1',
             hasHeader: true,

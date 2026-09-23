@@ -13,15 +13,16 @@ import {
     bulkDeleteImportLogs,
     deleteImportLog,
     fetchImportLogs,
-    previewCsvImport,
-    uploadMeteringFile,
+    previewCsvImports,
+    uploadMeteringFiles,
+    type BatchFileOutcome,
 } from '../lib/api/metering'
 import { queryKeys } from '../lib/api/queryKeys'
 import { formatDateTime, useAppSettings } from '../lib/appSettings'
 import { useManagedZev } from '../lib/managedZev'
 import { useTranslation } from 'react-i18next'
 import { useToast } from '../lib/toast'
-import type { ImportLog, ImportPreviewResult } from '../types/api'
+import type { ImportLog } from '../types/api'
 import { PageSkeleton } from '../components/PageSkeleton'
 import { BulkDeleteModal } from '../features/imports/BulkDeleteModal'
 import { ImportHistoryTable } from '../features/imports/ImportHistoryTable'
@@ -29,14 +30,17 @@ import { ImportProtocolModal } from '../features/imports/ImportProtocolModal'
 import { ImportWizardModal } from '../features/imports/ImportWizardModal'
 import {
     MAX_UPLOAD_BYTES,
+    aggregateMissingMeters,
     csvConfigFor,
     isLegacyExcel,
     isValidDelimiter,
     isValidTimestampFormat,
     parsePositiveInt,
     previewStampsEqual,
+    stampFilesOf,
     type CsvColumnMap,
     type CsvFormatProfile,
+    type FilePreview,
     type PreviewStamp,
 } from '../features/imports/importUtils'
 import { formatBytes } from '../lib/numbers'
@@ -66,7 +70,7 @@ export function ImportsPage({ embedded = false }: { embedded?: boolean }) {
     const [wizardStep, setWizardStep] = useState<1 | 2>(1)
 
     const [source, setSource] = useState<'csv' | 'sdatch'>('csv')
-    const [file, setFile] = useState<File | null>(null)
+    const [files, setFiles] = useState<File[]>([])
 
     const [hasHeader, setHasHeader] = useState(true)
     const [delimiter, setDelimiter] = useState(',')
@@ -77,7 +81,8 @@ export function ImportsPage({ embedded = false }: { embedded?: boolean }) {
     const [overwriteExisting, setOverwriteExisting] = useState(false)
     const [columnMap, setColumnMap] = useState<CsvColumnMap>(() => csvConfigFor(true, 'daily_15min').columnMap)
 
-    const [preview, setPreview] = useState<ImportPreviewResult | null>(null)
+    // One entry per file of the selection the preview was loaded for.
+    const [previews, setPreviews] = useState<FilePreview[]>([])
     const [previewStamp, setPreviewStamp] = useState<PreviewStamp | null>(null)
     const previewReqId = useRef(0)
     const [selectedLog, setSelectedLog] = useState<ImportLog | null>(null)
@@ -94,11 +99,9 @@ export function ImportsPage({ embedded = false }: { embedded?: boolean }) {
     )
 
     const currentStamp = useMemo<PreviewStamp | null>(() => {
-        if (!file) return null
+        if (files.length === 0) return null
         return {
-            fileName: file.name,
-            fileSize: file.size,
-            lastModified: file.lastModified,
+            files: stampFilesOf(files),
             source,
             zevId: scopedZevId ?? '',
             hasHeader,
@@ -110,17 +113,22 @@ export function ImportsPage({ embedded = false }: { embedded?: boolean }) {
             overwriteExisting,
             columnMap,
         }
-    }, [file, source, scopedZevId, hasHeader, delimiter, formatProfile, timestampFormat, intervalMinutes, valuesCount, overwriteExisting, columnMap])
+    }, [files, source, scopedZevId, hasHeader, delimiter, formatProfile, timestampFormat, intervalMinutes, valuesCount, overwriteExisting, columnMap])
 
     const previewStampMatches = previewStampsEqual(previewStamp, currentStamp)
 
-    const fileError = !file
-        ? null
-        : isLegacyExcel(file.name)
-            ? t('pages.imports.wizard.xlsRejected')
-            : file.size > MAX_UPLOAD_BYTES
-                ? t('pages.imports.wizard.fileTooLarge', { size: formatBytes(file.size), limit: formatBytes(MAX_UPLOAD_BYTES) })
-                : null
+    const fileErrors = useMemo(
+        () =>
+            files.map((file) =>
+                isLegacyExcel(file.name)
+                    ? t('pages.imports.wizard.xlsRejected')
+                    : file.size > MAX_UPLOAD_BYTES
+                        ? t('pages.imports.wizard.fileTooLarge', { size: formatBytes(file.size), limit: formatBytes(MAX_UPLOAD_BYTES) })
+                        : null,
+            ),
+        [files, t],
+    )
+    const hasFileError = fileErrors.some((entry) => entry !== null)
 
     const parsedIntervalMinutes = parsePositiveInt(intervalMinutes)
     const parsedValuesCount = parsePositiveInt(valuesCount)
@@ -144,7 +152,7 @@ export function ImportsPage({ embedded = false }: { embedded?: boolean }) {
     const csvConfigValid = csvConfigErrors.length === 0
 
     const previewMutation = useMutation({
-        mutationFn: previewCsvImport,
+        mutationFn: previewCsvImports,
     })
 
     function describeUploadError(error: unknown, fallback?: string): string {
@@ -156,40 +164,98 @@ export function ImportsPage({ embedded = false }: { embedded?: boolean }) {
         return data?.error || data?.detail || fallback || t('pages.imports.messages.importFailed')
     }
 
+    function handleUploadOutcomes(outcomes: BatchFileOutcome<ImportLog>[]) {
+        const imported = outcomes.filter((outcome) => outcome.value !== null)
+        const failed = outcomes.filter((outcome) => outcome.value === null)
+        void queryClient.invalidateQueries({ queryKey: ['metering'] })
+
+        if (imported.length === 0) {
+            // Nothing landed: keep the wizard open so the user can retry.
+            const detail = describeUploadError(failed[0]?.error)
+            pushToast(
+                outcomes.length > 1
+                    ? `${t('pages.imports.messages.importBatchAllFailed', { count: outcomes.length })} ${detail}`
+                    : detail,
+                'error',
+            )
+            return
+        }
+
+        const logs = imported.map((outcome) => outcome.value as ImportLog)
+        const totals = {
+            imported: logs.reduce((sum, log) => sum + log.rows_imported, 0),
+            skipped: logs.reduce((sum, log) => sum + log.rows_skipped, 0),
+            overwritten: logs.reduce((sum, log) => sum + (log.rows_overwritten ?? 0), 0),
+            issues: logs.reduce((sum, log) => sum + (log.errors?.length ?? 0), 0),
+        }
+        // The protocol modal shows one log: open the first that needs a look.
+        const logWithIssues = logs.find((log) => (log.errors?.length ?? 0) > 0)
+        const logWithNotes = logs.find((log) => (log.warnings ?? []).length > 0)
+        const logToOpen = logWithIssues ?? logWithNotes ?? null
+
+        if (failed.length > 0) {
+            // Keep only the files that did not go through, so a retry does not
+            // import the others a second time. Their previews stay valid.
+            const failedFiles = failed.map((outcome) => outcome.file)
+            // Outcomes and previews both follow the order of the selection.
+            const failedPositions = new Set(outcomes.flatMap((outcome, position) => (outcome.value === null ? [position] : [])))
+            setFiles(failedFiles)
+            setPreviews((prev) => prev.filter((_, position) => failedPositions.has(position)))
+            setPreviewStamp((prev) => (prev ? { ...prev, files: stampFilesOf(failedFiles) } : prev))
+            if (logToOpen) setSelectedLog(logToOpen)
+            pushToast(
+                t('pages.imports.messages.importBatchPartial', {
+                    done: imported.length,
+                    total: outcomes.length,
+                    failed: failed.length,
+                    names: failedFiles.map((file) => file.name).join(', '),
+                }),
+                'error',
+            )
+            return
+        }
+
+        resetWizard()
+        if (logToOpen) setSelectedLog(logToOpen)
+        if (outcomes.length > 1) {
+            pushToast(
+                t(totals.issues > 0
+                    ? 'pages.imports.messages.importBatchSuccessWithIssues'
+                    : 'pages.imports.messages.importBatchSuccess', {
+                    files: outcomes.length,
+                    imported: totals.imported,
+                    skipped: totals.skipped,
+                    overwritten: totals.overwritten,
+                    count: totals.issues,
+                }),
+                totals.issues > 0 ? 'error' : 'success',
+            )
+        } else if (totals.issues > 0) {
+            pushToast(
+                t('pages.imports.messages.importSuccessWithIssues', {
+                    imported: totals.imported,
+                    skipped: totals.skipped,
+                    count: totals.issues,
+                }),
+                'error',
+            )
+        } else if (logWithNotes) {
+            pushToast(
+                t('pages.imports.messages.importSuccessWithOverwrites', {
+                    imported: totals.imported,
+                    skipped: totals.skipped,
+                    overwritten: totals.overwritten,
+                }),
+                'success',
+            )
+        } else {
+            pushToast(t('pages.imports.messages.importSuccess', { imported: totals.imported, skipped: totals.skipped }), 'success')
+        }
+    }
+
     const uploadMutation = useMutation({
-        mutationFn: uploadMeteringFile,
-        onSuccess: (result) => {
-            const errorCount = result.errors?.length ?? 0
-            const warnings = result.warnings ?? []
-            resetWizard()
-            void queryClient.invalidateQueries({ queryKey: ['metering'] })
-            if (errorCount > 0) {
-                setSelectedLog(result)
-                pushToast(
-                    t('pages.imports.messages.importSuccessWithIssues', {
-                        imported: result.rows_imported,
-                        skipped: result.rows_skipped,
-                        count: errorCount,
-                    }),
-                    'error',
-                )
-            } else if (warnings.length > 0) {
-                setSelectedLog(result)
-                pushToast(
-                    t('pages.imports.messages.importSuccessWithOverwrites', {
-                        imported: result.rows_imported,
-                        skipped: result.rows_skipped,
-                        overwritten: result.rows_overwritten,
-                    }),
-                    'success',
-                )
-            } else {
-                pushToast(t('pages.imports.messages.importSuccess', { imported: result.rows_imported, skipped: result.rows_skipped }), 'success')
-            }
-        },
-        onError: (error) => {
-            pushToast(describeUploadError(error), 'error')
-        },
+        mutationFn: uploadMeteringFiles,
+        onSuccess: handleUploadOutcomes,
     })
 
     const deleteImportMutation = useMutation({
@@ -241,15 +307,20 @@ export function ImportsPage({ embedded = false }: { embedded?: boolean }) {
         },
     })
 
-    const canGoStep2 = !!file && !fileError && !!scopedZevId
-    const missingMeteringPoints = preview?.summary.missing_metering_points ?? 0
-    const previewOutdated = !!preview && !previewStampMatches
-    const hasPreviewErrors = (preview?.errors?.length ?? 0) > 0
+    const hasFiles = files.length > 0
+    const canGoStep2 = hasFiles && !hasFileError && !!scopedZevId
+    const hasPreview = previews.length > 0
+    const missingMeters = useMemo(() => aggregateMissingMeters(previews), [previews])
+    const missingMeteringPoints = missingMeters.count
+    const previewOutdated = hasPreview && !previewStampMatches
+    const hasPreviewErrors = previews.some((entry) => entry.error !== null || (entry.preview?.errors?.length ?? 0) > 0)
+    const previewIssueCount = previews.reduce(
+        (sum, entry) => sum + (entry.error !== null ? 1 : entry.preview?.errors.length ?? 0),
+        0,
+    )
     const canStartImport = source === 'csv'
-        ? !!file && !fileError && !!preview && previewStampMatches && csvConfigValid && !hasPreviewErrors && missingMeteringPoints === 0 && !!scopedZevId
-        : !!file && !fileError && !!scopedZevId
-
-    const previewRows = preview?.preview_rows ?? []
+        ? hasFiles && !hasFileError && hasPreview && previewStampMatches && csvConfigValid && !hasPreviewErrors && missingMeteringPoints === 0 && !!scopedZevId
+        : hasFiles && !hasFileError && !!scopedZevId
     const [historyFilters, setHistoryFilters] = useState<ColumnFiltersState>([])
     const importLogRows = useMemo(
         () =>
@@ -361,7 +432,7 @@ export function ImportsPage({ embedded = false }: { embedded?: boolean }) {
         setWizardOpen(false)
         setWizardStep(1)
         setSource('csv')
-        setFile(null)
+        setFiles([])
         setHasHeader(true)
         setDelimiter(cfg.delimiter)
         setFormatProfile('daily_15min')
@@ -370,7 +441,7 @@ export function ImportsPage({ embedded = false }: { embedded?: boolean }) {
         setValuesCount('96')
         setOverwriteExisting(false)
         setColumnMap(cfg.columnMap)
-        setPreview(null)
+        setPreviews([])
         setPreviewStamp(null)
     }
 
@@ -384,8 +455,8 @@ export function ImportsPage({ embedded = false }: { embedded?: boolean }) {
 
     function handleSourceChange(nextSource: 'csv' | 'sdatch') {
         setSource(nextSource)
-        setFile(null)
-        setPreview(null)
+        setFiles([])
+        setPreviews([])
         setPreviewStamp(null)
         setWizardStep(1)
     }
@@ -395,13 +466,16 @@ export function ImportsPage({ embedded = false }: { embedded?: boolean }) {
         const cfg = csvConfigFor(hasHeader, nextProfile)
         setDelimiter(cfg.delimiter)
         setColumnMap(cfg.columnMap)
-        setPreview(null)
+        setPreviews([])
         setPreviewStamp(null)
     }
 
-    function handleRemoveFile() {
-        setFile(null)
-        setPreview(null)
+    function handleRemoveFile(index: number) {
+        // Same identity rule as a new pick: a preview belongs to the exact
+        // selection it was loaded for.
+        previewReqId.current += 1
+        setFiles((prev) => prev.filter((_, position) => position !== index))
+        setPreviews([])
         setPreviewStamp(null)
     }
 
@@ -416,21 +490,20 @@ export function ImportsPage({ embedded = false }: { embedded?: boolean }) {
         // File metadata is not an identity: a replacement can have the same
         // name, size and modification time but different contents.
         previewReqId.current += 1
-        setPreview(null)
+        setPreviews([])
         setPreviewStamp(null)
-        const picked = event.target.files?.[0] ?? null
-        if (picked && isLegacyExcel(picked.name)) {
-            event.target.value = ''
-            setFile(null)
+        const picked = Array.from(event.target.files ?? [])
+        const accepted = picked.filter((file) => !isLegacyExcel(file.name))
+        if (accepted.length < picked.length) {
             pushToast(t('pages.imports.wizard.xlsRejected'), 'error')
-            return
         }
-        setFile(picked)
+        if (accepted.length === 0) event.target.value = ''
+        setFiles(accepted)
     }
 
     function handleNextStep(event: FormEvent<HTMLFormElement>) {
         event.preventDefault()
-        if (!file || fileError) {
+        if (!hasFiles || hasFileError) {
             pushToast(t('pages.imports.messages.chooseFileFirst'), 'error')
             return
         }
@@ -442,7 +515,7 @@ export function ImportsPage({ embedded = false }: { embedded?: boolean }) {
     }
 
     function copyMissingMeterIds() {
-        const ids = preview?.missing_meter_ids ?? []
+        const ids = missingMeters.ids
         if (ids.length === 0) {
             pushToast(t('pages.imports.preview.copyMissingIdsFailed'), 'error')
             return
@@ -454,13 +527,13 @@ export function ImportsPage({ embedded = false }: { embedded?: boolean }) {
     }
 
     function downloadMissingMeterIds() {
-        const ids = preview?.missing_meter_ids ?? []
+        const ids = missingMeters.ids
         if (ids.length === 0) return
         downloadBlob(new Blob([ids.join('\n')], { type: 'text/plain' }), 'missing-meter-ids.txt')
     }
 
     function loadPreview() {
-        if (!file || fileError) {
+        if (!hasFiles || hasFileError) {
             pushToast(t('pages.imports.messages.chooseFileFirst'), 'error')
             return
         }
@@ -476,7 +549,7 @@ export function ImportsPage({ embedded = false }: { embedded?: boolean }) {
         const reqId = ++previewReqId.current
         previewMutation.mutate(
             {
-                file,
+                files,
                 zevId: scopedZevId,
                 columnMap,
                 hasHeader,
@@ -488,26 +561,31 @@ export function ImportsPage({ embedded = false }: { embedded?: boolean }) {
                 overwriteExisting,
             },
             {
-                onSuccess: (result) => {
+                onSuccess: (outcomes) => {
                     if (reqId !== previewReqId.current) return
-                    setPreview(result)
+                    const loaded: FilePreview[] = outcomes.map((outcome) => ({
+                        fileName: outcome.file.name,
+                        preview: outcome.value,
+                        error: outcome.value ? null : describeUploadError(outcome.error, t('pages.imports.messages.previewFailed')),
+                    }))
+                    setPreviews(loaded)
                     setPreviewStamp(stamp)
-                    if (result.errors.length > 0) {
-                        pushToast(t('pages.imports.messages.previewLoadedWithIssues', { count: result.errors.length }), 'error')
+                    const issues = loaded.reduce(
+                        (sum, entry) => sum + (entry.error !== null ? 1 : entry.preview?.errors.length ?? 0),
+                        0,
+                    )
+                    if (issues > 0) {
+                        pushToast(t('pages.imports.messages.previewLoadedWithIssues', { count: issues }), 'error')
                     } else {
                         pushToast(t('pages.imports.messages.previewLoaded'), 'success')
                     }
-                },
-                onError: (error) => {
-                    if (reqId !== previewReqId.current) return
-                    pushToast(describeUploadError(error, t('pages.imports.messages.previewFailed')), 'error')
                 },
             },
         )
     }
 
     function startImport() {
-        if (!file || fileError) {
+        if (!hasFiles || hasFileError) {
             pushToast(t('pages.imports.messages.chooseFileFirst'), 'error')
             return
         }
@@ -517,15 +595,15 @@ export function ImportsPage({ embedded = false }: { embedded?: boolean }) {
         }
 
         if (source === 'csv') {
-            if (!preview || !previewStampMatches) {
+            if (!hasPreview || !previewStampMatches) {
                 pushToast(t('pages.imports.messages.loadPreviewFirst'), 'error')
                 return
             }
             if (hasPreviewErrors) {
-                pushToast(t('pages.imports.messages.previewLoadedWithIssues', { count: preview.errors.length }), 'error')
+                pushToast(t('pages.imports.messages.previewLoadedWithIssues', { count: previewIssueCount }), 'error')
                 return
             }
-            if (preview.summary.missing_metering_points > 0) {
+            if (missingMeteringPoints > 0) {
                 pushToast(t('pages.imports.messages.createMissingMetersFirst'), 'error')
                 return
             }
@@ -537,7 +615,7 @@ export function ImportsPage({ embedded = false }: { embedded?: boolean }) {
                 uploadMutation.mutate({
                     source,
                     zevId: scopedZevId,
-                    file,
+                    files,
                     columnMap,
                     hasHeader,
                     delimiter,
@@ -548,20 +626,21 @@ export function ImportsPage({ embedded = false }: { embedded?: boolean }) {
                     overwriteExisting,
                 })
             if (overwriteExisting) {
-                const existingCount = preview?.summary.readings_existing ?? 0
+                const existingCount = previews.reduce((sum, entry) => sum + (entry.preview?.summary.readings_existing ?? 0), 0)
+                // One file is named; several are counted, so the message stays short.
+                const multiple = files.length > 1
+                const withCount = existingCount > 0
+                const messageKey = multiple
+                    ? (withCount ? 'pages.imports.wizard.overwriteConfirmMessageMultiWithCount' : 'pages.imports.wizard.overwriteConfirmMessageMulti')
+                    : (withCount ? 'pages.imports.wizard.overwriteConfirmMessageWithCount' : 'pages.imports.wizard.overwriteConfirmMessage')
                 confirm({
                     title: t('pages.imports.wizard.overwriteConfirmTitle'),
-                    message:
-                        existingCount > 0
-                            ? t('pages.imports.wizard.overwriteConfirmMessageWithCount', {
-                                  zevName: selectedZev?.name ?? scopedZevId,
-                                  filename: file.name,
-                                  count: existingCount,
-                              })
-                            : t('pages.imports.wizard.overwriteConfirmMessage', {
-                                  zevName: selectedZev?.name ?? scopedZevId,
-                                  filename: file.name,
-                              }),
+                    message: t(messageKey, {
+                        zevName: selectedZev?.name ?? scopedZevId,
+                        filename: files[0].name,
+                        files: files.length,
+                        count: existingCount,
+                    }),
                     confirmText: t('pages.imports.wizard.startImport'),
                     isDangerous: true,
                     onConfirm: doUpload,
@@ -572,7 +651,7 @@ export function ImportsPage({ embedded = false }: { embedded?: boolean }) {
             return
         }
 
-        uploadMutation.mutate({ source, zevId: scopedZevId, file })
+        uploadMutation.mutate({ source, zevId: scopedZevId, files })
     }
 
     const bulkDeleteScopeLogs = useMemo(() => {
@@ -689,8 +768,8 @@ export function ImportsPage({ embedded = false }: { embedded?: boolean }) {
                 <ImportWizardModal
                 step={wizardStep}
                 source={source}
-                file={file}
-                fileError={fileError}
+                files={files}
+                fileErrors={fileErrors}
                 hasHeader={hasHeader}
                 delimiter={delimiter}
                 delimiterError={delimiterError}
@@ -703,11 +782,11 @@ export function ImportsPage({ embedded = false }: { embedded?: boolean }) {
                 valuesCountError={valuesCountError}
                 overwriteExisting={overwriteExisting}
                 columnMap={columnMap}
-                preview={preview}
+                previews={previews}
+                missingMeterIds={missingMeters.ids}
                 previewOutdated={previewOutdated}
                 previewLoading={previewMutation.isPending}
                 missingMeteringPoints={missingMeteringPoints}
-                previewRows={previewRows}
                 scopedZevId={scopedZevId ?? ''}
                 selectedZevName={selectedZev?.name ?? null}
                 canGoStep2={canGoStep2}

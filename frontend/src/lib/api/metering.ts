@@ -36,7 +36,7 @@ export async function bulkDeleteImportLogs(payload: {
   return data
 }
 
-export async function uploadMeteringFile(payload: {
+export type UploadMeteringFilePayload = {
   source: 'csv' | 'sdatch'
   zevId: string
   file: File
@@ -54,7 +54,9 @@ export async function uploadMeteringFile(payload: {
   intervalMinutes?: number
   valuesCount?: number
   overwriteExisting?: boolean
-}): Promise<ImportLog> {
+}
+
+export async function uploadMeteringFile(payload: UploadMeteringFilePayload): Promise<ImportLog> {
   const formData = new FormData()
   formData.append('zev_id', payload.zevId)
   formData.append('file', payload.file)
@@ -81,7 +83,7 @@ export async function uploadMeteringFile(payload: {
   return data
 }
 
-export async function previewCsvImport(payload: {
+export type PreviewCsvImportPayload = {
   file: File
   zevId: string
   columnMap?: {
@@ -98,7 +100,9 @@ export async function previewCsvImport(payload: {
   intervalMinutes?: number
   valuesCount?: number
   overwriteExisting?: boolean
-}): Promise<ImportPreviewResult> {
+}
+
+export async function previewCsvImport(payload: PreviewCsvImportPayload): Promise<ImportPreviewResult> {
   const formData = new FormData()
   formData.append('file', payload.file)
   formData.append('zev_id', payload.zevId)
@@ -121,6 +125,39 @@ export async function previewCsvImport(payload: {
     headers: { 'Content-Type': 'multipart/form-data' },
   })
   return data
+}
+
+/** Outcome of one file in a multi-file request; `error` is set when it failed. */
+export type BatchFileOutcome<T> = { file: File; value: T | null; error: unknown }
+
+// The backend takes one file per request and records one import log per file,
+// so a batch is a sequence of single-file calls. They run one after another
+// (not in parallel): each file is its own transaction and a burst would trip
+// the per-user import throttle for no gain. A failing file never stops the rest.
+async function runPerFile<T>(files: File[], run: (file: File) => Promise<T>): Promise<BatchFileOutcome<T>[]> {
+  const outcomes: BatchFileOutcome<T>[] = []
+  for (const file of files) {
+    try {
+      outcomes.push({ file, value: await run(file), error: null })
+    } catch (error) {
+      outcomes.push({ file, value: null, error })
+    }
+  }
+  return outcomes
+}
+
+export function previewCsvImports(
+  payload: Omit<PreviewCsvImportPayload, 'file'> & { files: File[] },
+): Promise<BatchFileOutcome<ImportPreviewResult>[]> {
+  const { files, ...shared } = payload
+  return runPerFile(files, (file) => previewCsvImport({ ...shared, file }))
+}
+
+export function uploadMeteringFiles(
+  payload: Omit<UploadMeteringFilePayload, 'file'> & { files: File[] },
+): Promise<BatchFileOutcome<ImportLog>[]> {
+  const { files, ...shared } = payload
+  return runPerFile(files, (file) => uploadMeteringFile({ ...shared, file }))
 }
 
 export async function fetchChartData(params: {

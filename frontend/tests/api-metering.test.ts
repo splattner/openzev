@@ -6,6 +6,7 @@ import {
   fetchMeteringDataQualityStatus,
   previewCsvImport,
   uploadMeteringFile,
+  uploadMeteringFiles,
 } from '../src/lib/api/metering'
 import { api } from '../src/lib/api/client'
 
@@ -150,5 +151,24 @@ describe('metering api module', () => {
 
     const file = new File(['meter,data'], 'readings.csv', { type: 'text/csv' })
     await previewCsvImport({ file, zevId: 'zev-1', overwriteExisting })
+  })
+
+  it('uploads a batch one file at a time with shared settings and keeps going after a failure', async () => {
+    const seen: string[] = []
+    apiMock.onPost('/metering/import/sdatch/').reply((config) => {
+      const formData = config.data as FormData
+      const name = (formData.get('file') as File).name
+      seen.push(name)
+      expect(formData.get('zev_id')).toBe('zev-1')
+      return name === 'b.xml' ? [400, { error: 'unreadable' }] : [201, { id: `log-${name}` }]
+    })
+
+    const files = ['a.xml', 'b.xml', 'c.xml'].map((name) => new File(['<x/>'], name))
+    const outcomes = await uploadMeteringFiles({ source: 'sdatch', zevId: 'zev-1', files })
+
+    expect(seen).toEqual(['a.xml', 'b.xml', 'c.xml'])
+    expect(outcomes.map((outcome) => outcome.file.name)).toEqual(['a.xml', 'b.xml', 'c.xml'])
+    expect(outcomes.map((outcome) => outcome.value?.id ?? null)).toEqual(['log-a.xml', null, 'log-c.xml'])
+    expect(outcomes[1].error).toBeTruthy()
   })
 })

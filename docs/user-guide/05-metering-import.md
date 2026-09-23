@@ -67,8 +67,13 @@ alike. Delimiter may be any single character (for example `,`, `;`, `|`, or tab)
 
 2. **Upload File**
    - Click **New Import**
-   - Select your CSV or Excel file
+   - Select your CSV or Excel file — or several at once (Ctrl/Shift-click in the file dialog). Each file gets its own card with a **Remove** button
    - Click **Next: Configuration**
+
+   All selected files are imported with the **same settings** (column mapping,
+   date format, overwrite mode), so select files that share one layout. Each
+   file becomes its own entry in the import history and protocol. Selecting
+   files again replaces the current selection.
 
 3. **Configure Mapping**
    - Assign columns in your file to OpenZEV fields:
@@ -83,7 +88,7 @@ alike. Delimiter may be any single character (for example `,`, `;`, `|`, or tab)
    as-is (assumed UTC). The format only applies to text cells.
 
 4. **Preview (required for CSV)**
-   - Click **Load Preview**. Configuration changes, including toggling overwrite, invalidate the preview — reload before importing. Selecting another file also requires a new preview.
+   - Click **Load Preview**. Configuration changes, including toggling overwrite, invalidate the preview — reload before importing. Selecting or removing a file also requires a new preview. With several files, each gets its own preview section; one file with errors blocks the whole import, and a meter missing from any file is listed once.
    - Check **Metering point exists** per row; missing IDs are listed with copy/download actions and block **Start Import** until the meters exist.
    - Check **Direction**: where each row's readings will land — *Consumption (in)*, *Feed-in (out)*, or both when a bidirectional meter's row splits by sign. If a whole file shows the wrong direction, the **Direction column** mapping is wrong.
    - Check **Existing data**: the database already holds that reading (standard rows), or the day already holds readings for that meter/direction (daily rows). Enabling overwrite shows an estimate of how many existing readings will be replaced; fully duplicate rows never block the import — they are skipped (reported in the protocol) in skip mode and replaced in overwrite mode.
@@ -124,14 +129,16 @@ ones; fully duplicate rows are skipped with a `Duplicate reading` error.
 OpenZEV supports the Swiss **SDAT-CH** metering data standard (used by utility providers).
 
 1. Go to **Metering → Import history**
-2. Upload your SDAT-CH file
+2. Upload your SDAT-CH file, or several at once (one import per file)
 3. OpenZEV automatically parses:
    - Metering point IDs
    - Timestamps
    - Values (kWh)
    - Quality flags
 4. There is no preview: the import runs immediately, and the import protocol
-   opens automatically if any rows were skipped or failed.
+   opens automatically if any rows were skipped or failed. With several files
+   they are imported one after another; if some fail, the others stay
+   imported and only the failed files remain selected so you can retry.
 
 > **Note:** SDAT-CH metadata (meter type, interval) is extracted; timestamp resolution is auto-detected.
 

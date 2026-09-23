@@ -97,7 +97,16 @@ function loadPreview() {
 
 function succeedPreview(preview: ImportPreviewResult) {
     act(() => {
-        mutateCalls[mutateCalls.length - 1].opts?.onSuccess?.(preview)
+        const { files } = mutateCalls[mutateCalls.length - 1].vars as { files: File[] }
+        mutateCalls[mutateCalls.length - 1].opts?.onSuccess?.(files.map((file) => ({ file, value: preview, error: null })))
+    })
+}
+
+/** Resolve the most recent upload mutation as if every file imported. */
+function succeedUpload(...logs: Array<Record<string, unknown>>) {
+    const { files } = mutateCalls[mutateCalls.length - 1].vars as { files: File[] }
+    act(() => {
+        mutationOptions[1].onSuccess(files.map((file, index) => ({ file, value: logs[index] ?? logs[0], error: null })))
     })
 }
 
@@ -247,7 +256,7 @@ describe('ImportsPage wizard gating', () => {
         goToStep2()
         loadPreview()
         succeedPreview(cleanPreview())
-        const original = mutateCalls[0].vars.file as File
+        const original = (mutateCalls[0].vars.files as File[])[0]
         act(() => { buttons('pages.imports.wizard.back')[0].click() })
         const input = container.querySelector('input[type=file]') as HTMLInputElement
         const replacement = new File(['x'.repeat(original.size)], original.name, { lastModified: original.lastModified })
@@ -267,9 +276,7 @@ describe('ImportsPage wizard gating', () => {
             startButton().click()
         })
         expect(mutateCalls).toHaveLength(2)
-        act(() => {
-            mutationOptions[1].onSuccess({ rows_imported: 1, rows_skipped: 0, errors: [] })
-        })
+        succeedUpload({ rows_imported: 1, rows_skipped: 0, errors: [] })
         expect(container.textContent).not.toContain('pages.imports.wizard.title')
         openWizard()
         expect(buttons('pages.imports.wizard.nextConfig')[0].disabled).toBe(true)
@@ -366,15 +373,13 @@ describe('ImportsPage wizard gating', () => {
         act(() => {
             startButton().click()
         })
-        act(() => {
-            mutationOptions[1].onSuccess({
+        succeedUpload({
                 id: 'log-1',
                 batch_id: 'batch-1',
                 rows_imported: 1,
                 rows_skipped: 1,
                 errors: [{ row: 2, error: 'Duplicate reading' }],
             })
-        })
         expect(container.textContent).not.toContain('pages.imports.wizard.title')
         expect(container.textContent).toContain('pages.imports.protocol.title')
         expect(pushToast).toHaveBeenCalledWith(
@@ -390,8 +395,7 @@ describe('ImportsPage wizard gating', () => {
         act(() => {
             startButton().click()
         })
-        act(() => {
-            mutationOptions[1].onSuccess({
+        succeedUpload({
                 id: 'log-1',
                 batch_id: 'batch-1',
                 rows_imported: 2,
@@ -400,7 +404,6 @@ describe('ImportsPage wizard gating', () => {
                 errors: [],
                 warnings: [{ row: null, warning: 'Existing readings were updated.' }],
             })
-        })
         expect(pushToast).toHaveBeenCalledWith(
             'pages.imports.messages.importSuccessWithOverwrites',
             'success',
@@ -575,15 +578,13 @@ describe('ImportsPage wizard gating', () => {
         act(() => {
             startButton().click()
         })
-        act(() => {
-            mutationOptions[1].onSuccess({
+        succeedUpload({
                 id: 'log-1',
                 batch_id: 'batch-1',
                 rows_imported: 1,
                 rows_skipped: 1,
                 errors: [{ row: 2, meter_id: 'M-9', error: 'Duplicate reading' }],
             })
-        })
         expect(container.textContent).toContain('M-9')
         expect(container.textContent).toContain('Duplicate reading')
     })
@@ -592,13 +593,23 @@ describe('ImportsPage wizard gating', () => {
         goToStep2()
         loadPreview()
         act(() => {
-            mutateCalls[mutateCalls.length - 1].opts?.onError?.({ response: { status: 413, data: {} } })
+            const { files } = mutateCalls[mutateCalls.length - 1].vars as { files: File[] }
+            mutateCalls[mutateCalls.length - 1].opts?.onSuccess?.([
+                { file: files[0], value: null, error: { response: { status: 413, data: {} } } },
+            ])
         })
-        expect(pushToast).toHaveBeenCalledWith('pages.imports.messages.importTooLarge', expect.objectContaining({}))
+        expect(container.textContent).toContain('pages.imports.messages.importTooLarge')
+        succeedPreview(cleanPreview())
+        act(() => startButton().click())
+        const { files } = mutateCalls[mutateCalls.length - 1].vars as { files: File[] }
         act(() => {
-            mutationOptions[1].onError({ response: { status: 429, data: { detail: 'throttled' } } })
+            mutationOptions[1].onSuccess([
+                { file: files[0], value: null, error: { response: { status: 429, data: { detail: 'throttled' } } } },
+            ])
         })
         expect(pushToast).toHaveBeenCalledWith('pages.imports.messages.importThrottled', 'error')
+        // A failed import keeps the wizard open for a retry.
+        expect(container.textContent).toContain('pages.imports.wizard.title')
     })
 
     it('renders a row action menu per log', () => {
@@ -709,3 +720,112 @@ function twoLogs() {
     ]
     renderPage()
 }
+
+describe('ImportsPage multi-file import', () => {
+    function pick(...names: string[]) {
+        const input = container.querySelector('input[type=file]') as HTMLInputElement
+        const picked = names.map((name, index) => new File([`meter_id,timestamp,energy_kwh\nM${index},2026-01-01T00:00:00Z,1.0`], name, { type: 'text/csv' }))
+        Object.defineProperty(input, 'files', { value: picked, configurable: true })
+        act(() => {
+            input.dispatchEvent(new Event('change', { bubbles: true }))
+        })
+    }
+
+    function goToStep2WithFiles(...names: string[]) {
+        openWizard()
+        pick(...names)
+        act(() => {
+            buttons('pages.imports.wizard.nextConfig')[0].click()
+        })
+    }
+
+    it('accepts several files, lists each and removes them one at a time', () => {
+        openWizard()
+        expect((container.querySelector('input[type=file]') as HTMLInputElement).multiple).toBe(true)
+        pick('a.csv', 'b.csv', 'c.csv')
+        expect(buttons('pages.imports.wizard.removeFile')).toHaveLength(3)
+        expect(container.textContent).toContain('pages.imports.wizard.sameSettingsHint')
+        act(() => {
+            buttons('pages.imports.wizard.removeFile')[1].click()
+        })
+        expect(container.textContent).toContain('a.csv')
+        expect(container.textContent).not.toContain('b.csv')
+        expect(container.textContent).toContain('c.csv')
+        expect(buttons('pages.imports.wizard.nextConfig')[0].disabled).toBe(false)
+    })
+
+    it('previews and uploads every file with the same settings', () => {
+        goToStep2WithFiles('a.csv', 'b.csv')
+        loadPreview()
+        expect((mutateCalls[0].vars.files as File[]).map((file) => file.name)).toEqual(['a.csv', 'b.csv'])
+        succeedPreview(cleanPreview())
+        expect(container.textContent).toContain('a.csv')
+        expect(container.textContent).toContain('b.csv')
+        act(() => startButton().click())
+        expect((mutateCalls[1].vars.files as File[]).map((file) => file.name)).toEqual(['a.csv', 'b.csv'])
+        succeedUpload({ id: 'l', rows_imported: 3, rows_skipped: 1, errors: [] })
+        expect(pushToast).toHaveBeenCalledWith(
+            'pages.imports.messages.importBatchSuccess',
+            'success',
+        )
+        expect(container.textContent).not.toContain('pages.imports.wizard.title')
+    })
+
+    it('blocks the import while any file has preview errors', () => {
+        goToStep2WithFiles('a.csv', 'b.csv')
+        loadPreview()
+        act(() => {
+            const { files } = mutateCalls[0].vars as { files: File[] }
+            mutateCalls[0].opts?.onSuccess?.([
+                { file: files[0], value: cleanPreview(), error: null },
+                { file: files[1], value: { ...cleanPreview(), errors: [{ row: 2, error: 'Bad value' }] }, error: null },
+            ])
+        })
+        expect(startButton().disabled).toBe(true)
+        expect(container.textContent).toContain('Bad value')
+    })
+
+    it('counts a meter missing from several files once', () => {
+        goToStep2WithFiles('a.csv', 'b.csv')
+        loadPreview()
+        const missing = {
+            ...cleanPreview(),
+            summary: { existing_metering_points: 0, missing_metering_points: 1, rows_previewed: 1, rows_skipped_existing: 0 },
+            missing_meter_ids: ['M-1'],
+        }
+        succeedPreview(missing)
+        expect(container.textContent).toContain('pages.imports.previewMissingBanner')
+        expect(container.textContent).not.toContain('pages.imports.preview.andMore')
+        expect(translate).toHaveBeenCalledWith('pages.imports.previewMissingBanner', { count: 1 })
+    })
+
+    it('keeps only the failed files selected after a partial import', () => {
+        goToStep2WithFiles('a.csv', 'b.csv', 'c.csv')
+        loadPreview()
+        succeedPreview(cleanPreview())
+        act(() => startButton().click())
+        const { files } = mutateCalls[1].vars as { files: File[] }
+        act(() => {
+            mutationOptions[1].onSuccess([
+                { file: files[0], value: { id: 'l1', rows_imported: 1, rows_skipped: 0, errors: [] }, error: null },
+                { file: files[1], value: null, error: { response: { status: 400, data: { error: 'Boom' } } } },
+                { file: files[2], value: { id: 'l3', rows_imported: 1, rows_skipped: 0, errors: [] }, error: null },
+            ])
+        })
+        expect(pushToast).toHaveBeenCalledWith(
+            'pages.imports.messages.importBatchPartial',
+            'error',
+        )
+        expect(translate).toHaveBeenCalledWith('pages.imports.messages.importBatchPartial', {
+            done: 2,
+            total: 3,
+            failed: 1,
+            names: 'b.csv',
+        })
+        expect(container.textContent).toContain('pages.imports.wizard.title')
+        // The retry covers only the failed file and its preview is still valid.
+        expect(startButton().disabled).toBe(false)
+        act(() => startButton().click())
+        expect((mutateCalls[2].vars.files as File[]).map((file) => file.name)).toEqual(['b.csv'])
+    })
+})
