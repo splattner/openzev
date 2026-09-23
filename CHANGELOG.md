@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.18.0](https://github.com/splattner/openzev/compare/v1.17.0...v1.18.0) (2026-09-23)
+
+
+### Features
+
+* **dashboard:** show each participant's ZEV-consumption share ([#808](https://github.com/splattner/openzev/issues/808)) ([e0e9f3d](https://github.com/splattner/openzev/commit/e0e9f3d4c326db665a96eaa0b3cf1049e87ac82f))
+* **metering:** detect CSV import settings from the file ([#810](https://github.com/splattner/openzev/issues/810)) ([0b22bba](https://github.com/splattner/openzev/commit/0b22bbab3a9b9eefd57082676a2a3d5b1a06f636))
+* **metering:** import several files at once in the import wizard ([#809](https://github.com/splattner/openzev/issues/809)) ([8893459](https://github.com/splattner/openzev/commit/8893459945abe9446d14f44df842a2ec59a0d06d))
+* **metering:** map OBIS codes to reading direction on CSV import ([#805](https://github.com/splattner/openzev/issues/805)) ([e56c073](https://github.com/splattner/openzev/commit/e56c07389d8f2287ffc107ad04996733a862dac6))
+
+
+### Bug Fixes
+
+* **frontend:** responsive dashboard tables and container-aware feasibility layout ([#807](https://github.com/splattner/openzev/issues/807)) ([ced6d9c](https://github.com/splattner/openzev/commit/ced6d9c33208cdf3f7299093d935396cd062bd47))
+
 ## [1.17.0](https://github.com/splattner/openzev/compare/v1.16.0...v1.17.0) (2026-09-23)
 
 
