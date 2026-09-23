@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.18.1](https://github.com/splattner/openzev/compare/v1.18.0...v1.18.1) (2026-09-23)
+
+
+### Bug Fixes
+
+* **metering:** bucket the dashboard summary in UTC ([#813](https://github.com/splattner/openzev/issues/813)) ([5c2cacc](https://github.com/splattner/openzev/commit/5c2cacce4776fa73a243dd14adfd551eb4cfd0dd))
+
 ## [1.18.0](https://github.com/splattner/openzev/compare/v1.17.0...v1.18.0) (2026-09-23)
 
 
