@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.18.2](https://github.com/splattner/openzev/compare/v1.18.1...v1.18.2) (2026-09-23)
+
+
+### Bug Fixes
+
+* **accounts:** treat a dead access cookie as anonymous ([#815](https://github.com/splattner/openzev/issues/815)) ([ff5e2f6](https://github.com/splattner/openzev/commit/ff5e2f63cbb7c0135b317ae94d17d2228ef2b7d3))
+
 ## [1.18.1](https://github.com/splattner/openzev/compare/v1.18.0...v1.18.1) (2026-09-23)
 
 
