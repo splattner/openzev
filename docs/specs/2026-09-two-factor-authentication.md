@@ -723,7 +723,9 @@ about the library mocked): `PasskeyRegistrationTests` (13), `PasskeyLoginTests` 
 successful login stamps `User.last_login`),
 `PasskeyGatesThePasswordRouteTests` (7, the passkey-gated password / magic-link routes and the recovery-code second step), `PasskeyThrottleTests` (1), `MfaPolicyTests` (11), `MfaRemovalGuardTests` (6),
 `MfaAdminResetTests` (7) and `WebAuthnRpCheckTests` (4). These replace the illustrative
-`PasskeyTests` / `MfaAdminTests` tables below and additionally cover replay of a spent ceremony,
+`PasskeyTests`, `MfaAdminTests`, `TotpEnrolmentTests` and `MfaDoorTests` tables below
+(where such a table states a different count, the as-shipped list above is the shipped
+one) and additionally cover replay of a spent ceremony,
 wrong-origin and tampered-signature assertions, the zero-counter exemption, the grace-period
 arithmetic (including an account far older than the policy), and recovery codes surviving a second
 factor. Frontend: `tests/mfa.test.ts` (22) covers the API client, the WebAuthn bridge and the gate's

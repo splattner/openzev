@@ -514,7 +514,7 @@ real PDFs (WeasyPrint) and asserting markup with the `<style>` blocks stripped
 | `test_very_long_notes_do_not_balloon_the_document` | A ~3,800-char note keeps the PDF ≤ 12 pages and Appendix B still renders last |
 | `test_unassigned_meter_placeholder_is_neutral` | Without assignments the markup shows the `meter_none` statement once per meter group and never a bare `CH` chip |
 
-**`ContractIssuanceTests`** (11 tests):
+**`ContractIssuanceTests`** (14 tests):
 
 | Test | Asserts |
 |---|---|
@@ -536,20 +536,21 @@ real PDFs (WeasyPrint) and asserting markup with the `<style>` blocks stripped
 | `test_concurrent_first_issuances_get_distinct_versions` | A request that read `latest` before a competing first issuance committed derives the version from the row visible under the Zev row lock — no `(participant, version)` collision |
 | `test_issue_zev_is_derived_from_the_participant` | `ContractIssue.save()` derives the denormalized `zev` from `participant.zev` |
 
-Total: 48 test methods across 7 classes in `test_contract_context.py`.
+Total: 51 test methods across 7 classes in `test_contract_context.py`.
 
 ### Backend — `invoices/test_template_admin.py`
 
 **`TemplateAdminPermissionTests`** (6), **`EmailTemplateAdminTests`** (4),
-**`PdfTemplatePreviewTests`** (4), **`PdfTemplateAdminTests`** (3) and
-**`PdfTemplateOverrideIntegrityTests`** (8) — 25 test methods across 5
+**`PdfTemplatePreviewTests`** (11), **`PdfTemplateAdminTests`** (3) and
+**`PdfTemplateOverrideIntegrityTests`** (9) — 33 test methods across 5
 classes.
 
-**`PdfTemplateOverrideIntegrityTests`** (8 tests):
+**`PdfTemplateOverrideIntegrityTests`** (9 tests):
 
 | Test | Asserts |
 |---|---|
 | `test_broken_override_is_rejected_and_nothing_is_stored` | PATCH with broken template syntax → 400, no `PdfTemplate` row |
+| `test_oversized_override_is_rejected_and_nothing_is_stored` | PATCH with content over `MAX_TEMPLATE_CHARS` → 400 naming the cap, no `PdfTemplate` row — the save path enforces the same cap as the preview |
 | `test_valid_override_is_stored_with_default_digest_and_not_stale` | PATCH validates via render; row stores `default_digest`, response `is_stale: false` |
 | `test_get_flags_override_saved_against_an_older_default_as_stale` | A stored digest that no longer matches the on-disk default → `is_stale: true` on GET |
 | `test_override_without_digest_provenance_is_never_stale` | A row with blank `default_digest` (no provenance) → `is_customized: true`, `is_stale: false` |
@@ -558,7 +559,7 @@ classes.
 | `test_override_with_shared_base_include_renders_through_the_real_path` | Current default stored as override still resolves `{% include "pdf/shared_pdf_base.html" %}` through the real `generate_contract_pdf` path (shared-base CSS present) |
 | `test_legacy_override_without_include_still_renders` | A pre-redesign override with its own full markup still renders a PDF without error |
 
-(8 methods — the class also guards the compat claim that old overrides keep
+(9 methods — the class also guards the compat claim that old overrides keep
 working.)
 
 ### Regression coverage in `invoices/test_pdf.py`
