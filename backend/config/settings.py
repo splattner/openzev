@@ -195,7 +195,7 @@ REST_FRAMEWORK = {
         # Per-IP budget for the unauthenticated onboarding-consume endpoint.
         "onboarding_link": env("ONBOARDING_LINK_THROTTLE_RATE", default="60/hour"),
         # Per-user budgets bounding bulk uploads (worker-exhaustion guard).
-        "import": env("IMPORT_THROTTLE_RATE", default="60/hour"),
+        "import": env("IMPORT_THROTTLE_RATE", default="600/hour"),
         "transfer_import": env("TRANSFER_IMPORT_THROTTLE_RATE", default="20/hour"),
     },
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
