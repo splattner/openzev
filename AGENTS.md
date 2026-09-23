@@ -129,6 +129,7 @@ After relevant changes, run what CI runs for the side you touched:
 
 - Never commit to `main`; branch off an up-to-date `origin/main`.
 - PR titles follow Conventional Commits (`feat(scope): ...`, `fix(scope): ...`) — CI checks this.
+- Review PRs with the `pr-review` skill, so every review comes out in the same shape (must-fix / in-scope improvements / other observations / validation).
 - Fill in `.github/PULL_REQUEST_TEMPLATE.md` (linked spec, validation).
 - **Before pushing follow-up commits to an existing PR branch, check the PR is still open** (`gh pr view <number> --json state`). If it was merged or closed in the meantime, do not push to that branch: create a new branch from `origin/main`, cherry-pick the new commits, and open a new PR.
 - After pushing, check CI (`gh pr checks <number>`) rather than assuming it passes.
