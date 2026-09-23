@@ -1,5 +1,6 @@
 import type {
   ChartDataPoint,
+  CsvDetectResult,
   DataQualityStatusResponse,
   HourlyProfileResponse,
   ImportDeletionResult,
@@ -122,6 +123,16 @@ export async function previewCsvImport(payload: PreviewCsvImportPayload): Promis
   if (payload.valuesCount != null) formData.append('values_count', String(payload.valuesCount))
 
   const { data } = await api.post<ImportPreviewResult>('/metering/import/preview-csv/', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  })
+  return data
+}
+
+/** Ask the backend which import settings fit the file (advisory, reads no data). */
+export async function detectCsvSettings(file: File): Promise<CsvDetectResult> {
+  const formData = new FormData()
+  formData.append('file', file)
+  const { data } = await api.post<CsvDetectResult>('/metering/import/detect-csv/', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
   })
   return data

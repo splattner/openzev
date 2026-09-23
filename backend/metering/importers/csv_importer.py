@@ -112,7 +112,7 @@ def _build_table(raw_rows, *, has_header):
     return Table(columns=columns, rows=rows)
 
 
-def _read_csv_table(file, *, has_header, delimiter):
+def _read_csv_table(file, *, has_header, delimiter, limit=None):
     # The file is decoded incrementally (no up-front read().decode() pass);
     # blank rows are skipped the way pandas does.
     size_hint = getattr(file, "size", None)
@@ -133,6 +133,8 @@ def _read_csv_table(file, *, has_header, delimiter):
         for row in reader:
             if not row:
                 continue
+            if limit is not None and len(rows) >= limit:
+                break
             if len(row) > MAX_CSV_COLUMNS:
                 raise ImportFileError(
                     f"Row {len(rows) + 1} has too many columns ({len(row)} > {MAX_CSV_COLUMNS})."
@@ -155,7 +157,7 @@ def _read_csv_table(file, *, has_header, delimiter):
     return _build_table(rows, has_header=has_header)
 
 
-def _read_xlsx_table(file, *, has_header):
+def _read_xlsx_table(file, *, has_header, limit=None):
     # XLSX is a ZIP: validate members / decompressed size / ratio before
     # openpyxl inflates anything (sharedStrings.xml alone can be a bomb).
     file.seek(0)
@@ -189,6 +191,8 @@ def _read_xlsx_table(file, *, has_header):
         row_cap = MAX_CSV_ROWS + (1 if has_header else 0)
         raw_rows = []
         for row in sheet.iter_rows(values_only=True):
+            if limit is not None and len(raw_rows) >= limit:
+                break
             if len(raw_rows) >= row_cap:
                 raise ImportFileError(
                     f"Excel sheet has too many rows (exceeds {MAX_CSV_ROWS})."
@@ -207,16 +211,16 @@ def _read_xlsx_table(file, *, has_header):
     return _build_table(raw_rows, has_header=has_header)
 
 
-def _read_table(file, *, has_header=True, delimiter=","):
+def _read_table(file, *, has_header=True, delimiter=",", limit=None):
     name = (getattr(file, "name", "") or "").lower()
     if name.endswith(".xls"):
         raise ImportFileError(
             "Legacy .xls files are not supported. Please save the file as .xlsx or CSV."
         )
     if name.endswith(".xlsx"):
-        return _read_xlsx_table(file, has_header=has_header)
+        return _read_xlsx_table(file, has_header=has_header, limit=limit)
     return _read_csv_table(
-        file, has_header=has_header, delimiter=_normalise_delimiter(delimiter)
+        file, has_header=has_header, delimiter=_normalise_delimiter(delimiter), limit=limit
     )
 
 

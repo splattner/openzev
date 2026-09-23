@@ -22,3 +22,9 @@ def preview_csv(client, name, content, **fields):
     return client.post(
         "/api/v1/metering/import/preview-csv/", {"file": upload, **fields}, format="multipart"
     )
+
+
+def detect_csv(client, name, content):
+    """POST a file to the settings-detection endpoint, returning the response."""
+    upload = SimpleUploadedFile(name, content, content_type="text/csv")
+    return client.post("/api/v1/metering/import/detect-csv/", {"file": upload}, format="multipart")

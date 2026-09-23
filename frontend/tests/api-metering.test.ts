@@ -2,6 +2,7 @@ import MockAdapter from 'axios-mock-adapter'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   bulkDeleteImportLogs,
+  detectCsvSettings,
   fetchChartData,
   fetchMeteringDataQualityStatus,
   previewCsvImport,
@@ -170,5 +171,18 @@ describe('metering api module', () => {
     expect(outcomes.map((outcome) => outcome.file.name)).toEqual(['a.xml', 'b.xml', 'c.xml'])
     expect(outcomes.map((outcome) => outcome.value?.id ?? null)).toEqual(['log-a.xml', null, 'log-c.xml'])
     expect(outcomes[1].error).toBeTruthy()
+  })
+
+  it('posts only the file to the detection endpoint', async () => {
+    apiMock.onPost('/metering/import/detect-csv/').reply((config) => {
+      const formData = config.data as FormData
+      expect((formData.get('file') as File).name).toBe('readings.csv')
+      expect(Array.from(formData.keys())).toEqual(['file'])
+      return [200, { detected: true, undetected: [], settings: { has_header: true } }]
+    })
+
+    const result = await detectCsvSettings(new File(['a,b'], 'readings.csv'))
+
+    expect(result.detected).toBe(true)
   })
 })

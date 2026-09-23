@@ -1,4 +1,4 @@
-import type { ImportPreviewResult } from '../../types/api'
+import type { CsvDetectResult, ImportPreviewResult } from '../../types/api'
 
 export type CsvColumnMap = {
     meter_id: string
@@ -41,6 +41,49 @@ export const dailyHeaderlessColumnMap: CsvColumnMap = {
 }
 
 export type CsvFormatProfile = 'standard' | 'daily_15min'
+
+export type DetectionState =
+    | { status: 'idle' }
+    | { status: 'loading'; fileName: string; fileCount: number }
+    | { status: 'done'; fileName: string; fileCount: number; undetected: string[] }
+    | { status: 'failed' }
+
+/**
+ * Turn a backend detection result into wizard state. Anything the backend
+ * could not determine keeps the default for the detected layout, so a partial
+ * result never leaves a mapping field empty that the defaults would have filled.
+ */
+export function settingsFromDetection(result: CsvDetectResult): {
+    hasHeader: boolean
+    delimiter: string
+    formatProfile: CsvFormatProfile
+    timestampFormat: string
+    intervalMinutes: string
+    valuesCount: string
+    columnMap: CsvColumnMap
+} {
+    const { settings } = result
+    const fallback = csvConfigFor(settings.has_header, settings.format_profile).columnMap
+    const mapped = settings.column_map
+    const standard = settings.format_profile === 'standard'
+    return {
+        hasHeader: settings.has_header,
+        // The delimiter field cannot show a literal tab: use the escape it accepts.
+        delimiter: settings.delimiter === '\t' ? '\\t' : settings.delimiter,
+        formatProfile: settings.format_profile,
+        timestampFormat: settings.timestamp_format,
+        intervalMinutes: String(settings.interval_minutes),
+        valuesCount: String(settings.values_count),
+        columnMap: {
+            meter_id: mapped.meter_id ?? fallback.meter_id,
+            timestamp: mapped.timestamp ?? fallback.timestamp,
+            energy_kwh: standard ? (mapped.energy_kwh ?? fallback.energy_kwh) : '',
+            // No direction column detected: leave it empty (meter-type inference).
+            direction: mapped.direction ?? '',
+            energy_start: standard ? '' : (mapped.energy_start ?? fallback.energy_start),
+        },
+    }
+}
 
 export function csvConfigFor(
     hasHeader: boolean,

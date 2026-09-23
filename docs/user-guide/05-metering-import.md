@@ -75,7 +75,13 @@ alike. Delimiter may be any single character (for example `,`, `;`, `|`, or tab)
    file becomes its own entry in the import history and protocol. Selecting
    files again replaces the current selection.
 
-3. **Configure Mapping**
+3. **Check the detected settings**
+   - OpenZEV reads the first file and fills in the settings for you: delimiter, header row, one value per line or one day per row (with its interval and number of values), the meter ID, date/time and direction columns, and the date format. A note above the settings says what was detected.
+   - If something could not be detected, the note names it and the field keeps a default — fill it in yourself.
+   - Change anything that is wrong; your changes are kept when you go back and forth. **Detect again** discards them and re-reads the file.
+   - With several files, the settings come from the first file and apply to all of them.
+
+   **Configure Mapping** (only needed where the detection is wrong)
    - Assign columns in your file to OpenZEV fields:
      - `Meter ID column` → which column?
      - `Timestamp`/`Date column` → which column?

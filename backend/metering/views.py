@@ -18,6 +18,7 @@ from zev.models import Zev, Participant, MeteringPoint, MeteringPointAssignment
 from .models import MeterReading, ImportLog
 from zev.scoping import ZevScopedQuerySetMixin
 from .serializers import MeterReadingSerializer, ImportLogSerializer
+from .importers.csv_detect import detect_csv_settings
 from .importers.csv_importer import ImportFileError, import_csv, preview_csv
 from .importers.sdatch_importer import import_sdatch
 from .analytics import (
@@ -557,6 +558,17 @@ class ImportView(viewsets.ViewSet):
     @action(detail=False, methods=["post"], url_path="sdatch")
     def upload_sdatch(self, request):
         return self._do_import(request, source="sdatch")
+
+    @action(detail=False, methods=["post"], url_path="detect-csv")
+    def detect_csv_import(self, request):
+        """Suggest wizard settings from the file's content (advisory, no DB access)."""
+        file = request.FILES.get("file")
+        if not file:
+            return Response({"error": "No file provided."}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            return Response(detect_csv_settings(file))
+        except ImportFileError as exc:
+            return Response({"error": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 
     @action(detail=False, methods=["post"], url_path="preview-csv")
     def preview_csv_import(self, request):

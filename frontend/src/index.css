@@ -1990,6 +1990,14 @@ h3 {
   grid-column: 1 / -1;
 }
 
+/* Two columns wide, but only where the grid has them: in the single-column
+   layout a span would create a second, implicit column. */
+@media (min-width: 641px) {
+  .grid-span-2 {
+    grid-column: span 2;
+  }
+}
+
 /* Grouped toggles for a tariff band's weekdays and months. Laid out like a
    plain field so the group's label lines up with the inputs beside it, but
    marked up as role="group" rather than a fieldset — a legend does not lay out

@@ -9,6 +9,11 @@ globalThis.IS_REACT_ACT_ENVIRONMENT = true
 
 const mutateCalls: Array<{ vars: any; opts?: { onSuccess?: (result: any) => void; onError?: (error: any) => void } }> = []
 const mutationOptions: Array<any> = []
+// Settings detection goes through its own mutation; tracking it separately
+// keeps the preview/upload call indexes the rest of this file relies on.
+const detectCalls: Array<{ vars: unknown }> = []
+// null = detection fails at once (defaults stay); 'pending' = never answers.
+let detectResult: unknown | 'pending' | null = null
 const pushToast = vi.fn()
 const refetchLogs = vi.fn()
 const translate = vi.fn((key: string) => key)
@@ -21,6 +26,13 @@ vi.mock('@tanstack/react-query', () => ({
         return {
             isPending: false,
             mutate: (vars: unknown, opts?: any) => {
+                if (options.mutationFn?.name === 'detectCsvSettings') {
+                    detectCalls.push({ vars })
+                    if (detectResult === 'pending') return
+                    if (detectResult === null) opts?.onError?.(new Error('detect failed'))
+                    else opts?.onSuccess?.(detectResult)
+                    return
+                }
                 mutateCalls.push({ vars, opts })
             },
         }
@@ -145,6 +157,8 @@ function cleanPreview(): ImportPreviewResult {
 beforeEach(() => {
     mutateCalls.length = 0
     mutationOptions.length = 0
+    detectCalls.length = 0
+    detectResult = null
     pushToast.mockClear()
     refetchLogs.mockClear()
     selectedZevId = 'zev-1'
@@ -827,5 +841,162 @@ describe('ImportsPage multi-file import', () => {
         expect(startButton().disabled).toBe(false)
         act(() => startButton().click())
         expect((mutateCalls[2].vars.files as File[]).map((file) => file.name)).toEqual(['b.csv'])
+    })
+})
+
+describe('ImportsPage settings detection', () => {
+    function detected(overrides: Record<string, unknown> = {}, undetected: string[] = []) {
+        return {
+            detected: true,
+            undetected,
+            settings: {
+                has_header: false,
+                delimiter: ';',
+                format_profile: 'standard',
+                timestamp_format: '%d.%m.%Y %H:%M',
+                interval_minutes: 15,
+                values_count: 96,
+                column_map: { meter_id: '0', timestamp: '1', energy_kwh: '2', direction: null, energy_start: null },
+                ...overrides,
+            },
+        }
+    }
+
+    function input(placeholder: string): HTMLInputElement {
+        return container.querySelector(`input[placeholder="${placeholder}"]`) as HTMLInputElement
+    }
+
+    function pickAndNext(...names: string[]) {
+        openWizard()
+        const field = container.querySelector('input[type=file]') as HTMLInputElement
+        const picked = names.map((name) => new File(['x'], name, { type: 'text/csv' }))
+        Object.defineProperty(field, 'files', { value: picked, configurable: true })
+        act(() => { field.dispatchEvent(new Event('change', { bubbles: true })) })
+        act(() => { buttons('pages.imports.wizard.nextConfig')[0].click() })
+    }
+
+    it('applies the detected settings and sends them with the preview', () => {
+        detectResult = detected()
+        pickAndNext('readings.csv')
+        expect(detectCalls).toHaveLength(1)
+        expect((detectCalls[0].vars as File).name).toBe('readings.csv')
+        expect(container.textContent).toContain('pages.imports.detection.done')
+        expect((container.querySelector('input[type=checkbox]') as HTMLInputElement).checked).toBe(false)
+        expect(input(',').value).toBe(';')
+        loadPreview()
+        expect(mutateCalls[0].vars).toMatchObject({
+            hasHeader: false,
+            delimiter: ';',
+            formatProfile: 'standard',
+            timestampFormat: '%d.%m.%Y %H:%M',
+            columnMap: { meter_id: '0', timestamp: '1', energy_kwh: '2', direction: '', energy_start: '' },
+        })
+    })
+
+    it('applies a daily-profile detection with interval settings', () => {
+        detectResult = detected({
+            has_header: true,
+            delimiter: ',',
+            format_profile: 'daily_15min',
+            timestamp_format: '',
+            interval_minutes: 60,
+            values_count: 24,
+            column_map: { meter_id: 'Zählpunkt', timestamp: 'Datum', energy_kwh: null, direction: 'Richtung', energy_start: '00:00' },
+        })
+        pickAndNext('daily.csv')
+        loadPreview()
+        expect(mutateCalls[0].vars).toMatchObject({
+            formatProfile: 'daily_15min',
+            timestampFormat: '',
+            intervalMinutes: 60,
+            valuesCount: 24,
+            columnMap: { meter_id: 'Zählpunkt', timestamp: 'Datum', energy_kwh: '', direction: 'Richtung', energy_start: '00:00' },
+        })
+    })
+
+    it('shows the tab delimiter in the escape form the field accepts', () => {
+        detectResult = detected({ delimiter: '\t' })
+        pickAndNext('tabbed.csv')
+        expect(input(',').value).toBe('\\t')
+        expect(container.textContent).not.toContain('pages.imports.wizard.delimiterInvalid')
+    })
+
+    it('names what could not be detected and keeps defaults for it', () => {
+        detectResult = detected({ column_map: { meter_id: null, timestamp: '1', energy_kwh: '2', direction: null, energy_start: null } }, ['meter_id'])
+        pickAndNext('readings.csv')
+        expect(translate).toHaveBeenCalledWith('pages.imports.detection.undetected', { fields: 'pages.imports.wizard.meterIdCol' })
+        loadPreview()
+        // Headerless standard default for the field that stayed undetected.
+        expect((mutateCalls[0].vars as any).columnMap.meter_id).toBe('0')
+    })
+
+    it('keeps the defaults and says so when detection does not recognise the file', () => {
+        detectResult = { ...detected(), detected: false, undetected: ['file'] }
+        pickAndNext('odd.csv')
+        expect(input(',').value).toBe(',')
+        expect(translate).toHaveBeenCalledWith('pages.imports.detection.undetected', { fields: 'pages.imports.detection.fieldFile' })
+    })
+
+    it('keeps the defaults and says so when the detection request fails', () => {
+        pickAndNext('readings.csv')
+        expect(container.textContent).toContain('pages.imports.detection.failed')
+        expect(buttons('pages.imports.loadPreview')[0].disabled).toBe(false)
+    })
+
+    it('blocks the preview while detection is running', () => {
+        detectResult = 'pending'
+        pickAndNext('readings.csv')
+        expect(container.textContent).toContain('pages.imports.detection.loading')
+        expect(buttons('pages.imports.loadPreview')[0].disabled).toBe(true)
+    })
+
+    it('does not overwrite manual edits when moving back and forth, but detects again for new files', () => {
+        detectResult = detected()
+        pickAndNext('a.csv')
+        setInputValue(input(','), '|')
+        act(() => { buttons('pages.imports.wizard.back')[0].click() })
+        act(() => { buttons('pages.imports.wizard.nextConfig')[0].click() })
+        expect(detectCalls).toHaveLength(1)
+        expect(container.querySelector('input[value="|"]')).not.toBeNull()
+
+        act(() => { buttons('pages.imports.wizard.back')[0].click() })
+        const field = container.querySelector('input[type=file]') as HTMLInputElement
+        Object.defineProperty(field, 'files', { value: [new File(['x'], 'b.csv')], configurable: true })
+        act(() => { field.dispatchEvent(new Event('change', { bubbles: true })) })
+        act(() => { buttons('pages.imports.wizard.nextConfig')[0].click() })
+        expect(detectCalls).toHaveLength(2)
+        expect(container.querySelector('input[value=";"]')).not.toBeNull()
+    })
+
+    it('detects again on request, restoring the detected settings', () => {
+        detectResult = detected()
+        pickAndNext('a.csv')
+        setInputValue(input(','), '|')
+        act(() => { buttons('pages.imports.detection.redetect')[0].click() })
+        expect(detectCalls).toHaveLength(2)
+        expect(container.querySelector('input[value=";"]')).not.toBeNull()
+    })
+
+    it('detects from the first file and says it applies to all of them', () => {
+        detectResult = detected()
+        pickAndNext('a.csv', 'b.csv')
+        expect(detectCalls).toHaveLength(1)
+        expect((detectCalls[0].vars as File).name).toBe('a.csv')
+        expect(translate).toHaveBeenCalledWith('pages.imports.detection.doneMulti', { filename: 'a.csv', count: 2 })
+    })
+
+    it('skips detection for SDAT-CH', () => {
+        detectResult = detected()
+        openWizard()
+        const select = container.querySelector('select') as HTMLSelectElement
+        act(() => {
+            select.value = 'sdatch'
+            select.dispatchEvent(new Event('change', { bubbles: true }))
+        })
+        const field = container.querySelector('input[type=file]') as HTMLInputElement
+        Object.defineProperty(field, 'files', { value: [new File(['<x/>'], 'a.xml')], configurable: true })
+        act(() => { field.dispatchEvent(new Event('change', { bubbles: true })) })
+        act(() => { buttons('pages.imports.wizard.nextConfig')[0].click() })
+        expect(detectCalls).toHaveLength(0)
     })
 })

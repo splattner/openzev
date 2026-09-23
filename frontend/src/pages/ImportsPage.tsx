@@ -12,6 +12,7 @@ import type { ColumnDef, ColumnFiltersState } from '../components/DataTable'
 import {
     bulkDeleteImportLogs,
     deleteImportLog,
+    detectCsvSettings,
     fetchImportLogs,
     previewCsvImports,
     uploadMeteringFiles,
@@ -37,9 +38,11 @@ import {
     isValidTimestampFormat,
     parsePositiveInt,
     previewStampsEqual,
+    settingsFromDetection,
     stampFilesOf,
     type CsvColumnMap,
     type CsvFormatProfile,
+    type DetectionState,
     type FilePreview,
     type PreviewStamp,
 } from '../features/imports/importUtils'
@@ -85,6 +88,11 @@ export function ImportsPage({ embedded = false }: { embedded?: boolean }) {
     const [previews, setPreviews] = useState<FilePreview[]>([])
     const [previewStamp, setPreviewStamp] = useState<PreviewStamp | null>(null)
     const previewReqId = useRef(0)
+    // Detection runs once per file selection (when entering step 2), so going
+    // back and forth never overwrites what the user has since edited.
+    const [detection, setDetection] = useState<DetectionState>({ status: 'idle' })
+    const detectReqId = useRef(0)
+    const detectedFor = useRef<string | null>(null)
     const [selectedLog, setSelectedLog] = useState<ImportLog | null>(null)
     const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false)
     const [bulkDeleteMode, setBulkDeleteMode] = useState<'period' | 'all'>('period')
@@ -307,6 +315,10 @@ export function ImportsPage({ embedded = false }: { embedded?: boolean }) {
         },
     })
 
+    const detectMutation = useMutation({
+        mutationFn: detectCsvSettings,
+    })
+
     const hasFiles = files.length > 0
     const canGoStep2 = hasFiles && !hasFileError && !!scopedZevId
     const hasPreview = previews.length > 0
@@ -426,7 +438,46 @@ export function ImportsPage({ embedded = false }: { embedded?: boolean }) {
         [t, settings, confirm, deleteImportMutation, dialogLoading],
     )
 
+    function clearDetection() {
+        detectReqId.current += 1
+        detectedFor.current = null
+        setDetection({ status: 'idle' })
+    }
+
+    function runDetection(force: boolean) {
+        if (source !== 'csv' || files.length === 0) return
+        const signature = JSON.stringify(stampFilesOf(files))
+        if (!force && detectedFor.current === signature) return
+        detectedFor.current = signature
+        const reqId = ++detectReqId.current
+        // Detection reads the first file; the others are assumed to share its layout.
+        setDetection({ status: 'loading', fileName: files[0].name, fileCount: files.length })
+        detectMutation.mutate(files[0], {
+            onSuccess: (result) => {
+                if (reqId !== detectReqId.current) return
+                if (result.detected) {
+                    const next = settingsFromDetection(result)
+                    setHasHeader(next.hasHeader)
+                    setDelimiter(next.delimiter)
+                    setFormatProfile(next.formatProfile)
+                    setTimestampFormat(next.timestampFormat)
+                    setIntervalMinutes(next.intervalMinutes)
+                    setValuesCount(next.valuesCount)
+                    setColumnMap(next.columnMap)
+                    setPreviews([])
+                    setPreviewStamp(null)
+                }
+                setDetection({ status: 'done', fileName: files[0].name, fileCount: files.length, undetected: result.undetected })
+            },
+            onError: () => {
+                if (reqId !== detectReqId.current) return
+                setDetection({ status: 'failed' })
+            },
+        })
+    }
+
     function resetWizard() {
+        clearDetection()
         previewReqId.current += 1
         const cfg = csvConfigFor(true, 'daily_15min')
         setWizardOpen(false)
@@ -454,6 +505,7 @@ export function ImportsPage({ embedded = false }: { embedded?: boolean }) {
     }
 
     function handleSourceChange(nextSource: 'csv' | 'sdatch') {
+        clearDetection()
         setSource(nextSource)
         setFiles([])
         setPreviews([])
@@ -474,6 +526,7 @@ export function ImportsPage({ embedded = false }: { embedded?: boolean }) {
         // Same identity rule as a new pick: a preview belongs to the exact
         // selection it was loaded for.
         previewReqId.current += 1
+        clearDetection()
         setFiles((prev) => prev.filter((_, position) => position !== index))
         setPreviews([])
         setPreviewStamp(null)
@@ -490,6 +543,7 @@ export function ImportsPage({ embedded = false }: { embedded?: boolean }) {
         // File metadata is not an identity: a replacement can have the same
         // name, size and modification time but different contents.
         previewReqId.current += 1
+        clearDetection()
         setPreviews([])
         setPreviewStamp(null)
         const picked = Array.from(event.target.files ?? [])
@@ -512,6 +566,7 @@ export function ImportsPage({ embedded = false }: { embedded?: boolean }) {
             return
         }
         setWizardStep(2)
+        runDetection(false)
     }
 
     function copyMissingMeterIds() {
@@ -783,6 +838,8 @@ export function ImportsPage({ embedded = false }: { embedded?: boolean }) {
                 overwriteExisting={overwriteExisting}
                 columnMap={columnMap}
                 previews={previews}
+                detection={detection}
+                onRedetect={() => runDetection(true)}
                 missingMeterIds={missingMeters.ids}
                 previewOutdated={previewOutdated}
                 previewLoading={previewMutation.isPending}

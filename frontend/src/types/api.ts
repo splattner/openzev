@@ -1214,6 +1214,29 @@ export interface ImportPreviewRow {
     values_count?: number
 }
 
+/** Import settings the backend suggests from a CSV/Excel file's content. */
+export interface CsvDetectResult {
+    /** False when the file cannot be mapped without manual settings. */
+    detected: boolean
+    /** Settings that could not be determined (`meter_id`, `timestamp`, `energy_kwh`, `timestamp_format`, `file`). */
+    undetected: string[]
+    settings: {
+        has_header: boolean
+        delimiter: string
+        format_profile: 'standard' | 'daily_15min'
+        timestamp_format: string
+        interval_minutes: number
+        values_count: number
+        column_map: {
+            meter_id: string | null
+            timestamp: string | null
+            energy_kwh: string | null
+            direction: string | null
+            energy_start: string | null
+        }
+    }
+}
+
 export interface ImportPreviewResult {
     rows_total: number
     preview_rows: ImportPreviewRow[]

@@ -10,7 +10,7 @@ import { useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { FormModal } from '../../components/FormModal'
-import { MAX_UPLOAD_BYTES, type CsvColumnMap, type CsvFormatProfile, type FilePreview } from './importUtils'
+import { MAX_UPLOAD_BYTES, type CsvColumnMap, type CsvFormatProfile, type DetectionState, type FilePreview } from './importUtils'
 import { formatBytes } from '../../lib/numbers'
 
 /**
@@ -59,6 +59,7 @@ export interface ImportWizardModalProps {
     overwriteExisting: boolean
     columnMap: CsvColumnMap
     previews: FilePreview[]
+    detection: DetectionState
     /** Meter ids missing across all previewed files. */
     missingMeterIds: string[]
     previewOutdated: boolean
@@ -85,9 +86,61 @@ export interface ImportWizardModalProps {
     onSubmitStep1: (event: React.FormEvent<HTMLFormElement>) => void
     onBackToStep1: () => void
     onLoadPreview: () => void
+    onRedetect: () => void
     onStartImport: () => void
     onCopyMissingIds: () => void
     onDownloadMissingIds: () => void
+}
+
+// Static keys (not built from the field name) so the dead-key check sees them.
+function undetectedLabel(field: string, t: (key: string) => string): string {
+    switch (field) {
+        case 'meter_id': return t('pages.imports.wizard.meterIdCol')
+        case 'timestamp': return t('pages.imports.wizard.timestampCol')
+        case 'energy_kwh': return t('pages.imports.wizard.energyCol')
+        case 'timestamp_format': return t('pages.imports.wizard.datetimeFormat')
+        default: return t('pages.imports.detection.fieldFile')
+    }
+}
+
+function DetectionNotice({ detection, onRedetect }: { detection: DetectionState; onRedetect: () => void }) {
+    const { t } = useTranslation()
+    if (detection.status === 'idle') return null
+    if (detection.status === 'loading') {
+        return <p className="muted" style={{ margin: 0 }}>{t('pages.imports.detection.loading', { filename: detection.fileName })}</p>
+    }
+    const redetect = (
+        <button type="button" className="button button-secondary button-compact" onClick={onRedetect}>
+            {t('pages.imports.detection.redetect')}
+        </button>
+    )
+    const row = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem 1rem', flexWrap: 'wrap' } as const
+    if (detection.status === 'failed') {
+        return (
+            <div className="warning-banner" style={row}>
+                <span>{t('pages.imports.detection.failed')}</span>
+                {redetect}
+            </div>
+        )
+    }
+    const undetected = detection.undetected
+    return (
+        <div className={undetected.length > 0 ? 'warning-banner' : 'info-banner'} style={row}>
+            <div>
+                <div>
+                    {detection.fileCount > 1
+                        ? t('pages.imports.detection.doneMulti', { filename: detection.fileName, count: detection.fileCount })
+                        : t('pages.imports.detection.done', { filename: detection.fileName })}
+                </div>
+                {undetected.length > 0 && (
+                    <div style={{ marginTop: '0.3rem' }}>
+                        {t('pages.imports.detection.undetected', { fields: undetected.map((field) => undetectedLabel(field, t)).join(', ') })}
+                    </div>
+                )}
+            </div>
+            {redetect}
+        </div>
+    )
 }
 
 function FilePreviewBlock({ entry, heading }: { entry: FilePreview; heading: boolean }) {
@@ -177,12 +230,18 @@ export function ImportWizardModal(props: ImportWizardModalProps) {
         step, source, files, fileErrors, hasHeader, delimiter, delimiterError,
         formatProfile, timestampFormat, timestampFormatError, intervalMinutes,
         intervalMinutesError, valuesCount, valuesCountError, overwriteExisting,
-        columnMap, previews, missingMeterIds, previewOutdated, previewLoading, missingMeteringPoints,
+        columnMap, previews, detection, missingMeterIds, previewOutdated, previewLoading, missingMeteringPoints,
         scopedZevId, selectedZevName, canGoStep2, canStartImport,
         csvConfigValid, uploadPending,
     } = props
 
     const showPreview = previews.length > 0 && !previewOutdated
+    const targetZev = (
+        <p style={{ margin: 0 }}>
+            <span className="muted">{t('pages.imports.wizard.targetZev')}: </span>
+            <strong>{selectedZevName ?? t('pages.imports.wizard.noZevSelected')}</strong>
+        </p>
+    )
 
     return (
         <FormModal isOpen={true} title={t('pages.imports.wizard.title')} onClose={props.onClose} maxWidth="1080px">
@@ -271,18 +330,48 @@ export function ImportWizardModal(props: ImportWizardModalProps) {
                 )}
 
                 {step === 2 && (
-                    <div className="page-stack" style={{ gap: '0.75rem' }}>
+                    <div className="page-stack" style={{ gap: '1.1rem' }}>
                         {source === 'csv' ? (
                             <>
-                                <label>
-                                    <span>{t('pages.imports.wizard.selectZev')}</span>
-                                    <input value={selectedZevName ?? t('pages.imports.wizard.noZevSelected')} disabled />
-                                </label>
+                                {targetZev}
                                 {!scopedZevId && (
                                     <p className="muted" style={{ margin: 0, color: 'var(--danger-600)' }}>{t('pages.imports.messages.selectZevFirst')}</p>
                                 )}
-                                <div className="inline-form grid grid-4">
-                                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '1.6rem' }}>
+                                <DetectionNotice detection={detection} onRedetect={props.onRedetect} />
+
+                                <div className="form-section">
+                                    <p className="form-section-header">{t('pages.imports.wizard.sections.format')}</p>
+                                    <div className="inline-form grid grid-3 align-start">
+                                        <label>
+                                            <span>{t('pages.imports.wizard.rowFormat')}</span>
+                                            <select
+                                                value={formatProfile}
+                                                onChange={(event) => props.onFormatProfileChange(event.target.value as FormatProfile)}
+                                            >
+                                                <option value="standard">{t('pages.imports.rowFormat.standard')}</option>
+                                                <option value="daily_15min">{t('pages.imports.rowFormat.daily15min')}</option>
+                                            </select>
+                                        </label>
+                                        <label>
+                                            <span>{t('pages.imports.wizard.delimiter')}</span>
+                                            <input value={delimiter} onChange={(event) => props.onDelimiterChange(event.target.value)} placeholder="," />
+                                            {delimiterError && (
+                                                <span className="field-error">{delimiterError}</span>
+                                            )}
+                                        </label>
+                                        <label>
+                                            <span>{t('pages.imports.wizard.datetimeFormat')}</span>
+                                            <input
+                                                value={timestampFormat}
+                                                onChange={(event) => props.onTimestampFormatChange(event.target.value)}
+                                                placeholder="%d.%m.%Y"
+                                            />
+                                            {timestampFormatError && (
+                                                <span className="field-error">{timestampFormatError}</span>
+                                            )}
+                                        </label>
+                                    </div>
+                                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                                         <input
                                             type="checkbox"
                                             checked={hasHeader}
@@ -290,56 +379,28 @@ export function ImportWizardModal(props: ImportWizardModalProps) {
                                         />
                                         <span>{t('pages.imports.wizard.hasHeader')}</span>
                                     </label>
-                                    <label>
-                                        <span>{t('pages.imports.wizard.delimiter')}</span>
-                                        <input value={delimiter} onChange={(event) => props.onDelimiterChange(event.target.value)} placeholder="," />
-                                        {delimiterError && (
-                                            <span className="field-error">{delimiterError}</span>
-                                        )}
-                                    </label>
-                                    <label>
-                                        <span>{t('pages.imports.wizard.rowFormat')}</span>
-                                        <select
-                                            value={formatProfile}
-                                            onChange={(event) => props.onFormatProfileChange(event.target.value as FormatProfile)}
-                                        >
-                                            <option value="standard">{t('pages.imports.rowFormat.standard')}</option>
-                                            <option value="daily_15min">{t('pages.imports.rowFormat.daily15min')}</option>
-                                        </select>
-                                    </label>
-                                    <label>
-                                        <span>{t('pages.imports.wizard.datetimeFormat')}</span>
-                                        <input
-                                            value={timestampFormat}
-                                            onChange={(event) => props.onTimestampFormatChange(event.target.value)}
-                                            placeholder="%d.%m.%Y"
-                                        />
-                                        {timestampFormatError && (
-                                            <span className="field-error">{timestampFormatError}</span>
-                                        )}
-                                    </label>
                                 </div>
 
-                                <div className="inline-form grid grid-4">
-                                    <label>
-                                        <span>{t('pages.imports.wizard.meterIdCol')}</span>
-                                        <input
-                                            value={columnMap.meter_id}
-                                            onChange={(event) => props.onColumnMapChange({ meter_id: event.target.value })}
-                                            placeholder={hasHeader ? 'meter_id' : '0'}
-                                        />
-                                    </label>
-                                    <label>
-                                        <span>{formatProfile === 'daily_15min' ? t('pages.imports.wizard.dateCol') : t('pages.imports.wizard.timestampCol')}</span>
-                                        <input
-                                            value={columnMap.timestamp}
-                                            onChange={(event) => props.onColumnMapChange({ timestamp: event.target.value })}
-                                            placeholder={hasHeader ? 'timestamp' : '3'}
-                                        />
-                                    </label>
-
-                                    {formatProfile === 'standard' ? (
-                                        <>
+                                <div className="form-section">
+                                    <p className="form-section-header">{t('pages.imports.wizard.sections.columns')}</p>
+                                    <div className="inline-form grid grid-3 align-start">
+                                        <label>
+                                            <span>{t('pages.imports.wizard.meterIdCol')}</span>
+                                            <input
+                                                value={columnMap.meter_id}
+                                                onChange={(event) => props.onColumnMapChange({ meter_id: event.target.value })}
+                                                placeholder={hasHeader ? 'meter_id' : '0'}
+                                            />
+                                        </label>
+                                        <label>
+                                            <span>{formatProfile === 'daily_15min' ? t('pages.imports.wizard.dateCol') : t('pages.imports.wizard.timestampCol')}</span>
+                                            <input
+                                                value={columnMap.timestamp}
+                                                onChange={(event) => props.onColumnMapChange({ timestamp: event.target.value })}
+                                                placeholder={hasHeader ? 'timestamp' : '3'}
+                                            />
+                                        </label>
+                                        {formatProfile === 'standard' ? (
                                             <label>
                                                 <span>{t('pages.imports.wizard.energyCol')}</span>
                                                 <input
@@ -348,9 +409,7 @@ export function ImportWizardModal(props: ImportWizardModalProps) {
                                                     placeholder={hasHeader ? 'energy_kwh' : '4'}
                                                 />
                                             </label>
-                                        </>
-                                    ) : (
-                                        <>
+                                        ) : (
                                             <label>
                                                 <span>{t('pages.imports.wizard.firstIntervalCol')}</span>
                                                 <input
@@ -359,96 +418,115 @@ export function ImportWizardModal(props: ImportWizardModalProps) {
                                                     placeholder={hasHeader ? 'energy_start' : '4'}
                                                 />
                                             </label>
-                                            <label>
-                                                <span>{t('pages.imports.wizard.intervalsPerRow')}</span>
-                                                <input type="number" min={1} max={1440} value={valuesCount} onChange={(event) => props.onValuesCountChange(event.target.value)} />
-                                                {valuesCountError && (
-                                                    <span className="field-error">{valuesCountError}</span>
-                                                )}
-                                            </label>
-                                            <label>
-                                                <span>{t('pages.imports.wizard.minutesPerInterval')}</span>
-                                                <input type="number" min={1} value={intervalMinutes} onChange={(event) => props.onIntervalMinutesChange(event.target.value)} />
-                                                {intervalMinutesError && (
-                                                    <span className="field-error">{intervalMinutesError}</span>
-                                                )}
-                                            </label>
-                                        </>
-                                    )}
-                                    <label>
-                                        <span>{t('pages.imports.wizard.directionCol')}</span>
-                                        {/* No placeholder: the other column
-                                            fields carry real defaults, so a
-                                            greyed-out sample here reads as a
-                                            value that is already set — an
-                                            empty direction column silently
-                                            falls back to meter-type
-                                            inference. The hint below says
-                                            what belongs in the field. */}
+                                        )}
+
+                                        {formatProfile === 'daily_15min' && (
+                                            <>
+                                                <label>
+                                                    <span>{t('pages.imports.wizard.intervalsPerRow')}</span>
+                                                    <input type="number" min={1} max={1440} value={valuesCount} onChange={(event) => props.onValuesCountChange(event.target.value)} />
+                                                    {valuesCountError && (
+                                                        <span className="field-error">{valuesCountError}</span>
+                                                    )}
+                                                </label>
+                                                <label>
+                                                    <span>{t('pages.imports.wizard.minutesPerInterval')}</span>
+                                                    <input type="number" min={1} value={intervalMinutes} onChange={(event) => props.onIntervalMinutesChange(event.target.value)} />
+                                                    {intervalMinutesError && (
+                                                        <span className="field-error">{intervalMinutesError}</span>
+                                                    )}
+                                                </label>
+                                            </>
+                                        )}
+                                        {/* Last, so its long hint cannot stretch a row
+                                            that other fields sit in. The standard layout
+                                            has no second field beside it, so it spans two
+                                            columns to keep the hint short. */}
+                                        <label className={formatProfile === 'standard' ? 'grid-span-2' : undefined}>
+                                            <span>{t('pages.imports.wizard.directionCol')}</span>
+                                            {/* No placeholder: the other column
+                                                fields carry real defaults, so a
+                                                greyed-out sample here reads as a
+                                                value that is already set — an
+                                                empty direction column silently
+                                                falls back to meter-type
+                                                inference. The hint below says
+                                                what belongs in the field. */}
+                                            <input
+                                                value={columnMap.direction}
+                                                onChange={(event) => props.onColumnMapChange({ direction: event.target.value })}
+                                            />
+                                            <small className="muted">{t('pages.imports.wizard.directionColHint')}</small>
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <div className="form-section">
+                                    <p className="form-section-header">{t('pages.imports.wizard.sections.options')}</p>
+                                    <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem' }}>
                                         <input
-                                            value={columnMap.direction}
-                                            onChange={(event) => props.onColumnMapChange({ direction: event.target.value })}
+                                            type="checkbox"
+                                            style={{ marginTop: '0.2rem' }}
+                                            checked={overwriteExisting}
+                                            onChange={(event) => props.onOverwriteChange(event.target.checked)}
                                         />
-                                        <small className="muted">{t('pages.imports.wizard.directionColHint')}</small>
+                                        <span>
+                                            {t('pages.imports.wizard.overwriteExisting')}
+                                            <small className="muted" style={{ display: 'block' }}>{t('pages.imports.wizard.overwriteExistingHint')}</small>
+                                        </span>
                                     </label>
                                 </div>
 
-                                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                    <input
-                                        type="checkbox"
-                                        checked={overwriteExisting}
-                                        onChange={(event) => props.onOverwriteChange(event.target.checked)}
-                                    />
-                                    <span>{t('pages.imports.wizard.overwriteExisting')}</span>
-                                </label>
-
-                                <div className="actions-row actions-row-wrap">
-                                    <button
-                                        type="button"
-                                        className="button button-primary"
-                                        onClick={props.onLoadPreview}
-                                            disabled={previewLoading || files.length === 0 || fileErrors.some((entry) => entry !== null) || !scopedZevId || !csvConfigValid}
-                                    >
-                                        <FontAwesomeIcon icon={faMagnifyingGlass} fixedWidth />
-                                        {previewLoading ? t('pages.imports.loadingPreview') : t('pages.imports.loadPreview')}
-                                    </button>
-                                </div>
-
-                                {previewOutdated && (
-                                    <div className="error-banner" style={{ marginTop: '0.4rem' }}>
-                                        {t('pages.imports.messages.previewOutdated')}
+                                <div className="form-section">
+                                    <p className="form-section-header">{t('pages.imports.wizard.sections.preview')}</p>
+                                    <div className="actions-row actions-row-wrap">
+                                        <button
+                                            type="button"
+                                            className="button button-primary"
+                                            onClick={props.onLoadPreview}
+                                                disabled={previewLoading || detection.status === 'loading' || files.length === 0 || fileErrors.some((entry) => entry !== null) || !scopedZevId || !csvConfigValid}
+                                        >
+                                            <FontAwesomeIcon icon={faMagnifyingGlass} fixedWidth />
+                                            {previewLoading ? t('pages.imports.loadingPreview') : t('pages.imports.loadPreview')}
+                                        </button>
                                     </div>
-                                )}
 
-                                {showPreview && missingMeteringPoints > 0 && (
-                                    <div className="error-banner" style={{ marginTop: '0.4rem' }}>
-                                        <div>{t('pages.imports.previewMissingBanner', { count: missingMeteringPoints })}</div>
-                                        {missingMeterIds.length > 0 && (
-                                            <div style={{ marginTop: '0.4rem', fontSize: '0.85rem' }}>
-                                                <strong>{t('pages.imports.preview.missingIdsLabel')}</strong>{' '}
-                                                {missingMeterIds.join(', ')}
-                                                {missingMeteringPoints > missingMeterIds.length && (
-                                                    <span> {t('pages.imports.preview.andMore', { count: missingMeteringPoints - missingMeterIds.length })}</span>
-                                                )}
-                                            </div>
-                                        )}
-                                        <div className="actions-row actions-row-wrap" style={{ marginTop: '0.5rem' }}>
-                                            <button type="button" className="button button-secondary" onClick={props.onCopyMissingIds}>
-                                                {t('pages.imports.preview.copyMissingIds')}
-                                            </button>
-                                            <button type="button" className="button button-secondary" onClick={props.onDownloadMissingIds}>
-                                                {t('pages.imports.preview.downloadMissingIds')}
-                                            </button>
-                                            <Link to="/metering/points" className="button button-secondary">
-                                                {t('pages.imports.preview.createMetersCta')}
-                                            </Link>
+                                    {previewOutdated && (
+                                        <div className="error-banner" style={{ marginTop: '0.4rem' }}>
+                                            {t('pages.imports.messages.previewOutdated')}
                                         </div>
-                                    </div>
-                                )}
+                                    )}
 
-                                {showPreview && previews.map((entry, index) => (
-                                    <FilePreviewBlock key={`${entry.fileName}-${index}`} entry={entry} heading={previews.length > 1} />
-                                ))}
+                                    {showPreview && missingMeteringPoints > 0 && (
+                                        <div className="error-banner" style={{ marginTop: '0.4rem' }}>
+                                            <div>{t('pages.imports.previewMissingBanner', { count: missingMeteringPoints })}</div>
+                                            {missingMeterIds.length > 0 && (
+                                                <div style={{ marginTop: '0.4rem', fontSize: '0.85rem' }}>
+                                                    <strong>{t('pages.imports.preview.missingIdsLabel')}</strong>{' '}
+                                                    {missingMeterIds.join(', ')}
+                                                    {missingMeteringPoints > missingMeterIds.length && (
+                                                        <span> {t('pages.imports.preview.andMore', { count: missingMeteringPoints - missingMeterIds.length })}</span>
+                                                    )}
+                                                </div>
+                                            )}
+                                            <div className="actions-row actions-row-wrap" style={{ marginTop: '0.5rem' }}>
+                                                <button type="button" className="button button-secondary" onClick={props.onCopyMissingIds}>
+                                                    {t('pages.imports.preview.copyMissingIds')}
+                                                </button>
+                                                <button type="button" className="button button-secondary" onClick={props.onDownloadMissingIds}>
+                                                    {t('pages.imports.preview.downloadMissingIds')}
+                                                </button>
+                                                <Link to="/metering/points" className="button button-secondary">
+                                                    {t('pages.imports.preview.createMetersCta')}
+                                                </Link>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {showPreview && previews.map((entry, index) => (
+                                        <FilePreviewBlock key={`${entry.fileName}-${index}`} entry={entry} heading={previews.length > 1} />
+                                    ))}
+                                </div>
                             </>
                         ) : (
                             <>
@@ -458,10 +536,7 @@ export function ImportWizardModal(props: ImportWizardModalProps) {
                                 <p className="muted" style={{ margin: 0 }}>
                                     {t('pages.imports.sdatchNoPreview')}
                                 </p>
-                                <label>
-                                    <span>{t('pages.imports.wizard.selectZev')}</span>
-                                    <input value={selectedZevName ?? t('pages.imports.wizard.noZevSelected')} disabled />
-                                </label>
+                                {targetZev}
                                 {!scopedZevId && (
                                     <p className="muted" style={{ margin: 0, color: 'var(--danger-600)' }}>{t('pages.imports.messages.selectZevFirst')}</p>
                                 )}
