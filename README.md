@@ -1,65 +1,88 @@
 # OpenZEV
 
-Open source platform for operating and billing (v)ZEV energy communities.
+[![Release](https://img.shields.io/github/v/release/splattner/openzev?filter=v*&label=release&color=2f7a4d)](https://github.com/splattner/openzev/releases)
+[![Build](https://img.shields.io/github/actions/workflow/status/splattner/openzev/container-build.yml?branch=main&label=build)](https://github.com/splattner/openzev/actions/workflows/container-build.yml)
+[![Licence](https://img.shields.io/github/license/splattner/openzev?color=2f7a4d)](LICENCE.md)
+
+Open source billing software for Swiss ZEV and vZEV energy communities.
 
 ![OpenZEV](docs/openzevlogo_whitebg.png)
 
-OpenZEV gives operators one place to manage participants, metering points, tariffs, imports, and invoicing for a vZEV or ZEV. It is built to support day-to-day operations from data import to payment tracking with role-based access for admins, owners, and participants.
+A ZEV is one grid connection shared by several households, which means somebody has
+to work out who owed what for the solar. OpenZEV does that end to end: import the
+meter load curves, split each 15-minute interval between participants, price it
+against your tariffs, and produce a PDF invoice with a QR-bill payment slip.
+
+I wrote it to bill my own ZEV, and put it out in case it is useful for yours.
+Self-hosted, AGPL-3.0.
 
 ## Disclaimer
 
 - Built for personal use and self-hosting tinkerers who enjoy running their own stack.
 - Shipped as-is, with no warranty (yes, even when it looks great in the dashboard).
-- Please double-check your data and billing outputs: we do not take responsibility for incorrect imports, calculations, invoices, or invoicing workflows.
-- Built with generous AI assistance, right down to the specs, ADRs, and user docs. Some choices may therefore look a little unconventional, or fall short of the practices a more experienced team would apply today. That is not accidental: this project is optimized for learning, experimentation, and running my own private ZEV, not for enterprise-grade process perfection.
+- Check your data and billing outputs before they reach a participant. I can't take responsibility for incorrect imports, calculations, invoices, or invoicing workflows.
+- Built with generous AI assistance, right down to the specs, ADRs, and user docs. Some choices may therefore look a little unconventional, or fall short of what a more experienced team would do today. That is not accidental: the project is optimized for learning, experimentation, and running my own ZEV, not for enterprise-grade process perfection.
 
-## Product Overview
+## What it does
 
-- Built for Swiss ZEV/vZEV operating models
-- End-to-end workflow from metering import to paid invoice
-- Transparent invoice lifecycle with clear status tracking
-- Open and extensible architecture for long-term adoption
+### Communities, roles and metering points
 
-## Main Features
+Four roles (`admin`, `zev_owner`, `participant`, `guest`), each with its own view of
+the same data: owners and admins get the operational screens, participants get
+self-service access to their own consumption and invoices.
 
-### Community & User Management
+Assignments between participants and metering points carry validity dates, so
+someone who moves out on 15 March is billed to 15 March and the next tenant picks up
+from there. Billing interval, invoice language and email templates are set per ZEV.
 
-- Manage vZEV and ZEV communities with clear role boundaries (`admin`, `zev_owner`, `participant`, `guest`)
-- Organize participants and metering points with validity-based assignments
-- Configure ZEV details, billing intervals, and per-ZEV invoice email templates
-- Role-aware dashboards: owner/admin operational views and participant self-service
+### Metering imports
 
-### Metering & Imports
+- CSV and Excel with configurable column mapping, in two format profiles: point readings, and daily 15-minute curves
+- SDAT-CH, for when your utility speaks it
+- Every import runs as a preview first and writes a per-row protocol, so you see what a file will do before it does it
+- A data-quality view flags gaps, duplicates and implausible readings per meter
+- Consumption and production as charts by period, or as a daily profile
 
-- Import metering data from CSV/Excel with configurable column mapping and two format profiles (point readings and daily 15-minute)
-- Support SDAT-CH imports for utility-oriented workflows
-- Preview-based validation with a per-row import protocol and data-quality status
-- Analyze consumption and production via chart and profile views
+### Tariffs and billing
 
-### Tariffs & Billing
+Allocation runs per timestamp: for each 15-minute interval the local pool is split
+across participants and priced with the tariff version that was valid at that moment.
+Tariffs are versioned series with high/low bands, seasonal periods and validity
+windows, so an invoice raised last year still prices at last year's rate.
 
-- Configure tariffs, tariff periods, and pricing per ZEV
-- Run timestamp-level billing allocation with a per-timestamp local-pool split
-- Process invoices through draft → approved → sent → paid → cancelled
-- Generate Swiss-ready PDF/A-3b documents — invoices with QR-bill payment slip, plus annual statements and contract PDFs
+Dynamic price series work the same way, including the BFE reference market price, and
+a grid operator's machine-readable tariff file (Art. 7b StromVV) can be imported
+directly instead of typed in.
 
-### Planning & Feasibility
+Invoices move through draft → approved → sent → paid, with cancelled branching off
+any stage. Cancelling keeps the document and its number rather than deleting the row.
 
-- Estimate vZEV savings, payback, ROI, and NPV before founding a community
-- Model individual producers and consumers with a per-participant benefit split and energy-flow diagram
-- Prefill a real ZEV's participants, measured self-consumption, and all-in tariffs as a starting point
+### Documents
 
-### Invoice Communication
+Invoices render as PDF/A-3b with a Swiss QR-bill payment slip. Annual statements and
+participation contracts come out of the same renderer, and every issued version is
+kept exactly as it was sent.
 
-- Send invoice emails asynchronously for reliable delivery
-- Track email history and retry failed sends
-- Customize invoice email templates per ZEV with sensible defaults
+### Feasibility planning
 
-### Product Experience
+Estimates savings, payback, ROI and NPV for a community you have not founded yet,
+modelling individual producers and consumers with a per-participant benefit split and
+an energy-flow diagram. If you already run a ZEV, it can prefill from its
+participants, measured self-consumption and all-in tariffs.
 
-- Multilingual frontend (EN/DE/FR/IT)
-- Built-in API docs via Swagger and ReDoc
-- Admin overview with operational metrics and status insights
+### Invoice email
+
+Invoice emails go out asynchronously through Celery, with per-invoice delivery
+history and a retry for failed sends. Templates are per ZEV, with defaults that work
+without editing.
+
+### Odds and ends
+
+- Frontend in German, French, Italian and English
+- API keys for scripting, with an optional read-only scope and their own rate budget
+- An audit log over privileged actions, scoped to what the viewer is allowed to see
+- Export or move a whole community between instances as a versioned archive
+- OpenAPI schema with Swagger UI and ReDoc
 
 ## Screenshots
 
@@ -93,13 +116,13 @@ Invoice lifecycle management, PDF generation, and email tracking.
 
 Step-by-step import flow with mapping, preview, and validation feedback.
 
-## Architecture & Stack
+## Stack
 
 - Backend: Django, Django REST Framework, SimpleJWT
 - Frontend: React, TypeScript, Vite, React Query, i18next
 - Async jobs and schedules: Celery worker + Beat with Redis broker
 - Database: SQLite (default), PostgreSQL, MariaDB via `DATABASE_URL`
-- Runtime/deploy: Docker and docker compose
+- Deploy: Docker Compose, or the Helm chart on Kubernetes
 
 ## User Documentation
 
@@ -329,7 +352,7 @@ python manage.py createsuperuser
 
 ### 2) Frontend
 
-Use the Node version pinned in `.node-version` (currently 24.20.0).
+Use the Node version pinned in `.node-version`.
 
 ```bash
 cd frontend
