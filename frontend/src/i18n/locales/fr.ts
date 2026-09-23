@@ -2326,6 +2326,7 @@ export const fr = {
                 productionExport: 'Production/Injection',
                 fromZev: 'Du RCP',
                 fromGrid: 'Du réseau',
+                fromZevPercent: 'De la ZEV (%)',
             },
             participantStats: {
                 consumedFromZev: 'Consommé du RCP',

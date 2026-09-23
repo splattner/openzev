@@ -174,6 +174,12 @@ describe('dashboard behavior preservation', () => {
         expect(container.textContent).toContain('pages.dashboard.perParticipant')
         expect(container.textContent).not.toContain('perParticipantMigrated')
         expect(container.querySelector('a[href^="/metering/chart"]')).toBeNull()
+
+        // ZEV-share column: Alice 35/50 = 70%, Bob 20/30 = 66.7%.
+        expect(container.textContent).toContain('pages.dashboard.col.fromZevPercent')
+        const rows = container.querySelectorAll('tbody tr')
+        expect(rows[0].textContent).toContain('70 %')
+        expect(rows[1].textContent).toContain('66.7 %')
     })
 
     it('manager row click selects the participant and loads the hourly profile', async () => {

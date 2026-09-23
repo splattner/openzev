@@ -2337,6 +2337,7 @@ export const en = {
                 productionExport: 'Production/Export',
                 fromZev: 'From ZEV',
                 fromGrid: 'From Grid',
+                fromZevPercent: 'From ZEV (%)',
             },
             participantStats: {
                 consumedFromZev: 'Consumed from ZEV',

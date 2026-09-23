@@ -2326,6 +2326,7 @@ export const de = {
                 productionExport: 'Produktion/Export',
                 fromZev: 'Aus ZEV',
                 fromGrid: 'Aus Netz',
+                fromZevPercent: 'Aus ZEV (%)',
             },
             participantStats: {
                 consumedFromZev: 'Aus ZEV verbraucht',
