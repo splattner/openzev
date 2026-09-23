@@ -119,6 +119,7 @@ p { margin: 0; }
   text-transform: uppercase;
 }
 .mono { font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, monospace; font-variant-numeric: tabular-nums; }
+.nowrap { white-space: nowrap; }
 
 /* ── Hero — deliberately dark in both themes, echoing the app's sidebar ── */
 .hero {
@@ -237,33 +238,6 @@ section { padding-block: clamp(56px, 8vw, 104px); }
   width: 6px; height: 6px; border-radius: 2px; background: var(--accent-hi);
 }
 
-/* Invoice lifecycle — a real sequence, so it earns a chain */
-.lifecycle { background: var(--bg-sunk); border-block: 1px solid var(--line-soft); }
-.chain { display: flex; align-items: stretch; gap: 10px; flex-wrap: wrap; margin-top: clamp(30px, 4vw, 44px); }
-.stage {
-  flex: 1 1 150px;
-  background: var(--bg-raised);
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  padding: 16px 18px;
-  position: relative;
-}
-.stage .pill {
-  display: inline-block;
-  font-family: "IBM Plex Mono", monospace;
-  font-size: .68rem; font-weight: 600;
-  letter-spacing: .08em; text-transform: uppercase;
-  padding: 4px 9px; border-radius: 999px;
-  background: var(--ozv-pale); color: var(--ozv-brand);
-}
-:root[data-theme="dark"] .stage .pill { background: rgba(158,195,172,.16); color: var(--ozv-sage); }
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .stage .pill { background: rgba(158,195,172,.16); color: var(--ozv-sage); } }
-.stage.paid { border-color: var(--accent-hi); }
-.stage.paid .pill { background: var(--accent-hi); color: #fff; }
-.stage p { margin-top: 10px; font-size: .84rem; color: var(--fg-muted); line-height: 1.5; }
-.chain-tail { margin-top: 18px; font-size: .86rem; color: var(--fg-muted); }
-.chain-tail code { font-family: "IBM Plex Mono", monospace; font-size: .82rem; background: var(--bg-raised); border: 1px solid var(--line); padding: 2px 7px; border-radius: 6px; }
-
 /* Screenshots */
 .shots { display: grid; gap: clamp(26px, 4vw, 44px); margin-top: clamp(34px, 4vw, 52px); }
 .shot { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr); gap: clamp(20px, 3vw, 44px); align-items: center; }
@@ -361,12 +335,12 @@ footer { background: var(--bg-sunk); border-top: 1px solid var(--line); padding-
 
     <div class="hero-grid">
       <div>
-        <p class="eyebrow">Swiss ZEV &amp; vZEV · self-hosted · AGPL-3.0</p>
+        <p class="eyebrow">Open source · Swiss ZEV &amp; vZEV · <span class="nowrap">self-hosted</span> · AGPL-3.0</p>
         <h1>From quarter-hourly meter data to a <em>paid invoice</em>.</h1>
         <p class="hero-lede">
-          OpenZEV runs the whole operating cycle of a Swiss energy community: import the
-          load curves, split the solar between neighbours timestamp by timestamp, price it
-          against real tariffs, and send a QR-bill invoice that reconciles.
+          Import the load curves, split the solar between participants per 15-minute
+          interval, price it against your tariffs, send a QR-bill invoice. I wrote it to
+          bill my own ZEV, and put it out in case it is useful for yours.
         </p>
         <div class="cta-row">
           <a class="btn btn-primary" href="#quickstart">Start in one command</a>
@@ -432,7 +406,7 @@ footer { background: var(--bg-sunk); border-top: 1px solid var(--line); padding-
       <div class="stat"><dt>Resolution</dt><dd>15-minute intervals</dd></div>
       <div class="stat"><dt>Documents</dt><dd>PDF/A-3b + QR-bill</dd></div>
       <div class="stat"><dt>Languages</dt><dd>DE · FR · IT · EN</dd></div>
-      <div class="stat"><dt>Deploy</dt><dd>Docker &amp; Helm</dd></div>
+      <div class="stat"><dt>Deploy</dt><dd>Docker or Kubernetes</dd></div>
     </dl>
   </div>
 </header>
@@ -443,31 +417,32 @@ footer { background: var(--bg-sunk); border-top: 1px solid var(--line); padding-
   <div class="wrap">
     <div class="sec-head">
       <p class="eyebrow">What it does</p>
-      <h2>Everything between the meter and the money.</h2>
+      <h2>Metering, tariffs, billing, documents</h2>
       <p>
-        A ZEV is only simple until you have to bill one. OpenZEV covers the parts that
-        actually consume the evenings: reconciling imports, keeping tariff history straight,
-        and producing documents a participant will accept.
+        Billing a ZEV is easy for one month. It gets harder when last year's tariff still has
+        to exist, when someone who moved out in March has to be billed for March, and when the
+        invoice has to be something a neighbour accepts without asking for the spreadsheet
+        behind it.
       </p>
     </div>
 
     <div class="features">
       <article class="feature wide">
         <span class="eyebrow">Metering &amp; imports</span>
-        <h3>Load curves in, validated.</h3>
-        <p>Import from the formats utilities actually send, and see what will land before it does.</p>
+        <h3>CSV, Excel and SDAT-CH</h3>
+        <p>The formats Swiss utilities actually send, plus whatever your own meter exports.</p>
         <ul>
           <li>CSV and Excel with configurable column mapping, plus SDAT-CH for utility workflows</li>
           <li>Preview-based validation with a per-row import protocol</li>
-          <li>Data-quality checks that flag readings nobody would be billed for</li>
+          <li>Data-quality checks for gaps, duplicates and implausible readings</li>
           <li>Consumption and production analysis by period or daily profile</li>
         </ul>
       </article>
 
       <article class="feature wide">
         <span class="eyebrow">Tariffs &amp; billing</span>
-        <h3>Priced the way the tariff really works.</h3>
-        <p>Allocation runs per timestamp, not per month — so high/low bands and spot prices land correctly.</p>
+        <h3>Allocation per 15-minute interval</h3>
+        <p>Each interval is priced with the tariff version that was valid at that timestamp. Nothing is averaged over the month.</p>
         <ul>
           <li>Versioned tariffs with high/low bands, seasonal periods and validity windows</li>
           <li>Dynamic price series, including the BFE reference market price</li>
@@ -478,34 +453,37 @@ footer { background: var(--bg-sunk); border-top: 1px solid var(--line); padding-
 
       <article class="feature">
         <span class="eyebrow">Documents</span>
-        <h3>Swiss-ready output.</h3>
+        <h3>Invoices, statements and contracts</h3>
         <p>
-          Invoices as PDF/A-3b with a QR-bill payment slip, plus annual statements and
-          participation contracts — each issued version kept exactly as it was sent.
+          Invoices render as PDF/A-3b with a QR-bill payment slip, and move through draft,
+          approved, sent, paid. Cancelling keeps the document and its number rather than
+          deleting the row. Annual statements and participation contracts come out of the
+          same renderer, and every issued version is kept as it was sent.
         </p>
       </article>
 
       <article class="feature">
         <span class="eyebrow">Community</span>
-        <h3>Roles and scope.</h3>
+        <h3>Roles, scope and moving dates</h3>
         <p>
-          Admins, ZEV owners and participants see different products. Metering points carry
-          validity-based assignments, so a participant moving out mid-period bills correctly.
+          Admins, ZEV owners and participants each get their own view of the same data.
+          Assignments between participants and metering points carry validity dates, so
+          someone moving out on 15 March is billed to 15 March.
         </p>
       </article>
 
       <article class="feature">
         <span class="eyebrow">Planning</span>
-        <h3>Before you found one.</h3>
+        <h3>Feasibility before you found one</h3>
         <p>
-          A feasibility calculator estimates savings, payback, ROI and NPV — and can prefill
-          from a real community's participants and measured self-consumption.
+          Estimates savings, payback, ROI and NPV for a planned community. If you already run
+          one, it can prefill from its participants and measured self-consumption.
         </p>
       </article>
 
       <article class="feature wide">
         <span class="eyebrow">Operations</span>
-        <h3>Built to be run by one person.</h3>
+        <h3>Built to be run by one person</h3>
         <ul>
           <li>Audit log across every privileged action, scoped to what you may see</li>
           <li>Asynchronous email delivery with per-invoice history and retry</li>
@@ -517,59 +495,22 @@ footer { background: var(--bg-sunk); border-top: 1px solid var(--line); padding-
   </div>
 </section>
 
-<section class="lifecycle">
-  <div class="wrap">
-    <div class="sec-head">
-      <p class="eyebrow">Invoice lifecycle</p>
-      <h2>One state at a time, and it is always visible.</h2>
-      <p>
-        Every invoice moves through the same chain. Transitions lock the row and decide against
-        committed state, so two people working the same billing run cannot overwrite each other.
-      </p>
-    </div>
-
-    <div class="chain">
-      <div class="stage">
-        <span class="pill">Draft</span>
-        <p>Generated from the period's readings and tariffs. Re-generate freely.</p>
-      </div>
-      <div class="stage">
-        <span class="pill">Approved</span>
-        <p>Figures accepted. The PDF is rendered off-request and attached.</p>
-      </div>
-      <div class="stage">
-        <span class="pill">Sent</span>
-        <p>Emailed to the participant; delivery and failures both recorded.</p>
-      </div>
-      <div class="stage paid">
-        <span class="pill">Paid</span>
-        <p>Marked on receipt, closing the period for that participant.</p>
-      </div>
-    </div>
-    <p class="chain-tail">
-      <code>Cancelled</code> branches off any stage and is never a deletion — the document
-      and its number stay, because an invoice a participant already holds cannot be unsent.
-    </p>
-  </div>
-</section>
-
 <section id="screens">
   <div class="wrap">
     <div class="sec-head">
       <p class="eyebrow">Screenshots</p>
-      <h2>The working interface.</h2>
-      <p>From the demo community that ships with the project — seeded with one command.</p>
+      <h2>What it looks like</h2>
+      <p>From the demo community that ships with the project, seeded with one command.</p>
     </div>
 
     <div class="shots">
       <article class="shot">
         <div class="shot-text">
           <span class="eyebrow">Overview</span>
-          <h3>Opens on what is due.</h3>
+          <h3>Billing periods, oldest first</h3>
           <p>
-            Billing periods are listed oldest first with the action each one needs, so a session
-            starts on the work rather than on a search. The period still collecting data says so
-            and asks for nothing.
+            Each period shows the action it needs, so you start on the work instead of going
+            looking for it. The period that is still collecting data just says so.
           </p>
         </div>
         <figure>
@@ -584,7 +525,7 @@ footer { background: var(--bg-sunk); border-top: 1px solid var(--line); padding-
           <p>
             Production, consumption, self-consumption and grid exchange for the selected period,
             with a Sankey diagram tracing every kWh from producer to participant. Filter by
-            participant, or change resolution down to the interval.
+            participant or change the resolution down to the interval.
           </p>
         </div>
         <figure>
@@ -595,11 +536,11 @@ footer { background: var(--bg-sunk); border-top: 1px solid var(--line); padding-
       <article class="shot">
         <div class="shot-text">
           <span class="eyebrow">Billing</span>
-          <h3>A billing run on one screen.</h3>
+          <h3>One row per participant</h3>
           <p>
-            Every participant's invoice for the period with its metering completeness, status,
-            total and PDF state — and batch actions for the steps you would otherwise repeat
-            once per household.
+            Every invoice for the period with its metering completeness, status, total and PDF
+            state, plus batch actions for the steps you would otherwise repeat once per
+            household.
           </p>
         </div>
         <figure>
@@ -610,11 +551,11 @@ footer { background: var(--bg-sunk); border-top: 1px solid var(--line); padding-
       <article class="shot">
         <div class="shot-text">
           <span class="eyebrow">Tariffs</span>
-          <h3>Price history you can audit.</h3>
+          <h3>Every tariff change is a new version</h3>
           <p>
-            Tariffs are versioned series, not editable rows. Each version keeps its own bands and
-            validity, so an invoice raised last year still prices at last year's rate — and the
-            chart shows exactly when each change took effect.
+            A tariff is a series of versions, each with its own bands and validity window. An
+            invoice raised last year still prices at last year's rate, and the chart shows when
+            each change took effect.
           </p>
         </div>
         <figure>
@@ -629,8 +570,8 @@ footer { background: var(--bg-sunk); border-top: 1px solid var(--line); padding-
   <div class="wrap">
     <div class="sec-head">
       <p class="eyebrow">Quick start</p>
-      <h2>Running locally in about a minute.</h2>
-      <p>Pick the path that matches where you want it to live. All three pull prebuilt images from GHCR.</p>
+      <h2>Three ways to run it</h2>
+      <p>Pick the one that matches where you want it to live. All three pull prebuilt images from GHCR.</p>
     </div>
 
     <div class="paths">
@@ -659,8 +600,8 @@ footer { background: var(--bg-sunk); border-top: 1px solid var(--line); padding-
 
       <article class="path">
         <span class="eyebrow">Kubernetes</span>
-        <h3>Helm chart</h3>
-        <p>Deploys frontend, backend, worker and beat with an Ingress and a media PVC. Bring your own PostgreSQL and Redis.</p>
+        <h3>Kubernetes, via Helm</h3>
+        <p>The chart deploys frontend, backend, worker and beat into your cluster with an Ingress and a media PVC. Bring your own PostgreSQL and Redis.</p>
 <pre><span class="p">helm repo add openzev \
   https://splattner.github.io/openzev</span>
 <span class="p">helm repo update</span>
@@ -681,8 +622,7 @@ footer { background: var(--bg-sunk); border-top: 1px solid var(--line); padding-
   <div class="wrap">
     <div class="sec-head">
       <p class="eyebrow">Under it</p>
-      <h2>A boring stack, on purpose.</h2>
-      <p>Nothing here is exotic. It is meant to still start in three years.</p>
+      <h2>The stack</h2>
     </div>
 
     <dl class="stack-row">
@@ -691,7 +631,7 @@ footer { background: var(--bg-sunk); border-top: 1px solid var(--line); padding-
       <div class="stack-item"><dt>Async</dt><dd>Celery worker and beat on Redis</dd></div>
       <div class="stack-item"><dt>Data</dt><dd>PostgreSQL, MariaDB or SQLite</dd></div>
       <div class="stack-item"><dt>API</dt><dd>OpenAPI schema with Swagger and ReDoc</dd></div>
-      <div class="stack-item"><dt>Deploy</dt><dd>Docker Compose or the Helm chart</dd></div>
+      <div class="stack-item"><dt>Deploy</dt><dd>Docker Compose, or Helm on Kubernetes</dd></div>
       <div class="stack-item">
         <dt>Licence</dt>
         <dd>
@@ -705,15 +645,16 @@ footer { background: var(--bg-sunk); border-top: 1px solid var(--line); padding-
     <div class="note">
       <h3>Read this before you bill someone with it</h3>
       <p>
-        OpenZEV is built for self-hosters who enjoy running their own stack, and is shipped
-        as-is with no warranty. Check your imports, your tariffs and your invoices before they
-        reach a participant — responsibility for what the numbers say stays with you.
+        I built OpenZEV to run my own ZEV, and I share it as-is, with no warranty. It suits
+        people who enjoy running their own stack. Check your imports, your tariffs and your
+        invoices before they reach a participant: responsibility for what the numbers say
+        stays with you.
       </p>
       <p>
-        It is also built with substantial AI assistance, down to the specs, ADRs and user
+        It is also built with a lot of AI assistance, down to the specs, ADRs and user
         documentation. Some choices will look unconventional to an experienced team. That is
-        the trade the project makes: it is optimised for learning, experimentation, and running
-        one real ZEV — not for enterprise process.
+        the trade I made: the project is optimised for learning, experimentation and running
+        one real ZEV, rather than for enterprise process.
       </p>
     </div>
   </div>
