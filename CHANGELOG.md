@@ -1,5 +1,34 @@
 # Changelog
 
+## [1.17.0](https://github.com/splattner/openzev/compare/v1.16.0...v1.17.0) (2026-09-23)
+
+
+### Features
+
+* **backups:** back up to local and S3 storage, encrypted and verifiable (phase 1) ([#769](https://github.com/splattner/openzev/issues/769)) ([9e88071](https://github.com/splattner/openzev/commit/9e8807110100c4852a479d6465ca427fc243a7b2))
+* **backups:** restore a whole instance from a backup (phase 2) ([#771](https://github.com/splattner/openzev/issues/771)) ([af0bb22](https://github.com/splattner/openzev/commit/af0bb2271ceeb88463d7ed1954f1340365c88a74))
+* **backups:** restore one community from a backup (phase 3) ([#774](https://github.com/splattner/openzev/issues/774)) ([bf1a755](https://github.com/splattner/openzev/commit/bf1a755ec22a52fe2384a9ef37809efdac87ca81))
+* **backups:** schedule, retention, verification and staleness (phase 4) ([#776](https://github.com/splattner/openzev/issues/776)) ([a590877](https://github.com/splattner/openzev/commit/a590877ed48721a6a2059216c80488155b019f0c))
+* **invoices:** block generating new invoices for a disabled ZEV ([#786](https://github.com/splattner/openzev/issues/786)) ([8c1ee26](https://github.com/splattner/openzev/commit/8c1ee266180823752fe7ca238979122145ad5b31))
+* **metering:** add preview-first imports and protect overwrite batches ([#773](https://github.com/splattner/openzev/issues/773)) ([ae10ca0](https://github.com/splattner/openzev/commit/ae10ca0d8dc6ee7febad1263b998ccad2e321ea4))
+* **zev:** admin purge — permanently delete a disabled ZEV (lifecycle phase 4) ([#789](https://github.com/splattner/openzev/issues/789)) ([9de77ca](https://github.com/splattner/openzev/commit/9de77cac2908e64304e3af5929f8ec4f6041ab30))
+* **zev:** close the existing-row write gap for a disabled ZEV ([#787](https://github.com/splattner/openzev/issues/787)) ([7df9056](https://github.com/splattner/openzev/commit/7df9056f1597a551887a19ecb933c2e2d0d4dafd))
+* **zev:** cut off access to a disabled ZEV's data (lifecycle phase 2) ([#785](https://github.com/splattner/openzev/issues/785)) ([aa135a8](https://github.com/splattner/openzev/commit/aa135a843348bd284276345fa2c3869058037af1))
+* **zev:** disable and enable a ZEV (lifecycle phase 1) ([#784](https://github.com/splattner/openzev/issues/784)) ([27ec33e](https://github.com/splattner/openzev/commit/27ec33ee7716134698c2cd4e3265519a9a2e37de))
+* **zev:** frontend for disable/enable (ZEV lifecycle) ([#788](https://github.com/splattner/openzev/issues/788)) ([30ee3f2](https://github.com/splattner/openzev/commit/30ee3f2daba5972f1f2469ac2ec2c79299236a19))
+* **zev:** gate participant geocoding behind a feature flag, off by default ([#797](https://github.com/splattner/openzev/issues/797)) ([ae8700f](https://github.com/splattner/openzev/commit/ae8700f5f7063d0cf98a906e15438a9b797146e3))
+* **zev:** transfer archive format v3 — carry invoice PDFs ([#790](https://github.com/splattner/openzev/issues/790)) ([3fa2df4](https://github.com/splattner/openzev/commit/3fa2df47e6e1216a7602a008255caad8a89de304))
+
+
+### Bug Fixes
+
+* **security:** enforce trusted proxy hops for client IPs ([#777](https://github.com/splattner/openzev/issues/777)) ([bc53295](https://github.com/splattner/openzev/commit/bc53295d25fd5c109d0643548ee13ffab5f2c943))
+* **security:** expire onboarding links and revoke sessions on logout ([#780](https://github.com/splattner/openzev/issues/780)) ([d3ee04c](https://github.com/splattner/openzev/commit/d3ee04ce88e41fab724f0a8ec48b424717eb2669))
+* **security:** harden production compose defaults ([#779](https://github.com/splattner/openzev/issues/779)) ([7160eb2](https://github.com/splattner/openzev/commit/7160eb2fe85a30cb7aa8ed347d942d6a59b1b74e))
+* **security:** validate audit request context, harden audit write, bind mixin events transactionally ([#778](https://github.com/splattner/openzev/issues/778)) ([3296ee8](https://github.com/splattner/openzev/commit/3296ee8a95cbbfc6098b31b1858e48c98bf1fc55))
+* **zev:** remove the broken plain hard-delete, keep disable→purge only ([#792](https://github.com/splattner/openzev/issues/792)) ([f878c7b](https://github.com/splattner/openzev/commit/f878c7b3407c8b15dbf944c28b517646b5426594))
+* **zev:** restrict ZEV deletion to admins ([#783](https://github.com/splattner/openzev/issues/783)) ([d28eff6](https://github.com/splattner/openzev/commit/d28eff6e5a5bff8a8548de4ded0bc3e6a4ef400b))
+
 ## [1.16.0](https://github.com/splattner/openzev/compare/v1.15.0...v1.16.0) (2026-09-20)
 
 
