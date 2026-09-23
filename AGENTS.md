@@ -106,7 +106,7 @@ When making code changes, follow these rules to keep specs accurate:
   For frontend CRUD / management-page cleanup work, also read `2026-04-frontend-management-page-design.md` before making layout or interaction changes.
 2. **After coding:** If your change modifies behavior described in a baseline spec, update the affected sections of that spec in the same commit/PR.
 3. **What to update:** Only the sections that changed — don't rewrite unrelated parts. Common updates include: adding/removing model fields, changing API endpoints or permissions, adding tests, modifying frontend components.
-4. **Validation:** After updating a spec, verify every claim in the changed sections against the actual code. Check field names, types, defaults, permission classes, endpoint paths, serializer fields, test method names, and test counts.
+4. **Validation:** After updating a spec, verify every claim in the changed sections against the actual code. Check field names, types, defaults, permission classes, endpoint paths, serializer fields, test method names, and test counts. The `spec-validate` skill does this pass and reports the drift.
 5. **New features:** If a new feature doesn't fit any existing baseline spec, create a new spec using `docs/specs/TEMPLATE.md`. Use the same implementation-grade detail level as the baseline specs.
 6. **Quality bar:** A spec is correct when someone could re-implement the described feature from the spec alone, without reading existing code.
 
