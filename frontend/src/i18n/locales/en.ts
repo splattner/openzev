@@ -2331,6 +2331,7 @@ export const en = {
             noData: 'No metering data for selected period.',
             perParticipant: 'Per Participant',
             noParticipantData: 'No participant-level data for selected period.',
+            showDetailsFor: 'Show details for {{name}}',
             col: {
                 participant: 'Participant',
                 consumption: 'Consumption',

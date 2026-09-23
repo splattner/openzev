@@ -33,7 +33,7 @@ export function InvoicePeriodRowsTable({
   const { t } = useTranslation()
 
   return (
-    <div className="table-card">
+    <div className="table-card table-scroll">
       <table>
         <thead>
           <tr>

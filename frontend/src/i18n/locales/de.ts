@@ -2320,6 +2320,7 @@ export const de = {
             noData: 'Keine Messdaten für den ausgewählten Zeitraum.',
             perParticipant: 'Pro Teilnehmer',
             noParticipantData: 'Keine Daten auf Teilnehmerebene für den ausgewählten Zeitraum.',
+            showDetailsFor: 'Details für {{name}} anzeigen',
             col: {
                 participant: 'Teilnehmer',
                 consumption: 'Verbrauch',

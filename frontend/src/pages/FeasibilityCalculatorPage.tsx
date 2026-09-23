@@ -104,7 +104,7 @@ function FeasibilityCalculator() {
     const participantTotals = resolveParticipantTotals(watchedValues)
 
     return (
-        <div className="page-stack">
+        <div className="page-stack feasibility-page">
             <header>
                 <p className="eyebrow">{t('pages.feasibility.eyebrow')}</p>
                 <h2>{t('pages.feasibility.title')}</h2>
@@ -116,13 +116,11 @@ function FeasibilityCalculator() {
             />
 
             <div
-                style={{
-                    display: 'grid',
-                    gridTemplateColumns:
-                        watchedValues.energy_input_mode === 'participants' ? 'minmax(320px, 540px) 1fr' : 'minmax(320px, 420px) 1fr',
-                    gap: '1.5rem',
-                    alignItems: 'start',
-                }}
+                className={
+                    watchedValues.energy_input_mode === 'participants'
+                        ? 'feasibility-layout feasibility-layout-wide'
+                        : 'feasibility-layout'
+                }
             >
                 <form className="card page-stack" onSubmit={(event) => event.preventDefault()}>
                     <h3 style={{ marginTop: 0, display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
@@ -294,7 +292,7 @@ function FeasibilityCalculator() {
 
                             <section className="card page-stack">
                                 <h3 style={{ marginTop: 0 }}>{t('pages.feasibility.results.splitTitle')}</h3>
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                                <div className="feasibility-split">
                                     <div>
                                         <p className="eyebrow">{t('pages.feasibility.results.consumers')}</p>
                                         <p style={{ margin: 0 }}>{t('pages.feasibility.results.baselineCost')}: {formatChf(Number(result.baseline_consumer_cost_chf))}</p>

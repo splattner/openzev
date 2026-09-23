@@ -153,6 +153,9 @@ If logged in as a ZEV owner:
 
 ![Manager Energy balance](screenshots/02c-energy-balance.png)
 
+In the participant table, Tab to a name and press Enter or Space to filter the
+charts; swipe the table horizontally on narrow screens to see every column.
+
 ### 4. View as Participant
 
 Login as a participant (Anna or Ben):

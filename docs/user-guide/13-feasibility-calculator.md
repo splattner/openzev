@@ -15,7 +15,9 @@ Everything it reports — savings, payback, ROI, NPV — is measured against tha
 
 ## Entering your scenario
 
-Inputs are on the left, grouped into three sections. Results update live as you type.
+On wide screens, inputs sit to the left of the results. On narrow screens,
+results follow the inputs. The three input sections are described below, and
+results update live as you type.
 
 ### System & energy
 

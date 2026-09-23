@@ -96,13 +96,13 @@ export function PageSkeleton({ variant }: PageSkeletonProps) {
         )
     }
 
-    // page — eyebrow + title + KPI row + 2 cards
+    // page skeleton; fixed widths are capped so narrow phones never pan.
     return (
         <div className="page-stack">
             <div>
                 <Block animate={animate} height={12} width="8rem" mb={8} />
-                <Block animate={animate} height={26} width="18rem" mb={8} />
-                <Block animate={animate} height={14} width="26rem" />
+                <Block animate={animate} height={26} width="18rem" mb={8} style={{ maxWidth: '100%' }} />
+                <Block animate={animate} height={14} width="26rem" style={{ maxWidth: '100%' }} />
             </div>
             <KpiRow animate={animate} withHint={false} />
             <CardSkeleton animate={animate} />

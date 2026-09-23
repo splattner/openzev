@@ -92,7 +92,7 @@ function EmailTemplateEditor({
                                 onChange={(e) => setBody(e.target.value)}
                             />
                         </label>
-                        <div className="actions-row">
+                        <div className="actions-row actions-row-wrap">
                             <button
                                 className="button"
                                 type="button"

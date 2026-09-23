@@ -220,8 +220,10 @@ describe('dashboard behavior preservation', () => {
         // Selected row is highlighted (re-query after re-render).
         const updatedRows = container.querySelectorAll('tbody tr')
         expect(updatedRows.length).toBe(2)
-        const selectedRowStyle = updatedRows[0].getAttribute('style') ?? ''
-        expect(selectedRowStyle).toContain('var(--surface)')
+        expect(updatedRows[0].classList.contains('is-selected')).toBe(true)
+        const selectedButton = updatedRows[0].querySelector('button.participant-select')
+        expect(selectedButton?.getAttribute('aria-current')).toBe('true')
+        expect(updatedRows[1].querySelector('button.participant-select')?.hasAttribute('aria-current')).toBe(false)
 
         // Hourly heading names the participant.
         const hourlyHeading = Array.from(container.querySelectorAll('h3')).find((h) =>
@@ -245,6 +247,46 @@ describe('dashboard behavior preservation', () => {
             h.textContent?.includes('pages.dashboard.consumptionAndProduction'),
         )
         expect(balanceHeading?.textContent).toContain('Alice')
+    })
+
+    it('manager participant buttons and numeric cells select their rows', async () => {
+        mockState.role = 'zev_owner'
+        mockState.summaryCalls = []
+        mockState.summary = managerSummary()
+        mockState.hourlyProfile = null
+        mockState.hourlyCalls = []
+        mockState.invoices = []
+        const container = await renderDashboard()
+        const rows = container.querySelectorAll('.participant-table tbody tr')
+        expect(rows.length).toBe(2)
+        const button = rows[1].querySelector('button.participant-select') as HTMLButtonElement
+        expect(button.tabIndex).toBeGreaterThanOrEqual(0)
+        button.focus()
+        expect(document.activeElement).toBe(button)
+        await act(async () => {
+            button.click()
+        })
+        // jsdom cannot synthesize native Enter/Space button activation; the real browser check covers it.
+        for (let i = 0; i < 20; i++) {
+            await flush()
+            const settledRows = container.querySelectorAll('.participant-table tbody tr')
+            const profileLoaded = mockState.hourlyCalls.some((call) => call.participantId === 'p2')
+            if (settledRows.length === 2 && settledRows[1].classList.contains('is-selected') && profileLoaded) break
+        }
+        expect(mockState.hourlyCalls.filter((call) => call.participantId === 'p2').length).toBe(1)
+
+        const numericCell = container.querySelector('.participant-table tbody tr:first-child td.numeric')
+        await act(async () => {
+            numericCell?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+        })
+        for (let i = 0; i < 20; i++) {
+            await flush()
+            const settledRows = container.querySelectorAll('.participant-table tbody tr')
+            const profileLoaded = mockState.hourlyCalls.some((call) => call.participantId === 'p1')
+            if (settledRows.length === 2 && settledRows[0].classList.contains('is-selected') && profileLoaded) break
+        }
+        expect(mockState.hourlyCalls.some((call) => call.participantId === 'p1')).toBe(true)
+        expect(container.querySelector('.participant-table tbody tr:first-child')?.classList.contains('is-selected')).toBe(true)
     })
 
     it('participant energy flow requires current_participant_id', async () => {
