@@ -45,8 +45,18 @@ class CookieJWTAuthentication(JWTAuthentication):
             if raw_token is None:
                 return None
 
-            validated_token = self.get_validated_token(raw_token)
-            user = self.get_user(validated_token)
+            # A cookie the browser sends on its own is not a credential the
+            # caller chose to present. Expired, signed-out or otherwise stale,
+            # it must read as "no credentials" — raising here would turn the
+            # public login-page endpoints (AllowAny) into 401s for anyone
+            # holding a dead cookie, and the client cannot refresh its way out
+            # once the refresh cookie is gone too. Protected views still answer
+            # 401 (NotAuthenticated), so the refresh flow is unchanged.
+            try:
+                validated_token = self.get_validated_token(raw_token)
+                user = self.get_user(validated_token)
+            except exceptions.AuthenticationFailed:
+                return None
 
             if request.method not in SAFE_METHODS:
                 enforce_csrf(request)

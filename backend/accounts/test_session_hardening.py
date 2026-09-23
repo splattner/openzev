@@ -129,6 +129,17 @@ class SessionRevocationTests(TestCase):
         revoke_sessions(self.user)
         self.assertEqual(_bearer(session["access"]).get(ME).status_code, 401)
 
+    def test_a_dead_access_cookie_does_not_break_the_public_login_endpoints(self):
+        session = _session(self.user)
+        revoke_sessions(self.user)
+        for cookie in (session["access"], "not.a.jwt"):
+            client = APIClient()
+            client.cookies["openzev_access"] = cookie
+            for path in ("/api/v1/auth/registration-enabled/", "/api/v1/auth/oauth/providers/"):
+                self.assertEqual(client.get(path).status_code, 200, path)
+            # Protected views still answer 401, which is what triggers a refresh.
+            self.assertEqual(client.get(ME).status_code, 401)
+
     def test_a_session_started_after_the_revocation_is_valid(self):
         revoke_sessions(self.user)
         self.assertEqual(_bearer(_session(self.user)["access"]).get(ME).status_code, 200)
