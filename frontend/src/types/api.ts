@@ -1208,6 +1208,8 @@ export interface ImportPreviewRow {
     timestamp?: string | null
     energy?: string | null
     existing_data?: boolean
+    /** Reading directions this row would import ('in' / 'out'). */
+    directions?: string[]
     interval_minutes?: number
     values_count?: number
 }

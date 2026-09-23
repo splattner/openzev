@@ -606,7 +606,75 @@ describe('ImportsPage wizard gating', () => {
         expect(buttons('pages.imports.actions.rowActions')).toHaveLength(2)
         expect(buttons('pages.imports.actions.openProtocol')).toHaveLength(2)
     })
+
+    it('offers the direction column for both row formats', () => {
+        // VNB profile exports carry the consumption/feed-in discriminator as
+        // an OBIS code column, so the daily profile needs the mapping too.
+        goToStep2()
+        expect(labelTexts()).toContain('pages.imports.wizard.directionCol')
+        selectRowFormat('daily_15min')
+        expect(labelTexts()).toContain('pages.imports.wizard.directionCol')
+        expect(container.textContent).toContain('pages.imports.wizard.directionColHint')
+    })
+
+    it('leaves the direction column empty without a value-like placeholder', () => {
+        // The other column fields carry real defaults, so a greyed-out sample
+        // in this one reads as already configured — and an unset direction
+        // column silently falls back to meter-type inference.
+        goToStep2()
+        selectRowFormat('daily_15min')
+        const input = directionInput()
+        expect(input.value).toBe('')
+        expect(input.placeholder).toBe('')
+    })
+
+    it('shows the direction a previewed row would import', () => {
+        goToStep2()
+        loadPreview()
+        const preview = cleanPreview()
+        preview.preview_rows[0].directions = ['out']
+        succeedPreview(preview)
+        expect(container.textContent).toContain('pages.imports.preview.directionOut')
+        expect(container.textContent).not.toContain('pages.imports.preview.directionIn')
+    })
+
+    it('lists both directions when a row splits by sign', () => {
+        goToStep2()
+        loadPreview()
+        const preview = cleanPreview()
+        preview.preview_rows[0].directions = ['in', 'out']
+        succeedPreview(preview)
+        expect(container.textContent).toContain('pages.imports.preview.directionIn')
+        expect(container.textContent).toContain('pages.imports.preview.directionOut')
+    })
 })
+
+/** The wizard's direction-column input, found via its label. */
+function directionInput(): HTMLInputElement {
+    const label = Array.from(container.querySelectorAll('label')).find(
+        (candidate) =>
+            candidate.querySelector('span')?.textContent === 'pages.imports.wizard.directionCol',
+    )!
+    return label.querySelector('input') as HTMLInputElement
+}
+
+/** Labels rendered inside the open wizard, by their translation key. */
+function labelTexts(): string[] {
+    return Array.from(container.querySelectorAll('label > span')).map(
+        (span) => span.textContent ?? '',
+    )
+}
+
+function selectRowFormat(profile: string) {
+    const select = Array.from(container.querySelectorAll('select')).find((candidate) =>
+        Array.from(candidate.options).some((option) => option.value === profile),
+    ) as HTMLSelectElement
+    const setter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value')!.set!
+    act(() => {
+        setter.call(select, profile)
+        select.dispatchEvent(new Event('change', { bubbles: true }))
+    })
+}
 
 function setInputValue(input: HTMLInputElement, value: string) {
     const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!

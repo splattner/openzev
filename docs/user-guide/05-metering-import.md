@@ -46,7 +46,7 @@ Prepare your data as CSV or Excel. Two row layouts are supported
 | `meter_id` | ✓ | Meter ID string | `CH-DEMO-CONS-0001` |
 | `timestamp` | ✓ | ISO 8601 or **Date/time format** below | `2026-01-15 14:00:00` |
 | `energy_kwh` | ✓ | Decimal (kWh, `,` accepted as `.`) | `1.2500` |
-| `direction` | ✗ | `in` or `out` (inferred from meter type when blank) | `in` |
+| `direction` | ✗ | `in`, `out`, or an OBIS code (inferred from meter type when blank) | `in` |
 
 **Daily profile — one day per row with N interval values:**
 
@@ -54,6 +54,7 @@ Prepare your data as CSV or Excel. Two row layouts are supported
 | --- | --- | --- | --- |
 | `meter_id` | ✓ | Meter ID string | `CH-DEMO-CONS-0001` |
 | `date` | ✓ | Calendar date (see **Date/time format**) | `15.01.2026` |
+| `direction` | ✗ | `in`, `out`, or an OBIS code — applies to the whole row | `1-1:1.29.0*255` |
 | `00:00` … `23:45` | ✓ | N decimal interval values (default 96 × 15 min) | `0.2500` |
 
 Empty interval cells are skipped. A daily row with no values at all is
@@ -74,6 +75,7 @@ alike. Delimiter may be any single character (for example `,`, `;`, `|`, or tab)
      - `Meter ID column` → which column?
      - `Timestamp`/`Date column` → which column?
      - `Energy column` or `First interval column` → which column?
+     - `Direction column` (optional) → which column says consumption vs. feed-in?
    - Set **Date/time format** as a Python `strptime` pattern (e.g. `%d.%m.%Y`, `%Y-%m-%dT%H:%M:%S%z`), or leave empty for auto-detect. The format must capture the full calendar date (year + month + day); `%d.%m` is rejected. Day-of-year (`%Y-%j`) is accepted.
    - For daily profiles set **Intervals per row** and **Minutes per interval**.
 
@@ -83,6 +85,7 @@ alike. Delimiter may be any single character (for example `,`, `;`, `|`, or tab)
 4. **Preview (required for CSV)**
    - Click **Load Preview**. Configuration changes, including toggling overwrite, invalidate the preview — reload before importing. Selecting another file also requires a new preview.
    - Check **Metering point exists** per row; missing IDs are listed with copy/download actions and block **Start Import** until the meters exist.
+   - Check **Direction**: where each row's readings will land — *Consumption (in)*, *Feed-in (out)*, or both when a bidirectional meter's row splits by sign. If a whole file shows the wrong direction, the **Direction column** mapping is wrong.
    - Check **Existing data**: the database already holds that reading (standard rows), or the day already holds readings for that meter/direction (daily rows). Enabling overwrite shows an estimate of how many existing readings will be replaced; fully duplicate rows never block the import — they are skipped (reported in the protocol) in skip mode and replaced in overwrite mode.
    - Review **Errors**: parse failures and empty daily rows. Values above 99999999.9999 kWh are rejected: they cannot be stored. Partially duplicate daily rows show no error — the existing slots are skipped and missing ones are imported (gap-fill).
 
@@ -191,6 +194,23 @@ The reading already exists. Without overwrite, fully duplicate rows are
 skipped; partially duplicate daily rows gap-fill the missing slots. With
 **Overwrite existing readings** checked, matching readings are updated and the
 protocol notes `Overwrote N existing readings.`
+
+**Two files for the same meter, one consumption and one feed-in?** Grid
+operators often deliver a profile export as one file per OBIS code — grid
+import as `1.29.0`, feed-in as `2.29.0` — with the same metering point ID and
+positive values in both. Imported without a **Direction column**, the second
+file looks like a duplicate of the first and every row is skipped.
+
+Map the OBIS column as the **Direction column** (in these exports it is the
+second column, index `1`) and both files import onto the same metering point,
+one as consumption and one as feed-in. The preview's **Direction** column
+confirms it before you commit. Note that the field is *empty* by default —
+nothing is pre-filled for you.
+
+Do **not** use **Overwrite existing readings** to force the second file
+through: it replaces the first file's readings with the second file's values
+under the first file's direction, which silently destroys the data you already
+imported.
 
 ### "Row contains no interval values."
 

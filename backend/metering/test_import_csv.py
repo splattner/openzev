@@ -1193,3 +1193,125 @@ class CsvImportTests(TestCase):
         # Two isolated days → two bounded day-window queries, never a
         # single two-year range scan.
         self.assertLessEqual(len(selects), 3)
+
+    def test_obis_direction_column_splits_one_meter_into_both_directions(self):
+        # A VNB profile export ships one file per OBIS code, both with
+        # positive values and the same metering point ID: 1.29.0 is grid
+        # import, 2.29.0 is feed-in. Without the direction column the second
+        # file collides with the first on (point, timestamp, direction).
+        self.metering_point.meter_type = MeteringPointType.BIDIRECTIONAL
+        self.metering_point.save(update_fields=["meter_type"])
+        kwargs = {
+            "format_profile": "daily_15min",
+            "has_header": "false",
+            "delimiter": ";",
+            "col_meter_id": "0",
+            "col_direction": "1",
+            "col_timestamp": "3",
+            "col_energy_start": "4",
+            "values_count": "2",
+            "timestamp_format": "%d.%m.%Y",
+            "zev_id": self.zev_id,
+        }
+        consumption = b"CH-IMPORT-1;1-1:1.29.0*255;KWH;01.07.2026;0.097;0.098\n"
+        production = b"CH-IMPORT-1;1-1:2.29.0*255;KWH;01.07.2026;1.500;2.250\n"
+
+        first = upload_csv(self.client, "obis-in.csv", consumption, **kwargs)
+        second = upload_csv(self.client, "obis-out.csv", production, **kwargs)
+
+        self.assertEqual(first.data["rows_imported"], 2)
+        self.assertEqual(second.data["rows_imported"], 2)
+        self.assertEqual(second.data["rows_skipped"], 0)
+        self.assertEqual(second.data["errors"], [])
+        day = datetime(2026, 7, 1, tzinfo=timezone.utc)
+        self.assertEqual(
+            MeterReading.objects.get(timestamp=day, direction=ReadingDirection.IN).energy_kwh,
+            Decimal("0.0970"),
+        )
+        self.assertEqual(
+            MeterReading.objects.get(timestamp=day, direction=ReadingDirection.OUT).energy_kwh,
+            Decimal("1.5000"),
+        )
+
+    def test_obis_direction_column_overrides_meter_type_inference(self):
+        # The metering point is a plain consumption meter, so inference would
+        # send every positive value to `in`; the OBIS code must win.
+        csv_bytes = (
+            b"meter_id,timestamp,energy_kwh,obis\n"
+            b"CH-IMPORT-1,2026-02-01T00:00:00Z,1.0000,1-0:2.8.0\n"
+        )
+
+        resp = upload_csv(
+            self.client, "obis-standard.csv", csv_bytes, col_direction="obis", zev_id=self.zev_id
+        )
+
+        self.assertEqual(resp.data["rows_imported"], 1)
+        self.assertEqual(MeterReading.objects.get().direction, ReadingDirection.OUT)
+
+    def test_non_active_energy_obis_code_is_rejected(self):
+        # 3.29.0 is reactive energy: guessing a direction for it would put
+        # the wrong quantity into billing, so the row is rejected instead.
+        csv_bytes = (
+            b"meter_id,timestamp,energy_kwh,obis\n"
+            b"CH-IMPORT-1,2026-02-02T00:00:00Z,1.0000,1-1:3.29.0*255\n"
+        )
+
+        resp = upload_csv(
+            self.client, "obis-reactive.csv", csv_bytes, col_direction="obis", zev_id=self.zev_id
+        )
+
+        self.assertEqual(resp.data["rows_imported"], 0)
+        self.assertEqual(resp.data["rows_skipped"], 1)
+        self.assertTrue(any("Invalid direction" in err["error"] for err in resp.data["errors"]))
+        self.assertEqual(MeterReading.objects.count(), 0)
+
+    def test_daily_invalid_direction_rejects_row_in_preview_and_import(self):
+        csv_bytes = b"CH-IMPORT-1;KWH;01.07.2026;0.097;0.098\n"
+        kwargs = {
+            "format_profile": "daily_15min",
+            "has_header": "false",
+            "delimiter": ";",
+            "col_meter_id": "0",
+            "col_direction": "1",
+            "col_timestamp": "2",
+            "col_energy_start": "3",
+            "values_count": "2",
+            "timestamp_format": "%d.%m.%Y",
+            "zev_id": self.zev_id,
+        }
+
+        preview = preview_csv(self.client, "daily-bad-direction.csv", csv_bytes, **kwargs)
+        imported = upload_csv(self.client, "daily-bad-direction.csv", csv_bytes, **kwargs)
+
+        self.assertTrue(any("Invalid direction" in err["error"] for err in preview.data["errors"]))
+        self.assertTrue(any("Invalid direction" in err["error"] for err in imported.data["errors"]))
+        self.assertEqual(imported.data["rows_imported"], 0)
+        self.assertEqual(imported.data["rows_skipped"], 1)
+        self.assertEqual(MeterReading.objects.count(), 0)
+
+    def test_preview_reports_row_directions(self):
+        # The preview row states where the readings land, so a misconfigured
+        # direction column is visible before anything is written.
+        daily = b"CH-IMPORT-1;1-1:2.29.0*255;KWH;01.07.2026;1.500;2.250\n"
+        daily_preview = preview_csv(
+            self.client,
+            "daily-directions.csv",
+            daily,
+            format_profile="daily_15min",
+            has_header="false",
+            delimiter=";",
+            col_meter_id="0",
+            col_direction="1",
+            col_timestamp="3",
+            col_energy_start="4",
+            values_count="2",
+            timestamp_format="%d.%m.%Y",
+            zev_id=self.zev_id,
+        )
+        standard = b"meter_id,timestamp,energy_kwh\nCH-IMPORT-1,2026-02-03T00:00:00Z,1.0000\n"
+        standard_preview = preview_csv(
+            self.client, "standard-directions.csv", standard, zev_id=self.zev_id
+        )
+
+        self.assertEqual(daily_preview.data["preview_rows"][0]["directions"], ["out"])
+        self.assertEqual(standard_preview.data["preview_rows"][0]["directions"], ["in"])

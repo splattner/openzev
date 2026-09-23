@@ -638,9 +638,14 @@ class CsvImportCharacterizationTests(TestCase):
             resp.data["errors"],
         )
 
-    def test_direction_mapped_to_an_unknown_column_is_silently_ignored(self):
-        """Unlike the required columns, an unresolvable direction mapping is
-        swallowed and treated as 'no explicit direction'."""
+    def test_direction_mapped_to_an_unknown_column_is_reported(self):
+        """A direction column the caller chose must not be swallowed.
+
+        Falling back to meter-type inference would send a feed-in file to
+        ``in``, where it collides with the consumption file for the same
+        metering point — the failure is silent and the data is wrong, so a
+        typo'd reference is a configuration error like any other.
+        """
         csv_bytes = (
             b"meter_id,timestamp,energy_kwh\n"
             b"CH-IMPORT-1,2026-07-09T00:00:00Z,1.0000\n"
@@ -649,7 +654,27 @@ class CsvImportCharacterizationTests(TestCase):
         resp = upload_csv(self.client, "nodirection.csv", csv_bytes, col_direction="does_not_exist", zev_id=str(self.zev.id))
 
         self.assertEqual(resp.status_code, 201)
+        self.assertEqual(resp.data["rows_imported"], 0)
+        self.assertTrue(
+            any("does_not_exist" in err["error"] for err in resp.data["errors"]),
+            resp.data["errors"],
+        )
+        self.assertEqual(MeterReading.objects.count(), 0)
+
+    def test_default_direction_mapping_stays_lenient_when_absent(self):
+        """The *default* reference is a different case: most files have no
+        direction column at all, and inferring from the meter type is the
+        documented behaviour there."""
+        csv_bytes = (
+            b"meter_id,timestamp,energy_kwh\n"
+            b"CH-IMPORT-1,2026-07-10T00:00:00Z,1.0000\n"
+        )
+
+        resp = upload_csv(self.client, "defaultdirection.csv", csv_bytes, zev_id=str(self.zev.id))
+
+        self.assertEqual(resp.status_code, 201)
         self.assertEqual(resp.data["rows_imported"], 1)
+        self.assertEqual(MeterReading.objects.get().direction, "in")
 
     # ── G. Preview ──────────────────────────────────────────────────────────
 

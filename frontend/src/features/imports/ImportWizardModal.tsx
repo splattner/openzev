@@ -14,6 +14,22 @@ import type { ImportPreviewResult, ImportPreviewRow } from '../../types/api'
 import { MAX_UPLOAD_BYTES, type CsvColumnMap, type CsvFormatProfile } from './importUtils'
 import { formatBytes } from '../../lib/numbers'
 
+/**
+ * Where a previewed row's readings will land. A row can carry both directions
+ * when a bidirectional meter's values are split by sign, so this renders a
+ * list rather than a single value.
+ */
+function formatDirections(directions: string[] | undefined, t: (key: string) => string): string {
+    if (!directions || directions.length === 0) return '-'
+    return directions
+        .map((direction) =>
+            direction === 'out'
+                ? t('pages.imports.preview.directionOut')
+                : t('pages.imports.preview.directionIn'),
+        )
+        .join(', ')
+}
+
 function Badge({ label, ok }: { label: string; ok: boolean }) {
     return (
         <span className={`badge ${ok ? 'badge-success' : 'badge-danger'}`}>
@@ -250,14 +266,6 @@ export function ImportWizardModal(props: ImportWizardModalProps) {
                                                     placeholder={hasHeader ? 'energy_kwh' : '4'}
                                                 />
                                             </label>
-                                            <label>
-                                                <span>{t('pages.imports.wizard.directionCol')}</span>
-                                                <input
-                                                    value={columnMap.direction}
-                                                    onChange={(event) => props.onColumnMapChange({ direction: event.target.value })}
-                                                    placeholder={hasHeader ? 'direction' : '5'}
-                                                />
-                                            </label>
                                         </>
                                     ) : (
                                         <>
@@ -285,6 +293,22 @@ export function ImportWizardModal(props: ImportWizardModalProps) {
                                             </label>
                                         </>
                                     )}
+                                    <label>
+                                        <span>{t('pages.imports.wizard.directionCol')}</span>
+                                        {/* No placeholder: the other column
+                                            fields carry real defaults, so a
+                                            greyed-out sample here reads as a
+                                            value that is already set — an
+                                            empty direction column silently
+                                            falls back to meter-type
+                                            inference. The hint below says
+                                            what belongs in the field. */}
+                                        <input
+                                            value={columnMap.direction}
+                                            onChange={(event) => props.onColumnMapChange({ direction: event.target.value })}
+                                        />
+                                        <small className="muted">{t('pages.imports.wizard.directionColHint')}</small>
+                                    </label>
                                 </div>
 
                                 <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -373,6 +397,7 @@ export function ImportWizardModal(props: ImportWizardModalProps) {
                                                     <th style={{ textAlign: 'left', padding: '0.4rem 0.6rem' }}>{t('pages.imports.preview.meterId')}</th>
                                                     <th style={{ textAlign: 'left', padding: '0.4rem 0.6rem' }}>{t('pages.imports.preview.status')}</th>
                                                     <th style={{ textAlign: 'left', padding: '0.4rem 0.6rem' }}>{t('pages.imports.preview.timestamp')}</th>
+                                                    <th style={{ textAlign: 'left', padding: '0.4rem 0.6rem' }}>{t('pages.imports.preview.direction')}</th>
                                                     <th style={{ textAlign: 'left', padding: '0.4rem 0.6rem' }}>{t('pages.imports.preview.existingData')}</th>
                                                 </tr>
                                             </thead>
@@ -385,6 +410,7 @@ export function ImportWizardModal(props: ImportWizardModalProps) {
                                                             <Badge label={row.metering_point_exists ? t('pages.imports.preview.exists') : t('pages.imports.preview.missing')} ok={row.metering_point_exists} />
                                                         </td>
                                                         <td style={{ padding: '0.4rem 0.6rem' }}>{row.timestamp ?? '-'}</td>
+                                                        <td style={{ padding: '0.4rem 0.6rem' }}>{formatDirections(row.directions, t)}</td>
                                                         <td style={{ padding: '0.4rem 0.6rem' }}>
                                                             {row.existing_data == null ? '-' : row.existing_data ? t('pages.imports.preview.yes') : t('pages.imports.preview.no')}
                                                         </td>

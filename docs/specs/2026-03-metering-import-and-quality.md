@@ -142,7 +142,7 @@ is rejected with an explicit error asking for `.xlsx` or CSV.
 | Profile | Row layout | Required columns |
 |---|---|---|
 | `standard` | One reading per row | `meter_id`, `timestamp`, `energy_kwh`, optional `direction` |
-| `daily_15min` | One day per row, 96 interval values | `meter_id`, `timestamp` (date), columns starting at `energy_start` position |
+| `daily_15min` | One day per row, 96 interval values | `meter_id`, `timestamp` (date), columns starting at `energy_start` position, optional `direction` |
 
 **Configuration parameters:**
 
@@ -172,6 +172,12 @@ is rejected with an explicit error asking for `.xlsx` or CSV.
 **Column resolution:** columns are resolved by name first; if the reference is
 a numeric string, it is used as a zero-based column index.  Out-of-range
 indices raise a column error that terminates the import with all rows skipped.
+The optional `direction` reference is the one exception, and only at its
+default value (`"direction"`): most files carry no such column, so an
+unresolvable *default* falls back to meter-type inference. A reference the
+caller set to anything else must resolve — silently dropping it would send a
+feed-in file to `in` — so it terminates the import as a column error like the
+required keys.
 Internally a reference resolves to a column *position*, so named columns and the
 positional `daily_15min` interval slots are read the same way.
 
@@ -185,6 +191,7 @@ positional `daily_15min` interval slots are read the same way.
 | Excel blank rows | Trailing all-empty rows are dropped; mid-file blank rows are kept and reported as rows with a missing `meter_id` |
 | Excel sheet | The first sheet is read, regardless of which sheet was active when the workbook was saved |
 | Ragged rows | Short rows are padded; extra trailing fields are ignored |
+| Direction cells | The mapped `direction` column accepts the literals `in`/`out` (case-insensitive) and OBIS identifiers of the form `[A-B:]C.D.E[*F]` — e.g. `1-1:1.29.0*255`, `1.29.0`, `1-0:2.8.0`. The C group decides the flow for active energy: `1` → `in` (grid import), `2` → `out` (feed-in). Any other C group (reactive energy `3`/`4` included) is rejected rather than guessed. An empty cell falls back to meter-type inference. The column applies to both format profiles |
 | Missing values | An absent cell reports "Missing …"; a whitespace-only cell reports "Empty …" |
 | Numbers | Comma decimal separators are accepted. Non-finite values (`nan`, `inf`) are rejected. Unparseable numbers report `Invalid numeric value '<input>'` rather than leaking `decimal` conversion codes. Magnitudes above `99999999.9999` kWh (the `DecimalField(max_digits=12, decimal_places=4)` bound) are rejected with an actionable error in both preview and import, so no `DataError` can escape the import transaction on PostgreSQL |
 | Timestamps | `timestamp_format` (a `strptime` string) wins if supplied and is interpreted as UTC: a parsed offset is converted to UTC (`astimezone`), never discarded — except native Excel datetime cells, which are used as-is (assumed UTC when naive, converted when aware). Otherwise ISO-8601 is parsed first, falling back to a lenient parser; naive values are assumed UTC. For `daily_15min`, non-ISO dates are parsed day-first to suit European exports |
@@ -207,6 +214,24 @@ def _infer_direction_and_energy(meter_type, energy, explicit_direction=None):
         return ("in" if energy >= 0 else "out"), abs(energy)
     return "in", abs(energy)       # consumption default
 ```
+
+An explicit direction always wins over meter-type inference. It is resolved
+once per row by `_row_direction(row, resolved_cols)`, which reads the mapped
+`direction` column and hands the cell to `_parse_direction_token`; both format
+profiles use the same pair, so a daily row's 96 slots share the row's
+direction. Without it, sign-based inference sends every positive value of a
+bidirectional meter to `in` — so a VNB profile export that ships grid import
+(`1.29.0`) and feed-in (`2.29.0`) as two positive-valued files for the *same*
+metering point collides on `(metering_point, timestamp, direction)`: the
+second file is skipped wholesale in skip mode, and in overwrite mode replaces
+the first file's readings. Mapping the OBIS column as `direction` is the
+supported way to import such a pair.
+
+An unparseable direction rejects the whole row — one error, one
+`rows_skipped`, nothing written — in both preview and import. Standard rows
+report it from `_interpret_standard_row` after the timestamp and energy
+checks; daily rows report it after the interval-value checks, so both profiles
+surface the same single error per row.
 
 **Decimal parsing:** values are parsed via `Decimal`, with comma → dot
 substitution, quantized to 4 decimal places.
@@ -297,7 +322,8 @@ token is required or checked.
       "metering_point_exists": true,
       "meter_type": "consumption",
       "timestamp": "2026-01-01T00:00:00+00:00",
-      "energy": "1.5000"
+      "energy": "1.5000",
+      "directions": ["in"]
     }
   ],
   "summary": {
@@ -313,6 +339,13 @@ token is required or checked.
 
 - `missing_meter_ids` is the sorted distinct missing set, capped at 50
   (truncated with +N). A meter appearing 30× counts as 1.
+
+Every preview row carries `directions`, the sorted set of reading directions
+that row would import (`["in"]`, `["out"]`, or `["in", "out"]` for a daily row
+a bidirectional meter splits by sign). It is empty for rows whose direction
+could not be determined — an invalid direction cell, or a row past the error
+cap. The wizard renders it as its own preview column, so a misconfigured
+direction column is visible before anything is written.
 
 For `daily_15min` profile, each preview row includes `interval_minutes` and
 `values_count` instead of `energy`. `existing_data` is direction-aware and
@@ -669,7 +702,7 @@ All import endpoints use `MultiPartParser` and `FormParser`.
 | `col_meter_id` | No | Column name/index for meter_id |
 | `col_timestamp` | No | Column name/index for timestamp |
 | `col_energy_kwh` | No | Column name/index for energy |
-| `col_direction` | No | Column name/index for direction |
+| `col_direction` | No | Column name/index for direction; accepts `in`/`out` or an OBIS code, and applies to both format profiles |
 | `col_energy_start` | No | Column name/index for first energy value (`daily_15min`) |
 | `has_header` | No | `true`/`false` (default `true`) |
 | `delimiter` | No | CSV separator (default `,`) |
@@ -952,8 +985,8 @@ type MeteringDashboardSummary =
 
 | Test module / class | Validates |
 |---|---|
-| `metering/test_import_csv.py::CsvImportTests` | §4.1/4.3/5.6/8.3: malformed CSV reported without crash; concurrent standard-profile duplicate races are skipped; timezone offset normalized (default parsing and explicit `%z` format); direct upload without preview valid (advisory contract); duplicate rows skipped; idempotent re-import; overwrite (`overwrite_existing=true`) updates in place and returns the overwrite note in `warnings` (never in `errors`); headerless positional mapping; `daily_15min` with `energy_start`/`values_count`; invalid/missing timestamp/energy handling; daily atomic rollback leaks no `imported` count on `IntegrityError`; empty daily rows skipped with an error; daily existence checks batched per contiguous file-day block (query-bound regression test); ZEV scoping (target-ZEV required, missing → 400, bad UUID → 400, unknown → 404, foreign-owned for owner → 403, disabled for owner → 400; admins can import into disabled ZEVs; mixed-ZEV file scoped to target with per-row errors; `log.zev` equals the requested target); preview (existing/missing meters without writing, unique counts, `missing_meter_ids` capped at 50, rows-beyond-cap still blocking, preview cap, no-write, field validation on missing-meter rows, clean invalid-number messages, single error per truncated/invalid daily row, validation stop at the error cap with whole-file coverage intact; ZEV rejections: missing → 400, bad UUID → 400, unknown → 404, foreign → 403; owners retain preview access for disabled ZEVs); import (truncated daily row writes nothing and counts one skip with zero readings; CSV errors carry `meter_id` when the row names a meter); same-owner multi-ZEV scoping (a meter from the owner's other ZEV is missing/skipped when targeting the first, for both import and preview); combined row-level field errors (bad timestamp, bad energy, bad direction, blank `meter_id`, missing timestamp/energy); column-mapping failure shape (200, empty `preview_rows`, single `row: null` error); exactly-50 missing IDs with no overflow remainder; audit events recorded for foreign-ZEV preview and import rejections; invalid `timestamp_format` rejected up front on preview (200 with a `row: null` error) and import (201 log, nothing written); year-less formats rejected on preview and upload; invalid timestamps report `Invalid timestamp value` without dateutil internals; daily `existing_data` is direction-aware; `test_daily_overwrite_preview_allows_duplicates_without_writing` covers skip/overwrite parity, invalid-value rejection, unchanged readings/logs during preview, and the final overwrite |
-| `metering/test_import_csv_characterization.py` | §4.1/4.3 parsing semantics (BOM, blank lines, ragged rows, Excel first-sheet and blank rows, empty-vs-missing, comma decimals, etc.), plus ZEV-required calls (every `upload_csv`/`preview_csv` passes `zev_id`; helper injects it by default), the unique preview summary (`"existing_metering_points" == 1` not 30), atomic daily validation (truncated/invalid rows write nothing: one error, one skip, zero readings) with per-slot gap-fill for partial duplicates, native Excel datetimes bypassing `timestamp_format` (standard and daily), and `meter_id` on CSV errors |
+| `metering/test_import_csv.py::CsvImportTests` | §4.1/4.3/5.6/8.3: malformed CSV reported without crash; concurrent standard-profile duplicate races are skipped; timezone offset normalized (default parsing and explicit `%z` format); direct upload without preview valid (advisory contract); duplicate rows skipped; idempotent re-import; overwrite (`overwrite_existing=true`) updates in place and returns the overwrite note in `warnings` (never in `errors`); headerless positional mapping; `daily_15min` with `energy_start`/`values_count`; invalid/missing timestamp/energy handling; daily atomic rollback leaks no `imported` count on `IntegrityError`; empty daily rows skipped with an error; daily existence checks batched per contiguous file-day block (query-bound regression test); ZEV scoping (target-ZEV required, missing → 400, bad UUID → 400, unknown → 404, foreign-owned for owner → 403, disabled for owner → 400; admins can import into disabled ZEVs; mixed-ZEV file scoped to target with per-row errors; `log.zev` equals the requested target); preview (existing/missing meters without writing, unique counts, `missing_meter_ids` capped at 50, rows-beyond-cap still blocking, preview cap, no-write, field validation on missing-meter rows, clean invalid-number messages, single error per truncated/invalid daily row, validation stop at the error cap with whole-file coverage intact; ZEV rejections: missing → 400, bad UUID → 400, unknown → 404, foreign → 403; owners retain preview access for disabled ZEVs); import (truncated daily row writes nothing and counts one skip with zero readings; CSV errors carry `meter_id` when the row names a meter); same-owner multi-ZEV scoping (a meter from the owner's other ZEV is missing/skipped when targeting the first, for both import and preview); combined row-level field errors (bad timestamp, bad energy, bad direction, blank `meter_id`, missing timestamp/energy); column-mapping failure shape (200, empty `preview_rows`, single `row: null` error); exactly-50 missing IDs with no overflow remainder; audit events recorded for foreign-ZEV preview and import rejections; invalid `timestamp_format` rejected up front on preview (200 with a `row: null` error) and import (201 log, nothing written); year-less formats rejected on preview and upload; invalid timestamps report `Invalid timestamp value` without dateutil internals; daily `existing_data` is direction-aware; `test_daily_overwrite_preview_allows_duplicates_without_writing` covers skip/overwrite parity, invalid-value rejection, unchanged readings/logs during preview, and the final overwrite; OBIS direction mapping (a `1.29.0` file and a `2.29.0` file import onto one bidirectional point as `in` and `out`; an OBIS code overrides meter-type inference on the standard profile; reactive `3.29.0` is rejected; an invalid daily direction rejects the row in preview and import; preview rows report their `directions`) |
+| `metering/test_import_csv_characterization.py` | §4.1/4.3 parsing semantics (BOM, blank lines, ragged rows, Excel first-sheet and blank rows, empty-vs-missing, comma decimals, etc.), plus ZEV-required calls (every `upload_csv`/`preview_csv` passes `zev_id`; helper injects it by default), the unique preview summary (`"existing_metering_points" == 1` not 30), atomic daily validation (truncated/invalid rows write nothing: one error, one skip, zero readings) with per-slot gap-fill for partial duplicates, native Excel datetimes bypassing `timestamp_format` (standard and daily), `meter_id` on CSV errors, and `direction` column resolution (an explicitly mapped but unresolvable reference is a column error; the default reference stays lenient and falls back to meter-type inference) |
 | `metering/test_import_limits.py::CsvLimitTests` / `XlsxZipLimitTests` / `BackendUploadCapTests` | §4.4/§8.3: size/row/col caps, `values_count`/`interval_minutes` bounds on both import and preview (with `zev_id`), error truncation with sentinel; overwrite note lives in `warnings`, XLSX ZIP limits; characterization also exercises preview with `zev_id` |
 | `metering/testing.py` | Shared `upload_csv`/`preview_csv` helpers used by all three modules (always exercise the required-`zev_id` path) |
 | `metering/test_import_logs.py::ImportLogDeletionTests` | §3.3/§5.7/§8.2: deletion/rollback plus list-payload identity (`zev_name`, `imported_by_display`, `batch_id` alongside the raw IDs); bulk delete without `zev_id` covers all visible ZEVs but never foreign ones |

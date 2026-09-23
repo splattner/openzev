@@ -10,6 +10,7 @@ Both formats support header-based mapping and index-based mapping for headerless
 
 import csv
 import io
+import re
 import uuid
 import zipfile
 from dataclasses import dataclass, field
@@ -301,19 +302,9 @@ def _interpret_standard_row(row, *, resolved_cols, timestamp_format, meter_type)
         energy_raw = _parse_decimal(row[resolved_cols["energy_kwh"]])
     except (InvalidOperation, ValueError, TypeError, OverflowError) as exc:
         return None, None, None, str(exc)
-    explicit_direction = None
-    direction_col = resolved_cols.get("direction")
-    if direction_col is not None:
-        raw_direction = _cell(row, direction_col)
-        if not _is_missing(raw_direction):
-            explicit_direction = str(raw_direction).strip().lower()
-            if explicit_direction and explicit_direction not in {"in", "out"}:
-                return (
-                    None,
-                    None,
-                    None,
-                    f"Invalid direction '{explicit_direction}'. Expected 'in' or 'out'.",
-                )
+    explicit_direction, direction_error = _row_direction(row, resolved_cols)
+    if direction_error is not None:
+        return None, None, None, direction_error
     direction, energy = _infer_direction_and_energy(meter_type, energy_raw, explicit_direction)
     return ts, direction, energy, None
 
@@ -366,6 +357,53 @@ def _parse_decimal(raw_value):
     return value
 
 
+# OBIS identifiers as VNB exports write them: an optional medium/channel prefix
+# ("1-1:"), the C.D.E value groups, and an optional tariff suffix ("*255") —
+# e.g. "1-1:1.29.0*255". The C group carries the flow direction for active
+# energy: 1 = positive (grid import / consumption), 2 = negative (feed-in).
+# Reactive energy (3/4) and every other group are rejected rather than guessed.
+_OBIS_RE = re.compile(r"^(?:\d+-\d+:)?(\d+)\.(\d+)\.(\d+)(?:\*\d+)?$")
+_OBIS_DIRECTIONS = {"1": "in", "2": "out"}
+_DIRECTION_HINT = "Expected 'in', 'out', or an OBIS code such as 1.29.0 (in) or 2.29.0 (out)."
+
+
+def _parse_direction_token(raw):
+    """Map one direction cell to ``in``/``out``.
+
+    Returns ``(direction, error)``; exactly one is None. Accepts the literal
+    ``in``/``out`` and the OBIS identifiers VNB profile exports carry in their
+    own column, so a file whose only consumption/feed-in discriminator is the
+    OBIS code imports without renaming columns.
+    """
+    token = str(raw).strip()
+    if not token:
+        return None, None
+    lowered = token.lower()
+    if lowered in {"in", "out"}:
+        return lowered, None
+    match = _OBIS_RE.match(token)
+    if match is not None:
+        direction = _OBIS_DIRECTIONS.get(match.group(1))
+        if direction is not None:
+            return direction, None
+    return None, f"Invalid direction '{token}'. {_DIRECTION_HINT}"
+
+
+def _row_direction(row, resolved_cols):
+    """Explicit direction for a row, from the mapped direction column.
+
+    ``(None, None)`` when no column is mapped or the cell is empty — the
+    caller then falls back to meter-type inference.
+    """
+    direction_col = resolved_cols.get("direction")
+    if direction_col is None:
+        return None, None
+    raw = _cell(row, direction_col)
+    if _is_missing(raw):
+        return None, None
+    return _parse_direction_token(raw)
+
+
 def _infer_direction_and_energy(meter_type, energy, explicit_direction=None):
     if explicit_direction in {"in", "out"}:
         return explicit_direction, abs(energy)
@@ -400,10 +438,17 @@ def _resolve_columns(table, col, required_keys):
     except KeyError as exc:
         return None, str(exc)
 
+    direction_ref = col.get("direction")
     try:
-        direction_ref = col.get("direction")
         resolved_cols["direction"] = _resolve_column(table, direction_ref) if direction_ref else None
-    except KeyError:
+    except KeyError as exc:
+        # The default reference is lenient: most files carry no direction
+        # column, and falling back to meter-type inference is correct there.
+        # A reference the caller chose is not — silently dropping it sends a
+        # feed-in file to `in` and collides with the consumption file for the
+        # same metering point, so report it as the configuration error it is.
+        if str(direction_ref).strip() != DEFAULT_COLUMN_MAP["direction"]:
+            return None, str(exc)
         resolved_cols["direction"] = None
 
     return resolved_cols, None
@@ -533,7 +578,7 @@ def _parse_daily_values(row, start_pos, values_count, width):
     return values, None
 
 
-def _daily_row_directions(row, start_pos, values_count, width, meter_type):
+def _daily_row_directions(row, start_pos, values_count, width, meter_type, explicit_direction=None):
     """Directions a daily row would import, for direction-aware existence checks."""
     directions: set[str] = set()
     for slot in range(values_count):
@@ -547,7 +592,7 @@ def _daily_row_directions(row, start_pos, values_count, width, meter_type):
             energy_raw = _parse_decimal(raw_energy)
         except InvalidOperation:
             continue
-        direction, _ = _infer_direction_and_energy(meter_type, energy_raw)
+        direction, _ = _infer_direction_and_energy(meter_type, energy_raw, explicit_direction)
         directions.add(direction)
     return directions
 
@@ -727,6 +772,9 @@ def preview_csv(
         meter_id = None
         mp = None
         day_start = None
+        # Directions this row would import, surfaced in the preview so a
+        # misconfigured direction column is visible before the write.
+        row_directions: list = []
         # After the error cap, keep scanning meter IDs so summary counts stay exact.
         deep = len(errors) < MAX_REPORTED_ERRORS
         if not deep:
@@ -763,14 +811,20 @@ def preview_csv(
                     # Meter type only affects direction inference for the
                     # duplicate check; numeric validation runs regardless.
                     probe_type = mp.meter_type if mp is not None else "consumption"
+                    # A mapped direction column (literal in/out, or the OBIS
+                    # code VNB profile exports carry) wins over meter-type
+                    # inference, so two files that differ only in OBIS code
+                    # land in different directions on the same metering point.
+                    explicit_direction, direction_error = _row_direction(row, resolved_cols)
                     # Existing-data flag runs even on invalid rows (e.g.
                     # truncated daily rows): it reflects day-level DB presence,
                     # not validation success.
-                    if mp is not None:
+                    if direction_error is None:
                         day_directions = _daily_row_directions(
-                            row, start_pos, values_count, table.width, probe_type
+                            row, start_pos, values_count, table.width, probe_type, explicit_direction
                         )
-                        if day_directions:
+                        row_directions = sorted(day_directions)
+                        if mp is not None and day_directions:
                             day_end = day_start + timedelta(days=1)
                             preview_existing_data = any(
                                 day_start <= ts < day_end
@@ -782,12 +836,16 @@ def preview_csv(
                         add_error(errors, _csv_error(row_number, meter_id, row_error))
                     elif all(v is None for v in values):
                         add_error(errors, _csv_error(row_number, meter_id, "Row contains no interval values."))
+                    elif direction_error is not None:
+                        # Reported after the value checks, matching the order
+                        # _interpret_standard_row uses for standard rows.
+                        add_error(errors, _csv_error(row_number, meter_id, direction_error))
                     elif mp is not None:
                         slot_keys = []
                         for slot, value in enumerate(values):
                             if value is None:
                                 continue
-                            direction, _ = _infer_direction_and_energy(probe_type, value)
+                            direction, _ = _infer_direction_and_energy(probe_type, value, explicit_direction)
                             ts = day_start + timedelta(minutes=interval_minutes * slot)
                             slot_keys.append((mp.id, ts, direction))
                         duplicates = sum(
@@ -817,7 +875,9 @@ def preview_csv(
             )
             if row_error is not None:
                 add_error(errors, _csv_error(row_number, meter_id, row_error))
-            elif mp is not None:
+            else:
+                row_directions = [direction]
+            if row_error is None and mp is not None:
                 key = (mp.id, ts, direction)
                 if key in preexisting_standard or key in preview_written_standard:
                     preview_existing_data = True
@@ -848,6 +908,7 @@ def preview_csv(
                         "meter_type": mp.meter_type if mp else None,
                         "timestamp": date_value,
                         "existing_data": preview_existing_data,
+                        "directions": row_directions,
                         "interval_minutes": interval_minutes,
                         "values_count": values_count,
                     }
@@ -862,6 +923,7 @@ def preview_csv(
                         "timestamp": None if _is_missing(raw_timestamp) else str(raw_timestamp),
                         "energy": None if _is_missing(row[resolved_cols["energy_kwh"]]) else str(row[resolved_cols["energy_kwh"]]),
                         "existing_data": preview_existing_data,
+                        "directions": row_directions,
                     }
                 )
 
@@ -1057,12 +1119,19 @@ def _import_table_rows(
                     skipped += 1
                     add_error(errors, _csv_error(row_number, meter_id, "Row contains no interval values."))
                     continue
+                # Mapped direction column (literal in/out, or an OBIS code)
+                # wins over meter-type inference — see preview_csv.
+                explicit_direction, direction_error = _row_direction(row, resolved_cols)
+                if direction_error is not None:
+                    skipped += 1
+                    add_error(errors, _csv_error(row_number, meter_id, direction_error))
+                    continue
                 slots: list = []
                 for slot, value in enumerate(values):
                     if value is None:
                         slots.append(None)
                         continue
-                    direction, energy = _infer_direction_and_energy(mp.meter_type, value)
+                    direction, energy = _infer_direction_and_energy(mp.meter_type, value, explicit_direction)
                     ts = day_start + timedelta(minutes=interval_minutes * slot)
                     if not overwrite_existing and (
                         (mp.id, ts, direction) in preexisting_daily
