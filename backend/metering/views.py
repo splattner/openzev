@@ -1,4 +1,5 @@
 import uuid
+from functools import partial
 from datetime import date as date_type, datetime, timedelta, timezone as dt_timezone
 
 from allocation.validity import period_end_exclusive_dt, period_start_dt, period_window
@@ -280,7 +281,11 @@ class MeterReadingViewSet(ZevScopedQuerySetMixin, viewsets.ModelViewSet):
         bucket = request.query_params.get("bucket", "day")
         zev_id = request.query_params.get("zev_id")
         selected_participant_id = request.query_params.get("participant_id")
-        trunc_fn = {"day": TruncDay, "hour": TruncHour, "month": TruncMonth}.get(bucket, TruncDay)
+        # Bucket in UTC like the period bounds below and the other metering
+        # endpoints (ADR 0007); the default (Europe/Zurich) would push the last
+        # two hours of every period day into the next day's bucket.
+        trunc_cls = {"day": TruncDay, "hour": TruncHour, "month": TruncMonth}.get(bucket, TruncDay)
+        trunc_fn = partial(trunc_cls, tzinfo=dt_timezone.utc)
 
         qs = self.get_queryset()
         if date_from:

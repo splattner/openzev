@@ -172,6 +172,38 @@ class DashboardSummaryAlignmentTests(TestCase):
 		self.assertAlmostEqual(float(unfiltered.data["totals"]["consumed_kwh"]), 40.0, places=6)
 
 
+class DashboardUtcBucketingTests(TestCase):
+	"""Buckets follow the UTC period bounds (ADR 0007), not Europe/Zurich."""
+
+	def setUp(self):
+		self.client = APIClient()
+		self.owner = make_user("bucket_owner", UserRole.ZEV_OWNER)
+		self.zev = Zev.objects.create(name="Bucket ZEV", owner=self.owner, zev_type="vzev", invoice_prefix="B")
+		self.mp = MeteringPoint.objects.create(zev=self.zev, meter_id="CH-B-1", meter_type=MeteringPointType.CONSUMPTION)
+		# 23:45 UTC on the last period day is already the next day in Europe/Zurich.
+		for ts in (datetime(2026, 8, 31, 12, 0, tzinfo=timezone.utc), datetime(2026, 8, 31, 23, 45, tzinfo=timezone.utc)):
+			MeterReading.objects.create(
+				metering_point=self.mp,
+				timestamp=ts,
+				energy_kwh=Decimal("1.0000"),
+				direction=ReadingDirection.IN,
+				resolution=ReadingResolution.FIFTEEN_MIN,
+			)
+
+	def test_late_evening_utc_reading_stays_in_its_utc_day_bucket(self):
+		auth(self.client, self.owner)
+		resp = self.client.get(
+			"/api/v1/metering/readings/dashboard-summary/",
+			{"zev_id": str(self.zev.id), "date_from": "2026-08-31", "date_to": "2026-08-31", "bucket": "day"},
+		)
+
+		self.assertEqual(resp.status_code, 200)
+		self.assertEqual(len(resp.data["timeline"]), 1)
+		bucket = resp.data["timeline"][0]
+		self.assertEqual(bucket["bucket"], "2026-08-31T00:00:00+00:00")
+		self.assertAlmostEqual(bucket["consumed_kwh"], 2.0, places=6)
+
+
 class DashboardMidPeriodTransferTests(TestCase):
 	def setUp(self):
 		self.client = APIClient()
