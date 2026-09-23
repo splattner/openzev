@@ -5,7 +5,7 @@ import { fetchHourlyProfile, fetchMeteringDashboardSummary } from '../lib/api/me
 import { fetchInvoices } from '../lib/api/invoices'
 import { queryKeys } from '../lib/api/queryKeys'
 import { formatKwh, formatPercent } from '../lib/numbers'
-import { dashboardKwhStat, hourlyKwhTick, hourlyKwhTooltipValue, kwhTick, kwhTooltipValue } from '../lib/dashboardFormatting'
+import { dashboardKwhStat, hourlyKwhTick, hourlyKwhTooltipValue, fromZevRate, kwhTick } from '../lib/dashboardFormatting'
 import { formatMeteringBucketLabel } from '../lib/meteringLabels'
 import { useAppSettings } from '../lib/appSettings'
 import { useAuth } from '../lib/auth'
@@ -93,11 +93,27 @@ export function DashboardPage() {
                 const locally_produced = Math.max(0, entry.produced_kwh - entry.exported_kwh)
                 const self_consumption_rate =
                     entry.produced_kwh > 0 ? Math.round((locally_produced / entry.produced_kwh) * 1000) / 10 : null
-                return { ...entry, locally_consumed, locally_produced, self_consumption_rate }
+                const from_zev_rate = fromZevRate(locally_consumed, entry.consumed_kwh)
+                return { ...entry, locally_consumed, locally_produced, self_consumption_rate, from_zev_rate }
             }),
         [ownerTimeline],
     )
-    const participantTimeline = useMemo(() => (summary?.role === 'participant' ? summary.timeline : []), [summary])
+    const participantTimeline = useMemo(
+        () =>
+            summary?.role === 'participant'
+                ? summary.timeline.map((entry) => ({
+                      ...entry,
+                      from_zev_rate: fromZevRate(entry.consumed_from_zev_kwh, entry.total_consumed_kwh),
+                  }))
+                : [],
+        [summary],
+    )
+    const participantFromZev = useMemo(() => {
+        if (summary?.role !== 'participant') return null
+        const { consumed_from_zev_kwh, total_consumed_kwh } = summary.totals
+        const pct = fromZevRate(consumed_from_zev_kwh, total_consumed_kwh)
+        return pct === null ? null : { pct, zevKwh: consumed_from_zev_kwh, totalKwh: total_consumed_kwh }
+    }, [summary])
     const hourlyProfile = hourlyProfileQuery.data?.hourly_profile ?? null
     const hourlyProfileData = useMemo(
         () => hourlyProfile?.map((entry) => ({ ...entry, label: `${String(entry.hour).padStart(2, '0')}:00` })) ?? [],
@@ -220,7 +236,6 @@ export function DashboardPage() {
                         formatBucketLabel={formatBucketLabel}
                         formatBucketTooltipLabel={formatBucketTooltipLabel}
                         kwhTick={kwhTick}
-                        kwhTooltipValue={kwhTooltipValue}
                     />
                     <ParticipantTableCard
                         participantStats={summary.participant_stats}
@@ -244,6 +259,18 @@ export function DashboardPage() {
                         <StatCard label={t('pages.dashboard.participantStats.consumedFromZev')} value={dashboardKwhStat(summary.totals.consumed_from_zev_kwh)} />
                         <StatCard label={t('pages.dashboard.participantStats.importedFromGrid')} value={dashboardKwhStat(summary.totals.imported_from_grid_kwh)} />
                         <StatCard label={t('pages.dashboard.participantStats.totalConsumption')} value={dashboardKwhStat(summary.totals.total_consumed_kwh)} />
+                        <StatCard
+                            label={t('pages.dashboard.participantStats.fromZevShare')}
+                            value={participantFromZev ? formatPercent(participantFromZev.pct) : '—'}
+                            hint={
+                                participantFromZev
+                                    ? t('pages.dashboard.hints.fromZevShare', {
+                                          zev: formatKwh(participantFromZev.zevKwh, { maxDecimals: 0 }),
+                                          total: formatKwh(participantFromZev.totalKwh, { maxDecimals: 0 }),
+                                      })
+                                    : undefined
+                            }
+                        />
                     </section>
                     {summary.zev_participant_stats.length > 0 && summary.current_participant_id && (
                         <EnergyFlowCard
@@ -257,7 +284,6 @@ export function DashboardPage() {
                         formatBucketLabel={formatBucketLabel}
                         formatBucketTooltipLabel={formatBucketTooltipLabel}
                         kwhTick={kwhTick}
-                        kwhTooltipValue={kwhTooltipValue}
                     />
                     {hourlyProfileData.length > 0 && (
                         <HourlyProfileCard

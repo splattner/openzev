@@ -2329,6 +2329,7 @@ export const fr = {
             },
             hints: {
                 selfConsumption: '{{local}} kWh sur {{total}} kWh produits consommés localement',
+                fromZevShare: '{{zev}} kWh sur {{total}} kWh consommés proviennent du RCP',
             },
             consumptionAndProduction: 'Consommation et production',
             consumption: 'Consommation',
@@ -2339,6 +2340,7 @@ export const fr = {
                 usedLocally: 'Utilisé localement',
                 exported: 'Injecté',
                 selfConsumedPct: 'Autoconsommation %',
+                fromZevPct: 'Du RCP %',
             },
             noData: 'Aucune donnée de mesure pour la période sélectionnée.',
             perParticipant: 'Par participant',
@@ -2354,6 +2356,7 @@ export const fr = {
             },
             participantStats: {
                 consumedFromZev: 'Consommé du RCP',
+                fromZevShare: 'Part du RCP',
                 importedFromGrid: 'Importé du réseau',
                 totalConsumption: 'Consommation totale',
             },

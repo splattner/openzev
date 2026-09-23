@@ -2329,6 +2329,7 @@ export const de = {
             },
             hints: {
                 selfConsumption: '{{local}} kWh von {{total}} kWh erzeugt lokal verbraucht',
+                fromZevShare: '{{zev}} kWh von {{total}} kWh Verbrauch stammen aus dem ZEV',
             },
             consumptionAndProduction: 'Verbrauch und Produktion',
             consumption: 'Verbrauch',
@@ -2339,6 +2340,7 @@ export const de = {
                 usedLocally: 'Lokal genutzt',
                 exported: 'Exportiert',
                 selfConsumedPct: 'Eigenverbrauch %',
+                fromZevPct: 'Aus ZEV %',
             },
             noData: 'Keine Messdaten für den ausgewählten Zeitraum.',
             perParticipant: 'Pro Teilnehmer',
@@ -2354,6 +2356,7 @@ export const de = {
             },
             participantStats: {
                 consumedFromZev: 'Aus ZEV verbraucht',
+                fromZevShare: 'Anteil aus ZEV',
                 importedFromGrid: 'Aus Netz importiert',
                 totalConsumption: 'Gesamtverbrauch',
             },

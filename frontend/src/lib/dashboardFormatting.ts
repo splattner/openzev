@@ -17,3 +17,7 @@ export const hourlyKwhTooltipValue = (value: unknown): string =>
 /** Dashboard KPI/table precision: up to two decimals. */
 export const dashboardKwhStat = (value: number): string =>
     `${formatKwh(value, { maxDecimals: 2 })} kWh`
+
+/** Share (0-100, one decimal) of consumption covered by the ZEV; null when nothing was consumed. */
+export const fromZevRate = (fromZevKwh: number, totalConsumedKwh: number): number | null =>
+    totalConsumedKwh > 0 ? Math.round((fromZevKwh / totalConsumedKwh) * 1000) / 10 : null

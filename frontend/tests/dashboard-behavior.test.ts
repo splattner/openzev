@@ -304,6 +304,10 @@ describe('dashboard behavior preservation', () => {
         mockState.summary = participantSummary('me')
         const withId = await renderDashboard()
         expect(withId.textContent).toContain('pages.dashboard.energyFlow.title')
+
+        // From-ZEV share KPI: 35 of 50 kWh = 70 %.
+        expect(withId.textContent).toContain('pages.dashboard.participantStats.fromZevShare')
+        expect(withId.textContent).toContain('70\u00a0%')
     })
 
     it('participant invoices keep the approved/sent/paid pdf filter with details actions', async () => {
