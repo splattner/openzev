@@ -655,7 +655,12 @@ Existing suites stay green (contract: 48 tests in `test_contract_context.py`; te
   Chromium's PDF plugin (viewport-only painting) leaves embedded viewers
   blank. Because the PDF embeds are 70–72 vh, the helper re-measures after
   resizing and solves the linear content-height model to its fixed point in
-  one step; only the 04b assign modal keeps a plain viewport shot. The
+  one step; only the 04b assign modal keeps a plain viewport shot. The helper
+  resets to the 1440×900 base viewport and lifts the `.table-scroll` height
+  cap while measuring and capturing, so its `100dvh`-relative cap cannot feed
+  a ~1:1 slope into the solver (the 17-admin-invoices capture once came out
+  1440×4024, half of it blank). A measured slope above 0.9 fails the run with
+  the measured heights. The
   data-dependent captures pin the global ZEV selection to the seeded demo
   ZEV, because the app's fallback otherwise lands on an arbitrary empty
   tenant of this database. Bare-metal capture must set

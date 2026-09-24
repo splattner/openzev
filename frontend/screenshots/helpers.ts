@@ -156,6 +156,12 @@ export async function resetHover(page: Page) {
   await page.waitForTimeout(250)
 }
 
+const SHOT_WIDTH = 1440
+const BASE_HEIGHT = 900
+const MAX_SLOPE = 0.9
+const MAX_MEASURE_STEPS = 4
+const SETTLE_MS = 400
+
 /**
  * Capture the whole page by growing the viewport to the content height.
  *
@@ -169,6 +175,9 @@ export async function resetHover(page: Page) {
  * 70–72vh), so after growing, re-measure; if the target moved, solve the
  * linear model c(h) = base + factor·h from both samples and jump straight to
  * its fixed point c(h) = h instead of creeping toward it.
+ *
+ * Tables stay uncapped through the capture (see below); a slope above
+ * MAX_SLOPE fails loudly instead of committing a half-blank capture.
  */
 export async function screenshotFull(page: Page, dir: string, name: string) {
   // Visible ones only: a hidden, kept-mounted tab panel (the account page) may
@@ -177,34 +186,54 @@ export async function screenshotFull(page: Page, dir: string, name: string) {
   await resetHover(page)
   const measure = () => page.evaluate(() => document.documentElement.scrollHeight)
   const resize = async (height: number) => {
-    await page.setViewportSize({ width: 1440, height })
-    await page.waitForTimeout(400)
+    await page.setViewportSize({ width: SHOT_WIDTH, height })
+    await page.waitForTimeout(SETTLE_MS)
   }
 
-  let viewport = 900
-  let content = await measure()
-  let prevViewport: number | null = null
-  let prevContent: number | null = null
-
-  for (let i = 0; i < 4 && content > viewport; i++) {
-    let target = Math.max(900, content)
-    if (prevViewport != null && prevContent != null && viewport > prevViewport) {
-      const factor = Math.min(0.9, (content - prevContent) / (viewport - prevViewport))
-      target = Math.max(900, Math.round((content - factor * viewport) / (1 - factor)))
-    }
-    prevViewport = viewport
-    prevContent = content
-    viewport = target
-    await resize(viewport)
-    content = await measure()
-  }
-  if (content > viewport) {
-    await resize(content) // non-linear fallback: fit whatever grew last
-  }
-  await page.screenshot({
-    path: path.join(dir, `${name}.png`),
-    fullPage: false,
+  await resize(BASE_HEIGHT)
+  // Uncap viewport-relative tables while measuring and capturing: the shipped
+  // `.table-scroll` cap is 100dvh-relative and would feed a ~1:1 slope into
+  // the solver. Where the cap would not bind, pixels match shipped CSS.
+  const styleHandle = await page.addStyleTag({
+    content: '.table-scroll { max-height: none !important; }',
   })
+
+  let viewport = BASE_HEIGHT
+  try {
+    let content = await measure()
+    let prevViewport: number | null = null
+    let prevContent: number | null = null
+
+    for (let i = 0; i < MAX_MEASURE_STEPS && content > viewport; i++) {
+      let target = Math.max(BASE_HEIGHT, content)
+      if (prevViewport != null && prevContent != null) {
+        // Target exceeded the viewport, so the divisor is non-zero.
+        const slope = (content - prevContent) / (viewport - prevViewport)
+        if (slope > MAX_SLOPE) {
+          throw new Error(
+            `screenshotFull(${name}): content tracks viewport (slope ${slope.toFixed(2)}; ` +
+            `viewport ${prevViewport}→${viewport}, content ${prevContent}→${content})`,
+          )
+        }
+        target = Math.max(BASE_HEIGHT, Math.round((content - slope * viewport) / (1 - slope)))
+      }
+      prevViewport = viewport
+      prevContent = content
+      viewport = target
+      await resize(viewport)
+      content = await measure()
+    }
+    if (content > viewport) {
+      viewport = content
+      await resize(viewport)
+    }
+    await page.screenshot({
+      path: path.join(dir, `${name}.png`),
+      fullPage: false,
+    })
+  } finally {
+    await styleHandle.evaluate((el) => el.remove()).catch(() => {})
+  }
 }
 
 /** Take a viewport-only screenshot (no scroll) — for viewport-scoped UI like modals. */
