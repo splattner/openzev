@@ -16,6 +16,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from rest_framework.test import APIClient
 
 from accounts.models import UserRole
+from audit.models import AuditEvent
 from metering.importers import csv_importer
 from metering.models import ImportLog, ImportSource, MeterReading, ReadingDirection, ReadingResolution
 from metering.testing import upload_csv
@@ -304,6 +305,83 @@ class ImportLogDeletionTests(TestCase):
         self.assertEqual(resp.data["deleted_readings"], 1)
         self.assertFalse(ImportLog.objects.filter(pk=own_log.id).exists())
         self.assertTrue(ImportLog.objects.filter(pk=other_log.id).exists())
+
+    def test_single_delete_audit_event_is_scoped_to_the_zev(self):
+        log = self._create_import_log_with_reading(
+            zev=self.zev,
+            metering_point=self.metering_point,
+            created_at=datetime(2026, 2, 10, 8, 0, tzinfo=timezone.utc),
+        )
+
+        self.client.delete(f"/api/v1/metering/import-logs/{log.id}/")
+
+        event = AuditEvent.objects.get(action_type="import_log.delete")
+        self.assertEqual(event.zev_id, self.zev.id)
+        listed = self.client.get("/api/v1/audit/events/?action_type=import_log.delete")
+        self.assertEqual(listed.status_code, 200)
+        self.assertEqual(listed.data["count"], 1)
+
+    def test_bulk_delete_records_one_scoped_audit_event_per_zev(self):
+        second_zev = Zev.objects.create(name="Second Audit ZEV", owner=self.owner, zev_type="vzev", invoice_prefix="A")
+        second_meter = MeteringPoint.objects.create(
+            zev=second_zev, meter_id="CH-DELETE-AUDIT", meter_type=MeteringPointType.CONSUMPTION
+        )
+        self._create_import_log_with_reading(
+            zev=self.zev,
+            metering_point=self.metering_point,
+            created_at=datetime(2026, 5, 1, 10, 0, tzinfo=timezone.utc),
+        )
+        self._create_import_log_with_reading(
+            zev=second_zev,
+            metering_point=second_meter,
+            created_at=datetime(2026, 5, 2, 10, 0, tzinfo=timezone.utc),
+        )
+        self._create_import_log_with_reading(
+            zev=second_zev,
+            metering_point=second_meter,
+            created_at=datetime(2026, 5, 3, 10, 0, tzinfo=timezone.utc),
+        )
+
+        resp = self.client.post("/api/v1/metering/import-logs/bulk-delete/", {"mode": "all"}, format="json")
+
+        self.assertEqual(resp.data["deleted_logs"], 3)
+        self.assertEqual(resp.data["deleted_readings"], 3)
+        events = {e.zev_id: e for e in AuditEvent.objects.filter(action_type="import_log.bulk_delete")}
+        self.assertEqual(set(events), {self.zev.id, second_zev.id})
+        self.assertEqual(events[self.zev.id].metadata_json["deleted_logs"], 1)
+        self.assertEqual(events[second_zev.id].metadata_json["deleted_logs"], 2)
+        self.assertEqual(events[second_zev.id].metadata_json["deleted_readings"], 2)
+
+    def test_bulk_delete_audit_event_hidden_from_other_zev_owner(self):
+        self._create_import_log_with_reading(
+            zev=self.zev,
+            metering_point=self.metering_point,
+            created_at=datetime(2026, 5, 1, 10, 0, tzinfo=timezone.utc),
+        )
+        self.client.post("/api/v1/metering/import-logs/bulk-delete/", {"mode": "all"}, format="json")
+
+        other_client = APIClient()
+        auth(other_client, self.other_owner)
+        listed = other_client.get("/api/v1/audit/events/?action_type=import_log.bulk_delete")
+        self.assertEqual(listed.status_code, 200)
+        self.assertEqual(listed.data["count"], 0)
+
+    def test_bulk_delete_does_not_scope_audit_event_to_unowned_zev_id(self):
+        self._create_import_log_with_reading(
+            zev=self.zev,
+            metering_point=self.metering_point,
+            created_at=datetime(2026, 5, 1, 10, 0, tzinfo=timezone.utc),
+        )
+
+        self.client.post(
+            "/api/v1/metering/import-logs/bulk-delete/",
+            {"mode": "all", "zev_id": str(self.other_zev.id)},
+            format="json",
+        )
+
+        event = AuditEvent.objects.get(action_type="import_log.bulk_delete")
+        self.assertIsNone(event.zev_id)
+        self.assertEqual(event.metadata_json["deleted_logs"], 0)
 
     def test_bulk_delete_rejects_malformed_zev_id(self):
         resp = self.client.post(
