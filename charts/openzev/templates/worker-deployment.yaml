@@ -40,6 +40,16 @@ spec:
               {{- else }}
               value: {{ .Values.secretKey.value | quote }}
               {{- end }}
+            {{- if .Values.backupEncryptionKeys.existingSecret.name }}
+            - name: BACKUP_ENCRYPTION_KEYS
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.backupEncryptionKeys.existingSecret.name }}
+                  key: {{ .Values.backupEncryptionKeys.existingSecret.key }}
+            {{- else if .Values.backupEncryptionKeys.value }}
+            - name: BACKUP_ENCRYPTION_KEYS
+              value: {{ .Values.backupEncryptionKeys.value | quote }}
+            {{- end }}
             - name: DATABASE_URL
               {{- if .Values.database.existingSecret.name }}
               valueFrom:

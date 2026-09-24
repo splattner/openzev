@@ -88,6 +88,33 @@ encrypted with the first, and all are tried on decrypt, so a key can be rotated
 without locking anyone out. Losing every key makes enrolled authenticator apps
 unusable — back it up like `SECRET_KEY`. The key is only needed by the backend.
 
+## Backup encryption key
+
+Backup archives and stored backup-destination secrets are encrypted with keys
+that are independent of `SECRET_KEY` and the two-factor key (ADR 0024). A
+backup holds password hashes, personal data and invoices, so set one. Until
+then archives are written unencrypted. Keys must be at least 32 characters:
+
+```bash
+python -c "import base64, os; print(base64.urlsafe_b64encode(os.urandom(32)).decode())"
+```
+
+Set it as `backupEncryptionKeys.value`, or load it from an existing secret:
+
+```yaml
+backupEncryptionKeys:
+  existingSecret:
+    name: openzev-backup-secret
+    key: BACKUP_ENCRYPTION_KEYS
+```
+
+If `backupEncryptionKeys.existingSecret.name` is set, it overrides
+`backupEncryptionKeys.value`. The value may hold several comma-separated keys,
+newest first: the first encrypts and all are tried on decrypt, so a key can be
+rotated. Keep a copy off the cluster — without it an encrypted backup cannot be
+opened. The key is passed to the backend and the worker (which runs backup
+jobs), not to beat.
+
 ## Passkeys
 
 Passkeys (WebAuthn) are bound to the domain users open OpenZEV on, so the
