@@ -67,10 +67,9 @@ The chart shows:
     pure production meter and "Feed-in" for a bidirectional one.
   - 🔵 **Blue:** Consumption (`IN`)
 - **Tooltips:** Hover to see exact values
-- **Summary cards** above the chart: the meter ID (or ZEV name, for a whole-ZEV
-  total), total consumption, average and peak consumption per bar (with the
-  peak card naming which bar it was), total production/feed-in (when present),
-  and the number of bars shown
+- **Summary cards** above the chart: total consumption, average and peak
+  consumption per bar (with the peak card naming which bar it was), total
+  production/feed-in (when present), and the number of bars shown
 
 ### Raw Readings Table
 

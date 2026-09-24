@@ -2135,8 +2135,6 @@ export const en = {
                 hourlyUnavailableHint: 'Hourly resolution is only available for periods of {{maxDays}} days or less.',
             },
             stats: {
-                meterId: 'Meter ID',
-                zev: 'ZEV',
                 totalConsumption: 'Total Consumption (IN)',
                 averageConsumption: 'Average Consumption (IN)',
                 peakConsumption: 'Peak Consumption (IN)',

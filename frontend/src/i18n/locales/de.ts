@@ -2124,8 +2124,6 @@ export const de = {
                 hourlyUnavailableHint: 'Stündliche Auflösung ist nur für Zeiträume von {{maxDays}} Tagen oder weniger verfügbar.',
             },
             stats: {
-                meterId: 'Zähler-ID',
-                zev: 'ZEV',
                 totalConsumption: 'Gesamtverbrauch (Bezug)',
                 averageConsumption: 'Durchschnittlicher Verbrauch (Bezug)',
                 peakConsumption: 'Spitzenverbrauch (Bezug)',
