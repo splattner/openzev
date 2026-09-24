@@ -779,6 +779,7 @@ and missing meters still block the wizard.
 - `mode = period` requires `date_from` and `date_to` and filters with the half-open UTC range `[date_from 00:00Z, date_to + 1 day 00:00Z)` on `ImportLog.created_at`. History timestamps render in local time; the delete dialog labels the range as UTC so display, selection and deletion stay consistent.
 - Bulk delete validates an optional `zev_id` as a UUID before filtering. Invalid calendar dates, non-string dates, reversed ranges, and `date_to=9999-12-31` return 400 rather than overflowing the exclusive end bound.
 - History table filename/source filters are client-side only and never narrow bulk delete: the UI copy names the selected ZEV (or "all visible ZEVs" when none is selected), and the count uses the same half-open UTC instants as the backend.
+- Both endpoints write an audit event (`import_log.delete`, `import_log.bulk_delete`) scoped to the ZEV of the deleted logs, so the owning ZEV owner sees it in their audit log. Bulk delete writes one event per affected ZEV (metadata carries the request filters plus that ZEV's `deleted_logs`/`deleted_readings`). The ZEV is taken from the deleted logs, never from the request's `zev_id`; a bulk delete that removes nothing, or removes only logs without a ZEV, writes a single unscoped (admin-only) event.
 - Delete responses return counts for both deleted logs and deleted readings; bulk deletion also returns `timezone: "UTC"`; the frontend invalidates both import-log and metering queries so charts/quality refresh.
 
 ---
@@ -1018,7 +1019,7 @@ type MeteringDashboardSummary =
 | `metering/test_import_limits.py::CsvLimitTests` / `XlsxZipLimitTests` / `BackendUploadCapTests` | §4.4/§8.3: size/row/col caps, `values_count`/`interval_minutes` bounds on both import and preview (with `zev_id`), error truncation with sentinel; overwrite note lives in `warnings`, XLSX ZIP limits; characterization also exercises preview with `zev_id` |
 | `metering/testing.py` | Shared `upload_csv`/`preview_csv`/`detect_csv` helpers used by the import modules (the upload/preview helpers always exercise the required-`zev_id` path) |
 | `metering/test_import_csv_detect.py` | §4.3.1: delimiter, header, column, layout, interval and timestamp-format detection across standard/headerless/OBIS/daily/hourly-with-total/Excel files, each detected configuration round-tripped through the real preview endpoint (no errors, no missing meters); undetected reporting; bounded sample; 400 for missing/legacy files; role gating |
-| `metering/test_import_logs.py::ImportLogDeletionTests` | §3.3/§5.7/§8.2: deletion/rollback plus list-payload identity (`zev_name`, `imported_by_display`, `batch_id` alongside the raw IDs); bulk delete without `zev_id` covers all visible ZEVs but never foreign ones |
+| `metering/test_import_logs.py::ImportLogDeletionTests` | §3.3/§5.7/§8.2: deletion/rollback plus list-payload identity (`zev_name`, `imported_by_display`, `batch_id` alongside the raw IDs); bulk delete without `zev_id` covers all visible ZEVs but never foreign ones; delete/bulk-delete audit events are ZEV-scoped (one per ZEV for bulk), hidden from other owners, and never scoped from an unowned `zev_id` |
 
 ### Backend (`metering/test_reading_visibility.py`)
 

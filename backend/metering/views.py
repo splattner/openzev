@@ -455,6 +455,12 @@ class ImportLogViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.
         return base.filter(Q(zev__owner=user) | Q(imported_by=user)).distinct()
 
     def _delete_import_logs(self, queryset):
+        """Delete the selected logs and their readings.
+
+        Returns ``(result, by_zev)``: ``result`` is the response payload and
+        ``by_zev`` maps each affected ``Zev`` (``None`` for logs without one)
+        to its own counts, so the audit trail can be scoped per community.
+        """
         with transaction.atomic():
             # Freeze and lock the selection before checking protection. Avoid
             # locking nullable select_related joins from get_queryset().
@@ -465,22 +471,29 @@ class ImportLogViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.
                     "code": "overwrite_import_protected",
                     "error": "Imports that overwrote readings cannot be deleted. No imports were deleted.",
                 })
-            batch_ids = {log.batch_id for log in logs if log.batch_id}
-            deleted_logs = len(logs)
-            if batch_ids:
-                deleted_readings, _ = MeterReading.objects.filter(import_batch__in=batch_ids).delete()
-            else:
-                deleted_readings = 0
+            zevs = Zev.objects.in_bulk({log.zev_id for log in logs if log.zev_id})
+            by_zev = {}
+            for log in logs:
+                counts = by_zev.setdefault(zevs.get(log.zev_id), {"deleted_logs": 0, "deleted_readings": 0, "batch_ids": set()})
+                counts["deleted_logs"] += 1
+                if log.batch_id:
+                    counts["batch_ids"].add(log.batch_id)
+            for counts in by_zev.values():
+                batch_ids = counts.pop("batch_ids")
+                if batch_ids:
+                    counts["deleted_readings"], _ = MeterReading.objects.filter(import_batch__in=batch_ids).delete()
             ImportLog.objects.filter(pk__in=[log.pk for log in logs]).delete()
 
-        return {
-            "deleted_logs": deleted_logs,
-            "deleted_readings": deleted_readings,
+        result = {
+            "deleted_logs": len(logs),
+            "deleted_readings": sum(counts["deleted_readings"] for counts in by_zev.values()),
         }
+        return result, by_zev
 
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
-        result = self._delete_import_logs(self.get_queryset().filter(pk=instance.pk))
+        zev = instance.zev
+        result, _ = self._delete_import_logs(self.get_queryset().filter(pk=instance.pk))
         record_audit_event(
             request=request,
             action_category=AuditActionCategory.METERING,
@@ -488,6 +501,7 @@ class ImportLogViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.
             target_type="metering.ImportLog",
             target_id=str(instance.pk),
             target_display=str(instance.batch_id),
+            zev=zev,
             summary=f"Deleted import log {instance.pk} and related readings.",
             metadata=result,
         )
@@ -526,24 +540,30 @@ class ImportLogViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.
         elif mode != "all":
             return Response({"error": "Unsupported deletion mode."}, status=status.HTTP_400_BAD_REQUEST)
 
-        result = self._delete_import_logs(queryset)
+        result, by_zev = self._delete_import_logs(queryset)
         result["mode"] = mode
         result["timezone"] = "UTC"
-        record_audit_event(
-            request=request,
-            action_category=AuditActionCategory.METERING,
-            action_type="import_log.bulk_delete",
-            target_type="metering.ImportLog",
-            summary="Bulk deleted import logs and related readings.",
-            metadata={
-                "mode": mode,
-                "zev_id": zev_id,
-                "date_from": str(request.data.get("date_from") or ""),
-                "date_to": str(request.data.get("date_to") or ""),
-                "timezone": "UTC",
-                **result,
-            },
-        )
+        request_metadata = {
+            "mode": mode,
+            "zev_id": zev_id,
+            "date_from": str(request.data.get("date_from") or ""),
+            "date_to": str(request.data.get("date_to") or ""),
+            "timezone": "UTC",
+        }
+        # One event per affected ZEV, so each owner sees the deletion in their
+        # own scoped audit log. Attribution comes only from the deleted logs,
+        # never from the request's zev_id, which is unchecked user input. A
+        # no-op deletion (or logs without a ZEV) yields one unscoped event.
+        for zev, counts in (by_zev or {None: {"deleted_logs": 0, "deleted_readings": 0}}).items():
+            record_audit_event(
+                request=request,
+                action_category=AuditActionCategory.METERING,
+                action_type="import_log.bulk_delete",
+                target_type="metering.ImportLog",
+                zev=zev,
+                summary="Bulk deleted import logs and related readings.",
+                metadata={**request_metadata, **counts},
+            )
         return Response(result, status=status.HTTP_200_OK)
 
 
