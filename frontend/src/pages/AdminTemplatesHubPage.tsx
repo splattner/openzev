@@ -3,16 +3,14 @@ import { Tabs } from '@mantine/core'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { AdminPdfTemplatesPage, type PdfTemplateTab } from './AdminPdfTemplatesPage'
 import { AdminEmailTemplatesPage } from './AdminEmailTemplatesPage'
-import type { EmailTemplateKey } from '../lib/emailTemplateFields'
+import { EMAIL_TEMPLATE_KEYS, type EmailTemplateKey } from '../lib/emailTemplateFields'
 
 export type AdminTemplatesTab = 'pdf' | 'email'
 
 type TemplateKey = PdfTemplateTab | EmailTemplateKey
 
 const pdfTemplates: PdfTemplateTab[] = ['invoice', 'contract', 'annual_statement']
-const emailTemplates: EmailTemplateKey[] = [
-    'invoice_email', 'participant_onboarding', 'email_verification', 'participant_magic_link',
-]
+const emailTemplates: EmailTemplateKey[] = [...EMAIL_TEMPLATE_KEYS]
 
 /**
  * Admin Templates hub (nav-regroup phase 3, spec §6): every template is a tab

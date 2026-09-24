@@ -221,58 +221,9 @@ label > small.muted {
   white-space: nowrap;
 }
 
-.email-field-reference {
-  width: 100%;
-  font-size: 0.78rem;
-  border-collapse: collapse;
-  table-layout: fixed;
-}
-
-.email-field-reference thead th {
-  white-space: normal;
-  padding: 0.4rem;
-}
-
-.email-field-reference td {
-  overflow-wrap: anywhere;
-  line-height: 1.35;
-  vertical-align: top;
-}
-
-.email-field-reference td:first-child {
-  font-family: monospace;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  width: 50%;
-}
-
-.field-reference-aside {
-  max-height: 80vh;
-  overflow-y: auto;
-}
-
-.field-reference-aside h4 {
-  margin: 0;
-}
-
-.field-reference-aside .muted {
-  font-size: 0.78rem;
-  margin: 0;
-  line-height: 1.35;
-}
-
 .mono-editor {
   font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
   font-size: 0.9rem;
-}
-
-.field-reference-details summary {
-  cursor: pointer;
-}
-
-.field-reference-details-content {
-  margin-top: 0.75rem;
 }
 
 .page-stack tbody tr,
@@ -3324,6 +3275,85 @@ input.recurrence-chip-input {
 
 .button-ghost:hover:not(:disabled) {
   background: var(--surface);
+}
+
+.field-reference {
+  max-height: 80vh;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.field-reference__heading {
+  margin: 0;
+}
+
+.field-reference__search {
+  width: 100%;
+}
+
+.field-reference__empty {
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+.field-reference__group-heading {
+  margin: 0.75rem 0 0.25rem;
+}
+
+.field-reference__table {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+}
+
+.field-reference__table .field-reference__variable {
+  width: 55%;
+  padding: 0.25rem 0.5rem 0.25rem 0;
+  overflow-wrap: anywhere;
+}
+
+.field-reference__table .field-reference__description {
+  padding: 0.25rem 0.5rem 0.25rem 0;
+  overflow-wrap: anywhere;
+}
+
+.field-reference__example {
+  font-size: 0.78rem;
+  font-style: italic;
+  overflow-wrap: anywhere;
+}
+
+.field-reference__table .field-reference__count {
+  width: 3rem;
+  padding: 0.25rem 0;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.field-reference-token {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--interactive);
+  font: inherit;
+  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-align: left;
+  cursor: pointer;
+}
+
+.field-reference-token:hover {
+  color: var(--interactive-hover);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.field-reference-token:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 3px;
+  border-radius: 3px;
 }
 
 /* Success banner */

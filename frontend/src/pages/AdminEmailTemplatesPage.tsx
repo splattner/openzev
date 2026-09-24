@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { PageSkeleton } from '../components/PageSkeleton'
 import { useTranslation } from 'react-i18next'
 import {
@@ -9,19 +9,16 @@ import {
 } from '../lib/api/invoices'
 import { queryKeys } from '../lib/api/queryKeys'
 import { useToast } from '../lib/toast'
-import { EmailFieldReference } from '../components/EmailFieldReference'
-import { EMAIL_TEMPLATE_FIELDS, type EmailField, type EmailTemplateKey } from '../lib/emailTemplateFields'
+import { FieldReference, useTemplateTokenInsertion } from '../components/FieldReference'
+import type { EmailTemplateKey } from '../lib/emailTemplateFields'
 
-function EmailTemplateEditor({
-    templateKey,
-    fields,
-}: {
-    templateKey: EmailTemplateKey
-    fields: EmailField[]
-}) {
+function EmailTemplateEditor({ templateKey }: { templateKey: EmailTemplateKey }) {
     const { t } = useTranslation()
     const { pushToast } = useToast()
     const queryClient = useQueryClient()
+    const subjectRef = useRef<HTMLInputElement>(null)
+    const bodyRef = useRef<HTMLTextAreaElement>(null)
+    const lastFocusedRef = useRef<HTMLInputElement | HTMLTextAreaElement | null>(null)
 
     const query = useQuery({
         queryKey: queryKeys.admin.emailTemplate(templateKey),
@@ -56,6 +53,14 @@ function EmailTemplateEditor({
         onError: () => pushToast(t('common.error'), 'error'),
     })
 
+    const handleInsert = useTemplateTokenInsertion(
+        subjectRef,
+        bodyRef,
+        lastFocusedRef,
+        setSubject,
+        setBody,
+    )
+
     return (
         <div className="content-with-aside">
             <section className="card page-stack">
@@ -78,6 +83,8 @@ function EmailTemplateEditor({
                         <label>
                             <span>{t('admin.emailTemplates.subject')}</span>
                             <input
+                                ref={subjectRef}
+                                onFocus={() => { lastFocusedRef.current = subjectRef.current }}
                                 type="text"
                                 value={subject}
                                 onChange={(e) => setSubject(e.target.value)}
@@ -86,6 +93,8 @@ function EmailTemplateEditor({
                         <label>
                             <span>{t('admin.emailTemplates.body')}</span>
                             <textarea
+                                ref={bodyRef}
+                                onFocus={() => { lastFocusedRef.current = bodyRef.current }}
                                 className="mono-editor"
                                 rows={24}
                                 value={body}
@@ -115,7 +124,17 @@ function EmailTemplateEditor({
                     </>
                 )}
             </section>
-            <EmailFieldReference fields={fields} variant="aside" />
+            {query.data ? (
+                <FieldReference
+                    groups={query.data.fields ?? []}
+                    content={`${subject}\n${body}`}
+                    onInsert={handleInsert}
+                />
+            ) : query.isError ? (
+                <p className="error-banner" role="alert">{t('common.error')}</p>
+            ) : (
+                <p className="muted" role="status">{t('common.loading')}</p>
+            )}
         </div>
     )
 }
@@ -132,11 +151,11 @@ export function AdminEmailTemplatesPage({ embedded = false, template }: {
     const [selectedTemplate, setSelectedTemplate] = useState<EmailTemplateKey>('invoice_email')
     const activeTab = template ?? selectedTemplate
 
-    const tabs: { key: EmailTemplateKey; label: string; fields: EmailField[] }[] = [
-        { key: 'invoice_email', label: t('admin.emailTemplates.invoiceEmail'), fields: EMAIL_TEMPLATE_FIELDS.invoice_email },
-        { key: 'participant_onboarding', label: t('admin.emailTemplates.onboardingEmail'), fields: EMAIL_TEMPLATE_FIELDS.participant_onboarding },
-        { key: 'email_verification', label: t('admin.emailTemplates.verificationEmail'), fields: EMAIL_TEMPLATE_FIELDS.email_verification },
-        { key: 'participant_magic_link', label: t('admin.emailTemplates.magicLinkEmail'), fields: EMAIL_TEMPLATE_FIELDS.participant_magic_link },
+    const tabs: { key: EmailTemplateKey; label: string }[] = [
+        { key: 'invoice_email', label: t('admin.emailTemplates.invoiceEmail') },
+        { key: 'participant_onboarding', label: t('admin.emailTemplates.onboardingEmail') },
+        { key: 'email_verification', label: t('admin.emailTemplates.verificationEmail') },
+        { key: 'participant_magic_link', label: t('admin.emailTemplates.magicLinkEmail') },
     ]
 
     return (
@@ -162,7 +181,6 @@ export function AdminEmailTemplatesPage({ embedded = false, template }: {
             <EmailTemplateEditor
                 key={activeTab}
                 templateKey={activeTab}
-                fields={EMAIL_TEMPLATE_FIELDS[activeTab]}
             />
         </div>
     )

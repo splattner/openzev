@@ -249,7 +249,7 @@ From the page, **Send me a sign-in link** emails a one-time link to the address 
 
 Both fields support variable placeholders such as `{invoice_number}`, `{zev_name}`, `{participant_name}`, `{period_start}`, `{period_end}`, and `{total_chf}`. See [Email Configuration → Email Templates](10-email-configuration.md#email-templates) for the full variable reference.
 
-Leave fields blank to use the system defaults. If a template contains an invalid placeholder, the system falls back to defaults automatically.
+Leave fields blank to use the admin's global invoice-email template when one is customized, or the shipped default otherwise. If a template contains an invalid placeholder, the system falls back to defaults automatically.
 
 For more details on email delivery, see [Email Configuration](10-email-configuration.md). For system-wide default email templates managed by admins, see [Platform → Templates → Email templates](14-admin-console.md#email-templates).
 

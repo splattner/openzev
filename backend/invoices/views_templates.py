@@ -1,18 +1,7 @@
-"""Admin-only administration of the PDF and email templates.
+"""Admin PDF and email template APIs.
 
-These endpoints used to live as ``@action`` methods on ``InvoiceViewSet``, but
-they are not invoice-domain code: they never touch the invoice queryset, and
-they already record their audit events under ``AuditActionCategory.GOVERNANCE``
-rather than ``INVOICE``. They sat on the viewset only because its router was a
-convenient place to hang a URL.
-
-Admin-ness is now enforced declaratively via ``IsAdmin`` instead of a
-hand-written ``if not request.user.is_admin`` inside every handler, and the
-DENIED audit event those hand-written checks used to write is recorded from
-``permission_denied`` — so a new endpoint added to this module cannot silently
-forget either one.
-
-The URLs are unchanged; see ``invoices/urls.py``.
+ZEV owners may read the invoice-email fallback; other reads and all mutations
+require admin access. Routes are defined in ``invoices/urls.py``.
 """
 
 import hashlib
@@ -27,10 +16,11 @@ from rest_framework import exceptions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from accounts.permissions import IsAdmin
+from accounts.permissions import IsAdmin, IsZevOwnerOrAdmin
 from audit.models import AuditActionCategory, AuditEventStatus
 from audit.services import record_audit_event
 
+from .field_catalog import email_field_catalog, pdf_field_catalog
 from .models import EMAIL_TEMPLATE_DEFAULTS, EmailTemplate, PdfTemplate
 from .pdf_render import render_pdf
 from .template_context import (
@@ -125,11 +115,13 @@ def _is_stale(record, template_name: str) -> bool:
 
 
 class _AdminTemplateView(APIView):
-    """Base class for the admin-only template endpoints.
+    """Base class for admin-only template endpoints.
 
-    Subclasses that want a DENIED audit event when a non-admin is turned away
-    override :meth:`denial_audit`; the event is then written for them, rather
-    than by a hand-rolled permission check in each handler.
+    ``EmailTemplateView`` overrides :meth:`get_permissions` for invoice-email
+    GET so ZEV owners can read their global fallback. Subclasses that want a DENIED audit
+    event when a non-admin is turned away override :meth:`denial_audit`; the
+    event is then written for them, rather than by a hand-rolled permission
+    check in each handler.
     """
 
     permission_classes = [IsAdmin]
@@ -193,6 +185,7 @@ class PdfTemplateView(_AdminTemplateView):
             "content": content,
             "is_customized": record is not None,
             "is_stale": _is_stale(record, self.template_name),
+            "fields": pdf_field_catalog(self.template_type),
         })
 
     def patch(self, request, *args, **kwargs):
@@ -235,7 +228,12 @@ class PdfTemplateView(_AdminTemplateView):
         """Revert to the on-disk default."""
         PdfTemplate.objects.filter(template_name=self.template_name).delete()
         self._record(request, action_suffix="reset", summary=f"Reset PDF template {self.template_name} to default.")
-        return Response({"template_name": self.template_name, "content": _read_default_template(self.template_name), "is_customized": False, "detail": "PDF template reset to default."})
+        return Response({
+            "template_name": self.template_name,
+            "content": _read_default_template(self.template_name),
+            "is_customized": False,
+            "detail": "PDF template reset to default.",
+        })
 
 
 class PdfTemplatePreviewView(_AdminTemplateView):
@@ -330,12 +328,23 @@ class EmailTemplateListView(_AdminTemplateView):
 class EmailTemplateView(_AdminTemplateView):
     """Read, customise or reset a single email template.
 
-    GET    — returns current subject+body (DB override if present, else hardcoded default).
-    PATCH  — saves subject/body to the database.
-    DELETE — removes the DB override, reverting to the hardcoded default.
+    GET    — admins may read all global templates; ZEV owners may read the
+             invoice-email fallback and field catalog for their per-ZEV editor.
+    PATCH  — admins save subject/body to the database.
+    DELETE — admins remove the DB override, reverting to the hardcoded default.
     """
 
-    def denial_audit(self, request) -> dict:
+    def get_permissions(self):
+        if self.request.method == "GET" and self.kwargs.get("template_key") == "invoice_email":
+            return [IsZevOwnerOrAdmin()]
+        return super().get_permissions()
+
+    def denial_audit(self, request) -> dict | None:
+        # Only the invoice_email GET is open to ZEV owners (see
+        # get_permissions); read denials are expected 403s, not governance
+        # events — unlike the PDF views, which historically audit reads.
+        if request.method == "GET":
+            return None
         template_key = str(self.kwargs.get("template_key") or "")
         return {
             "action_type": "template.email.update",
@@ -374,6 +383,7 @@ class EmailTemplateView(_AdminTemplateView):
             "subject": record.subject if record else defaults["subject"],
             "body": record.body if record else defaults["body"],
             "is_customized": record is not None,
+            "fields": email_field_catalog(template_key),
         })
 
     def patch(self, request, template_key=None, *args, **kwargs):

@@ -36,8 +36,8 @@ class InvoiceEmailFormattingTests(TestCase):
     def test_email_uses_zev_custom_templates(self):
         owner = make_user("email_tpl_owner", UserRole.ZEV_OWNER)
         zev = make_zev(owner, "Template ZEV")
-        zev.email_subject_template = "[{zev_name}] Invoice {invoice_number}"
-        zev.email_body_template = "Hello {participant_name}, total {total_chf} CHF"
+        zev.email_subject_template = "{invoice_number}|{zev_name}|{participant_name}|{period_start}|{period_end}|{due_date}|{total_chf}"
+        zev.email_body_template = "{invoice_number}|{zev_name}|{participant_name}|{period_start}|{period_end}|{due_date}|{total_chf}"
         zev.save(update_fields=["email_subject_template", "email_body_template"])
 
         participant = make_participant(zev, first="Tem", last="Plate")
@@ -47,9 +47,19 @@ class InvoiceEmailFormattingTests(TestCase):
         send_invoice_email_task.run(str(invoice.pk), "recipient@example.com")
 
         self.assertEqual(len(mail.outbox), 1)
-        self.assertEqual(mail.outbox[0].subject, f"[{zev.name}] Invoice {invoice.invoice_number}")
-        self.assertIn(f"Hello {participant.full_name}", mail.outbox[0].body)
-        self.assertIn("total", mail.outbox[0].body)
+        expected = "|".join(
+            [
+                invoice.invoice_number,
+                zev.name,
+                participant.full_name,
+                "01.01.2026",
+                "31.01.2026",
+                "",
+                "42.00",
+            ]
+        )
+        self.assertEqual(mail.outbox[0].subject, expected)
+        self.assertEqual(mail.outbox[0].body, expected)
 
     def test_email_includes_due_date_variable(self):
         owner = make_user("email_due_owner", UserRole.ZEV_OWNER)

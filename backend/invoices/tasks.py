@@ -7,6 +7,8 @@ from django.utils import timezone as djtimezone
 from audit.models import AuditActionCategory, AuditEventSource, AuditEventStatus
 from audit.services import record_audit_event
 
+from .email_context import build_invoice_email_context
+
 logger = logging.getLogger(__name__)
 
 
@@ -62,15 +64,15 @@ def send_invoice_email_task(self, invoice_id: str, recipient_email: str = None):
     from zev.models import DEFAULT_EMAIL_SUBJECT_TEMPLATE, DEFAULT_EMAIL_BODY_TEMPLATE
     from .models import EmailTemplate
 
-    template_ctx = {
-        "invoice_number": invoice.invoice_number,
-        "zev_name": invoice.zev.name,
-        "participant_name": invoice.participant.full_name,
-        "period_start": formatted_period_start,
-        "period_end": formatted_period_end,
-        "total_chf": invoice.total_chf,
-        "due_date": formatted_due_date,
-    }
+    template_ctx = build_invoice_email_context(
+        invoice_number=invoice.invoice_number,
+        zev_name=invoice.zev.name,
+        participant_name=invoice.participant.full_name,
+        period_start=formatted_period_start,
+        period_end=formatted_period_end,
+        due_date=formatted_due_date,
+        total_chf=invoice.total_chf,
+    )
 
     # Resolution order: per-ZEV override → admin global override → hardcoded default
     global_override = EmailTemplate.objects.filter(template_key="invoice_email").first()

@@ -362,7 +362,8 @@ class EmailTemplate(models.Model):
     Admin-customizable email template stored in the database.
 
     Each template_key maps to a specific email type (invoice_email,
-    participant_onboarding, email_verification).  Hardcoded defaults
+    participant_onboarding, email_verification, participant_magic_link).
+    Hardcoded defaults
     are defined in EMAIL_TEMPLATE_DEFAULTS.  Deleting the DB row
     reverts to the hardcoded default.
     """

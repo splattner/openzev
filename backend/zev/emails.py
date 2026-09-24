@@ -10,6 +10,8 @@ import logging
 from django.conf import settings
 from django.core.mail import EmailMessage
 
+from invoices.email_context import build_onboarding_email_context
+
 logger = logging.getLogger(__name__)
 
 
@@ -36,13 +38,13 @@ def send_onboarding_email(participant, inviter_name: str, link_url: str, expires
     subject_tpl = override.subject if override else defaults["subject"]
     body_tpl = override.body if override else defaults["body"]
 
-    context = {
-        "participant_name": participant.full_name,
-        "inviter_name": inviter_name,
-        "zev_name": participant.zev.name,
-        "link_url": link_url,
-        "expiry_date": format_expiry_date(expires_at),
-    }
+    context = build_onboarding_email_context(
+        participant_name=participant.full_name,
+        inviter_name=inviter_name,
+        zev_name=participant.zev.name,
+        link_url=link_url,
+        expiry_date=format_expiry_date(expires_at),
+    )
 
     def _render(template: str, fallback: str) -> str:
         """Fill ``template``, falling back to the shipped default on a bad edit.

@@ -17,6 +17,8 @@ from audit.models import AuditEvent, AuditEventSource
 from testing.helpers import authenticate as auth, make_user
 
 from . import onboarding
+from invoices.models import EmailTemplate
+
 from .emails import format_expiry_date
 from .models import Participant, ParticipantOnboardingToken, Zev
 from .services import get_participant_onboarding_link, send_participant_onboarding_link
@@ -108,6 +110,31 @@ class SendOnboardingLinkServiceTests(TestCase):
         self.assertIn(format_expiry_date(token.expires_at), mail.outbox[0].body)
         participant.refresh_from_db()
         self.assertFalse(participant.user.has_usable_password())
+
+    def test_custom_template_uses_every_send_time_field(self):
+        participant = Participant.objects.create(
+            zev=self.zev, first_name="All", last_name="Fields",
+            email="all.fields@example.com", valid_from=date(2026, 1, 1),
+        )
+        EmailTemplate.objects.create(
+            template_key="participant_onboarding",
+            subject="{participant_name}|{inviter_name}|{zev_name}|{link_url}|{expiry_date}",
+            body="{participant_name}|{inviter_name}|{zev_name}|{link_url}|{expiry_date}",
+        )
+
+        url, token = send_participant_onboarding_link(participant, self.owner)
+
+        expected = "|".join(
+            [
+                participant.full_name,
+                self.owner.username,
+                self.zev.name,
+                url,
+                format_expiry_date(token.expires_at),
+            ]
+        )
+        self.assertEqual(mail.outbox[-1].subject, expected)
+        self.assertEqual(mail.outbox[-1].body, expected)
 
     def test_resending_reuses_the_same_link(self):
         participant = Participant.objects.create(

@@ -17,7 +17,7 @@ from .models import (
 	VatRate,
 )
 from audit.models import AuditActionCategory, AuditEvent, AuditEventStatus
-from invoices.models import Invoice, InvoiceStatus
+from invoices.models import EmailTemplate, Invoice, InvoiceStatus
 from zev.models import MeteringPoint, MeteringPointAssignment, MeteringPointType, Participant, Zev
 from datetime import date, timedelta
 from django.utils import timezone
@@ -220,6 +220,27 @@ class RegistrationTests(TestCase):
 		self.assertFalse(user.is_active)
 		self.assertTrue(user.must_change_password)
 		self.assertGreaterEqual(len(mail.outbox), 1)
+
+	def test_register_template_uses_the_send_time_context(self):
+		EmailTemplate.objects.create(
+			template_key="email_verification",
+			subject="Verify {verify_url}",
+			body="Verify {verify_url}",
+		)
+		client = APIClient()
+
+		resp = client.post(
+			"/api/v1/auth/register/",
+			{"email": "verify.fields@example.com"},
+			format="json",
+		)
+
+		self.assertEqual(resp.status_code, 201)
+		message = mail.outbox[-1]
+		self.assertTrue(message.subject.startswith("Verify http"))
+		self.assertIn("/verify-email?token=", message.subject)
+		self.assertTrue(message.body.startswith("Verify http"))
+		self.assertIn("/verify-email?token=", message.body)
 
 	def test_register_rejects_duplicate_email_case_insensitive(self):
 		User.objects.create_user(

@@ -60,6 +60,7 @@ from audit.mixins import AuditedUpdateMixin
 from audit.services import build_diff, record_audit_event
 from zev import onboarding as zev_onboarding
 from zev.models import Participant, Zev
+from invoices.email_context import build_verification_email_context
 
 logger = logging.getLogger(__name__)
 
@@ -758,7 +759,7 @@ def register(request):
     subject_tpl = override.subject if override else defaults["subject"]
     body_tpl = override.body if override else defaults["body"]
 
-    template_ctx = {"verify_url": verify_url}
+    template_ctx = build_verification_email_context(verify_url=verify_url)
 
     try:
         subject = subject_tpl.format_map(template_ctx)

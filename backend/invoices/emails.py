@@ -12,6 +12,8 @@ from django.core.mail import EmailMessage
 
 from accounts.models import MAGIC_LINK_LIFETIME
 
+from .email_context import build_magic_link_email_context
+
 logger = logging.getLogger(__name__)
 
 
@@ -40,12 +42,12 @@ def send_magic_link_email(participant, zev, link) -> None:
     subject_tpl = override.subject if override else defaults["subject"]
     body_tpl = override.body if override else defaults["body"]
 
-    context = {
-        "participant_name": participant.full_name,
-        "zev_name": zev.name,
-        "link_url": f"{settings.FRONTEND_URL.rstrip('/')}/signin/{link.token}",
-        "valid_minutes": int(MAGIC_LINK_LIFETIME.total_seconds() // 60),
-    }
+    context = build_magic_link_email_context(
+        participant_name=participant.full_name,
+        zev_name=zev.name,
+        link_url=f"{settings.FRONTEND_URL.rstrip('/')}/signin/{link.token}",
+        valid_minutes=int(MAGIC_LINK_LIFETIME.total_seconds() // 60),
+    )
 
     def _render(template: str, fallback: str) -> str:
         """Fill ``template``, falling back to the shipped default on a bad edit.

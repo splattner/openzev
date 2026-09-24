@@ -43,7 +43,7 @@ FADP) before release.
 |---|---|
 | Templates | New shared partial `pdf/shared_pdf_base.html`; `invoices/invoice_pdf.html` refactored to include it (CSS extraction only — markup untouched); `contracts/participant_contract_pdf.html` fully redesigned to the same anatomy |
 | Context | `invoices/dates.py` (shared date formatting), `_build_contract_context` additions (formatted contract date, participation start, document id, VAT rate display), `build_sample_contract_context` extended |
-| Tests | `invoices/test_contract_context.py`: context fields, translation + placeholder parity, tariff rule, blank-box placeholders, four-language end-to-end renders and contract issuance; `invoices/test_template_admin.py`: override-integrity tests (save-time validation, staleness), include-through-override compatibility |
+| Tests | `invoices/test_contract_context.py`: context fields, translation + placeholder parity, tariff rule, blank-box placeholders, four-language end-to-end renders and contract issuance; `invoices/test_template_admin.py`: override-integrity tests (save-time validation, staleness), include-through-override compatibility; `invoices/test_field_catalog.py`: catalog resolution, named-field coverage, and response smoke checks; `frontend/tests/field-reference.test.ts` (20 tests) and `frontend/tests/email-template-parity.test.ts` (5 tests): insertion/token normalization, syntax-aware counting, and backend-key/i18n parity |
 | Template admin | `PdfTemplate` overrides are validated before they are stored (PATCH rejects syntax errors and unknown output variables with `400`), and customizations are stale-tracked via `PdfTemplate.default_digest` + `is_stale` (migration `invoices/0009`, admin UI stale banner) — see §5.2 |
 | Docs | This baseline spec |
 | Legal wording | Clause texts were updated alongside the layout (see §7): clauses 2 (purpose/scope with EnG/EnV citations), 4 (mandate + annual information duty), 5 (binding tariff rule, cap with tenancy-law reservation, notification/termination, billing), 6 (per-interval allocation, feed-in remuneration), 7 (universal-service guarantee), 8 (grid-operator-area join condition), 10 (communication) and 12 (regulatory-change dissolution). `Anhang B` adds a **binding** privacy notice (controller, purposes, recipients, retention table, data-subject rights) |
@@ -53,10 +53,11 @@ FADP) before release.
 - No new endpoints, permissions or serializers; the download endpoint keeps
   its path and permission model, but its behavior now issues or reuses a
   persisted versioned snapshot — see §13.
-- No frontend changes beyond the template-validation work: the admin template
-  editor (`AdminPdfTemplatesPage.tsx`) gains an override-staleness banner,
-  accessible tab roles (roving tabindex + arrow-key navigation) and the
-  redesigned contract template's fields in the editor reference.
+- Frontend changes are confined to template administration: the existing admin
+  Templates hub keeps its outer tab strip; embedded PDF editors gain
+  stale-override feedback, and embedded PDF, admin-email, and per-ZEV
+  invoice-email editors use the shared catalog-driven field reference described
+  in §5.3. Document-generation and navigation layouts are unchanged.
 - Three data-model additions: `PdfTemplate.default_digest` (migration
   `invoices/0009`) for stale-override detection, plus the `ContractIssue`
   snapshot table and per-ZEV `contract_counter` (migrations `invoices/0010`,
@@ -253,6 +254,65 @@ Two protections ship with this branch:
 
 The admin UI (`AdminPdfTemplatesPage.tsx`) shows a stale banner when
 `is_customized && is_stale`, and `DELETE` reverts to the on-disk default.
+
+### 5.3 Catalog-driven field reference
+
+The "Verfügbare Felder" reference used to be a static list hardcoded in the
+frontend (`AdminPdfTemplatesPage.tsx`), which drifted from the real render
+contexts — the contract redesign shipped eight previously omitted contract
+reference tokens (participation start, document id, VAT display, clause-5 tariff rule /
+percentage line / reference product, tariff-row validity, payment terms), and
+the invoice and annual-statement references were missing fields too
+(`status_display`, invoice-number prefix/suffix, `item.unit_label`,
+`savings_data.*`, `energy_summary.*`, invoice-row status).
+
+The reference is now catalog-driven and shared across all template surfaces:
+
+- **Backend source of truth.** `invoices/field_catalog_data.py` holds the
+  curated static catalog definitions per PDF type (`invoice`, `contract`,
+  `annual_statement`) and per email key (`invoice_email`,
+  `participant_onboarding`, `email_verification`, `participant_magic_link`).
+  `invoices/field_catalog.py` resolves those definitions into API payloads.
+  Each entry carries the token to paste (`variable`), a React i18n key
+  (`description_key`) and an internal `sample_path` into the matching sample
+  context. A successful single-template PDF or email `GET` response includes
+  `fields`; PATCH/DELETE return their template metadata and `detail` without
+  `fields`, and the admin-only email list endpoint does not include `fields`. There is no new
+  endpoint. Admins may read any email-template detail; ZEV owners may read only
+  `invoice_email` for the per-ZEV editor's fallback. Mutations and the list
+  remain admin-only.
+- **Payload shape.** `fields` is an array of `{ group_key, group_title_key,
+  fields }`; PDF group titles are i18n keys and email group titles are `null`.
+  Each field is `{ variable, description_key, example }`. `example` is `null`
+  for a missing sample value and for `|safe`, `tr.*`, markup, or overlong
+  values (chart SVG, clause text).
+- **Computed examples.** The backend resolves examples from preview contexts; tests
+  check representative values. Email examples come from the same pure production
+  context builders used by the four send paths (`invoices/email_context.py`,
+  `invoices/tasks.py`, `zev/emails.py`, `accounts/views.py`, and
+  `invoices/emails.py`).
+- **Drift and payload checks.** `invoices/test_field_catalog.py` resolves every
+  internal catalog `sample_path`, checks unique variables, compares
+  default-template output tokens except template-local bindings, names the newer
+  invoice/contract fields explicitly, compares email variables with the shared
+  production context builders, and smoke-checks selected PDF/email response keys.
+  It does not auto-introspect every real render-context key into the catalog.
+  Frontend parity tests verify that the four backend email keys have frontend
+  routes/tabs and that every backend `description_key` has an English translation;
+  `locale-parity.test.ts` covers all-locale structure.
+- **Shared frontend component.** `frontend/src/components/FieldReference.tsx`
+  replaces the static PDF sidebar and email reference tables in
+  `AdminPdfTemplatesPage.tsx`, `AdminEmailTemplatesPage.tsx`, and
+  `ZevEmailTemplateFields.tsx`. It supports click-to-insert into the mounted
+  source editor (or the focused subject/body in email editors). PDF insertion
+  is available in source-editor view, not while the PDF preview is displayed.
+  Loop tags insert an indented block; Shift-click preserves editor focus and
+  leaves the caret at the original insertion start. The component also provides
+  search, computed examples, and occurrence badges. `TemplateTextarea`
+  tooltips include examples for cataloged tokens. Lookup normalizes whitespace
+  and Django filters such as `floatformat` or `default`. Unlisted tokens are
+  left unmarked because valid loop-local variables also occur in the default
+  template; save-time strict validation checks output variables.
 
 ## 6. Contract template anatomy
 
@@ -485,6 +545,15 @@ contracts never do. The existing sample keys already include
 | `test_no_local_tariff_prints_no_rule_and_placeholder_amount` | No local tariffs → no `tariff_rule`, green box renders the `—` placeholder and `tariff-empty` |
 | `test_empty_notes_render_blank_box_not_placeholder_prose` | Empty notes print a blank freetext box on real contracts — never the German example prose (`freetext-placeholder` absent) |
 
+**`ContractPdfSeasonalTariffTests`** (4 tests):
+
+| Test | Asserts |
+|---|---|
+| `test_each_season_gets_its_own_row_naming_its_months` | Each seasonal window is represented separately and names its months |
+| `test_a_year_round_tariff_reads_exactly_as_it_did_before` | A year-round tariff retains the existing rendering contract |
+| `test_a_three_band_tariff_prints_every_band` | All three seasonal bands appear in the contract table |
+| `test_both_bands_of_a_season_are_printed` | Both tariff bands belonging to one season are printed |
+
 **`ContractPdfTranslationParityTests`** (3 tests):
 
 | Test | Asserts |
@@ -530,20 +599,26 @@ real PDFs (WeasyPrint) and asserting markup with the `<style>` blocks stripped
 | `test_get_streams_the_existing_snapshot_without_issuing` | `GET` serves the issued snapshot and mints nothing |
 | `test_get_404s_before_the_contract_has_been_issued` | `GET` with no prior issuance returns 404 and creates no `ContractIssue` |
 | `test_get_serves_the_latest_version_after_a_reissue` | `GET` streams `_v2` once a data change has been issued |
-| `ContractPdfCsrfTests::test_cookie_get_never_issues_a_contract` | The forged cross-site request (auth cookies, no CSRF token) mints nothing — regression test for #448 |
-| `ContractPdfCsrfTests::test_cookie_post_without_csrf_is_forbidden` | Cookie-authenticated `POST` without a CSRF token is rejected 403 |
-| `ContractPdfCsrfTests::test_cookie_post_with_csrf_issues` | Cookie-authenticated `POST` with a valid CSRF token issues normally |
 | `test_concurrent_first_issuances_get_distinct_versions` | A request that read `latest` before a competing first issuance committed derives the version from the row visible under the Zev row lock — no `(participant, version)` collision |
 | `test_issue_zev_is_derived_from_the_participant` | `ContractIssue.save()` derives the denormalized `zev` from `participant.zev` |
 
-Total: 51 test methods across 7 classes in `test_contract_context.py`.
+**`ContractPdfCsrfTests`** (3 tests):
+
+| Test | Asserts |
+|---|---|
+| `test_cookie_get_never_issues_a_contract` | A forged cross-site request with auth cookies but no CSRF token mints nothing (regression test for #448) |
+| `test_cookie_post_without_csrf_is_forbidden` | Cookie-authenticated POST without CSRF is rejected with 403 |
+| `test_cookie_post_with_csrf_issues` | Cookie-authenticated POST with a valid CSRF token issues normally |
+
+Total: 58 test methods across 9 classes in `test_contract_context.py`.
 
 ### Backend — `invoices/test_template_admin.py`
 
-**`TemplateAdminPermissionTests`** (6), **`EmailTemplateAdminTests`** (4),
-**`PdfTemplatePreviewTests`** (11), **`PdfTemplateAdminTests`** (3) and
-**`PdfTemplateOverrideIntegrityTests`** (9) — 33 test methods across 5
-classes.
+**`TemplateAdminPermissionTests`** (10), **`EmailTemplateAdminTests`** (4),
+**`PdfTemplatePreviewTests`** (11), **`PdfTemplateAdminTests`** (3),
+**`TemplateFieldCatalogEndpointTests`** (5),
+**`PdfTemplateOverrideIntegrityTests`** (9), **`PdfRenderFetchPolicyTests`** (2),
+and **`InvoicePdfDownloadTests`** (5) — 49 test methods across 8 classes.
 
 **`PdfTemplateOverrideIntegrityTests`** (9 tests):
 
@@ -562,6 +637,16 @@ classes.
 (9 methods — the class also guards the compat claim that old overrides keep
 working.)
 
+### Backend — `invoices/test_field_catalog.py`
+
+14 test methods across 3 `SimpleTestCase` classes:
+`PdfCatalogResolutionTests` (7) checks sample-path resolution, computed rather
+than literal examples, unique variables, default-template output and translation
+tokens, and explicitly named newer invoice/contract fields; `EmailCatalogResolutionTests`
+(2) resolves all four shared production email context builders and compares each
+catalog key-for-key; `CatalogPayloadShapeTests` (5) smoke-checks selected PDF/email
+response keys, unknown-key behavior, null SVG/translation examples, and representative preview parity.
+
 ### Regression coverage in `invoices/test_pdf.py`
 
 The invoice refactor (CSS extraction into the shared partial) is guarded by
@@ -572,15 +657,15 @@ described in §5.1.
 
 ### Validation commands
 
-- `python -m pytest -q` — full backend suite green, 1103 tests (incl.
-  contract context, issuance and template-override tests).
+- `python -m pytest -q` — full backend suite green (including contract context,
+  issuance, template-override, and field-catalog tests).
 - `ruff check invoices/` — lint clean.
 - `python manage.py makemigrations --check --dry-run` — no missing migrations.
-- `npm run test:unit` + `npm run build` — frontend (template editor field
-  reference and stale banner) green.
-- Manual: render de/fr/it/en sample PDFs via the admin template preview
-  (`/api/v1/invoices/invoices/contract-pdf-template/` POST) and eyeball
-  pagination — signature block must not split, footer on every page.
+- `node --version`; `npm run lint`; `npm run lint:style`; `node ../scripts/check-frontend-hex.mjs`; `npm run test:unit`; `npm run build` — green.
+- Manual: inspect the contract PDF in the admin Templates hub, or POST
+  `/api/v1/invoices/invoices/preview-pdf-template/` with `template_type: "contract"`
+  and `output: "pdf"` to check pagination. Inspect the de/fr/it/en PDFs exercised
+  by `ContractPdfRenderingTests`; the preview sample context is English-only.
 
 ### Acceptance criteria
 

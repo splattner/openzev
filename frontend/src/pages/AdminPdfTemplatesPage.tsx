@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
 import { PageSkeleton } from '../components/PageSkeleton'
+import { FieldReference, fieldDescription, tokenMatchKey, useTemplateTokenInsertionAtElement } from '../components/FieldReference'
 import { useTranslation } from 'react-i18next'
 import {
     fetchContractPdfTemplate,
@@ -15,7 +16,7 @@ import {
     updateAnnualStatementPdfTemplate,
 } from '../lib/api/invoices'
 import { queryKeys } from '../lib/api/queryKeys'
-import type { PdfTemplateResponse } from '../types/api'
+import type { PdfTemplateResponse, TemplateField, TemplateFieldGroup } from '../types/api'
 import { useToast } from '../lib/toast'
 import { PdfPreview } from '../components/PdfPreview'
 
@@ -23,67 +24,52 @@ const PDF_TEMPLATE_TABS = ['invoice', 'contract', 'annual_statement'] as const
 
 export type PdfTemplateTab = (typeof PDF_TEMPLATE_TABS)[number]
 
-interface FieldGroup {
-    title: string
-    fields: { variable: string; description: string }[]
+export interface TemplateTextareaHandle {
+    insert: (variable: string, keepFocus: boolean) => void
 }
 
-function FieldReference({ groups }: { groups: FieldGroup[] }) {
+const TemplateTextarea = forwardRef(function TemplateTextarea(
+    {
+        value,
+        onChange,
+        groups,
+    }: {
+        value: string
+        onChange: (value: string) => void
+        groups: TemplateFieldGroup[]
+    },
+    ref,
+) {
     const { t } = useTranslation()
-    return (
-        <aside
-            className="card page-stack"
-            style={{ maxHeight: '80vh', overflowY: 'auto', width: '100%' }}
-            tabIndex={0}
-            aria-label={t('admin.fieldReference')}
-        >
-            <h4 style={{ margin: 0 }}>{t('admin.availableFields')}</h4>
-            {groups.map((group) => (
-                <div key={group.title}>
-                    <h5 style={{ margin: '0.75rem 0 0.25rem' }}>{group.title}</h5>
-                    <table style={{ width: '100%', fontSize: '0.82rem', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
-                        <tbody>
-                            {group.fields.map((f) => (
-                                <tr key={f.variable} style={{ borderBottom: '1px solid var(--border-default)' }}>
-                                    <td style={{ padding: '0.25rem 0.4rem 0.25rem 0', fontFamily: 'monospace', overflowWrap: 'anywhere', width: '52%' }}>
-                                        {f.variable}
-                                    </td>
-                                    <td className="muted" style={{ padding: '0.25rem 0', overflowWrap: 'anywhere', lineHeight: 1.35 }}>
-                                        {f.description}
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
-            ))}
-        </aside>
-    )
-}
-
-function TemplateTextarea({
-    value,
-    onChange,
-    fieldGroups,
-}: {
-    value: string
-    onChange: (value: string) => void
-    fieldGroups: FieldGroup[]
-}) {
     const textareaRef = useRef<HTMLTextAreaElement>(null)
     const overlayRef = useRef<HTMLDivElement>(null)
     const containerRef = useRef<HTMLDivElement>(null)
-    const [tooltip, setTooltip] = useState<{ text: string; x: number; y: number } | null>(null)
+    const [tooltip, setTooltip] = useState<{ text: string; example?: string | null; x: number; y: number } | null>(null)
 
-    const fieldMap = useMemo(() => {
-        const map = new Map<string, string>()
-        for (const group of fieldGroups) {
-            for (const f of group.fields) {
-                map.set(f.variable, f.description)
+    const insertToken = useTemplateTokenInsertionAtElement(textareaRef, onChange)
+
+    const fieldMaps = useMemo(() => {
+        const exact = new Map<string, TemplateField>()
+        const normalized = new Map<string, TemplateField>()
+        for (const group of groups) {
+            for (const field of group.fields) {
+                exact.set(field.variable, field)
+                const key = tokenMatchKey(field.variable)
+                // Keep the first normalized entry as a deterministic fallback;
+                // exact filter variants still resolve to their own description.
+                if (!normalized.has(key)) {
+                    normalized.set(key, field)
+                }
             }
         }
-        return map
-    }, [fieldGroups])
+        return { exact, normalized }
+    }, [groups])
+
+    useImperativeHandle(ref, () => ({
+        insert(variable: string, keepFocus: boolean) {
+            insertToken(variable, keepFocus)
+        },
+    }), [insertToken])
 
     const handleScroll = useCallback(() => {
         if (textareaRef.current && overlayRef.current) {
@@ -145,8 +131,9 @@ function TemplateTextarea({
                     if (!part.variable) {
                         return <span key={i}>{part.text}</span>
                     }
-                    const desc = fieldMap.get(part.variable)
-                    if (!desc) {
+                    const field = fieldMaps.exact.get(part.variable.trim()) ?? fieldMaps.normalized.get(tokenMatchKey(part.variable))
+                    if (!field) {
+                        // Local or custom variables may not be cataloged.
                         return <span key={i}>{part.text}</span>
                     }
                     return (
@@ -157,7 +144,8 @@ function TemplateTextarea({
                                 const rect = (e.target as HTMLElement).getBoundingClientRect()
                                 const containerRect = containerRef.current?.getBoundingClientRect() ?? rect
                                 setTooltip({
-                                    text: desc,
+                                    text: fieldDescription(t, field),
+                                    example: field.example,
                                     x: rect.left - containerRect.left,
                                     y: rect.top - containerRect.top - 28,
                                 })
@@ -175,11 +163,16 @@ function TemplateTextarea({
                     style={{ left: tooltip.x, top: tooltip.y }}
                 >
                     {tooltip.text}
+                    {tooltip.example && (
+                        <div style={{ fontStyle: 'italic' }}>
+                            {t('admin.example')}: {tooltip.example}
+                        </div>
+                    )}
                 </div>
             )}
         </div>
     )
-}
+})
 
 function TemplateEditor({
     data,
@@ -189,7 +182,6 @@ function TemplateEditor({
     onReset,
     isSaving,
     isResetting,
-    fieldGroups,
     templateType,
 }: {
     data: PdfTemplateResponse | undefined
@@ -199,7 +191,6 @@ function TemplateEditor({
     onReset: () => void
     isSaving: boolean
     isResetting: boolean
-    fieldGroups: FieldGroup[]
     templateType: 'invoice' | 'contract' | 'annual_statement'
 }) {
     const { t } = useTranslation()
@@ -214,6 +205,7 @@ function TemplateEditor({
     const revisionRef = useRef(0)
     const urlRef = useRef<string | null>(null)
     const abortRef = useRef<AbortController | null>(null)
+    const textareaHandleRef = useRef<TemplateTextareaHandle>(null)
 
     useEffect(() => {
         if (data?.content != null) {
@@ -284,6 +276,10 @@ function TemplateEditor({
         [],
     )
 
+    const handleInsert = useCallback((variable: string, keepFocus: boolean) => {
+        textareaHandleRef.current?.insert(variable, keepFocus)
+    }, [])
+
     return (
         <div className="content-with-aside">
             <section className="card page-stack">
@@ -303,9 +299,10 @@ function TemplateEditor({
                             <label>
                                 <span>{t('admin.templateContent')}</span>
                                 <TemplateTextarea
+                                    ref={textareaHandleRef}
                                     value={content}
                                     onChange={setContent}
-                                    fieldGroups={fieldGroups}
+                                    groups={data.fields ?? []}
                                 />
                             </label>
                         )}
@@ -319,7 +316,7 @@ function TemplateEditor({
                         )}
                         {showPreview && (
                             <div className="page-stack">
-                                <div className="actions-row actions-row-wrap">
+                                <div className="actions-row">
                                     <button
                                         className={`button button-compact ${debugSource ? 'button-secondary' : ''}`}
                                         type="button"
@@ -399,7 +396,17 @@ function TemplateEditor({
                     </>
                 )}
             </section>
-            <FieldReference groups={fieldGroups} />
+            {data ? (
+                <FieldReference
+                    groups={data.fields ?? []}
+                    content={content}
+                    onInsert={showPreview ? undefined : handleInsert}
+                />
+            ) : isError ? (
+                <p className="error-banner" role="alert">{t('common.error')}</p>
+            ) : (
+                <p className="muted" role="status">{t('common.loading')}</p>
+            )}
         </div>
     )
 }
@@ -424,270 +431,6 @@ export function AdminPdfTemplatesPage({ embedded = false, template }: {
         annual_statement: t('admin.annualStatementTemplate'),
     }
 
-    const invoiceFieldGroups: FieldGroup[] = [
-        {
-            title: t('admin.fields.invoiceObject'),
-            fields: [
-                { variable: '{{ invoice.invoice_number }}', description: t('admin.fields.invoiceNumber') },
-                { variable: '{{ invoice.get_status_display }}', description: t('admin.fields.invoiceStatus') },
-                { variable: '{{ invoice.subtotal_chf }}', description: t('admin.fields.subtotal') },
-                { variable: '{{ invoice.vat_rate }}', description: t('admin.fields.vatRateFraction') },
-                { variable: '{{ vat_rate_percent }}', description: t('admin.fields.vatRatePercent') },
-                { variable: '{{ invoice.vat_chf }}', description: t('admin.fields.vatAmount') },
-                { variable: '{{ invoice.total_chf }}', description: t('admin.fields.total') },
-                { variable: '{{ invoice.notes }}', description: t('admin.fields.invoiceNotes') },
-            ],
-        },
-        {
-            title: t('admin.fields.formattedDates'),
-            fields: [
-                { variable: '{{ formatted_dates.invoice_date }}', description: t('admin.fields.invoiceDate') },
-                { variable: '{{ formatted_dates.period_start }}', description: t('admin.fields.periodStart') },
-                { variable: '{{ formatted_dates.period_end }}', description: t('admin.fields.periodEnd') },
-                { variable: '{{ formatted_dates.due_date }}', description: t('admin.fields.dueDate') },
-            ],
-        },
-        {
-            title: t('admin.fields.participant'),
-            fields: [
-                { variable: '{{ participant.full_name }}', description: t('admin.fields.fullName') },
-                { variable: '{{ participant.address_line1 }}', description: t('admin.fields.addressLine1') },
-                { variable: '{{ participant.postal_code }}', description: t('admin.fields.postalCode') },
-                { variable: '{{ participant.city }}', description: t('admin.fields.city') },
-                { variable: '{{ participant.email }}', description: t('admin.fields.email') },
-            ],
-        },
-        {
-            title: t('admin.fields.zev'),
-            fields: [
-                { variable: '{{ zev.name }}', description: t('admin.fields.zevName') },
-                { variable: '{{ zev.vat_number }}', description: t('admin.fields.vatNumber') },
-                { variable: '{{ zev.bank_iban }}', description: t('admin.fields.bankIban') },
-            ],
-        },
-        {
-            title: t('admin.fields.ownerParticipant'),
-            fields: [
-                { variable: '{{ owner_participant.full_name }}', description: t('admin.fields.fullName') },
-                { variable: '{{ owner_participant.address_line1 }}', description: t('admin.fields.addressLine1') },
-                { variable: '{{ owner_participant.address_line2 }}', description: t('admin.fields.addressLine2') },
-                { variable: '{{ owner_participant.postal_code }}', description: t('admin.fields.postalCode') },
-                { variable: '{{ owner_participant.city }}', description: t('admin.fields.city') },
-            ],
-        },
-        {
-            title: t('admin.fields.lineItems'),
-            fields: [
-                { variable: '{% for group in grouped_items %}', description: t('admin.fields.groupLoop') },
-                { variable: '{{ group.label }}', description: t('admin.fields.groupLabel') },
-                { variable: '{{ group.subtotal }}', description: t('admin.fields.groupSubtotal') },
-                { variable: '{% for item in group.items %}', description: t('admin.fields.itemLoop') },
-                { variable: '{{ item.description }}', description: t('admin.fields.itemDescription') },
-                { variable: '{{ item.quantity_kwh }}', description: t('admin.fields.itemQuantity') },
-                { variable: '{{ item.unit_price_chf }}', description: t('admin.fields.itemUnitPrice') },
-                { variable: '{{ item.total_chf }}', description: t('admin.fields.itemTotal') },
-            ],
-        },
-        {
-            title: t('admin.fields.chartsAndSavings'),
-            fields: [
-                { variable: '{{ energy_chart_svg|safe }}', description: t('admin.fields.energyChart') },
-                { variable: '{{ hourly_profile_chart_svg|safe }}', description: t('admin.fields.hourlyChart') },
-                { variable: '{{ savings_data.local_kwh }}', description: t('admin.fields.savingsLocalKwh') },
-                { variable: '{{ savings_data.saved_chf }}', description: t('admin.fields.savingsSavedChf') },
-                { variable: '{{ qr_svg|safe }}', description: t('admin.fields.qrCode') },
-            ],
-        },
-        {
-            title: t('admin.fields.translations'),
-            fields: [
-                { variable: '{{ tr.<key> }}', description: t('admin.fields.trDescription') },
-            ],
-        },
-    ]
-
-    const contractFieldGroups: FieldGroup[] = [
-        {
-            title: t('admin.fields.participant'),
-            fields: [
-                { variable: '{{ participant.full_name }}', description: t('admin.fields.fullName') },
-                { variable: '{{ participant.address_line1 }}', description: t('admin.fields.addressLine1') },
-                { variable: '{{ participant.address_line2 }}', description: t('admin.fields.addressLine2') },
-                { variable: '{{ participant.postal_code }}', description: t('admin.fields.postalCode') },
-                { variable: '{{ participant.city }}', description: t('admin.fields.city') },
-                { variable: '{{ participant.phone }}', description: t('admin.fields.phone') },
-                { variable: '{{ participant.email }}', description: t('admin.fields.email') },
-            ],
-        },
-        {
-            title: t('admin.fields.zev'),
-            fields: [
-                { variable: '{{ zev.name }}', description: t('admin.fields.zevName') },
-                { variable: '{{ zev.get_zev_type_display }}', description: t('admin.fields.zevType') },
-                { variable: '{{ zev.grid_operator }}', description: t('admin.fields.gridOperator') },
-                { variable: '{{ zev.vat_number }}', description: t('admin.fields.vatNumber') },
-                { variable: '{{ zev.bank_iban }}', description: t('admin.fields.bankIban') },
-            ],
-        },
-        {
-            title: t('admin.fields.ownerParticipant'),
-            fields: [
-                { variable: '{{ owner_participant.full_name }}', description: t('admin.fields.fullName') },
-                { variable: '{{ owner_participant.address_line1 }}', description: t('admin.fields.addressLine1') },
-                { variable: '{{ owner_participant.address_line2 }}', description: t('admin.fields.addressLine2') },
-                { variable: '{{ owner_participant.postal_code }}', description: t('admin.fields.postalCode') },
-                { variable: '{{ owner_participant.city }}', description: t('admin.fields.city') },
-                { variable: '{{ owner_participant.email }}', description: t('admin.fields.email') },
-            ],
-        },
-        {
-            title: t('admin.fields.meteringPoints'),
-            fields: [
-                { variable: '{% for mp in consumption_mps %}', description: t('admin.fields.consumptionMpLoop') },
-                { variable: '{% for mp in production_mps %}', description: t('admin.fields.productionMpLoop') },
-                { variable: '{{ mp.meter_id }}', description: t('admin.fields.meterId') },
-                { variable: '{{ mp.location_description }}', description: t('admin.fields.meterLocation') },
-            ],
-        },
-        {
-            title: t('admin.fields.tariffs'),
-            fields: [
-                { variable: '{% for row in local_tariff_rows %}', description: t('admin.fields.tariffLoop') },
-                { variable: '{{ row.name }}', description: t('admin.fields.tariffName') },
-                { variable: '{{ row.rate_rp }}', description: t('admin.fields.tariffRate') },
-                { variable: '{{ row.rate_description }}', description: t('admin.fields.tariffRateDesc') },
-                { variable: '{{ row.pct }}', description: t('admin.fields.tariffPct') },
-                { variable: '{{ row.unit }}', description: t('admin.fields.tariffUnit') },
-                { variable: '{{ row.valid_from }}', description: t('admin.fields.tariffValidFrom') },
-                { variable: '{{ row.valid_to }}', description: t('admin.fields.tariffValidTo') },
-                { variable: '{{ row.validity }}', description: t('admin.fields.tariffValidity') },
-                { variable: '{{ row.notes }}', description: t('admin.fields.tariffNotes') },
-                { variable: '{{ local_tariff_notes }}', description: t('admin.fields.localTariffNotes') },
-            ],
-        },
-        {
-            title: t('admin.fields.tariffClause'),
-            fields: [
-                { variable: '{{ tariff_rule }}', description: t('admin.fields.tariffRule') },
-                { variable: '{{ tariff_pct_line }}', description: t('admin.fields.tariffPctLine') },
-                { variable: '{{ tariff_reference_product }}', description: t('admin.fields.tariffReferenceProduct') },
-            ],
-        },
-        {
-            title: t('admin.fields.contractDetails'),
-            fields: [
-                { variable: '{{ contract_date }}', description: t('admin.fields.contractDate') },
-                { variable: '{{ participation_start }}', description: t('admin.fields.participationStart') },
-                { variable: '{{ document_id }}', description: t('admin.fields.documentId') },
-                { variable: '{{ vat_rate_display }}', description: t('admin.fields.vatRateDisplay') },
-                { variable: '{{ billing_interval_display }}', description: t('admin.fields.billingInterval') },
-                { variable: '{{ additional_contract_notes }}', description: t('admin.fields.additionalNotes') },
-                { variable: '{{ lang }}', description: t('admin.fields.languageCode') },
-            ],
-        },
-        {
-            title: t('admin.fields.translations'),
-            fields: [
-                { variable: '{{ tr.<key> }}', description: t('admin.fields.trDescription') },
-            ],
-        },
-    ]
-
-    const annualStatementFieldGroups: FieldGroup[] = [
-        {
-            title: t('admin.fields.annualStatementData'),
-            fields: [
-                { variable: '{{ year }}', description: t('admin.fields.annualYear') },
-                { variable: '{{ lang }}', description: t('admin.fields.languageCode') },
-            ],
-        },
-        {
-            title: t('admin.fields.participant'),
-            fields: [
-                { variable: '{{ participant.full_name }}', description: t('admin.fields.fullName') },
-                { variable: '{{ participant.address_line1 }}', description: t('admin.fields.addressLine1') },
-                { variable: '{{ participant.address_line2 }}', description: t('admin.fields.addressLine2') },
-                { variable: '{{ participant.postal_code }}', description: t('admin.fields.postalCode') },
-                { variable: '{{ participant.city }}', description: t('admin.fields.city') },
-            ],
-        },
-        {
-            title: t('admin.fields.zev'),
-            fields: [
-                { variable: '{{ zev.name }}', description: t('admin.fields.zevName') },
-                { variable: '{{ zev.vat_number }}', description: t('admin.fields.vatNumber') },
-            ],
-        },
-        {
-            title: t('admin.fields.ownerParticipant'),
-            fields: [
-                { variable: '{{ owner_participant.full_name }}', description: t('admin.fields.fullName') },
-                { variable: '{{ owner_participant.address_line1 }}', description: t('admin.fields.addressLine1') },
-                { variable: '{{ owner_participant.postal_code }}', description: t('admin.fields.postalCode') },
-                { variable: '{{ owner_participant.city }}', description: t('admin.fields.city') },
-            ],
-        },
-        {
-            title: t('admin.fields.annualTotals'),
-            fields: [
-                { variable: '{{ totals.total_consumed_kwh }}', description: t('admin.fields.annualTotalConsumed') },
-                { variable: '{{ totals.from_zev_kwh }}', description: t('admin.fields.annualFromZev') },
-                { variable: '{{ totals.from_grid_kwh }}', description: t('admin.fields.annualFromGrid') },
-                { variable: '{{ totals.total_produced_kwh }}', description: t('admin.fields.annualTotalProduced') },
-                { variable: '{{ totals.self_sufficiency_pct }}', description: t('admin.fields.annualSelfSufficiency') },
-            ],
-        },
-        {
-            title: t('admin.fields.annualMonthlyData'),
-            fields: [
-                { variable: '{% for row in monthly_data %}', description: t('admin.fields.annualMonthlyLoop') },
-                { variable: '{{ row.month_label }}', description: t('admin.fields.annualMonthLabel') },
-                { variable: '{{ row.consumed_kwh }}', description: t('admin.fields.annualMonthConsumed') },
-                { variable: '{{ row.from_zev_kwh }}', description: t('admin.fields.annualMonthFromZev') },
-                { variable: '{{ row.from_grid_kwh }}', description: t('admin.fields.annualMonthFromGrid') },
-                { variable: '{{ row.produced_kwh }}', description: t('admin.fields.annualMonthProduced') },
-                { variable: '{{ row.self_sufficiency_pct }}', description: t('admin.fields.annualMonthSelfSufficiency') },
-            ],
-        },
-        {
-            title: t('admin.fields.annualInvoices'),
-            fields: [
-                { variable: '{% for inv in invoices %}', description: t('admin.fields.annualInvoiceLoop') },
-                { variable: '{{ inv.invoice_number }}', description: t('admin.fields.invoiceNumber') },
-                { variable: '{{ inv.period_start_formatted }}', description: t('admin.fields.periodStart') },
-                { variable: '{{ inv.period_end_formatted }}', description: t('admin.fields.periodEnd') },
-                { variable: '{{ inv.subtotal_chf }}', description: t('admin.fields.subtotal') },
-                { variable: '{{ inv.vat_chf }}', description: t('admin.fields.vatAmount') },
-                { variable: '{{ inv.total_chf }}', description: t('admin.fields.total') },
-                { variable: '{{ invoice_totals.subtotal_chf }}', description: t('admin.fields.annualInvoiceTotalSubtotal') },
-                { variable: '{{ invoice_totals.total_chf }}', description: t('admin.fields.annualInvoiceTotalTotal') },
-            ],
-        },
-        {
-            title: t('admin.fields.chartsAndSavings'),
-            fields: [
-                { variable: '{{ monthly_chart_svg|safe }}', description: t('admin.fields.annualMonthlyChart') },
-                { variable: '{{ savings.local_kwh }}', description: t('admin.fields.savingsLocalKwh') },
-                { variable: '{{ savings.local_chf }}', description: t('admin.fields.annualSavingsLocalChf') },
-                { variable: '{{ savings.local_rp }}', description: t('admin.fields.annualSavingsLocalRp') },
-                { variable: '{{ savings.grid_rp }}', description: t('admin.fields.annualSavingsGridRp') },
-                { variable: '{{ savings.hypothetical_chf }}', description: t('admin.fields.annualSavingsHypothetical') },
-                { variable: '{{ savings.saved_chf }}', description: t('admin.fields.savingsSavedChf') },
-            ],
-        },
-        {
-            title: t('admin.fields.formattedDates'),
-            fields: [
-                { variable: '{{ formatted_dates.statement_date }}', description: t('admin.fields.annualStatementDate') },
-            ],
-        },
-        {
-            title: t('admin.fields.translations'),
-            fields: [
-                { variable: '{{ tr.<key> }}', description: t('admin.fields.trDescription') },
-            ],
-        },
-    ]
 
     const invoiceTemplateQuery = useQuery({
         queryKey: queryKeys.admin.invoicePdfTemplate(),
@@ -764,13 +507,13 @@ export function AdminPdfTemplatesPage({ embedded = false, template }: {
     return (
         <div className="page-stack">
             {!embedded && (
-            <header>
-                <p className="eyebrow">{t('nav.platformScope')}</p>
-                <h2>{t('admin.pdfTemplates')}</h2>
-                <p className="muted">
-                    {t('admin.pdfTemplatesDescription')}
-                </p>
-            </header>
+                <header>
+                    <p className="eyebrow">{t('nav.platformScope')}</p>
+                    <h2>{t('admin.pdfTemplates')}</h2>
+                    <p className="muted">
+                        {t('admin.pdfTemplatesDescription')}
+                    </p>
+                </header>
             )}
 
             {!embedded && (
@@ -791,7 +534,6 @@ export function AdminPdfTemplatesPage({ embedded = false, template }: {
                     onReset={() => resetInvoiceMutation.mutate()}
                     isSaving={saveInvoiceMutation.isPending}
                     isResetting={resetInvoiceMutation.isPending}
-                    fieldGroups={invoiceFieldGroups}
                     templateType="invoice"
                 />
             )}
@@ -805,7 +547,6 @@ export function AdminPdfTemplatesPage({ embedded = false, template }: {
                     onReset={() => resetContractMutation.mutate()}
                     isSaving={saveContractMutation.isPending}
                     isResetting={resetContractMutation.isPending}
-                    fieldGroups={contractFieldGroups}
                     templateType="contract"
                 />
             )}
@@ -819,7 +560,6 @@ export function AdminPdfTemplatesPage({ embedded = false, template }: {
                     onReset={() => resetAnnualStatementMutation.mutate()}
                     isSaving={saveAnnualStatementMutation.isPending}
                     isResetting={resetAnnualStatementMutation.isPending}
-                    fieldGroups={annualStatementFieldGroups}
                     templateType="annual_statement"
                 />
             )}

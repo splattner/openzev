@@ -63,8 +63,8 @@ docker compose restart backend worker
 
 The sections below describe the **invoice** email, which is the one ZEV owners
 customize per ZEV. Three further templates are system-wide and edited by admins
-in **Admin Console → Email Templates**: the invitation, the address
-verification, and the **sign-in link** email sent when a participant requests
+in **Admin Console → Email Templates**: onboarding, address verification, and
+the **sign-in link** email sent when a participant requests
 one from the QR code on their invoice. See
 [Admin Console → Email Templates](14-admin-console.md#email-templates) for those,
 including their placeholders.
@@ -87,6 +87,7 @@ Use placeholders to personalize emails:
 | `{participant_name}` | Participant full name | `Alice Mueller` |
 | `{period_start}` | Billing period start date (formatted per regional settings) | `01.01.2026` |
 | `{period_end}` | Billing period end date (formatted per regional settings) | `31.01.2026` |
+| `{due_date}` | Payment due date (formatted per regional settings; empty when unset) | `14.02.2026` |
 | `{total_chf}` | Invoice total in CHF | `123.45` |
 
 ### Default Template
@@ -115,7 +116,7 @@ If a template contains an invalid placeholder (typo or unsupported variable), th
 When you [send approved invoices](09-invoice-management.md#sending-invoices-by-email):
 
 1. OpenZEV generates the PDF (if not already generated)
-2. Email is created using the ZEV's template (or the default)
+2. Email is created using the ZEV template, then the global admin invoice-email override, then the shipped default
 3. A Celery task is queued for asynchronous delivery
 4. The PDF is attached as `invoice_<number>.pdf`
 5. On success, invoice status changes to `Sent` and `sent_at` is recorded

@@ -1,16 +1,4 @@
-"""Coverage for the admin-only template endpoints in ``views_templates``.
-
-The endpoints themselves are old; this module is new because extracting them
-from ``InvoiceViewSet`` replaced six hand-written ``if not request.user.is_admin``
-checks with a declarative ``IsAdmin`` permission class. Two things had to survive
-that swap and were previously untested:
-
-* every one of the six endpoints still refuses a non-admin, and
-* the GOVERNANCE audit event written on denial is unchanged.
-
-Both are pinned here so a future change to the permission wiring cannot quietly
-drop them.
-"""
+"""Test template endpoint permissions, denial audits, and owner read access."""
 
 from django.test import TestCase
 from rest_framework.test import APIClient
@@ -41,7 +29,6 @@ ALL_ENDPOINTS = [
       for m in ("get", "patch", "delete")],
     ("post", "/api/v1/invoices/invoices/preview-pdf-template/", {"content": "<p>x</p>"}),
     ("get", "/api/v1/invoices/invoices/email-templates/", None),
-    ("get", "/api/v1/invoices/invoices/email-template/invoice_email/", None),
     ("patch", "/api/v1/invoices/invoices/email-template/invoice_email/", {"subject": "S", "body": "B"}),
     ("delete", "/api/v1/invoices/invoices/email-template/invoice_email/", None),
 ]
@@ -100,19 +87,61 @@ class TemplateAdminPermissionTests(TestCase):
                     f"Denied PDF template mutation by non-admin ({template_name}).",
                 )
 
-    def test_non_admin_email_template_denial_is_audited(self):
+    def test_non_admin_cannot_mutate_email_templates(self):
+        auth(self.client, self.owner)
+
+        for method, payload in (("patch", {"subject": "S", "body": "B"}), ("delete", None)):
+            with self.subTest(method=method):
+                AuditEvent.objects.all().delete()
+                resp = self._call(
+                    method,
+                    "/api/v1/invoices/invoices/email-template/invoice_email/",
+                    payload,
+                )
+
+                self.assertEqual(resp.status_code, 403)
+                event = AuditEvent.objects.get()
+                self.assertEqual(event.action_category, AuditActionCategory.GOVERNANCE)
+                self.assertEqual(event.action_type, "template.email.update")
+                self.assertEqual(event.status, AuditEventStatus.DENIED)
+                self.assertEqual(event.target_type, "invoices.EmailTemplate")
+                self.assertEqual(event.target_id, "invoice_email")
+                self.assertEqual(event.summary, "Denied email template mutation by non-admin.")
+
+    def test_zev_owner_can_read_email_template_catalog(self):
         auth(self.client, self.owner)
 
         resp = self.client.get("/api/v1/invoices/invoices/email-template/invoice_email/")
 
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn("fields", resp.data)
+        self.assertFalse(AuditEvent.objects.exists())
+
+    def test_zev_owner_cannot_read_other_global_email_templates(self):
+        auth(self.client, self.owner)
+
+        for template_key in ("participant_onboarding", "email_verification", "participant_magic_link"):
+            with self.subTest(template_key=template_key):
+                resp = self.client.get(f"/api/v1/invoices/invoices/email-template/{template_key}/")
+                self.assertEqual(resp.status_code, 403)
+
+        self.assertFalse(AuditEvent.objects.exists())
+
+    def test_participant_cannot_read_email_template_catalog(self):
+        auth(self.client, self.participant)
+
+        resp = self.client.get("/api/v1/invoices/invoices/email-template/invoice_email/")
+
         self.assertEqual(resp.status_code, 403)
-        event = AuditEvent.objects.get()
-        self.assertEqual(event.action_category, AuditActionCategory.GOVERNANCE)
-        self.assertEqual(event.action_type, "template.email.update")
-        self.assertEqual(event.status, AuditEventStatus.DENIED)
-        self.assertEqual(event.target_type, "invoices.EmailTemplate")
-        self.assertEqual(event.target_id, "invoice_email")
-        self.assertEqual(event.summary, "Denied email template mutation by non-admin.")
+        self.assertFalse(AuditEvent.objects.exists())
+
+    def test_anonymous_email_template_read_is_unauthorized(self):
+        self.client.credentials()
+
+        resp = self.client.get("/api/v1/invoices/invoices/email-template/invoice_email/")
+
+        self.assertEqual(resp.status_code, 401)
+        self.assertFalse(AuditEvent.objects.exists())
 
     def test_format_suffix_urls_are_served(self):
         """The router used to generate these routes but the action signatures
@@ -142,6 +171,7 @@ class EmailTemplateAdminTests(TestCase):
         patch_resp = self.client.patch(url, {"subject": "Custom", "body": "Body"}, format="json")
         self.assertEqual(patch_resp.status_code, 200)
         self.assertTrue(patch_resp.data["is_customized"])
+        self.assertNotIn("fields", patch_resp.data)
         self.assertEqual(EmailTemplate.objects.get(template_key="invoice_email").subject, "Custom")
 
         get_resp = self.client.get(url)
@@ -151,6 +181,7 @@ class EmailTemplateAdminTests(TestCase):
         delete_resp = self.client.delete(url)
         self.assertEqual(delete_resp.status_code, 200)
         self.assertFalse(delete_resp.data["is_customized"])
+        self.assertNotIn("fields", delete_resp.data)
         self.assertEqual(delete_resp.data["subject"], default_subject)
         self.assertFalse(EmailTemplate.objects.filter(template_key="invoice_email").exists())
 
@@ -359,6 +390,7 @@ class PdfTemplateAdminTests(TestCase):
         delete_resp = self.client.delete(url)
         self.assertEqual(delete_resp.status_code, 200)
         self.assertEqual(delete_resp.data["content"], default_content)
+        self.assertNotIn("fields", delete_resp.data)
         self.assertFalse(PdfTemplate.objects.filter(template_name=template_name).exists())
 
     def test_update_and_reset_are_audited(self):
@@ -375,12 +407,82 @@ class PdfTemplateAdminTests(TestCase):
         self.assertEqual(reset_event.summary, "Reset PDF template invoices/invoice_pdf.html to default.")
 
 
+class TemplateFieldCatalogEndpointTests(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        auth(self.client, make_user("catalog_admin", UserRole.ADMIN))
+
+    def test_every_pdf_template_get_returns_its_field_catalog(self):
+        for path, _template_name, _action_prefix in PDF_TEMPLATE_ENDPOINTS:
+            with self.subTest(template=path):
+                resp = self.client.get(f"/api/v1/invoices/invoices/{path}/")
+                self.assertEqual(resp.status_code, 200)
+                self.assertIn("fields", resp.data)
+                variables = {
+                    entry["variable"]
+                    for group in resp.data["fields"]
+                    for entry in group["fields"]
+                }
+                self.assertIn("{{ participant.full_name }}", variables)
+
+    def test_every_email_template_get_returns_its_field_catalog(self):
+        for template_key in EMAIL_TEMPLATE_DEFAULTS:
+            with self.subTest(template_key=template_key):
+                resp = self.client.get(
+                    f"/api/v1/invoices/invoices/email-template/{template_key}/"
+                )
+                self.assertEqual(resp.status_code, 200)
+                self.assertIn("fields", resp.data)
+                variables = {
+                    entry["variable"]
+                    for group in resp.data["fields"]
+                    for entry in group["fields"]
+                }
+                self.assertNotEqual(variables, set())
+
+    def test_every_pdf_template_mutation_does_not_return_its_field_catalog(self):
+        for path, _template_name, _action_prefix in PDF_TEMPLATE_ENDPOINTS:
+            with self.subTest(template=path):
+                url = f"/api/v1/invoices/invoices/{path}/"
+                patch_resp = self.client.patch(url, {"content": "<p>custom</p>"}, format="json")
+                self.assertEqual(patch_resp.status_code, 200)
+                self.assertNotIn("fields", patch_resp.data)
+
+                delete_resp = self.client.delete(url)
+                self.assertEqual(delete_resp.status_code, 200)
+                self.assertNotIn("fields", delete_resp.data)
+
+    def test_every_email_template_mutation_does_not_return_its_field_catalog(self):
+        for template_key in EMAIL_TEMPLATE_DEFAULTS:
+            with self.subTest(template_key=template_key):
+                url = f"/api/v1/invoices/invoices/email-template/{template_key}/"
+                patch_resp = self.client.patch(url, {"subject": "S", "body": "B"}, format="json")
+                self.assertEqual(patch_resp.status_code, 200)
+                self.assertNotIn("fields", patch_resp.data)
+
+                delete_resp = self.client.delete(url)
+                self.assertEqual(delete_resp.status_code, 200)
+                self.assertNotIn("fields", delete_resp.data)
+
+    def test_field_catalog_examples_render_in_the_preview(self):
+        resp = self.client.get("/api/v1/invoices/invoices/pdf-template/")
+        fields = {
+            entry["variable"]: entry
+            for group in resp.data["fields"]
+            for entry in group["fields"]
+        }
+        self.assertEqual(fields["{{ participant.full_name }}"]["example"], "Hans Beispiel")
+
+        preview = self.client.post(
+            "/api/v1/invoices/invoices/preview-pdf-template/",
+            {"content": "{{ participant.full_name }}", "template_type": "invoice"},
+            format="json",
+        )
+        self.assertEqual(preview.data["html"], "Hans Beispiel")
+
+
 class PdfTemplateOverrideIntegrityTests(TestCase):
-    """The whole-document override path is validated at the door and
-    provenance-aware: broken templates are rejected on save (never stored to
-    fail at document-render time), staleness against a changed on-disk default
-    is surfaced on read, and the shared-base include keeps working through the
-    DB override render path."""
+    """Test override validation, stale detection, and shared-base rendering."""
 
     def setUp(self):
         self.client = APIClient()

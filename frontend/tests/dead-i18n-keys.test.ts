@@ -11,7 +11,8 @@ import { en } from '../src/i18n/locales/en'
  * a 4× maintenance tax.
  *
  * Liveness rules, in order:
- * 1. exact key string in the corpus (src + tests + screenshots, minus locales)
+ * 1. exact key string in the corpus (src + tests + screenshots, minus locales,
+ *    plus the backend field-catalog keys)
  * 2. i18next plural fallback: strip _one/_other/…, retry exact
  * 3. dynamic: the key extends the literal head of a real dynamic call site
  *    — t(`prefix.${expr}`) — directly or via a variable assigned a template
@@ -26,6 +27,7 @@ import { en } from '../src/i18n/locales/en'
 
 const ROOT = resolve(__dirname, '..')
 const SRC = join(ROOT, 'src')
+const BACKEND_FIELD_CATALOG_DATA = resolve(ROOT, '..', 'backend', 'invoices', 'field_catalog_data.py')
 
 function sourceFiles(dir: string): string[] {
     return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
@@ -36,13 +38,16 @@ function sourceFiles(dir: string): string[] {
     })
 }
 
+const backendKeys = [...readFileSync(BACKEND_FIELD_CATALOG_DATA, 'utf8')
+    .matchAll(/"(?:description_key|group_title_key)":\s*"([^"]+)"/g)].map((m) => m[1])
+
 const corpus = [
     ...sourceFiles(SRC),
     ...sourceFiles(join(ROOT, 'tests')),
     ...sourceFiles(join(ROOT, 'screenshots')),
 ]
     .map((f) => readFileSync(f, 'utf8'))
-    .join('\n')
+    .join('\n') + '\n' + backendKeys.join('\n')
 
 function flatten(obj: Record<string, unknown>, prefix = ''): string[] {
     return Object.entries(obj).flatMap(([k, v]) => {
@@ -85,6 +90,10 @@ function isLive(key: string): boolean {
 
 describe('i18n locale keys', () => {
     it('are all reachable from code (no dead keys)', () => {
+        // The backend catalog regex above must keep parsing real keys; a
+        // catalog reformat that silently yields zero matches would otherwise
+        // turn every catalog key dead without a loud failure.
+        expect(backendKeys.length).toBeGreaterThan(100)
         const dead = localeKeys().filter((k) => !isLive(k))
         expect(dead).toEqual([])
     })
@@ -94,5 +103,11 @@ describe('i18n locale keys', () => {
         const [probe] = flatten({ __probe__: { plantedKey: 'x' } })
         expect(probe).toBe('__probe__.plantedKey')
         expect(isLive(probe)).toBe(false)
+    })
+
+    it('does not mark whole trees live from plain strings', () => {
+        expect(corpus).toContain('admin')
+        expect(dynamicPrefixes['admin.']).toBeUndefined()
+        expect(isLive('admin.__deadPrefixProbe__')).toBe(false)
     })
 })

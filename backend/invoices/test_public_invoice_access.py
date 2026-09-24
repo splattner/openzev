@@ -593,12 +593,19 @@ class MagicLinkTemplateTests(PublicInvoiceTestCase):
         self.assertIn("/signin/", self._sent().body)
 
     def test_a_customised_template_is_used(self):
-        self._customise(subject="Ihr Link für {zev_name}", body="Hier: {link_url}")
+        self._customise(
+            subject="{participant_name}|{zev_name}|{link_url}|{valid_minutes}",
+            body="{participant_name}|{zev_name}|{link_url}|{valid_minutes}",
+        )
 
         self._request()
 
-        self.assertEqual(self._sent().subject, f"Ihr Link für {self.zev.name}")
-        self.assertIn("/signin/", self._sent().body)
+        for message in (self._sent().subject, self._sent().body):
+            participant_name, zev_name, link_url, valid_minutes = message.split("|")
+            self.assertEqual(participant_name, self.participant.full_name)
+            self.assertEqual(zev_name, self.zev.name)
+            self.assertIn("/signin/", link_url)
+            self.assertEqual(valid_minutes, "15")
 
     def test_an_unknown_placeholder_still_sends_a_usable_link(self):
         """The regression this class exists for: never a body reading `{link_url}`."""

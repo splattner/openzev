@@ -1303,12 +1303,31 @@ export interface DashboardStats {
     }>
 }
 
+export interface TemplateField {
+    variable: string
+    description_key: string
+    /** Example value resolved from the backend sample context, when one exists. */
+    example: string | null
+}
+
+export interface TemplateFieldGroup {
+    group_key: string
+    group_title_key: string | null
+    fields: TemplateField[]
+}
+
+/** PATCH/DELETE response payload; the client refetches the detail and catalog. */
+export interface TemplateMutationResponse {
+    detail: string
+}
+
 export interface PdfTemplateResponse {
     template_name: string
     content: string
     is_customized: boolean
     is_stale?: boolean
     detail?: string
+    fields: TemplateFieldGroup[]
 }
 
 export interface EmailTemplateResponse {
@@ -1317,6 +1336,7 @@ export interface EmailTemplateResponse {
     body: string
     is_customized: boolean
     detail?: string
+    fields: TemplateFieldGroup[]
 }
 
 export interface ZevOwnerDashboardSummary {

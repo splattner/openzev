@@ -239,6 +239,7 @@ Admins can manage the HTML/CSS template used for invoice PDF generation in **Pla
 ![PDF templates](screenshots/14-admin-pdf-templates.png)
 
 - Edit the template used for invoice PDF rendering (tabs for the invoice, participant contract, and annual statement templates)
+- The **Available Fields** panel lists supported fields with preview examples. In source view, search by token or description and click a token to insert it at the caret. Shift-click keeps the caret in its original position. Loop tags insert a ready-to-fill block.
 - **Preview** shows a real, sample-data PDF rendered through the same pipeline as issued documents; a source toggle reveals the raw template markup
 - Template changes affect future PDF renders. Existing stored PDFs remain
   unchanged until **regenerated** — individual invoices can be regenerated, and
@@ -257,7 +258,7 @@ OpenZEV uses four email templates:
 | Template | Purpose |
 | --- | --- |
 | **Invoice Email** | Sent to participants when invoices are delivered |
-| **Invitation Email** | Sent when a participant is invited to join a ZEV |
+| **Onboarding Email** | Sent when a participant is added to a ZEV, with a reusable onboarding link |
 | **Verification Email** | Sent for email address verification |
 | **Sign-in Link Email** | Sent when a participant asks for a sign-in link from the QR code on their invoice (see [Participant Access from the Invoice](02-zev-setup.md#participant-access-from-the-invoice)) |
 
@@ -287,27 +288,36 @@ The body editor uses a monospace font to make placeholder variables easier to re
 
 Each template supports placeholder variables. Use `{variable_name}` syntax in the subject or body — they are replaced with actual values when the email is sent.
 
-The **Available Fields** panel on the right side of the editor lists all supported variables for the currently selected template.
+The **Available Fields** panel lists the supported variables for the selected template, with translated descriptions, sample values, and a usage count. The panel is keyboard-focusable and scrollable. Use the search box to filter by token or description. Click a token to insert it at the editor caret; Shift-click keeps the caret in its original position.
 
 #### Invoice Email Variables
 
 See [Email Configuration → Email Templates](10-email-configuration.md#email-templates) for the invoice email placeholders.
 
-#### Invitation Email Variables
+#### Onboarding Email Variables
 
 | Variable | Description |
 | --- | --- |
 | `{participant_name}` | Full name of the participant |
-| `{inviter_name}` | Name of the person who sent the invitation |
+| `{inviter_name}` | Name of the person who added the participant |
 | `{zev_name}` | Name of the ZEV |
-| `{username}` | Login username for the participant |
-| `{temporary_password}` | Temporary password for first login |
+| `{link_url}` | Reusable onboarding link |
+| `{expiry_date}` | Formatted onboarding-link expiry date |
 
 #### Verification Email Variables
 
 | Variable | Description |
 | --- | --- |
 | `{verify_url}` | Email verification link URL |
+
+#### Sign-in Link Email Variables
+
+| Variable | Description |
+| --- | --- |
+| `{participant_name}` | Full name of the participant |
+| `{zev_name}` | Name of the ZEV |
+| `{link_url}` | One-time sign-in link |
+| `{valid_minutes}` | Sign-in-link lifetime in minutes |
 
 ### Customization Indicator
 

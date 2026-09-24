@@ -118,19 +118,19 @@ Ordering: `["-created_at"]`.
 
 A row exists only when the template has been customized via the admin API. When no row is present, the on-disk default file is used. Deleting the row reverts to the default.
 
-Since the redesign (see `2026-08-contract-pdf-redesign.md` §12) `PATCH` validates the submitted content by rendering it against the matching sample context before storing (400 on error, nothing persisted) — in strict mode, unknown template variables (e.g. a `{{ participant.emali }}` typo, which the default engine renders as an empty string) are rejected with 400 naming the variable. Responses carry `is_stale` — true when `default_digest` no longer matches the current on-disk default, i.e. a release shipped a new default since the override was last saved. Migration `0009` backfills pre-existing overrides with the digest of the default shipping in that release (a baseline — legacy provenance is unknowable); a blank digest (no provenance) is never flagged stale. Overrides keep working with `{% include "pdf/shared_pdf_base.html" %}` (resolved through the engine loaders), so keeping that line gives future design-token updates for free; pre-redesign overrides without the include still render standalone.
+Since the redesign (see `2026-08-contract-pdf-redesign.md` §12) `PATCH` validates the submitted content by rendering it against the matching sample context before storing (400 on error, nothing persisted) — in strict mode, unknown template variables (e.g. a `{{ participant.emali }}` typo, which the default engine renders as an empty string) are rejected with 400 naming the variable. GET and PATCH responses carry `is_stale` (DELETE omits it) — true when `default_digest` no longer matches the current on-disk default, i.e. a release shipped a new default since the override was last saved. Migration `0009` backfills pre-existing overrides with the digest of the default shipping in that release (a baseline — legacy provenance is unknowable); a blank digest (no provenance) is never flagged stale. Overrides keep working with `{% include "pdf/shared_pdf_base.html" %}` (resolved through the engine loaders), so keeping that line gives future design-token updates for free; pre-redesign overrides without the include still render standalone.
 
 ### 3.5 EmailTemplate
 
 | Field | Type | Description |
 |---|---|-|
 | `id` | `BigAutoField` (PK) | Auto-generated |
-| `template_key` | `CharField(100)`, unique | Email type key: `invoice_email`, `participant_invitation`, or `email_verification` |
+| `template_key` | `CharField(100)`, unique | Application/API key. Recognized values are `invoice_email`, `participant_onboarding`, `email_verification`, and `participant_magic_link`; the database field itself is free-form rather than a choices enum. |
 | `subject` | `CharField(500)` | Customized subject template |
 | `body` | `TextField` | Customized body template |
 | `updated_at` | `DateTimeField` (auto) | Last modification timestamp |
 
-A row exists only when an admin has customized the template via the admin API (§7.4). Hardcoded defaults live in `EMAIL_TEMPLATE_DEFAULTS` (`invoices/models.py`); deleting the row reverts to them.
+A row exists only when an admin has customized the template via the admin API (§7.4). `EMAIL_TEMPLATE_DEFAULTS` (`invoices/models.py`) defines the four recognized application keys. Deleting a row normally restores that key's hardcoded subject/body. `participant_magic_link` is the exception at delivery time: when no override exists, `send_magic_link_email` chooses the shipped default for the ZEV's invoice language; a saved override still replaces all four language defaults. `participant_invitation` was replaced by `participant_onboarding`, and migration `0017_drop_participant_invitation_template` deletes any legacy row.
 
 ---
 
@@ -416,31 +416,31 @@ remain incomplete (no new billing restriction).
 
 ### 5.7 PDF template management
 
-The invoice, contract, and annual-statement PDF templates are editable via the admin API. Templates are stored in the database (`PdfTemplate` model) when customized; on-disk files serve as immutable defaults and are never modified. All three template endpoints are served by `PdfTemplateView` (`views_templates.py`), a subclass of the shared `_AdminTemplateView` base (`permission_classes = [IsAdmin]`); mutations are audit-logged (`template.invoice_pdf.*`, `template.contract_pdf.*`, `template.annual_statement_pdf.*`), and non-admin mutation attempts are audit-logged as `DENIED`.
+The invoice, contract, and annual-statement PDF templates are editable via the admin API. Templates are stored in the database (`PdfTemplate` model) when customized; on-disk files serve as immutable defaults and are never modified. All three template endpoints are served by `PdfTemplateView` (`views_templates.py`), a subclass of the shared `_AdminTemplateView` base (`permission_classes = [IsAdmin]`). Successful mutations are audit-logged under `template.invoice_pdf.*`, `template.contract_pdf.*`, and `template.annual_statement_pdf.*`; authenticated non-admin denials, including PDF reads, are recorded as `DENIED`. Unauthenticated `401` responses are not audited.
 
 #### Invoice PDF template
 
 | Method | URL | Permission | Description |
 |---|---|---|---|
-| `GET` | `/invoices/invoices/pdf-template/` | `admin` only | Return current content + `is_customized` flag (DB if overridden, else on-disk default) |
-| `PATCH` | `/invoices/invoices/pdf-template/` | `admin` only | Save content to database; never writes to filesystem |
-| `DELETE` | `/invoices/invoices/pdf-template/` | `admin` only | Remove DB override; reverts to on-disk default |
+| `GET` | `/invoices/invoices/pdf-template/` | `admin` only | Return `template_name`, content, `is_customized`, `is_stale`, and `fields` (DB override if present, else on-disk default) |
+| `PATCH` | `/invoices/invoices/pdf-template/` | `admin` only | Validate and save content; return it with `is_customized: true`, `is_stale: false`, and `detail`; never writes to the filesystem |
+| `DELETE` | `/invoices/invoices/pdf-template/` | `admin` only | Remove the DB override; return default content, `is_customized: false`, and `detail` (no `is_stale`) |
 
 #### Contract PDF template
 
 | Method | URL | Permission | Description |
 |---|---|---|---|
-| `GET` | `/invoices/invoices/contract-pdf-template/` | `admin` only | Return current content + `is_customized` flag |
-| `PATCH` | `/invoices/invoices/contract-pdf-template/` | `admin` only | Save content to database |
-| `DELETE` | `/invoices/invoices/contract-pdf-template/` | `admin` only | Remove DB override; reverts to on-disk default |
+| `GET` | `/invoices/invoices/contract-pdf-template/` | `admin` only | Return `template_name`, current content, `is_customized`, `is_stale`, and `fields` |
+| `PATCH` | `/invoices/invoices/contract-pdf-template/` | `admin` only | Save content; return the mutation response described above |
+| `DELETE` | `/invoices/invoices/contract-pdf-template/` | `admin` only | Return `template_name`, default content, `is_customized: false`, and `detail`; omit `is_stale` |
 
 #### Annual statement PDF template
 
 | Method | URL | Permission | Description |
 |---|---|---|---|
-| `GET` | `/invoices/invoices/annual-statement-pdf-template/` | `admin` only | Return current content + `is_customized` flag |
-| `PATCH` | `/invoices/invoices/annual-statement-pdf-template/` | `admin` only | Save content to database |
-| `DELETE` | `/invoices/invoices/annual-statement-pdf-template/` | `admin` only | Remove DB override; reverts to on-disk default |
+| `GET` | `/invoices/invoices/annual-statement-pdf-template/` | `admin` only | Return `template_name`, current content, `is_customized`, `is_stale`, and `fields` |
+| `PATCH` | `/invoices/invoices/annual-statement-pdf-template/` | `admin` only | Save content; return the mutation response described above |
+| `DELETE` | `/invoices/invoices/annual-statement-pdf-template/` | `admin` only | Return `template_name`, default content, `is_customized: false`, and `detail`; omit `is_stale` |
 #### Invoice PDF download
 
 | Method | URL | Permission | Description |
@@ -454,22 +454,43 @@ The invoice, contract, and annual-statement PDF templates are editable via the a
 |---|---|---|---|
 | `POST` | `/invoices/invoices/preview-pdf-template/` | `admin` only | Render submitted template content with sample data; returns rendered HTML or real PDF bytes |
 
-Request body: `{ "content": "<html>...", "template_type": "invoice" | "contract" | "annual_statement" }` (defaults to `invoice`) plus `"output": "html" | "pdf"` (defaults to `html`). The sample context comes from `build_sample_invoice_context()`, `build_sample_contract_context()`, or `build_sample_annual_statement_context()` in `invoices/template_context.py`. With `output: "html"` the response is `{ "html": "<rendered html>" }`; with `output: "pdf"` the same content runs through the WeasyPrint pipeline (`render_pdf()`) and the response is raw `application/pdf` bytes rendered from sample data. Template rendering errors return `400` with `{ "error": "Template rendering error: ..." }`; missing/blank content returns `400`; unknown `template_type`/`output` values return `400`; content above `MAX_PREVIEW_CHARS` (500,000) returns `400`; a PDF-stage failure returns a generic `500` (details logged server-side).
+Request body: `{ "content": "<html>...", "template_type": "invoice" | "contract" | "annual_statement" }` (defaults to `invoice`) plus `"output": "html" | "pdf"` (defaults to `html`). The sample context comes from `build_sample_invoice_context()`, `build_sample_contract_context()`, or `build_sample_annual_statement_context()` in `invoices/template_context.py`. With `output: "html"` the response is `{ "html": "<rendered html>" }`; with `output: "pdf"` the same content runs through the WeasyPrint pipeline (`render_pdf()`) and the response is raw `application/pdf` bytes rendered from sample data. Template rendering errors return `400` with `{ "error": "Template rendering error: ..." }`; missing/blank content returns `400`; unknown `template_type`/`output` values return `400`; content above `MAX_TEMPLATE_CHARS` (500,000) returns `400`; a PDF-stage failure returns a generic `500` (details logged server-side).
 
-**Response shape (GET and PATCH):**
+**Response shape (example GET; PATCH/DELETE return the same template metadata without `fields`):**
 
 ```json
 {
   "template_name": "invoices/invoice_pdf.html",
   "content": "<!DOCTYPE html>...",
   "is_customized": true,
-  "detail": "PDF template updated successfully."
+  "is_stale": false,
+  "fields": [
+    {
+      "group_key": "participant",
+      "group_title_key": "admin.fields.participant",
+      "fields": [
+        {
+          "variable": "{{ participant.full_name }}",
+          "description_key": "admin.fields.fullName",
+          "example": "Hans Beispiel"
+        }
+      ]
+    }
+  ]
 }
 ```
 
-- `is_customized: false` means the on-disk default is active.
-- `is_customized: true` means a DB row overrides the default.
-- DELETE returns `is_customized: false` and the default content.
+- GET returns `is_stale`; PATCH returns `is_stale: false`; DELETE omits it.
+- `is_customized: false` means the on-disk default is active;
+  `is_customized: true` means a DB row overrides it.
+- GET returns `fields`: the curated catalog resolved by
+  `invoices/field_catalog.py` from `invoices/field_catalog_data.py`,
+  with `example` values resolved from the sample context used by preview and
+  save-time validation. PDF `group_title_key` values are React i18n keys; email
+  groups use `null`. `example` is `null` for a missing sample value and for
+  `|safe`, `tr.*`, markup, or overlong values (e.g. chart SVG, clause text).
+- PATCH/DELETE return `detail` only in addition to their template metadata;
+  they do not recompute or return the catalog.
 
 ---
 
@@ -582,14 +603,16 @@ rejected (HTTP `400`). The retried send creates a **new** `EmailLog` entry.
 
 ### 7.4 System email template management
 
-Admin-only endpoints manage the global `EmailTemplate` overrides (§3.5) for the three template keys defined in `EMAIL_TEMPLATE_DEFAULTS`: `invoice_email`, `participant_invitation`, `email_verification`. Mutations are audit-logged; non-admin attempts return `403` and are audit-logged as `DENIED`.
+The global `EmailTemplate` overrides (§3.5) use the four keys defined in `EMAIL_TEMPLATE_DEFAULTS`: `invoice_email`, `participant_onboarding`, `email_verification`, and `participant_magic_link`. `participant_onboarding` replaced `participant_invitation`; its catalog exposes `{participant_name}`, `{inviter_name}`, `{zev_name}`, `{link_url}`, and `{expiry_date}`. The magic-link catalog exposes `{participant_name}`, `{zev_name}`, `{link_url}`, and `{valid_minutes}`. Admins may read all four global templates; ZEV owners may read only `invoice_email` and its field catalog so the per-ZEV editor can show the effective fallback. Listing and mutations remain admin-only. Denied mutations are audit-logged as `DENIED`; denied reads are not governance mutation events.
 
-| Method | URL | Description |
-|---|---|---|
-| `GET` | `/invoices/invoices/email-templates/` | List all template keys with current `subject`, `body`, and `is_customized` (DB override if present, else hardcoded default) |
-| `GET` | `/invoices/invoices/email-template/{key}/` | Single template: `{template_key, subject, body, is_customized}`; `404` for unknown keys |
-| `PATCH` | `/invoices/invoices/email-template/{key}/` | Save `subject`/`body` to the database (`template.email.update`); blank or non-string values → `400` |
-| `DELETE` | `/invoices/invoices/email-template/{key}/` | Remove the DB override, reverting to the hardcoded default (`template.email.reset`) |
+| Method | URL | Permission | Response / behavior |
+|---|---|---|---|
+| `GET` | `/invoices/invoices/email-templates/` | `IsAdmin` | Bare array of `{template_key, subject, body, is_customized}` for all four keys; no `fields` |
+| `GET` | `/invoices/invoices/email-template/{key}/` | `IsZevOwnerOrAdmin` for `invoice_email`; otherwise `IsAdmin` | `{template_key, subject, body, is_customized, fields}`; participant → `403`, unauthenticated → `401`; an unknown key returns `404` only after authorization succeeds |
+| `PATCH` | `/invoices/invoices/email-template/{key}/` | `IsAdmin` | Save `subject`/`body` (`template.email.update`); return template metadata with `is_customized: true` plus `detail`; blank/non-string values → `400` |
+| `DELETE` | `/invoices/invoices/email-template/{key}/` | `IsAdmin` | Remove the DB override (`template.email.reset`); return the shipped subject/body, `is_customized: false`, and `detail` |
+
+The `participant_magic_link` shipped body/subject is selected by the ZEV invoice language when no override exists. Saving one override deliberately replaces that language-specific default for every language, as the admin editor explains.
 
 ---
 
@@ -980,6 +1003,10 @@ the cockpit readiness and attention caches.
 | `test_invoice_numbering.py` | `TestNumberingIsScopedToTheZev`, `TestDuplicatesWithinOneZevAreStillRejected` | §4.1: two ZEVs on the default `INV` prefix both bill and each counts from 1; a duplicate number within one ZEV is refused at the database level (`bulk_create` bypasses `save()`) |
 | `test_serializers.py` | `InvoiceDescriptionSerializationTests` | §8.9: period suffix stripping in serializer |
 | `test_template_context.py` | `BuildSampleInvoiceContextTests`, `BuildSampleContractContextTests`, `BuildSampleAnnualStatementContextTests` | §5.7 preview: sample context required keys, invoice number/totals, `grouped_items` structure, formatted dates, annual-statement monthly data and chart |
+| `test_field_catalog.py` | `PdfCatalogResolutionTests` (7), `EmailCatalogResolutionTests` (2), `CatalogPayloadShapeTests` (5) | §5.7/§7.4: sample-path resolution, default-template output coverage, unique/current catalog coverage, four shared production email contexts, payload shape, unknown keys, null SVG/translation examples, and representative preview/example parity |
+| `test_template_admin.py` | `TemplateAdminPermissionTests` (10), `EmailTemplateAdminTests` (4), `TemplateFieldCatalogEndpointTests` (5), plus PDF admin/preview/override/download coverage | §5.7/§7.4: declarative permissions and mutation audits; admin email reads, owner invoice-email read only; participant/unauthenticated read denials (`403`/`401`, no audit event); participant mutation denials (`403`, recorded as `DENIED`); CRUD validation; `fields` on single-template GET responses, and reduced PATCH/DELETE responses |
+| `test_public_invoice_access.py` | `MagicLinkTemplateTests` | §7.4: language-specific shipped magic-link defaults, one global override for every language, and invalid-placeholder fallback |
+| `../zev/test_onboarding.py` | `OnboardingTokenServiceTests`, `SendOnboardingLinkServiceTests` | §7.4: participant-onboarding token/link generation and the send service contract |
 | `test_pdfa.py` | `RenderPdfVariantTests`, `InvoicePdfaTests` | §8.1: `render_pdf` emits PDF/A-3b (XMP `pdfaid` + OutputIntent); generated invoice PDFs are PDF/A |
 
 ### Backend (`invoices/test_pdf.py`)
@@ -1021,7 +1048,7 @@ the cockpit readiness and attention caches.
   action links to the locked invoice (`pages.invoices.reviewConflict`)
   instead of offering Generate; fully settled rows link to the covering
   invoice (`pages.invoices.viewCoveringInvoice`).
-- Email field reference is shared: `frontend/src/lib/emailTemplateFields.ts` defines `EMAIL_TEMPLATE_FIELDS`; `frontend/src/components/EmailFieldReference.tsx` (`email-field-reference`) is used by `ZevEmailTemplateFields` and `AdminEmailTemplatesPage`.
+- Template field definitions come from the backend catalogs. `frontend/src/lib/emailTemplateFields.ts` owns only `EMAIL_TEMPLATE_KEYS`/`EmailTemplateKey`, the four-key frontend route contract. `frontend/src/components/FieldReference.tsx` is shared by `ZevEmailTemplateFields`, `AdminEmailTemplatesPage`, and `AdminPdfTemplatesPage`; it renders API-provided groups (without the backend-only `sample_path`), examples, search, usage badges, and click-to-insert behavior. Insertion calculates state changes and restores the caret after controlled React updates rather than writing `element.value` directly. `frontend/tests/templates-hub.test.ts` covers the seven-tab hub and cross-category routing; `field-reference.test.ts`, `email-template-parity.test.ts`, and `dead-i18n-keys.test.ts` pin token helpers, syntax-aware counting, key/tab parity, backend description-key translations, and catalog-key reachability.
 - Annual-statement export card (admin/owner): prepare → poll → download with partial, failed and expired states. Polling stops on ZEV/year switch, and a create response that resolves after the user switched ZEV/year is discarded (the old selection's job is never shown under the new one); a failed job shows the backend's safe `error_message` when there is one; a single transient poll error is tolerated (only consecutive errors or a long wall-clock backstop end the poll); a failed download surfaces an error instead of crashing; an in-flight or completed export is restored after a reload (`AnnualStatementsExportCard`)
 - Build and type checks (`npm run build`)
 
