@@ -65,17 +65,31 @@ In order, and none of it is optional:
 
 ## 2. Verify
 
-CI is the authority on whether the suite passes. Read it rather than guessing:
+CI is the authority on whether the suite passes. `pr-quality.yml` already runs
+lint, `manage.py check`, the full pytest suite, the frontend lint, style, hex
+sweep, unit tests and build, and `helm lint`. Re-running those locally
+duplicates CI and proves nothing it has not already proved, so read the result
+rather than reproducing it:
 
 ```
 gh pr checks <n>
+gh pr view <n> --json headRefOid
 ```
 
-If checks are red, the failing job is a must-fix and the review says which job
-and why. If checks have not run (draft, or docs-only paths that `pr-quality.yml`
-skips), say so.
+Check that the checks ran against the **current head commit** (`headRefOid`),
+not an earlier push — a green result for a stale SHA is no signal.
 
-Then run only what the diff touches. Do not run the full suite on every review:
+- **Green on the head SHA:** run nothing CI already covers. Say so in
+  Validation. Local commands are then only for what CI does not run (see
+  "Beyond CI" below) or to confirm one specific suspected bug.
+- **Red:** the failing job is a must-fix, and the review says which job and why.
+  Read the log (`gh run view <run-id> --log-failed`); do not reproduce the
+  failure blind.
+- **No signal:** a pre-PR branch, a draft, a stale SHA, or docs-only paths that
+  `pr-quality.yml` skips. Say so, and fall back to the table below, running only
+  what the diff touches. Do not run the full suite.
+
+Fallback commands, for when CI has no signal for the head commit:
 
 | Diff touches | From | Command |
 |---|---|---|
@@ -88,13 +102,24 @@ Then run only what the diff touches. Do not run the full suite on every review:
 | `charts/**` | repo root | `helm lint ./charts/openzev` |
 | docs or specs only | — | nothing — CI skips these paths too |
 
-Use the Node version in `.node-version` for frontend commands. If a user-facing
-frontend change can be seen in the running dev stack, check whether the stack is
-already up (`docker ps` / `podman ps`) and look at it, including at ~400px
-width; otherwise say it was not visually checked.
+Use the Node version in `.node-version` for frontend commands.
 
-Record every command and its result — the Validation section reports them
-verbatim.
+### Beyond CI
+
+These are worth doing even when CI is green, because no workflow covers them:
+
+- **Migrations:** when models or migrations changed, from `backend/`
+  (`source ../.venv/bin/activate`): `python manage.py makemigrations --check --dry-run`.
+- **Visual check:** if a user-facing frontend change can be seen in the running
+  dev stack, check whether the stack is already up (`docker ps` / `podman ps`)
+  and look at it, including at ~400px width; otherwise say it was not visually
+  checked.
+- **Confirming a suspected bug:** a single targeted test or command that
+  reproduces a concrete concern raised during the read. This is investigation,
+  not validation — do not widen it into a suite run.
+
+Record every command that was run and its result — the Validation section
+reports them verbatim. Do not list checks CI ran as if the review ran them.
 
 ## 3. Gates
 
@@ -181,8 +206,8 @@ about it. Not a restatement of the title.>
 
 ### Validation
 
-- CI: <green | red — which job and why | not run, because …>
-- Ran: `<command>` → <result>
+- CI: <green on `<short-sha>` | red — which job and why | not run, because …>
+- Ran: `<command>` → <result> *(only what CI does not cover, or a fallback when CI had no signal)*
 - Not checked: <the honest blind spots — what this review did not cover>
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
