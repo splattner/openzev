@@ -1,0 +1,341 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OpenZEV</title>
+<meta name="description" content="Piattaforma open source per gestire e fatturare gli (v)RCP svizzeri — dai dati del contatore al quarto d’ora fino alla QR-fattura pagata.">
+<link rel="canonical" href="https://splattner.github.io/openzev/it/">
+<link rel="alternate" hreflang="de" href="https://splattner.github.io/openzev/">
+<link rel="alternate" hreflang="fr" href="https://splattner.github.io/openzev/fr/">
+<link rel="alternate" hreflang="it" href="https://splattner.github.io/openzev/it/">
+<link rel="alternate" hreflang="en" href="https://splattner.github.io/openzev/en/">
+<link rel="alternate" hreflang="x-default" href="https://splattner.github.io/openzev/">
+<link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+<meta property="og:title" content="OpenZEV">
+<meta property="og:description" content="Piattaforma open source per gestire e fatturare gli (v)RCP svizzeri — dai dati del contatore al quarto d’ora fino alla QR-fattura pagata.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://splattner.github.io/openzev/it/">
+<meta property="og:locale" content="it_CH">
+<meta property="og:image" content="https://splattner.github.io/openzev/assets/site-energy.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="../assets/site.css">
+</head>
+<body>
+
+<header class="hero">
+  <div class="wrap hero-inner">
+    <nav class="topbar">
+      <img src="../assets/logo.png" alt="OpenZEV" width="132" height="132">
+      <div class="toplinks">
+        <a href="#features">Funzionalità</a>
+        <a href="#screens">Schermate</a>
+        <a href="#quickstart">Avvio rapido</a>
+        <a href="https://github.com/splattner/openzev">GitHub</a>
+        <span class="lang" role="group" aria-label="Lingua">
+          <a href="../" hreflang="de" lang="de">DE</a>
+          <a href="../fr/" hreflang="fr" lang="fr">FR</a>
+          <a href="../it/" hreflang="it" lang="it" aria-current="page">IT</a>
+          <a href="../en/" hreflang="en" lang="en">EN</a>
+        </span>
+      </div>
+    </nav>
+
+    <div class="hero-grid">
+      <div>
+        <p class="eyebrow">Open source · RCP &amp; vRCP svizzeri · <span class="nowrap">self-hosted</span> · AGPL-3.0</p>
+        <h1>Dai dati del contatore al quarto d’ora alla <em>fattura pagata</em>.</h1>
+        <p class="hero-lede">Importa le curve di carico, ripartisci il solare tra i partecipanti per intervallo di 15 minuti, valorizzalo con le tue tariffe e invia una QR-fattura. L’ho scritto per fatturare il mio RCP e lo pubblico nel caso possa servire anche al tuo.</p>
+        <div class="cta-row">
+          <a class="btn btn-primary" href="#quickstart">Avvia con un solo comando</a>
+          <a class="btn btn-ghost" href="https://github.com/splattner/openzev">Codice sorgente su GitHub</a>
+        </div>
+      </div>
+
+      <div class="flow-card">
+        <p class="eyebrow">Bilancio energetico · comunità demo · T3 2026</p>
+        <!-- Sources (left) split into sinks (right); band heights are to scale,
+             and both sides reconcile: 625.8 + 1263.05 = 1888.85 produced,
+             625.8 + 738.9 = 1364.7 consumed. -->
+        <svg viewBox="0 0 470 220" role="img" aria-label="Flusso di energia in un trimestre. Dei 1’888.85 kWh prodotti in loco, 625.8 kWh sono consumati localmente e 1’263.05 kWh sono immessi nella rete. Altri 738.9 kWh sono prelevati dalla rete, portando il consumo locale a 1’364.7 kWh e il tasso di autoconsumo al 33.1 per cento.">
+          <defs>
+            <linearGradient id="pvLocal" x1="0" x2="1">
+              <stop offset="0" stop-color="#2f7a4d" stop-opacity=".95"/>
+              <stop offset="1" stop-color="#a7d63a" stop-opacity=".85"/>
+            </linearGradient>
+            <linearGradient id="pvExport" x1="0" x2="1">
+              <stop offset="0" stop-color="#2f7a4d" stop-opacity=".6"/>
+              <stop offset="1" stop-color="#62c8ff" stop-opacity=".45"/>
+            </linearGradient>
+            <linearGradient id="gridLocal" x1="0" x2="1">
+              <stop offset="0" stop-color="#62c8ff" stop-opacity=".42"/>
+              <stop offset="1" stop-color="#f6c213" stop-opacity=".5"/>
+            </linearGradient>
+          </defs>
+
+          <!-- flows, drawn under the bars -->
+          <path d="M17 30 L300 30 L300 65.7 L17 65.7 Z" fill="url(#pvLocal)"/>
+          <path d="M17 65.7 C 160 65.7, 160 118, 300 118 L300 190 C 160 190, 160 138, 17 138 Z" fill="url(#pvExport)"/>
+          <path d="M17 166 C 160 166, 160 65.7, 300 65.7 L300 108 C 160 108, 160 208, 17 208 Z" fill="url(#gridLocal)"/>
+
+          <!-- sources -->
+          <rect x="8" y="30" width="9" height="108" rx="3" fill="#2f7a4d"/>
+          <text x="8" y="22" fill="#cfe3d6" font-family="IBM Plex Mono, monospace" font-size="9.5">FV  1’888.85 kWh</text>
+          <rect x="8" y="166" width="9" height="42" rx="3" fill="#62c8ff" opacity=".85"/>
+          <text x="8" y="158" fill="#cfe3d6" font-family="IBM Plex Mono, monospace" font-size="9.5">Rete  738.9 kWh</text>
+
+          <!-- sinks -->
+          <rect x="300" y="30" width="9" height="78" rx="3" fill="#a7d63a"/>
+          <text x="316" y="54" fill="#eaf3ed" font-family="Archivo, sans-serif" font-size="14" font-weight="700">625.8 kWh</text>
+          <text x="316" y="69" fill="#a7d63a" font-family="IBM Plex Mono, monospace" font-size="9.5">consumato localmente</text>
+          <text x="316" y="83" fill="#8fa89a" font-family="IBM Plex Mono, monospace" font-size="9">33.1 % autoconsumato</text>
+
+          <rect x="300" y="118" width="9" height="72" rx="3" fill="#62c8ff" opacity=".7"/>
+          <text x="316" y="150" fill="#eaf3ed" font-family="Archivo, sans-serif" font-size="14" font-weight="700">1’263.05 kWh</text>
+          <text x="316" y="165" fill="#8fa89a" font-family="IBM Plex Mono, monospace" font-size="9.5">immesso in rete</text>
+        </svg>
+        <div class="flow-legend">
+          <span><i class="swatch" style="background:#a7d63a"></i>Consumo locale</span>
+          <span><i class="swatch" style="background:#62c8ff"></i>Scambio con la rete</span>
+          <span><i class="swatch" style="background:#2f7a4d"></i>Produzione</span>
+        </div>
+        <p class="flow-note">La stessa ripartizione eseguita dal motore di fatturazione — <code class="mono">min(produzione, consumo)</code> per intervallo di 15 minuti — è la base di ogni riga di fattura.</p>
+      </div>
+    </div>
+
+    <dl class="stat-strip">
+      <div class="stat"><dt>Risoluzione</dt><dd>Intervalli di 15 minuti</dd></div>
+      <div class="stat"><dt>Documenti</dt><dd>PDF/A-3b + QR-fattura</dd></div>
+      <div class="stat"><dt>Lingue</dt><dd>DE · FR · IT · EN</dd></div>
+      <div class="stat"><dt>Installazione</dt><dd>Docker o Kubernetes</dd></div>
+    </dl>
+  </div>
+</header>
+
+<main>
+
+<section id="features">
+  <div class="wrap">
+    <div class="sec-head">
+      <p class="eyebrow">Cosa fa</p>
+      <h2>Misure, tariffe, fatturazione, documenti</h2>
+      <p>Fatturare un RCP per un mese è facile. Diventa più difficile quando la tariffa dell’anno scorso deve continuare a esistere, quando chi si è trasferito a marzo deve essere fatturato fino a marzo e quando la fattura deve essere qualcosa che un vicino accetta senza chiedere il foglio di calcolo che c’è dietro.</p>
+    </div>
+
+    <div class="features">
+      <article class="feature wide">
+        <span class="eyebrow">Misure &amp; importazioni</span>
+        <h3>CSV, Excel e SDAT-CH</h3>
+        <p>I formati che i gestori di rete svizzeri inviano davvero, più tutto ciò che esporta il tuo contatore.</p>
+        <ul>
+          <li>CSV ed Excel con mappatura delle colonne configurabile, più SDAT-CH per i flussi con il gestore di rete</li>
+          <li>Validazione con anteprima e protocollo di importazione riga per riga</li>
+          <li>Controlli di qualità dei dati su lacune, duplicati e letture non plausibili</li>
+          <li>Analisi di consumo e produzione per periodo o profilo giornaliero</li>
+        </ul>
+      </article>
+
+      <article class="feature wide">
+        <span class="eyebrow">Tariffe &amp; fatturazione</span>
+        <h3>Ripartizione per intervallo di 15 minuti</h3>
+        <p>Ogni intervallo è valorizzato con la versione di tariffa valida in quel momento. Nulla viene mediato sul mese.</p>
+        <ul>
+          <li>Tariffe versionate con fasce alta/bassa, periodi stagionali e finestre di validità</li>
+          <li>Serie di prezzi dinamici, incluso il prezzo di mercato di riferimento dell’UFE</li>
+          <li>Importazione del file tariffario leggibile da macchina di un gestore di rete (art. 7b OAEl)</li>
+          <li>Ripartizione del pool locale tra tutti i partecipanti, per ogni marca temporale</li>
+        </ul>
+      </article>
+
+      <article class="feature">
+        <span class="eyebrow">Documenti</span>
+        <h3>Fatture, conteggi e contratti</h3>
+        <p>Le fatture vengono generate in PDF/A-3b con la sezione di pagamento QR e passano attraverso gli stati bozza, approvata, inviata, pagata. Uno storno conserva il documento e il suo numero invece di eliminare la riga. Conteggi annuali e contratti di partecipazione escono dallo stesso motore di rendering e ogni versione emessa viene conservata così come è stata inviata.</p>
+      </article>
+
+      <article class="feature">
+        <span class="eyebrow">Comunità</span>
+        <h3>Ruoli, ambito e date di trasloco</h3>
+        <p>Amministratori, proprietari dell’RCP e partecipanti hanno ciascuno la propria vista sugli stessi dati. Le assegnazioni tra partecipanti e punti di misura hanno date di validità: chi si trasferisce il 15 marzo viene fatturato fino al 15 marzo.</p>
+      </article>
+
+      <article class="feature">
+        <span class="eyebrow">Pianificazione</span>
+        <h3>La fattibilità prima di costituirne uno</h3>
+        <p>Stima risparmi, tempo di recupero, ROI e VAN per una comunità in progetto. Se ne gestisci già una, il calcolo può essere precompilato dai suoi partecipanti e dall’autoconsumo misurato.</p>
+      </article>
+
+      <article class="feature wide">
+        <span class="eyebrow">Esercizio</span>
+        <h3>Pensato per essere gestito da una sola persona</h3>
+        <ul>
+          <li>Registro di audit di tutte le azioni privilegiate, limitato a ciò che puoi vedere</li>
+          <li>Invio asincrono delle e-mail con cronologia per fattura e nuovo tentativo</li>
+          <li>Chiavi API per gli script, in sola lettura e con un proprio limite di richieste</li>
+          <li>Esporta o sposta un’intera comunità tra istanze come archivio versionato</li>
+        </ul>
+      </article>
+    </div>
+  </div>
+</section>
+
+<section id="screens">
+  <div class="wrap">
+    <div class="sec-head">
+      <p class="eyebrow">Schermate</p>
+      <h2>Come si presenta</h2>
+      <p>Dalla comunità demo inclusa nel progetto, creata con un solo comando. L’interfaccia è disponibile in quattro lingue; le schermate la mostrano in inglese.</p>
+    </div>
+
+    <div class="shots">
+      <article class="shot">
+        <div class="shot-text">
+          <span class="eyebrow">Panoramica</span>
+          <h3>Periodi di fatturazione, i più vecchi per primi</h3>
+          <p>Ogni periodo mostra l’azione richiesta, così inizi dal lavoro da fare invece di cercarlo. Il periodo che sta ancora raccogliendo dati lo dice semplicemente.</p>
+        </div>
+        <figure>
+          <img src="../assets/site-overview.png" alt="Schermata di panoramica di OpenZEV con i periodi di fatturazione per stato, ciascuno con la prossima azione (interfaccia in inglese)" width="1440" height="900">
+        </figure>
+      </article>
+
+      <article class="shot">
+        <div class="shot-text">
+          <span class="eyebrow">Bilancio energetico</span>
+          <h3>Dove è finito davvero il solare.</h3>
+          <p>Produzione, consumo, autoconsumo e scambio con la rete per il periodo scelto, con un diagramma di Sankey che segue ogni kWh dal produttore al partecipante. Filtra per partecipante o scendi fino al singolo intervallo.</p>
+        </div>
+        <figure>
+          <img src="../assets/site-energy.png" alt="Schermata del bilancio energetico con indicatori chiave e un diagramma di Sankey del flusso di energia tra produttore, partecipanti e rete (interfaccia in inglese)" width="1440" height="900" loading="lazy">
+        </figure>
+      </article>
+
+      <article class="shot">
+        <div class="shot-text">
+          <span class="eyebrow">Fatturazione</span>
+          <h3>Una riga per partecipante</h3>
+          <p>Tutte le fatture del periodo con completezza delle misure, stato, totale e stato del PDF, più azioni di gruppo per i passaggi che altrimenti ripeteresti per ogni economia domestica.</p>
+        </div>
+        <figure>
+          <img src="../assets/site-invoices.png" alt="Schermata di fatturazione con la fattura di ogni partecipante, badge di stato, totali e azioni di gruppo (interfaccia in inglese)" width="1440" height="900" loading="lazy">
+        </figure>
+      </article>
+
+      <article class="shot">
+        <div class="shot-text">
+          <span class="eyebrow">Tariffe</span>
+          <h3>Ogni modifica di tariffa è una nuova versione</h3>
+          <p>Una tariffa è una serie di versioni, ciascuna con le proprie fasce e la propria finestra di validità. Una fattura emessa l’anno scorso viene valorizzata ancora alla tariffa dell’anno scorso e il grafico mostra quando ogni modifica è entrata in vigore.</p>
+        </div>
+        <figure>
+          <img src="../assets/site-tariffs.png" alt="Dettaglio di una tariffa con cronologia delle versioni, grafico dell’andamento dei prezzi e fasce tariffarie alta e bassa (interfaccia in inglese)" width="1440" height="900" loading="lazy">
+        </figure>
+      </article>
+    </div>
+  </div>
+</section>
+
+<section id="quickstart" class="quickstart">
+  <div class="wrap">
+    <div class="sec-head">
+      <p class="eyebrow">Avvio rapido</p>
+      <h2>Tre modi per eseguirlo</h2>
+      <p>Scegli quello che corrisponde a dove vuoi installarlo. Tutti e tre scaricano immagini già pronte da GHCR.</p>
+    </div>
+
+    <div class="paths">
+      <article class="path">
+        <span class="eyebrow">Provalo</span>
+        <h3>Comunità demo</h3>
+        <p>Avvia lo stack e crea una comunità completa — partecipanti, contatori, tariffe e letture — così c’è qualcosa da guardare.</p>
+<pre><span class="c"># clona, poi:</span>
+<span class="p">scripts/start-demo-environment.sh</span>
+
+<span class="c"># → http://localhost:8080</span>
+<span class="c"># admin@openzev.local / admin1234</span></pre>
+      </article>
+
+      <article class="path">
+        <span class="eyebrow">Self-hosting</span>
+        <h3>Docker Compose</h3>
+        <p>Lo stack completo — frontend, API, worker e beat Celery, PostgreSQL e Redis — senza dati demo.</p>
+<pre><span class="p">docker compose up -d --build</span>
+
+<span class="c"># frontend  :8080</span>
+<span class="c"># api       :8001</span>
+
+<span class="p">docker compose down</span></pre>
+      </article>
+
+      <article class="path">
+        <span class="eyebrow">Kubernetes</span>
+        <h3>Kubernetes, con Helm</h3>
+        <p>Il chart distribuisce frontend, backend, worker e beat nel tuo cluster con un Ingress e un PVC per i media. PostgreSQL e Redis restano a tuo carico.</p>
+<pre><span class="p">helm repo add openzev \
+  https://splattner.github.io/openzev</span>
+<span class="p">helm repo update</span>
+<span class="p">helm install openzev openzev/openzev \
+  -n openzev --create-namespace</span></pre>
+      </article>
+    </div>
+
+    <div class="after">
+      <span><b>Immagini</b> ghcr.io/splattner/openzev-{backend,frontend,fullstack}</span>
+      <span><b>Firmati</b> manifest di release e attestazioni SBOM</span>
+      <span><b>Database</b> PostgreSQL, MariaDB o SQLite tramite DATABASE_URL</span>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="sec-head">
+      <p class="eyebrow">Sotto il cofano</p>
+      <h2>Lo stack tecnologico</h2>
+    </div>
+
+    <dl class="stack-row">
+      <div class="stack-item"><dt>Backend</dt><dd>Django, Django REST Framework, SimpleJWT</dd></div>
+      <div class="stack-item"><dt>Frontend</dt><dd>React, TypeScript, Vite, React Query, i18next</dd></div>
+      <div class="stack-item"><dt>Asincrono</dt><dd>Worker e beat Celery su Redis</dd></div>
+      <div class="stack-item"><dt>Dati</dt><dd>PostgreSQL, MariaDB o SQLite</dd></div>
+      <div class="stack-item"><dt>API</dt><dd>Schema OpenAPI con Swagger e ReDoc</dd></div>
+      <div class="stack-item"><dt>Installazione</dt><dd>Docker Compose, oppure Helm su Kubernetes</dd></div>
+      <div class="stack-item">
+        <dt>Licenza</dt>
+        <dd>
+          <a href="https://github.com/splattner/openzev/blob/main/LICENCE.md">AGPL-3.0</a> —
+          eseguilo, modificalo, ospitalo. Se offri una versione modificata ad altri tramite una rete, ricevono anche il codice sorgente.
+        </dd>
+      </div>
+    </dl>
+
+    <div class="note">
+      <h3>Leggi questo prima di fatturare qualcuno con OpenZEV</h3>
+      <p>Ho costruito OpenZEV per gestire il mio RCP e lo condivido così com’è, senza garanzia. Si adatta a chi ama gestire il proprio stack. Controlla importazioni, tariffe e fatture prima che raggiungano un partecipante: la responsabilità di ciò che dicono i numeri resta tua.</p>
+      <p>È inoltre costruito con molta assistenza di IA, fino alle specifiche, agli ADR e alla documentazione utente. Alcune scelte sembreranno poco convenzionali a un team esperto. È il compromesso che ho scelto: il progetto è ottimizzato per l’apprendimento, la sperimentazione e la gestione di un vero RCP, non per i processi aziendali.</p>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <div class="wrap foot">
+    <div class="foot-links">
+      <a href="https://github.com/splattner/openzev">Codice sorgente</a>
+      <a href="https://github.com/splattner/openzev/tree/main/docs/user-guide">Guida utente</a>
+      <a href="https://github.com/splattner/openzev/tree/main/charts/openzev">Chart Helm</a>
+      <a href="https://github.com/splattner/openzev/releases">Release</a>
+      <a href="https://github.com/splattner/openzev/blob/main/docs/ROADMAP.md">Roadmap</a>
+      <a href="https://github.com/splattner/openzev/issues">Issue</a>
+      <a href="https://github.com/splattner/openzev/blob/main/LICENCE.md">Licenza</a>
+    </div>
+    <p class="foot-meta">Software libero sotto GNU Affero General Public License v3, per gli RCP e vRCP svizzeri ai sensi dell’ordinanza sull’energia (OEn, art. 16a–16g). Non affiliato ad alcuna azienda elettrica né ufficio federale.</p>
+  </div>
+</footer>
+
+</body>
+</html>
