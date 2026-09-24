@@ -1,0 +1,334 @@
+<!doctype html>
+<html lang="{{lang}}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OpenZEV</title>
+<meta name="description" content="{{meta_description}}">
+<link rel="canonical" href="{{canonical}}">
+{{hreflang_links}}
+<link rel="icon" href="{{root}}assets/favicon.svg" type="image/svg+xml">
+<meta property="og:title" content="OpenZEV">
+<meta property="og:description" content="{{meta_description}}">
+<meta property="og:type" content="website">
+<meta property="og:url" content="{{canonical}}">
+<meta property="og:locale" content="{{og_locale}}">
+<meta property="og:image" content="{{base}}assets/site-energy.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="{{root}}assets/site.css">
+</head>
+<body>
+
+<header class="hero">
+  <div class="wrap hero-inner">
+    <nav class="topbar">
+      <img src="{{root}}assets/logo.png" alt="OpenZEV" width="132" height="132">
+      <div class="toplinks">
+        <a href="#features">{{nav_features}}</a>
+        <a href="#screens">{{nav_screens}}</a>
+        <a href="#quickstart">{{nav_quickstart}}</a>
+        <a href="https://github.com/splattner/openzev">GitHub</a>
+        <span class="lang" role="group" aria-label="{{lang_label}}">
+{{lang_switcher}}
+        </span>
+      </div>
+    </nav>
+
+    <div class="hero-grid">
+      <div>
+        <p class="eyebrow">{{hero_eyebrow}}</p>
+        <h1>{{hero_title}}</h1>
+        <p class="hero-lede">{{hero_lede}}</p>
+        <div class="cta-row">
+          <a class="btn btn-primary" href="#quickstart">{{cta_start}}</a>
+          <a class="btn btn-ghost" href="https://github.com/splattner/openzev">{{cta_source}}</a>
+        </div>
+      </div>
+
+      <div class="flow-card">
+        <p class="eyebrow">{{flow_eyebrow}}</p>
+        <!-- Sources (left) split into sinks (right); band heights are to scale,
+             and both sides reconcile: 625.8 + 1263.05 = 1888.85 produced,
+             625.8 + 738.9 = 1364.7 consumed. -->
+        <svg viewBox="0 0 470 220" role="img" aria-label="{{flow_aria}}">
+          <defs>
+            <linearGradient id="pvLocal" x1="0" x2="1">
+              <stop offset="0" stop-color="#2f7a4d" stop-opacity=".95"/>
+              <stop offset="1" stop-color="#a7d63a" stop-opacity=".85"/>
+            </linearGradient>
+            <linearGradient id="pvExport" x1="0" x2="1">
+              <stop offset="0" stop-color="#2f7a4d" stop-opacity=".6"/>
+              <stop offset="1" stop-color="#62c8ff" stop-opacity=".45"/>
+            </linearGradient>
+            <linearGradient id="gridLocal" x1="0" x2="1">
+              <stop offset="0" stop-color="#62c8ff" stop-opacity=".42"/>
+              <stop offset="1" stop-color="#f6c213" stop-opacity=".5"/>
+            </linearGradient>
+          </defs>
+
+          <!-- flows, drawn under the bars -->
+          <path d="M17 30 L300 30 L300 65.7 L17 65.7 Z" fill="url(#pvLocal)"/>
+          <path d="M17 65.7 C 160 65.7, 160 118, 300 118 L300 190 C 160 190, 160 138, 17 138 Z" fill="url(#pvExport)"/>
+          <path d="M17 166 C 160 166, 160 65.7, 300 65.7 L300 108 C 160 108, 160 208, 17 208 Z" fill="url(#gridLocal)"/>
+
+          <!-- sources -->
+          <rect x="8" y="30" width="9" height="108" rx="3" fill="#2f7a4d"/>
+          <text x="8" y="22" fill="#cfe3d6" font-family="IBM Plex Mono, monospace" font-size="9.5">{{flow_pv}}  {{flow_pv_kwh}} kWh</text>
+          <rect x="8" y="166" width="9" height="42" rx="3" fill="#62c8ff" opacity=".85"/>
+          <text x="8" y="158" fill="#cfe3d6" font-family="IBM Plex Mono, monospace" font-size="9.5">{{flow_grid}}  {{flow_grid_kwh}} kWh</text>
+
+          <!-- sinks -->
+          <rect x="300" y="30" width="9" height="78" rx="3" fill="#a7d63a"/>
+          <text x="316" y="54" fill="#eaf3ed" font-family="Archivo, sans-serif" font-size="14" font-weight="700">{{flow_local_kwh}} kWh</text>
+          <text x="316" y="69" fill="#a7d63a" font-family="IBM Plex Mono, monospace" font-size="9.5">{{flow_local}}</text>
+          <text x="316" y="83" fill="#8fa89a" font-family="IBM Plex Mono, monospace" font-size="9">{{flow_selfcons}}</text>
+
+          <rect x="300" y="118" width="9" height="72" rx="3" fill="#62c8ff" opacity=".7"/>
+          <text x="316" y="150" fill="#eaf3ed" font-family="Archivo, sans-serif" font-size="14" font-weight="700">{{flow_export_kwh}} kWh</text>
+          <text x="316" y="165" fill="#8fa89a" font-family="IBM Plex Mono, monospace" font-size="9.5">{{flow_export}}</text>
+        </svg>
+        <div class="flow-legend">
+          <span><i class="swatch" style="background:#a7d63a"></i>{{legend_local}}</span>
+          <span><i class="swatch" style="background:#62c8ff"></i>{{legend_grid}}</span>
+          <span><i class="swatch" style="background:#2f7a4d"></i>{{legend_production}}</span>
+        </div>
+        <p class="flow-note">{{flow_note}}</p>
+      </div>
+    </div>
+
+    <dl class="stat-strip">
+      <div class="stat"><dt>{{stat1_dt}}</dt><dd>{{stat1_dd}}</dd></div>
+      <div class="stat"><dt>{{stat2_dt}}</dt><dd>{{stat2_dd}}</dd></div>
+      <div class="stat"><dt>{{stat3_dt}}</dt><dd>{{stat3_dd}}</dd></div>
+      <div class="stat"><dt>{{stat4_dt}}</dt><dd>{{stat4_dd}}</dd></div>
+    </dl>
+  </div>
+</header>
+
+<main>
+
+<section id="features">
+  <div class="wrap">
+    <div class="sec-head">
+      <p class="eyebrow">{{features_eyebrow}}</p>
+      <h2>{{features_title}}</h2>
+      <p>{{features_lede}}</p>
+    </div>
+
+    <div class="features">
+      <article class="feature wide">
+        <span class="eyebrow">{{f1_eyebrow}}</span>
+        <h3>{{f1_title}}</h3>
+        <p>{{f1_text}}</p>
+        <ul>
+          <li>{{f1_li1}}</li>
+          <li>{{f1_li2}}</li>
+          <li>{{f1_li3}}</li>
+          <li>{{f1_li4}}</li>
+        </ul>
+      </article>
+
+      <article class="feature wide">
+        <span class="eyebrow">{{f2_eyebrow}}</span>
+        <h3>{{f2_title}}</h3>
+        <p>{{f2_text}}</p>
+        <ul>
+          <li>{{f2_li1}}</li>
+          <li>{{f2_li2}}</li>
+          <li>{{f2_li3}}</li>
+          <li>{{f2_li4}}</li>
+        </ul>
+      </article>
+
+      <article class="feature">
+        <span class="eyebrow">{{f3_eyebrow}}</span>
+        <h3>{{f3_title}}</h3>
+        <p>{{f3_text}}</p>
+      </article>
+
+      <article class="feature">
+        <span class="eyebrow">{{f4_eyebrow}}</span>
+        <h3>{{f4_title}}</h3>
+        <p>{{f4_text}}</p>
+      </article>
+
+      <article class="feature">
+        <span class="eyebrow">{{f5_eyebrow}}</span>
+        <h3>{{f5_title}}</h3>
+        <p>{{f5_text}}</p>
+      </article>
+
+      <article class="feature wide">
+        <span class="eyebrow">{{f6_eyebrow}}</span>
+        <h3>{{f6_title}}</h3>
+        <ul>
+          <li>{{f6_li1}}</li>
+          <li>{{f6_li2}}</li>
+          <li>{{f6_li3}}</li>
+          <li>{{f6_li4}}</li>
+        </ul>
+      </article>
+    </div>
+  </div>
+</section>
+
+<section id="screens">
+  <div class="wrap">
+    <div class="sec-head">
+      <p class="eyebrow">{{screens_eyebrow}}</p>
+      <h2>{{screens_title}}</h2>
+      <p>{{screens_lede}}</p>
+    </div>
+
+    <div class="shots">
+      <article class="shot">
+        <div class="shot-text">
+          <span class="eyebrow">{{s1_eyebrow}}</span>
+          <h3>{{s1_title}}</h3>
+          <p>{{s1_text}}</p>
+        </div>
+        <figure>
+          <img src="{{root}}assets/site-overview.png" alt="{{s1_alt}}" width="1440" height="900">
+        </figure>
+      </article>
+
+      <article class="shot">
+        <div class="shot-text">
+          <span class="eyebrow">{{s2_eyebrow}}</span>
+          <h3>{{s2_title}}</h3>
+          <p>{{s2_text}}</p>
+        </div>
+        <figure>
+          <img src="{{root}}assets/site-energy.png" alt="{{s2_alt}}" width="1440" height="900" loading="lazy">
+        </figure>
+      </article>
+
+      <article class="shot">
+        <div class="shot-text">
+          <span class="eyebrow">{{s3_eyebrow}}</span>
+          <h3>{{s3_title}}</h3>
+          <p>{{s3_text}}</p>
+        </div>
+        <figure>
+          <img src="{{root}}assets/site-invoices.png" alt="{{s3_alt}}" width="1440" height="900" loading="lazy">
+        </figure>
+      </article>
+
+      <article class="shot">
+        <div class="shot-text">
+          <span class="eyebrow">{{s4_eyebrow}}</span>
+          <h3>{{s4_title}}</h3>
+          <p>{{s4_text}}</p>
+        </div>
+        <figure>
+          <img src="{{root}}assets/site-tariffs.png" alt="{{s4_alt}}" width="1440" height="900" loading="lazy">
+        </figure>
+      </article>
+    </div>
+  </div>
+</section>
+
+<section id="quickstart" class="quickstart">
+  <div class="wrap">
+    <div class="sec-head">
+      <p class="eyebrow">{{qs_eyebrow}}</p>
+      <h2>{{qs_title}}</h2>
+      <p>{{qs_lede}}</p>
+    </div>
+
+    <div class="paths">
+      <article class="path">
+        <span class="eyebrow">{{p1_eyebrow}}</span>
+        <h3>{{p1_title}}</h3>
+        <p>{{p1_text}}</p>
+<pre><span class="c"># {{p1_clone}}</span>
+<span class="p">scripts/start-demo-environment.sh</span>
+
+<span class="c"># → http://localhost:8080</span>
+<span class="c"># admin@openzev.local / admin1234</span></pre>
+      </article>
+
+      <article class="path">
+        <span class="eyebrow">{{p2_eyebrow}}</span>
+        <h3>{{p2_title}}</h3>
+        <p>{{p2_text}}</p>
+<pre><span class="p">docker compose up -d --build</span>
+
+<span class="c"># frontend  :8080</span>
+<span class="c"># api       :8001</span>
+
+<span class="p">docker compose down</span></pre>
+      </article>
+
+      <article class="path">
+        <span class="eyebrow">{{p3_eyebrow}}</span>
+        <h3>{{p3_title}}</h3>
+        <p>{{p3_text}}</p>
+<pre><span class="p">helm repo add openzev \
+  https://splattner.github.io/openzev</span>
+<span class="p">helm repo update</span>
+<span class="p">helm install openzev openzev/openzev \
+  -n openzev --create-namespace</span></pre>
+      </article>
+    </div>
+
+    <div class="after">
+      <span><b>{{after1_b}}</b> ghcr.io/splattner/openzev-{backend,frontend,fullstack}</span>
+      <span><b>{{after2_b}}</b> {{after2_t}}</span>
+      <span><b>{{after3_b}}</b> {{after3_t}}</span>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="sec-head">
+      <p class="eyebrow">{{stack_eyebrow}}</p>
+      <h2>{{stack_title}}</h2>
+    </div>
+
+    <dl class="stack-row">
+      <div class="stack-item"><dt>{{st1_dt}}</dt><dd>{{st1_dd}}</dd></div>
+      <div class="stack-item"><dt>{{st2_dt}}</dt><dd>{{st2_dd}}</dd></div>
+      <div class="stack-item"><dt>{{st3_dt}}</dt><dd>{{st3_dd}}</dd></div>
+      <div class="stack-item"><dt>{{st4_dt}}</dt><dd>{{st4_dd}}</dd></div>
+      <div class="stack-item"><dt>{{st5_dt}}</dt><dd>{{st5_dd}}</dd></div>
+      <div class="stack-item"><dt>{{st6_dt}}</dt><dd>{{st6_dd}}</dd></div>
+      <div class="stack-item">
+        <dt>{{st7_dt}}</dt>
+        <dd>
+          <a href="https://github.com/splattner/openzev/blob/main/LICENCE.md">AGPL-3.0</a> —
+          {{st7_dd}}
+        </dd>
+      </div>
+    </dl>
+
+    <div class="note">
+      <h3>{{note_title}}</h3>
+      <p>{{note_p1}}</p>
+      <p>{{note_p2}}</p>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <div class="wrap foot">
+    <div class="foot-links">
+      <a href="https://github.com/splattner/openzev">{{foot_source}}</a>
+      <a href="https://github.com/splattner/openzev/tree/main/docs/user-guide">{{foot_guide}}</a>
+      <a href="https://github.com/splattner/openzev/tree/main/charts/openzev">{{foot_chart}}</a>
+      <a href="https://github.com/splattner/openzev/releases">{{foot_releases}}</a>
+      <a href="https://github.com/splattner/openzev/blob/main/docs/ROADMAP.md">{{foot_roadmap}}</a>
+      <a href="https://github.com/splattner/openzev/issues">{{foot_issues}}</a>
+      <a href="https://github.com/splattner/openzev/blob/main/LICENCE.md">{{foot_licence}}</a>
+    </div>
+    <p class="foot-meta">{{foot_meta}}</p>
+  </div>
+</footer>
+
+</body>
+</html>

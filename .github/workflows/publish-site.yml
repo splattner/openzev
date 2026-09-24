@@ -2,7 +2,8 @@ name: Publish Site
 
 # The gh-pages branch is a Helm repository first: chart-releaser owns
 # `index.yaml` and every `openzev-*.tgz` there. This workflow only ever writes
-# `index.html` and `assets/`, so a browser gets the landing page and
+# the site's own paths (`index.html`, `assets/` and one directory per extra
+# language), so a browser gets the landing page and
 # `helm repo add` keeps resolving `index.yaml` from the same origin.
 
 on:
@@ -10,6 +11,7 @@ on:
         branches: [main]
         paths:
             - "docs/site/**"
+            - "scripts/site/**"
             - ".github/workflows/publish-site.yml"
     workflow_dispatch:
 
@@ -37,12 +39,16 @@ jobs:
                   ref: gh-pages
                   path: pages
 
+            - name: Check the language pages are up to date
+              run: python3 source/scripts/site/build.py --check
+
             - name: Stage the site
               run: |
                   set -euo pipefail
-                  # Replace the site's own paths wholesale so removed assets do
-                  # not linger, and leave everything else on the branch alone.
-                  rm -rf pages/assets
+                  # Replace the site's own paths wholesale so removed assets and
+                  # pages do not linger, and leave everything else on the branch
+                  # alone.
+                  rm -rf pages/assets pages/en pages/fr pages/it
                   cp -R source/docs/site/. pages/
                   # Keep Jekyll off; chart-releaser created this originally.
                   touch pages/.nojekyll
@@ -54,7 +60,7 @@ jobs:
                   git config user.name "github-actions[bot]"
                   git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-                  git add index.html assets .nojekyll
+                  git add index.html assets en fr it .nojekyll
                   if git diff --cached --quiet; then
                       echo "Site is already up to date."
                       exit 0

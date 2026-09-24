@@ -13,6 +13,7 @@ This file gives coding agents the minimum project-specific context needed to wor
 - `docs/specs/`, `docs/adr/` — feature specs and architecture decisions
 - `docs/user-guide/` — end-user documentation
 - `docs/release-notes/` — hand-written release notes for minor/major releases
+- `docs/site/` — the public landing page (German at the root, plus `fr/`, `it/`, `en/`), **generated**: edit `scripts/site/template.html` and `scripts/site/lang/*.json`, run `python scripts/site/build.py`, and commit the output (the publish workflow checks it is current)
 
 ## Key Stack
 
