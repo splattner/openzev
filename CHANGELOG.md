@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.18.3](https://github.com/splattner/openzev/compare/v1.18.2...v1.18.3) (2026-09-24)
+
+
+### Bug Fixes
+
+* **admin:** clarify the ZEV IBAN warning ([#817](https://github.com/splattner/openzev/issues/817)) ([cb86408](https://github.com/splattner/openzev/commit/cb864083e515b06f8e408520e44ea6510bb74eae))
+
 ## [1.18.2](https://github.com/splattner/openzev/compare/v1.18.1...v1.18.2) (2026-09-23)
 
 
