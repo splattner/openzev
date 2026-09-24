@@ -647,18 +647,6 @@ export function MeteringChartPage({ tab }: { tab: 'chart' | 'quality' | 'imports
                                         gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
                                     }}
                                 >
-                                    {selectedMp && (
-                                        <StatCard
-                                            label={t('pages.meteringData.stats.meterId')}
-                                            value={selectedMp.meter_id}
-                                        />
-                                    )}
-                                    {isZevTotal && (
-                                        <StatCard
-                                            label={t('pages.meteringData.stats.zev')}
-                                            value={zevNameById.get(selectedZevId) ?? selectedZevId}
-                                        />
-                                    )}
                                     <StatCard
                                         label={t('pages.meteringData.stats.totalConsumption')}
                                         value={`${formatKwh(totalIn, { maxDecimals: 2 })} kWh`}

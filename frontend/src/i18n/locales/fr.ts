@@ -2124,8 +2124,6 @@ export const fr = {
                 hourlyUnavailableHint: 'La résolution horaire n\'est disponible que pour des périodes de {{maxDays}} jours ou moins.',
             },
             stats: {
-                meterId: 'ID du compteur',
-                zev: 'ZEV',
                 totalConsumption: 'Consommation totale (soutirage)',
                 averageConsumption: 'Consommation moyenne (soutirage)',
                 peakConsumption: 'Pointe de consommation (soutirage)',
