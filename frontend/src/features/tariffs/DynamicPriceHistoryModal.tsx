@@ -9,6 +9,7 @@ import { StatCard } from '../../components/StatCard'
 import { fetchDynamicPriceHistory } from '../../lib/api/tariffs'
 import { formatDateTime, formatShortDate, useAppSettings } from '../../lib/appSettings'
 import { AXIS_COLOR, CHART_GRIDLINE, CONS_COLORS } from '../../lib/chartTokens'
+import { CHART_TOOLTIP_STYLE } from '../../lib/chartTheme'
 import { formatIsoDate, todayLocalIso } from '../../lib/dates'
 import { queryKeys } from '../../lib/api/queryKeys'
 import type { DynamicPriceHistory, DynamicPricePoint, DynamicTariffSource, Tariff } from '../../types/api'
@@ -271,6 +272,7 @@ export function DynamicPriceHistoryPanel({ source, tariff }: PanelProps) {
               />
               <YAxis stroke={AXIS_COLOR} fontSize={11} width={64} tickFormatter={(value) => Number(value).toFixed(3)} />
               <Tooltip
+                contentStyle={CHART_TOOLTIP_STYLE}
                 labelFormatter={(value) => formatDateTime(new Date(Number(value)).toISOString(), settings)}
                 formatter={(value) => [`${Number(value).toFixed(5)} CHF/kWh`, t('pages.dynamicSources.history.price')]}
               />

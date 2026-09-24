@@ -69,6 +69,9 @@ export function Layout() {
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
     const userMenuRef = useRef<HTMLDivElement | null>(null)
     const zevMenuRef = useRef<HTMLDivElement | null>(null)
+    const userMenuTriggerRef = useRef<HTMLButtonElement | null>(null)
+    const zevMenuTriggerRef = useRef<HTMLButtonElement | null>(null)
+    const mobileMenuButtonRef = useRef<HTMLButtonElement | null>(null)
 
     useEffect(() => {
         window.localStorage.setItem('openzev.sidebarCollapsed', String(isSidebarCollapsed))
@@ -87,6 +90,21 @@ export function Layout() {
     }, [isMobileMenuOpen])
 
     useEffect(() => {
+        if (isUserMenuOpen) {
+            userMenuRef.current?.querySelector<HTMLElement>('.user-menu-dropdown a, .user-menu-dropdown button')?.focus()
+        }
+    }, [isUserMenuOpen])
+
+    useEffect(() => {
+        if (isZevMenuOpen) {
+            const dropdown = zevMenuRef.current?.querySelector<HTMLElement>('.zev-menu-dropdown')
+            const firstOption = dropdown?.querySelector<HTMLElement>('button:not(:disabled)')
+            const focusTarget = firstOption ?? dropdown
+            focusTarget?.focus()
+        }
+    }, [isZevMenuOpen])
+
+    useEffect(() => {
         function handleOutsideClick(event: MouseEvent) {
             if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
                 setIsUserMenuOpen(false)
@@ -98,6 +116,9 @@ export function Layout() {
 
         function handleEscape(event: KeyboardEvent) {
             if (event.key === 'Escape') {
+                if (isMobileMenuOpen) mobileMenuButtonRef.current?.focus()
+                else if (isUserMenuOpen) userMenuTriggerRef.current?.focus()
+                else if (isZevMenuOpen) zevMenuTriggerRef.current?.focus()
                 setIsUserMenuOpen(false)
                 setIsZevMenuOpen(false)
                 setIsMobileMenuOpen(false)
@@ -110,7 +131,7 @@ export function Layout() {
             document.removeEventListener('mousedown', handleOutsideClick)
             document.removeEventListener('keydown', handleEscape)
         }
-    }, [])
+    }, [isUserMenuOpen, isZevMenuOpen, isMobileMenuOpen])
 
     const displayName = `${user?.first_name ?? ''} ${user?.last_name ?? ''}`.trim() || user?.username || ''
     const canManage = user?.role === 'admin' || user?.role === 'zev_owner'
@@ -182,14 +203,22 @@ export function Layout() {
                     {/* Exactly one managed community means there is nothing to
                         switch — the page eyebrows carry the name instead. */}
                     {canManage && !isPlatformScope && managedZevs.length !== 1 && (
-                        <div className="user-menu zev-menu sidebar-zev-menu" ref={zevMenuRef}>
+                        <div
+                            className="user-menu zev-menu sidebar-zev-menu"
+                            ref={zevMenuRef}
+                            onBlur={(event) => {
+                                if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setIsZevMenuOpen(false)
+                            }}
+                        >
                             <button
+                                ref={zevMenuTriggerRef}
                                 type="button"
                                 className="user-menu-trigger"
                                 aria-label={selectedZev?.name ? t('nav.manageZevFor', { name: selectedZev.name }) : t('nav.manageZev')}
                                 aria-expanded={isZevMenuOpen}
                                 aria-controls="zev-menu-list"
                                 onClick={() => {
+                                    setIsUserMenuOpen(false)
                                     // Auto-expand sidebar if collapsed before opening menu.
                                     if (isSidebarCollapsed) {
                                         setIsSidebarCollapsed(false)
@@ -207,10 +236,10 @@ export function Layout() {
                             </button>
 
                             {isZevMenuOpen && (
-                                <div className="user-menu-dropdown zev-menu-dropdown" id="zev-menu-list">
+                                <div className="user-menu-dropdown zev-menu-dropdown" id="zev-menu-list" role="group" aria-label={t('nav.manageZev')} tabIndex={-1}>
                                     <div className="user-menu-section">
                                         <div className="user-menu-section-title">{t('nav.manageZev')}</div>
-                                        <div className="zev-dropdown-list" role="group" aria-label={t('nav.manageZev')}>
+                                        <div className="zev-dropdown-list">
                                             {managedZevLoading ? (
                                                 <div className="zev-dropdown-item zev-dropdown-item-muted">{t('nav.loadingZevs')}</div>
                                             ) : managedZevs.length === 0 ? (
@@ -224,6 +253,7 @@ export function Layout() {
                                                             type="button"
                                                             className={`zev-dropdown-item${isSelected ? ' active' : ''}`}
                                                             onClick={() => {
+                                                                zevMenuTriggerRef.current?.focus()
                                                                 if (isSelectable) {
                                                                     setSelectedZevId(zev.id)
                                                                 }
@@ -323,6 +353,7 @@ export function Layout() {
             <main className="content">
                 <header className="top-nav">
                     <button
+                        ref={mobileMenuButtonRef}
                         type="button"
                         className="mobile-menu-button"
                         onClick={() => setIsMobileMenuOpen((prev) => !prev)}
@@ -361,13 +392,23 @@ export function Layout() {
                         </div>
                     )}
 
-                    <div className="user-menu" ref={userMenuRef}>
+                    <div
+                        className="user-menu"
+                        ref={userMenuRef}
+                        onBlur={(event) => {
+                            if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setIsUserMenuOpen(false)
+                        }}
+                    >
                         <button
+                            ref={userMenuTriggerRef}
                             type="button"
                             className="user-menu-trigger"
                             aria-expanded={isUserMenuOpen}
                             aria-controls="user-menu-list"
-                            onClick={() => setIsUserMenuOpen((prev) => !prev)}
+                            onClick={() => {
+                                setIsZevMenuOpen(false)
+                                setIsUserMenuOpen((prev) => !prev)
+                            }}
                         >
                             <span className="user-avatar" aria-hidden="true">👤</span>
                             <span className="user-meta">

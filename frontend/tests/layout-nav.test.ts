@@ -271,10 +271,112 @@ describe('phase-3 hub nav (see docs/specs/2026-03-community-and-access.md §9.3)
             trigger.dispatchEvent(new MouseEvent('click', { bubbles: true }))
         })
         expect(page.container.querySelector('#user-menu-list')).not.toBe(null)
+        expect(document.activeElement?.getAttribute('href')).toBe('/account')
         await act(async () => {
             document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
         })
         expect(page.container.querySelector('#user-menu-list')).toBe(null)
+        expect(document.activeElement).toBe(trigger)
+        page.unmount()
+    })
+
+    it('keeps language selection available and closes the account panel when focus leaves', async () => {
+        mockSession('admin')
+        const page = await renderLayout()
+        const trigger = page.container.querySelector('.top-nav .user-menu-trigger') as HTMLElement
+        await act(async () => trigger.click())
+        const languageButtons = Array.from(
+            page.container.querySelectorAll<HTMLButtonElement>('.language-selector-button'),
+        )
+        expect(languageButtons.map((button) => button.textContent)).toEqual(
+            expect.arrayContaining(['EN', 'DE', 'FR', 'IT']),
+        )
+        const french = languageButtons.find((button) => button.textContent === 'FR') as HTMLElement
+        await act(async () => french.click())
+        expect(mockAuth().logout).not.toHaveBeenCalled()
+        expect(page.container.querySelector('#user-menu-list')).not.toBe(null)
+        await act(async () => (page.container.querySelector('.mobile-menu-button') as HTMLElement).focus())
+        expect(page.container.querySelector('#user-menu-list')).toBe(null)
+        expect(trigger.getAttribute('aria-expanded')).toBe('false')
+        page.unmount()
+    })
+
+    it('focuses a selectable community and returns focus to the switcher on Escape', async () => {
+        mockSession('admin')
+        const page = await renderLayout()
+        const trigger = page.container.querySelector('.sidebar-zev-menu .user-menu-trigger') as HTMLElement
+        await act(async () => trigger.click())
+        expect(trigger.getAttribute('aria-expanded')).toBe('true')
+        const options = page.container.querySelectorAll<HTMLButtonElement>('.zev-dropdown-item:not(:disabled)')
+        expect(document.activeElement).toBe(options[0])
+        expect(options[0].getAttribute('aria-current')).toBe('true')
+        await act(async () => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })))
+        expect(page.container.querySelector('#zev-menu-list')).toBe(null)
+        expect(document.activeElement).toBe(trigger)
+        await act(async () => trigger.click())
+        const secondOption = page.container.querySelectorAll<HTMLButtonElement>('.zev-dropdown-item:not(:disabled)')[1]
+        await act(async () => secondOption.click())
+        expect(mockManagedZev().setSelectedZevId).toHaveBeenCalledWith(2)
+        expect(page.container.querySelector('#zev-menu-list')).toBe(null)
+        expect(document.activeElement).toBe(trigger)
+        page.unmount()
+    })
+
+    it('returns focus to the mobile menu button when Escape closes the drawer', async () => {
+        mockSession('admin')
+        const page = await renderLayout()
+        const mobileButton = page.container.querySelector('.mobile-menu-button') as HTMLElement
+        const zevTrigger = page.container.querySelector('.sidebar-zev-menu .user-menu-trigger') as HTMLElement
+        await act(async () => mobileButton.click())
+        expect(mobileButton.getAttribute('aria-expanded')).toBe('true')
+        await act(async () => zevTrigger.click())
+        expect(page.container.querySelector('#zev-menu-list')).not.toBe(null)
+        await act(async () => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })))
+        expect(page.container.querySelector('#zev-menu-list')).toBe(null)
+        expect(mobileButton.getAttribute('aria-expanded')).toBe('false')
+        expect(document.activeElement).toBe(mobileButton)
+        page.unmount()
+    })
+
+    it('opening one disclosure closes the other', async () => {
+        mockSession('admin')
+        const page = await renderLayout()
+        const userTrigger = page.container.querySelector('.top-nav .user-menu-trigger') as HTMLElement
+        const zevTrigger = page.container.querySelector('.sidebar-zev-menu .user-menu-trigger') as HTMLElement
+        await act(async () => zevTrigger.click())
+        expect(page.container.querySelector('#zev-menu-list')).not.toBe(null)
+        await act(async () => userTrigger.click())
+        expect(page.container.querySelector('#user-menu-list')).not.toBe(null)
+        expect(page.container.querySelector('#zev-menu-list')).toBe(null)
+        await act(async () => zevTrigger.click())
+        expect(page.container.querySelector('#zev-menu-list')).not.toBe(null)
+        expect(page.container.querySelector('#user-menu-list')).toBe(null)
+        page.unmount()
+    })
+
+    it('expands the collapsed sidebar before showing a keyboard-focusable community list', async () => {
+        window.localStorage.setItem('openzev.sidebarCollapsed', 'true')
+        try {
+            mockSession('admin')
+            const page = await renderLayout()
+            const trigger = page.container.querySelector('.sidebar-zev-menu .user-menu-trigger') as HTMLElement
+            await act(async () => trigger.click())
+            expect(page.container.querySelector('.shell.shell-collapsed')).toBe(null)
+            expect(page.container.querySelector('#zev-menu-list')).not.toBe(null)
+            expect(document.activeElement?.classList.contains('zev-dropdown-item')).toBe(true)
+            page.unmount()
+        } finally {
+            window.localStorage.removeItem('openzev.sidebarCollapsed')
+        }
+    })
+
+    it('focuses the empty community panel when no options are available', async () => {
+        mockSession('admin', false, 0)
+        const page = await renderLayout()
+        const trigger = page.container.querySelector('.sidebar-zev-menu .user-menu-trigger') as HTMLElement
+        await act(async () => trigger.click())
+        expect(document.activeElement?.id).toBe('zev-menu-list')
+        expect(document.activeElement?.textContent).toContain('nav.noZevAvailable')
         page.unmount()
     })
 })

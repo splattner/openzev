@@ -1304,6 +1304,14 @@ expander, full sidebar width, expands-first when collapsed, auto-closes on
 entry into platform scope) only when there is something to switch — several
 managed communities, or none (empty state). With exactly one managed
 community it is unmounted; participants get no switcher.
+The switcher is a keyboard-operable disclosure: opening it focuses the first
+enabled community button (or the empty/loading panel), Escape closes it and
+returns focus to the trigger, selecting a community closes it and restores
+focus to the trigger, and tabbing out closes it. On mobile, Escape also closes
+the sidebar drawer and returns focus to its menu button. Opening one disclosure
+closes the other. The account disclosure
+in the top bar follows the same focus and dismissal rules while keeping its
+language choices as ordinary buttons; selecting a language leaves it open.
 Every ZEV-scoped page header carries the selected ZEV name as an eyebrow
 above the page title. Participant pages show their community name from
 `zev_name` on `GET /auth/me/` only with a single membership
