@@ -1,7 +1,9 @@
 import uuid
 from datetime import date
 from django.core.exceptions import ValidationError
+from django.core.validators import MinValueValidator
 from django.db import models
+from django.db.models import Q
 from zev.models import Zev
 
 from allocation.validity import active_during
@@ -137,11 +139,6 @@ class Tariff(models.Model):
     billing_mode = models.CharField(max_length=40, choices=BillingMode.choices, default=BillingMode.ENERGY)
     energy_type = models.CharField(max_length=20, choices=EnergyType.choices, null=True, blank=True)
     fixed_price_chf = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
-    percentage = models.DecimalField(
-        max_digits=5, decimal_places=2, null=True, blank=True,
-        help_text="Percentage of all energy tariffs (same energy type) used as the effective price. "
-                  "Only applicable for billing_mode=percentage_of_energy.",
-    )
     split_key = models.CharField(max_length=10, choices=SplitKey.choices, default=SplitKey.EQUAL)
     valid_from = models.DateField()
     valid_to = models.DateField(null=True, blank=True)
@@ -194,6 +191,18 @@ class Tariff(models.Model):
 
         if self.billing_mode in {BillingMode.ENERGY, BillingMode.PERCENTAGE_OF_ENERGY} and not self.energy_type:
             errors["energy_type"] = "Energy-based tariffs require an energy type."
+
+        # Bands are priced per mode: an energy band carries a price, a
+        # percentage band carries a percentage. A band of one mode is
+        # meaningless under the other, so switching modes with bands already
+        # attached has to be rejected rather than leave bands nobody can price.
+        if not self._state.adding and self.pk:
+            try:
+                previous_mode = Tariff.objects.only("billing_mode").get(pk=self.pk).billing_mode
+            except Tariff.DoesNotExist:
+                previous_mode = None
+            if previous_mode is not None and previous_mode != self.billing_mode and self.periods.exists():
+                errors["billing_mode"] = "Remove this tariff's bands before changing its billing mode."
 
         for field, message in self._dynamic_source_errors().items():
             errors.setdefault(field, message)
@@ -321,7 +330,17 @@ class TariffPeriod(models.Model):
         max_length=60, blank=True,
         help_text="Name for this band, e.g. 'Peak'. Only used for period type 'band'.",
     )
-    price_chf_per_kwh = models.DecimalField(max_digits=8, decimal_places=5)
+    price_chf_per_kwh = models.DecimalField(
+        max_digits=8, decimal_places=5, null=True, blank=True,
+        help_text="Price in CHF per kWh. Required on a band of an energy tariff, "
+                  "and must be null on a percentage-of-energy tariff.",
+    )
+    percentage = models.DecimalField(
+        max_digits=5, decimal_places=2, null=True, blank=True,
+        validators=[MinValueValidator(0)],
+        help_text="Percentage of all grid energy tariffs used as the effective price. "
+                  "Only for percentage-of-energy tariffs.",
+    )
     time_from = models.TimeField(null=True, blank=True, help_text="Start of this period (HH:MM)")
     time_to = models.TimeField(null=True, blank=True, help_text="End of this period (HH:MM)")
     weekdays = models.CharField(
@@ -345,6 +364,15 @@ class TariffPeriod(models.Model):
         # opinion — the engine's fallback reads periods[0] and must not depend
         # on that. `id` keeps the total order for bands that start together.
         ordering = ["period_type", models.F("time_from").asc(nulls_first=True), "id"]
+        constraints = [
+            models.CheckConstraint(
+                name="tariffperiod_exactly_one_price",
+                condition=(
+                    Q(price_chf_per_kwh__isnull=False, percentage__isnull=True)
+                    | Q(price_chf_per_kwh__isnull=True, percentage__isnull=False)
+                ),
+            ),
+        ]
 
     def clean(self):
         # Enforce this at model level because admin writes bypass the serializer.
@@ -355,6 +383,25 @@ class TariffPeriod(models.Model):
         # A band that prices no month at all is simply unreachable.
         if self.months and not parse_number_list(self.months):
             raise ValidationError({"months": "Leave months blank to apply in every month."})
+
+        if self.tariff_id:
+            billing_mode = self.tariff.billing_mode
+            if billing_mode == BillingMode.ENERGY:
+                errors = {}
+                if self.price_chf_per_kwh is None:
+                    errors["price_chf_per_kwh"] = "A price band needs a price."
+                if self.percentage is not None:
+                    errors["percentage"] = "Only percentage-of-energy tariffs take a percentage."
+                if errors:
+                    raise ValidationError(errors)
+            elif billing_mode == BillingMode.PERCENTAGE_OF_ENERGY:
+                errors = {}
+                if self.percentage is None:
+                    errors["percentage"] = "A percentage band needs a percentage."
+                if self.price_chf_per_kwh is not None:
+                    errors["price_chf_per_kwh"] = "A percentage band takes a percentage, not a price."
+                if errors:
+                    raise ValidationError(errors)
 
     @property
     def display_name(self) -> str:
@@ -372,4 +419,6 @@ class TariffPeriod(models.Model):
         return self.get_period_type_display()
 
     def __str__(self):
+        if self.percentage is not None:
+            return f"{self.tariff.name} / {self.get_period_type_display()} @ {self.percentage}%"
         return f"{self.tariff.name} / {self.get_period_type_display()} @ {self.price_chf_per_kwh} CHF/kWh"

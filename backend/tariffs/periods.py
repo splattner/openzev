@@ -14,6 +14,9 @@ season.
 """
 from __future__ import annotations
 
+from datetime import datetime, timedelta
+from decimal import ROUND_HALF_UP, Decimal
+
 ALL_MONTHS = frozenset(range(1, 13))
 ALL_WEEKDAYS = frozenset(range(7))  # 0 = Monday, matching datetime.weekday()
 
@@ -91,3 +94,80 @@ def hhmm(value) -> str:
     assigned one holds whatever was given it, and both reach the naming code.
     """
     return str(value)[:5]
+
+
+# The literal mirrors ``tariffs.models.PeriodType.FLAT``. It cannot be imported
+# here: ``TariffPeriod.clean`` reads ``hhmm``/``parse_number_list`` from this
+# module, so importing back from ``models`` would be circular.
+_FLAT_PERIOD_TYPE = "flat"
+
+
+def resolve_band(periods, ts: datetime):
+    """The band among ``periods`` that prices a tariff at ``ts``, or ``None``.
+
+    The single resolution rule for both energy and percentage bands — see
+    ``invoices.engine._resolve_tariff_band``, which delegates here so a static
+    tariff's price is resolved in exactly one place regardless of billing
+    mode. ``periods`` is any iterable of ``TariffPeriod``-like rows (already
+    fetched, not re-queried).
+    """
+    periods = list(periods)
+    if not periods:
+        return None
+
+    # The month is checked before anything else, the flat case included: a
+    # winter-only flat band that short-circuited on period_type would bill its
+    # winter price in July. Bands with no months set match every month.
+    in_season = [period for period in periods if ts.month in months_of(period)]
+
+    # A flat band short-circuits without looking at the window, which is only
+    # safe because a flat band may not share its months with a timed one.
+    t_time = ts.time()
+    weekday = ts.weekday()  # 0 = Monday
+    for period in in_season:
+        if period.period_type == _FLAT_PERIOD_TYPE:
+            return period
+        if period.time_from and period.time_to:
+            if weekday in weekdays_of(period) and period.time_from <= t_time < period.time_to:
+                return period
+
+    # Nothing matched the hour: the day's first band in this season, else the
+    # tariff's first band overall.
+    return (in_season or periods)[0]
+
+
+# A non-leap reference year: 2025 has no 29 February to double-count or skip,
+# so every day-of-year maps to exactly one calendar date across the whole
+# resolution loop below.
+_AVERAGE_REFERENCE_YEAR = 2025
+_AVERAGE_STEP = timedelta(minutes=15)
+
+
+def average_percentage(tariff) -> Decimal:
+    """Time-weighted mean percentage of ``tariff``'s bands over one reference year.
+
+    Used where a single representative percentage is needed (the feasibility
+    prefill estimate) rather than the exact per-timestamp resolution the
+    engine performs when actually billing. Walks a non-leap reference year
+    (2025) in 15-minute steps, resolving each with :func:`resolve_band` — the
+    same rule the engine uses — and averages the result. ``Decimal("0")``
+    when the tariff has no bands. The result is an estimate by time, not by
+    energy.
+    """
+    periods = list(tariff.periods.all())
+    if not periods:
+        return Decimal("0")
+
+    total = Decimal("0")
+    steps = 0
+    current = datetime(_AVERAGE_REFERENCE_YEAR, 1, 1, 0, 0)
+    end = datetime(_AVERAGE_REFERENCE_YEAR + 1, 1, 1, 0, 0)
+    while current < end:
+        band = resolve_band(periods, current)
+        total += band.percentage if band is not None and band.percentage is not None else Decimal("0")
+        steps += 1
+        current += _AVERAGE_STEP
+
+    if steps == 0:
+        return Decimal("0")
+    return (total / steps).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)

@@ -223,3 +223,23 @@ def flat_tariff(zev, *, category=TariffCategory.ENERGY, energy_type=EnergyType.L
     TariffPeriodFactory(tariff=tariff, period_type=PeriodType.FLAT,
                         price_chf_per_kwh=Decimal(price))
     return tariff
+
+
+def percentage_tariff(zev, *, category=TariffCategory.LEVIES, energy_type=EnergyType.LOCAL,
+                      percentage="50.00", valid_from=None, valid_to=None) -> Tariff:
+    """Create a percentage-of-energy tariff with a single flat percentage band.
+
+    Mirrors ``flat_tariff``: a percentage tariff has no price of its own since
+    SPEC-2026-percentage-tariff-bands moved it onto ``TariffPeriod`` (§4.1).
+    """
+    tariff = TariffFactory(
+        zev=zev,
+        category=category,
+        billing_mode=BillingMode.PERCENTAGE_OF_ENERGY,
+        energy_type=energy_type,
+        valid_from=valid_from or DEFAULT_VALID_FROM,
+        valid_to=valid_to,
+    )
+    TariffPeriodFactory(tariff=tariff, period_type=PeriodType.FLAT,
+                        price_chf_per_kwh=None, percentage=Decimal(percentage))
+    return tariff
