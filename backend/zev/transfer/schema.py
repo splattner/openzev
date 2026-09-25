@@ -11,14 +11,15 @@ break every archive already sitting on someone's disk.
 """
 
 # Bumped whenever the archive layout changes in a way an older importer cannot
-# read. Version 3 adds the invoice_pdfs section (issued invoice documents,
-# opt-in — see SECTION_INVOICE_PDFS). Version 2 adds enabled/empty_on_not_found
-# source settings and frozen invoice-to-source provenance. Version 1 remains
-# readable for static exports and legacy adapter-based dynamic descriptors. An
-# archive naming a version that is not listed here is rejected outright rather
-# than imported half-understood.
-FORMAT_VERSION = 3
-SUPPORTED_FORMAT_VERSIONS = frozenset({1, 2, 3})
+# read. Version 4 moves the percentage of a percentage-of-energy tariff onto
+# its periods. Version 3 adds the invoice_pdfs section (issued invoice
+# documents, opt-in — see SECTION_INVOICE_PDFS). Version 2 adds
+# enabled/empty_on_not_found source settings and frozen invoice-to-source
+# provenance. Version 1 remains readable for static exports and legacy
+# adapter-based dynamic descriptors. An archive naming a version that is not
+# listed here is rejected outright rather than imported half-understood.
+FORMAT_VERSION = 4
+SUPPORTED_FORMAT_VERSIONS = frozenset({1, 2, 3, 4})
 
 MANIFEST_NAME = "manifest.json"
 READINGS_DIR = "readings"
@@ -161,7 +162,6 @@ TARIFF_FIELDS = (
     "billing_mode",
     "energy_type",
     "fixed_price_chf",
-    "percentage",
     "minimum_price_chf_per_kwh",
     "split_key",
     "valid_from",
@@ -198,6 +198,7 @@ DYNAMIC_SOURCE_FIELDS = (
 TARIFF_PERIOD_FIELDS = (
     "period_type",
     "price_chf_per_kwh",
+    "percentage",
     "time_from",
     "time_to",
     "weekdays",
