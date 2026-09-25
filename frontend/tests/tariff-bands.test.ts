@@ -43,7 +43,7 @@ describe('naming a band', () => {
 function version(periods: TariffVersion['periods']): TariffVersion {
     return {
         id: 'v1', zev: 'z1', name: 'Grid', category: 'grid_fees', billing_mode: 'energy',
-        energy_type: 'grid', fixed_price_chf: null, percentage: null, split_key: 'equal',
+        energy_type: 'grid', fixed_price_chf: null, split_key: 'equal',
         valid_from: '2026-01-01', valid_to: '2026-12-31', notes: '', periods,
     } as TariffVersion
 }

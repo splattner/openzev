@@ -119,7 +119,15 @@ export function TariffDetailDrawer({
     // not one of the fields versions must agree on.
     const dynamicSource = shown.dynamic_source ? sourceById.get(shown.dynamic_source) : undefined
     const isDynamic = Boolean(shown.dynamic_source)
-    const usesPeriods = displaySeries.billing_mode === 'energy' && !isDynamic
+    // A percentage tariff is never dynamic (only billing_mode=energy can link
+    // a fetched series), so its bands always apply — the single percentage
+    // summary the drawer used to show is replaced by this band list (§5.7).
+    const usesPeriods = (displaySeries.billing_mode === 'energy' && !isDynamic)
+        || displaySeries.billing_mode === 'percentage_of_energy'
+    const isPercentageTariff = displaySeries.billing_mode === 'percentage_of_energy'
+    const baseRate = shown.percentage_base_summary?.price_chf_per_kwh
+        ? Number(shown.percentage_base_summary.price_chf_per_kwh)
+        : null
     const pricingLabel = pricingLabelFor(displaySeries, shown)
     const pricingTooltip = pricingTooltipFor(displaySeries, shown, dynamicSource)
     const notes = shown.notes?.trim()
@@ -401,7 +409,21 @@ export function TariffDetailDrawer({
                                                     <span className="badge badge-neutral">
                                                         {bandName(period, t(`pages.tariffs.periodTypes.${period.period_type}` as Parameters<typeof t>[0], { defaultValue: period.period_type }))}
                                                     </span>
-                                                    <strong>CHF {period.price_chf_per_kwh}/kWh</strong>
+                                                    {isPercentageTariff ? (
+                                                        <span className="tariff-period-price">
+                                                            <strong>{period.percentage} %</strong>
+                                                            {baseRate != null && period.percentage != null && (
+                                                                <span className="muted">
+                                                                    {' '}
+                                                                    {t('pages.tariffs.approxPrice', {
+                                                                        price: (baseRate * Number(period.percentage) / 100).toFixed(3),
+                                                                    })}
+                                                                </span>
+                                                            )}
+                                                        </span>
+                                                    ) : (
+                                                        <strong>CHF {period.price_chf_per_kwh}/kWh</strong>
+                                                    )}
                                                 </div>
                                                 <div className="muted tariff-period-meta">
                                                     {period.period_type === 'flat'

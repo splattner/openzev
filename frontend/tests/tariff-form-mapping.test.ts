@@ -19,7 +19,6 @@ describe('tariff form mapping', () => {
       billing_mode: 'percentage_of_energy',
       energy_type: 'grid',
       fixed_price_chf: null,
-      percentage: '12.50',
       valid_from: '2026-01-01',
       valid_to: null,
       notes: null,
@@ -32,8 +31,8 @@ describe('tariff form mapping', () => {
       name: 'Energy 2026',
       billing_mode: 'percentage_of_energy',
       energy_type: 'grid',
-      percentage: '12.50',
       valid_from: '2026-01-01',
+      is_new: false,
     })
   })
 
@@ -45,7 +44,6 @@ describe('tariff form mapping', () => {
         billing_mode: 'energy',
         energy_type: 'local',
         fixed_price_chf: '',
-        percentage: '',
       },
       'z-1',
     )
@@ -57,7 +55,6 @@ describe('tariff form mapping', () => {
       billing_mode: 'energy',
       energy_type: 'local',
       fixed_price_chf: null,
-      percentage: null,
       // Not a shared fee mode, so split_key is forced to 'equal' regardless
       // of the form value — it only means something for SHARED_* tariffs.
       split_key: 'equal',
@@ -67,6 +64,8 @@ describe('tariff form mapping', () => {
       dynamic_source: null,
       minimum_price_chf_per_kwh: null,
     })
+    // Not a percentage tariff at all, so the field is absent, not null.
+    expect(payload).not.toHaveProperty('initial_percentage')
   })
 
   it('carries a picked dynamic source through for an energy tariff', () => {
@@ -93,7 +92,7 @@ describe('tariff form mapping', () => {
   it('maps a tariff carrying a dynamic source into form values', () => {
     const tariff = {
       id: 't-1', zev: 'z-1', name: 'Grid (dynamic)', category: 'grid_fees',
-      billing_mode: 'energy', energy_type: 'grid', fixed_price_chf: null, percentage: null,
+      billing_mode: 'energy', energy_type: 'grid', fixed_price_chf: null,
       valid_from: '2026-01-01', valid_to: null, notes: '',
       dynamic_source: 'src-1',
     } as unknown as Tariff
@@ -155,12 +154,48 @@ describe('tariff form mapping', () => {
     expect(nonShared.split_key).toBe('equal')
   })
 
-  it('maps tariff period api model and form values correctly', () => {
+  describe('initial_percentage (SPEC-2026-percentage-tariff-bands §5.5)', () => {
+    it('is sent when creating a percentage-of-energy tariff', () => {
+      const payload = mapTariffFormValuesToInput(
+        {
+          ...defaultTariffFormValues, billing_mode: 'percentage_of_energy', energy_type: 'local',
+          initial_percentage: '42.00', is_new: true,
+        },
+        'z-1',
+      )
+
+      expect(payload.initial_percentage).toBe('42.00')
+    })
+
+    it('is absent, not null, when updating an existing percentage tariff', () => {
+      const payload = mapTariffFormValuesToInput(
+        {
+          ...defaultTariffFormValues, billing_mode: 'percentage_of_energy', energy_type: 'local',
+          initial_percentage: '42.00', is_new: false,
+        },
+        'z-1',
+      )
+
+      expect(payload).not.toHaveProperty('initial_percentage')
+    })
+
+    it('is absent for a mode other than percentage-of-energy, even on create', () => {
+      const payload = mapTariffFormValuesToInput(
+        { ...defaultTariffFormValues, billing_mode: 'energy', energy_type: 'grid', is_new: true },
+        'z-1',
+      )
+
+      expect(payload).not.toHaveProperty('initial_percentage')
+    })
+  })
+
+  it('maps an energy tariff period api model and form values correctly', () => {
     const period = {
       id: 'tp-1',
       tariff: 't-1',
       period_type: 'high',
       price_chf_per_kwh: '0.45',
+      percentage: null,
       time_from: '06:00',
       time_to: '22:00',
       weekdays: '1,2,3,4,5',
@@ -168,11 +203,13 @@ describe('tariff form mapping', () => {
       updated_at: '2026-01-01T00:00:00Z',
     } as unknown as TariffPeriod
 
-    expect(mapTariffPeriodToFormValues(period)).toEqual({
+    expect(mapTariffPeriodToFormValues(period, 'energy')).toEqual({
       ...defaultTariffPeriodFormValues,
       tariff: 't-1',
+      billing_mode: 'energy',
       period_type: 'high',
       price_chf_per_kwh: '0.45',
+      percentage: '',
       time_from: '06:00',
       time_to: '22:00',
       weekdays: '1,2,3,4,5',
@@ -181,9 +218,11 @@ describe('tariff form mapping', () => {
     expect(
       mapTariffPeriodFormValuesToInput({
         tariff: 't-1',
+        billing_mode: 'energy',
         period_type: 'low',
         label: '',
         price_chf_per_kwh: '0.12',
+        percentage: '',
         time_from: '',
         time_to: '',
         weekdays: '',
@@ -194,6 +233,54 @@ describe('tariff form mapping', () => {
       period_type: 'low',
       label: '',
       price_chf_per_kwh: '0.12',
+      percentage: null,
+      time_from: null,
+      time_to: null,
+      weekdays: '',
+      months: '',
+    })
+  })
+
+  it('maps a percentage tariff period by percentage instead of price', () => {
+    const period = {
+      id: 'tp-2',
+      tariff: 't-2',
+      period_type: 'flat',
+      price_chf_per_kwh: null,
+      percentage: '60.00',
+      time_from: null,
+      time_to: null,
+      weekdays: '',
+    } as unknown as TariffPeriod
+
+    expect(mapTariffPeriodToFormValues(period, 'percentage_of_energy')).toEqual({
+      ...defaultTariffPeriodFormValues,
+      tariff: 't-2',
+      billing_mode: 'percentage_of_energy',
+      period_type: 'flat',
+      price_chf_per_kwh: '',
+      percentage: '60.00',
+    })
+
+    expect(
+      mapTariffPeriodFormValuesToInput({
+        tariff: 't-2',
+        billing_mode: 'percentage_of_energy',
+        period_type: 'flat',
+        label: '',
+        price_chf_per_kwh: '',
+        percentage: '60.00',
+        time_from: '',
+        time_to: '',
+        weekdays: '',
+        months: '',
+      }),
+    ).toEqual({
+      tariff: 't-2',
+      period_type: 'flat',
+      label: '',
+      price_chf_per_kwh: null,
+      percentage: '60.00',
       time_from: null,
       time_to: null,
       weekdays: '',
@@ -204,8 +291,10 @@ describe('tariff form mapping', () => {
   it('keeps a band label, and drops one left behind by a type change', () => {
     const values = {
       tariff: 't-1',
+      billing_mode: 'energy' as const,
       label: 'Spitzenlast',
       price_chf_per_kwh: '0.24',
+      percentage: '',
       time_from: '07:00',
       time_to: '17:00',
       weekdays: '',

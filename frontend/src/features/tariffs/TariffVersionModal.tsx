@@ -13,6 +13,7 @@ type PeriodDraft = {
   period_type: TariffPeriodType
   label: string
   price_chf_per_kwh: string
+  percentage: string
   time_from: string | null
   time_to: string | null
   weekdays: string
@@ -35,7 +36,8 @@ function draftsFrom(source: TariffVersion): PeriodDraft[] {
     // A band is named by its label; dropping it here would leave the copy
     // showing a bare time window on the contract.
     label: period.label ?? '',
-    price_chf_per_kwh: String(period.price_chf_per_kwh),
+    price_chf_per_kwh: period.price_chf_per_kwh != null ? String(period.price_chf_per_kwh) : '',
+    percentage: period.percentage != null ? String(period.percentage) : '',
     time_from: period.time_from ?? null,
     time_to: period.time_to ?? null,
     weekdays: period.weekdays ?? '',
@@ -64,7 +66,6 @@ export function TariffVersionModal({
   const [validFrom, setValidFrom] = useState('')
   const [name, setName] = useState('')
   const [fixedPrice, setFixedPrice] = useState('')
-  const [percentage, setPercentage] = useState('')
   const [minimumPrice, setMinimumPrice] = useState('')
   const [periods, setPeriods] = useState<PeriodDraft[]>([])
 
@@ -77,7 +78,6 @@ export function TariffVersionModal({
     setValidFrom(dialog.kind === 'rename' ? '' : dayjs().format('YYYY-MM-DD'))
     setName(dialog.kind === 'duplicate' ? '' : series.name)
     setFixedPrice(source.fixed_price_chf ? String(source.fixed_price_chf) : '')
-    setPercentage(source.percentage ? String(source.percentage) : '')
     setMinimumPrice(source.minimum_price_chf_per_kwh ? String(source.minimum_price_chf_per_kwh) : '')
     setPeriods(draftsFrom(source))
   }, [dialog])
@@ -86,9 +86,11 @@ export function TariffVersionModal({
 
   const { kind, series, source } = dialog
   const isDynamic = Boolean(source.dynamic_source)
-  const usesPeriods = series.billing_mode === 'energy' && !isDynamic
-  const usesPercentage = series.billing_mode === 'percentage_of_energy'
-  const usesFixedPrice = !usesPeriods && !usesPercentage && !isDynamic
+  // A percentage tariff carries the same kind of bands an energy tariff does
+  // (§5.7) — it is never dynamic, so no `!isDynamic` guard is needed for it.
+  const isPercentage = series.billing_mode === 'percentage_of_energy'
+  const usesPeriods = (series.billing_mode === 'energy' && !isDynamic) || isPercentage
+  const usesFixedPrice = !usesPeriods && !isDynamic
   const usesMinimumPrice = isDynamic && series.energy_type === 'feed_in'
 
   const title = kind === 'new-version'
@@ -100,13 +102,13 @@ export function TariffVersionModal({
   function buildPayload(): TariffVersionInput {
     const payload: TariffVersionInput = { valid_from: validFrom }
     if (usesFixedPrice) payload.fixed_price_chf = fixedPrice || null
-    if (usesPercentage) payload.percentage = percentage || null
     if (usesMinimumPrice) payload.minimum_price_chf_per_kwh = minimumPrice || null
     if (usesPeriods) {
       payload.periods = periods.map((period) => ({
         period_type: period.period_type,
         label: period.label,
-        price_chf_per_kwh: period.price_chf_per_kwh,
+        price_chf_per_kwh: isPercentage ? null : period.price_chf_per_kwh,
+        percentage: isPercentage ? period.percentage : null,
         time_from: period.time_from || null,
         time_to: period.time_to || null,
         weekdays: period.weekdays,
@@ -190,21 +192,6 @@ export function TariffVersionModal({
           </label>
         )}
 
-        {kind !== 'rename' && usesPercentage && (
-          <label>
-            <span>{t('pages.tariffs.form.percentage')}</span>
-            <input
-              type="number"
-              step="0.01"
-              min="0"
-              max="100"
-              value={percentage}
-              onChange={(event) => setPercentage(event.target.value)}
-              required
-            />
-          </label>
-        )}
-
         {kind !== 'rename' && usesMinimumPrice && (
           <label>
             <span>{t('pages.tariffs.form.minimumPrice')}</span>
@@ -237,18 +224,38 @@ export function TariffVersionModal({
                         defaultValue: period.period_type,
                       })}
                     </span>
-                    <input
-                      type="number"
-                      step="0.00001"
-                      value={period.price_chf_per_kwh}
-                      onChange={(event) => setPeriods((current) => current.map(
-                        (entry, entryIndex) => entryIndex === index
-                          ? { ...entry, price_chf_per_kwh: event.target.value }
-                          : entry,
-                      ))}
-                      required
-                    />
-                    <span className="muted">{t('pages.tariffs.chfPerKwh')}</span>
+                    {isPercentage ? (
+                      <>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={period.percentage}
+                          onChange={(event) => setPeriods((current) => current.map(
+                            (entry, entryIndex) => entryIndex === index
+                              ? { ...entry, percentage: event.target.value }
+                              : entry,
+                          ))}
+                          required
+                        />
+                        <span className="muted">%</span>
+                      </>
+                    ) : (
+                      <>
+                        <input
+                          type="number"
+                          step="0.00001"
+                          value={period.price_chf_per_kwh}
+                          onChange={(event) => setPeriods((current) => current.map(
+                            (entry, entryIndex) => entryIndex === index
+                              ? { ...entry, price_chf_per_kwh: event.target.value }
+                              : entry,
+                          ))}
+                          required
+                        />
+                        <span className="muted">{t('pages.tariffs.chfPerKwh')}</span>
+                      </>
+                    )}
                   </label>
                 ))}
               </div>
