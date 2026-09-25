@@ -134,14 +134,12 @@ ones; fully duplicate rows are skipped with a `Duplicate reading` error.
 
 OpenZEV supports the Swiss **SDAT-CH** metering data standard (used by utility providers).
 
-1. Go to **Metering → Import history**
-2. Upload your SDAT-CH file, or several at once (one import per file)
-3. OpenZEV automatically parses:
-   - Metering point IDs
-   - Timestamps
-   - Values (kWh)
-   - Quality flags
-4. There is no preview: the import runs immediately, and the import protocol
+1. Go to **Metering → Import history** and click **New Import**
+2. Choose the **SDAT-CH (ebIX XML)** format
+3. Upload your SDAT-CH file, or several at once (one import per file)
+4. OpenZEV automatically parses metering point IDs, timestamps (with the
+   offset the file carries) and values (kWh)
+5. There is no preview: the import runs immediately, and the import protocol
    opens automatically if any rows were skipped or failed. With several files
    they are imported one after another; if some fail, the others stay
    imported and only the failed files remain selected so you can retry.
@@ -150,18 +148,30 @@ OpenZEV supports the Swiss **SDAT-CH** metering data standard (used by utility p
 
 ## Timestamp Handling
 
-OpenZEV stores all readings internally on the UTC timeline, but there is **no
-timezone selector** in the import UI. The **Date/time format** field is a Python
+OpenZEV stores all readings on the UTC timeline, and there is **no timezone
+selector** in the import UI:
+
+- A timestamp **with** an offset (`2026-01-15T14:00:00+01:00`, as in SDAT-CH
+  files) is converted to UTC correctly.
+- A timestamp **without** an offset (`2026-01-15 14:00:00`) is read as
+  **UTC**, not Swiss time.
+- A daily-profile row's first interval starts at **00:00 UTC** of its date.
+- Billing periods also run from 00:00 UTC to 00:00 UTC.
+
+So a file of Swiss local times without offsets lands one hour (winter) or two
+hours (summer) late. Within a period that changes nothing, but readings near
+a period boundary can fall into the neighbouring period. If your files carry
+local time, prefer an export with offsets and a format such as
+`%Y-%m-%dT%H:%M:%S%z`.
+ The **Date/time format** field is a Python
 `strptime` pattern controlling how text timestamps are parsed; empty means
 auto-detect (ISO first, then day-first European fallback for dates like
 `07.01.2026`). The pattern must include the full date — `%d.%m.%Y`,
 `%Y-%m-%dT%H:%M:%S%z`, `%Y-%j` — while `%d.%m` or `%H:%M` are rejected.
 
-Be aware that mixing naive local-time timestamps and UTC can cause
-off-by-one-hour billing errors between Swiss local time (CET, UTC+1) and UTC.
-For example, `2026-01-15 22:00:00` in Swiss local time (CET) corresponds to
-`2026-01-15 21:00:00` UTC. Use one consistent timestamp interpretation across
-all your import files.
+Whatever you choose, use one consistent timestamp interpretation across all
+your import files: mixing local-time and UTC files for the same meter creates
+overlaps and gaps an hour wide.
 
 ## Common Import Scenarios
 
@@ -180,14 +190,14 @@ CH12346-load,2026-01-15 01:00:00,0.630
 
 1. Upload file
 2. Map columns (meter_id, timestamp, energy_kwh)
-3. Set the timestamp format and check the preview (should show 2 meters, ~720 rows per meter)
+3. Check the detected timestamp format and the preview (2 meters, one row per reading)
 4. Import
 
 ### Scenario 2: Utility SDAT-CH Export
 
 Utility provides file: `20260315_metering.sdat`
 
-1. Upload to **SDAT-CH Import** (select the target ZEV first)
+1. Click **New Import** and choose **SDAT-CH (ebIX XML)** (select the target ZEV first)
 2. OpenZEV auto-parses metadata
 3. The import runs without a preview; check the protocol for skipped rows
 

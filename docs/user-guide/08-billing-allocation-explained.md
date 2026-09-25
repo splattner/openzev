@@ -4,7 +4,7 @@ This guide explains the exact billing logic used by OpenZEV so you can understan
 
 ## Key Principle: Fair Sharing
 
-OpenZEV allocates energy fairly at the **timestamp level** (e.g., hour-by-hour), not just monthly totals.
+OpenZEV allocates energy fairly at the **timestamp level** (each 15-minute or hourly reading), not just monthly totals.
 
 **Concept:** At each moment, community production is shared among participants proportional to their consumption at that moment. Remaining consumption comes from the grid.
 
@@ -125,14 +125,14 @@ Once energy is allocated, tariffs are applied per energy type:
 Alice's charges (Jan, sample rates):
 - Local energy: 168 kWh × 0.11 CHF/kWh (average HT/NT) = **CHF 18.48**
 - Grid energy: 98 kWh × 0.23 CHF/kWh (average HT/NT) = **CHF 22.54**
-- Feed-in (if any): 5 kWh × 0.08 CHF/kWh = **CHF 0.40**
+- Feed-in credit (if any): 5 kWh × 0.08 CHF/kWh = **CHF −0.40**
 - Fixed fee: CHF 50/month = **CHF 50.00**
 
-**Invoice subtotal:** 18.48 + 22.54 + 0.40 + 50.00 = **CHF 91.42**
+**Invoice subtotal:** 18.48 + 22.54 − 0.40 + 50.00 = **CHF 90.62**
 
-If VAT applies (8.1%):
-- VAT: 91.42 × 0.081 = **CHF 7.40** (rounded)
-- **Invoice total:** CHF 98.82
+If the ZEV is VAT-registered (8.1%):
+- VAT: 90.62 × 0.081 = **CHF 7.34** (rounded)
+- **Invoice total:** CHF 97.96
 
 ## Fixed-Fee Behavior
 
@@ -266,9 +266,13 @@ nothing is billed twice.
 - Line item totals: Rounded to 2 decimals (CHF 0.01)
 - Invoice subtotal: Rounded to 2 decimals
 
-**VAT:**
-- Applied only if ZEV has a VAT number configured
-- Rate selected by invoice period end date from [Platform → System Settings → VAT](14-admin-console.md#vat-settings)
+**VAT** depends on the ZEV's [VAT treatment](02-zev-setup.md#vat-configuration):
+- **VAT-registered** — VAT is added on top of the subtotal as its own line
+- **Not registered — fold VAT into prices** — grid energy, grid fees, levies
+  and metering lines are grossed up by the rate; no VAT line
+- **Not VAT-registered** — no VAT at all
+- The rate is the one active on the invoice period's end date, from
+  [Platform → System Settings → VAT](14-admin-console.md#vat-settings)
 - If no rate is active, VAT defaults to 0%
 
 **Final total:**
@@ -289,7 +293,7 @@ flowchart TD
   I --> J[Apply feed-in tariffs to participant OUT readings]
   J --> K[Apply fixed-fee tariffs by month / metering point rules]
   K --> L[Round item totals + subtotal]
-  L --> M[Apply VAT if ZEV has VAT number]
+  L --> M[Apply VAT per the ZEV's VAT treatment]
   M --> N[Create invoice + line items]
   N --> O[End]
 ```
@@ -326,10 +330,10 @@ If $C_z(t) = 0$ (no one is consuming), no one is allocated local energy:
 
 ### Partial Metering
 
-If a participant's consumption meter is missing in a period:
-- OpenZEV marks the invoice as **incomplete**
-- Billing uses available readings + warning note
-- ZEV owner should investigate and re-run invoice if data is corrected
+If a participant's meter is missing readings in a period:
+- Nothing is estimated — the missing intervals count as no energy
+- The period's readiness check on **Overview** flags the gap before you generate
+- Import the missing data, then regenerate the (draft) invoice
 
 ### Meter Replacement
 

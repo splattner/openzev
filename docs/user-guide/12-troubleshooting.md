@@ -17,7 +17,8 @@ docker compose logs
 
 | Symptom | Cause | Fix |
 | --- | --- | --- |
-| Port already in use | Another app on 8080 or 8000 | `lsof -i :8080` and kill conflicting process, or change docker-compose ports |
+| Port already in use | Another app on 8080 (dev stack: 5173, 8001, 5432, 6379) | `lsof -i :8080` and stop the conflicting process, or change the port mapping in the compose file |
+| Backend exits right after starting, log names `accounts.E0xx` or `SECRET_KEY` | A required production setting in `backend/.env` is missing or wrong | Fix the named setting — see [Production with Docker Compose](01-getting-started.md#2-configure-backendenv) |
 | Database connection error | PostgreSQL not running | `docker compose ps` to check db service |
 | "permission denied" | File permissions issue | `docker compose down && docker compose up --build` |
 
@@ -49,8 +50,8 @@ Development stack (`docker-compose.dev.yml`) uses port 8001 instead.
 
 | Symptom | Likely Cause | Solution |
 | --- | --- | --- |
-| "Invalid credentials" | Wrong username/password | Check [demo accounts](01-getting-started.md#demo-accounts) |
-| "Account not activated" | User never received invitation | Reset password via login page |
+| "Invalid credentials" | Wrong username/password | Sign in with the email address, not the username. Check the [demo accounts](01-getting-started.md#demo-accounts); on a new production instance, [create the first admin account](01-getting-started.md#creating-the-first-admin-account) |
+| Participant never set a password | The onboarding link was not used, or has expired | The community owner sends a new onboarding link from the participant's card |
 | "Permission denied" | User role is too restrictive | Ask admin to update your role |
 | Signed out on every device without logging out | Your password or email was changed, your two-factor was reset, or someone chose **Sign out everywhere** for your account | Sign in again; if you did not expect it, change your password and check with your administrator |
 | Email-change link says it "does not work" | The link was already used, is older than 24 hours, or your password or address changed after you asked | Request the change again under **My Account → Profile** |
@@ -58,11 +59,14 @@ Development stack (`docker-compose.dev.yml`) uses port 8001 instead.
 
 ### Forgot Password
 
-1. Go to login page
-2. Click **Forgot Password?**
-3. Enter email address
-4. Check email for reset link (may be in spam)
-5. Follow link to set new password
+There is no "forgot password" link on the login page.
+
+- **Participants:** ask the community owner to send the onboarding link again
+  (**Participants → More → Send onboarding link**). It signs you in, and you
+  choose a new password. If your invoice has a participant QR code, you can
+  also request a sign-in link from the page it opens.
+- **Owners and admins:** someone with server access sets a new password — see
+  [Roles and Permissions → "User cannot login"](11-roles-and-permissions.md#user-cannot-login).
 
 ### "Unauthorized" / "403 Forbidden" Errors
 
@@ -71,8 +75,8 @@ Development stack (`docker-compose.dev.yml`) uses port 8001 instead.
 **Cause:** Your role or ZEV scope doesn't grant access.
 
 **Fix:**
-1. Check your role: Click profile → **My Account**
-2. Ask admin if you need additional access
+1. Ask an admin to check your role under **Platform → Accounts → Users**
+2. Ask for additional access if you need it
 3. Ensure you're in correct ZEV (use ZEV selector if available)
 
 ### Can't See Other ZEVs
@@ -88,18 +92,21 @@ Development stack (`docker-compose.dev.yml`) uses port 8001 instead.
 Import fails because a metering point ID in the file doesn't exist. See
 [Metering Imports → Handling Import Errors](05-metering-import.md#handling-import-errors).
 
-### "Timestamp outside validity period"
+### Readings imported but not billed
 
-Readings are rejected because the timestamp falls outside the meter's assignment
-validity window. See [Metering Imports](05-metering-import.md) and
-[Metering Points → Assignment Validity](04-metering-points.md#assignment-validity-periods).
+Imports do not check assignment windows: a reading on a day when the meter has
+no assignment holder is stored, but billed to nobody. **Metering → Data
+Quality** shows an **Unassigned readings** warning for such meters. Fix the
+assignment's validity dates — see
+[Metering Points → Assignment Validity](04-metering-points.md#assignment-validity-periods) —
+and regenerate affected draft invoices.
 
 ### Import hangs or times out
 
 **Problem:** Large file upload gets stuck.
 
 **Causes:**
-- File too large (>1GB)
+- File too large (the limit is 50 MB per file)
 - Network timeout
 - Backend processing slow
 
@@ -118,13 +125,16 @@ Many meters show "Missing". Diagnose the gaps with
 
 ### "Cannot generate invoices"
 
-**Problem:** Generate invoices button disabled or returns error.
+**Problem:** The generate action is missing or returns an error.
 
 **Checks:**
 1. Metering data imported? Check **Metering → Chart**
 2. Tariffs configured? Check **Tariffs**
 3. Participants active? Check **Participants**
 4. Data quality OK? Check **Metering → Data Quality**
+5. Does the row say an existing invoice covers or overlaps the period? Invoices
+   from an earlier billing interval block generation — follow its link to the
+   blocking invoice
 
 ### Invoice totals seem wrong
 
@@ -146,9 +156,9 @@ Many meters show "Missing". Diagnose the gaps with
 
 **Fix:**
 1. Check participant email in **Participants** — is it correct?
-2. Open invoice → **Email History** — see error message
+2. Open **Billing → Emails** → **View history** — see the error message
 3. Correct email address if wrong
-4. Click **Resend** on invoice
+4. Click **Retry** there, or **More → Resend Email** on the invoice
 
 ### Invoice appears but participant hasn't received email
 
@@ -157,7 +167,7 @@ Many meters show "Missing". Diagnose the gaps with
 **Check:**
 1. Ask participant to check spam/junk folder
 2. Verify email address is correct in **Participants**
-3. Check **Email History** on invoice for delivery status
+3. Check **Billing → Emails** for the delivery status
 4. If status = **Failed**, resend manually or correct email + resend
 
 ## Performance
@@ -168,9 +178,8 @@ Many meters show "Missing". Diagnose the gaps with
 
 **Checks:**
 1. Database size too large? Check storage: `docker compose exec db du -sh /var/lib/postgresql/data`
-2. Many invoices? Archive old invoices to separate database
-3. Memory usage? `docker stats`
-4. Restart services: `docker compose restart`
+2. Memory usage? `docker stats`
+3. Restart services: `docker compose restart`
 
 ### Chart rendering is slow
 
@@ -178,8 +187,8 @@ Many meters show "Missing". Diagnose the gaps with
 
 **Fix:**
 1. Narrow date range (select 7 days instead of year)
-2. Increase resolution (daily instead of hourly)
-3. Select specific metering point instead of all
+2. Use a coarser resolution (daily instead of hourly)
+3. Select a specific metering point instead of the whole-ZEV total
 
 ## Database
 
@@ -244,7 +253,7 @@ A common cause is the Celery worker not running — check `docker compose logs w
 **Fix:**
 1. Restart worker service: `docker compose restart worker`
 2. Check Redis: `docker compose logs redis`
-3. Monitor tasks: Check admin dashboard for queued jobs
+3. Check worker and scheduler status under **Platform → Overview → System health**
 
 ## Getting Help
 

@@ -74,11 +74,17 @@ Invoices progress through a controlled workflow:
 Draft → Approved → Sent → Paid
 ```
 
-- **Draft** — just generated, can be reviewed, approved, deleted, or regenerated.
-- **Approved** — locked for review; can be emailed, marked paid, or deleted.
-- **Sent** — email was sent to the participant; can be resent or marked paid.
-- **Paid** — fully settled; no further actions.
-- **Cancelled** — removed from the active workflow; can be deleted or regenerated. A cancelled invoice does not count as generated for its period: its period card still asks you to generate a replacement. The backend supports cancellation, but there is currently no cancel button in the UI.
+- **Draft** — just generated; can be reviewed, approved, regenerated or deleted.
+- **Approved** — locked; can be emailed or marked as sent. Its amounts can no
+  longer change.
+- **Sent** — emailed (or marked as sent); can be resent or marked paid.
+- **Paid** — fully settled; only its PDF can still be regenerated.
+- **Cancelled** — removed from the active workflow; can be deleted or generated
+  again. A cancelled invoice does not count as generated for its period: its
+  period card still asks you to generate a replacement. Cancelling is available
+  through the API only — there is no cancel button in the UI.
+
+Only admins can delete an invoice that is approved, sent or paid.
 
 ## Billing Hub (Invoices · Emails · Statements)
 
@@ -175,25 +181,49 @@ If no participants with active assignments exist for the period, the page shows 
 - **Metering Points** — to check metering-point assignments.
 - **Tariffs** — to configure pricing.
 
-## Generating Invoices
+## Row and Batch Actions
 
-Invoice generation happens **per participant** from the period overview table.
+Each row shows its next step as a button — **Generate invoice**, **Approve**,
+**Send Email** or **Mark Paid**, depending on the status — and puts the rest
+under **More**:
+
+| Status | Button | Under **More** |
+| --- | --- | --- |
+| *(none)* / Cancelled | **Generate invoice** / **Generate again** | Delete (cancelled) |
+| Draft | **Approve** | Regenerate invoice, Generate/Regenerate PDF, Delete |
+| Approved | **Send Email** | Mark as Sent, Generate/Regenerate PDF |
+| Sent | **Mark Paid** | Resend Email, Generate/Regenerate PDF |
+| Paid | — | Generate/Regenerate PDF |
+
+Admins also see **Delete** for approved, sent and paid invoices.
+
+The **Batch actions** toolbar above the table acts on the whole period at once:
+**Generate all**, **Approve all**, **Send all**, **Regenerate all PDFs** and
+**Download all PDFs**. The recommended next batch step names how many
+invoices it touches (for example *Approve 4 invoices*).
+
+## Generating Invoices
 
 1. Navigate to the desired billing period.
 2. Review the **Metering Data** column — ensure data is complete for the participants you want to invoice.
-3. Click **Generate Invoice** in the **Actions** column for the participant.
+3. Click **Generate invoice** on a participant's row, or **Generate all** in the
+   batch toolbar. Generating all runs in the background; the table fills in as
+   the invoices are created.
 
 The system calculates energy allocation and applies tariffs, creating a **Draft** invoice.
 
 ### Regenerating an Existing Invoice
 
-If an invoice already exists for a participant in the current period, the button label changes to **Generate Again**. Clicking it replaces the existing invoice with a freshly calculated one. Use this after correcting metering data or tariff configuration.
+While an invoice is a **Draft**, **More → Regenerate invoice** replaces it with a
+freshly calculated one. Use this after correcting metering data or tariff
+configuration. Approved, sent and paid invoices are locked and cannot be
+regenerated.
 
 > **Tip:** You can generate invoices even when metering data is incomplete, but totals may be inaccurate. It is best to resolve missing data first.
 
 ## Reviewing Invoices
 
-Click **Open Details** in the Actions column to view a read-only invoice detail page.
+Click **Open details** on a row to view a read-only invoice detail page.
 
 ### Invoice Detail Page
 
@@ -218,14 +248,16 @@ The detail page shows:
 with each line's type, description, quantity (kWh), unit price (CHF), and
 total, plus a subtotal per group. If no PDF has been generated yet, the page shows a **Generate PDF** button instead (owners/admins only — a participant sees a plain document-unavailable message, since the API rejects their generation attempt); the viewer appears once the document exists.
 
-> **Note:** Invoices cannot be edited directly. If a correction is needed, fix the underlying data (metering readings or tariff prices) and use **Generate Again** to recreate the invoice.
+> **Note:** Invoices cannot be edited directly. If a correction is needed on a
+> draft, fix the underlying data (metering readings or tariff prices) and
+> regenerate it.
 
 ## Approving Invoices
 
 Approval locks an invoice and signals that it has been reviewed.
 
 1. Find the draft invoice in the period overview.
-2. Click **Approve** in the Actions column.
+2. Click **Approve** on its row (or **Approve all** for every draft in the period).
 
 The status changes from `Draft` to `Approved`. Only draft invoices can be approved.
 
@@ -237,7 +269,9 @@ PDF generation is a separate step from invoice creation.
 - **Regenerate** — replaces an existing PDF (e.g. after the HTML template was updated).
 - **Open PDF** — opens the generated PDF in a new browser tab.
 
-These buttons appear in the **PDF** column of the period overview table for any invoice that exists.
+These actions appear in the **PDF** column and under **More** for any invoice
+that exists. **Download all PDFs** in the batch toolbar downloads the period's
+documents together.
 
 ## Participant Access Links
 
@@ -263,16 +297,22 @@ Revoking is recorded in the audit log, as is every first open of a link in a giv
 
 Once an invoice is approved, you can email it to the participant.
 
-1. Click **Send Email** in the Actions column (visible for `Approved` or `Sent` invoices).
-2. The system queues the email via Celery and begins polling for delivery status.
-3. While polling, the button shows **Sending…** and is disabled.
+1. Click **Send Email** on an approved invoice's row (or **Send all**).
+2. The system queues the email and watches for the delivery result.
+3. While it waits, the button shows **Sending…** and is disabled.
 4. The **Email** column updates automatically when the email is delivered or fails.
 
-For invoices already in `Sent` status, the button label changes to **Resend Email**, allowing you to send additional copies.
+For a `Sent` invoice, **More → Resend Email** sends another copy.
 
-### Email Logs
+If you delivered the invoice some other way (printed, handed over), use
+**More → Mark as Sent** on the approved invoice instead: it moves to `Sent`
+without an email.
 
-Click the sent/total counter button (e.g. `1/2`) in the **Email** column to open the **Email Logs** modal. This shows each email attempt with recipient, status (`pending`, `sent`, `failed`), and timestamp, with a **Retry** button next to any failed entry to re-queue that specific email.
+### Email History
+
+The **Email** column shows only the latest delivery status. Every attempt, with
+recipient, status and error, is in **Billing → Emails** under **View
+history**, where a failed latest attempt also has a **Retry** button.
 
 Email sending is asynchronous via Celery with automatic retries. For delivery mechanics, retry behavior, and troubleshooting failed emails, see [Email Configuration](10-email-configuration.md).
 
@@ -280,7 +320,7 @@ Email sending is asynchronous via Celery with automatic retries. For delivery me
 
 When a participant has paid:
 
-1. Click **Mark Paid** in the Actions column (visible for `Approved` and `Sent` invoices).
+1. Click **Mark Paid** on the row (shown for `Sent` invoices).
 
 The status changes to `Paid`. There is no additional confirmation dialog or payment-detail input — it is a single-click action.
 
@@ -288,13 +328,13 @@ The status changes to `Paid`. There is no additional confirmation dialog or paym
 
 Invoices can be deleted to clean up incorrect or test data.
 
-1. Click **Delete** in the Actions column.
+1. Open **More** on the row and click **Delete**.
 2. Confirm in the deletion dialog.
 
 **Delete visibility rules:**
 
-- **Draft** or **Cancelled** invoices — the delete button is visible for all ZEV owners.
-- **Any status** — admins always see the delete button.
+- **Draft** or **Cancelled** invoices — **More → Delete** is available to ZEV owners.
+- **Any status** — admins can always delete.
 
 Deletion is permanent; the invoice is removed from the database.
 
@@ -338,13 +378,13 @@ available after billing. The selected community appears above the page title.
 1. Verify [tariff prices](07-tariff-configuration.md) are correct for the period.
 2. Check [metering data](06-metering-analysis.md) completeness — missing readings lead to under-counted energy.
 3. Review the [billing allocation logic](08-billing-allocation-explained.md) to understand how local vs. grid energy is split.
-4. If needed, fix the data and click **Generate Again** to recreate the invoice.
+4. If needed, fix the data and regenerate the invoice while it is still a draft.
 
 ### Email not received by participant
 
 1. Check the participant's email address in [Participants](03-participant-management.md).
-2. Open the **Email Logs** modal to check delivery status and error messages.
-3. Click **Retry** on any failed log entry.
+2. Open **Billing → Emails** and **View history** to check delivery status and error messages.
+3. Click **Retry** on a failed latest attempt.
 4. Review [Email Configuration](10-email-configuration.md) for SMTP environment variable issues.
 
 ## Best Practices
@@ -352,7 +392,8 @@ available after billing. The selected community appears above the page title.
 - **Check metering completeness** before generating invoices — the Metering Data column shows exactly which meters are missing data and how many days are affected.
 - **Approve after review** — open the invoice detail page and check the embedded invoice document (line items and totals) before approving.
 - **Generate PDFs before sending** — while not strictly required, generating the PDF first lets you review the document before emailing.
-- **Use Generate Again sparingly** — regenerating replaces the existing invoice. If the old invoice was already sent, consider whether the participant needs to be notified of the change.
+- **Approve only when final** — once approved, an invoice can no longer be
+  regenerated. Correct data and tariffs while it is still a draft.
 
 ## Next Steps
 
