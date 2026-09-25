@@ -4,8 +4,8 @@ This guide covers creating and configuring a ZEV energy community in OpenZEV.
 
 ## What is a ZEV?
 
-A ZEV (or vZEV) is a virtual energy community:
-- Members (participants) share local energy production
+A ZEV or vZEV is a self-consumption community under Swiss energy law:
+- Members (participants) share locally produced solar energy
 - Energy is allocated fairly using a timestamp-level allocation model
 - Billing is transparent and community-auditable
 
@@ -16,8 +16,8 @@ OpenZEV supports operating one or many ZEVs, each with independent:
 - Invoicing schedules
 
 There are two types:
-- **ZEV** — Zusammenschluss zum Eigenverbrauch (physical self-consumption community)
-- **vZEV** — Virtueller Zusammenschluss zum Eigenverbrauch (virtual self-consumption community)
+- **ZEV** — Zusammenschluss zum Eigenverbrauch: the members sit behind one shared grid connection
+- **vZEV** — virtueller Zusammenschluss zum Eigenverbrauch: the members keep their own grid connections and are combined through the grid operator's meters
 
 ## Creating a ZEV
 
@@ -30,12 +30,12 @@ New ZEV owners can register themselves and create their ZEV without admin involv
 **Step 1: Register on the login page**
 
 1. Go to the login page
-2. In the **Register** panel on the right, click **Register as ZEV Owner**
-3. In the modal, enter:
-   - **Username** — Your login username
-   - **Email** — Your email address (used for verification)
-4. Click **Register**
-5. A verification email is sent to your address
+2. In the **New to OpenZEV?** panel on the right, click **Create account**
+3. In the modal, enter your **Email address** — it is your sign-in name
+4. Click **Send verification email**
+
+The panel is shown only while self-registration is enabled (an admin can turn
+it off under **Platform → System Settings → Functions**).
 
 **Step 2: Verify your email**
 
@@ -47,7 +47,7 @@ New ZEV owners can register themselves and create their ZEV without admin involv
 
 1. Enter a new password (minimum 8 characters)
 2. Confirm the password
-3. Click **Continue**
+3. Click **Set password & continue**
 
 **Step 4: Create your ZEV (Step 2 of 2)**
 
@@ -59,10 +59,10 @@ New ZEV owners can register themselves and create their ZEV without admin involv
    - **Postal Code** — Postal code of the grid connection (optional); suggests
      the grid operator below from ElCom's official register
    - **Grid Operator** — Your VNB name (optional)
-   - **Payment recipient address** — Address printed as the QR-Rechnung creditor
+   - **Payment recipient address** — your address, printed as the QR-Rechnung creditor
    - **Bank Name** — Bank holding the payment account (optional)
    - **Bank IBAN** — Account receiving participant payments (optional; required for QR payment details)
-2. Click **Create ZEV**
+2. Click **Create ZEV & finish**
 3. You are redirected to the dashboard as the owner of your new ZEV
 
 > **Note:** Self-registration creates the account with the `zev_owner` role. Each self-registered owner can create exactly one ZEV via this flow.
@@ -79,36 +79,32 @@ Admins can create a ZEV together with a new responsible-person account in a sing
 **Setup → Settings**, `/zev-settings`). The settings are organized into tabs:
 
 - **General** — name, start date, ZEV type, grid connection
-- **Billing & payment** — billing interval, invoice language, payment terms,
-  invoice prefix, VAT, bank details
-- **Documents & emails** — invoice email template, contract/tariff notes
+- **Billing & payment** — billing interval, invoice language, payment term,
+  invoice presentation, participant QR code, invoice prefix, bank details, VAT
+- **Documents & emails** — invoice email template, notes, contract notes
 - **Audit log** — this ZEV's audit events (see
   [Audit Logs](14-admin-console.md#audit-logs))
 - **Export / transfer** — whole-ZEV export archive (see
-  [ZEV Transfer](../specs/2026-08-zev-transfer-archive.md))
+  [ZEV Export and Import](17-zev-transfer.md))
 
 ![ZEV settings](screenshots/06-zev-settings.png)
 
-### General Settings
+Each tab has its own **Save** button, and saving on any tab saves the whole
+form.
 
-The General and Billing & payment tabs hold the settings form sections:
+### General tab
 
-Text, selection, and date fields share the same compact size. In **Grid Connection**,
-each field's guidance appears directly beneath it. On narrow screens the fields
-stack into one column. Select the start-date field to open its calendar.
-
-#### Basic Information
+#### General ZEV Settings
 
 | Setting | Purpose | Required |
 | --- | --- | --- |
 | **Name** | Community identifier | Yes |
-| **Start Date** | When the ZEV begins operation | Yes |
-| **ZEV Type** | `ZEV` or `vZEV` | Yes |
-| **Billing Interval** | Invoice frequency | Yes |
-| **Invoice Language** | Language for generated PDFs (de/fr/it/en) | Yes |
-| **Itemise price bands on the invoice** | Show each price band of a multi-band tariff as its own line (see below) | No |
+| **Start date** | When the ZEV begins operation | Yes |
+| **ZEV type** | `ZEV` or `vZEV` | Yes |
 
-#### Grid Information
+#### Grid Connection
+
+In **Grid Connection**, each field's guidance appears directly beneath it.
 
 | Setting | Purpose | Required |
 | --- | --- | --- |
@@ -126,19 +122,37 @@ stack into one column. Select the start-date field to open its calendar.
 > ElCom's copy being updated, so an untested suggestion is never saved
 > automatically, and an address you already entered is never overwritten.
 
-#### Billing & Payment
+### Billing & payment tab
 
 ![Billing and payment settings](screenshots/06b-zev-billing-settings.png)
 
+#### Billing & Payment
+
 | Setting | Purpose | Required |
 | --- | --- | --- |
-| **Invoice Prefix** | Prefix for invoice numbers (default: `INV`) | No |
-| **VAT treatment** | How VAT is applied when billing participants (see below) | No |
-| **VAT Number** | Swiss UID — shown only when VAT treatment is *VAT-registered* | If registered |
-| **Bank Name** | Bank holding the payment account (optional) | No |
-| **Bank IBAN** | IBAN for QR-Rechnung | No |
+| **Billing interval** | Invoice frequency (see below) | Yes |
+| **Invoice language** | Language for generated PDFs (de/fr/it/en) | Yes |
+| **Payment term (days)** | Days from the issue date until payment is due (default 30, 1–365) | Yes |
+| **Itemise price bands on the invoice** | Show each price band of a multi-band tariff as its own line (see [below](#price-bands-on-the-invoice)) | No |
+| **Participant QR code on the invoice** | Print a QR code that opens the invoice online (see [below](#participant-access-from-the-invoice)) | No |
 
-#### Notes
+#### Payment Details
+
+| Setting | Purpose | Required |
+| --- | --- | --- |
+| **Invoice prefix** | Prefix for invoice numbers (default: `INV`) | No |
+| **Bank name** | Internal reference for the payment account | No |
+| **Bank IBAN** | Account participants pay into; without it invoices carry no payment details or QR payment slip | No |
+| **VAT treatment** | How VAT is applied when billing participants (see [below](#vat-configuration)) | No |
+| **VAT number** | Swiss UID — shown only when VAT treatment is *VAT-registered* | If registered |
+
+The QR-Rechnung creditor address is the address of the ZEV's responsible
+person, taken from their participant record.
+
+### Documents & emails tab
+
+The invoice email template (see [Email Templates](#email-templates) below)
+and these free-text fields:
 
 | Setting | Purpose |
 | --- | --- |
@@ -184,6 +198,8 @@ Choose how often invoices are generated:
   An admin still has to configure the VAT rate for this to take effect; with no
   active rate, prices are billed unchanged.
 
+If no VAT rate is active for an invoice period, VAT defaults to **0%** in every mode.
+
 ### Price bands on the invoice
 
 A tariff can carry several price bands — peak and off-peak, a weekend rate, a
@@ -219,13 +235,11 @@ This changes invoices **generated from now on**. Invoices you have already
 generated are left exactly as they are; regenerate one (only possible while it
 is still a draft) if you want it in the new shape.
 
-If no VAT rate is active for an invoice period, VAT defaults to **0%** in every mode.
-
 ### Participant Access from the Invoice
 
 Off by default, and **no upgrade turns it on for you**.
 
-Tick **Participant QR code on the invoice** under **Manage (v)ZEV → Settings → General ZEV Settings** and every invoice you generate from then on carries a second QR code on its insights page. Scanning it opens that one invoice — the total, whether it is paid, the line items, the consumption figures and the same three charts the insights page prints — with no account and no password.
+Tick **Participant QR code on the invoice** under **Settings → Billing & payment** and every invoice you generate from then on carries a second QR code on its insights page. Scanning it opens that one invoice — the total, whether it is paid, the line items, the consumption figures and the same three charts the insights page prints — with no account and no password.
 
 The setting changes invoices **generated from now on**. Invoices already generated keep whatever they were printed with.
 
@@ -263,7 +277,7 @@ ZEV access is controlled via **role assignments**:
 | **ZEV Owner** | Full operational management of owned ZEV(s) |
 | **Participant** | Read-only access to own metering data and invoices |
 
-Admins manage user accounts in **Admin → Accounts**.
+Admins manage user accounts in **Platform → Accounts**.
 
 Participants automatically see only their own metering data and invoices (ZEV-scoped access).
 

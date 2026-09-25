@@ -8,7 +8,7 @@ OpenZEV sends emails asynchronously for reliable delivery:
 
 - **Invoice notifications:** When invoices are sent to participants
 - **Delivery tracking:** System logs all sends and failures via `EmailLog`
-- **Retry behavior:** Failed sends are retried automatically (up to 3 times)
+- **Retry behavior:** Failed sends are retried automatically (up to 3 retries)
 - **Customization:** Email subject and body can be tailored per ZEV
 
 ## SMTP Configuration (Environment Variables)
@@ -26,6 +26,7 @@ Email delivery is configured entirely through environment variables in your `.en
 | `EMAIL_HOST_USER` | SMTP authentication username | `your-email@gmail.com` |
 | `EMAIL_HOST_PASSWORD` | SMTP authentication password or app token | `app-specific-password` |
 | `DEFAULT_FROM_EMAIL` | Sender address for all outgoing emails | `openzev@example.com` |
+| `EMAIL_TIMEOUT` | Seconds to wait for the SMTP server (optional) | `20` |
 
 ### Development vs. Production
 
@@ -63,10 +64,10 @@ docker compose restart backend worker
 
 The sections below describe the **invoice** email, which is the one ZEV owners
 customize per ZEV. Three further templates are system-wide and edited by admins
-in **Admin Console → Email Templates**: onboarding, address verification, and
+in **Platform → Templates → Email templates**: onboarding, address verification, and
 the **sign-in link** email sent when a participant requests
 one from the QR code on their invoice. See
-[Admin Console → Email Templates](14-admin-console.md#email-templates) for those,
+[Platform Administration → Email Templates](14-admin-console.md#email-templates) for those,
 including their placeholders.
 
 ### Template Fields
@@ -132,8 +133,8 @@ Behind the scenes:
 
 If email fails:
 - **EmailLog status:** `failed`, error message recorded
-- **Automatic retry:** Celery retries after ~60 seconds, up to 3 attempts total
-- **After 3 failures:** Task stops retrying; use manual retry from the UI
+- **Automatic retry:** retried after ~60 seconds, up to 3 retries (4 attempts in total); each attempt gets its own log entry
+- **After the last failure:** no more automatic retries; use **Retry** in **Billing → Emails**
 
 ## Email Delivery Status
 
@@ -147,23 +148,25 @@ Each invoice tracks email delivery via `EmailLog` entries:
 
 ### Email History
 
-On the invoice list, click the **email status indicator** to open the **Email History** modal. This shows all email attempts for that invoice:
+The invoice list shows only the latest delivery status. Open **Billing →
+Emails** (`/billing/emails`) for every invoice's delivery state, and
+**View history** on a row for all attempts:
 
 - **Recipient** email address
 - **Subject** line
 - **Status** with color indicator (amber/green/red)
 - **Timestamp** of each attempt
 - **Error message** (for failed attempts)
-- **Retry button** — for failed emails, click to queue a new delivery attempt
+- **Retry** — shown when the latest attempt failed; queues a new delivery attempt
 
 ## Handling Email Failures
 
 ### Email Failed or Not Received
 
 **Step 1: Check email history**
-1. Open invoice list
-2. Click the email status indicator for the invoice
-3. Review the error message in the Email History modal
+1. Open **Billing → Emails**
+2. Click **View history** on the invoice's row
+3. Review the error message
 
 **Step 2: Verify recipient email**
 1. Go to [Participants](03-participant-management.md)
@@ -172,15 +175,15 @@ On the invoice list, click the **email status indicator** to open the **Email Hi
 4. Correct if needed
 
 **Step 3: Retry delivery**
-1. Open Email History modal for the invoice
-2. Click **Retry** on the failed email log entry
+1. In **Billing → Emails**, find the invoice
+2. Click **Retry**
 3. A new delivery attempt is queued
 4. Check status after a few seconds
 
 **Step 4: Manual delivery (if retries fail)**
 1. Download the invoice PDF from OpenZEV
 2. Send to participant manually via your own email
-3. Mark the invoice as sent using the **Mark Sent** action
+3. Mark the invoice as sent with **More → Mark as Sent** (only while it is still `Approved`)
 
 ### Common Issues
 
@@ -195,11 +198,9 @@ On the invoice list, click the **email status indicator** to open the **Email Hi
 
 Failed emails are automatically retried by Celery:
 
-- **Max retries:** 3 attempts total
+- **Max retries:** 3 (4 attempts in total)
 - **Retry delay:** ~60 seconds between attempts
-- **After 3 failures:** Task stops; use manual retry from Email History modal
-
-You can also manually retry at any time via the Email History modal without waiting for automatic retries.
+- **After the last failure:** no more automatic retries; use **Retry** in **Billing → Emails**
 
 ## Archiving and Compliance
 
@@ -216,7 +217,7 @@ Email delivery logs are kept for compliance and audit:
 
 **Test with console backend:** During setup, use `EMAIL_BACKEND=django.core.mail.backends.console.EmailBackend` to verify email content in logs before enabling real SMTP delivery.
 
-**Monitor delivery:** Check Email History regularly for persistent failures.
+**Monitor delivery:** Check **Billing → Emails** regularly for persistent failures; failed deliveries also appear on **Overview**.
 
 **Use app-specific passwords:** For Gmail and similar providers, generate an app-specific password instead of using your main account password.
 

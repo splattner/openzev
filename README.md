@@ -182,6 +182,13 @@ Then start without demo data:
 docker compose up -d --build
 ```
 
+The instance starts without any accounts. Create the first admin (you sign in
+with its email address):
+
+```bash
+docker compose exec backend python manage.py createsuperuser
+```
+
 The stack requires `backend/.env` before starting. Only the frontend (`8080`)
 is reachable from the host; the backend is not published and is reachable only
 through the frontend's `/api/` proxy, while PostgreSQL and Redis talk over the
@@ -231,7 +238,7 @@ Services: Frontend <http://localhost:8080> · Backend API <http://localhost:8080
 > For demo data, `scripts/start-demo-environment.sh` reseeds from scratch and no
 > dump is needed.
 
-For a step-by-step walkthrough — roles, exploring each interface, demo accounts, and resetting demo data — see the [Getting Started guide](docs/user-guide/01-getting-started.md).
+For a step-by-step walkthrough — production setup, the first admin account, roles, exploring each interface, demo accounts, and resetting demo data — see the [Getting Started guide](docs/user-guide/01-getting-started.md).
 
 ## Optional: Fullstack Container Mode
 
@@ -245,7 +252,7 @@ docker compose -f docker-compose.fullstack.yml up -d --build
 
 `app` serves the frontend and proxies API requests to Django inside the same container; `worker`, `db`, and `redis` stay separate. Frontend URL: <http://localhost:8080>. Stop with `docker compose -f docker-compose.fullstack.yml down`.
 
-See the [Getting Started guide](docs/user-guide/01-getting-started.md#fullstack-container-mode-single-container) for details.
+See the [Getting Started guide](docs/user-guide/01-getting-started.md#single-container-variant) for details.
 
 ## Helm Installation (Kubernetes)
 

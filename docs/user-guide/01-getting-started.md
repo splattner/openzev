@@ -1,18 +1,35 @@
 # Getting Started with OpenZEV
 
-This guide covers installation, quick setup, and first-time use of OpenZEV.
+This guide covers installing OpenZEV — as a demo, for development, or for
+production with Docker Compose or Kubernetes — creating the first admin
+account, and a first tour of the interface.
+
+## Choose an Installation
+
+| You want to… | Use | Section |
+|---|---|---|
+| Try OpenZEV with sample data | `scripts/start-demo-environment.sh` | [Demo and local development](#demo-and-local-development) |
+| Work on the code | `docker-compose.dev.yml` | [Demo and local development](#demo-and-local-development) |
+| Run it for a real community on one server | `docker-compose.yml` | [Production with Docker Compose](#production-with-docker-compose) |
+| Run it as one application container | `docker-compose.fullstack.yml` | [Single-container variant](#single-container-variant) |
+| Run it on Kubernetes | Helm chart `charts/openzev` | [Production on Kubernetes (Helm)](#production-on-kubernetes-helm) |
+
+A production instance starts empty: no accounts, no communities. After
+installing, [create the first admin account](#creating-the-first-admin-account).
 
 ## Prerequisites
 
-- Docker and Docker Compose installed on your system
-- Basic familiarity with terminal/command line
+- For Docker Compose: Docker with the Compose plugin (or Podman with
+  `podman compose`), and a copy of this repository (`git clone
+  https://github.com/splattner/openzev.git`)
+- For Kubernetes: a cluster, `helm`, `kubectl`, and a PostgreSQL database and
+  Redis instance the cluster can reach
+- For a public instance: a domain name, TLS termination (a reverse proxy or
+  ingress with a certificate), and an SMTP account for outgoing mail
+- Basic familiarity with the terminal
 - A modern web browser
 
-## Quick Start with Docker
-
-OpenZEV is designed to run in Docker for easy setup and deployment.
-
-### Demo and local development
+## Demo and local development
 
 Keep frontend, backend, and worker separated for cleaner scaling and easier operations. To start the stack and seed the full demo dataset in one step:
 
@@ -44,34 +61,85 @@ To stop the dev stack:
 docker compose -f docker-compose.dev.yml down
 ```
 
-### Self-hosting
+Never use either of these for real data: they run with `DEBUG=True`, and the
+demo seed ships well-known passwords.
 
-For a production-like deployment, copy the production template and configure
-it for this host (leave `CORS_ALLOWED_ORIGINS` empty for same-origin
-deployments where nginx proxies `/api/`):
+## Production with Docker Compose
+
+`docker-compose.yml` runs the frontend (nginx), the backend (Django +
+gunicorn), a Celery worker, one Celery Beat scheduler, PostgreSQL and Redis on
+one host. Only the frontend port `8080` is published; nginx proxies `/api/` to
+the backend, and PostgreSQL and Redis are reachable only on the compose
+network. The images are built from your checkout of the repository.
+
+### 1. Get the code
+
+```bash
+git clone https://github.com/splattner/openzev.git
+cd openzev
+git checkout vX.Y.Z   # pick the newest release tag; main may be unstable
+```
+
+### 2. Configure `backend/.env`
 
 ```bash
 cp backend/.env.production.example backend/.env
-docker compose up -d --build
 ```
 
-The stack requires `backend/.env` before starting. Only the frontend (`8080`)
-is reachable from the host; the backend is not published and is reachable only
-through the frontend's `/api/` proxy, while PostgreSQL and Redis talk over the
-compose network only.
+Fill in every value. The examples below assume the instance is reached at
+`https://zev.example.ch`:
 
-Configure the SMTP settings and sender address in `backend/.env` before using
-registration, onboarding, invoice, or security emails; see the [Email
-Configuration guide](10-email-configuration.md).
+| Setting | Example | Notes |
+|---|---|---|
+| `SECRET_KEY` | *(generated, see below)* | The backend refuses to start without it |
+| `ALLOWED_HOSTS` | `zev.example.ch` | Bare hostname(s), comma-separated, no scheme or port |
+| `CSRF_TRUSTED_ORIGINS` | `https://zev.example.ch` | Full public origin — set it even though CORS stays empty |
+| `CORS_ALLOWED_ORIGINS` | *(empty)* | Leave empty: nginx serves the UI and the API from the same origin |
+| `FRONTEND_URL` | `https://zev.example.ch` | Used for links in emails and for redirects |
+| `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_USE_TLS`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`, `DEFAULT_FROM_EMAIL` | your SMTP account | Needed for invitations, password resets and invoice emails — see [Email Configuration](10-email-configuration.md) |
+| `WEBAUTHN_RP_ID` | `zev.example.ch` | Bare domain for passkeys; changing it later invalidates every registered passkey |
+| `WEBAUTHN_ORIGIN` | `https://zev.example.ch` | Full origin for passkeys |
+| `MFA_ENCRYPTION_KEYS` | *(generated, see below)* | Encrypts two-factor secrets; without it nobody can enrol an authenticator app |
+| `BACKUP_ENCRYPTION_KEYS` | *(generated, see below)* | Encrypts backup archives; without it backups are written unencrypted — see [Backups](18-backups.md) |
 
-> **HTTPS is required for public access.** With `DEBUG=False` the auth and
-> CSRF cookies are `Secure`, so browsers only send them over HTTPS — plain
-> HTTP works for local loopback testing, but a public domain needs TLS
-> termination (e.g. a reverse proxy in front of port `8080`). Set
-> `ALLOWED_HOSTS` to the public hostname, `CSRF_TRUSTED_ORIGINS` and
-> `FRONTEND_URL` to the public `https://` origin (even when
-> `CORS_ALLOWED_ORIGINS` stays empty for same-origin deployments), and open
-> the app at that `https://` URL.
+Generate the three keys with Python (any machine with Python 3; the
+`cryptography` package is only needed for the second line):
+
+```bash
+python3 -c "import secrets; print(secrets.token_urlsafe(50))"                               # SECRET_KEY
+python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"  # MFA_ENCRYPTION_KEYS
+python3 -c "import base64, os; print(base64.urlsafe_b64encode(os.urandom(32)).decode())"    # BACKUP_ENCRYPTION_KEYS
+```
+
+Store a copy of all three keys outside the server. Losing
+`MFA_ENCRYPTION_KEYS` makes enrolled authenticator apps unusable, and losing
+`BACKUP_ENCRYPTION_KEYS` makes encrypted backups unreadable.
+
+The backend checks this configuration every time it starts. If a required
+value is missing or still points at a development host, the database
+migration step stops with an error such as `accounts.E003` (hosts),
+`accounts.E005` (trusted origins) or `accounts.E006` (email backend), and the
+backend container exits — read it with `docker compose logs backend`.
+
+### 3. Start the stack
+
+```bash
+docker compose up -d --build
+docker compose ps
+```
+
+The backend applies database migrations on every start. The `beat` container
+may exit once on the very first start, before those migrations have created
+its tables; it restarts on its own.
+
+### 4. Put HTTPS in front of it
+
+With `DEBUG=False` the login and CSRF cookies are marked `Secure`, so browsers
+only send them over HTTPS. Plain `http://localhost:8080` works for a quick
+check on the server itself, but a public instance needs TLS termination in
+front of port `8080` — for example Caddy, Traefik, or an nginx with a Let's
+Encrypt certificate — forwarding `https://zev.example.ch` to
+`http://127.0.0.1:8080`. Open the app at that `https://` URL.
 
 The shipped nginx sanitizes `X-Forwarded-For` and the production stack keeps
 `NUM_PROXIES=1`. If another proxy sits in front of it, audit and rate-limit
@@ -82,20 +150,116 @@ configured to preserve client addresses.
 > **`/media/` is never web-served in production** — invoice files are served
 > only through authenticated API endpoints.
 
-### Fullstack Container Mode (Single Container)
+### 5. Create the first admin account
 
-If you prefer running frontend and backend in a single container, copy and
-fill the production checklist as above, then run:
+See [Creating the first admin account](#creating-the-first-admin-account) below.
+
+### 6. Back up and update
+
+- Set up backups of the database **and** the `backend_media` volume (invoice
+  PDFs) before billing real participants — see [Backups](18-backups.md).
+- To update, check out the new release tag and rebuild; migrations run
+  automatically when the backend starts:
+
+  ```bash
+  git fetch --tags
+  git checkout vX.Y.Z
+  docker compose up -d --build
+  ```
+
+### Single-container variant
+
+`docker-compose.fullstack.yml` runs the frontend and backend in one `app`
+container (nginx and gunicorn together); the worker, Beat scheduler,
+PostgreSQL and Redis stay separate services. Configuration and HTTPS work
+exactly as above:
 
 ```bash
-cp backend/.env.production.example backend/.env
+cp backend/.env.production.example backend/.env   # then fill it in as in step 2
 docker compose -f docker-compose.fullstack.yml up -d --build
-docker compose -f docker-compose.fullstack.yml down
 ```
 
-In fullstack mode:
-- Frontend URL: http://localhost:8080
-- Worker, database, and Redis run as separate services
+The frontend is on http://localhost:8080. Stop it with
+`docker compose -f docker-compose.fullstack.yml down`. Pass
+`-f docker-compose.fullstack.yml` to every `docker compose` command for this
+stack, and use the service name `app` where the default stack uses `backend`.
+
+## Production on Kubernetes (Helm)
+
+The Helm chart deploys the frontend, backend, a Celery worker, one Celery Beat
+scheduler, an Ingress and a volume for invoice files. It does **not** deploy
+PostgreSQL or Redis — provide both yourself (a managed service or a separate
+chart).
+
+1. Create secrets for the database URL, Django `SECRET_KEY`, the SMTP password
+   and the encryption keys (generate the keys as shown in
+   [step 2](#2-configure-backendenv) above).
+2. Write a `values-prod.yaml` with your domain, trusted origins, passkey
+   domain, database and Redis endpoints, SMTP settings and ingress. The
+   [chart README](../../charts/openzev/README.md#example-values) has a
+   complete example — start from it.
+3. Install:
+
+   ```bash
+   helm repo add openzev https://splattner.github.io/openzev
+   helm repo update
+   helm upgrade --install openzev openzev/openzev -n openzev --create-namespace -f values-prod.yaml
+   ```
+
+4. [Create the first admin account](#creating-the-first-admin-account).
+
+The ingress needs TLS for the same reason as above (`Secure` cookies), and the
+backend runs the same configuration check on start. For every chart value,
+including TLS, existing secrets and `NUM_PROXIES` behind an ingress, see the
+[chart README](../../charts/openzev/README.md).
+
+## Creating the First Admin Account
+
+A fresh production instance has no accounts, and the login page has no way to
+create an admin. Create the first one from the command line with Django's
+`createsuperuser` command, run inside the backend container. It asks for a
+username, an email address and a password:
+
+```bash
+# Docker Compose (docker-compose.yml)
+docker compose exec backend python manage.py createsuperuser
+
+# Single container (docker-compose.fullstack.yml)
+docker compose -f docker-compose.fullstack.yml exec app python manage.py createsuperuser
+
+# Kubernetes (release "openzev" in namespace "openzev")
+kubectl -n openzev exec -it deploy/openzev-backend -- python manage.py createsuperuser
+```
+
+The account gets the **admin** role. You sign in with the **email address**,
+not the username. The password must pass the usual strength checks (at least
+8 characters, not entirely numeric, not a common password).
+
+To create the account from a script instead of interactively, pass the
+password through the environment:
+
+```bash
+docker compose exec -e DJANGO_SUPERUSER_PASSWORD='choose-a-strong-password' backend \
+  python manage.py createsuperuser --noinput --username admin --email admin@example.ch
+```
+
+Then:
+
+1. Open the instance in the browser and sign in with that email address and
+   password.
+2. Under **Account → Security**, turn on two-factor authentication or add a
+   passkey for the admin account.
+3. Create the other people's accounts in **Platform → Accounts → Users**, or
+   create a community and its owner with the wizard in **Platform → ZEVs** —
+   see [Platform Administration](14-admin-console.md).
+4. Decide whether strangers may sign up. **ZEV owner self-registration is on by
+   default**: anyone who can reach the login page can register an owner
+   account and create a community. On a public instance you run only for your
+   own community, turn it off under **Platform → System Settings → Functions**,
+   or set `FEATURE_ZEV_SELF_REGISTRATION_ENABLED=false` in `backend/.env`.
+
+Use `createsuperuser` again whenever you need another admin and cannot sign in
+— for example, if the only admin account was locked out.
 
 ## Demo Accounts
 
@@ -120,11 +284,20 @@ both communities. Issued contract snapshots are retained.
 
 ## First-Time Setup
 
+This tour uses the demo accounts. On a production instance, sign in with the
+admin account you [created above](#creating-the-first-admin-account); the
+pages look the same, just without data.
+
 ### 1. Login
 
-1. Navigate to http://localhost:8080
+1. Navigate to http://localhost:8080 (or your instance's `https://` URL)
 2. Login with admin credentials (or ZEV owner to manage a community)
 3. Managers land on **Overview**; participants land on their personal dashboard
+
+The interface follows your browser's language (German, French, Italian or
+English). To change it, open the account menu at the top right
+and pick a **Language**; the choice is remembered in this browser. Invoice and
+contract PDFs use the community's own **Invoice language** instead.
 
 ![Login page](screenshots/01-login.png)
 

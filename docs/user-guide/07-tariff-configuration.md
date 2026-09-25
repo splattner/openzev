@@ -6,14 +6,16 @@ This guide covers setting up tariffs and pricing in OpenZEV.
 
 A **tariff** is a pricing rule that defines how to charge participants for energy.
 
-OpenZEV supports several tariff types:
-- **Energy tariffs** — Per-kWh fees for consumption or production
-- **Fixed fees** — Monthly, quarterly, or yearly community costs
-
-Tariffs are **activity-based**:
-- **Local energy tariff** — Energy supplied within the community
-- **Grid energy tariff** — Energy imported from external grid
-- **Feed-in tariff** — Credits for participant production fed back
+Each tariff has:
+- a **Category** — `Energy`, `Grid Fees`, `Levies` or `Metering Tariff`
+  (groups the lines on the invoice)
+- a **Billing mode** — per kWh (*By energy*), a *Percentage of energy
+  tariffs*, or a fixed fee (monthly, yearly, per metering point, or shared
+  across the community)
+- for per-kWh tariffs, an **Energy type** — which energy it prices:
+  - **Local** — energy supplied within the community (solar)
+  - **Grid** — energy imported from the external grid
+  - **Feed-in** — credit for production fed back
 
 ![Tariffs page](screenshots/07-tariffs.png)
 
@@ -23,9 +25,10 @@ Tariffs are **activity-based**:
 
 1. Click **New Tariff**
 2. Enter details:
-   - **Name** — Tariff identifier (e.g., "Summer Local 2026-Q2")
-   - **Type** — `Local Energy`, `Grid Energy`, `Feed-in`, or `Fixed Fee`
-   - **Description** (optional)
+   - **Name** — Tariff identifier, printed on invoice lines (e.g., "Local solar")
+   - **Category**, **Billing mode** and — for per-kWh tariffs — **Energy type**
+     (see above)
+   - **Notes** (optional)
 
 3. Set **Validity Period**:
    - **Valid From** — Start date
@@ -35,9 +38,15 @@ Tariffs are **activity-based**:
    > version** rather than editing or creating a second tariff — see
    > [Tariff Versions](#tariff-versions).
 
-4. Configure pricing (depends on type; see below)
+4. Configure pricing: the fixed amount for a fee, the percentage for a
+   percentage tariff, or — for a per-kWh tariff — a
+   [dynamic price source](#dynamic-tariffs) if it has one
 
-5. Click **Create**
+5. Click **Save Tariff**
+
+6. For a per-kWh tariff with fixed prices, add its prices as
+   [Tariff Periods](#tariff-periods) — a tariff without a period prices
+   nothing
 
 ## Importing Tariffs from Your Grid Operator
 
@@ -225,7 +234,7 @@ minimum.
 
 ### Operating a price source (administrators)
 
-Sources live under **Admin → Dynamic prices** and are shared across
+Sources live under **Platform → Overview → Dynamic prices** and are shared across
 communities: two ZEVs on the same operator product fetch once, together.
 
 - **Status** is `Healthy`, `Failed` (with the user-safe error), `Not
@@ -393,7 +402,7 @@ This is useful when you want to set local energy prices as a fraction of the gri
 
 ### Fixed Fee Tariff
 
-Flat monthly, quarterly, or annual charges (not energy-dependent).
+Flat monthly or yearly charges (not energy-dependent).
 
 **Charge types:**
 - **Monthly fee** — CHF X per month, charged to *each* participant
@@ -471,21 +480,27 @@ across the participants. It appears on invoices as a credit line.
 
 ## Tariff Periods
 
-**Tariff periods** subdivide a tariff by time-of-day (for HT/NT pricing).
+**Tariff periods** hold a per-kWh tariff's prices. There are no default
+periods: a new per-kWh tariff has none until you add one. Each period has a
+type:
 
-Default periods:
-- **HT (High Tariff):** 06:00–22:00 (daytime peak)
-- **NT (Night Tariff):** 22:00–06:00 (night/off-peak)
+| Period type | Use for |
+| --- | --- |
+| **Flat** | One price around the clock |
+| **High (HT)** / **Low (NT)** | The usual two-rate tariff, e.g. HT 06:00–22:00 and NT for the rest |
+| **Time band** | Any further price — a weekend rate, a winter price — named with its own **Band name** |
 
-Create custom periods if your ZEV has different peak hours:
+To add one:
 
 1. Open the tariff's detail panel (**View details**)
 2. Click **Add Period** in the Tariff Periods section
 3. Enter:
-   - **Name** — Period identifier (e.g., "Winter Peak")
-   - **Start Time** — HH:MM (24-hour format)
-   - **End Time** — HH:MM
-   - **Price— CHF/kWh
+   - **Period type** (see above) and, for a time band, a **Band name**
+   - **Time from** / **Time to** — HH:MM (24-hour format)
+   - **Weekdays** and **Months** the period applies to (all selected means
+     every day / all year)
+   - **CHF/kWh**
+4. Click **Save Tariff Period**
 
 > **Crossing midnight:** If end time < start time, period wraps (e.g., 22:00–06:00).
 

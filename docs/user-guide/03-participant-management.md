@@ -16,13 +16,14 @@ A **participant** is a member of a ZEV community:
 
 **ZEV Owners** add new participants in **Participants**.
 
-1. Click **Add Participant**
+1. Click **New Participant**
 2. Enter participant details:
-   - **First Name** and **Last Name** (required)
-   - **Email Address** (used for login and invoice notifications)
-   - **Company/Organization** (optional, for business participants)
+   - **Title**, **First Name** and **Last Name** (first and last name required)
+   - **Email** (where onboarding links and invoice emails go)
    - **Phone** (optional)
-   - **Address** (optional, for invoice delivery)
+   - **Address** — address lines, postal code and city (needed on the invoice
+     and for the [map](#map))
+   - **Notes** (optional, internal)
 
 3. Set **Validity Period**:
    - **Valid From:** Participant entry date (defaults to today)
@@ -33,14 +34,17 @@ A **participant** is a member of a ZEV community:
 4. Set **Allocation Weight** (optional — leave empty for the default `1`).
    See [Allocation Weight](#allocation-weight) below.
 
-5. Click **Create**
+5. Click **Save Participant**
 
-The participant is created and added to a participant list.
+The participant is added to the list. A card flagged **Needs attention** is
+missing an email address, a postal address or a metering point; the
+**Readiness** filter narrows the list to those cards.
 
 ## Participant Account Access
 
 Participants can:
-- Login with their email and a password (initially set during account creation or password reset)
+- Sign in through their onboarding link, and afterwards with their email and
+  a password they choose themselves
 - View their own consumption and production data
 - Download invoices
 - Update their account profile
@@ -55,7 +59,7 @@ yet*, plus an onboarding status badge (*Not invited*, *Invited*, *Active*,
 *Revoked*, *Expired*). While a link is live — or after it has expired — the
 card also shows its expiry date beside the badge, so you can see when a dead
 link died without resending it. Open **More** on a card to send or copy the participant's onboarding link
-(which creates the account). The link stays usable for 30 days and can be
+(which creates the account), or to revoke it. The link stays usable for 30 days and can be
 reused within that time — copying or resending it hands out the same link,
 unless it has expired, in which case a fresh one is issued automatically. Once
 the participant sets their own password, the link is revoked. Administrators can also **Link existing** — attach
@@ -63,13 +67,31 @@ a guest or participant account that is not yet linked to anyone — or **Unlink*
 the current one. Platform → Accounts lists every account and which communities
 it belongs to; see [Roles and Permissions](11-roles-and-permissions.md).
 
+### A Participant Forgot Their Password
+
+There is no "forgot password" link on the login page. Send or copy the
+participant's onboarding link again from **More** on their card: it signs
+them in, and they then choose a new password. If their invoices carry the
+[participant QR code](02-zev-setup.md#participant-access-from-the-invoice),
+they can also request a sign-in link themselves from the page it opens.
+
+## Participation Contract
+
+**Contract PDF** on a participant's card downloads their participation
+contract, filled from the ZEV settings (including the contract notes on the
+**Documents & emails** tab), the participant's details and the tariffs.
+
+Every contract is kept exactly as issued, with a document number. Downloading
+again returns the same version while nothing has changed; once the
+participant's details, the tariffs or the settings change, the next download
+issues a new numbered version, and the earlier ones stay on record.
+
 ## Editing Participant Details
 
 1. Go to **Participants**
-2. Select a participant from the list
-3. Click **Edit**
-4. Update fields as needed
-5. Click **Save**
+2. Click **Edit** on the participant's card
+3. Update fields as needed
+4. Click **Save Participant**
 
 ### Updating Validity Periods
 
@@ -137,23 +159,20 @@ laundry by floor area.
 > **draft** invoice for an earlier period, it is recalculated with the *new*
 > weight. Agree weights before a billing run rather than during one.
 
-## Viewing Participant Metering Points
+## Participant Metering Points
 
-From the participant detail page, you can see all assigned metering points:
-- **Consumption meters** (type `IN`)
-- **Production meters** (type `OUT`)
-- **Bidirectional meters** (both `IN` and `OUT`)
-
-Each meter shows:
-- **Meter ID** — Equipment identifier
-- **Type** — `consumption`, `production`, or `bidirectional`
-- **Valid From/To** — Meter assignment period
-
-> **See also:** [Metering Points](04-metering-points.md) for setup details.
+Metering points are assigned to participants on the **Metering Points** page,
+each assignment with its own validity period. A participant without any
+metering point is flagged **Needs attention**. See
+[Metering Points](04-metering-points.md).
 
 ## Map
 
-The Participants page shows a small map with each participant's building outlined on OpenStreetMap. It's built from the address fields (street, postal code, city), assuming a Swiss address, and updates automatically whenever a participant's address is added or changed.
+The map is **off by default**, because locating buildings sends participant
+addresses to the public OpenStreetMap Nominatim service. An admin turns it on
+under **Platform → System Settings → Functions** (`participant_geocoding_enabled`).
+
+When it is on, the Participants page shows a small map with each participant's building outlined on OpenStreetMap. It's built from the address fields (street, postal code, city), assuming a Swiss address, and updates automatically whenever a participant's address is added or changed.
 
 - Participants at the same building share a single outline; its popup lists everyone there.
 - An address that can't be located (typo, incomplete, or simply not entered yet) is just left off the map — a note below it says how many participants aren't shown. There's no manual pin-placement in this iteration.
@@ -161,34 +180,36 @@ The Participants page shows a small map with each participant's building outline
 
 ## Removing a Participant
 
-Participants are **never deleted**—instead, mark them inactive:
+When someone leaves the community, **end their membership instead of deleting
+them**:
 
 1. Go to **Participants**
-2. Select the participant
-3. Click **Edit**
-4. Set **Valid To** to the participant's last active date
-5. Click **Save**
+2. Click **Edit** on the participant's card
+3. Set **Valid To** to the participant's last active date
+4. Click **Save Participant**
 
-Past invoices and data remain intact for audit trail. Future invoicing skips inactive participants.
+Past invoices and data remain intact. Invoice periods after **Valid To** skip
+the participant.
+
+> **Warning:** **Delete** (under **More**) removes the participant *and every
+> invoice issued to them*, including sent and paid ones. Use it only for a
+> participant created by mistake.
 
 ## Participant Communication
 
-### Initial Setup Email
+### Onboarding Email
 
-When adding a participant, they can be sent an invitation email with:
-- Account activation link
-- Password setup instructions
-- Link to their participant portal
+**Send onboarding link** (under **More** on the card) emails the participant
+their onboarding link. Nothing is sent automatically when you add a
+participant. The email text is an admin-managed template — see
+[Email Configuration](10-email-configuration.md).
 
-Enable in **ZEV Settings** if needed.
+### Invoice Emails
 
-### Invoice Notifications
-
-Participants receive invoice notifications when:
-- Invoice is sent (status = **Sent**)
-- Invoice is paid (status = **Paid**)
-
-Email frequency depends on your ZEV's [billing interval](02-zev-setup.md#billing-interval).
+A participant receives an email with the invoice PDF when you send the
+invoice (status **Sent**). No email is sent when an invoice is marked paid.
+How often invoices go out depends on your ZEV's
+[billing interval](02-zev-setup.md#billing-interval).
 
 ## Participant Data Retention
 
@@ -202,19 +223,15 @@ Participant records are kept permanently for:
 ## Troubleshooting
 
 **Participant cannot login**
-- Check that participant email is correct
-- Reset password via login page "Forgot Password"
-- Verify participant is marked as active (**Valid To** is not in the past)
+- Check that the participant's email is correct — it is their sign-in name
+- Check the onboarding badge on their card: *Expired* or *Revoked* links no
+  longer work; send a new one
+- For a forgotten password, see [above](#a-participant-forgot-their-password)
 
 **Participant invoices are wrong**
 - Check participant validity period (**Valid From/To**)
 - Verify metering points are correctly assigned
 - See [Metering Analysis](06-metering-analysis.md) to check data quality
-
-**Bulk import failed**
-- Check CSV column names and data types
-- Ensure emails are unique and valid
-- Review error messages for specific rows
 
 ## Next Steps
 

@@ -7,7 +7,7 @@ This guide covers metering point types, configuration, and maintenance in OpenZE
 A **metering point** is a physical or logical energy meter:
 - Assigned to a participant over a validity window rather than owned outright — see [Assignment Validity Periods](#assignment-validity-periods) below
 - Measures energy consumption or production
-- Records readings at regular intervals (typically hourly)
+- Records readings at regular intervals (typically every 15 minutes)
 - Forms the basis for invoice calculations
 
 A single participant can be assigned multiple metering points (e.g., PV on roof + home consumption).
@@ -18,11 +18,11 @@ A single participant can be assigned multiple metering points (e.g., PV on roof 
 
 OpenZEV supports three metering point types:
 
-| Type | Purpose | Icon | Usage |
-| --- | --- | --- | --- |
-| **Consumption** (`IN`) | Measures energy drawn from grid/community | 📥 | Household loads, offices |
-| **Production** (`OUT`) | Measures energy fed back to grid/community | 📤 | Solar panels, wind turbines |
-| **Bidirectional** | Combined meter (both consumption and production) | 🔄 | Modern smart meters |
+| Type | Purpose | Usage |
+| --- | --- | --- |
+| **Consumption** | Measures energy drawn from grid/community | Household loads, offices |
+| **Production** | Measures energy fed into grid/community | Solar panels |
+| **Bidirectional** | Combined meter (both consumption and production) | A household with its own PV on one meter |
 
 ## Creating a Metering Point
 
@@ -172,28 +172,29 @@ Click **Chart** on a card for the metering point's full reading history.
 
 To stop billing a meter:
 
-1. Open the meter's **⋯ More** menu and click **Edit**
-2. Set **Active** to off
-3. Click **Save Changes**
+1. Click **Edit** on its current assignment row
+2. Set **Valid To** to the last day it should be billed
+3. Click **Save Assignment**
 
-Deactivating a meter removes it from data-health and "needs attention"
-monitoring; on its own it does not stop billing — end its assignment for
-that (see the tip above). Historical data remains available either way.
+Then, if the meter is physically gone, open its **⋯ More** menu, click
+**Edit**, set **Active** to off and click **Save Changes**. Deactivating
+removes it from data-health and "needs attention" monitoring and stops
+per-metering-point fees; on its own it does not stop energy billing.
+Historical data remains available either way.
 
 ## Metering Point and Billing
 
 During invoice generation:
 
-1. System identifies all active metering points for each participant
-2. Resolves active participant assignments by date
-3. Loads readings from each point during invoice period
-4. Allocates energy between local and grid (see [Billing Allocation](08-billing-allocation-explained.md))
-5. Generates line items per metering point type
+1. Resolves each participant's metering point assignments by date
+2. Loads readings from each point during the invoice period
+3. Allocates energy between local and grid (see [Billing Allocation](08-billing-allocation-explained.md))
+4. Generates line items per metering point type
 
-If a metering point has **no readings** in an invoice period:
-- That participant may be marked as having incomplete data
-- Invoice can still be generated using last-known readings (with warnings)
-- See [Data Quality](06-metering-analysis.md) for details
+If a metering point is **missing readings** in an invoice period, nothing is
+estimated: the missing intervals simply count as no energy. The period's
+readiness check on **Overview** flags the gap before you generate, so import
+the missing data first — see [Data Quality](06-metering-analysis.md).
 
 ## Next Steps
 

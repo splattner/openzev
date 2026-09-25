@@ -30,9 +30,9 @@ OpenZEV supports four distinct roles:
 - **Accounts:** user management and platform-wide API keys
 - **Templates:** PDF invoice/contract/statement templates and system-wide email defaults
 
-### Admin Dashboard
+### Platform Overview
 
-Accessible via **Admin Dashboard**:
+Accessible via **Platform → Overview**:
 
 - System health and status
 - Account count and active users
@@ -100,7 +100,7 @@ The participant sidebar shows **Dashboard**, **My invoices**, and **Annual state
 
 - **Dashboard:** View own energy consumption/production overview
 - **My invoices:** View and download own invoices (read-only; shows invoices even before a PDF exists)
-- **Annual statement:** View the community's annual statement
+- **Annual statement:** View their own annual statement and tax overview
 - **Metering Data:** Direct route to own consumption charts and trends
 - **Account Profile:** Update personal information
 
@@ -348,7 +348,7 @@ is unaffected unless the administrator requires the provider to assert a second 
 
 ### Requiring it for a role (administrators)
 
-Under **Platform administration → System Settings → Security**, choose which roles must use
+Under **Platform → System Settings → Security**, choose which roles must use
 two-factor authentication and set a grace period in days. Users of those roles see a reminder on their
 account page and a set-up screen they can postpone until the grace period ends. The period counts from
 the later of the account's creation and the day you last changed the policy, so switching it on never
@@ -369,7 +369,7 @@ therefore not forced to enrol by this alone.
 ### Locked out?
 
 On the second step of a password sign-in, enter one of your recovery codes. If you have lost your devices and your recovery codes, ask an
-administrator: **Admin → Accounts → Reset two-factor** removes every passkey, the authenticator app
+administrator: **Platform → Accounts → Users → More → Reset two-factor** removes every passkey, the authenticator app
 and all recovery codes for that user, and is recorded in the audit log. An administrator can never see
 or recover your secrets, and cannot set up a factor on your behalf.
 
@@ -437,33 +437,41 @@ If operating multiple communities:
 
 ### "Cannot access [feature]" (permission error)
 
-**Check your role:**
-1. Click profile icon (top right)
-2. View **My Account**
-3. Check **Role** and **ZEV Assignments**
-
-If role is wrong, ask an admin to update.
+Ask an admin to check your account's **Platform role** and communities under
+**Platform → Accounts → Users**. If the role is wrong, they can change it there.
 
 ### "Cannot see other ZEVs"
 
-**Expected behavior:** ZEV Owners are scoped to assigned ZEVs.
+**Expected behavior:** ZEV Owners are scoped to the ZEVs they own.
 
-**If you need access:**
-- Ask an admin to add you to the ZEV via **Admin → Accounts**
+**If you need access:** ask an admin to make you the owner of that ZEV
+(**Platform → Overview → ZEVs**).
 
 ### "User cannot login"
 
 **Possible causes:**
-- User account not yet activated (check email for invitation)
+- The onboarding link was never used, has expired, or was revoked
 - User account deactivated
-- Password not set or forgotten
+- Password forgotten — there is no self-service password reset
 
 **Fix:**
-1. Check if user received invitation email
-2. Can send password reset link from **Admin → Accounts**
+1. Check the account under **Platform → Accounts → Users**: is it active, and
+   has it ever signed in?
+2. **Participant:** the community owner sends or copies the onboarding link
+   again from the participant's card (**More**). It signs them in, and they
+   choose a new password.
+3. **Owner or admin who forgot their password:** someone with server access
+   sets a new one on the command line (the user then signs in with it):
+
+   ```bash
+   docker compose exec backend python manage.py changepassword <username>
+   ```
+
+   The username is shown in the **Account** column of the accounts list.
+4. **Locked out by two-factor:** see [Locked out?](#locked-out)
 
 ## Next Steps
 
-- **User management:** Admin controls at **Admin → Accounts**
+- **User management:** Admin controls at **Platform → Accounts**
 - **ZEV settings:** [ZEV Setup and Configuration](02-zev-setup.md)
 - **Participant management:** [Managing Participants](03-participant-management.md)

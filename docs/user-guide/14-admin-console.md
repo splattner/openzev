@@ -10,7 +10,7 @@ The Platform group has four entries (hubs with tabs-as-routes):
 - **Overview** (`/admin`) — KPIs · ZEVs · All invoices · Dynamic price sources · Platform audit log · System health
 - **Accounts** (`/admin/accounts`) — Users · API keys
 - **Templates** (`/admin/templates`) — PDF templates · Email templates
-- **System Settings** (`/admin/system-settings`) — Regional · Features · OAuth · Security · VAT · Backup
+- **System Settings** (`/admin/system-settings`) — Regional Settings · Functions · OAuth · Security · VAT · Backup
 
 Legacy routes (`/admin/zevs`, `/admin/invoices`, `/admin/audit-logs`,
 `/admin/api-keys`, `/admin/pdf-templates`, `/admin/email-templates`) redirect
@@ -33,21 +33,25 @@ Admins can view and manage all ZEVs in the system.
 
 Admins can create a ZEV together with a new responsible-person account in one wizard:
 
-1. Click **Create New ZEV**
-2. Fill in ZEV details (name, start date, type, billing interval, etc.).
-3. Fill in the responsible person details (name, address, email).
+1. Click **New ZEV**
+2. **Step 1** — fill in ZEV details (name, start date, type, billing interval, etc.).
+3. **Step 2** — fill in the responsible person details (name, address, email).
    The payment section belongs with this person because the participant record
    supplies the creditor name and address on QR-Rechnungen. Enter the optional
    **Bank Name** and **Bank IBAN** for the account receiving participant payments.
    Skipping the IBAN leaves the **Missing or invalid IBAN** list
    badge and the Overview QR warning until the fields are filled under
    ZEV Settings → Billing & payment
-4. Optionally add initial metering points for the responsible person
-5. Click **Create**
+4. **Step 3** — optionally add initial metering points for the responsible person
+5. **Step 4** — review, then click **Create ZEV**
 
-The system creates the ZEV, the responsible-person account (with a temporary password), its participant record, and the listed metering points.
+The system creates the ZEV, the responsible-person account with the **ZEV
+Owner** role and a temporary password, its participant record, and the listed
+metering points. The temporary password is shown once at the end — pass it on
+to the responsible person, who sets their own password at first sign-in.
 
-Admins can also create a bare ZEV (without the wizard) via the standard CRUD interface, assigning an existing user as owner.
+Admins can also create a bare ZEV (without the wizard) through the API,
+assigning an existing user as owner.
 
 ![Admin ZEV management](screenshots/15-admin-zevs.png)
 
@@ -121,9 +125,9 @@ Configure regional display settings in **Platform → System Settings → Region
 
 > **Note:** The legacy route `/admin/settings/regional` redirects here.
 
-### Features
+### Functions
 
-Feature flags are managed in **Platform → System Settings → Features**.
+Feature flags are managed in **Platform → System Settings → Functions**.
 See [Feature Flags](#feature-flags) below.
 
 ### OAuth
@@ -144,9 +148,15 @@ Configure external OAuth login providers in **Platform → System Settings → O
 > **Note:** The legacy routes `/admin/features`, `/admin/oauth`, and `/admin/settings/vat` redirect to
 > the matching tab on the System Settings page.
 
+### Security
+
+Choose which roles must use two-factor authentication, and the grace period
+they get, in **Platform → System Settings → Security**. See
+[Roles and Permissions → Requiring it for a role](11-roles-and-permissions.md#requiring-it-for-a-role-administrators).
+
 ### VAT
 
-Configure VAT rates in **Platform → System Settings → VAT** — the fourth tab. See [VAT Settings](#vat-settings) for validity-window behavior and the workflow.
+Configure VAT rates in **Platform → System Settings → VAT**. See [VAT Settings](#vat-settings) for validity-window behavior and the workflow.
 
 ## Audit Logs
 
@@ -155,17 +165,14 @@ billing-relevant, and destructive actions.
 
 - **Platform → Overview → Audit log** (`/admin/audit`) — admins can view **all**
   events across the platform.
-- **Setup → ZEV settings → Audit log** (`/zev-settings/audit`) — admins **and
-  ZEV owners** can view events scoped to their communities. Owners only see
-  events for ZEVs they manage; they cannot see global or other-ZEV events.
-  (The legacy route `/audit-logs` redirects here.)
+- **Setup → Settings → Audit log** (`/zev-settings/audit`) — admins **and
+  ZEV owners** see the events of the currently selected community. Owners only
+  see events for ZEVs they manage; they cannot see global or other-ZEV events.
+  There is no community selector here (it follows the sidebar switcher) and no
+  text search; the filters are date range, actor, category, action type, and
+  status. (The legacy route `/audit-logs` redirects here.)
 
-- **Setup → Settings → Audit log** (`/zev-settings/audit`) — ZEV owners see events scoped to
-  their communities and **follow the global community selection**: there is
-  no community selector here, and no text search. Available filters are
-  date range, actor, category, action type, and status.
-
-**Platform → Overview → Audit Logs** supports the full filter set: date range,
+**Platform → Overview → Audit log** supports the full filter set: date range,
 community (ZEV) selector, actor, category, action type, status, and text
 search. Text search is available only to admin users. Events are
 read-only — there is no public write endpoint.
@@ -213,7 +220,7 @@ API keys.
 
 ## VAT Settings
 
-Admins configure VAT rates in **Platform → System Settings → VAT** (fourth tab).
+Admins configure VAT rates in **Platform → System Settings → VAT**.
 
 ![VAT settings](screenshots/13-admin-vat-settings.png)
 
@@ -226,11 +233,13 @@ VAT rates are validity-window based — you can set rates for specific time peri
 
 ### How VAT Works
 
-1. A ZEV owner enters their **VAT Number** (Swiss UID format) in [ZEV Settings](02-zev-setup.md#vat-configuration)
+1. A ZEV owner chooses the ZEV's **VAT treatment** in [ZEV Settings](02-zev-setup.md#vat-configuration)
+   (*VAT-registered* also needs the **VAT Number**)
 2. An admin configures the applicable VAT rate(s) in **Platform → System Settings → VAT**
-3. When invoices are generated, the system looks up the active rate for the invoice period
+3. When invoices are generated, the system looks up the rate active on the invoice period's end date
 
-If no VAT number is set on the ZEV, or no VAT rate is active for an invoice period, VAT defaults to **0%**.
+A ZEV that is *Not VAT-registered* is billed without VAT. If no VAT rate is
+active for an invoice period, VAT defaults to **0%** in every mode.
 
 ## Invoice PDF Templates
 
@@ -258,7 +267,7 @@ OpenZEV uses four email templates:
 | Template | Purpose |
 | --- | --- |
 | **Invoice Email** | Sent to participants when invoices are delivered |
-| **Onboarding Email** | Sent when a participant is added to a ZEV, with a reusable onboarding link |
+| **Onboarding Email** | Sent when an owner chooses **Send onboarding link** on a participant, with a reusable onboarding link |
 | **Verification Email** | Sent for email address verification |
 | **Sign-in Link Email** | Sent when a participant asks for a sign-in link from the QR code on their invoice (see [Participant Access from the Invoice](02-zev-setup.md#participant-access-from-the-invoice)) |
 
@@ -372,7 +381,7 @@ Feature flags can be controlled by:
 
 1. Code defaults (defined in backend code)
 2. Environment variable overrides
-3. Platform toggles (System Settings → Features)
+3. Platform toggles (System Settings → Functions)
 
 The backend and frontend both read the same feature flag state.
 
@@ -380,14 +389,16 @@ The backend and frontend both read the same feature flag state.
 
 | Flag name | Default | Purpose |
 | --- | --- | --- |
-| `zev_self_registration_enabled` | `true` | Allows self-registration from the login page |
+| `zev_self_registration_enabled` | `true` | Allows ZEV owner self-registration from the login page |
+| `feasibility_calculator_enabled` | `false` | Shows the [feasibility calculator](13-feasibility-calculator.md) to admins and ZEV owners |
+| `participant_geocoding_enabled` | `false` | Looks up participant buildings on OpenStreetMap for the [participant map](03-participant-management.md#map); sends addresses to the public Nominatim service |
 
 ### How State Is Resolved
 
 For each flag, OpenZEV resolves the final state in this order:
 
 1. Environment variable `FEATURE_<FLAG_NAME_IN_UPPERCASE>`
-2. Value stored in database (set via Platform → System Settings → Features)
+2. Value stored in database (set via Platform → System Settings → Functions)
 3. Code default
 4. `false` fallback
 
@@ -399,7 +410,7 @@ FEATURE_ZEV_SELF_REGISTRATION_ENABLED=true
 
 ### Managing flags via the UI
 
-Manage flags in **Platform → System Settings → Features**.
+Manage flags in **Platform → System Settings → Functions**.
 
 Each flag has:
 
