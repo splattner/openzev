@@ -1,0 +1,2533 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="User guide for OpenZEV, open source billing software for Swiss ZEV and vZEV energy communities.">
+      
+      
+      
+        <link rel="canonical" href="https://www.openzev.ch/docs/08-billing-allocation-explained/">
+      
+      
+        <link rel="prev" href="../07-tariff-configuration/">
+      
+      
+        <link rel="next" href="../09-invoice-management/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/favicon.svg">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>How Allocation and Billing Works - OpenZEV Documentation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,700,700i%7CIBM+Plex+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"IBM Plex Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/docs.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#how-energy-allocation-and-billing-works" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="https://www.openzev.ch/" title="OpenZEV Documentation" class="md-header__button md-logo" aria-label="OpenZEV Documentation" data-md-component="logo">
+      
+  <img src="../assets/favicon.svg" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            OpenZEV Documentation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              How Allocation and Billing Works
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="custom" data-md-color-accent="custom"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/splattner/openzev" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    splattner/openzev
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="https://www.openzev.ch/" title="OpenZEV Documentation" class="md-nav__button md-logo" aria-label="OpenZEV Documentation" data-md-component="logo">
+      
+  <img src="../assets/favicon.svg" alt="logo">
+
+    </a>
+    OpenZEV Documentation
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/splattner/openzev" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    splattner/openzev
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../01-getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../11-roles-and-permissions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Roles and Permissions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Planning
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Planning
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../13-feasibility-calculator/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    vZEV Feasibility Calculator
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setting Up Your ZEV
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Setting Up Your ZEV
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../02-zev-setup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ZEV Setup and Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../03-participant-management/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Managing Participants
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../04-metering-points/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Metering Points
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Operations
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Operations
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../05-metering-import/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Metering Imports
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../06-metering-analysis/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Metering Analysis
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../07-tariff-configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tariff Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Billing and Invoicing
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Billing and Invoicing
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How Allocation and Billing Works
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How Allocation and Billing Works
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#key-principle-fair-sharing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Key Principle: Fair Sharing
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#inputs-for-one-invoice" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Inputs for One Invoice
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#timestamp-level-allocation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Timestamp-Level Allocation
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Timestamp-Level Allocation">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-local-pool" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1) Local Pool
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#example-local-pool-calculation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example: Local Pool Calculation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-participants-local-energy-share" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2) Participant's Local Energy Share
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-participants-grid-energy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3) Participant's Grid Energy
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#worked-example" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Worked Example
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#period-aggregation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Period Aggregation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#tariff-application" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tariff Application
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#fixed-fee-behavior" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fixed-Fee Behavior
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Fixed-Fee Behavior">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#shared-fees-and-changing-membership" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Shared Fees and Changing Membership
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#common-area-community-metering-points" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Common-Area (Community) Metering Points
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Common-Area (Community) Metering Points">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#eligibility-is-checked-per-day" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Eligibility is checked per day
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#production-is-shared-symmetrically" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Production is shared symmetrically
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#a-meter-can-change-mid-period" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A meter can change mid-period
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rounding-and-vat" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Rounding and VAT
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#billing-flow-diagram" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Billing Flow Diagram
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#participant-trust--verification" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Participant Trust &amp; Verification
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#why-timestamp-level-allocation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why Timestamp-Level Allocation?
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#edge-cases" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Edge Cases
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Edge Cases">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#zero-community-consumption" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Zero Community Consumption
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#partial-metering" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Partial Metering
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meter-replacement" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Meter Replacement
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#worked-example-two-timestamp-period" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Worked Example: Two-Timestamp Period
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#questions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Questions?
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../09-invoice-management/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Invoice Management
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../10-email-configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Email Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Administration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Administration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../14-admin-console/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Platform Administration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../17-zev-transfer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ZEV Export and Import
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../18-backups/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backups
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Automation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Automation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../16-api-keys/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Keys
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../12-troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../15-glossary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Glossary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#key-principle-fair-sharing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Key Principle: Fair Sharing
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#inputs-for-one-invoice" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Inputs for One Invoice
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#timestamp-level-allocation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Timestamp-Level Allocation
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Timestamp-Level Allocation">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-local-pool" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1) Local Pool
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#example-local-pool-calculation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example: Local Pool Calculation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-participants-local-energy-share" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2) Participant's Local Energy Share
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-participants-grid-energy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3) Participant's Grid Energy
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#worked-example" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Worked Example
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#period-aggregation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Period Aggregation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#tariff-application" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tariff Application
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#fixed-fee-behavior" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fixed-Fee Behavior
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Fixed-Fee Behavior">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#shared-fees-and-changing-membership" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Shared Fees and Changing Membership
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#common-area-community-metering-points" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Common-Area (Community) Metering Points
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Common-Area (Community) Metering Points">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#eligibility-is-checked-per-day" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Eligibility is checked per day
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#production-is-shared-symmetrically" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Production is shared symmetrically
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#a-meter-can-change-mid-period" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A meter can change mid-period
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rounding-and-vat" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Rounding and VAT
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#billing-flow-diagram" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Billing Flow Diagram
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#participant-trust--verification" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Participant Trust &amp; Verification
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#why-timestamp-level-allocation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why Timestamp-Level Allocation?
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#edge-cases" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Edge Cases
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Edge Cases">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#zero-community-consumption" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Zero Community Consumption
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#partial-metering" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Partial Metering
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meter-replacement" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Meter Replacement
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#worked-example-two-timestamp-period" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Worked Example: Two-Timestamp Period
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#questions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Questions?
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+    <a href="https://github.com/splattner/openzev/edit/main/docs/user-guide/08-billing-allocation-explained.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4zm10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1z"/></svg>
+    </a>
+  
+  
+
+
+<h1 id="how-energy-allocation-and-billing-works">How Energy Allocation and Billing Works<a class="headerlink" href="#how-energy-allocation-and-billing-works" title="Permanent link">&para;</a></h1>
+<p>This guide explains the exact billing logic used by OpenZEV so you can understand and verify participant invoices.</p>
+<h2 id="key-principle-fair-sharing">Key Principle: Fair Sharing<a class="headerlink" href="#key-principle-fair-sharing" title="Permanent link">&para;</a></h2>
+<p>OpenZEV allocates energy fairly at the <strong>timestamp level</strong> (each 15-minute or hourly reading), not just monthly totals.</p>
+<p><strong>Concept:</strong> At each moment, community production is shared among participants proportional to their consumption at that moment. Remaining consumption comes from the grid.</p>
+<h2 id="inputs-for-one-invoice">Inputs for One Invoice<a class="headerlink" href="#inputs-for-one-invoice" title="Permanent link">&para;</a></h2>
+<p>For a participant and billing period, OpenZEV loads:</p>
+<ul>
+<li><strong>Participant readings:</strong><ul>
+<li>Consumption (<code>IN</code>) from participant metering points</li>
+<li>Feed-in/production (<code>OUT</code>) from participant metering points</li>
+</ul>
+</li>
+</ul>
+<ul>
+<li><strong>ZEV totals per timestamp:</strong><ul>
+<li>Total community consumption (all participants)</li>
+<li>Total community production (all participants)</li>
+</ul>
+</li>
+</ul>
+<ul>
+<li><strong>Active tariffs</strong> for the participant's ZEV</li>
+</ul>
+<h2 id="timestamp-level-allocation">Timestamp-Level Allocation<a class="headerlink" href="#timestamp-level-allocation" title="Permanent link">&para;</a></h2>
+<p>At each moment <span class="arithmatex">\(t\)</span> (e.g., one hour), OpenZEV calculates:</p>
+<h3 id="1-local-pool">1) Local Pool<a class="headerlink" href="#1-local-pool" title="Permanent link">&para;</a></h3>
+<p>The amount of energy that can be matched <em>locally</em> (within community):</p>
+<div class="arithmatex">\[L(t) = \min(P_z(t), C_z(t))\]</div>
+<p>Where:</p>
+<ul>
+<li><span class="arithmatex">\(P_z(t)\)</span> = total ZEV production at timestamp <span class="arithmatex">\(t\)</span></li>
+<li><span class="arithmatex">\(C_z(t)\)</span> = total ZEV consumption at timestamp <span class="arithmatex">\(t\)</span></li>
+<li><span class="arithmatex">\(L(t)\)</span> = local pool</li>
+</ul>
+<p><strong>Intuition:</strong> Local pool is the overlapping overlap between "how much is being produced" and "how much is being consumed" at that exact moment. Can never exceed either.</p>
+<h3 id="example-local-pool-calculation">Example: Local Pool Calculation<a class="headerlink" href="#example-local-pool-calculation" title="Permanent link">&para;</a></h3>
+<p><strong>Scenario a) Production &lt; Consumption</strong></p>
+<ul>
+<li>ZEV produces 15 kW, community consumes 25 kW</li>
+<li>Local pool = min(15, 25) = <strong>15 kW</strong> (limited by production)</li>
+<li>Remaining 10 kW demand goes to grid</li>
+</ul>
+<p><strong>Scenario b) Production &gt; Consumption</strong></p>
+<ul>
+<li>ZEV produces 30 kW, community consumes 20 kW</li>
+<li>Local pool = min(30, 20) = <strong>20 kW</strong> (limited by demand)</li>
+<li>Remaining 10 kW production is exported to grid (not billed to participants)</li>
+</ul>
+<h3 id="2-participants-local-energy-share">2) Participant's Local Energy Share<a class="headerlink" href="#2-participants-local-energy-share" title="Permanent link">&para;</a></h3>
+<p>Each participant gets a <strong>fair share</strong> of the local pool proportional to their consumption:</p>
+<div class="arithmatex">\[E_{local,p}(t) = \begin{cases}
+\min\left(C_p(t),\; L(t) \cdot \frac{C_p(t)}{C_z(t)}\right) &amp; \text{if } C_z(t) &gt; 0 \\
+0 &amp; \text{if } C_z(t) = 0
+\end{cases}\]</div>
+<p>Where:</p>
+<ul>
+<li><span class="arithmatex">\(C_p(t)\)</span> = participant consumption at time <span class="arithmatex">\(t\)</span></li>
+<li><span class="arithmatex">\(C_z(t)\)</span> = total ZEV consumption at time <span class="arithmatex">\(t\)</span></li>
+<li><span class="arithmatex">\(E_{local,p}(t)\)</span> = participant's local energy</li>
+</ul>
+<p><strong>Intuition:</strong> If a participant consumes 20% of total community demand at that moment, they get 20% of the local pool (but never more than their own consumption).</p>
+<h3 id="3-participants-grid-energy">3) Participant's Grid Energy<a class="headerlink" href="#3-participants-grid-energy" title="Permanent link">&para;</a></h3>
+<p>The remainder of consumption must come from external grid:</p>
+<div class="arithmatex">\[E_{grid,p}(t) = C_p(t) - E_{local,p}(t)\]</div>
+<p><strong>Physical vs. Billing Note:</strong> This is an <em>allocation model</em>, not a physical electron trace. A participant can be allocated grid energy even in their moment of overproduction—that production goes to the community pool, and they consume allocated local/grid energy at other times.</p>
+<h2 id="worked-example">Worked Example<a class="headerlink" href="#worked-example" title="Permanent link">&para;</a></h2>
+<p><strong>Timestamp:</strong> 2026-01-15, 14:00 (solar peak)</p>
+<p><strong>Community state:</strong></p>
+<ul>
+<li>Total consumption: 25 kW (all participants)</li>
+<li>Total production: 15 kW (all solar panels)</li>
+<li>Local pool: min(15, 25) = 15 kW</li>
+</ul>
+<p><strong>Participant Alice:</strong></p>
+<ul>
+<li>Consumption: 10 kW (40% of community)</li>
+<li>As % of community demand: 10/25 = 40%</li>
+<li>Alice's local share: 15 kW × 40% = 6.0 kW</li>
+<li>Alice's grid share: 10 kW − 6.0 kW = 4.0 kW</li>
+</ul>
+<p><strong>Participant Bob:</strong></p>
+<ul>
+<li>Consumption: 15 kW (60% of community)</li>
+<li>As % of community demand: 15/25 = 60%</li>
+<li>Bob's local share: 15 kW × 60% = 9.0 kW</li>
+<li>Bob's grid share: 15 kW − 9.0 kW = 6.0 kW</li>
+</ul>
+<p><strong>Check:</strong> 6.0 + 9.0 = 15.0 ✓ (all local pool allocated)</p>
+<h2 id="period-aggregation">Period Aggregation<a class="headerlink" href="#period-aggregation" title="Permanent link">&para;</a></h2>
+<p>Over a full billing period (e.g., calendar month), readings are summed:</p>
+<ul>
+<li><strong>Total period local energy:</strong> Sum of <span class="arithmatex">\(E_{local,p}(t)\)</span> for all timestamps</li>
+<li><strong>Total period grid energy:</strong> Sum of <span class="arithmatex">\(E_{grid,p}(t)\)</span> for all timestamps</li>
+<li><strong>Total period feed-in:</strong> Sum of any participant production (<code>OUT</code> readings)</li>
+</ul>
+<p>Example: Over January (744 hours)</p>
+<ul>
+<li>Alice accumulated: 168 kWh local + 98 kWh grid = 266 kWh total</li>
+<li>Bob accumulated: 240 kWh local + 147 kWh grid = 387 kWh total</li>
+</ul>
+<h2 id="tariff-application">Tariff Application<a class="headerlink" href="#tariff-application" title="Permanent link">&para;</a></h2>
+<p>Once energy is allocated, tariffs are applied per energy type:</p>
+<table>
+<thead>
+<tr>
+<th>Energy Type</th>
+<th>Tariff Applied</th>
+<th>Price</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Local energy</td>
+<td>Local tariff (HT/NT by hour)</td>
+<td>e.g., 0.10–0.12 CHF/kWh</td>
+</tr>
+<tr>
+<td>Grid energy</td>
+<td>Grid tariff (HT/NT by hour)</td>
+<td>e.g., 0.18–0.28 CHF/kWh</td>
+</tr>
+<tr>
+<td>Feed-in production</td>
+<td>Feed-in tariff</td>
+<td>e.g., 0.08 CHF/kWh</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Continuing the example:</strong></p>
+<p>Alice's charges (Jan, sample rates):</p>
+<ul>
+<li>Local energy: 168 kWh × 0.11 CHF/kWh (average HT/NT) = <strong>CHF 18.48</strong></li>
+<li>Grid energy: 98 kWh × 0.23 CHF/kWh (average HT/NT) = <strong>CHF 22.54</strong></li>
+<li>Feed-in credit (if any): 5 kWh × 0.08 CHF/kWh = <strong>CHF −0.40</strong></li>
+<li>Fixed fee: CHF 50/month = <strong>CHF 50.00</strong></li>
+</ul>
+<p><strong>Invoice subtotal:</strong> 18.48 + 22.54 − 0.40 + 50.00 = <strong>CHF 90.62</strong></p>
+<p>If the ZEV is VAT-registered (8.1%):</p>
+<ul>
+<li>VAT: 90.62 × 0.081 = <strong>CHF 7.34</strong> (rounded)</li>
+<li><strong>Invoice total:</strong> CHF 97.96</li>
+</ul>
+<h2 id="fixed-fee-behavior">Fixed-Fee Behavior<a class="headerlink" href="#fixed-fee-behavior" title="Permanent link">&para;</a></h2>
+<p>Non-energy tariffs follow special rules:</p>
+<ul>
+<li><strong>Monthly fee:</strong> Charged once per billing month in the invoice period</li>
+<li><strong>Yearly fee:</strong> Charged as 1/12 per billing month (CHF price ÷ 12)</li>
+<li><strong>Per-metering-point fee:</strong> Charged for each <em>active meter</em> per month</li>
+<li><strong>Shared fee:</strong> One community-wide amount <em>divided</em> between the participants</li>
+</ul>
+<p>Exact invoice engine keys used for fixed-fee tariffs:</p>
+<ul>
+<li><code>monthly_fee</code>: charged per intersecting month in the invoice period</li>
+<li><code>yearly_fee</code>: monthly installment (<code>fixed_price_chf / 12</code>) per intersecting month</li>
+<li><code>per_metering_point_monthly_fee</code>: charged per active metering point per intersecting month</li>
+<li><code>per_metering_point_yearly_fee</code>: monthly installment (<code>fixed_price_chf / 12</code>) per active metering point per intersecting month</li>
+<li><code>shared_monthly_fee</code>: <code>fixed_price_chf</code> divided by the number of participants active in each intersecting month</li>
+<li><code>shared_yearly_fee</code>: monthly installment (<code>fixed_price_chf / 12</code>) divided the same way</li>
+</ul>
+<p>Negative fixed prices are represented as credit invoice items.</p>
+<p><strong>Example:</strong> ZEV with 3 participants, each with 1 meter</p>
+<p>January, per participant:</p>
+<ul>
+<li>Monthly admin fee: CHF 50 → <strong>CHF 50 each</strong></li>
+<li>Meter fee (1 meter each): CHF 5 → <strong>CHF 5 each</strong></li>
+<li>Shared caretaker fee, CHF 90 for the community → <strong>CHF 30 each</strong></li>
+</ul>
+<p>So each January invoice carries CHF 85 of fixed fees, and the ZEV collects
+3 × 50 + 3 × 5 + 90 = <strong>CHF 255</strong>.</p>
+<p>Note the difference: a <strong>monthly fee</strong> of CHF 50 is CHF 50 <em>per participant</em>
+(CHF 150 collected), while a <strong>shared</strong> fee of CHF 90 is CHF 90 for the
+community however many members it has.</p>
+<h3 id="shared-fees-and-changing-membership">Shared Fees and Changing Membership<a class="headerlink" href="#shared-fees-and-changing-membership" title="Permanent link">&para;</a></h3>
+<p>A shared fee is divided <strong>per month</strong>, so the split follows membership as it
+changes. Each participant is charged only for the months they were a member,
+and each month's amount is collected exactly once.</p>
+<p><strong>Example — CHF 60/month shared, billed January to March:</strong></p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>Jan</th>
+<th>Feb</th>
+<th>Mar</th>
+<th>Total</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Alice (whole period)</td>
+<td>20.00</td>
+<td>20.00</td>
+<td>20.00</td>
+<td>60.00</td>
+</tr>
+<tr>
+<td>Bob (whole period)</td>
+<td>20.00</td>
+<td>20.00</td>
+<td>20.00</td>
+<td>60.00</td>
+</tr>
+<tr>
+<td>Carol (joins Feb 1)</td>
+<td>—</td>
+<td>20.00</td>
+<td>20.00</td>
+<td>40.00</td>
+</tr>
+<tr>
+<td>Dave (leaves Jan 31)</td>
+<td>20.00</td>
+<td>—</td>
+<td>—</td>
+<td>20.00</td>
+</tr>
+<tr>
+<td><strong>Collected</strong></td>
+<td>60.00</td>
+<td>60.00</td>
+<td>60.00</td>
+<td><strong>180.00</strong></td>
+</tr>
+</tbody>
+</table>
+<p>Dave still receives an invoice for the period — anyone active at any point in it
+does — and pays for the single month he was a member of. January is divided
+three ways because Dave was there; February and March are divided three ways
+because Carol has replaced him.</p>
+<p>If the amount does not divide evenly, each invoice rounds to the centime on its
+own, so the community may end up a centime or two short: CHF 100 across 3
+participants bills 33.33 each and collects CHF 99.99. See
+<a href="#rounding-and-vat">Rounding and VAT</a> below.</p>
+<p>A shared fee can also be divided by <strong>allocation weight</strong> instead of per head —
+see <a href="../07-tariff-configuration/#how-a-shared-fee-is-split">Split key</a>. The
+month-by-month logic above is identical; only the denominator changes.</p>
+<h2 id="common-area-community-metering-points">Common-Area (Community) Metering Points<a class="headerlink" href="#common-area-community-metering-points" title="Permanent link">&para;</a></h2>
+<p>Everything above attributes each reading to <strong>one</strong> participant: whoever held
+the meter at that moment. A common-area meter — stairwell, lift, laundry,
+shared heat pump — measures energy nobody uses alone.</p>
+<p>Marking an assignment as
+<a href="../04-metering-points/#shared-common-area-metering-points">Community</a> changes
+how those readings are billed:</p>
+<ol>
+<li><strong>Price once.</strong> The meter's reading is split into local and grid energy
+   against the community pool, and priced with the ordinary tariffs — exactly
+   the same arithmetic as any other meter. Nothing special happens here.</li>
+<li><strong>Allocate second.</strong> The resulting kWh and francs are then divided between
+   every eligible participant by their
+   <a href="../03-participant-management/#allocation-weight">allocation weight</a>.</li>
+</ol>
+<p>The holder of record gets no special treatment: they pay their weighted share
+like everybody else.</p>
+<p><strong>Example — a 12 kWh common-area draw on one day, four participants:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Participant</th>
+<th>Weight</th>
+<th>Share</th>
+<th>Billed</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Alice</td>
+<td>1</td>
+<td>12.5 %</td>
+<td>1.5 kWh</td>
+</tr>
+<tr>
+<td>Bob</td>
+<td>1</td>
+<td>12.5 %</td>
+<td>1.5 kWh</td>
+</tr>
+<tr>
+<td>Carol</td>
+<td>2</td>
+<td>25.0 %</td>
+<td>3.0 kWh</td>
+</tr>
+<tr>
+<td>Dave</td>
+<td>4</td>
+<td>50.0 %</td>
+<td>6.0 kWh</td>
+</tr>
+<tr>
+<td><strong>Total</strong></td>
+<td><strong>8</strong></td>
+<td><strong>100 %</strong></td>
+<td><strong>12 kWh</strong></td>
+</tr>
+</tbody>
+</table>
+<p>These kWh are added to each participant's own <code>total_local_kwh</code> /
+<code>total_grid_kwh</code> totals, and their invoice lines carry a
+<strong>Gemeinschaftsanteil</strong> (<em>Community share</em>) marker so the shared portion is
+visible next to their personal consumption.</p>
+<h3 id="eligibility-is-checked-per-day">Eligibility is checked per day<a class="headerlink" href="#eligibility-is-checked-per-day" title="Permanent link">&para;</a></h3>
+<p>Community energy uses the reading's <strong>date</strong>, not the month. A participant who
+joins on 16 February pays nothing towards common-area energy measured on
+15 February, and a leaver's share stops on their leave date.</p>
+<blockquote>
+<p><strong>Fees work per month, energy per day.</strong> A per-metering-point fee on a
+community meter is a monthly charge, so anyone who was a member for <em>any</em>
+part of the month shares it. Community <em>energy</em> is date-accurate. This is the
+same distinction that already applies to personal fees versus personal
+energy.</p>
+</blockquote>
+<h3 id="production-is-shared-symmetrically">Production is shared symmetrically<a class="headerlink" href="#production-is-shared-symmetrically" title="Permanent link">&para;</a></h3>
+<p>If the community meter is a production or bidirectional meter, its output is
+credited to eligible participants using the same weights and the same
+eligibility rule as consumption.</p>
+<h3 id="a-meter-can-change-mid-period">A meter can change mid-period<a class="headerlink" href="#a-meter-can-change-mid-period" title="Permanent link">&para;</a></h3>
+<p>Allocation is resolved per reading, so a meter that is <code>Personal</code> in January
+and <code>Community</code> from February bills correctly on both sides: the holder is
+charged in full for January, and February is split. Nothing is lost and
+nothing is billed twice.</p>
+<h2 id="rounding-and-vat">Rounding and VAT<a class="headerlink" href="#rounding-and-vat" title="Permanent link">&para;</a></h2>
+<p><strong>Precision:</strong></p>
+<ul>
+<li>Energy quantities: 4 decimals (0.0001 kWh), rounded half-up</li>
+<li>Unit prices: 5 decimals (e.g., 0.12345 CHF/kWh)</li>
+<li>Line item totals: Rounded to 2 decimals (CHF 0.01)</li>
+<li>Invoice subtotal: Rounded to 2 decimals</li>
+</ul>
+<p><strong>VAT</strong> depends on the ZEV's <a href="../02-zev-setup/#vat-configuration">VAT treatment</a>:</p>
+<ul>
+<li><strong>VAT-registered</strong> — VAT is added on top of the subtotal as its own line</li>
+<li><strong>Not registered — fold VAT into prices</strong> — grid energy, grid fees, levies
+  and metering lines are grossed up by the rate; no VAT line</li>
+<li><strong>Not VAT-registered</strong> — no VAT at all</li>
+<li>The rate is the one active on the invoice period's end date, from
+  <a href="../14-admin-console/#vat-settings">Platform → System Settings → VAT</a></li>
+<li>If no rate is active, VAT defaults to 0%</li>
+</ul>
+<p><strong>Final total:</strong>
+$<span class="arithmatex">\(\text{Invoice Total} = \text{Subtotal} + \text{VAT}\)</span>$</p>
+<h2 id="billing-flow-diagram">Billing Flow Diagram<a class="headerlink" href="#billing-flow-diagram" title="Permanent link">&para;</a></h2>
+<pre class="mermaid"><code>flowchart TD
+  A[Start invoice generation] --&gt; B[Load participant IN/OUT readings in period]
+  B --&gt; C[Load ZEV total IN/OUT per timestamp]
+  C --&gt; D[Load active tariffs + tariff periods]
+  D --&gt; E[For each participant IN reading timestamp]
+  E --&gt; F[Compute local pool = min ZEV production, ZEV consumption]
+  F --&gt; G[Allocate participant local share proportionally]
+  G --&gt; H[Compute participant grid remainder]
+  H --&gt; I[Apply local/grid energy tariffs at timestamp]
+  I --&gt; J[Apply feed-in tariffs to participant OUT readings]
+  J --&gt; K[Apply fixed-fee tariffs by month / metering point rules]
+  K --&gt; L[Round item totals + subtotal]
+  L --&gt; M[Apply VAT per the ZEV's VAT treatment]
+  M --&gt; N[Create invoice + line items]
+  N --&gt; O[End]</code></pre>
+<p>Implementation reference: <code>backend/invoices/engine.py</code> (<code>generate_invoice</code>).</p>
+<h2 id="participant-trust--verification">Participant Trust &amp; Verification<a class="headerlink" href="#participant-trust--verification" title="Permanent link">&para;</a></h2>
+<p>Every participant should be able to verify their invoice:</p>
+<ol>
+<li><strong>Period check:</strong> Invoice period matches expected billing window ✓</li>
+<li><strong>Energy split check:</strong> Local + Grid = Total consumption (minus feed-in) ✓</li>
+<li><strong>Tariff check:</strong> Line item prices match published tariffs ✓</li>
+<li><strong>Credit check:</strong> Feed-in and other credits appear as negatives ✓</li>
+<li><strong>Rounding check:</strong> Line totals and VAT are CHF cents ✓</li>
+<li><strong>Total check:</strong> Subtotal + VAT = Invoice total ✓</li>
+</ol>
+<p>If any check fails, the invoice should be reviewed and corrected.</p>
+<h2 id="why-timestamp-level-allocation">Why Timestamp-Level Allocation?<a class="headerlink" href="#why-timestamp-level-allocation" title="Permanent link">&para;</a></h2>
+<p>Simpler approaches (monthly totals, last-hour precedence) can be unfair:</p>
+<ul>
+<li><strong>Monthly total:</strong> Participant might produce heavily in June but consume in January; monthly total loses timing fairness</li>
+<li><strong>Allocation by timing:</strong> Timestamp-level correctly captures the moment-by-moment local/grid split</li>
+</ul>
+<h2 id="edge-cases">Edge Cases<a class="headerlink" href="#edge-cases" title="Permanent link">&para;</a></h2>
+<h3 id="zero-community-consumption">Zero Community Consumption<a class="headerlink" href="#zero-community-consumption" title="Permanent link">&para;</a></h3>
+<p>If <span class="arithmatex">\(C_z(t) = 0\)</span> (no one is consuming), no one is allocated local energy:</p>
+<ul>
+<li><span class="arithmatex">\(E_{local,p}(t) = 0\)</span> for all participants</li>
+<li>Participant feed-in is not charged</li>
+</ul>
+<h3 id="partial-metering">Partial Metering<a class="headerlink" href="#partial-metering" title="Permanent link">&para;</a></h3>
+<p>If a participant's meter is missing readings in a period:</p>
+<ul>
+<li>Nothing is estimated — the missing intervals count as no energy</li>
+<li>The period's readiness check on <strong>Overview</strong> flags the gap before you generate</li>
+<li>Import the missing data, then regenerate the (draft) invoice</li>
+</ul>
+<h3 id="meter-replacement">Meter Replacement<a class="headerlink" href="#meter-replacement" title="Permanent link">&para;</a></h3>
+<p>If a meter was replaced mid-period:</p>
+<ul>
+<li>Old meter: <strong>Valid To</strong> = replacement date</li>
+<li>New meter: <strong>Valid From</strong> = replacement date</li>
+<li>Readings from both meters are included</li>
+<li>No double-billing or gaps</li>
+</ul>
+<h2 id="worked-example-two-timestamp-period">Worked Example: Two-Timestamp Period<a class="headerlink" href="#worked-example-two-timestamp-period" title="Permanent link">&para;</a></h2>
+<p>Assume two timestamps in the same invoice period:</p>
+<p><strong>Timestamp t1</strong> (morning, cloudy)</p>
+<ul>
+<li>Community consumption: 20 kW</li>
+<li>Community production: 10 kW</li>
+<li>Local pool: min(10, 20) = 10 kW</li>
+<li>Alice consumption: 8 kW → Local: 10 × (8/20) = 4.0 kW, Grid: 4.0 kW</li>
+<li>Bob consumption: 12 kW → Local: 10 × (12/20) = 6.0 kW, Grid: 6.0 kW</li>
+</ul>
+<p><strong>Timestamp t2</strong> (afternoon, sunny)</p>
+<ul>
+<li>Community consumption: 12 kW</li>
+<li>Community production: 30 kW</li>
+<li>Local pool: min(30, 12) = 12 kW</li>
+<li>Alice consumption: 6 kW → Local: 12 × (6/12) = 6.0 kW, Grid: 0 kW</li>
+<li>Bob consumption: 6 kW → Local: 12 × (6/12) = 6.0 kW, Grid: 0 kW</li>
+</ul>
+<p><strong>Period totals:</strong></p>
+<ul>
+<li>Alice: 10 kWh local, 4 kWh grid (14 kWh total consumption)</li>
+<li>Bob: 12 kWh local, 6 kWh grid (18 kWh total consumption)</li>
+</ul>
+<p>With tariffs:</p>
+<ul>
+<li>Local: 0.10 CHF/kWh</li>
+<li>Grid: 0.30 CHF/kWh</li>
+</ul>
+<p>Alice's energy charges:</p>
+<ul>
+<li>Local: 10 × 0.10 = CHF 1.00</li>
+<li>Grid: 4 × 0.30 = CHF 1.20</li>
+<li>Subtotal: CHF 2.20</li>
+</ul>
+<h2 id="questions">Questions?<a class="headerlink" href="#questions" title="Permanent link">&para;</a></h2>
+<p>See <a href="../15-glossary/">FAQ and Glossary</a> for more on energy allocation and billing concepts.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="Footer" >
+        
+          
+          <a href="../07-tariff-configuration/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Tariff Configuration">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Previous
+              </span>
+              <div class="md-ellipsis">
+                Tariff Configuration
+              </div>
+            </div>
+          </a>
+        
+        
+          
+          <a href="../09-invoice-management/" class="md-footer__link md-footer__link--next" aria-label="Next: Invoice Management">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Next
+              </span>
+              <div class="md-ellipsis">
+                Invoice Management
+              </div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"/></svg>
+            </div>
+          </a>
+        
+      </nav>
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      OpenZEV · AGPL-3.0
+    </div>
+  
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://github.com/splattner/openzev" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.sections", "navigation.top", "navigation.footer", "search.suggest", "search.highlight", "content.code.copy", "content.action.edit", "toc.follow"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+        <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>

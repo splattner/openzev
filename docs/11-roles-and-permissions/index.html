@@ -1,0 +1,2982 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="User guide for OpenZEV, open source billing software for Swiss ZEV and vZEV energy communities.">
+      
+      
+      
+        <link rel="canonical" href="https://www.openzev.ch/docs/11-roles-and-permissions/">
+      
+      
+        <link rel="prev" href="../01-getting-started/">
+      
+      
+        <link rel="next" href="../13-feasibility-calculator/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/favicon.svg">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Roles and Permissions - OpenZEV Documentation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,700,700i%7CIBM+Plex+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"IBM Plex Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/docs.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#roles-and-permissions" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="https://www.openzev.ch/" title="OpenZEV Documentation" class="md-header__button md-logo" aria-label="OpenZEV Documentation" data-md-component="logo">
+      
+  <img src="../assets/favicon.svg" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            OpenZEV Documentation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Roles and Permissions
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="custom" data-md-color-accent="custom"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/splattner/openzev" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    splattner/openzev
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="https://www.openzev.ch/" title="OpenZEV Documentation" class="md-nav__button md-logo" aria-label="OpenZEV Documentation" data-md-component="logo">
+      
+  <img src="../assets/favicon.svg" alt="logo">
+
+    </a>
+    OpenZEV Documentation
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/splattner/openzev" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    splattner/openzev
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../01-getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Roles and Permissions
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Roles and Permissions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#user-roles" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        User Roles
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#admin-role" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Admin Role
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Admin Role">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#admin-capabilities" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Admin Capabilities
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#platform-overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Platform Overview
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#who-should-be-admin" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Who Should Be Admin?
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#zev-owner-role" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ZEV Owner Role
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="ZEV Owner Role">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#zev-owner-capabilities" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ZEV Owner Capabilities
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#zev-scope" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ZEV Scope
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#who-should-be-zev-owner" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Who Should Be ZEV Owner?
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#participant-role" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Participant Role
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Participant Role">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#participant-capabilities" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Participant Capabilities
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#participant-restrictions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Participant Restrictions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#who-are-participants" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Who Are Participants?
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#reaching-a-participant-without-an-account" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reaching a Participant Without an Account
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#guest-role" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Guest Role
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#access-control-matrix" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Access Control Matrix
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#assigning-roles" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Assigning Roles
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Assigning Roles">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-accounts-list" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Accounts list
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#change-an-accounts-role" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Change an Account's Role
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#create-a-new-account" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Create a New Account
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#give-a-participant-an-account" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Give a Participant an Account
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#other-account-actions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Other Account Actions
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#data-privacy-and-scoping" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Data Privacy and Scoping
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Data Privacy and Scoping">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#participant-privacy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Participant Privacy
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#zev-isolation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ZEV Isolation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#audit-trail" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Audit Trail
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#best-practices" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Best Practices
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#two-factor-authentication" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Two-Factor Authentication
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Two-Factor Authentication">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#passkeys-no-password-needed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Passkeys (no password needed)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#authenticator-app" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Authenticator app
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#requiring-it-for-a-role-administrators" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Requiring it for a role (administrators)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#locked-out" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Locked out?
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#email-address-and-sessions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Email Address and Sessions
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Email Address and Sessions">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#changing-your-email-address" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Changing your email address
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#signing-out-other-devices" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Signing out other devices
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#multi-zev-setups" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Multi-ZEV Setups
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#troubleshooting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Troubleshooting
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Troubleshooting">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cannot-access-feature-permission-error" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        "Cannot access [feature]" (permission error)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cannot-see-other-zevs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        "Cannot see other ZEVs"
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#user-cannot-login" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        "User cannot login"
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#next-steps" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Next Steps
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Planning
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Planning
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../13-feasibility-calculator/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    vZEV Feasibility Calculator
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setting Up Your ZEV
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Setting Up Your ZEV
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../02-zev-setup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ZEV Setup and Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../03-participant-management/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Managing Participants
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../04-metering-points/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Metering Points
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Operations
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Operations
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../05-metering-import/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Metering Imports
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../06-metering-analysis/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Metering Analysis
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../07-tariff-configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tariff Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Billing and Invoicing
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Billing and Invoicing
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../08-billing-allocation-explained/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How Allocation and Billing Works
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../09-invoice-management/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Invoice Management
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../10-email-configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Email Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Administration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Administration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../14-admin-console/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Platform Administration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../17-zev-transfer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ZEV Export and Import
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../18-backups/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backups
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Automation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Automation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../16-api-keys/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Keys
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../12-troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../15-glossary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Glossary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#user-roles" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        User Roles
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#admin-role" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Admin Role
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Admin Role">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#admin-capabilities" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Admin Capabilities
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#platform-overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Platform Overview
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#who-should-be-admin" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Who Should Be Admin?
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#zev-owner-role" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ZEV Owner Role
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="ZEV Owner Role">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#zev-owner-capabilities" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ZEV Owner Capabilities
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#zev-scope" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ZEV Scope
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#who-should-be-zev-owner" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Who Should Be ZEV Owner?
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#participant-role" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Participant Role
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Participant Role">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#participant-capabilities" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Participant Capabilities
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#participant-restrictions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Participant Restrictions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#who-are-participants" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Who Are Participants?
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#reaching-a-participant-without-an-account" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reaching a Participant Without an Account
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#guest-role" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Guest Role
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#access-control-matrix" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Access Control Matrix
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#assigning-roles" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Assigning Roles
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Assigning Roles">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-accounts-list" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Accounts list
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#change-an-accounts-role" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Change an Account's Role
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#create-a-new-account" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Create a New Account
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#give-a-participant-an-account" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Give a Participant an Account
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#other-account-actions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Other Account Actions
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#data-privacy-and-scoping" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Data Privacy and Scoping
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Data Privacy and Scoping">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#participant-privacy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Participant Privacy
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#zev-isolation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ZEV Isolation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#audit-trail" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Audit Trail
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#best-practices" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Best Practices
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#two-factor-authentication" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Two-Factor Authentication
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Two-Factor Authentication">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#passkeys-no-password-needed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Passkeys (no password needed)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#authenticator-app" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Authenticator app
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#requiring-it-for-a-role-administrators" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Requiring it for a role (administrators)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#locked-out" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Locked out?
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#email-address-and-sessions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Email Address and Sessions
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Email Address and Sessions">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#changing-your-email-address" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Changing your email address
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#signing-out-other-devices" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Signing out other devices
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#multi-zev-setups" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Multi-ZEV Setups
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#troubleshooting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Troubleshooting
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Troubleshooting">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cannot-access-feature-permission-error" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        "Cannot access [feature]" (permission error)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cannot-see-other-zevs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        "Cannot see other ZEVs"
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#user-cannot-login" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        "User cannot login"
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#next-steps" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Next Steps
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+    <a href="https://github.com/splattner/openzev/edit/main/docs/user-guide/11-roles-and-permissions.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4zm10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1z"/></svg>
+    </a>
+  
+  
+
+
+<h1 id="roles-and-permissions">Roles and Permissions<a class="headerlink" href="#roles-and-permissions" title="Permanent link">&para;</a></h1>
+<p>This guide explains user roles and access boundaries in OpenZEV.</p>
+<h2 id="user-roles">User Roles<a class="headerlink" href="#user-roles" title="Permanent link">&para;</a></h2>
+<p>OpenZEV supports four distinct roles:</p>
+<table>
+<thead>
+<tr>
+<th>Role</th>
+<th>Scope</th>
+<th>Typical User</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Admin</strong></td>
+<td>Global system</td>
+<td>Platform operator, IT</td>
+<td>Full access to all ZEVs, settings, accounts</td>
+</tr>
+<tr>
+<td><strong>ZEV Owner</strong></td>
+<td>Single ZEV (scoped)</td>
+<td>Community operator</td>
+<td>Manage one or more ZEV communities</td>
+</tr>
+<tr>
+<td><strong>Participant</strong></td>
+<td>Own data only</td>
+<td>Community member</td>
+<td>View own consumption, download invoices</td>
+</tr>
+<tr>
+<td><strong>Guest</strong></td>
+<td>None until linked</td>
+<td>Unlinked account</td>
+<td>Stand-by log-in; no community access until linked to a participant</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>Note:</strong> The <strong>guest</strong> role is an internal transitional role. It normally has
+no domain access and is used when an account is not (or no longer) linked to a
+ZEV or participant.</p>
+</blockquote>
+<h2 id="admin-role">Admin Role<a class="headerlink" href="#admin-role" title="Permanent link">&para;</a></h2>
+<p><strong>Admins</strong> have unrestricted access to the entire system.</p>
+<h3 id="admin-capabilities">Admin Capabilities<a class="headerlink" href="#admin-capabilities" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Account Management:</strong> Create, edit, remove user accounts</li>
+<li><strong>User Roles:</strong> Assign roles and ZEV scopes to other users</li>
+<li><strong>System Settings:</strong> regional date formats, VAT rate configuration, feature flags, and OAuth providers</li>
+<li><strong>Overview hub:</strong> KPIs, multi-ZEV oversight, all invoices, the platform audit log, and system health</li>
+<li><strong>Accounts:</strong> user management and platform-wide API keys</li>
+<li><strong>Templates:</strong> PDF invoice/contract/statement templates and system-wide email defaults</li>
+</ul>
+<h3 id="platform-overview">Platform Overview<a class="headerlink" href="#platform-overview" title="Permanent link">&para;</a></h3>
+<p>Accessible via <strong>Platform → Overview</strong>:</p>
+<ul>
+<li>System health and status</li>
+<li>Account count and active users</li>
+<li>Total invoices generated</li>
+<li>Email delivery metrics</li>
+<li>Recent alerts and issues</li>
+</ul>
+<p><img alt="Admin dashboard" src="../screenshots/10-admin-dashboard.png" /></p>
+<h3 id="who-should-be-admin">Who Should Be Admin?<a class="headerlink" href="#who-should-be-admin" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Platform owner or operator</li>
+<li>IT/system administrator</li>
+<li>Finance/compliance officer (for audit access)</li>
+</ul>
+<blockquote>
+<p><strong>Important:</strong> Give admin access sparingly. It grants unrestricted power.</p>
+</blockquote>
+<h2 id="zev-owner-role">ZEV Owner Role<a class="headerlink" href="#zev-owner-role" title="Permanent link">&para;</a></h2>
+<p><strong>ZEV Owners</strong> manage one or more energy communities (ZEVs).</p>
+<h3 id="zev-owner-capabilities">ZEV Owner Capabilities<a class="headerlink" href="#zev-owner-capabilities" title="Permanent link">&para;</a></h3>
+<p><strong>Per assigned ZEV:</strong></p>
+<ul>
+<li>Manage participants (add, edit, view)</li>
+<li>Configure metering points</li>
+<li>Import metering data</li>
+<li>View data quality reports</li>
+<li>Configure tariffs</li>
+<li>Generate and approve invoices</li>
+<li>Send invoices to participants</li>
+<li>Track email delivery</li>
+<li>Customize email templates</li>
+<li>Configure ZEV settings (billing interval, VAT number, etc.)</li>
+<li>Turn participant invoice access on or off, and revoke a printed access link</li>
+</ul>
+<p><strong>Restrictions:</strong></p>
+<ul>
+<li>Cannot access other ZEVs (unless assigned to multiple)</li>
+<li>Cannot access admin settings</li>
+<li>Cannot manage global user accounts</li>
+<li>Cannot view other ZEV's metering data or invoices</li>
+</ul>
+<h3 id="zev-scope">ZEV Scope<a class="headerlink" href="#zev-scope" title="Permanent link">&para;</a></h3>
+<p>A ZEV Owner is <strong>scoped</strong> to one or more ZEVs:</p>
+<ul>
+<li><strong>Single ZEV:</strong> Owner manages one community only</li>
+<li><strong>Multiple ZEVs:</strong> Owner can switch between assigned communities via ZEV selector</li>
+<li>Each ZEV is isolated—data from one ZEV is not visible in another</li>
+</ul>
+<h3 id="who-should-be-zev-owner">Who Should Be ZEV Owner?<a class="headerlink" href="#who-should-be-zev-owner" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Community president or board representative</li>
+<li>Energy manager for a specific community</li>
+<li>Finance officer responsible for invoicing</li>
+<li>Metering and tariff specialist</li>
+</ul>
+<h2 id="participant-role">Participant Role<a class="headerlink" href="#participant-role" title="Permanent link">&para;</a></h2>
+<p><strong>Participants</strong> are community members with read-only access to their own data.</p>
+<h3 id="participant-capabilities">Participant Capabilities<a class="headerlink" href="#participant-capabilities" title="Permanent link">&para;</a></h3>
+<p>The participant sidebar shows <strong>Dashboard</strong>, <strong>My invoices</strong>, and <strong>Annual statement</strong>; own consumption charts and trends stay reachable through the direct <code>/metering/chart</code> route.</p>
+<ul>
+<li><strong>Dashboard:</strong> View own energy consumption/production overview</li>
+<li><strong>My invoices:</strong> View and download own invoices (read-only; shows invoices even before a PDF exists)</li>
+<li><strong>Annual statement:</strong> View their own annual statement and tax overview</li>
+<li><strong>Metering Data:</strong> Direct route to own consumption charts and trends</li>
+<li><strong>Account Profile:</strong> Update personal information</li>
+</ul>
+<h3 id="participant-restrictions">Participant Restrictions<a class="headerlink" href="#participant-restrictions" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Cannot see other participants' data</li>
+<li>Cannot see metering data from other ZEVs</li>
+<li>Cannot modify tariffs, metering points, or settings</li>
+<li>Cannot generate or approve invoices</li>
+<li>Cannot access admin features</li>
+</ul>
+<h3 id="who-are-participants">Who Are Participants?<a class="headerlink" href="#who-are-participants" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Household members with metering points</li>
+<li>Small businesses with energy meters</li>
+<li>Anyone with meter(s) in a ZEV community</li>
+</ul>
+<h3 id="reaching-a-participant-without-an-account">Reaching a Participant Without an Account<a class="headerlink" href="#reaching-a-participant-without-an-account" title="Permanent link">&para;</a></h3>
+<p>Participants do not have to hold an account to see their own bill. If the ZEV
+has <a href="../02-zev-setup/#participant-access-from-the-invoice">participant invoice access</a>
+switched on, the QR code printed on an invoice opens <strong>that one invoice</strong> — no
+username, no password, no session.</p>
+<p>This is not a role. Whoever holds the printed invoice can open the page, and the
+page is limited to what that sheet of paper already shows: the total, whether it
+is paid, the line items, the consumption figures and the charts printed on the
+same insights page. It cannot reach another invoice, and it cannot change
+anything.</p>
+<p>From there, <strong>Send me a sign-in link</strong> emails a one-time link to the address on
+file, which does start a normal participant session with the ordinary
+participant scoping above. The requester never names the destination address —
+the invoice identifies who they are — so there is no way to use it to find out
+whether an address has an account.</p>
+<p>A ZEV owner or admin can revoke any printed link; see
+<a href="../09-invoice-management/#participant-access-links">Invoice Management → Participant access links</a>.</p>
+<h2 id="guest-role">Guest Role<a class="headerlink" href="#guest-role" title="Permanent link">&para;</a></h2>
+<p>A <strong>Guest</strong> is a log-in account that is not currently linked to a participant. It
+has no access to a ZEV's data until an admin links it to a participant.</p>
+<ul>
+<li><strong>How a Guest is created:</strong> when an admin <strong>unlinks</strong> an account from a
+  participant, that account's role becomes <code>guest</code>.</li>
+<li><strong>Re-linking:</strong> a guest account can be linked to a participant again by an
+  admin (same as a participant account).</li>
+<li><strong>Restrictions:</strong> guests cannot manage communities or settings, and cannot be
+  impersonated or impersonate others.</li>
+</ul>
+<h2 id="access-control-matrix">Access Control Matrix<a class="headerlink" href="#access-control-matrix" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Feature</th>
+<th>Admin</th>
+<th>ZEV Owner</th>
+<th>Participant</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Participants</strong></td>
+<td>View all</td>
+<td>View own ZEV</td>
+<td>View self</td>
+</tr>
+<tr>
+<td><strong>Metering Points</strong></td>
+<td>View all</td>
+<td>View own ZEV</td>
+<td>View own meters</td>
+</tr>
+<tr>
+<td><strong>Metering Data</strong></td>
+<td>View all</td>
+<td>View own ZEV</td>
+<td>View own readings</td>
+</tr>
+<tr>
+<td><strong>Tariffs</strong></td>
+<td>View all</td>
+<td>Create/edit own ZEV</td>
+<td>View only</td>
+</tr>
+<tr>
+<td><strong>Invoices</strong></td>
+<td>View all</td>
+<td>Create own ZEV</td>
+<td>View own only</td>
+</tr>
+<tr>
+<td><strong>Email Templates</strong></td>
+<td>Manage defaults</td>
+<td>Customize own ZEV</td>
+<td>—</td>
+</tr>
+<tr>
+<td><strong>Settings</strong></td>
+<td>Global settings</td>
+<td>Own ZEV settings</td>
+<td>Account profile</td>
+</tr>
+<tr>
+<td><strong>Admin Panel</strong></td>
+<td>Full access</td>
+<td>—</td>
+<td>—</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>Note:</strong> Guest accounts have no access in any column above until they are
+linked to a participant, after which they follow the Participant rules.</p>
+</blockquote>
+<h2 id="assigning-roles">Assigning Roles<a class="headerlink" href="#assigning-roles" title="Permanent link">&para;</a></h2>
+<p><strong>Only Admins</strong> can assign roles to other users.</p>
+<h3 id="the-accounts-list">The Accounts list<a class="headerlink" href="#the-accounts-list" title="Permanent link">&para;</a></h3>
+<p><img alt="Admin accounts page" src="../screenshots/11-admin-accounts.png" /></p>
+<p><strong>Platform → Accounts → Users</strong> lists every account on the platform, one row
+each:</p>
+<ul>
+<li><strong>Account</strong> — name, username, email and the account's <strong>platform role</strong>.</li>
+<li><strong>Communities</strong> — one chip per community the account belongs to, marked
+  <em>Owner</em> or <em>Participant</em>. An account that belongs to several communities
+  still has a single row. Click a chip to open that community's Participants
+  page.</li>
+<li><strong>Security</strong> — which second factors the account has (authenticator app,
+  passkey), or <em>No two-factor</em>; whether it is still within its grace period or
+  overdue, for an account the two-factor policy names (see below); and when it
+  last signed in, or <em>Never signed in</em>.</li>
+</ul>
+<p>Use <strong>Search</strong>, <strong>Platform role</strong>, <strong>Community</strong> and <strong>Two-factor</strong> to narrow
+the list — the community filter finds everyone who is an owner or participant
+there, and the two-factor filter narrows to accounts that still need to set it
+up. The <strong>Never signed in</strong> stat at the top counts accounts nobody has ever
+signed into — useful for spotting a stale invitation or an account that can be
+cleaned up.</p>
+<blockquote>
+<p><strong>Platform role vs. community membership.</strong> The platform role (Admin, ZEV
+Owner, Participant, Guest) belongs to the <em>account</em> and applies in every
+community. Which communities an account belongs to is set on each community's
+<strong>Participants</strong> page, not here.</p>
+</blockquote>
+<h3 id="change-an-accounts-role">Change an Account's Role<a class="headerlink" href="#change-an-accounts-role" title="Permanent link">&para;</a></h3>
+<ol>
+<li>Go to <strong>Platform → Accounts → Users</strong></li>
+<li>Click <strong>Edit</strong> on the account</li>
+<li>Change the <strong>Platform role</strong> (and name or email if needed)</li>
+<li>Click <strong>Save account</strong></li>
+</ol>
+<p>Changes take effect immediately. You cannot change your own role.</p>
+<h3 id="create-a-new-account">Create a New Account<a class="headerlink" href="#create-a-new-account" title="Permanent link">&para;</a></h3>
+<p>Click <strong>New account</strong> on <strong>Platform → Accounts → Users</strong> for an account that is
+not tied to any community — a second administrator, a service account, or any
+account you want ready before it is needed. Enter a username, email, first and
+last name, and the platform role, then click <strong>Create account</strong>.</p>
+<p>There is no password field: OpenZEV generates one and shows it once, with a
+<strong>Copy password</strong> button — share it with the account holder however you
+normally would. They set their own password the first time they sign in.</p>
+<p>To create an account <strong>for a specific participant</strong>, use the community's
+Participants page instead — see below.</p>
+<h3 id="give-a-participant-an-account">Give a Participant an Account<a class="headerlink" href="#give-a-participant-an-account" title="Permanent link">&para;</a></h3>
+<p>Accounts are attached to participants from the community that the participant
+belongs to:</p>
+<ol>
+<li>Switch to the community and open <strong>Participants</strong></li>
+<li>On the participant's card, open <strong>More</strong></li>
+<li>Choose <strong>Send onboarding link</strong> or <strong>Copy onboarding link</strong> (creates the
+   account and gives the participant a sign-in link), or — as an admin —
+   <strong>Link existing</strong> to attach a guest or participant account that is not yet
+   linked</li>
+<li>To detach an account again, choose <strong>Unlink</strong> (it becomes a Guest account)</li>
+</ol>
+<h3 id="other-account-actions">Other Account Actions<a class="headerlink" href="#other-account-actions" title="Permanent link">&para;</a></h3>
+<p>Open <strong>More</strong> on an account row for:</p>
+<ul>
+<li><strong>Impersonate</strong> — view the platform as a participant or owner (never an
+  admin).</li>
+<li><strong>Reset two-factor</strong> — removes the account's passkeys, authenticator app and
+  recovery codes, so someone locked out can sign in with their password again.</li>
+<li><strong>View activity</strong> — opens the platform audit log filtered to this account's
+  own actions.</li>
+<li><strong>Sign out everywhere</strong> — ends every session the account holds, on every
+  browser and device, so it has to sign in again. Use it when you suspect
+  someone else has access. It is recorded in the audit log and is not offered
+  on your own row (use <strong>Sign out other devices</strong> on your account page).</li>
+<li><strong>Deactivate</strong> — the account can no longer sign in, and every session it
+  holds ends immediately. Its data and history are kept, and you can
+  <strong>Activate</strong> it again later. Not offered on your own row: OpenZEV refuses to
+  let you deactivate yourself, since it would sign you out with no way back in
+  except another administrator.</li>
+<li><strong>Delete</strong> — only available for accounts that do not belong to a community.
+  Unlink the account from its participant first; an owner's account cannot be
+  deleted while it owns a community.</li>
+</ul>
+<h2 id="data-privacy-and-scoping">Data Privacy and Scoping<a class="headerlink" href="#data-privacy-and-scoping" title="Permanent link">&para;</a></h2>
+<p>OpenZEV enforces data boundaries:</p>
+<h3 id="participant-privacy">Participant Privacy<a class="headerlink" href="#participant-privacy" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Participants can <strong>only</strong> view their own consumption and invoices</li>
+<li>They cannot see other participants' data in the same ZEV</li>
+<li>API access is also scoped—a participant token can only fetch own data</li>
+</ul>
+<h3 id="zev-isolation">ZEV Isolation<a class="headerlink" href="#zev-isolation" title="Permanent link">&para;</a></h3>
+<ul>
+<li>ZEV Owners assigned to ZEV A <strong>cannot</strong> see ZEV B's data</li>
+<li>Tariffs, metering points, and invoices are entirely isolated by ZEV</li>
+<li>Admins can view all ZEVs but typically delegate operations to ZEV Owners</li>
+</ul>
+<h3 id="audit-trail">Audit Trail<a class="headerlink" href="#audit-trail" title="Permanent link">&para;</a></h3>
+<p>Security-relevant and billing-relevant user actions are logged:</p>
+<ul>
+<li>Who did what (action)</li>
+<li>When (timestamp)</li>
+<li>What changed (old → new values)</li>
+</ul>
+<p>Audit logs are visible to <strong>admins</strong> (all events, <strong>Platform → Overview →
+Audit log</strong>) and to <strong>ZEV owners</strong> for their own communities (scoped events,
+<strong>Setup → Settings → Audit log</strong>).</p>
+<h2 id="best-practices">Best Practices<a class="headerlink" href="#best-practices" title="Permanent link">&para;</a></h2>
+<p><strong>Principle of Least Privilege:</strong></p>
+<ul>
+<li>Assign the minimum role needed for the job</li>
+<li>Participants should not be admins</li>
+<li>Limit admin accounts to platform operators</li>
+</ul>
+<p><strong>Separate Roles:</strong></p>
+<ul>
+<li>Use different user accounts for different roles</li>
+<li>Don't share admin accounts between people</li>
+<li>Create audit trail by attributing actions to individuals</li>
+</ul>
+<p><strong>Regular Reviews:</strong></p>
+<ul>
+<li>Periodically review who has access to what</li>
+<li>Remove access when people leave the organization</li>
+<li>Audit role assignments for compliance</li>
+</ul>
+<p><strong>Account Security:</strong></p>
+<ul>
+<li>Users should use strong passwords</li>
+<li>Turn on two-factor authentication under <strong>My Account → Security</strong> (see below)</li>
+<li>Don't write passwords down</li>
+</ul>
+<h2 id="two-factor-authentication">Two-Factor Authentication<a class="headerlink" href="#two-factor-authentication" title="Permanent link">&para;</a></h2>
+<p>Every user can protect their account with a <strong>passkey</strong>, an <strong>authenticator app</strong>, or both. Set them
+up under <strong>My Account → Security → Two-Factor Authentication</strong>.</p>
+<p><img alt="Account security tab" src="../screenshots/16b-account-security.png" /></p>
+<h3 id="passkeys-no-password-needed">Passkeys (no password needed)<a class="headerlink" href="#passkeys-no-password-needed" title="Permanent link">&para;</a></h3>
+<p>A passkey lets you sign in with your fingerprint, face or device PIN — no password. It is
+phishing-resistant: it only works on the real OpenZEV address.</p>
+<ol>
+<li>Click <strong>Add a passkey</strong>, give it a name (for example "MacBook Touch ID"), and confirm on your device</li>
+<li>Add a second one on another device, so a lost phone does not lock you out</li>
+<li>Save the <strong>recovery codes</strong> shown once when you add your first factor</li>
+</ol>
+<p>To sign in, click <strong>Sign in with a passkey</strong> on the login page. The button only appears in browsers
+that support passkeys.</p>
+<h3 id="authenticator-app">Authenticator app<a class="headerlink" href="#authenticator-app" title="Permanent link">&para;</a></h3>
+<ol>
+<li>Click <strong>Set up two-factor authentication</strong>, scan the QR code with your authenticator app
+   (Google Authenticator, Aegis, 1Password, …) or type the key in by hand</li>
+<li>Enter the 6-digit code the app shows to confirm</li>
+<li>Save the ten <strong>recovery codes</strong> if you have no other factor yet — each works a single time</li>
+</ol>
+<p>Afterwards, signing in with your password asks for the 6-digit code as a second step. Use
+<strong>Use a recovery code instead</strong> if you don't have your phone. The same code is asked when you sign in
+through an emailed invoice link or onboarding link. Signing in through an external identity provider
+is unaffected unless the administrator requires the provider to assert a second factor.</p>
+<blockquote>
+<p><strong>Note:</strong> Adding a passkey protects your password too. Signing in with your password (or an
+emailed link) then asks for a second step: a recovery code if you only have a passkey, or the
+6-digit code if you also have an authenticator app. The login page offers <strong>Sign in with a passkey
+instead</strong> at that point. Keep your recovery codes somewhere safe — they are what gets you in with a
+password if you can't use your passkey.</p>
+</blockquote>
+<h3 id="requiring-it-for-a-role-administrators">Requiring it for a role (administrators)<a class="headerlink" href="#requiring-it-for-a-role-administrators" title="Permanent link">&para;</a></h3>
+<p>Under <strong>Platform → System Settings → Security</strong>, choose which roles must use
+two-factor authentication and set a grace period in days. Users of those roles see a reminder on their
+account page and a set-up screen they can postpone until the grace period ends. The period counts from
+the later of the account's creation and the day you last changed the policy, so switching it on never
+locks anyone out immediately. A user whose role requires it cannot remove their last factor.</p>
+<p>To see who has not enrolled yet, go to <strong>Platform → Accounts → Users</strong>: an account the policy names
+gets a badge in the Security column — "2FA required · due <code>&lt;date&gt;</code>" during the grace period, "2FA
+overdue" once it has passed — and the <strong>Two-factor</strong> filter narrows the list to exactly those
+accounts. The "Needs two-factor" stat at the top of the page counts them.</p>
+<p>Once the grace period ends, an account with no factor is also refused any change it tries to make
+through the API, not only in the web app — so this is enforced, not just suggested. Reading data is
+never affected, and neither is an API key: a key cannot complete the enrolment ceremony this policy
+pushes someone toward, so it is a separate credential this policy does not reach. An account whose
+day-to-day access is entirely through an API key it minted before the policy applied to it is
+therefore not forced to enrol by this alone.</p>
+<h3 id="locked-out">Locked out?<a class="headerlink" href="#locked-out" title="Permanent link">&para;</a></h3>
+<p>On the second step of a password sign-in, enter one of your recovery codes. If you have lost your devices and your recovery codes, ask an
+administrator: <strong>Platform → Accounts → Users → More → Reset two-factor</strong> removes every passkey, the authenticator app
+and all recovery codes for that user, and is recorded in the audit log. An administrator can never see
+or recover your secrets, and cannot set up a factor on your behalf.</p>
+<p>The server needs an encryption key (<code>MFA_ENCRYPTION_KEYS</code>) before authenticator apps can be enrolled
+or a requirement can be set, and the passkey domain settings (<code>WEBAUTHN_RP_ID</code>, <code>WEBAUTHN_ORIGIN</code>)
+must match the address users open OpenZEV on. See <code>backend/.env.example</code> and the Helm chart README.</p>
+<h2 id="email-address-and-sessions">Email Address and Sessions<a class="headerlink" href="#email-address-and-sessions" title="Permanent link">&para;</a></h2>
+<h3 id="changing-your-email-address">Changing your email address<a class="headerlink" href="#changing-your-email-address" title="Permanent link">&para;</a></h3>
+<p>Your email address is what you sign in with and where sign-in links are sent, so changing
+it takes a few extra steps. Under <strong>My Account → Profile → Email address</strong>:</p>
+<ol>
+<li>Click <strong>Change email</strong>, enter the new address and your <strong>current password</strong></li>
+<li>Open the confirmation link OpenZEV sends to the <strong>new</strong> address (valid for 24 hours)</li>
+<li>Sign in again with the new address — the change signs you out everywhere</li>
+</ol>
+<p>The old address is emailed afterwards, so a change you did not make does not go unnoticed. The
+link works once, and stops working if your password or address changes before you use it.</p>
+<p>Accounts that have no password — participants, who sign in with emailed links, and accounts that
+only use an external identity provider — cannot do this themselves. For participants the address is
+maintained by the community owner on the participant record; an administrator can change any
+account's address under <strong>Platform → Accounts → Edit</strong>.</p>
+<h3 id="signing-out-other-devices">Signing out other devices<a class="headerlink" href="#signing-out-other-devices" title="Permanent link">&para;</a></h3>
+<p>Under <strong>My Account → Security → Sessions</strong>, <strong>Sign out other devices</strong> ends every session except the
+one you are using. Do it if you lost a device or suspect someone else has access. There is no list
+of individual devices — the action always covers all of them.</p>
+<p>OpenZEV also emails you whenever how your account is secured changes — a passkey or authenticator
+app added or removed, recovery codes regenerated, your password changed, or an administrator
+resetting your two-factor authentication or signing you out everywhere. It always goes to your own
+address, says what happened and when, and cannot be turned off — think of it as a smoke detector for
+your account. If one of these arrives and you did not do it, change your password and check with
+your administrator.</p>
+<p>Sessions on other devices also end automatically when you:</p>
+<ul>
+<li>change your password (you stay signed in on the device you used),</li>
+<li>confirm an email change, or</li>
+<li>have your two-factor authentication reset by an administrator, or your account deactivated.</li>
+</ul>
+<p><strong>Logout</strong> in the user menu signs the account out on every device, including
+the one you are using — you will have to sign back in everywhere. API keys are separate
+credentials and stay valid — see <a href="../16-api-keys/">API keys</a>.</p>
+<h2 id="multi-zev-setups">Multi-ZEV Setups<a class="headerlink" href="#multi-zev-setups" title="Permanent link">&para;</a></h2>
+<p>If operating multiple communities:</p>
+<p><strong>Admin perspective:</strong></p>
+<ul>
+<li>Can oversee all ZEVs</li>
+<li>Can assign ZEV Owners to specific communities</li>
+<li>Can monitor cross-ZEV metrics and KPIs</li>
+</ul>
+<p><strong>ZEV Owner perspective:</strong></p>
+<ul>
+<li>Use the ZEV switcher (sidebar top) to switch between assigned ZEVs</li>
+<li>Each ZEV has isolated data</li>
+<li>Can be assigned to manage 1 or many ZEVs</li>
+</ul>
+<h2 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">&para;</a></h2>
+<h3 id="cannot-access-feature-permission-error">"Cannot access [feature]" (permission error)<a class="headerlink" href="#cannot-access-feature-permission-error" title="Permanent link">&para;</a></h3>
+<p>Ask an admin to check your account's <strong>Platform role</strong> and communities under
+<strong>Platform → Accounts → Users</strong>. If the role is wrong, they can change it there.</p>
+<h3 id="cannot-see-other-zevs">"Cannot see other ZEVs"<a class="headerlink" href="#cannot-see-other-zevs" title="Permanent link">&para;</a></h3>
+<p><strong>Expected behavior:</strong> ZEV Owners are scoped to the ZEVs they own.</p>
+<p><strong>If you need access:</strong> ask an admin to make you the owner of that ZEV
+(<strong>Platform → Overview → ZEVs</strong>).</p>
+<h3 id="user-cannot-login">"User cannot login"<a class="headerlink" href="#user-cannot-login" title="Permanent link">&para;</a></h3>
+<p><strong>Possible causes:</strong></p>
+<ul>
+<li>The onboarding link was never used, has expired, or was revoked</li>
+<li>User account deactivated</li>
+<li>Password forgotten — there is no self-service password reset</li>
+</ul>
+<p><strong>Fix:</strong></p>
+<ol>
+<li>Check the account under <strong>Platform → Accounts → Users</strong>: is it active, and
+   has it ever signed in?</li>
+<li><strong>Participant:</strong> the community owner sends or copies the onboarding link
+   again from the participant's card (<strong>More</strong>). It signs them in, and they
+   choose a new password.</li>
+<li>
+<p><strong>Owner or admin who forgot their password:</strong> someone with server access
+   sets a new one on the command line (the user then signs in with it):</p>
+<div class="highlight"><pre><span></span><code>docker<span class="w"> </span>compose<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>backend<span class="w"> </span>python<span class="w"> </span>manage.py<span class="w"> </span>changepassword<span class="w"> </span>&lt;username&gt;
+</code></pre></div>
+<p>The username is shown in the <strong>Account</strong> column of the accounts list.</p>
+</li>
+<li>
+<p><strong>Locked out by two-factor:</strong> see <a href="#locked-out">Locked out?</a></p>
+</li>
+</ol>
+<h2 id="next-steps">Next Steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>User management:</strong> Admin controls at <strong>Platform → Accounts</strong></li>
+<li><strong>ZEV settings:</strong> <a href="../02-zev-setup/">ZEV Setup and Configuration</a></li>
+<li><strong>Participant management:</strong> <a href="../03-participant-management/">Managing Participants</a></li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="Footer" >
+        
+          
+          <a href="../01-getting-started/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Getting Started">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Previous
+              </span>
+              <div class="md-ellipsis">
+                Getting Started
+              </div>
+            </div>
+          </a>
+        
+        
+          
+          <a href="../13-feasibility-calculator/" class="md-footer__link md-footer__link--next" aria-label="Next: vZEV Feasibility Calculator">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Next
+              </span>
+              <div class="md-ellipsis">
+                vZEV Feasibility Calculator
+              </div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"/></svg>
+            </div>
+          </a>
+        
+      </nav>
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      OpenZEV · AGPL-3.0
+    </div>
+  
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://github.com/splattner/openzev" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.sections", "navigation.top", "navigation.footer", "search.suggest", "search.highlight", "content.code.copy", "content.action.edit", "toc.follow"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+        <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>

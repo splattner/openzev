@@ -1,0 +1,2604 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="User guide for OpenZEV, open source billing software for Swiss ZEV and vZEV energy communities.">
+      
+      
+      
+        <link rel="canonical" href="https://www.openzev.ch/docs/12-troubleshooting/">
+      
+      
+        <link rel="prev" href="../16-api-keys/">
+      
+      
+        <link rel="next" href="../15-glossary/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/favicon.svg">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Troubleshooting - OpenZEV Documentation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,700,700i%7CIBM+Plex+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"IBM Plex Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/docs.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#troubleshooting" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="https://www.openzev.ch/" title="OpenZEV Documentation" class="md-header__button md-logo" aria-label="OpenZEV Documentation" data-md-component="logo">
+      
+  <img src="../assets/favicon.svg" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            OpenZEV Documentation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Troubleshooting
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="custom" data-md-color-accent="custom"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/splattner/openzev" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    splattner/openzev
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="https://www.openzev.ch/" title="OpenZEV Documentation" class="md-nav__button md-logo" aria-label="OpenZEV Documentation" data-md-component="logo">
+      
+  <img src="../assets/favicon.svg" alt="logo">
+
+    </a>
+    OpenZEV Documentation
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/splattner/openzev" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    splattner/openzev
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../01-getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../11-roles-and-permissions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Roles and Permissions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Planning
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Planning
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../13-feasibility-calculator/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    vZEV Feasibility Calculator
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setting Up Your ZEV
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Setting Up Your ZEV
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../02-zev-setup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ZEV Setup and Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../03-participant-management/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Managing Participants
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../04-metering-points/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Metering Points
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Operations
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Operations
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../05-metering-import/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Metering Imports
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../06-metering-analysis/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Metering Analysis
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../07-tariff-configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tariff Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Billing and Invoicing
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Billing and Invoicing
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../08-billing-allocation-explained/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How Allocation and Billing Works
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../09-invoice-management/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Invoice Management
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../10-email-configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Email Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Administration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Administration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../14-admin-console/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Platform Administration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../17-zev-transfer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ZEV Export and Import
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../18-backups/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backups
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Automation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Automation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../16-api-keys/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Keys
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#general-issues" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        General Issues
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="General Issues">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#application-wont-start" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Application Won't Start
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cant-access-frontend" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Can't Access Frontend
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cant-access-api" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Can't Access API
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#authentication--access" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Authentication &amp; Access
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Authentication &amp; Access">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cant-login" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Can't Login
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#forgot-password" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Forgot Password
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#unauthorized--403-forbidden-errors" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        "Unauthorized" / "403 Forbidden" Errors
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cant-see-other-zevs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Can't See Other ZEVs
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#data-import--metering" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Data Import &amp; Metering
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Data Import &amp; Metering">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#metering-point-not-found-on-import" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        "Metering point not found" on import
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#readings-imported-but-not-billed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Readings imported but not billed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#import-hangs-or-times-out" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Import hangs or times out
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#data-quality-shows-mostly-missing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Data quality shows mostly "Missing"
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#billing--invoices" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Billing &amp; Invoices
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Billing &amp; Invoices">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cannot-generate-invoices" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        "Cannot generate invoices"
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#invoice-totals-seem-wrong" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Invoice totals seem wrong
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cannot-send-invoice--email-failed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        "Cannot send invoice" / Email failed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#invoice-appears-but-participant-hasnt-received-email" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Invoice appears but participant hasn't received email
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#performance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Performance
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Performance">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#application-is-slow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Application is slow
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#chart-rendering-is-slow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Chart rendering is slow
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#database" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Database
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Database">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#database-wont-start" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Database won't start
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#database-backup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Database backup
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#email--async-jobs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Email &amp; Async Jobs
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Email &amp; Async Jobs">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#email-not-being-sent" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Email not being sent
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#background-jobs-stuck" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Background jobs stuck
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#getting-help" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Getting Help
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Getting Help">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#logs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Logs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#export-logs-for-support" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Export Logs for Support
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#system-information" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        System Information
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#next-steps" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Next Steps
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../15-glossary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Glossary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#general-issues" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        General Issues
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="General Issues">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#application-wont-start" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Application Won't Start
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cant-access-frontend" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Can't Access Frontend
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cant-access-api" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Can't Access API
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#authentication--access" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Authentication &amp; Access
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Authentication &amp; Access">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cant-login" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Can't Login
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#forgot-password" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Forgot Password
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#unauthorized--403-forbidden-errors" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        "Unauthorized" / "403 Forbidden" Errors
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cant-see-other-zevs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Can't See Other ZEVs
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#data-import--metering" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Data Import &amp; Metering
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Data Import &amp; Metering">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#metering-point-not-found-on-import" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        "Metering point not found" on import
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#readings-imported-but-not-billed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Readings imported but not billed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#import-hangs-or-times-out" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Import hangs or times out
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#data-quality-shows-mostly-missing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Data quality shows mostly "Missing"
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#billing--invoices" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Billing &amp; Invoices
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Billing &amp; Invoices">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cannot-generate-invoices" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        "Cannot generate invoices"
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#invoice-totals-seem-wrong" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Invoice totals seem wrong
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cannot-send-invoice--email-failed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        "Cannot send invoice" / Email failed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#invoice-appears-but-participant-hasnt-received-email" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Invoice appears but participant hasn't received email
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#performance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Performance
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Performance">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#application-is-slow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Application is slow
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#chart-rendering-is-slow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Chart rendering is slow
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#database" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Database
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Database">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#database-wont-start" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Database won't start
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#database-backup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Database backup
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#email--async-jobs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Email &amp; Async Jobs
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Email &amp; Async Jobs">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#email-not-being-sent" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Email not being sent
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#background-jobs-stuck" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Background jobs stuck
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#getting-help" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Getting Help
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Getting Help">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#logs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Logs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#export-logs-for-support" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Export Logs for Support
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#system-information" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        System Information
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#next-steps" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Next Steps
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+    <a href="https://github.com/splattner/openzev/edit/main/docs/user-guide/12-troubleshooting.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4zm10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1z"/></svg>
+    </a>
+  
+  
+
+
+<h1 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">&para;</a></h1>
+<p>Common issues and solutions for OpenZEV.</p>
+<h2 id="general-issues">General Issues<a class="headerlink" href="#general-issues" title="Permanent link">&para;</a></h2>
+<h3 id="application-wont-start">Application Won't Start<a class="headerlink" href="#application-wont-start" title="Permanent link">&para;</a></h3>
+<p><strong>Problem:</strong> OpenZEV services don't start or crash on startup.</p>
+<p><strong>Diagnosis:</strong>
+<div class="highlight"><pre><span></span><code>docker<span class="w"> </span>compose<span class="w"> </span>logs
+</code></pre></div></p>
+<p><strong>Common causes:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Symptom</th>
+<th>Cause</th>
+<th>Fix</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Port already in use</td>
+<td>Another app on 8080 (dev stack: 5173, 8001, 5432, 6379)</td>
+<td><code>lsof -i :8080</code> and stop the conflicting process, or change the port mapping in the compose file</td>
+</tr>
+<tr>
+<td>Backend exits right after starting, log names <code>accounts.E0xx</code> or <code>SECRET_KEY</code></td>
+<td>A required production setting in <code>backend/.env</code> is missing or wrong</td>
+<td>Fix the named setting — see <a href="../01-getting-started/#2-configure-backendenv">Production with Docker Compose</a></td>
+</tr>
+<tr>
+<td>Database connection error</td>
+<td>PostgreSQL not running</td>
+<td><code>docker compose ps</code> to check db service</td>
+</tr>
+<tr>
+<td>"permission denied"</td>
+<td>File permissions issue</td>
+<td><code>docker compose down &amp;&amp; docker compose up --build</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="cant-access-frontend">Can't Access Frontend<a class="headerlink" href="#cant-access-frontend" title="Permanent link">&para;</a></h3>
+<p><strong>Problem:</strong> http://localhost:8080 doesn't load.</p>
+<p><strong>Checks:</strong></p>
+<ol>
+<li>Is frontend container running? <code>docker compose ps</code></li>
+<li>Try restarting: <code>docker compose restart frontend</code></li>
+<li>Check logs: <code>docker compose logs frontend</code></li>
+<li>Port conflict? Is port 8080 in use? <code>lsof -i :8080</code></li>
+</ol>
+<h3 id="cant-access-api">Can't Access API<a class="headerlink" href="#cant-access-api" title="Permanent link">&para;</a></h3>
+<p><strong>Problem:</strong> http://localhost:8080/api/docs/ returns error or no connection.</p>
+<p>Development stack (<code>docker-compose.dev.yml</code>) uses port 8001 instead.</p>
+<p><strong>Checks:</strong></p>
+<ol>
+<li>Backend running? <code>docker compose ps</code></li>
+<li>Check logs: <code>docker compose logs backend</code></li>
+<li>Database connected? <code>docker compose logs db</code></li>
+<li>More troubleshooting: Check Redis for celery</li>
+</ol>
+<h2 id="authentication--access">Authentication &amp; Access<a class="headerlink" href="#authentication--access" title="Permanent link">&para;</a></h2>
+<h3 id="cant-login">Can't Login<a class="headerlink" href="#cant-login" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Symptom</th>
+<th>Likely Cause</th>
+<th>Solution</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>"Invalid credentials"</td>
+<td>Wrong username/password</td>
+<td>Sign in with the email address, not the username. Check the <a href="../01-getting-started/#demo-accounts">demo accounts</a>; on a new production instance, <a href="../01-getting-started/#creating-the-first-admin-account">create the first admin account</a></td>
+</tr>
+<tr>
+<td>Participant never set a password</td>
+<td>The onboarding link was not used, or has expired</td>
+<td>The community owner sends a new onboarding link from the participant's card</td>
+</tr>
+<tr>
+<td>"Permission denied"</td>
+<td>User role is too restrictive</td>
+<td>Ask admin to update your role</td>
+</tr>
+<tr>
+<td>Signed out on every device without logging out</td>
+<td>Your password or email was changed, your two-factor was reset, or someone chose <strong>Sign out everywhere</strong> for your account</td>
+<td>Sign in again; if you did not expect it, change your password and check with your administrator</td>
+</tr>
+<tr>
+<td>Email-change link says it "does not work"</td>
+<td>The link was already used, is older than 24 hours, or your password or address changed after you asked</td>
+<td>Request the change again under <strong>My Account → Profile</strong></td>
+</tr>
+<tr>
+<td>"429 Too many requests"</td>
+<td>Login/registration attempts exceeded the per-IP rate limit</td>
+<td>Wait a while (check the <code>Retry-After</code> header) before trying again</td>
+</tr>
+</tbody>
+</table>
+<h3 id="forgot-password">Forgot Password<a class="headerlink" href="#forgot-password" title="Permanent link">&para;</a></h3>
+<p>There is no "forgot password" link on the login page.</p>
+<ul>
+<li><strong>Participants:</strong> ask the community owner to send the onboarding link again
+  (<strong>Participants → More → Send onboarding link</strong>). It signs you in, and you
+  choose a new password. If your invoice has a participant QR code, you can
+  also request a sign-in link from the page it opens.</li>
+<li><strong>Owners and admins:</strong> someone with server access sets a new password — see
+  <a href="../11-roles-and-permissions/#user-cannot-login">Roles and Permissions → "User cannot login"</a>.</li>
+</ul>
+<h3 id="unauthorized--403-forbidden-errors">"Unauthorized" / "403 Forbidden" Errors<a class="headerlink" href="#unauthorized--403-forbidden-errors" title="Permanent link">&para;</a></h3>
+<p><strong>Problem:</strong> Accessing feature you shouldn't see (permission issue).</p>
+<p><strong>Cause:</strong> Your role or ZEV scope doesn't grant access.</p>
+<p><strong>Fix:</strong></p>
+<ol>
+<li>Ask an admin to check your role under <strong>Platform → Accounts → Users</strong></li>
+<li>Ask for additional access if you need it</li>
+<li>Ensure you're in correct ZEV (use ZEV selector if available)</li>
+</ol>
+<h3 id="cant-see-other-zevs">Can't See Other ZEVs<a class="headerlink" href="#cant-see-other-zevs" title="Permanent link">&para;</a></h3>
+<p><strong>Expected behavior:</strong> ZEV Owners only see assigned ZEVs.</p>
+<p><strong>If you need access:</strong> Ask an admin to assign you to the ZEV.</p>
+<h2 id="data-import--metering">Data Import &amp; Metering<a class="headerlink" href="#data-import--metering" title="Permanent link">&para;</a></h2>
+<h3 id="metering-point-not-found-on-import">"Metering point not found" on import<a class="headerlink" href="#metering-point-not-found-on-import" title="Permanent link">&para;</a></h3>
+<p>Import fails because a metering point ID in the file doesn't exist. See
+<a href="../05-metering-import/#handling-import-errors">Metering Imports → Handling Import Errors</a>.</p>
+<h3 id="readings-imported-but-not-billed">Readings imported but not billed<a class="headerlink" href="#readings-imported-but-not-billed" title="Permanent link">&para;</a></h3>
+<p>Imports do not check assignment windows: a reading on a day when the meter has
+no assignment holder is stored, but billed to nobody. <strong>Metering → Data
+Quality</strong> shows an <strong>Unassigned readings</strong> warning for such meters. Fix the
+assignment's validity dates — see
+<a href="../04-metering-points/#assignment-validity-periods">Metering Points → Assignment Validity</a> —
+and regenerate affected draft invoices.</p>
+<h3 id="import-hangs-or-times-out">Import hangs or times out<a class="headerlink" href="#import-hangs-or-times-out" title="Permanent link">&para;</a></h3>
+<p><strong>Problem:</strong> Large file upload gets stuck.</p>
+<p><strong>Causes:</strong></p>
+<ul>
+<li>File too large (the limit is 50 MB per file)</li>
+<li>Network timeout</li>
+<li>Backend processing slow</li>
+</ul>
+<p><strong>Fix:</strong></p>
+<ol>
+<li>Break large files into monthly chunks</li>
+<li>Ensure stable internet connection</li>
+<li>Check backend logs: <code>docker compose logs backend</code></li>
+<li>Restart service: <code>docker compose restart backend</code></li>
+</ol>
+<h3 id="data-quality-shows-mostly-missing">Data quality shows mostly "Missing"<a class="headerlink" href="#data-quality-shows-mostly-missing" title="Permanent link">&para;</a></h3>
+<p>Many meters show "Missing". Diagnose the gaps with
+<a href="../06-metering-analysis/">Metering Analysis</a> before re-importing.</p>
+<h2 id="billing--invoices">Billing &amp; Invoices<a class="headerlink" href="#billing--invoices" title="Permanent link">&para;</a></h2>
+<h3 id="cannot-generate-invoices">"Cannot generate invoices"<a class="headerlink" href="#cannot-generate-invoices" title="Permanent link">&para;</a></h3>
+<p><strong>Problem:</strong> The generate action is missing or returns an error.</p>
+<p><strong>Checks:</strong></p>
+<ol>
+<li>Metering data imported? Check <strong>Metering → Chart</strong></li>
+<li>Tariffs configured? Check <strong>Tariffs</strong></li>
+<li>Participants active? Check <strong>Participants</strong></li>
+<li>Data quality OK? Check <strong>Metering → Data Quality</strong></li>
+<li>Does the row say an existing invoice covers or overlaps the period? Invoices
+   from an earlier billing interval block generation — follow its link to the
+   blocking invoice</li>
+</ol>
+<h3 id="invoice-totals-seem-wrong">Invoice totals seem wrong<a class="headerlink" href="#invoice-totals-seem-wrong" title="Permanent link">&para;</a></h3>
+<p><strong>Troubleshooting:</strong></p>
+<ol>
+<li>Check <a href="../08-billing-allocation-explained/">billing allocation model</a> to understand calculation</li>
+<li>Verify tariff prices in <strong>Tariffs</strong></li>
+<li>Check data quality for gaps</li>
+<li>Manually verify example row:<ul>
+<li>Energy (kWh) × Price (CHF/kWh) = Line total (CHF)</li>
+<li>Compare with invoice</li>
+</ul>
+</li>
+</ol>
+<p><strong>If still wrong:</strong></p>
+<ul>
+<li>Share the invoice <strong>number and billing period</strong> with support or the developer for review</li>
+<li>Provide the raw readings and tariff configuration used for that period</li>
+</ul>
+<h3 id="cannot-send-invoice--email-failed">"Cannot send invoice" / Email failed<a class="headerlink" href="#cannot-send-invoice--email-failed" title="Permanent link">&para;</a></h3>
+<p><strong>Problem:</strong> Invoice marked <strong>Sent</strong> but email delivery failed.</p>
+<p><strong>Fix:</strong></p>
+<ol>
+<li>Check participant email in <strong>Participants</strong> — is it correct?</li>
+<li>Open <strong>Billing → Emails</strong> → <strong>View history</strong> — see the error message</li>
+<li>Correct email address if wrong</li>
+<li>Click <strong>Retry</strong> there, or <strong>More → Resend Email</strong> on the invoice</li>
+</ol>
+<h3 id="invoice-appears-but-participant-hasnt-received-email">Invoice appears but participant hasn't received email<a class="headerlink" href="#invoice-appears-but-participant-hasnt-received-email" title="Permanent link">&para;</a></h3>
+<p><strong>Problem:</strong> Status shows <strong>Sent</strong> but participant hasn't received email.</p>
+<p><strong>Check:</strong></p>
+<ol>
+<li>Ask participant to check spam/junk folder</li>
+<li>Verify email address is correct in <strong>Participants</strong></li>
+<li>Check <strong>Billing → Emails</strong> for the delivery status</li>
+<li>If status = <strong>Failed</strong>, resend manually or correct email + resend</li>
+</ol>
+<h2 id="performance">Performance<a class="headerlink" href="#performance" title="Permanent link">&para;</a></h2>
+<h3 id="application-is-slow">Application is slow<a class="headerlink" href="#application-is-slow" title="Permanent link">&para;</a></h3>
+<p><strong>Problem:</strong> Pages load slowly or create operations time out.</p>
+<p><strong>Checks:</strong></p>
+<ol>
+<li>Database size too large? Check storage: <code>docker compose exec db du -sh /var/lib/postgresql/data</code></li>
+<li>Memory usage? <code>docker stats</code></li>
+<li>Restart services: <code>docker compose restart</code></li>
+</ol>
+<h3 id="chart-rendering-is-slow">Chart rendering is slow<a class="headerlink" href="#chart-rendering-is-slow" title="Permanent link">&para;</a></h3>
+<p><strong>Problem:</strong> Metering Data chart takes long time to render.</p>
+<p><strong>Fix:</strong></p>
+<ol>
+<li>Narrow date range (select 7 days instead of year)</li>
+<li>Use a coarser resolution (daily instead of hourly)</li>
+<li>Select a specific metering point instead of the whole-ZEV total</li>
+</ol>
+<h2 id="database">Database<a class="headerlink" href="#database" title="Permanent link">&para;</a></h2>
+<h3 id="database-wont-start">Database won't start<a class="headerlink" href="#database-wont-start" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code>docker<span class="w"> </span>compose<span class="w"> </span>logs<span class="w"> </span>db
+</code></pre></div>
+<p>Common errors:</p>
+<ul>
+<li><strong>Permission denied:</strong> Database volume ownership issue
+  <div class="highlight"><pre><span></span><code>docker<span class="w"> </span>compose<span class="w"> </span>down
+docker<span class="w"> </span>compose<span class="w"> </span>up<span class="w"> </span>-d<span class="w">  </span><span class="c1"># Fresh start</span>
+</code></pre></div></li>
+<li><strong>Disk full:</strong> Clean up old data or expand volume</li>
+<li><strong>Corruption:</strong> May need to restore from backup (<a href="../18-backups/#restoring-an-instance">how</a>)</li>
+</ul>
+<h3 id="database-backup">Database backup<a class="headerlink" href="#database-backup" title="Permanent link">&para;</a></h3>
+<p>Use the built-in backups: they cover the database <strong>and</strong> the invoice PDF files,
+can be encrypted, and can be verified. See <a href="../18-backups/">Backups</a>. To recover
+from one — on a fresh installation, over an existing one, or for one community
+only — see <a href="../18-backups/#restoring-an-instance">Restoring an instance</a> and
+<a href="../18-backups/#restoring-one-community">Restoring one community</a>.</p>
+<p>If the backup page says <strong>backups have fallen behind</strong>, check in this order: is the
+Celery <strong>worker</strong> running (Overview → System health)? Is the <strong>scheduler (beat)</strong>
+running? Did the last run fail (the reason is on the failed row)? Is the destination
+reachable (<strong>Test</strong> it)? If a backup or restore fails with <em>the backup file is no
+longer available</em>, the worker and the web process are not looking at the same local
+directory: use a shared volume, or an S3 destination. See
+<a href="../18-backups/#scheduling-and-keeping-backups">Scheduling and keeping backups</a>.</p>
+<p>A plain database dump is still useful as an additional safety net, but <strong>it does
+not include the invoice PDFs</strong>, which are files in the media volume
+(<code>backend_media</code>), not database rows. Back that volume up as well, or a restore
+leaves every invoice pointing at a document that is not there.</p>
+<div class="highlight"><pre><span></span><code>docker<span class="w"> </span>compose<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>db<span class="w"> </span>pg_dump<span class="w"> </span>-U<span class="w"> </span>openzev<span class="w"> </span>openzev<span class="w"> </span>&gt;<span class="w"> </span>backup_<span class="k">$(</span>date<span class="w"> </span>+%Y%m%d<span class="k">)</span>.sql
+</code></pre></div>
+<p>To restore a dump:</p>
+<div class="highlight"><pre><span></span><code>docker<span class="w"> </span>compose<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>-T<span class="w"> </span>db<span class="w"> </span>psql<span class="w"> </span>-U<span class="w"> </span>openzev<span class="w"> </span>openzev<span class="w"> </span>&lt;<span class="w"> </span>backup_YYYYMMDD.sql
+</code></pre></div>
+<h2 id="email--async-jobs">Email &amp; Async Jobs<a class="headerlink" href="#email--async-jobs" title="Permanent link">&para;</a></h2>
+<h3 id="email-not-being-sent">Email not being sent<a class="headerlink" href="#email-not-being-sent" title="Permanent link">&para;</a></h3>
+<p>Invoices stuck on <strong>Pending</strong> or <strong>Failed</strong> email delivery. See
+<a href="../10-email-configuration/#handling-email-failures">Email Configuration → Handling Email Failures</a>.
+A common cause is the Celery worker not running — check <code>docker compose logs worker</code>.</p>
+<h3 id="background-jobs-stuck">Background jobs stuck<a class="headerlink" href="#background-jobs-stuck" title="Permanent link">&para;</a></h3>
+<p><strong>Problem:</strong> Import or invoice generation never completes.</p>
+<p><strong>Fix:</strong></p>
+<ol>
+<li>Restart worker service: <code>docker compose restart worker</code></li>
+<li>Check Redis: <code>docker compose logs redis</code></li>
+<li>Check worker and scheduler status under <strong>Platform → Overview → System health</strong></li>
+</ol>
+<h2 id="getting-help">Getting Help<a class="headerlink" href="#getting-help" title="Permanent link">&para;</a></h2>
+<h3 id="logs">Logs<a class="headerlink" href="#logs" title="Permanent link">&para;</a></h3>
+<p>Most issues can be diagnosed from logs:</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># All services</span>
+docker<span class="w"> </span>compose<span class="w"> </span>logs
+
+<span class="c1"># Specific service</span>
+docker<span class="w"> </span>compose<span class="w"> </span>logs<span class="w"> </span>backend
+docker<span class="w"> </span>compose<span class="w"> </span>logs<span class="w"> </span>frontend
+docker<span class="w"> </span>compose<span class="w"> </span>logs<span class="w"> </span>worker
+docker<span class="w"> </span>compose<span class="w"> </span>logs<span class="w"> </span>db
+
+<span class="c1"># With timestamps</span>
+docker<span class="w"> </span>compose<span class="w"> </span>logs<span class="w"> </span>-t
+
+<span class="c1"># Follow live (tail)</span>
+docker<span class="w"> </span>compose<span class="w"> </span>logs<span class="w"> </span>-f<span class="w"> </span>backend
+</code></pre></div>
+<h3 id="export-logs-for-support">Export Logs for Support<a class="headerlink" href="#export-logs-for-support" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code>docker<span class="w"> </span>compose<span class="w"> </span>logs<span class="w"> </span>&gt;<span class="w"> </span>openzev_logs.txt
+</code></pre></div>
+<h3 id="system-information">System Information<a class="headerlink" href="#system-information" title="Permanent link">&para;</a></h3>
+<p>When reporting issues, include:</p>
+<ul>
+<li>Docker version: <code>docker --version</code></li>
+<li>Docker compose version: <code>docker compose --version</code></li>
+<li>OS: Linux, Mac, Windows</li>
+<li>Amount of data: # of participants, invoices, metering points</li>
+<li>Issue reproducibility: Always? Sometimes? After import?</li>
+</ul>
+<h2 id="next-steps">Next Steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Review specific guide for your issue (e.g., <a href="../05-metering-import/">Metering Imports</a>)</li>
+<li>Check <a href="../10-email-configuration/">Email Configuration</a> for email issues</li>
+<li>Visit <a href="https://github.com/splattner/openzev/issues">GitHub Issues</a> to search for your issue or report new ones</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="Footer" >
+        
+          
+          <a href="../16-api-keys/" class="md-footer__link md-footer__link--prev" aria-label="Previous: API Keys">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Previous
+              </span>
+              <div class="md-ellipsis">
+                API Keys
+              </div>
+            </div>
+          </a>
+        
+        
+          
+          <a href="../15-glossary/" class="md-footer__link md-footer__link--next" aria-label="Next: Glossary">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Next
+              </span>
+              <div class="md-ellipsis">
+                Glossary
+              </div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"/></svg>
+            </div>
+          </a>
+        
+      </nav>
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      OpenZEV · AGPL-3.0
+    </div>
+  
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://github.com/splattner/openzev" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.sections", "navigation.top", "navigation.footer", "search.suggest", "search.highlight", "content.code.copy", "content.action.edit", "toc.follow"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+        <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>

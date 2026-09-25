@@ -1,0 +1,2546 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="User guide for OpenZEV, open source billing software for Swiss ZEV and vZEV energy communities.">
+      
+      
+      
+        <link rel="canonical" href="https://www.openzev.ch/docs/18-backups/">
+      
+      
+        <link rel="prev" href="../17-zev-transfer/">
+      
+      
+        <link rel="next" href="../16-api-keys/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/favicon.svg">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Backups - OpenZEV Documentation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,700,700i%7CIBM+Plex+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"IBM Plex Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/docs.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#backups" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="https://www.openzev.ch/" title="OpenZEV Documentation" class="md-header__button md-logo" aria-label="OpenZEV Documentation" data-md-component="logo">
+      
+  <img src="../assets/favicon.svg" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            OpenZEV Documentation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Backups
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="custom" data-md-color-accent="custom"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/splattner/openzev" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    splattner/openzev
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="https://www.openzev.ch/" title="OpenZEV Documentation" class="md-nav__button md-logo" aria-label="OpenZEV Documentation" data-md-component="logo">
+      
+  <img src="../assets/favicon.svg" alt="logo">
+
+    </a>
+    OpenZEV Documentation
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/splattner/openzev" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    splattner/openzev
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../01-getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../11-roles-and-permissions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Roles and Permissions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Planning
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Planning
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../13-feasibility-calculator/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    vZEV Feasibility Calculator
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setting Up Your ZEV
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Setting Up Your ZEV
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../02-zev-setup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ZEV Setup and Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../03-participant-management/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Managing Participants
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../04-metering-points/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Metering Points
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Operations
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Operations
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../05-metering-import/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Metering Imports
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../06-metering-analysis/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Metering Analysis
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../07-tariff-configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tariff Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Billing and Invoicing
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Billing and Invoicing
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../08-billing-allocation-explained/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How Allocation and Billing Works
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../09-invoice-management/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Invoice Management
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../10-email-configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Email Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Administration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Administration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../14-admin-console/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Platform Administration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../17-zev-transfer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ZEV Export and Import
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backups
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backups
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#what-a-backup-contains" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What a backup contains
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#encrypt-your-backups" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Encrypt your backups
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#destinations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Destinations
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#taking-a-backup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Taking a backup
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#verifying-a-backup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Verifying a backup
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#scheduling-and-keeping-backups" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Scheduling and keeping backups
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Scheduling and keeping backups">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-schedule" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The schedule
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#retention-how-many-to-keep" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Retention: how many to keep
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#deleting-a-file-yourself" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Deleting a file yourself
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#is-it-working-staleness" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Is it working? Staleness
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#restoring-an-instance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Restoring an instance
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Restoring an instance">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#on-a-fresh-installation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        On a fresh installation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-to-expect" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What to expect
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#replacing-an-installation-that-already-has-data" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Replacing an installation that already has data
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#when-the-command-refuses" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        When the command refuses
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#practise-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Practise it
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#restoring-one-community" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Restoring one community
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Restoring one community">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#step-by-step" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step by step
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#how-accounts-are-handled" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How accounts are handled
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-else-to-know" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What else to know
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#from-the-command-line" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        From the command line
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#when-it-refuses" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        When it refuses
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-a-backup-does-not-do" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What a backup does not do
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#settings-reference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Settings reference
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Automation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Automation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../16-api-keys/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Keys
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../12-troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../15-glossary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Glossary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#what-a-backup-contains" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What a backup contains
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#encrypt-your-backups" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Encrypt your backups
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#destinations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Destinations
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#taking-a-backup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Taking a backup
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#verifying-a-backup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Verifying a backup
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#scheduling-and-keeping-backups" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Scheduling and keeping backups
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Scheduling and keeping backups">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-schedule" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The schedule
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#retention-how-many-to-keep" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Retention: how many to keep
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#deleting-a-file-yourself" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Deleting a file yourself
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#is-it-working-staleness" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Is it working? Staleness
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#restoring-an-instance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Restoring an instance
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Restoring an instance">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#on-a-fresh-installation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        On a fresh installation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-to-expect" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What to expect
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#replacing-an-installation-that-already-has-data" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Replacing an installation that already has data
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#when-the-command-refuses" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        When the command refuses
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#practise-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Practise it
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#restoring-one-community" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Restoring one community
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Restoring one community">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#step-by-step" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step by step
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#how-accounts-are-handled" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How accounts are handled
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-else-to-know" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What else to know
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#from-the-command-line" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        From the command line
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#when-it-refuses" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        When it refuses
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-a-backup-does-not-do" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What a backup does not do
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#settings-reference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Settings reference
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+    <a href="https://github.com/splattner/openzev/edit/main/docs/user-guide/18-backups.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4zm10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1z"/></svg>
+    </a>
+  
+  
+
+
+<h1 id="backups">Backups<a class="headerlink" href="#backups" title="Permanent link">&para;</a></h1>
+<p>Back up the whole instance, or a single community, to a local directory or to
+S3-compatible storage. Administrators manage backups under <strong>Platform
+administration → System Settings → Backup</strong>.</p>
+<blockquote>
+<p><strong>Two kinds of restore.</strong> One <strong>community</strong> can be brought back to the state of a
+backup from this page — see <a href="#restoring-one-community">Restoring one community</a>.
+A <strong>whole instance</strong> is restored from the server's command line — see
+<a href="#restoring-an-instance">Restoring an instance</a>. Either way, check your backups
+regularly (see <a href="#verifying-a-backup">Verifying a backup</a>), and let them run by
+themselves (see <a href="#scheduling-and-keeping-backups">Scheduling and keeping backups</a>).</p>
+</blockquote>
+<h2 id="what-a-backup-contains">What a backup contains<a class="headerlink" href="#what-a-backup-contains" title="Permanent link">&para;</a></h2>
+<p>A backup holds everything needed to rebuild what it covers:</p>
+<table>
+<thead>
+<tr>
+<th>Whole instance</th>
+<th>One community</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Accounts, API keys, passkeys and two-factor devices</td>
+<td>The community's settings</td>
+</tr>
+<tr>
+<td>Regional settings, feature flags, VAT rates, OAuth providers</td>
+<td>Participants and onboarding links</td>
+</tr>
+<tr>
+<td>PDF and email templates</td>
+<td>Metering points and assignments</td>
+</tr>
+<tr>
+<td>Dynamic price series and their sources</td>
+<td>Tariffs and their periods</td>
+</tr>
+<tr>
+<td>Every community, in full</td>
+<td>Meter readings, import history</td>
+</tr>
+<tr>
+<td>Audit events that belong to no community</td>
+<td>Invoices, their items, <strong>their PDF files</strong>, access links and email log</td>
+</tr>
+<tr>
+<td>Issued contracts whose community was deleted</td>
+<td>Issued contracts</td>
+</tr>
+<tr>
+<td></td>
+<td>The community's audit trail</td>
+</tr>
+</tbody>
+</table>
+<p>Invoice PDFs are <strong>files on disk</strong>, not database rows. A plain database dump
+(<code>pg_dump</code>) does not include them, so a restore from a dump alone leaves every
+invoice pointing at a document that is not there. OpenZEV backups copy them in.</p>
+<p>Not included, on purpose: short-lived login and verification tokens, sessions,
+generated annual-statement downloads (they expire after a day), and the
+encryption keys themselves.</p>
+<h2 id="encrypt-your-backups">Encrypt your backups<a class="headerlink" href="#encrypt-your-backups" title="Permanent link">&para;</a></h2>
+<p><strong>A backup is the most sensitive file OpenZEV can produce.</strong> Unencrypted, it holds
+password hashes, participants' names, addresses and consumption profiles, every
+invoice, and the OAuth client secret in readable form.</p>
+<p>Encryption is switched on by setting <code>BACKUP_ENCRYPTION_KEYS</code> on the server. Generate
+a key with:</p>
+<div class="highlight"><pre><span></span><code>python<span class="w"> </span>-c<span class="w"> </span><span class="s2">"import base64, os; print(base64.urlsafe_b64encode(os.urandom(32)).decode())"</span>
+</code></pre></div>
+<ul>
+<li>The backup page shows a warning until a key is set, and every backup records
+  whether it was encrypted.</li>
+<li>Backups are encrypted with AES-256-GCM. Several keys can be listed, comma
+  separated: the first encrypts, every one can decrypt. To rotate, add the new
+  key <strong>in front</strong>, take fresh backups, and drop the old key only once no backup
+  you still need was made with it.</li>
+<li><strong>Keep a copy of the key somewhere other than the server.</strong> Without it an
+  encrypted backup cannot be opened — by anyone, including us. It is a separate
+  secret from <code>MFA_ENCRYPTION_KEYS</code> and <code>SECRET_KEY</code>, and it is not stored in the
+  backup.</li>
+<li>To restore a backup made on another instance you will also need that instance's
+  <code>MFA_ENCRYPTION_KEYS</code>, or every two-factor secret in it is unreadable. Each
+  backup records a fingerprint of the keys it needs, and restoring tells you before
+  it changes anything if they do not match (see
+  <a href="#restoring-an-instance">Restoring an instance</a>).</li>
+</ul>
+<h2 id="destinations">Destinations<a class="headerlink" href="#destinations" title="Permanent link">&para;</a></h2>
+<p>A destination is where finished backups are written. Add one with <strong>Add
+destination</strong>.</p>
+<p><strong>Local directory</strong> — an absolute path on the server. It must be outside the
+media directory (archives contain private data and the media directory is served
+to browsers), and it is created if it does not exist. Files are readable by the
+server's user only. In a container, mount a volume there or the backups vanish
+with the container. The background worker writes the archive and later reads it
+back to restore from it, and the web process serves the download, so the directory
+must be the <strong>same storage for the worker and the web process</strong> — a shared volume,
+not two containers each with their own copy of the path. If a restore fails with
+<em>the backup file is no longer available</em>, this is the first thing to check.</p>
+<p><strong>S3-compatible storage</strong> — Amazon S3, MinIO, Garage, Wasabi, Backblaze B2 and
+similar. Give a bucket, an optional key prefix and region, and, for anything other
+than Amazon S3, the endpoint URL.</p>
+<p>S3 credentials are taken from the first of these that applies:</p>
+<ol>
+<li><strong>The server's environment</strong> — <code>BACKUP_S3_ACCESS_KEY_ID</code> and
+   <code>BACKUP_S3_SECRET_ACCESS_KEY</code>. These override everything, and keep the secret out
+   of the database entirely.</li>
+<li><strong>Stored on the destination</strong> — the secret is encrypted with
+   <code>BACKUP_ENCRYPTION_KEYS</code> and is never shown again. A secret can only be stored
+   once that key is set.</li>
+<li><strong>An instance role</strong> — leave both credential fields empty (for example IAM roles
+   for service accounts on Kubernetes).</li>
+</ol>
+<p>Use <strong>Test</strong> on a destination to write and delete a small probe object before
+relying on it. Deleting a destination never deletes the archives already written
+there.</p>
+<h2 id="taking-a-backup">Taking a backup<a class="headerlink" href="#taking-a-backup" title="Permanent link">&para;</a></h2>
+<p><strong>From the app:</strong> choose <em>Whole instance</em> or <em>One community</em>, pick a destination and
+click <strong>Back up now</strong>. The backup runs in the background and the list updates as it
+progresses. <strong>Details</strong> shows what a finished backup contains, including any invoice
+PDFs that were referenced but missing from storage. <strong>Download</strong> is offered for
+archives in a local directory; archives in S3 are fetched from the bucket.</p>
+<p><strong>From the command line</strong> — this needs no background worker, so it also works from
+cron:</p>
+<div class="highlight"><pre><span></span><code>python<span class="w"> </span>manage.py<span class="w"> </span>openzev_backup<span class="w"> </span>--destination<span class="w"> </span>nightly
+python<span class="w"> </span>manage.py<span class="w"> </span>openzev_backup<span class="w"> </span>--path<span class="w"> </span>/var/backups/openzev
+python<span class="w"> </span>manage.py<span class="w"> </span>openzev_backup<span class="w"> </span>--destination<span class="w"> </span>nightly<span class="w"> </span>--zev<span class="w"> </span><span class="s2">"Sonnenhof"</span>
+</code></pre></div>
+<p>The command warns on standard error when the archive will not be encrypted, prints
+the location, size and SHA-256 of the result, and exits non-zero on failure.</p>
+<p>A backup reads the database inside a single consistent snapshot, so it never
+contains a state that did not exist. It only takes a few minutes for large
+instances (millions of readings), and needs free disk space for one archive in the
+server's temporary directory — set <code>BACKUP_WORK_DIR</code> to put it elsewhere.</p>
+<h2 id="verifying-a-backup">Verifying a backup<a class="headerlink" href="#verifying-a-backup" title="Permanent link">&para;</a></h2>
+<p>A backup you have never checked is a hope, not a backup.</p>
+<p><strong>From the app:</strong> press <strong>Check</strong> on a backup. It reads the stored file again — from
+the local directory, or by downloading it from S3 — and records the result on the
+backup: <em>Intact</em> with the date, or <em>Check failed</em> with the reason. It checks that the
+bytes are the ones written (against the checksum recorded at the time, which catches
+a file that decayed on disk or was tampered with even if you cannot decrypt it),
+then decrypts it and checks every part, that nothing has been added or removed, and
+that every section a backup must contain is there. It changes nothing.</p>
+<p><strong>From the command line</strong>, for a copy of a file:</p>
+<div class="highlight"><pre><span></span><code>python<span class="w"> </span>manage.py<span class="w"> </span>openzev_backup_verify<span class="w"> </span>/var/backups/openzev/openzev-backup-….zip.enc
+</code></pre></div>
+<p>Run it on a copy that has been through the same path you would use in an emergency
+(downloaded from the bucket, copied off the server) to catch problems in transit as
+well as at rest.</p>
+<h2 id="scheduling-and-keeping-backups">Scheduling and keeping backups<a class="headerlink" href="#scheduling-and-keeping-backups" title="Permanent link">&para;</a></h2>
+<h3 id="the-schedule">The schedule<a class="headerlink" href="#the-schedule" title="Permanent link">&para;</a></h3>
+<p><strong>Backup → Schedule</strong> turns on automatic backups: every day or every week, at a time
+of day in the server's time zone (shown next to the field). Each run backs up the
+<strong>whole instance to every enabled destination</strong>; a destination that is still busy with
+the previous backup is skipped, not queued up behind it.</p>
+<p>Two things have to be true for it to run at all, and the page says both:</p>
+<ul>
+<li><strong>The scheduler (beat) has to be running</strong> next to the worker. Without it the
+  schedule is saved but nothing fires. The backup page and the <em>System health</em> tab go
+  red if it stops working — see below.</li>
+<li><strong>Set <code>BACKUP_ENCRYPTION_KEYS</code> first.</strong> A schedule without a key writes unencrypted
+  archives, unattended, every time. The page warns while a schedule is on with no key,
+  and <code>python manage.py check --database default</code> reports it as <code>backups.W001</code>.</li>
+</ul>
+<p>Changes take effect without a restart.</p>
+<h3 id="retention-how-many-to-keep">Retention: how many to keep<a class="headerlink" href="#retention-how-many-to-keep" title="Permanent link">&para;</a></h3>
+<p>Every destination has <strong>Keep the latest</strong>. Set it to <code>7</code> and, after each new backup
+finishes, the destination keeps the seven newest backups of each kind — the whole
+instance, and each community separately — and deletes the files of older ones.</p>
+<ul>
+<li><strong>The default is <code>0</code>: keep everything.</strong> Nothing is ever deleted unless you turn
+  this on.</li>
+<li>Deletion happens <em>after</em> a new backup has finished, never before, so a destination
+  set to keep one backup is never left with none.</li>
+<li>The newest backup of each kind is never deleted, and neither is one that a restore
+  or a check is reading right now.</li>
+<li>A deleted backup <strong>stays in the list</strong> as history ("File removed: beyond
+  retention"), but can no longer be restored, downloaded or checked.</li>
+<li>Backups written with <code>--path</code> (no saved destination) are yours to manage: OpenZEV
+  does not know that directory's bounds, so it never deletes from it.</li>
+</ul>
+<p>To see what a setting <em>would</em> delete before trusting it:</p>
+<div class="highlight"><pre><span></span><code>python<span class="w"> </span>manage.py<span class="w"> </span>openzev_backup_sweep<span class="w"> </span>--dry-run
+</code></pre></div>
+<p>The same clean-up runs every hour on its own, and at the start and end of each backup.
+Run <code>openzev_backup_sweep</code> from cron if you have no scheduler.</p>
+<p><strong>Safety backups</strong> — the backup of a community taken just before restoring it — are
+not routine backups, so retention never counts them. They <strong>expire after 30 days</strong>
+(<code>BACKUP_SAFETY_RETENTION_DAYS</code>; <code>0</code> keeps them). Until then, restoring from one
+undoes the restore.</p>
+<h3 id="deleting-a-file-yourself">Deleting a file yourself<a class="headerlink" href="#deleting-a-file-yourself" title="Permanent link">&para;</a></h3>
+<p><strong>Delete file</strong> on a backup removes its file from the destination (after asking) and
+keeps the entry. It refuses while a restore or a check is using the backup. A
+destination that still holds backup files cannot be deleted — delete their files
+first, or just disable it.</p>
+<h3 id="is-it-working-staleness">Is it working? Staleness<a class="headerlink" href="#is-it-working-staleness" title="Permanent link">&para;</a></h3>
+<p>The backup page and <strong>Overview → System health</strong> show whether the instance is
+actually protected. With a schedule on, backups are <strong>stale</strong> when the last finished
+whole-instance backup is older than <strong>twice the schedule's interval</strong> — one missed
+run is tolerated, two are a problem — or when none has ever finished. The health card
+is also red when the last run failed after the last success, or when a destination is
+enabled but nothing has ever succeeded; it is grey ("not set up") when no destination
+is enabled at all.</p>
+<p>Only whole-instance backups count. A backup of one community does not protect the
+instance, and a safety backup is the way back from a restore, so neither can make the
+instance look freshly backed up.</p>
+<h2 id="restoring-an-instance">Restoring an instance<a class="headerlink" href="#restoring-an-instance" title="Permanent link">&para;</a></h2>
+<p>Restoring a whole instance rebuilds everything a backup holds — accounts, settings,
+templates, price series, every community with its readings, invoices <strong>and their
+PDF files</strong>, issued contracts, and the audit trail — with every identifier
+unchanged. It is meant for two situations: <strong>setting up a new installation from a
+backup</strong>, and <strong>replacing an installation with an earlier state of itself</strong>.</p>
+<p>It is a command on the server, not a button, on purpose: it replaces every
+account, including the administrator who would be pressing the button.</p>
+<h3 id="on-a-fresh-installation">On a fresh installation<a class="headerlink" href="#on-a-fresh-installation" title="Permanent link">&para;</a></h3>
+<ol>
+<li><strong>Install OpenZEV and create an empty database.</strong> Use the version that made the
+   backup if you can: a backup restores only into the database structure it was
+   taken from. <code>openzev_backup_verify</code> prints that version, and the restore
+   command tells you exactly what to do if the two differ.</li>
+<li><strong>Set the keys the backup needs</strong> in the new installation's environment:<ul>
+<li><code>BACKUP_ENCRYPTION_KEYS</code> — the key the backup was encrypted with, if it was.</li>
+<li><code>MFA_ENCRYPTION_KEYS</code> — the old instance's, or its members' two-factor
+   secrets cannot be read. (Recovery codes and an administrator's reset still
+   work, and the restore warns you if the key is missing.)</li>
+</ul>
+</li>
+<li>
+<p><strong>Create the database structure</strong>, and nothing else:</p>
+<div class="highlight"><pre><span></span><code>python<span class="w"> </span>manage.py<span class="w"> </span>migrate
+</code></pre></div>
+<p>Do not create users or communities. A superuser created for setup is fine; it
+ is replaced by the backup's accounts.</p>
+</li>
+<li>
+<p><strong>Get the archive onto the server</strong> — copy the file, or read it straight from
+   S3-compatible storage (next step).</p>
+</li>
+<li>
+<p><strong>Check it first.</strong> A dry run does everything except write:</p>
+<div class="highlight"><pre><span></span><code>python<span class="w"> </span>manage.py<span class="w"> </span>openzev_restore<span class="w"> </span>--mode<span class="w"> </span>instance<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--from<span class="w"> </span>/var/backups/openzev/openzev-backup-….zip.enc<span class="w"> </span>--dry-run
+</code></pre></div>
+<p>It verifies the archive, checks it fits this installation, reads every record,
+ and lists what would be restored. If anything is wrong it stops here and says
+ what.</p>
+</li>
+<li>
+<p><strong>Restore.</strong> Stop the web and worker processes first, then run the same
+   command without <code>--dry-run</code>:</p>
+<div class="highlight"><pre><span></span><code>python<span class="w"> </span>manage.py<span class="w"> </span>openzev_restore<span class="w"> </span>--mode<span class="w"> </span>instance<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--from<span class="w"> </span>/var/backups/openzev/openzev-backup-….zip.enc
+</code></pre></div>
+<p>From S3-compatible storage, give the object's address; credentials come from
+ <code>BACKUP_S3_ACCESS_KEY_ID</code> / <code>BACKUP_S3_SECRET_ACCESS_KEY</code>, or from the server's
+ role:</p>
+<div class="highlight"><pre><span></span><code>python<span class="w"> </span>manage.py<span class="w"> </span>openzev_restore<span class="w"> </span>--mode<span class="w"> </span>instance<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--from<span class="w"> </span>s3://my-bucket/openzev/openzev-backup-….zip.enc<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--region<span class="w"> </span>eu-central-1<span class="w"> </span><span class="o">[</span>--endpoint-url<span class="w"> </span>https://s3.example.com<span class="o">]</span>
+</code></pre></div>
+</li>
+<li>
+<p><strong>Start the web and worker processes</strong> and sign in with an account from the
+   backup.</p>
+</li>
+</ol>
+<p>The restore happens in a single step: if anything fails, nothing is changed, and
+the invoice PDFs it had already written are removed again. When it finishes it
+prints how many records of each kind it restored, and adds an entry to the audit
+log recording that the instance was restored.</p>
+<h3 id="what-to-expect">What to expect<a class="headerlink" href="#what-to-expect" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Everything is as it was when the backup was taken</strong> — including the audit
+  trail, so a restored instance carries its whole history. Anything created after
+  that moment is not in the backup.</li>
+<li><strong>Invoice PDFs come back under the same names.</strong> A PDF that was already missing
+  when the backup was made cannot be restored; the command tells you how many, and
+  regenerating the invoice recreates it.</li>
+<li><strong>New records after a restore work normally.</strong> The restore moves the database's
+  counters past the restored records so the next new user or rate does not clash
+  with an old one.</li>
+<li><strong>Destinations and schedules are not restored.</strong> Backup destinations are
+  instance configuration (they may hold credentials that belong to the old
+  environment); add them again under <strong>Backup</strong>.</li>
+</ul>
+<h3 id="replacing-an-installation-that-already-has-data">Replacing an installation that already has data<a class="headerlink" href="#replacing-an-installation-that-already-has-data" title="Permanent link">&para;</a></h3>
+<p>By default the command refuses to touch an installation that has communities or
+accounts — a whole-instance restore replaces <strong>everything</strong>, and doing it to the
+wrong server would be a very bad day. To do it on purpose, add <code>--force</code>. Use
+<code>--dry-run --force</code> first: it reports how many existing records would be deleted.</p>
+<p>Take a backup of the current state first if there is any chance you want it.</p>
+<h3 id="when-the-command-refuses">When the command refuses<a class="headerlink" href="#when-the-command-refuses" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Message says</th>
+<th>What it means</th>
+<th>What to do</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><em>not a backup</em></td>
+<td>It is a community transfer archive, not a backup</td>
+<td>Import it from the community's settings instead</td>
+</tr>
+<tr>
+<td><em>single community</em></td>
+<td>It is a backup of one community</td>
+<td>Whole-instance restore needs an instance backup; restore that community from <strong>Backup → Restore a community</strong> instead</td>
+</tr>
+<tr>
+<td><em>newer version of OpenZEV</em></td>
+<td>The backup was taken by a newer release than this one</td>
+<td>Upgrade OpenZEV, then restore</td>
+</tr>
+<tr>
+<td><em>has not applied migrations</em></td>
+<td>The database structure is older than the backup's</td>
+<td>Run <code>python manage.py migrate</code></td>
+</tr>
+<tr>
+<td><em>schema is newer than the backup</em></td>
+<td>The database structure is newer than the backup's</td>
+<td>It names the <code>migrate &lt;app&gt; &lt;migration&gt;</code> steps that bring the structure back; restore; then run <code>python manage.py migrate</code></td>
+</tr>
+<tr>
+<td><em>already has data</em></td>
+<td>The installation is not empty</td>
+<td>Restore into a fresh one, or add <code>--force</code> deliberately</td>
+</tr>
+<tr>
+<td><em>encrypted under a key this instance does not have</em></td>
+<td><code>BACKUP_ENCRYPTION_KEYS</code> lacks the key</td>
+<td>Add the key (its fingerprint is in the message)</td>
+</tr>
+<tr>
+<td><em>failed verification</em></td>
+<td>The file is damaged or incomplete</td>
+<td>Use another copy; the problems are listed</td>
+</tr>
+</tbody>
+</table>
+<h3 id="practise-it">Practise it<a class="headerlink" href="#practise-it" title="Permanent link">&para;</a></h3>
+<p>Restore a recent backup into a throwaway installation once, before you need to.
+Time it, and write down which keys you needed and where they were. A restore
+drill on a quiet afternoon is how you find out that the key was only ever on the
+server that is now gone.</p>
+<h2 id="restoring-one-community">Restoring one community<a class="headerlink" href="#restoring-one-community" title="Permanent link">&para;</a></h2>
+<p>Use this when one community has gone wrong — a bad import, a wrong bulk edit, a
+deleted community — and everything else is fine. It puts <strong>that community</strong> back
+to the state of a backup and leaves alone:</p>
+<ul>
+<li>every <strong>other community</strong>,</li>
+<li>every <strong>account</strong> — no user is created, changed or deleted, not a password, not
+  a two-factor device,</li>
+<li>the <strong>audit trail</strong> — it is never rewritten; the restore itself is added to it.</li>
+</ul>
+<p>It works from <strong>Platform administration → System Settings → Backup → Restore a
+community</strong>, and from the command line (below). You need a finished backup that
+holds the community: an instance backup holds all of them, a single-community
+backup one.</p>
+<h3 id="step-by-step">Step by step<a class="headerlink" href="#step-by-step" title="Permanent link">&para;</a></h3>
+<ol>
+<li>Choose the <strong>backup</strong> and the <strong>community</strong> in it, and press <strong>Preview
+   restore</strong>. Nothing is changed. The preview is computed against the live data
+   and shows, for each kind of data, how many records the backup has and how many
+   there are now. The audit trail is listed as <em>never restored, only added to</em>.</li>
+<li><strong>Read the problems.</strong> They come in two kinds:<ul>
+<li><em>needs your confirmation</em> — issued records the restore would lose: a <strong>sent or
+   paid invoice</strong> it would delete or roll back to an earlier status, or an
+   <strong>issued contract</strong> it would delete. You can go ahead, on purpose, with the
+   switch that appears.</li>
+<li><em>cannot be overridden</em> — going ahead would damage something else: a <strong>meter
+   id</strong> in the backup that now belongs to another community, a price source the
+   backup refers to that no longer exists, an <strong>owner</strong> with no matching account
+   (when the community has to be recreated), or an <strong>export or another restore</strong>
+   running for that community. Resolve these first, then preview again.</li>
+</ul>
+</li>
+<li><strong>Choose where the safety backup goes.</strong> Before anything is changed, the
+   community <em>as it is now</em> is backed up there. If that backup fails, nothing is
+   restored. It is the way back: restore from it to undo the restore.</li>
+<li><strong>Type the community's name</strong> and press <strong>Restore now</strong>. The whole restore is
+   applied in one step. If anything fails, the community is exactly as it was.</li>
+</ol>
+<h3 id="how-accounts-are-handled">How accounts are handled<a class="headerlink" href="#how-accounts-are-handled" title="Permanent link">&para;</a></h3>
+<p>A backup refers to people by an internal number that means nothing elsewhere, so
+a restore looks each person up <strong>by email address</strong> (then username) among today's
+accounts and links them again. Someone with no matching account is listed in the
+preview and left unlinked — a restore <strong>never creates an account</strong>. If the
+community's owner has no matching account, an existing community keeps its
+current owner; a community that has to be recreated cannot be, until the owner's
+account exists.</p>
+<h3 id="what-else-to-know">What else to know<a class="headerlink" href="#what-else-to-know" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>A deleted community is recreated</strong> with everything the backup holds. Its old
+  audit events stay in the trail as they are.</li>
+<li><strong>Invoice PDFs</strong> are restored under their original names. Files for invoices
+  that no longer exist are left in storage.</li>
+<li><strong>Do not run it while invoices are being generated in bulk</strong> for that
+  community: there is no job to detect that, so this is on you. A running annual
+  export is detected and blocks the restore.</li>
+<li>The restore is recorded in <strong>History</strong> on the same page and in the audit trail
+  (<code>restore.created</code>, <code>restore.started</code>, <code>zev.restored</code>, or <code>restore.failed</code>).
+  A preview is recorded as <code>restore.previewed</code>.</li>
+</ul>
+<h3 id="from-the-command-line">From the command line<a class="headerlink" href="#from-the-command-line" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><span class="c1"># What would it do? (exits non-zero if it would be refused)</span>
+python<span class="w"> </span>manage.py<span class="w"> </span>openzev_restore<span class="w"> </span>--mode<span class="w"> </span>zev<span class="w"> </span>--from<span class="w"> </span>/var/backups/openzev/openzev-backup-….zip.enc<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--zev<span class="w"> </span><span class="s2">"Sonnenhof"</span><span class="w"> </span>--dry-run
+
+<span class="c1"># Do it, with the safety backup written to a directory you name</span>
+python<span class="w"> </span>manage.py<span class="w"> </span>openzev_restore<span class="w"> </span>--mode<span class="w"> </span>zev<span class="w"> </span>--from<span class="w"> </span>/var/backups/openzev/openzev-backup-….zip.enc<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--zev<span class="w"> </span><span class="s2">"Sonnenhof"</span><span class="w"> </span>--path<span class="w"> </span>/var/backups/openzev/safety
+</code></pre></div>
+<p><code>--zev</code> takes the community's name or id; a <strong>deleted</strong> community is named by id
+(<code>openzev_backup_verify</code> lists the ids in a backup). Use <code>--destination NAME</code> for a
+saved destination instead of <code>--path</code>. <code>--force</code> goes ahead past the
+<em>needs your confirmation</em> problems. <code>--from</code> can also be an <code>s3://</code> address, as for
+<a href="#restoring-an-instance">restoring an instance</a>.</p>
+<h3 id="when-it-refuses">When it refuses<a class="headerlink" href="#when-it-refuses" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Message says</th>
+<th>What it means</th>
+<th>What to do</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><em>does not contain that community</em></td>
+<td>The backup was taken of other communities</td>
+<td>Pick another backup</td>
+</tr>
+<tr>
+<td><em>would delete or roll back N issued record(s)</em></td>
+<td>Sent or paid invoices, or issued contracts, would be lost</td>
+<td>Read them in the plan; go ahead only if you mean it</td>
+</tr>
+<tr>
+<td><em>cannot be overridden</em></td>
+<td>See step 2 above</td>
+<td>Resolve it and preview again</td>
+</tr>
+<tr>
+<td><em>safety backup failed</em></td>
+<td>The safety backup could not be written</td>
+<td>Fix the destination (<strong>Test</strong> it under Destinations); nothing was restored</td>
+</tr>
+<tr>
+<td><em>newer version</em> / <em>migrations</em></td>
+<td>The backup was made by a different version</td>
+<td>As for <a href="#when-the-command-refuses">restoring an instance</a></td>
+</tr>
+</tbody>
+</table>
+<h2 id="what-a-backup-does-not-do">What a backup does not do<a class="headerlink" href="#what-a-backup-does-not-do" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>It is a snapshot, not a log.</strong> Restoring returns things to how they were at the
+  moment the backup was taken; anything after that is lost. How often you back up
+  sets how much you can lose. If you need finer recovery than that, use your
+  database's own point-in-time recovery (WAL archiving with pgBackRest or wal-g) <em>in
+  addition</em>.</li>
+<li><strong>It is not a substitute for testing a restore.</strong> <em>Intact</em> means the file is
+  complete and unchanged, not that you know how to use it. See
+  <a href="#practise-it">Practise it</a>.</li>
+<li><strong>The schedule and retention are instance settings, not part of a backup.</strong> After a
+  whole-instance restore, add the destinations and switch the schedule on again.</li>
+</ul>
+<h2 id="settings-reference">Settings reference<a class="headerlink" href="#settings-reference" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Setting</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>BACKUP_ENCRYPTION_KEYS</code></td>
+<td>Comma-separated keys, at least 32 characters each. First encrypts, all decrypt. Optional but strongly recommended.</td>
+</tr>
+<tr>
+<td><code>BACKUP_S3_ACCESS_KEY_ID</code>, <code>BACKUP_S3_SECRET_ACCESS_KEY</code></td>
+<td>S3 credentials from the environment; override any stored on a destination.</td>
+</tr>
+<tr>
+<td><code>BACKUP_WORK_DIR</code></td>
+<td>Where archives are assembled before being stored. Needs room for one full archive.</td>
+</tr>
+<tr>
+<td><code>BACKUP_RUNNER_TIMEOUT_S</code></td>
+<td>Time budget for one backup run. Default 10800 (3 hours). A job still <code>running</code> well past this is failed by the sweep.</td>
+</tr>
+<tr>
+<td><code>BACKUP_SAFETY_RETENTION_DAYS</code></td>
+<td>How long a safety backup (taken before restoring a community) is kept. Default 30; <code>0</code> keeps them until deleted.</td>
+</tr>
+</tbody>
+</table>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="Footer" >
+        
+          
+          <a href="../17-zev-transfer/" class="md-footer__link md-footer__link--prev" aria-label="Previous: ZEV Export and Import">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Previous
+              </span>
+              <div class="md-ellipsis">
+                ZEV Export and Import
+              </div>
+            </div>
+          </a>
+        
+        
+          
+          <a href="../16-api-keys/" class="md-footer__link md-footer__link--next" aria-label="Next: API Keys">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Next
+              </span>
+              <div class="md-ellipsis">
+                API Keys
+              </div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"/></svg>
+            </div>
+          </a>
+        
+      </nav>
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      OpenZEV · AGPL-3.0
+    </div>
+  
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://github.com/splattner/openzev" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.sections", "navigation.top", "navigation.footer", "search.suggest", "search.highlight", "content.code.copy", "content.action.edit", "toc.follow"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+        <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>

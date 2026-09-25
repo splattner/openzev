@@ -1,0 +1,3320 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="User guide for OpenZEV, open source billing software for Swiss ZEV and vZEV energy communities.">
+      
+      
+      
+        <link rel="canonical" href="https://www.openzev.ch/docs/07-tariff-configuration/">
+      
+      
+        <link rel="prev" href="../06-metering-analysis/">
+      
+      
+        <link rel="next" href="../08-billing-allocation-explained/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/favicon.svg">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Tariff Configuration - OpenZEV Documentation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,700,700i%7CIBM+Plex+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"IBM Plex Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/docs.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#tariff-configuration" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="https://www.openzev.ch/" title="OpenZEV Documentation" class="md-header__button md-logo" aria-label="OpenZEV Documentation" data-md-component="logo">
+      
+  <img src="../assets/favicon.svg" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            OpenZEV Documentation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Tariff Configuration
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="custom" data-md-color-accent="custom"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/splattner/openzev" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    splattner/openzev
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="https://www.openzev.ch/" title="OpenZEV Documentation" class="md-nav__button md-logo" aria-label="OpenZEV Documentation" data-md-component="logo">
+      
+  <img src="../assets/favicon.svg" alt="logo">
+
+    </a>
+    OpenZEV Documentation
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/splattner/openzev" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    splattner/openzev
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../01-getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../11-roles-and-permissions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Roles and Permissions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Planning
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Planning
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../13-feasibility-calculator/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    vZEV Feasibility Calculator
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setting Up Your ZEV
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Setting Up Your ZEV
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../02-zev-setup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ZEV Setup and Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../03-participant-management/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Managing Participants
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../04-metering-points/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Metering Points
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Operations
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Operations
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../05-metering-import/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Metering Imports
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../06-metering-analysis/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Metering Analysis
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tariff Configuration
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tariff Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#what-is-a-tariff" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What is a Tariff?
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#creating-a-tariff" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Creating a Tariff
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#importing-tariffs-from-your-grid-operator" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Importing Tariffs from Your Grid Operator
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Importing Tariffs from Your Grid Operator">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#running-an-import" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Running an import
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#one-published-tariff-can-become-two" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        One published tariff can become two
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#choosing-how-a-fee-is-billed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Choosing how a fee is billed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-the-statuses-mean" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What the statuses mean
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#importing-next-years-document" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Importing next year's document
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-is-not-imported" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What is not imported
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dynamic-tariffs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Dynamic tariffs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#reading-a-dynamic-tariffs-price" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reading a dynamic tariff's price
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#feed-in-at-the-bfe-reference-market-price" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Feed-in at the BFE reference market price
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#operating-a-price-source-administrators" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Operating a price source (administrators)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#recovering-a-refused-price-series" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Recovering a refused price series
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#if-migration-0014-refuses-existing-intervals" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        If migration 0014 refuses existing intervals
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#energy-tariff-types" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Energy Tariff Types
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Energy Tariff Types">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#local-energy-tariff" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Local Energy Tariff
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#grid-energy-tariff" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Grid Energy Tariff
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#feed-in-tariff" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Feed-In Tariff
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#percentage-of-energy-tariff" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Percentage of Energy Tariff
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fixed-fee-tariff" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fixed Fee Tariff
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#shared-fees" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Shared Fees
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Shared Fees">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#how-a-shared-fee-is-split" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How a shared fee is split
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#tariff-periods" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tariff Periods
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#multi-tariff-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Multi-Tariff Configuration
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#tariff-versions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tariff Versions
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Tariff Versions">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#adding-a-new-version" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Adding a New Version
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#comparing-versions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Comparing Versions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#price-history" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Price History
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#renaming" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Renaming
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#duplicating" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Duplicating
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#which-version-gets-billed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Which Version Gets Billed
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#tariff-validation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tariff Validation
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Tariff Validation">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#several-tariffs-at-once-is-normal" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Several Tariffs at Once Is Normal
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#copying-tariffs-to-another-community" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Copying Tariffs to Another Community
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#editing-and-deactivating-tariffs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Editing and Deactivating Tariffs
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Editing and Deactivating Tariffs">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#updating-a-tariff" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Updating a Tariff
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#deactivating-a-tariff" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Deactivating a Tariff
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#tariff-application-during-billing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tariff Application During Billing
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#printing-a-tariff-overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Printing a Tariff Overview
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#tariff-tips" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tariff Tips
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#next-steps" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Next Steps
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Billing and Invoicing
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Billing and Invoicing
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../08-billing-allocation-explained/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How Allocation and Billing Works
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../09-invoice-management/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Invoice Management
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../10-email-configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Email Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Administration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Administration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../14-admin-console/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Platform Administration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../17-zev-transfer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ZEV Export and Import
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../18-backups/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backups
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Automation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Automation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../16-api-keys/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Keys
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../12-troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../15-glossary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Glossary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#what-is-a-tariff" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What is a Tariff?
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#creating-a-tariff" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Creating a Tariff
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#importing-tariffs-from-your-grid-operator" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Importing Tariffs from Your Grid Operator
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Importing Tariffs from Your Grid Operator">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#running-an-import" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Running an import
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#one-published-tariff-can-become-two" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        One published tariff can become two
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#choosing-how-a-fee-is-billed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Choosing how a fee is billed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-the-statuses-mean" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What the statuses mean
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#importing-next-years-document" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Importing next year's document
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-is-not-imported" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What is not imported
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dynamic-tariffs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Dynamic tariffs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#reading-a-dynamic-tariffs-price" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reading a dynamic tariff's price
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#feed-in-at-the-bfe-reference-market-price" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Feed-in at the BFE reference market price
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#operating-a-price-source-administrators" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Operating a price source (administrators)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#recovering-a-refused-price-series" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Recovering a refused price series
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#if-migration-0014-refuses-existing-intervals" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        If migration 0014 refuses existing intervals
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#energy-tariff-types" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Energy Tariff Types
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Energy Tariff Types">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#local-energy-tariff" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Local Energy Tariff
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#grid-energy-tariff" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Grid Energy Tariff
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#feed-in-tariff" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Feed-In Tariff
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#percentage-of-energy-tariff" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Percentage of Energy Tariff
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fixed-fee-tariff" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fixed Fee Tariff
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#shared-fees" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Shared Fees
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Shared Fees">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#how-a-shared-fee-is-split" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How a shared fee is split
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#tariff-periods" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tariff Periods
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#multi-tariff-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Multi-Tariff Configuration
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#tariff-versions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tariff Versions
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Tariff Versions">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#adding-a-new-version" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Adding a New Version
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#comparing-versions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Comparing Versions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#price-history" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Price History
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#renaming" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Renaming
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#duplicating" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Duplicating
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#which-version-gets-billed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Which Version Gets Billed
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#tariff-validation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tariff Validation
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Tariff Validation">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#several-tariffs-at-once-is-normal" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Several Tariffs at Once Is Normal
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#copying-tariffs-to-another-community" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Copying Tariffs to Another Community
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#editing-and-deactivating-tariffs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Editing and Deactivating Tariffs
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Editing and Deactivating Tariffs">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#updating-a-tariff" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Updating a Tariff
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#deactivating-a-tariff" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Deactivating a Tariff
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#tariff-application-during-billing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tariff Application During Billing
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#printing-a-tariff-overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Printing a Tariff Overview
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#tariff-tips" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tariff Tips
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#next-steps" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Next Steps
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+    <a href="https://github.com/splattner/openzev/edit/main/docs/user-guide/07-tariff-configuration.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4zm10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1z"/></svg>
+    </a>
+  
+  
+
+
+<h1 id="tariff-configuration">Tariff Configuration<a class="headerlink" href="#tariff-configuration" title="Permanent link">&para;</a></h1>
+<p>This guide covers setting up tariffs and pricing in OpenZEV.</p>
+<h2 id="what-is-a-tariff">What is a Tariff?<a class="headerlink" href="#what-is-a-tariff" title="Permanent link">&para;</a></h2>
+<p>A <strong>tariff</strong> is a pricing rule that defines how to charge participants for energy.</p>
+<p>Each tariff has:</p>
+<ul>
+<li>a <strong>Category</strong> — <code>Energy</code>, <code>Grid Fees</code>, <code>Levies</code> or <code>Metering Tariff</code>
+  (groups the lines on the invoice)</li>
+<li>a <strong>Billing mode</strong> — per kWh (<em>By energy</em>), a <em>Percentage of energy
+  tariffs</em>, or a fixed fee (monthly, yearly, per metering point, or shared
+  across the community)</li>
+<li>for per-kWh tariffs, an <strong>Energy type</strong> — which energy it prices:<ul>
+<li><strong>Local</strong> — energy supplied within the community (solar)</li>
+<li><strong>Grid</strong> — energy imported from the external grid</li>
+<li><strong>Feed-in</strong> — credit for production fed back</li>
+</ul>
+</li>
+</ul>
+<p><img alt="Tariffs page" src="../screenshots/07-tariffs.png" /></p>
+<h2 id="creating-a-tariff">Creating a Tariff<a class="headerlink" href="#creating-a-tariff" title="Permanent link">&para;</a></h2>
+<p><strong>ZEV Owners</strong> create tariffs in <strong>Tariffs</strong>.</p>
+<ol>
+<li>Click <strong>New Tariff</strong></li>
+<li>
+<p>Enter details:</p>
+<ul>
+<li><strong>Name</strong> — Tariff identifier, printed on invoice lines (e.g., "Local solar")</li>
+<li><strong>Category</strong>, <strong>Billing mode</strong> and — for per-kWh tariffs — <strong>Energy type</strong>
+   (see above)</li>
+<li><strong>Notes</strong> (optional)</li>
+</ul>
+</li>
+<li>
+<p>Set <strong>Validity Period</strong>:</p>
+<ul>
+<li><strong>Valid From</strong> — Start date</li>
+<li><strong>Valid To</strong> — End date (leave blank for ongoing)</li>
+</ul>
+<blockquote>
+<p><strong>Tip:</strong> Leave <strong>Valid To</strong> blank. When the price later changes, use <strong>New
+version</strong> rather than editing or creating a second tariff — see
+<a href="#tariff-versions">Tariff Versions</a>.</p>
+</blockquote>
+</li>
+<li>
+<p>Configure pricing: the fixed amount for a fee, the percentage for a
+   percentage tariff, or — for a per-kWh tariff — a
+   <a href="#dynamic-tariffs">dynamic price source</a> if it has one</p>
+</li>
+<li>
+<p>Click <strong>Save Tariff</strong></p>
+</li>
+<li>
+<p>For a per-kWh tariff with fixed prices, add its prices as
+   <a href="#tariff-periods">Tariff Periods</a> — a tariff without a period prices
+   nothing</p>
+</li>
+</ol>
+<h2 id="importing-tariffs-from-your-grid-operator">Importing Tariffs from Your Grid Operator<a class="headerlink" href="#importing-tariffs-from-your-grid-operator" title="Permanent link">&para;</a></h2>
+<p>Swiss grid operators publish their tariffs in machine-readable form every year
+(Art. 7b StromVV). Rather than transcribing next year's prices by hand, point
+OpenZEV at that file and it will show you exactly what it would create.</p>
+<h3 id="running-an-import">Running an import<a class="headerlink" href="#running-an-import" title="Permanent link">&para;</a></h3>
+<ol>
+<li>Go to <strong>Tariffs</strong> and click <strong>Import from grid operator</strong>.</li>
+<li>Paste the <strong>Tariff document URL</strong> — usually a <code>.json</code> file linked from your
+   operator's tariff page. If you stored it under
+   <strong>Settings → Grid Connection → Tariff document URL</strong>, it is filled in for
+   you.</li>
+<li>Click <strong>Read document</strong>. <strong>Nothing is saved at this point.</strong> You get a table
+   of everything the document offers, with a <strong>Status</strong> for each row.</li>
+<li>Tick what you want. <strong>Select standard tariffs</strong> ticks only what the operator
+   itself flags as its standard product — a document can carry 35 rows when
+   your community needs four, so nothing is pre-ticked wholesale.</li>
+<li>Click <strong>Import N tariffs</strong>.</li>
+</ol>
+<p>Leave <strong>Remember this address for next year's tariffs</strong> ticked and the URL is
+stored on the ZEV, so next year's refresh is one click.</p>
+<h3 id="one-published-tariff-can-become-two">One published tariff can become two<a class="headerlink" href="#one-published-tariff-can-become-two" title="Permanent link">&para;</a></h3>
+<p>A published tariff often carries both a monthly <strong>base price</strong> (Grundpreis) and
+a per-kWh <strong>energy price</strong> (Arbeitspreis). An OpenZEV tariff is billed one way
+or the other, never both, so such an entry is imported as <strong>two tariffs</strong>:</p>
+<div class="highlight"><pre><span></span><code>Netznutzung Basis (Grundpreis)     CHF 7.00/month
+Netznutzung Basis (Arbeitspreis)   CHF 0.284/kWh
+</code></pre></div>
+<p>Those suffixes are your operator's own words, and they appear on invoice lines,
+so a participant comparing an invoice against the published tariff sheet sees
+matching vocabulary.</p>
+<h3 id="choosing-how-a-fee-is-billed">Choosing how a fee is billed<a class="headerlink" href="#choosing-how-a-fee-is-billed" title="Permanent link">&para;</a></h3>
+<p>The document says a base price is CHF per month. It cannot say <em>who</em> pays it —
+that depends on how your community relates to its operator. So each fee row has
+a <strong>Billed as</strong> picker, and the choice is yours:</p>
+<table>
+<thead>
+<tr>
+<th>Billed as</th>
+<th>When it is right</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Shared monthly fee</strong> <em>(default)</em></td>
+<td>The usual ZEV: the operator bills the community once for its connection, and the fee is split across participants</td>
+</tr>
+<tr>
+<td><strong>Monthly fee</strong></td>
+<td>A vZEV whose participants each hold their own contract with the operator</td>
+</tr>
+<tr>
+<td><strong>Per metering point, monthly</strong></td>
+<td>A charge levied per meter — a metering fee is the typical case</td>
+</tr>
+</tbody>
+</table>
+<p>Getting this wrong bills the same connection several times over, so the picker
+never guesses on your behalf beyond the default.</p>
+<h3 id="what-the-statuses-mean">What the statuses mean<a class="headerlink" href="#what-the-statuses-mean" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Status</th>
+<th>Meaning</th>
+<th>Imported?</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>New</strong></td>
+<td>Nothing like it in this community yet</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td><strong>New version</strong></td>
+<td>You already have this tariff; the document carries a later price. See <a href="#tariff-versions">Tariff Versions</a></td>
+<td>Yes</td>
+</tr>
+<tr>
+<td><strong>Already imported</strong></td>
+<td>A version already starts on that date — you have imported this document before</td>
+<td>No</td>
+</tr>
+<tr>
+<td><strong>Name conflict</strong></td>
+<td>A tariff of that name exists but means something else (a different category or energy type), which cannot be reconciled automatically</td>
+<td>No</td>
+</tr>
+<tr>
+<td><strong>Not supported</strong></td>
+<td>The entry cannot be represented — the row says why</td>
+<td>No</td>
+</tr>
+</tbody>
+</table>
+<p>Only <strong>New</strong> and <strong>New version</strong> rows can be ticked.</p>
+<h3 id="importing-next-years-document">Importing next year's document<a class="headerlink" href="#importing-next-years-document" title="Permanent link">&para;</a></h3>
+<p>Re-importing is the normal yearly workflow, and it is safe to run twice:</p>
+<ul>
+<li>Rows you have already imported come back as <strong>Already imported</strong> and are left
+  alone. Nothing is rewritten.</li>
+<li>A newer price arrives as <strong>New version</strong>. Your existing version is closed the
+  day before the new one starts, so the two never overlap and no period is
+  billed twice.</li>
+<li><strong>If you renamed a tariff after importing it</strong>, the new version still lands in
+  it. OpenZEV records which published price each tariff came from, so it
+  recognises your renamed tariff as the same one; the row says <em>Will be added
+  to "your name"</em>, and it keeps the name you gave it.</li>
+<li><strong>The way you chose to bill a fee is remembered.</strong> Next year's document
+  proposes the default again, but the import matches what you already decided
+  rather than refusing the row.</li>
+</ul>
+<h3 id="what-is-not-imported">What is not imported<a class="headerlink" href="#what-is-not-imported" title="Permanent link">&para;</a></h3>
+<p>These are reported in the preview rather than skipped silently — a row that
+cannot be imported always says why:</p>
+<ul>
+<li><strong>Power / demand charges</strong> (CHF/kW) — OpenZEV does not bill demand, and no
+  demand data is metered.</li>
+<li><strong>Reactive-power charges</strong> (CHF/kVarh).</li>
+<li><strong>Storage grid-usage refunds.</strong></li>
+<li>A <strong>dynamic tariff with no fetchable URL</strong>, or a component with no billable
+  energy value in CHF/kWh. V2 metering components are supported when they
+  publish an energy price.</li>
+<li>Prices in a unit that cannot be billed — an energy price not in CHF/kWh, or a
+  base price not in CHF/month — and negative prices.</li>
+</ul>
+<p>Where a published price is more precise than OpenZEV stores, it is rounded and
+the row tells you so.</p>
+<h3 id="dynamic-tariffs">Dynamic tariffs<a class="headerlink" href="#dynamic-tariffs" title="Permanent link">&para;</a></h3>
+<p>Some operators no longer publish a fixed price at all — they publish a URL
+that serves a new price every quarter-hour. Importing one of these creates a
+tariff linked to that price source instead of to fixed bands; OpenZEV fetches
+it on a schedule and bills each reading at whatever the series says for that
+moment, negative prices included.</p>
+<ul>
+<li>The import preview marks a dynamic row with a <strong>Dynamic</strong> badge and shows
+  the URL it will fetch from, instead of a list of prices — there is nothing
+  to list yet.</li>
+<li>The document never names which <em>product</em> the source should use (an
+  operator like Groupe E publishes several, at materially different prices).
+  Enter the correct product name in the preview before importing. Leaving the
+  visible product field blank explicitly confirms the endpoint default. V2
+  product names returned by discovery are retained with the source.</li>
+<li>On the Tariffs page, a dynamic tariff shows a <strong>Dynamic</strong> badge next to its
+  energy type. The badge turns red, with the failure shown as a tooltip, if
+  the source's last scheduled fetch failed.</li>
+<li>You can also link a plain energy tariff to an existing dynamic source by
+  hand, from the tariff's edit form — useful once a source has already been
+  created by an earlier import.</li>
+</ul>
+<h3 id="reading-a-dynamic-tariffs-price">Reading a dynamic tariff's price<a class="headerlink" href="#reading-a-dynamic-tariffs-price" title="Permanent link">&para;</a></h3>
+<p>An operator's fetched price changes every quarter-hour, so the Tariffs page
+shows a <strong>representative average</strong> instead of a rate: <code>Avg CHF 0.123/kWh</code>,
+with a tooltip explaining the reference window. It is weighted by interval
+duration over the trailing 30 days within the tariff's validity — not a fixed
+rate, and the contract and tariff overview say so in a footnote.</p>
+<p>The BFE reference market price (below) publishes one price per <em>quarter</em>, and
+only weeks after that quarter has ended, so its trailing 30 days would always
+be empty. For that kind of source the window ends at the last fully published
+day instead of at today; the reference dates beside the figure say which
+period it covers.</p>
+<p>For a percentage tariff, the base uses grid tariffs and prices at today, clamped
+to the displayed version's validity. A historical percentage version therefore
+uses its historical base, not the latest average of an ongoing grid tariff.</p>
+<ul>
+<li><strong>Partial</strong> means the window has gaps; the average covers only what was
+  fetched.</li>
+<li><strong>Price unavailable</strong> (or <strong>base price unavailable</strong> on a percentage
+  tariff) means nothing was fetched for the window. No substitute number is
+  shown, and a percentage tariff built on it has no base either — printing a
+  partial sum would understate the rate.</li>
+</ul>
+<h3 id="feed-in-at-the-bfe-reference-market-price">Feed-in at the BFE reference market price<a class="headerlink" href="#feed-in-at-the-bfe-reference-market-price" title="Permanent link">&para;</a></h3>
+<p>Many operators pay feed-in remuneration as <strong>the greater of</strong> a minimum price
+they guarantee <strong>or</strong> the federal reference market price for the period. Since
+1 January 2026 that is also the statutory default when nothing else is agreed
+(Art. 15 EnG/EnV, reference price per Art. 15 EnFV).</p>
+<p>Set this up in two parts:</p>
+<ol>
+<li><strong>Add the reference price as a source.</strong> In the dynamic source dialog,
+   choose the kind <strong>BFE reference market price</strong> instead of an operator
+   endpoint. Pick the series your installation reports on — <strong>quarterly</strong> or
+   <strong>monthly</strong> — and the <strong>technology</strong> (photovoltaics for a normal rooftop
+   ZEV). There is no URL to enter and nothing to discover: OpenZEV downloads
+   the federal publication and stores its whole history, back to Q3 2023, the
+   moment you save.</li>
+<li><strong>Link a feed-in tariff to it and enter the minimum.</strong> On a feed-in tariff
+   with that source selected, the form shows <strong>Minimum price (CHF/kWh)</strong>.
+   Leave it empty if your operator pays the reference price flat.</li>
+</ol>
+<p>Every exported kWh is then credited at whichever is higher for that moment.
+The Tariffs page shows the reference average with <code>min. CHF 0.080/kWh</code> beside
+it, and the tariff overview PDF prints the rate together with the guaranteed
+minimum.</p>
+<ul>
+<li><strong>A quarter can only be billed once BFE has published it</strong> — roughly ten
+  working days after the quarter ends. Until then the period counts as
+  unpriced: readiness names the days and invoice generation refuses, rather
+  than falling back to the minimum and under-crediting a producer whose
+  reference price later turns out to be higher.</li>
+<li>The minimum is part of a tariff <em>version</em>. Renegotiating it means creating
+  a new version from the date it changes, exactly like any other price.</li>
+<li>The figures are federal open data (<code>Opendata BY</code>). Reusing them outside
+  OpenZEV — a newsletter, your own report — requires naming the source, the
+  Swiss Federal Office of Energy (BFE).</li>
+</ul>
+<h3 id="operating-a-price-source-administrators">Operating a price source (administrators)<a class="headerlink" href="#operating-a-price-source-administrators" title="Permanent link">&para;</a></h3>
+<p>Sources live under <strong>Platform → Overview → Dynamic prices</strong> and are shared across
+communities: two ZEVs on the same operator product fetch once, together.</p>
+<ul>
+<li><strong>Status</strong> is <code>Healthy</code>, <code>Failed</code> (with the user-safe error), <code>Not
+  fetched</code>, or <code>Disabled</code>. A source with an unresolved older window shows
+  <code>Retry from &lt;date&gt;</code> — the earliest range a refresh still needs to fill.</li>
+<li><strong>Disable</strong> a dead endpoint with the <strong>Enable scheduled fetches</strong> toggle
+  instead of deleting it: stored prices stay as billing evidence, the
+  schedule skips it, and the tariff keeps billing from history.</li>
+<li>Refreshes run <strong>every 4 hours</strong> over yesterday → two days ahead (operators
+  republish during the day; day-ahead prices arrive in the afternoon). A new
+  enabled source additionally fetches up to 400 days of history once, right
+  after import. Disabled sources do not start automatic fetches; an explicit
+  administrator fetch is still available. Re-enabling an old source fetches
+  at most 14 days on a scheduled run; use backfill for older missing history.</li>
+<li><strong>404 is a failure by default.</strong> If the operator documents that this URL
+  uses 404 for an empty publication, an administrator can enable
+  <strong>empty_on_not_found</strong> on the source in Django admin. This opt-in treats
+  every 404 as empty, including a removed product; verify the URL when gaps
+  persist. Rechecking capabilities preserves this setting. <strong>410</strong> always fails.</li>
+</ul>
+<h3 id="recovering-a-refused-price-series">Recovering a refused price series<a class="headerlink" href="#recovering-a-refused-price-series" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>BilledPriceChanged:</strong> an operator changed a price or interval already
+  retained for an invoice. The original remains stored. Check the operator's
+  publication and affected invoices before correcting or cancelling invoices;
+  retries cannot reconcile conflicting billing evidence.
+  On a <strong>BFE reference price</strong> source this also stops <em>newly published</em>
+  quarters from arriving, because every fetch re-reads the whole federal
+  history and the conflict fails the run as a whole. Resolve the revised
+  quarter — cancel or correct the affected invoice, then clear the source's
+  prices — rather than waiting for the next scheduled refresh.</li>
+<li><strong>PriceIntervalConflict:</strong> a replacement is overlapping or incomplete.
+  Backfill the complete unbilled range. A complete replacement can change
+  interval resolution atomically while preserving billed historical intervals.
+  A partial replacement that changes a price is refused without clipping either
+  boundary. A same-priced response clipped at a fetch boundary safely extends
+  only the uncovered portion and keeps the existing stored boundary. If the
+  endpoint no longer serves the complete interval, keep the old series and
+  create a replacement source/version for future pricing.</li>
+<li><strong>PriceSeriesConflict:</strong> the run reports one or more such refusals. Independent
+  valid intervals may have been stored, but the source remains failed. Examine
+  the price history and first reported conflict, then retry manually once the
+  cause is resolved. Deterministic schema/product errors also need configuration
+  or upstream correction; Celery does not retry them as outages.</li>
+<li><strong>Clear fetched prices</strong> is available only when no non-cancelled invoice
+  retains the source. Drafts count too. Editing or deleting a tariff cannot
+  release its invoice's stored provenance. Clearing waits for any invoice
+  generation transaction using the source before rechecking protection.</li>
+</ul>
+<p>Republishing the same prices at another interval resolution is harmless: the
+original stored rows remain as evidence. Cancelled invoices release price
+protection but still retain the source itself; disable an obsolete source
+instead of deleting invoice provenance. Evidence covers applicable tariff
+windows conservatively, including tariffs that produced no invoice line.
+Sources shared by several ZEVs serialize invoice generation and maintenance;
+a long invoice transaction can delay a fetch or clear operation.</p>
+<h3 id="if-migration-0014-refuses-existing-intervals">If migration 0014 refuses existing intervals<a class="headerlink" href="#if-migration-0014-refuses-existing-intervals" title="Permanent link">&para;</a></h3>
+<ol>
+<li>Keep the previous release running with invoice generation and price-fetch
+   jobs paused. Take a database backup before correcting any stored prices.</li>
+<li>Use the row/source IDs in the error to inspect the affected source. For
+   example, in <code>python manage.py shell</code>, read
+   <code>DynamicPricePoint.objects.filter(source_id=source_id).order_by("valid_from").values("pk", "valid_from", "valid_to", "price_chf_per_kwh")</code>
+   after importing the model from <code>tariffs.dynamic.models</code> and setting
+   <code>source_id</code> to the reported UUID. For invalid-range errors that only name
+   row IDs, first inspect those rows to find their source.</li>
+<li>Compare the overlapping or inverted intervals with the original operator
+   publication and retained invoices. Do not bulk-delete or clip billed
+   history to make the migration pass. If the correct historical inputs
+   cannot be established, retain the backup and resolve the invoice evidence
+   with the operator before proceeding. There is no safe generic repair.</li>
+<li>For verified unbilled data, have the administrator apply the reviewed
+   correction while writers remain paused. Record the original rows and the
+   correction. Retry <code>python manage.py migrate</code>; the preflight checks again
+   before adding constraints. Resume jobs only after migration succeeds.</li>
+</ol>
+<p>Migration 0015 can similarly refuse an exact-URL source that incorrectly claims
+range-query support. Its error names the source UUID and URL. Verify that the
+endpoint must be fetched verbatim, set <code>supports_range=False</code> for that source,
+and retry the migration; do not change the source URL or tariff identity.</p>
+<p>Version 2 sources need an explicit operator product name, even when the
+endpoint has no published prices yet. An old blank v2 source must be disabled
+and replaced with a named source. Missing product metadata in a v2 response is
+a provider/schema error, distinct from the provider returning a different product.</p>
+<p>Transfers preserve invoice totals and source provenance, but do not include
+the original price points. Keep a database backup when retaining the fetched
+billing inputs is required; an operator may no longer publish that history.</p>
+<blockquote>
+<p><strong>Tip:</strong> Import prices exactly as published — they are net of VAT. If your
+community pays VAT it cannot reclaim, set the VAT treatment in
+<a href="../02-zev-setup/#vat-configuration">ZEV settings</a> rather than adjusting
+tariff prices by hand; a re-import would undo that.</p>
+</blockquote>
+<h2 id="energy-tariff-types">Energy Tariff Types<a class="headerlink" href="#energy-tariff-types" title="Permanent link">&para;</a></h2>
+<h3 id="local-energy-tariff">Local Energy Tariff<a class="headerlink" href="#local-energy-tariff" title="Permanent link">&para;</a></h3>
+<p>Charges for energy consumed from the ZEV's own production.</p>
+<p><strong>Pricing options:</strong></p>
+<ul>
+<li><strong>Flat rate</strong> — Single price per kWh (e.g., CHF 0.12/kWh)</li>
+<li><strong>Time-of-use (HT/NT)</strong> — Different rates by time-of-day<ul>
+<li>HT (high tariff) — Peak hours (e.g., 06:00–22:00)</li>
+<li>NT (night tariff) — Off-peak (e.g., 22:00–06:00)</li>
+</ul>
+</li>
+</ul>
+<p>Example:
+<div class="highlight"><pre><span></span><code>Local Energy Tariff "Summer Local"
+├─ HT (06:00–22:00): CHF 0.10/kWh
+├─ NT (22:00–06:00): CHF 0.05/kWh
+</code></pre></div></p>
+<h3 id="grid-energy-tariff">Grid Energy Tariff<a class="headerlink" href="#grid-energy-tariff" title="Permanent link">&para;</a></h3>
+<p>Charges for energy consumed from the external grid (not covered by local production).</p>
+<p>Usually higher than local tariff to reflect grid cost.</p>
+<p>Example:
+<div class="highlight"><pre><span></span><code>Grid Tariff "Grid 2026"
+├─ HT: CHF 0.28/kWh (includes distribution)
+├─ NT: CHF 0.18/kWh
+</code></pre></div></p>
+<h3 id="feed-in-tariff">Feed-In Tariff<a class="headerlink" href="#feed-in-tariff" title="Permanent link">&para;</a></h3>
+<p>Credits for participant production fed back to community/grid.</p>
+<p>Often lower than local tariff (encourages consumption of own production).</p>
+<p>Example:
+<div class="highlight"><pre><span></span><code>Feed-in Tariff "Solar Credit"
+├─ Flat: CHF 0.08/kWh
+</code></pre></div></p>
+<h3 id="percentage-of-energy-tariff">Percentage of Energy Tariff<a class="headerlink" href="#percentage-of-energy-tariff" title="Permanent link">&para;</a></h3>
+<p>A percentage tariff derives its price from other active tariffs rather than specifying a fixed CHF/kWh rate.</p>
+<p>Instead of setting a price, you set a <strong>percentage</strong> (0–100%). During billing, OpenZEV looks up the sum of all active <strong>grid energy tariff</strong> rates at each timestamp and multiplies by the percentage to calculate the effective per-kWh price.</p>
+<p><strong>Configuration:</strong></p>
+<ul>
+<li><strong>Billing Mode</strong> — Select <code>Percentage of energy tariffs</code></li>
+<li><strong>Energy Type</strong> — <code>Local Energy</code>, <code>Grid Energy</code>, or <code>Feed-in</code> (determines which energy stream the tariff applies to)</li>
+<li><strong>Percentage</strong> — The percentage value (e.g., 50%)</li>
+</ul>
+<blockquote>
+<p><strong>Note:</strong> Percentage tariffs do not have HT/NT periods. The effective price is derived automatically from the grid energy tariff rates at each timestamp.</p>
+</blockquote>
+<p>Example:
+<div class="highlight"><pre><span></span><code>Percentage Tariff "Local Energy 50%"
+├─ Energy type: Local Energy
+├─ Percentage: 50%
+├─ Effective price: 50% of grid energy rate
+│   (if Grid HT = CHF 0.28/kWh → Local = CHF 0.14/kWh)
+│   (if Grid NT = CHF 0.18/kWh → Local = CHF 0.09/kWh)
+</code></pre></div></p>
+<p>This is useful when you want to set local energy prices as a fraction of the grid energy rate, so that price changes to the grid tariff are automatically reflected.</p>
+<h3 id="fixed-fee-tariff">Fixed Fee Tariff<a class="headerlink" href="#fixed-fee-tariff" title="Permanent link">&para;</a></h3>
+<p>Flat monthly or yearly charges (not energy-dependent).</p>
+<p><strong>Charge types:</strong></p>
+<ul>
+<li><strong>Monthly fee</strong> — CHF X per month, charged to <em>each</em> participant</li>
+<li><strong>Yearly fee</strong> — CHF X per year, charged to each participant (paid monthly as CHF X/12)</li>
+<li><strong>Per-metering-point fee</strong> — CHF Y per active meter per month. A
+  <a href="../04-metering-points/#shared-common-area-metering-points">community metering point</a>
+  is charged once and split across the community by allocation weight, instead
+  of being charged to its holder.</li>
+<li><strong>Shared monthly fee</strong> — CHF X per month for the <em>whole community</em>, divided between the participants</li>
+<li><strong>Shared yearly fee</strong> — CHF X per year for the whole community, divided and paid monthly</li>
+</ul>
+<p>Example:
+<div class="highlight"><pre><span></span><code>Fixed Fees 2026
+├─ Community admin fee: CHF 50/month     (each participant pays 50)
+├─ Meter maintenance:   CHF 5 per meter/month
+├─ Caretaker contract:  CHF 90/month shared  (3 participants → 30 each)
+</code></pre></div></p>
+<h3 id="shared-fees">Shared Fees<a class="headerlink" href="#shared-fees" title="Permanent link">&para;</a></h3>
+<p>Use a shared fee for a cost the community carries <strong>jointly</strong> — a caretaker
+contract, an insurance premium, the ZEV's own administration — rather than one
+attributable to a participant's consumption or meters.</p>
+<blockquote>
+<p><strong>The price you enter means something different here.</strong> For every other fixed
+fee, the amount is what <em>one participant</em> pays. For a shared fee it is what
+the <strong>whole community</strong> pays. Entering CHF 20 intending "per person" will bill
+the community CHF 20 in total, not CHF 20 each.</p>
+</blockquote>
+<h4 id="how-a-shared-fee-is-split">How a shared fee is split<a class="headerlink" href="#how-a-shared-fee-is-split" title="Permanent link">&para;</a></h4>
+<ul>
+<li>The amount is divided between the participants <strong>active in each billed month</strong>.</li>
+<li>The division is recalculated every month, so somebody joining in February does
+  not change what January cost.</li>
+<li>Each participant is charged only for the months they were actually a member.</li>
+</ul>
+<p><strong>Split key.</strong> When you pick one of the two shared billing modes, a <strong>Split
+key</strong> selector appears with two options:</p>
+<table>
+<thead>
+<tr>
+<th>Split key</th>
+<th>Divides the amount by</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Equally between participants</strong> (default)</td>
+<td>Headcount — everybody pays the same share</td>
+</tr>
+<tr>
+<td><strong>By allocation weight</strong></td>
+<td>Each participant's <a href="../03-participant-management/#allocation-weight">allocation weight</a></td>
+</tr>
+</tbody>
+</table>
+<p><code>Equally</code> is the original behaviour and stays the default, so existing shared
+fees are untouched. Choose <em>By allocation weight</em> when the community has agreed
+that a joint cost should follow the same key as common-area energy — for
+example, billing the caretaker contract by floor area rather than per head.</p>
+<p>With every participant left at the default weight of <code>1</code>, both keys produce
+exactly the same amounts.</p>
+<p><img alt="Split key selector on a shared fee tariff" src="../screenshots/07c-tariff-split-key.png" /></p>
+<blockquote>
+<p><strong>Switching the key changes what people pay.</strong> The selector only appears for
+the two shared modes, and the change is recorded in the audit log along with
+the rest of the tariff edit. Regenerate draft invoices to apply it.</p>
+</blockquote>
+<p>The split key applies <strong>only</strong> to the two shared fee modes. Per-metering-point
+fees on a <a href="../04-metering-points/#shared-common-area-metering-points">community metering point</a>
+always divide by allocation weight — there is nothing to configure, because the
+cost belongs to a shared <em>meter</em> rather than to the community as a whole.</p>
+<p>For a worked example of how a shared fee splits as members join and leave, and
+how rounding works, see
+<a href="../08-billing-allocation-explained/#shared-fees-and-changing-membership">How Energy Allocation and Billing Works</a>.</p>
+<p><strong>A note on the ZEV owner:</strong> the owner is counted like anyone else, provided
+they have a participant record in the ZEV. If the owner is not a participant,
+they are not counted and not charged.</p>
+<p><strong>Credits:</strong> enter a negative amount to distribute a community-wide <em>rebate</em>
+across the participants. It appears on invoices as a credit line.</p>
+<h2 id="tariff-periods">Tariff Periods<a class="headerlink" href="#tariff-periods" title="Permanent link">&para;</a></h2>
+<p><strong>Tariff periods</strong> hold a per-kWh tariff's prices. There are no default
+periods: a new per-kWh tariff has none until you add one. Each period has a
+type:</p>
+<table>
+<thead>
+<tr>
+<th>Period type</th>
+<th>Use for</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Flat</strong></td>
+<td>One price around the clock</td>
+</tr>
+<tr>
+<td><strong>High (HT)</strong> / <strong>Low (NT)</strong></td>
+<td>The usual two-rate tariff, e.g. HT 06:00–22:00 and NT for the rest</td>
+</tr>
+<tr>
+<td><strong>Time band</strong></td>
+<td>Any further price — a weekend rate, a winter price — named with its own <strong>Band name</strong></td>
+</tr>
+</tbody>
+</table>
+<p>To add one:</p>
+<ol>
+<li>Open the tariff's detail panel (<strong>View details</strong>)</li>
+<li>Click <strong>Add Period</strong> in the Tariff Periods section</li>
+<li>Enter:<ul>
+<li><strong>Period type</strong> (see above) and, for a time band, a <strong>Band name</strong></li>
+<li><strong>Time from</strong> / <strong>Time to</strong> — HH:MM (24-hour format)</li>
+<li><strong>Weekdays</strong> and <strong>Months</strong> the period applies to (all selected means
+   every day / all year)</li>
+<li><strong>CHF/kWh</strong></li>
+</ul>
+</li>
+<li>Click <strong>Save Tariff Period</strong></li>
+</ol>
+<blockquote>
+<p><strong>Crossing midnight:</strong> If end time &lt; start time, period wraps (e.g., 22:00–06:00).</p>
+</blockquote>
+<h2 id="multi-tariff-configuration">Multi-Tariff Configuration<a class="headerlink" href="#multi-tariff-configuration" title="Permanent link">&para;</a></h2>
+<p>Most ZEVs use multiple tariffs simultaneously:</p>
+<table>
+<thead>
+<tr>
+<th>Tariff</th>
+<th>Purpose</th>
+<th>Typical Price</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Local Energy (HT)</td>
+<td>Community supply, daytime</td>
+<td>CHF 0.10/kWh</td>
+</tr>
+<tr>
+<td>Local Energy (NT)</td>
+<td>Community supply, night</td>
+<td>CHF 0.05/kWh</td>
+</tr>
+<tr>
+<td>Grid Energy (HT)</td>
+<td>External grid, daytime</td>
+<td>CHF 0.28/kWh</td>
+</tr>
+<tr>
+<td>Grid Energy (NT)</td>
+<td>External grid, night</td>
+<td>CHF 0.18/kWh</td>
+</tr>
+<tr>
+<td>Feed-in</td>
+<td>Participant solar credits</td>
+<td>CHF 0.08/kWh</td>
+</tr>
+<tr>
+<td>Fixed Fee</td>
+<td>Monthly admin cost, per participant</td>
+<td>CHF 50/month</td>
+</tr>
+<tr>
+<td>Shared Fee</td>
+<td>Joint community cost, divided between participants</td>
+<td>CHF 90/month total</td>
+</tr>
+</tbody>
+</table>
+<p>During billing, OpenZEV automatically selects the right tariff for each timestamp and energy type.</p>
+<h2 id="tariff-versions">Tariff Versions<a class="headerlink" href="#tariff-versions" title="Permanent link">&para;</a></h2>
+<p>Prices change — usually every year. Rather than creating a new tariff each time,
+add a <strong>version</strong> to the existing one.</p>
+<p>All versions of a tariff share its <strong>name</strong>. That is what makes them versions:
+the name identifies the tariff, and the validity windows say which version
+applied when.</p>
+<div class="highlight"><pre><span></span><code>Local Energy                                    ← one tariff, three versions
+├─ 2025-01-01 → 2025-12-31   0.10 CHF/kWh
+├─ 2026-01-01 → 2026-12-31   0.11 CHF/kWh
+└─ 2027-01-01 → (open)       0.12 CHF/kWh       ← active
+</code></pre></div>
+<h3 id="adding-a-new-version">Adding a New Version<a class="headerlink" href="#adding-a-new-version" title="Permanent link">&para;</a></h3>
+<ol>
+<li>Find the tariff, click <strong>View details</strong> to open its detail panel, then
+   click <strong>New version</strong></li>
+<li>Enter the date the new prices take effect (defaults to today)</li>
+<li>Adjust the prices (pre-filled from the current version)</li>
+<li>Click <strong>Create</strong></li>
+</ol>
+<p>OpenZEV <strong>closes the previous version automatically</strong> on the day before, so the
+timeline stays continuous. You never set an end date by hand — the dialog names
+the closing date it will use as you pick the start date.</p>
+<blockquote>
+<p><strong>Why this matters:</strong> if a day falls between two versions, OpenZEV has no price
+for it. The energy still appears on the invoice but is <strong>charged at nothing</strong> —
+a whole month can be given away without any warning. Letting OpenZEV compute
+the end date removes the off-by-one that causes this. Any series that already
+has a gap is flagged on the tariff card.</p>
+</blockquote>
+<p>You can also insert a version <em>between</em> two existing ones; OpenZEV bounds it on
+both sides.</p>
+<h3 id="comparing-versions">Comparing Versions<a class="headerlink" href="#comparing-versions" title="Permanent link">&para;</a></h3>
+<p>The Tariffs page shows <strong>one card per tariff</strong>, displaying what it costs <em>today</em>
+rather than a card per version. A badge tells you how many versions it has.
+Click <strong>View details</strong> to open a panel on the right with everything else:
+version history, the price chart, price bands, and notes.</p>
+<p><strong>Version history</strong> lists every version with its window and price. Click one
+to make the <em>panel</em> show that version — its price bands switch to the ones in
+force then, and a <strong>Viewing an older version</strong> badge appears so you can't
+mistake a historical rate for the current one. The card behind the panel keeps
+showing the active version throughout, so switching versions to look something
+up never changes what the list itself reports. Click the active version to go
+back.</p>
+<p>Each row has its own edit and delete buttons, because correcting a superseded
+version's end date is a normal follow-up to adding a new one.</p>
+<p>The panel stays open across a page reload or a shared link — the URL records
+which tariff and version you're looking at.</p>
+<p><img alt="Tariff version history and price chart" src="../screenshots/07b-tariff-versions.png" /></p>
+<h3 id="price-history">Price History<a class="headerlink" href="#price-history" title="Permanent link">&para;</a></h3>
+<p>Once a tariff has <strong>more than one version</strong>, its detail panel also charts how
+its price moved over time.</p>
+<ul>
+<li>The line is <strong>stepped</strong>, not sloped — a price holds for its whole window and
+  then jumps. A sloped line would suggest it drifted between two Januaries.</li>
+<li>HT and NT are <strong>separate lines</strong>, so you can see the spread widen or narrow.</li>
+<li><strong>Uncovered stretches are shaded red</strong> and the line breaks: nothing was billed
+  there. This is the same problem the gap badge reports, shown on a timeline.</li>
+<li>For a <strong>percentage tariff</strong> the chart shows the <em>effective</em> price it worked out
+  to, derived from the grid tariffs in force at each point — so it moves when
+  those move, even in months this tariff itself did not change. A note under the
+  title says so.</li>
+</ul>
+<h3 id="renaming">Renaming<a class="headerlink" href="#renaming" title="Permanent link">&para;</a></h3>
+<p>Renaming is done for the <strong>whole tariff</strong>, not per version — the name is what
+holds the versions together, so renaming just one would split it into two
+unrelated tariffs. <strong>Rename</strong> sits at the top of the detail panel, and tells
+you how many versions it will affect.</p>
+<h3 id="duplicating">Duplicating<a class="headerlink" href="#duplicating" title="Permanent link">&para;</a></h3>
+<p>Use <strong>Duplicate</strong> (also at the top of the detail panel) to create a <em>different</em>
+tariff starting from an existing one's numbers. It asks for a new name and leaves
+the original untouched. (Use <strong>New version</strong> instead when the prices of the
+<em>same</em> tariff have changed.)</p>
+<h3 id="which-version-gets-billed">Which Version Gets Billed<a class="headerlink" href="#which-version-gets-billed" title="Permanent link">&para;</a></h3>
+<p>OpenZEV picks the version that was valid <strong>on each individual reading's
+timestamp</strong> — not the one valid at the end of the invoice period. So an invoice
+covering a price change is priced correctly on both sides of it: a January–March
+invoice uses the old price for January and the new one from February.</p>
+<h2 id="tariff-validation">Tariff Validation<a class="headerlink" href="#tariff-validation" title="Permanent link">&para;</a></h2>
+<p>When saving a tariff, OpenZEV checks:</p>
+<table>
+<thead>
+<tr>
+<th>Check</th>
+<th>Requirement</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Valid From ≤ Valid To</strong></td>
+<td>Validity period must be in order</td>
+</tr>
+<tr>
+<td><strong>No overlapping windows for the same name</strong></td>
+<td>Two tariffs <em>called the same thing</em> can't both be valid on the same date — see below</td>
+</tr>
+<tr>
+<td><strong>Versions agree on identity</strong></td>
+<td>All versions of a name share one category, billing mode and energy type</td>
+</tr>
+<tr>
+<td><strong>Price format</strong></td>
+<td>Numeric, up to 5 decimals (e.g., <code>0.12345</code> CHF/kWh)</td>
+</tr>
+<tr>
+<td><strong>Mandatory fields</strong></td>
+<td>Name, type, validity period, prices</td>
+</tr>
+</tbody>
+</table>
+<p>If validation fails, you'll see a clear error message. Fix and retry.</p>
+<h3 id="several-tariffs-at-once-is-normal">Several Tariffs at Once Is Normal<a class="headerlink" href="#several-tariffs-at-once-is-normal" title="Permanent link">&para;</a></h3>
+<p>You can have <strong>as many tariffs applying simultaneously as you need</strong>, including
+in the same category, with the same billing mode and the same energy type. This
+is the usual shape of a Swiss tariff sheet:</p>
+<div class="highlight"><pre><span></span><code>Grid Fees
+├─ Netznutzung Arbeit         0.09000 CHF/kWh
+└─ Systemdienstleistung SDL   0.00750 CHF/kWh
+
+Levies
+├─ Netzzuschlag               0.02300 CHF/kWh
+└─ Kantonale Abgabe           0.00500 CHF/kWh
+</code></pre></div>
+<p>All four apply at once, and each becomes its own line on the invoice, so
+participants see what they are paying for rather than one merged figure.</p>
+<p>The <strong>only</strong> thing OpenZEV blocks is two tariffs with the <strong>same name</strong> whose
+validity windows overlap — because same name means same tariff, so an overlap
+means two prices claim the same day:</p>
+<div class="highlight"><pre><span></span><code>✗ Local Energy   2026-01-01 → (open)      ← old version, never closed
+  Local Energy   2026-04-01 → (open)      ← new version
+    Both apply. Every participant is billed twice.
+
+✓ Local Energy   2026-01-01 → 2026-03-31  ← closed automatically
+  Local Energy   2026-04-01 → (open)
+</code></pre></div>
+<p>Use <strong>New version</strong> and you never hit this: OpenZEV closes the old window for
+you. You only see this error when editing validity dates by hand. If two tariffs
+really are meant to apply together, give them different names — which you would
+want anyway, since the name is what appears on the invoice line.</p>
+<p>Because a shared name makes two tariffs versions of each other, they must also
+<strong>agree on what the tariff is</strong> — same category, same billing mode, same energy
+type. OpenZEV rejects a version that disagrees and tells you which value the
+others use. If you meant a genuinely different tariff, give it a different name.</p>
+<h2 id="copying-tariffs-to-another-community">Copying Tariffs to Another Community<a class="headerlink" href="#copying-tariffs-to-another-community" title="Permanent link">&para;</a></h2>
+<p>The tariff-only JSON export has been replaced by a whole-ZEV transfer. To move a
+tariff structure to another instance, export the ZEV with <strong>only the Tariffs
+section</strong> selected and import it there — the result is a new ZEV carrying just
+the pricing. See <a href="../17-zev-transfer/">ZEV Export and Import</a>.</p>
+<h2 id="editing-and-deactivating-tariffs">Editing and Deactivating Tariffs<a class="headerlink" href="#editing-and-deactivating-tariffs" title="Permanent link">&para;</a></h2>
+<h3 id="updating-a-tariff">Updating a Tariff<a class="headerlink" href="#updating-a-tariff" title="Permanent link">&para;</a></h3>
+<p>Edit <strong>future</strong> tariffs freely:</p>
+<ol>
+<li>Select tariff</li>
+<li>Click <strong>Edit</strong></li>
+<li>Change prices, periods, validity dates</li>
+<li>Click <strong>Save</strong></li>
+</ol>
+<p>Changes apply to <strong>new invoices only</strong>. Past invoices keep original tariffs.</p>
+<p><strong>Edit</strong> works on one <strong>version</strong>. The four fields that identify the tariff —
+name, category, billing mode, energy type — are therefore shown as values rather
+than inputs: they are shared by every version, so changing them on one alone
+would break the series. Use <strong>Rename</strong> for the name; for a different category,
+billing mode or energy type, create a separate tariff.</p>
+<blockquote>
+<p><strong>Prices changed from a certain date?</strong> Use <strong>New version</strong> instead of editing.
+Editing rewrites what the <em>current</em> version has always charged; a new version
+records the change, keeps the old prices on the record, and lets invoices
+spanning the switch bill each part correctly. See
+<a href="#tariff-versions">Tariff Versions</a>.</p>
+</blockquote>
+<h3 id="deactivating-a-tariff">Deactivating a Tariff<a class="headerlink" href="#deactivating-a-tariff" title="Permanent link">&para;</a></h3>
+<p>Set <strong>Valid To</strong> to exclude from future invoices:</p>
+<ol>
+<li>Select tariff</li>
+<li>Click <strong>Edit</strong></li>
+<li>Set <strong>Valid To</strong> to today or last usage date</li>
+<li>Click <strong>Save</strong></li>
+</ol>
+<blockquote>
+<p><strong>Important:</strong> Never delete a tariff—always set Valid To instead. This preserves invoice audit trail.</p>
+</blockquote>
+<p>This applies to the delete button on a <strong>version</strong> row too. Deleting a version
+removes the prices that applied in its window, which leaves a gap: energy in
+those days is then billed at nothing. Reserve it for a version created by
+mistake — one you have not billed against.</p>
+<h2 id="tariff-application-during-billing">Tariff Application During Billing<a class="headerlink" href="#tariff-application-during-billing" title="Permanent link">&para;</a></h2>
+<p>When OpenZEV generates an invoice:</p>
+<ol>
+<li>
+<p><strong>For each timestamp in billing period:</strong></p>
+<ul>
+<li>Identify energy type (local vs. grid)</li>
+<li>Find applicable tariff by validity date</li>
+<li>Find applicable period (HT vs. NT) by timestamp</li>
+<li>Multiply energy × price</li>
+</ul>
+</li>
+<li>
+<p><strong>Fixed fees:</strong></p>
+<ul>
+<li>Sum all applicable monthly fees by calendar month in period</li>
+<li>Apply yearly fees as monthly installments (price ÷ 12)</li>
+<li>Group by metering point type if per-point fees</li>
+</ul>
+</li>
+<li>
+<p><strong>Final invoice:</strong></p>
+<ul>
+<li>Sum all line items</li>
+<li>Apply VAT if configured</li>
+<li>Create PDF invoice</li>
+</ul>
+</li>
+</ol>
+<blockquote>
+<p><strong>See also:</strong> <a href="../08-billing-allocation-explained/">How Energy Allocation Works</a> for detailed billing logic.</p>
+</blockquote>
+<h2 id="printing-a-tariff-overview">Printing a Tariff Overview<a class="headerlink" href="#printing-a-tariff-overview" title="Permanent link">&para;</a></h2>
+<p>Click <strong>Tariff overview (PDF)</strong> on the Tariffs page toolbar to download every
+tariff in force today, grouped by category (Energy, Grid Fees, Levies,
+Metering) — the same grouping and order as an invoice's line items.</p>
+<ul>
+<li>Each price band is listed and named on its own line, using the exact same
+  wording as the participation contract (HT/NT, a seasonal band's month
+  range, or a plain band's time window) — the two documents describe a
+  tariff the same way.</li>
+<li>A <strong>percentage-of-energy tariff</strong> prints its formula (e.g. <code>18.00 % ×
+  29.50 Rp./kWh</code>), computed from the same grid tariffs the participation
+  contract uses. If the grid tariff it is based on has more than one price
+  band, a footnote explains that the figure shown is the tariff's base rate,
+  not what any single reading is actually billed at.</li>
+<li>A <strong>shared fee</strong> states how it is split (equally, or by weight) — the
+  figure printed is what the whole community pays, not one participant's
+  share.</li>
+<li>The document states the ZEV's VAT treatment. Under <strong>VAT inclusive</strong>, an
+  explicit note says the prices shown are net and that VAT is added on the
+  invoice — the number on this document is deliberately not the number a
+  participant is billed.</li>
+<li>Switch the page's own <strong>Valid now / All versions</strong> filter before
+  downloading to include superseded and future tariff versions, shown
+  greyed out with their full validity span instead of "from …".</li>
+</ul>
+<p>There is no date picker (yet) — the overview always reflects today. Only ZEV
+owners and admins can download it; there is nothing on this document a
+participant does not already see broken out on their own participation
+contract or invoice.</p>
+<h2 id="tariff-tips">Tariff Tips<a class="headerlink" href="#tariff-tips" title="Permanent link">&para;</a></h2>
+<p><strong>Use consistent naming:</strong> Helps operators find right tariff.</p>
+<ul>
+<li>❌ Bad: <code>Tariff1</code>, <code>FeeX</code>, <code>new_rate</code></li>
+<li>✓ Good: <code>Local Energy HT 2026-Q2</code>, <code>Grid Energy 2026</code>, <code>Fixed Fees Monthly</code></li>
+</ul>
+<p><strong>Plan ahead:</strong> Create seasonal tariffs before the season starts.</p>
+<p><strong>Test with draft invoices:</strong> Generate test invoices before finalizing.</p>
+<p><strong>Review after each quarter:</strong> Check if tariffs align with actual ZEV costs.</p>
+<h2 id="next-steps">Next Steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>Check data quality:</strong> <a href="../06-metering-analysis/">Metering Analysis</a></li>
+<li><strong>Understand allocation:</strong> <a href="../08-billing-allocation-explained/">How Energy Allocation Works</a></li>
+<li><strong>Generate invoices:</strong> <a href="../09-invoice-management/">Invoice Management</a></li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="Footer" >
+        
+          
+          <a href="../06-metering-analysis/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Metering Analysis">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Previous
+              </span>
+              <div class="md-ellipsis">
+                Metering Analysis
+              </div>
+            </div>
+          </a>
+        
+        
+          
+          <a href="../08-billing-allocation-explained/" class="md-footer__link md-footer__link--next" aria-label="Next: How Allocation and Billing Works">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Next
+              </span>
+              <div class="md-ellipsis">
+                How Allocation and Billing Works
+              </div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"/></svg>
+            </div>
+          </a>
+        
+      </nav>
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      OpenZEV · AGPL-3.0
+    </div>
+  
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://github.com/splattner/openzev" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.sections", "navigation.top", "navigation.footer", "search.suggest", "search.highlight", "content.code.copy", "content.action.edit", "toc.follow"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+        <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>

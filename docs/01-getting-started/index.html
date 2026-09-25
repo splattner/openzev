@@ -1,0 +1,2623 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="User guide for OpenZEV, open source billing software for Swiss ZEV and vZEV energy communities.">
+      
+      
+      
+        <link rel="canonical" href="https://www.openzev.ch/docs/01-getting-started/">
+      
+      
+        <link rel="prev" href="..">
+      
+      
+        <link rel="next" href="../11-roles-and-permissions/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/favicon.svg">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Getting Started - OpenZEV Documentation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,700,700i%7CIBM+Plex+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"IBM Plex Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/docs.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#getting-started-with-openzev" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="https://www.openzev.ch/" title="OpenZEV Documentation" class="md-header__button md-logo" aria-label="OpenZEV Documentation" data-md-component="logo">
+      
+  <img src="../assets/favicon.svg" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            OpenZEV Documentation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Getting Started
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="custom" data-md-color-accent="custom"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/splattner/openzev" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    splattner/openzev
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="https://www.openzev.ch/" title="OpenZEV Documentation" class="md-nav__button md-logo" aria-label="OpenZEV Documentation" data-md-component="logo">
+      
+  <img src="../assets/favicon.svg" alt="logo">
+
+    </a>
+    OpenZEV Documentation
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/splattner/openzev" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    splattner/openzev
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#choose-an-installation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Choose an Installation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#prerequisites" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Prerequisites
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#demo-and-local-development" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Demo and local development
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#production-with-docker-compose" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Production with Docker Compose
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Production with Docker Compose">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-get-the-code" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Get the code
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-configure-backendenv" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Configure backend/.env
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-start-the-stack" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Start the stack
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-put-https-in-front-of-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Put HTTPS in front of it
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#5-create-the-first-admin-account" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Create the first admin account
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#6-back-up-and-update" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Back up and update
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#single-container-variant" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Single-container variant
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#production-on-kubernetes-helm" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Production on Kubernetes (Helm)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#creating-the-first-admin-account" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Creating the First Admin Account
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#demo-accounts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Demo Accounts
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Demo Accounts">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#resetting-demo-data" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Resetting Demo Data
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#first-time-setup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        First-Time Setup
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="First-Time Setup">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-login" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Login
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-explore-as-admin" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Explore as Admin
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-explore-as-zev-owner" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Explore as ZEV Owner
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-view-as-participant" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. View as Participant
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#api-access" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        API Access
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#prebuilt-container-images" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Prebuilt Container Images
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Prebuilt Container Images">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#reverse-proxies-and-num_proxies" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reverse proxies and NUM_PROXIES
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#whats-next" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What's Next?
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#troubleshooting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Troubleshooting
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Troubleshooting">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#services-wont-start" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Services won't start
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cant-access-frontend" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Can't access frontend
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#database-connection-errors" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Database connection errors
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-database-looks-empty-after-switching-compose-files" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The database looks empty after switching compose files
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#disclaimer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Disclaimer
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../11-roles-and-permissions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Roles and Permissions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Planning
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Planning
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../13-feasibility-calculator/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    vZEV Feasibility Calculator
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setting Up Your ZEV
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Setting Up Your ZEV
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../02-zev-setup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ZEV Setup and Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../03-participant-management/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Managing Participants
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../04-metering-points/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Metering Points
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Operations
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Operations
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../05-metering-import/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Metering Imports
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../06-metering-analysis/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Metering Analysis
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../07-tariff-configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tariff Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Billing and Invoicing
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Billing and Invoicing
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../08-billing-allocation-explained/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How Allocation and Billing Works
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../09-invoice-management/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Invoice Management
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../10-email-configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Email Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Administration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Administration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../14-admin-console/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Platform Administration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../17-zev-transfer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ZEV Export and Import
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../18-backups/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backups
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Automation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Automation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../16-api-keys/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Keys
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../12-troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../15-glossary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Glossary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#choose-an-installation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Choose an Installation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#prerequisites" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Prerequisites
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#demo-and-local-development" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Demo and local development
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#production-with-docker-compose" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Production with Docker Compose
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Production with Docker Compose">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-get-the-code" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Get the code
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-configure-backendenv" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Configure backend/.env
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-start-the-stack" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Start the stack
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-put-https-in-front-of-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Put HTTPS in front of it
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#5-create-the-first-admin-account" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Create the first admin account
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#6-back-up-and-update" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Back up and update
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#single-container-variant" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Single-container variant
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#production-on-kubernetes-helm" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Production on Kubernetes (Helm)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#creating-the-first-admin-account" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Creating the First Admin Account
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#demo-accounts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Demo Accounts
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Demo Accounts">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#resetting-demo-data" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Resetting Demo Data
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#first-time-setup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        First-Time Setup
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="First-Time Setup">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-login" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Login
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-explore-as-admin" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Explore as Admin
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-explore-as-zev-owner" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Explore as ZEV Owner
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-view-as-participant" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. View as Participant
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#api-access" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        API Access
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#prebuilt-container-images" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Prebuilt Container Images
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Prebuilt Container Images">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#reverse-proxies-and-num_proxies" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reverse proxies and NUM_PROXIES
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#whats-next" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What's Next?
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#troubleshooting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Troubleshooting
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Troubleshooting">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#services-wont-start" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Services won't start
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cant-access-frontend" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Can't access frontend
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#database-connection-errors" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Database connection errors
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-database-looks-empty-after-switching-compose-files" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The database looks empty after switching compose files
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#disclaimer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Disclaimer
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+    <a href="https://github.com/splattner/openzev/edit/main/docs/user-guide/01-getting-started.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4zm10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1z"/></svg>
+    </a>
+  
+  
+
+
+<h1 id="getting-started-with-openzev">Getting Started with OpenZEV<a class="headerlink" href="#getting-started-with-openzev" title="Permanent link">&para;</a></h1>
+<p>This guide covers installing OpenZEV — as a demo, for development, or for
+production with Docker Compose or Kubernetes — creating the first admin
+account, and a first tour of the interface.</p>
+<h2 id="choose-an-installation">Choose an Installation<a class="headerlink" href="#choose-an-installation" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>You want to…</th>
+<th>Use</th>
+<th>Section</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Try OpenZEV with sample data</td>
+<td><code>scripts/start-demo-environment.sh</code></td>
+<td><a href="#demo-and-local-development">Demo and local development</a></td>
+</tr>
+<tr>
+<td>Work on the code</td>
+<td><code>docker-compose.dev.yml</code></td>
+<td><a href="#demo-and-local-development">Demo and local development</a></td>
+</tr>
+<tr>
+<td>Run it for a real community on one server</td>
+<td><code>docker-compose.yml</code></td>
+<td><a href="#production-with-docker-compose">Production with Docker Compose</a></td>
+</tr>
+<tr>
+<td>Run it as one application container</td>
+<td><code>docker-compose.fullstack.yml</code></td>
+<td><a href="#single-container-variant">Single-container variant</a></td>
+</tr>
+<tr>
+<td>Run it on Kubernetes</td>
+<td>Helm chart <code>charts/openzev</code></td>
+<td><a href="#production-on-kubernetes-helm">Production on Kubernetes (Helm)</a></td>
+</tr>
+</tbody>
+</table>
+<p>A production instance starts empty: no accounts, no communities. After
+installing, <a href="#creating-the-first-admin-account">create the first admin account</a>.</p>
+<h2 id="prerequisites">Prerequisites<a class="headerlink" href="#prerequisites" title="Permanent link">&para;</a></h2>
+<ul>
+<li>For Docker Compose: Docker with the Compose plugin (or Podman with
+  <code>podman compose</code>), and a copy of this repository (<code>git clone
+  https://github.com/splattner/openzev.git</code>)</li>
+<li>For Kubernetes: a cluster, <code>helm</code>, <code>kubectl</code>, and a PostgreSQL database and
+  Redis instance the cluster can reach</li>
+<li>For a public instance: a domain name, TLS termination (a reverse proxy or
+  ingress with a certificate), and an SMTP account for outgoing mail</li>
+<li>Basic familiarity with the terminal</li>
+<li>A modern web browser</li>
+</ul>
+<h2 id="demo-and-local-development">Demo and local development<a class="headerlink" href="#demo-and-local-development" title="Permanent link">&para;</a></h2>
+<p>Keep frontend, backend, and worker separated for cleaner scaling and easier operations. To start the stack and seed the full demo dataset in one step:</p>
+<div class="highlight"><pre><span></span><code>scripts/start-demo-environment.sh
+</code></pre></div>
+<p>The script creates <code>backend/.env</code> from <code>backend/.env.example</code> (development
+defaults) when it does not exist yet, and refuses to run when <code>backend/.env</code>
+disables <code>DEBUG</code> (a production configuration) instead of seeding it.
+For day-to-day development with live
+reload, use the dev stack instead:</p>
+<div class="highlight"><pre><span></span><code><span class="nb">cd</span><span class="w"> </span>/path/to/openzev
+docker<span class="w"> </span>compose<span class="w"> </span>-f<span class="w"> </span>docker-compose.dev.yml<span class="w"> </span>up<span class="w"> </span>-d<span class="w"> </span>--build
+</code></pre></div>
+<p>Wait a few seconds for services to start, then access:</p>
+<ul>
+<li><strong>Frontend (UI):</strong> http://localhost:8080 (dev stack: http://localhost:5173)</li>
+<li><strong>Backend API:</strong> http://localhost:8080/api/v1/ (dev stack: http://localhost:8001)</li>
+<li><strong>Database:</strong> localhost:5432 (PostgreSQL, dev stack only)</li>
+<li><strong>Message Broker:</strong> localhost:6379 (Redis, dev stack only)</li>
+</ul>
+<p>To stop the dev stack:</p>
+<div class="highlight"><pre><span></span><code>docker<span class="w"> </span>compose<span class="w"> </span>-f<span class="w"> </span>docker-compose.dev.yml<span class="w"> </span>down
+</code></pre></div>
+<p>Never use either of these for real data: they run with <code>DEBUG=True</code>, and the
+demo seed ships well-known passwords.</p>
+<h2 id="production-with-docker-compose">Production with Docker Compose<a class="headerlink" href="#production-with-docker-compose" title="Permanent link">&para;</a></h2>
+<p><code>docker-compose.yml</code> runs the frontend (nginx), the backend (Django +
+gunicorn), a Celery worker, one Celery Beat scheduler, PostgreSQL and Redis on
+one host. Only the frontend port <code>8080</code> is published; nginx proxies <code>/api/</code> to
+the backend, and PostgreSQL and Redis are reachable only on the compose
+network. The images are built from your checkout of the repository.</p>
+<h3 id="1-get-the-code">1. Get the code<a class="headerlink" href="#1-get-the-code" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/splattner/openzev.git
+<span class="nb">cd</span><span class="w"> </span>openzev
+git<span class="w"> </span>checkout<span class="w"> </span>vX.Y.Z<span class="w">   </span><span class="c1"># pick the newest release tag; main may be unstable</span>
+</code></pre></div>
+<h3 id="2-configure-backendenv">2. Configure <code>backend/.env</code><a class="headerlink" href="#2-configure-backendenv" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code>cp<span class="w"> </span>backend/.env.production.example<span class="w"> </span>backend/.env
+</code></pre></div>
+<p>Fill in every value. The examples below assume the instance is reached at
+<code>https://zev.example.ch</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Setting</th>
+<th>Example</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>SECRET_KEY</code></td>
+<td><em>(generated, see below)</em></td>
+<td>The backend refuses to start without it</td>
+</tr>
+<tr>
+<td><code>ALLOWED_HOSTS</code></td>
+<td><code>zev.example.ch</code></td>
+<td>Bare hostname(s), comma-separated, no scheme or port</td>
+</tr>
+<tr>
+<td><code>CSRF_TRUSTED_ORIGINS</code></td>
+<td><code>https://zev.example.ch</code></td>
+<td>Full public origin — set it even though CORS stays empty</td>
+</tr>
+<tr>
+<td><code>CORS_ALLOWED_ORIGINS</code></td>
+<td><em>(empty)</em></td>
+<td>Leave empty: nginx serves the UI and the API from the same origin</td>
+</tr>
+<tr>
+<td><code>FRONTEND_URL</code></td>
+<td><code>https://zev.example.ch</code></td>
+<td>Used for links in emails and for redirects</td>
+</tr>
+<tr>
+<td><code>EMAIL_HOST</code>, <code>EMAIL_PORT</code>, <code>EMAIL_USE_TLS</code>, <code>EMAIL_HOST_USER</code>, <code>EMAIL_HOST_PASSWORD</code>, <code>DEFAULT_FROM_EMAIL</code></td>
+<td>your SMTP account</td>
+<td>Needed for invitations, password resets and invoice emails — see <a href="../10-email-configuration/">Email Configuration</a></td>
+</tr>
+<tr>
+<td><code>WEBAUTHN_RP_ID</code></td>
+<td><code>zev.example.ch</code></td>
+<td>Bare domain for passkeys; changing it later invalidates every registered passkey</td>
+</tr>
+<tr>
+<td><code>WEBAUTHN_ORIGIN</code></td>
+<td><code>https://zev.example.ch</code></td>
+<td>Full origin for passkeys</td>
+</tr>
+<tr>
+<td><code>MFA_ENCRYPTION_KEYS</code></td>
+<td><em>(generated, see below)</em></td>
+<td>Encrypts two-factor secrets; without it nobody can enrol an authenticator app</td>
+</tr>
+<tr>
+<td><code>BACKUP_ENCRYPTION_KEYS</code></td>
+<td><em>(generated, see below)</em></td>
+<td>Encrypts backup archives; without it backups are written unencrypted — see <a href="../18-backups/">Backups</a></td>
+</tr>
+</tbody>
+</table>
+<p>Generate the three keys with Python (any machine with Python 3; the
+<code>cryptography</code> package is only needed for the second line):</p>
+<div class="highlight"><pre><span></span><code>python3<span class="w"> </span>-c<span class="w"> </span><span class="s2">"import secrets; print(secrets.token_urlsafe(50))"</span><span class="w">                               </span><span class="c1"># SECRET_KEY</span>
+python3<span class="w"> </span>-c<span class="w"> </span><span class="s2">"from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"</span><span class="w">  </span><span class="c1"># MFA_ENCRYPTION_KEYS</span>
+python3<span class="w"> </span>-c<span class="w"> </span><span class="s2">"import base64, os; print(base64.urlsafe_b64encode(os.urandom(32)).decode())"</span><span class="w">    </span><span class="c1"># BACKUP_ENCRYPTION_KEYS</span>
+</code></pre></div>
+<p>Store a copy of all three keys outside the server. Losing
+<code>MFA_ENCRYPTION_KEYS</code> makes enrolled authenticator apps unusable, and losing
+<code>BACKUP_ENCRYPTION_KEYS</code> makes encrypted backups unreadable.</p>
+<p>The backend checks this configuration every time it starts. If a required
+value is missing or still points at a development host, the database
+migration step stops with an error such as <code>accounts.E003</code> (hosts),
+<code>accounts.E005</code> (trusted origins) or <code>accounts.E006</code> (email backend), and the
+backend container exits — read it with <code>docker compose logs backend</code>.</p>
+<h3 id="3-start-the-stack">3. Start the stack<a class="headerlink" href="#3-start-the-stack" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code>docker<span class="w"> </span>compose<span class="w"> </span>up<span class="w"> </span>-d<span class="w"> </span>--build
+docker<span class="w"> </span>compose<span class="w"> </span>ps
+</code></pre></div>
+<p>The backend applies database migrations on every start. The <code>beat</code> container
+may exit once on the very first start, before those migrations have created
+its tables; it restarts on its own.</p>
+<h3 id="4-put-https-in-front-of-it">4. Put HTTPS in front of it<a class="headerlink" href="#4-put-https-in-front-of-it" title="Permanent link">&para;</a></h3>
+<p>With <code>DEBUG=False</code> the login and CSRF cookies are marked <code>Secure</code>, so browsers
+only send them over HTTPS. Plain <code>http://localhost:8080</code> works for a quick
+check on the server itself, but a public instance needs TLS termination in
+front of port <code>8080</code> — for example Caddy, Traefik, or an nginx with a Let's
+Encrypt certificate — forwarding <code>https://zev.example.ch</code> to
+<code>http://127.0.0.1:8080</code>. Open the app at that <code>https://</code> URL.</p>
+<p>The shipped nginx sanitizes <code>X-Forwarded-For</code> and the production stack keeps
+<code>NUM_PROXIES=1</code>. If another proxy sits in front of it, audit and rate-limit
+identity is therefore the immediate outer-proxy address; do not increase
+<code>NUM_PROXIES</code> unless the entire proxy chain is deliberately sanitized and
+configured to preserve client addresses.</p>
+<blockquote>
+<p><strong><code>/media/</code> is never web-served in production</strong> — invoice files are served
+only through authenticated API endpoints.</p>
+</blockquote>
+<h3 id="5-create-the-first-admin-account">5. Create the first admin account<a class="headerlink" href="#5-create-the-first-admin-account" title="Permanent link">&para;</a></h3>
+<p>See <a href="#creating-the-first-admin-account">Creating the first admin account</a> below.</p>
+<h3 id="6-back-up-and-update">6. Back up and update<a class="headerlink" href="#6-back-up-and-update" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Set up backups of the database <strong>and</strong> the <code>backend_media</code> volume (invoice
+  PDFs) before billing real participants — see <a href="../18-backups/">Backups</a>.</li>
+<li>
+<p>To update, check out the new release tag and rebuild; migrations run
+  automatically when the backend starts:</p>
+<div class="highlight"><pre><span></span><code>git<span class="w"> </span>fetch<span class="w"> </span>--tags
+git<span class="w"> </span>checkout<span class="w"> </span>vX.Y.Z
+docker<span class="w"> </span>compose<span class="w"> </span>up<span class="w"> </span>-d<span class="w"> </span>--build
+</code></pre></div>
+</li>
+</ul>
+<h3 id="single-container-variant">Single-container variant<a class="headerlink" href="#single-container-variant" title="Permanent link">&para;</a></h3>
+<p><code>docker-compose.fullstack.yml</code> runs the frontend and backend in one <code>app</code>
+container (nginx and gunicorn together); the worker, Beat scheduler,
+PostgreSQL and Redis stay separate services. Configuration and HTTPS work
+exactly as above:</p>
+<div class="highlight"><pre><span></span><code>cp<span class="w"> </span>backend/.env.production.example<span class="w"> </span>backend/.env<span class="w">   </span><span class="c1"># then fill it in as in step 2</span>
+docker<span class="w"> </span>compose<span class="w"> </span>-f<span class="w"> </span>docker-compose.fullstack.yml<span class="w"> </span>up<span class="w"> </span>-d<span class="w"> </span>--build
+</code></pre></div>
+<p>The frontend is on http://localhost:8080. Stop it with
+<code>docker compose -f docker-compose.fullstack.yml down</code>. Pass
+<code>-f docker-compose.fullstack.yml</code> to every <code>docker compose</code> command for this
+stack, and use the service name <code>app</code> where the default stack uses <code>backend</code>.</p>
+<h2 id="production-on-kubernetes-helm">Production on Kubernetes (Helm)<a class="headerlink" href="#production-on-kubernetes-helm" title="Permanent link">&para;</a></h2>
+<p>The Helm chart deploys the frontend, backend, a Celery worker, one Celery Beat
+scheduler, an Ingress and a volume for invoice files. It does <strong>not</strong> deploy
+PostgreSQL or Redis — provide both yourself (a managed service or a separate
+chart).</p>
+<ol>
+<li>Create secrets for the database URL, Django <code>SECRET_KEY</code>, the SMTP password
+   and the encryption keys (generate the keys as shown in
+   <a href="#2-configure-backendenv">step 2</a> above).</li>
+<li>Write a <code>values-prod.yaml</code> with your domain, trusted origins, passkey
+   domain, database and Redis endpoints, SMTP settings and ingress. The
+   <a href="https://github.com/splattner/openzev/blob/main/charts/openzev/README.md#example-values">chart README</a> has a
+   complete example — start from it.</li>
+<li>
+<p>Install:</p>
+<div class="highlight"><pre><span></span><code>helm<span class="w"> </span>repo<span class="w"> </span>add<span class="w"> </span>openzev<span class="w"> </span>https://splattner.github.io/openzev
+helm<span class="w"> </span>repo<span class="w"> </span>update
+helm<span class="w"> </span>upgrade<span class="w"> </span>--install<span class="w"> </span>openzev<span class="w"> </span>openzev/openzev<span class="w"> </span>-n<span class="w"> </span>openzev<span class="w"> </span>--create-namespace<span class="w"> </span>-f<span class="w"> </span>values-prod.yaml
+</code></pre></div>
+</li>
+<li>
+<p><a href="#creating-the-first-admin-account">Create the first admin account</a>.</p>
+</li>
+</ol>
+<p>The ingress needs TLS for the same reason as above (<code>Secure</code> cookies), and the
+backend runs the same configuration check on start. For every chart value,
+including TLS, existing secrets and <code>NUM_PROXIES</code> behind an ingress, see the
+<a href="https://github.com/splattner/openzev/blob/main/charts/openzev/README.md">chart README</a>.</p>
+<h2 id="creating-the-first-admin-account">Creating the First Admin Account<a class="headerlink" href="#creating-the-first-admin-account" title="Permanent link">&para;</a></h2>
+<p>A fresh production instance has no accounts, and the login page has no way to
+create an admin. Create the first one from the command line with Django's
+<code>createsuperuser</code> command, run inside the backend container. It asks for a
+username, an email address and a password:</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># Docker Compose (docker-compose.yml)</span>
+docker<span class="w"> </span>compose<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>backend<span class="w"> </span>python<span class="w"> </span>manage.py<span class="w"> </span>createsuperuser
+
+<span class="c1"># Single container (docker-compose.fullstack.yml)</span>
+docker<span class="w"> </span>compose<span class="w"> </span>-f<span class="w"> </span>docker-compose.fullstack.yml<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>app<span class="w"> </span>python<span class="w"> </span>manage.py<span class="w"> </span>createsuperuser
+
+<span class="c1"># Kubernetes (release "openzev" in namespace "openzev")</span>
+kubectl<span class="w"> </span>-n<span class="w"> </span>openzev<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>-it<span class="w"> </span>deploy/openzev-backend<span class="w"> </span>--<span class="w"> </span>python<span class="w"> </span>manage.py<span class="w"> </span>createsuperuser
+</code></pre></div>
+<p>The account gets the <strong>admin</strong> role. You sign in with the <strong>email address</strong>,
+not the username. The password must pass the usual strength checks (at least
+8 characters, not entirely numeric, not a common password).</p>
+<p>To create the account from a script instead of interactively, pass the
+password through the environment:</p>
+<div class="highlight"><pre><span></span><code>docker<span class="w"> </span>compose<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>-e<span class="w"> </span><span class="nv">DJANGO_SUPERUSER_PASSWORD</span><span class="o">=</span><span class="s1">'choose-a-strong-password'</span><span class="w"> </span>backend<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>python<span class="w"> </span>manage.py<span class="w"> </span>createsuperuser<span class="w"> </span>--noinput<span class="w"> </span>--username<span class="w"> </span>admin<span class="w"> </span>--email<span class="w"> </span>admin@example.ch
+</code></pre></div>
+<p>Then:</p>
+<ol>
+<li>Open the instance in the browser and sign in with that email address and
+   password.</li>
+<li>Under <strong>Account → Security</strong>, turn on two-factor authentication or add a
+   passkey for the admin account.</li>
+<li>Create the other people's accounts in <strong>Platform → Accounts → Users</strong>, or
+   create a community and its owner with the wizard in <strong>Platform → ZEVs</strong> —
+   see <a href="../14-admin-console/">Platform Administration</a>.</li>
+<li>Decide whether strangers may sign up. <strong>ZEV owner self-registration is on by
+   default</strong>: anyone who can reach the login page can register an owner
+   account and create a community. On a public instance you run only for your
+   own community, turn it off under <strong>Platform → System Settings → Functions</strong>,
+   or set <code>FEATURE_ZEV_SELF_REGISTRATION_ENABLED=false</code> in <code>backend/.env</code>.</li>
+</ol>
+<p>Use <code>createsuperuser</code> again whenever you need another admin and cannot sign in
+— for example, if the only admin account was locked out.</p>
+<h2 id="demo-accounts">Demo Accounts<a class="headerlink" href="#demo-accounts" title="Permanent link">&para;</a></h2>
+<p>A demo dataset is available for testing. It is loaded by starting the stack
+with <code>scripts/start-demo-environment.sh</code>, or by running <code>seed_demo</code> on an
+already-running stack (see below). It contains two communities owned by the
+same owner — the flagship <strong>ZEV STWEG Sonnenhof</strong> and the smaller
+<strong>ZEV Sonnenfirma AG</strong> — so both sides of the community switcher have real
+data to show. Credentials and the full list of what the seed creates are in
+the root <a href="https://github.com/splattner/openzev/blob/main/README.md#seed-data--demo-accounts"><code>README.md</code></a>.</p>
+<h3 id="resetting-demo-data">Resetting Demo Data<a class="headerlink" href="#resetting-demo-data" title="Permanent link">&para;</a></h3>
+<p>To reload the demo dataset:</p>
+<div class="highlight"><pre><span></span><code>docker<span class="w"> </span>compose<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>backend<span class="w"> </span>python<span class="w"> </span>manage.py<span class="w"> </span>seed_demo
+</code></pre></div>
+<p>This refreshes demo readings, invoices, import/email logs and audit events for
+both communities. Issued contract snapshots are retained.</p>
+<h2 id="first-time-setup">First-Time Setup<a class="headerlink" href="#first-time-setup" title="Permanent link">&para;</a></h2>
+<p>This tour uses the demo accounts. On a production instance, sign in with the
+admin account you <a href="#creating-the-first-admin-account">created above</a>; the
+pages look the same, just without data.</p>
+<h3 id="1-login">1. Login<a class="headerlink" href="#1-login" title="Permanent link">&para;</a></h3>
+<ol>
+<li>Navigate to http://localhost:8080 (or your instance's <code>https://</code> URL)</li>
+<li>Login with admin credentials (or ZEV owner to manage a community)</li>
+<li>Managers land on <strong>Overview</strong>; participants land on their personal dashboard</li>
+</ol>
+<p>The interface follows your browser's language (German, French, Italian or
+English). To change it, open the account menu at the top right
+and pick a <strong>Language</strong>; the choice is remembered in this browser. Invoice and
+contract PDFs use the community's own <strong>Invoice language</strong> instead.</p>
+<p><img alt="Login page" src="../screenshots/01-login.png" /></p>
+<h3 id="2-explore-as-admin">2. Explore as Admin<a class="headerlink" href="#2-explore-as-admin" title="Permanent link">&para;</a></h3>
+<p>If logged in as admin:</p>
+<ul>
+<li>Go to <strong>Platform → Overview</strong> to see system-wide KPIs</li>
+<li>View <strong>ZEVs</strong>, <strong>Accounts</strong>, <strong>Invoices</strong>, and <strong>System Settings</strong> (regional/VAT)</li>
+<li>To work inside a community: open <strong>Platform → Overview → ZEVs</strong> and click <strong>Manage</strong> on a row — this selects the ZEV and takes you to its operational Overview. (While under <code>/admin</code> the shell shows the <strong>Platform administration</strong> indicator instead of the switcher.)</li>
+<li>The sidebar ZEV switcher (top-left) selects the working community anywhere else; the selected community is shown above the page title on every page, so it stays visible even when the navigation scrolls, the sidebar is collapsed, or you are on mobile</li>
+<li>For keyboard access, open the switcher or account button with Enter or Space, use Tab to move through its options, and press Escape to close it. After selecting a community, focus returns to the switcher. On mobile, Escape closes the navigation drawer and returns focus to its menu button.</li>
+</ul>
+<h3 id="3-explore-as-zev-owner">3. Explore as ZEV Owner<a class="headerlink" href="#3-explore-as-zev-owner" title="Permanent link">&para;</a></h3>
+<p>If logged in as a ZEV owner:</p>
+<ul>
+<li>Go to <strong>Overview</strong> for setup guidance and billing work grouped by period</li>
+<li>Go to <strong>Energy balance</strong> to analyse production, consumption, self-consumption, and grid exchange for a period</li>
+<li>Go to <strong>Settings</strong> to configure your community parameters (General · Billing &amp; payment · Documents &amp; emails · Audit log · Export/transfer)</li>
+<li>Go to <strong>Participants</strong> to view member list</li>
+<li>Go to <strong>Metering Points</strong> to see participant meters</li>
+<li>Go to <strong>Metering</strong> for consumption charts, data quality, and import history</li>
+<li>Go to <strong>Tariffs</strong> to configure energy pricing</li>
+<li>Go to <strong>Billing</strong> to generate and manage invoices, inspect/retry email delivery, and download statements</li>
+<li>Go to <strong>Reports</strong> for annual statements and financial summaries</li>
+</ul>
+<p><img alt="Manager Overview" src="../screenshots/02-dashboard.png" /></p>
+<p><img alt="Manager Energy balance" src="../screenshots/02c-energy-balance.png" /></p>
+<p>In the participant table, Tab to a name and press Enter or Space to filter the
+charts; swipe the table horizontally on narrow screens to see every column.</p>
+<h3 id="4-view-as-participant">4. View as Participant<a class="headerlink" href="#4-view-as-participant" title="Permanent link">&para;</a></h3>
+<p>Login as a participant (Anna or Ben):</p>
+<ul>
+<li><strong>Dashboard</strong> shows your energy consumption/production overview</li>
+<li><strong>My invoices</strong> lists the invoices issued to you (details + PDF)</li>
+<li><strong>Annual statement</strong> shows your yearly statement and financial summary</li>
+</ul>
+<p><img alt="Participant Dashboard" src="../screenshots/02b-participant-dashboard.png" /></p>
+<p><img alt="Account profile" src="../screenshots/16-account-profile.png" /></p>
+<h2 id="api-access">API Access<a class="headerlink" href="#api-access" title="Permanent link">&para;</a></h2>
+<p>OpenZEV provides a complete REST API for programmatic access:</p>
+<ul>
+<li><strong>Swagger UI:</strong> http://localhost:8080/api/docs/</li>
+<li><strong>ReDoc:</strong> http://localhost:8080/api/redoc/</li>
+<li><strong>API Base URL:</strong> http://localhost:8080/api/v1/</li>
+</ul>
+<p>Development stack (<code>docker-compose.dev.yml</code>) serves the API directly on port 8001.</p>
+<p>The API is protected by JWT authentication. Demo credentials work for API access too.</p>
+<h2 id="prebuilt-container-images">Prebuilt Container Images<a class="headerlink" href="#prebuilt-container-images" title="Permanent link">&para;</a></h2>
+<p>If you prefer not to build locally, prebuilt images are available on GitHub Container Registry:</p>
+<ul>
+<li><code>ghcr.io/splattner/openzev-backend:latest</code></li>
+<li><code>ghcr.io/splattner/openzev-frontend:latest</code></li>
+<li><code>ghcr.io/splattner/openzev-fullstack:latest</code></li>
+</ul>
+<p>Tag variants:</p>
+<ul>
+<li><code>latest</code> — newest published release</li>
+<li><code>vX.Y.Z</code> — specific release version</li>
+<li><code>main</code> — latest development build (may be unstable)</li>
+</ul>
+<h3 id="reverse-proxies-and-num_proxies">Reverse proxies and NUM_PROXIES<a class="headerlink" href="#reverse-proxies-and-num_proxies" title="Permanent link">&para;</a></h3>
+<p><code>NUM_PROXIES</code> defaults to <code>0</code>, so direct requests cannot choose their own
+rate-limit or audit identity through <code>X-Forwarded-For</code>. The default and fullstack
+Compose stacks use <code>1</code> behind nginx and expose the API through port 8080 only.
+The development stack keeps <code>0</code> because its backend is directly accessible;
+requests through Vite may share a rate-limit bucket. For custom proxies or
+Kubernetes, follow the <a href="https://github.com/splattner/openzev/blob/main/charts/openzev/README.md#reverse-proxies-and-num_proxies">proxy configuration guidance</a>
+before enabling trusted hops.</p>
+<h2 id="whats-next">What's Next?<a class="headerlink" href="#whats-next" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>Operators:</strong> See <a href="../02-zev-setup/">ZEV Setup and Configuration</a></li>
+<li><strong>Data Management:</strong> See <a href="../05-metering-import/">Metering Imports</a></li>
+<li><strong>Billing:</strong> See <a href="../07-tariff-configuration/">Tariff Configuration</a></li>
+<li><strong>Understanding Roles:</strong> See <a href="../11-roles-and-permissions/">Roles and Permissions</a></li>
+</ul>
+<h2 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">&para;</a></h2>
+<h3 id="services-wont-start">Services won't start<a class="headerlink" href="#services-wont-start" title="Permanent link">&para;</a></h3>
+<p>Check Docker logs:</p>
+<div class="highlight"><pre><span></span><code>docker<span class="w"> </span>compose<span class="w"> </span>logs
+</code></pre></div>
+<h3 id="cant-access-frontend">Can't access frontend<a class="headerlink" href="#cant-access-frontend" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Ensure port 8080 is not in use: <code>lsof -i :8080</code></li>
+<li>Check Docker container is running: <code>docker compose ps</code></li>
+</ul>
+<h3 id="database-connection-errors">Database connection errors<a class="headerlink" href="#database-connection-errors" title="Permanent link">&para;</a></h3>
+<p>Verify PostgreSQL container is healthy:</p>
+<div class="highlight"><pre><span></span><code>docker<span class="w"> </span>compose<span class="w"> </span>logs<span class="w"> </span>db
+</code></pre></div>
+<h3 id="the-database-looks-empty-after-switching-compose-files">The database looks empty after switching compose files<a class="headerlink" href="#the-database-looks-empty-after-switching-compose-files" title="Permanent link">&para;</a></h3>
+<p>All three compose files (<code>docker-compose.yml</code>, <code>docker-compose.dev.yml</code>,
+<code>docker-compose.fullstack.yml</code>) share the <code>postgres_data</code> volume and mount it at
+<code>/var/lib/postgresql/data</code>, with <code>PGDATA</code> pinned to the <code>pgdata</code> subdirectory —
+so switching between them keeps one database.</p>
+<p>Older revisions mounted that volume at different paths in different files, which
+gave each stack a cluster the others could not see: starting one, then the
+other, looked like the database had been wiped. If you are coming from such a
+setup, the first start after upgrading initialises an empty cluster; see the
+upgrade note in the <a href="https://github.com/splattner/openzev/blob/main/README.md#quick-start-docker">README</a> for how to
+carry data across.</p>
+<p>See <a href="../12-troubleshooting/">Troubleshooting</a> for more help.</p>
+<h2 id="disclaimer">Disclaimer<a class="headerlink" href="#disclaimer" title="Permanent link">&para;</a></h2>
+<p>OpenZEV is built for personal use and self-hosting by tinkerers who enjoy running their own stack. <strong>Please double-check your data and billing outputs</strong>—we do not take responsibility for incorrect imports, calculations, invoices, or invoicing workflows.</p>
+<p>Before using in production:</p>
+<ul>
+<li>Test thoroughly with sample data</li>
+<li>Verify all calculations match your tariff agreements</li>
+<li>Set up regular backups of your database <strong>and</strong> the invoice PDF files — see <a href="../18-backups/">Backups</a></li>
+<li>Review user roles and access controls</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="Footer" >
+        
+          
+          <a href=".." class="md-footer__link md-footer__link--prev" aria-label="Previous: Home">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Previous
+              </span>
+              <div class="md-ellipsis">
+                Home
+              </div>
+            </div>
+          </a>
+        
+        
+          
+          <a href="../11-roles-and-permissions/" class="md-footer__link md-footer__link--next" aria-label="Next: Roles and Permissions">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Next
+              </span>
+              <div class="md-ellipsis">
+                Roles and Permissions
+              </div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"/></svg>
+            </div>
+          </a>
+        
+      </nav>
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      OpenZEV · AGPL-3.0
+    </div>
+  
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://github.com/splattner/openzev" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.sections", "navigation.top", "navigation.footer", "search.suggest", "search.highlight", "content.code.copy", "content.action.edit", "toc.follow"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+        <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>

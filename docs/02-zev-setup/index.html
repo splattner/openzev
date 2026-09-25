@@ -1,0 +1,2384 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="User guide for OpenZEV, open source billing software for Swiss ZEV and vZEV energy communities.">
+      
+      
+      
+        <link rel="canonical" href="https://www.openzev.ch/docs/02-zev-setup/">
+      
+      
+        <link rel="prev" href="../13-feasibility-calculator/">
+      
+      
+        <link rel="next" href="../03-participant-management/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/favicon.svg">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>ZEV Setup and Configuration - OpenZEV Documentation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,700,700i%7CIBM+Plex+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"IBM Plex Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/docs.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#zev-setup-and-configuration" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="https://www.openzev.ch/" title="OpenZEV Documentation" class="md-header__button md-logo" aria-label="OpenZEV Documentation" data-md-component="logo">
+      
+  <img src="../assets/favicon.svg" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            OpenZEV Documentation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              ZEV Setup and Configuration
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="custom" data-md-color-accent="custom"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/splattner/openzev" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    splattner/openzev
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="https://www.openzev.ch/" title="OpenZEV Documentation" class="md-nav__button md-logo" aria-label="OpenZEV Documentation" data-md-component="logo">
+      
+  <img src="../assets/favicon.svg" alt="logo">
+
+    </a>
+    OpenZEV Documentation
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/splattner/openzev" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    splattner/openzev
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../01-getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../11-roles-and-permissions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Roles and Permissions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Planning
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Planning
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../13-feasibility-calculator/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    vZEV Feasibility Calculator
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setting Up Your ZEV
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Setting Up Your ZEV
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ZEV Setup and Configuration
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ZEV Setup and Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#what-is-a-zev" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What is a ZEV?
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#creating-a-zev" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Creating a ZEV
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Creating a ZEV">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#option-a-self-registration-zev-owner" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Option A: Self-Registration (ZEV Owner)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#option-b-admin-created-zev-with-responsible-person-wizard" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Option B: Admin-Created ZEV (with Responsible Person Wizard)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#zev-settings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ZEV Settings
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="ZEV Settings">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#general-tab" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        General tab
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="General tab">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#general-zev-settings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        General ZEV Settings
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#grid-connection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Grid Connection
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#billing--payment-tab" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Billing &amp; payment tab
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Billing &amp; payment tab">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#billing--payment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Billing &amp; Payment
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#payment-details" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Payment Details
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#documents--emails-tab" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Documents &amp; emails tab
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#billing-interval" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Billing Interval
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#vat-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        VAT Configuration
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#price-bands-on-the-invoice" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Price bands on the invoice
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#participant-access-from-the-invoice" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Participant Access from the Invoice
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#email-templates" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Email Templates
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#access-control" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Access Control
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#data-ownership-and-privacy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Data Ownership and Privacy
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#multi-zev-operations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Multi-ZEV Operations
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#next-steps" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Next Steps
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../03-participant-management/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Managing Participants
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../04-metering-points/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Metering Points
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Operations
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Operations
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../05-metering-import/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Metering Imports
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../06-metering-analysis/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Metering Analysis
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../07-tariff-configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tariff Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Billing and Invoicing
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Billing and Invoicing
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../08-billing-allocation-explained/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How Allocation and Billing Works
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../09-invoice-management/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Invoice Management
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../10-email-configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Email Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Administration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Administration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../14-admin-console/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Platform Administration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../17-zev-transfer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ZEV Export and Import
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../18-backups/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backups
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Automation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Automation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../16-api-keys/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Keys
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../12-troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../15-glossary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Glossary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#what-is-a-zev" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What is a ZEV?
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#creating-a-zev" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Creating a ZEV
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Creating a ZEV">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#option-a-self-registration-zev-owner" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Option A: Self-Registration (ZEV Owner)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#option-b-admin-created-zev-with-responsible-person-wizard" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Option B: Admin-Created ZEV (with Responsible Person Wizard)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#zev-settings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ZEV Settings
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="ZEV Settings">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#general-tab" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        General tab
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="General tab">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#general-zev-settings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        General ZEV Settings
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#grid-connection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Grid Connection
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#billing--payment-tab" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Billing &amp; payment tab
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Billing &amp; payment tab">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#billing--payment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Billing &amp; Payment
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#payment-details" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Payment Details
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#documents--emails-tab" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Documents &amp; emails tab
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#billing-interval" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Billing Interval
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#vat-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        VAT Configuration
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#price-bands-on-the-invoice" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Price bands on the invoice
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#participant-access-from-the-invoice" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Participant Access from the Invoice
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#email-templates" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Email Templates
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#access-control" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Access Control
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#data-ownership-and-privacy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Data Ownership and Privacy
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#multi-zev-operations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Multi-ZEV Operations
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#next-steps" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Next Steps
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+    <a href="https://github.com/splattner/openzev/edit/main/docs/user-guide/02-zev-setup.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4zm10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1z"/></svg>
+    </a>
+  
+  
+
+
+<h1 id="zev-setup-and-configuration">ZEV Setup and Configuration<a class="headerlink" href="#zev-setup-and-configuration" title="Permanent link">&para;</a></h1>
+<p>This guide covers creating and configuring a ZEV energy community in OpenZEV.</p>
+<h2 id="what-is-a-zev">What is a ZEV?<a class="headerlink" href="#what-is-a-zev" title="Permanent link">&para;</a></h2>
+<p>A ZEV or vZEV is a self-consumption community under Swiss energy law:</p>
+<ul>
+<li>Members (participants) share locally produced solar energy</li>
+<li>Energy is allocated fairly using a timestamp-level allocation model</li>
+<li>Billing is transparent and community-auditable</li>
+</ul>
+<p>OpenZEV supports operating one or many ZEVs, each with independent:</p>
+<ul>
+<li>Participants</li>
+<li>Metering points</li>
+<li>Tariffs</li>
+<li>Invoicing schedules</li>
+</ul>
+<p>There are two types:</p>
+<ul>
+<li><strong>ZEV</strong> — Zusammenschluss zum Eigenverbrauch: the members sit behind one shared grid connection</li>
+<li><strong>vZEV</strong> — virtueller Zusammenschluss zum Eigenverbrauch: the members keep their own grid connections and are combined through the grid operator's meters</li>
+</ul>
+<h2 id="creating-a-zev">Creating a ZEV<a class="headerlink" href="#creating-a-zev" title="Permanent link">&para;</a></h2>
+<p>There are two ways to create a ZEV:</p>
+<h3 id="option-a-self-registration-zev-owner">Option A: Self-Registration (ZEV Owner)<a class="headerlink" href="#option-a-self-registration-zev-owner" title="Permanent link">&para;</a></h3>
+<p>New ZEV owners can register themselves and create their ZEV without admin involvement.</p>
+<p><strong>Step 1: Register on the login page</strong></p>
+<ol>
+<li>Go to the login page</li>
+<li>In the <strong>New to OpenZEV?</strong> panel on the right, click <strong>Create account</strong></li>
+<li>In the modal, enter your <strong>Email address</strong> — it is your sign-in name</li>
+<li>Click <strong>Send verification email</strong></li>
+</ol>
+<p>The panel is shown only while self-registration is enabled (an admin can turn
+it off under <strong>Platform → System Settings → Functions</strong>).</p>
+<p><strong>Step 2: Verify your email</strong></p>
+<ol>
+<li>Open the verification email ("Verify your OpenZEV account")</li>
+<li>Click the verification link (valid for 24 hours)</li>
+<li>You are redirected to the setup wizard</li>
+</ol>
+<p><strong>Step 3: Set your password (Step 1 of 2)</strong></p>
+<ol>
+<li>Enter a new password (minimum 8 characters)</li>
+<li>Confirm the password</li>
+<li>Click <strong>Set password &amp; continue</strong></li>
+</ol>
+<p><strong>Step 4: Create your ZEV (Step 2 of 2)</strong></p>
+<ol>
+<li>Fill in the ZEV details:<ul>
+<li><strong>ZEV Name</strong> — Community identifier (required)</li>
+<li><strong>Start Date</strong> — When the ZEV begins operation (defaults to today)</li>
+<li><strong>ZEV Type</strong> — <code>ZEV</code> or <code>vZEV</code></li>
+<li><strong>Billing Interval</strong> — Monthly, quarterly, semi-annual, or annual</li>
+<li><strong>Postal Code</strong> — Postal code of the grid connection (optional); suggests
+   the grid operator below from ElCom's official register</li>
+<li><strong>Grid Operator</strong> — Your VNB name (optional)</li>
+<li><strong>Payment recipient address</strong> — your address, printed as the QR-Rechnung creditor</li>
+<li><strong>Bank Name</strong> — Bank holding the payment account (optional)</li>
+<li><strong>Bank IBAN</strong> — Account receiving participant payments (optional; required for QR payment details)</li>
+</ul>
+</li>
+<li>Click <strong>Create ZEV &amp; finish</strong></li>
+<li>You are redirected to the dashboard as the owner of your new ZEV</li>
+</ol>
+<blockquote>
+<p><strong>Note:</strong> Self-registration creates the account with the <code>zev_owner</code> role. Each self-registered owner can create exactly one ZEV via this flow.</p>
+<p>The IBAN belongs to the account that receives participant payments. If you enter one, provide the payment recipient's address as well so QR-Rechnungen can be generated. Skipping it leaves invoices without payment details until you add it under <strong>Billing &amp; payment</strong> in ZEV Settings.</p>
+</blockquote>
+<h3 id="option-b-admin-created-zev-with-responsible-person-wizard">Option B: Admin-Created ZEV (with Responsible Person Wizard)<a class="headerlink" href="#option-b-admin-created-zev-with-responsible-person-wizard" title="Permanent link">&para;</a></h3>
+<p>Admins can create a ZEV together with a new responsible-person account in a single wizard. See <a href="../14-admin-console/#zev-management">Platform → Overview → ZEVs</a> for details.</p>
+<h2 id="zev-settings">ZEV Settings<a class="headerlink" href="#zev-settings" title="Permanent link">&para;</a></h2>
+<p><strong>ZEV Owners</strong> configure their community in <strong>ZEV Settings</strong> (sidebar entry
+<strong>Setup → Settings</strong>, <code>/zev-settings</code>). The settings are organized into tabs:</p>
+<ul>
+<li><strong>General</strong> — name, start date, ZEV type, grid connection</li>
+<li><strong>Billing &amp; payment</strong> — billing interval, invoice language, payment term,
+  invoice presentation, participant QR code, invoice prefix, bank details, VAT</li>
+<li><strong>Documents &amp; emails</strong> — invoice email template, notes, contract notes</li>
+<li><strong>Audit log</strong> — this ZEV's audit events (see
+  <a href="../14-admin-console/#audit-logs">Audit Logs</a>)</li>
+<li><strong>Export / transfer</strong> — whole-ZEV export archive (see
+  <a href="../17-zev-transfer/">ZEV Export and Import</a>)</li>
+</ul>
+<p><img alt="ZEV settings" src="../screenshots/06-zev-settings.png" /></p>
+<p>Each tab has its own <strong>Save</strong> button, and saving on any tab saves the whole
+form.</p>
+<h3 id="general-tab">General tab<a class="headerlink" href="#general-tab" title="Permanent link">&para;</a></h3>
+<h4 id="general-zev-settings">General ZEV Settings<a class="headerlink" href="#general-zev-settings" title="Permanent link">&para;</a></h4>
+<table>
+<thead>
+<tr>
+<th>Setting</th>
+<th>Purpose</th>
+<th>Required</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Name</strong></td>
+<td>Community identifier</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td><strong>Start date</strong></td>
+<td>When the ZEV begins operation</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td><strong>ZEV type</strong></td>
+<td><code>ZEV</code> or <code>vZEV</code></td>
+<td>Yes</td>
+</tr>
+</tbody>
+</table>
+<h4 id="grid-connection">Grid Connection<a class="headerlink" href="#grid-connection" title="Permanent link">&para;</a></h4>
+<p>In <strong>Grid Connection</strong>, each field's guidance appears directly beneath it.</p>
+<table>
+<thead>
+<tr>
+<th>Setting</th>
+<th>Purpose</th>
+<th>Required</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Postal Code</strong></td>
+<td>Postal code of the grid connection. Used only to suggest a grid operator and its tariff document URL from the official ElCom register — see below</td>
+<td>No</td>
+</tr>
+<tr>
+<td><strong>Grid Operator</strong></td>
+<td>VNB name (Verteilnetzbetreiber)</td>
+<td>No</td>
+</tr>
+<tr>
+<td><strong>Tariff document URL</strong></td>
+<td>Where this operator publishes its machine-readable tariffs (Art. 7b StromVV). Used by the <a href="../07-tariff-configuration/#importing-tariffs-from-your-grid-operator">tariff import</a></td>
+<td>No</td>
+</tr>
+<tr>
+<td><strong>Grid Connection Point</strong></td>
+<td>Verknüpfungspunkt / EAN identifier</td>
+<td>No</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>Tip:</strong> Enter a <strong>Postal Code</strong> and OpenZEV suggests the grid operator that
+serves it, sourced from ElCom's official register. Click the suggestion to
+fill in <strong>Grid Operator</strong>. If that operator has a registered tariff
+document URL, a second suggestion offers to fill in <strong>Tariff document
+URL</strong> too — but only after <strong>Test this URL</strong> confirms the address actually
+serves a tariff document. Operators sometimes move the file without
+ElCom's copy being updated, so an untested suggestion is never saved
+automatically, and an address you already entered is never overwritten.</p>
+</blockquote>
+<h3 id="billing--payment-tab">Billing &amp; payment tab<a class="headerlink" href="#billing--payment-tab" title="Permanent link">&para;</a></h3>
+<p><img alt="Billing and payment settings" src="../screenshots/06b-zev-billing-settings.png" /></p>
+<h4 id="billing--payment">Billing &amp; Payment<a class="headerlink" href="#billing--payment" title="Permanent link">&para;</a></h4>
+<table>
+<thead>
+<tr>
+<th>Setting</th>
+<th>Purpose</th>
+<th>Required</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Billing interval</strong></td>
+<td>Invoice frequency (see below)</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td><strong>Invoice language</strong></td>
+<td>Language for generated PDFs (de/fr/it/en)</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td><strong>Payment term (days)</strong></td>
+<td>Days from the issue date until payment is due (default 30, 1–365)</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td><strong>Itemise price bands on the invoice</strong></td>
+<td>Show each price band of a multi-band tariff as its own line (see <a href="#price-bands-on-the-invoice">below</a>)</td>
+<td>No</td>
+</tr>
+<tr>
+<td><strong>Participant QR code on the invoice</strong></td>
+<td>Print a QR code that opens the invoice online (see <a href="#participant-access-from-the-invoice">below</a>)</td>
+<td>No</td>
+</tr>
+</tbody>
+</table>
+<h4 id="payment-details">Payment Details<a class="headerlink" href="#payment-details" title="Permanent link">&para;</a></h4>
+<table>
+<thead>
+<tr>
+<th>Setting</th>
+<th>Purpose</th>
+<th>Required</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Invoice prefix</strong></td>
+<td>Prefix for invoice numbers (default: <code>INV</code>)</td>
+<td>No</td>
+</tr>
+<tr>
+<td><strong>Bank name</strong></td>
+<td>Internal reference for the payment account</td>
+<td>No</td>
+</tr>
+<tr>
+<td><strong>Bank IBAN</strong></td>
+<td>Account participants pay into; without it invoices carry no payment details or QR payment slip</td>
+<td>No</td>
+</tr>
+<tr>
+<td><strong>VAT treatment</strong></td>
+<td>How VAT is applied when billing participants (see <a href="#vat-configuration">below</a>)</td>
+<td>No</td>
+</tr>
+<tr>
+<td><strong>VAT number</strong></td>
+<td>Swiss UID — shown only when VAT treatment is <em>VAT-registered</em></td>
+<td>If registered</td>
+</tr>
+</tbody>
+</table>
+<p>The QR-Rechnung creditor address is the address of the ZEV's responsible
+person, taken from their participant record.</p>
+<h3 id="documents--emails-tab">Documents &amp; emails tab<a class="headerlink" href="#documents--emails-tab" title="Permanent link">&para;</a></h3>
+<p>The invoice email template (see <a href="#email-templates">Email Templates</a> below)
+and these free-text fields:</p>
+<table>
+<thead>
+<tr>
+<th>Setting</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Notes</strong></td>
+<td>General notes about the ZEV</td>
+</tr>
+<tr>
+<td><strong>Local Tariff Notes</strong></td>
+<td>Free-text conditions for local tariff (appears on contract PDF)</td>
+</tr>
+<tr>
+<td><strong>Additional Contract Notes</strong></td>
+<td>Extra text for participation contract PDF</td>
+</tr>
+</tbody>
+</table>
+<h3 id="billing-interval">Billing Interval<a class="headerlink" href="#billing-interval" title="Permanent link">&para;</a></h3>
+<p>Choose how often invoices are generated:</p>
+<ul>
+<li><strong>Monthly</strong> — One invoice per month</li>
+<li><strong>Quarterly</strong> — One invoice per 3 months</li>
+<li><strong>Semi-Annual</strong> — One invoice every 6 months</li>
+<li><strong>Annual</strong> — One invoice per year</li>
+</ul>
+<blockquote>
+<p><strong>Tip:</strong> Monthly is most common for community billing; annual works for smaller communities or cooperatives with annual settlements.</p>
+</blockquote>
+<h3 id="vat-configuration">VAT Configuration<a class="headerlink" href="#vat-configuration" title="Permanent link">&para;</a></h3>
+<p><strong>VAT treatment</strong> has three options:</p>
+<ul>
+<li><strong>Not VAT-registered</strong> (default) — tariff prices are billed exactly as you
+  entered them. No VAT line appears. Use this when the prices you entered are
+  already the final amounts your participants should pay.</li>
+</ul>
+<ul>
+<li><strong>VAT-registered</strong> — enter your <strong>VAT Number</strong> (UID format), and ask an admin
+  to configure VAT rates (<a href="../14-admin-console/#vat-settings">Platform → VAT Settings</a>).
+  Tariff prices are treated as net; the invoice adds the active rate on top and
+  shows a VAT line. You reclaim the VAT you pay upstream in your own VAT return.</li>
+</ul>
+<ul>
+<li>
+<p><strong>Not registered — fold VAT into prices</strong> — for the common case of a small
+  ZEV that is <em>not</em> registered but whose grid operator invoices it <strong>with VAT
+  it cannot reclaim</strong>. Enter tariff prices net, exactly as the operator
+  publishes them (this is also what the <a href="../07-tariff-configuration/#importing-tariffs-from-your-grid-operator">tariff import</a>
+  writes). At invoice time OpenZEV grosses up grid energy, grid fees, levies
+  and metering by the active VAT rate. Your own local (solar) energy and the
+  feed-in credit are left untouched. No VAT line appears — a non-registered
+  issuer must not show one — but the amounts billed are gross, so you recover
+  what the operator charged you. The folded-in VAT is recorded per invoice for
+  your bookkeeping.</p>
+<p>An admin still has to configure the VAT rate for this to take effect; with no
+active rate, prices are billed unchanged.</p>
+</li>
+</ul>
+<p>If no VAT rate is active for an invoice period, VAT defaults to <strong>0%</strong> in every mode.</p>
+<h3 id="price-bands-on-the-invoice">Price bands on the invoice<a class="headerlink" href="#price-bands-on-the-invoice" title="Permanent link">&para;</a></h3>
+<p>A tariff can carry several price bands — peak and off-peak, a weekend rate, a
+different winter price. By default such a tariff appears on the invoice as
+<strong>one line</strong>, priced at the average of the bands your participant actually
+used, weighted by how much they used in each.</p>
+<p>That average is nobody's published rate. It also differs from participant to
+participant: someone who runs their washing machine at night gets a lower
+figure than their neighbour, from the same tariff. Neither can check the
+invoice against the tariff sheet they were given.</p>
+<p>Tick <strong>Itemise price bands on the invoice</strong> and each band that was used gets
+its own line at its own rate:</p>
+<div class="highlight"><pre><span></span><code>Netznutzung – HT (Hochtarif)    412.0000 kWh × 0.28400   117.01
+Netznutzung – NT (Niedertarif)  638.0000 kWh × 0.19100   121.86
+</code></pre></div>
+<p>The bands are named the way your participation contracts name them, so the two
+documents agree.</p>
+<p>The invoice costs exactly the same either way — a tariff's total is worked out
+first and then divided across its band lines, never the other way round. A
+tariff with only one band is never split.</p>
+<p>Fixed monthly and yearly fees are not affected: they have no bands. Neither
+are percentage-of-energy tariffs, whose price comes from the grid rate rather
+than from a band of their own.</p>
+<p>This changes invoices <strong>generated from now on</strong>. Invoices you have already
+generated are left exactly as they are; regenerate one (only possible while it
+is still a draft) if you want it in the new shape.</p>
+<h3 id="participant-access-from-the-invoice">Participant Access from the Invoice<a class="headerlink" href="#participant-access-from-the-invoice" title="Permanent link">&para;</a></h3>
+<p>Off by default, and <strong>no upgrade turns it on for you</strong>.</p>
+<p>Tick <strong>Participant QR code on the invoice</strong> under <strong>Settings → Billing &amp; payment</strong> and every invoice you generate from then on carries a second QR code on its insights page. Scanning it opens that one invoice — the total, whether it is paid, the line items, the consumption figures and the same three charts the insights page prints — with no account and no password.</p>
+<p>The setting changes invoices <strong>generated from now on</strong>. Invoices already generated keep whatever they were printed with.</p>
+<p>What the QR deliberately cannot do: reach any other invoice, name any other participant beyond what the energy-flow diagram already prints on the same sheet, or change anything.</p>
+<p>Two things to know before turning it on:</p>
+<ul>
+<li><strong>The link never expires.</strong> It is printed on a document that sits in a folder for years, and a link that dies underneath it is a support ticket rather than a security control. Revoking is the control — see <a href="../09-invoice-management/#participant-access-links">Invoice Management → Participant access links</a>.</li>
+<li><strong>Anyone holding the invoice can open it.</strong> That is the design: the page shows nothing the printed page does not already show. But it does mean a photographed or mis-delivered invoice is readable by whoever has it, until you revoke the link.</li>
+</ul>
+<p>The QR sits on the insights page and never on a sheet carrying the QR-Rechnung, so the two codes cannot be confused; it is smaller and captioned "this is not a payment code" in all four languages. An invoice with no consumption gets no QR, because there would be nothing to show.</p>
+<p>From the page, <strong>Send me a sign-in link</strong> emails a one-time link to the address you have on file for that participant, which opens the ordinary participant portal. The requester never gets to say where it goes — the invoice identifies them — and nobody sets a password at any point.</p>
+<h3 id="email-templates">Email Templates<a class="headerlink" href="#email-templates" title="Permanent link">&para;</a></h3>
+<p><strong>ZEV Owners</strong> can customize invoice email templates in <strong>ZEV Settings → Documents &amp; emails</strong>:</p>
+<ul>
+<li><strong>Subject line</strong> — Email subject sent with invoices</li>
+<li><strong>Email body</strong> — Message body sent with invoice PDF attachment</li>
+</ul>
+<p>Both fields support variable placeholders such as <code>{invoice_number}</code>, <code>{zev_name}</code>, <code>{participant_name}</code>, <code>{period_start}</code>, <code>{period_end}</code>, and <code>{total_chf}</code>. See <a href="../10-email-configuration/#email-templates">Email Configuration → Email Templates</a> for the full variable reference.</p>
+<p>Leave fields blank to use the admin's global invoice-email template when one is customized, or the shipped default otherwise. If a template contains an invalid placeholder, the system falls back to defaults automatically.</p>
+<p>For more details on email delivery, see <a href="../10-email-configuration/">Email Configuration</a>. For system-wide default email templates managed by admins, see <a href="../14-admin-console/#email-templates">Platform → Templates → Email templates</a>.</p>
+<h2 id="access-control">Access Control<a class="headerlink" href="#access-control" title="Permanent link">&para;</a></h2>
+<p>ZEV access is controlled via <strong>role assignments</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>Role</th>
+<th>Access</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Admin</strong></td>
+<td>Global access to all ZEVs, users, and settings</td>
+</tr>
+<tr>
+<td><strong>ZEV Owner</strong></td>
+<td>Full operational management of owned ZEV(s)</td>
+</tr>
+<tr>
+<td><strong>Participant</strong></td>
+<td>Read-only access to own metering data and invoices</td>
+</tr>
+</tbody>
+</table>
+<p>Admins manage user accounts in <strong>Platform → Accounts</strong>.</p>
+<p>Participants automatically see only their own metering data and invoices (ZEV-scoped access).</p>
+<h2 id="data-ownership-and-privacy">Data Ownership and Privacy<a class="headerlink" href="#data-ownership-and-privacy" title="Permanent link">&para;</a></h2>
+<ul>
+<li>All metering data is scoped to the ZEV — participants cannot see other participants' readings</li>
+<li>Invoices are private to their recipient and ZEV owners</li>
+<li>Admins have global read access for monitoring and compliance</li>
+</ul>
+<h2 id="multi-zev-operations">Multi-ZEV Operations<a class="headerlink" href="#multi-zev-operations" title="Permanent link">&para;</a></h2>
+<p>If running multiple ZEVs:</p>
+<ol>
+<li><strong>ZEV switcher:</strong> Use the ZEV switcher at the top of the sidebar (top-left); the selected community is also shown above the page title on every page. Under Platform pages (<code>/admin/*</code>) the switcher is replaced by the <strong>Platform administration</strong> indicator — enter a ZEV via <strong>Platform → Overview → ZEVs → Manage</strong> instead</li>
+<li><strong>Each ZEV is independent:</strong> Tariffs, participants, and invoices are isolated</li>
+<li><strong>Owners can manage one or more ZEVs:</strong> Admin can assign ownership of additional ZEVs</li>
+</ol>
+<h2 id="next-steps">Next Steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>Add participants:</strong> <a href="../03-participant-management/">Managing Participants</a></li>
+<li><strong>Configure metering points:</strong> <a href="../04-metering-points/">Metering Points</a></li>
+<li><strong>Import readings:</strong> <a href="../05-metering-import/">Metering Imports</a></li>
+<li><strong>Set up tariffs:</strong> <a href="../07-tariff-configuration/">Tariff Configuration</a></li>
+<li><strong>Email setup:</strong> <a href="../10-email-configuration/">Email Configuration</a></li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="Footer" >
+        
+          
+          <a href="../13-feasibility-calculator/" class="md-footer__link md-footer__link--prev" aria-label="Previous: vZEV Feasibility Calculator">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Previous
+              </span>
+              <div class="md-ellipsis">
+                vZEV Feasibility Calculator
+              </div>
+            </div>
+          </a>
+        
+        
+          
+          <a href="../03-participant-management/" class="md-footer__link md-footer__link--next" aria-label="Next: Managing Participants">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Next
+              </span>
+              <div class="md-ellipsis">
+                Managing Participants
+              </div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"/></svg>
+            </div>
+          </a>
+        
+      </nav>
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      OpenZEV · AGPL-3.0
+    </div>
+  
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://github.com/splattner/openzev" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.sections", "navigation.top", "navigation.footer", "search.suggest", "search.highlight", "content.code.copy", "content.action.edit", "toc.follow"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+        <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>

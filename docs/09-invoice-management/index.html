@@ -1,0 +1,2577 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="User guide for OpenZEV, open source billing software for Swiss ZEV and vZEV energy communities.">
+      
+      
+      
+        <link rel="canonical" href="https://www.openzev.ch/docs/09-invoice-management/">
+      
+      
+        <link rel="prev" href="../08-billing-allocation-explained/">
+      
+      
+        <link rel="next" href="../10-email-configuration/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/favicon.svg">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Invoice Management - OpenZEV Documentation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,700,700i%7CIBM+Plex+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"IBM Plex Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/docs.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#invoice-management" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="https://www.openzev.ch/" title="OpenZEV Documentation" class="md-header__button md-logo" aria-label="OpenZEV Documentation" data-md-component="logo">
+      
+  <img src="../assets/favicon.svg" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            OpenZEV Documentation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Invoice Management
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="custom" data-md-color-accent="custom"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/splattner/openzev" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    splattner/openzev
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="https://www.openzev.ch/" title="OpenZEV Documentation" class="md-nav__button md-logo" aria-label="OpenZEV Documentation" data-md-component="logo">
+      
+  <img src="../assets/favicon.svg" alt="logo">
+
+    </a>
+    OpenZEV Documentation
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/splattner/openzev" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    splattner/openzev
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../01-getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../11-roles-and-permissions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Roles and Permissions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Planning
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Planning
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../13-feasibility-calculator/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    vZEV Feasibility Calculator
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setting Up Your ZEV
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Setting Up Your ZEV
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../02-zev-setup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ZEV Setup and Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../03-participant-management/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Managing Participants
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../04-metering-points/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Metering Points
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Operations
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Operations
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../05-metering-import/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Metering Imports
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../06-metering-analysis/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Metering Analysis
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../07-tariff-configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tariff Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Billing and Invoicing
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Billing and Invoicing
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../08-billing-allocation-explained/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How Allocation and Billing Works
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Invoice Management
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Invoice Management
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#billing-work-by-period-overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Billing Work by Period (Overview)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#participant-view-my-invoices" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Participant View: My Invoices
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#invoice-lifecycle" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Invoice Lifecycle
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#billing-hub-invoices--emails--statements" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Billing Hub (Invoices · Emails · Statements)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#period-based-invoice-view" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Period-Based Invoice View
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Period-Based Invoice View">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#period-navigation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Period Navigation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#period-overview-table" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Period Overview Table
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#empty-state" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Empty State
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#row-and-batch-actions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Row and Batch Actions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#generating-invoices" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Generating Invoices
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Generating Invoices">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#regenerating-an-existing-invoice" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Regenerating an Existing Invoice
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#reviewing-invoices" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reviewing Invoices
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Reviewing Invoices">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#invoice-detail-page" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Invoice Detail Page
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#approving-invoices" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Approving Invoices
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#generating-and-managing-pdfs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Generating and Managing PDFs
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#participant-access-links" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Participant Access Links
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Participant Access Links">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#revoking-a-link" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Revoking a link
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sending-invoices-by-email" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sending Invoices by Email
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Sending Invoices by Email">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#email-history" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Email History
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#marking-invoices-as-paid" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Marking Invoices as Paid
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deleting-invoices" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Deleting Invoices
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#annual-statements-and-tax-overviews-billing--reports" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Annual Statements and Tax Overviews (Billing + Reports)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#troubleshooting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Troubleshooting
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Troubleshooting">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#no-participants-appear-in-the-period-overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        No participants appear in the period overview
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#invoice-totals-look-wrong" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Invoice totals look wrong
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#email-not-received-by-participant" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Email not received by participant
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#best-practices" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Best Practices
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#next-steps" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Next Steps
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../10-email-configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Email Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Administration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Administration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../14-admin-console/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Platform Administration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../17-zev-transfer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ZEV Export and Import
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../18-backups/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backups
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Automation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Automation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../16-api-keys/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Keys
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../12-troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../15-glossary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Glossary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#billing-work-by-period-overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Billing Work by Period (Overview)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#participant-view-my-invoices" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Participant View: My Invoices
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#invoice-lifecycle" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Invoice Lifecycle
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#billing-hub-invoices--emails--statements" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Billing Hub (Invoices · Emails · Statements)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#period-based-invoice-view" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Period-Based Invoice View
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Period-Based Invoice View">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#period-navigation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Period Navigation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#period-overview-table" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Period Overview Table
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#empty-state" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Empty State
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#row-and-batch-actions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Row and Batch Actions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#generating-invoices" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Generating Invoices
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Generating Invoices">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#regenerating-an-existing-invoice" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Regenerating an Existing Invoice
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#reviewing-invoices" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reviewing Invoices
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Reviewing Invoices">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#invoice-detail-page" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Invoice Detail Page
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#approving-invoices" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Approving Invoices
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#generating-and-managing-pdfs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Generating and Managing PDFs
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#participant-access-links" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Participant Access Links
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Participant Access Links">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#revoking-a-link" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Revoking a link
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sending-invoices-by-email" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sending Invoices by Email
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Sending Invoices by Email">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#email-history" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Email History
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#marking-invoices-as-paid" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Marking Invoices as Paid
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deleting-invoices" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Deleting Invoices
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#annual-statements-and-tax-overviews-billing--reports" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Annual Statements and Tax Overviews (Billing + Reports)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#troubleshooting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Troubleshooting
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Troubleshooting">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#no-participants-appear-in-the-period-overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        No participants appear in the period overview
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#invoice-totals-look-wrong" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Invoice totals look wrong
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#email-not-received-by-participant" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Email not received by participant
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#best-practices" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Best Practices
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#next-steps" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Next Steps
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+    <a href="https://github.com/splattner/openzev/edit/main/docs/user-guide/09-invoice-management.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4zm10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1z"/></svg>
+    </a>
+  
+  
+
+
+<h1 id="invoice-management">Invoice Management<a class="headerlink" href="#invoice-management" title="Permanent link">&para;</a></h1>
+<p>This guide covers generating, reviewing, and managing invoices for participants.</p>
+<h2 id="billing-work-by-period-overview">Billing Work by Period (Overview)<a class="headerlink" href="#billing-work-by-period-overview" title="Permanent link">&para;</a></h2>
+<p>The manager <strong>Overview</strong> groups billing work into one card per period, oldest
+open period first. Each card shows the period status, the server-selected next
+action, overdue invoices and failed deliveries, and any additional warnings.
+Open <strong>Period details</strong> to see the remaining workflow steps and the compact
+<strong>Checked and complete</strong> checklist. Steps that open an actionable page link to
+it; a step that merely waits on an upstream one has no link. Data problems
+never block generation — they appear as warnings. When locked invoices from an
+earlier interval overlap the period (for example, paid monthly invoices under a
+new quarterly rhythm), the card shows a generation conflict with a link to the
+blocking invoices instead of offering generation.</p>
+<p>Period resolution and step completion are separate: a period counts as open
+when it holds a draft or
+approved invoice, or a billable participant (active with a meter assignment)
+with no invoice — a partial batch generation therefore keeps the period open
+even after those invoices are sent. The later steps are trailing states, not
+gates: approve/send/pay track the period's active invoices, so an older
+period can be fully sent yet still show an unpaid payments step or an
+unresolved failed delivery. Cancelled invoices are withdrawn and count neither for nor against any
+step — but one still counts as an existing invoice, so it suppresses the
+missing-invoice prompt for its participant until the operator regenerates it.</p>
+<p>A community created mid-period has no partial first period: billing periods
+align to the calendar, so the first billable one starts at the next aligned
+boundary after the community's start date.</p>
+<p>Three "nothing to do right now" states look similar but behave differently:</p>
+<ul>
+<li><strong>First run</strong> — a brand-new ZEV with no participants <strong>or</strong> no metering
+  points yet shows a setup checklist.</li>
+<li><strong>Awaiting first period</strong> — participants and meters exist, but the first
+  billing period has not ended yet. Missing meter assignments and a blank
+  IBAN still show as warnings above the waiting message.</li>
+<li><strong>Caught up</strong> — no ended period needs you right now (nothing waiting at
+  draft/approved, every eligible participant invoiced); Overview shows a quiet
+  <strong>Up to date</strong> message and keeps completed periods collapsed below it.</li>
+</ul>
+<p>An unfinished setup never hides behind a green status: with active
+participants but no current meter assignment Overview says nothing is
+billable yet and links to meter assignment, and a missing IBAN for QR bills
+stays visible beside normal period work without blocking generation.</p>
+<p>Invoice alerts appear in the matching period card: unresolved failed invoice
+emails (a later successful retry clears the item) and overdue sent invoices.
+Alerts without a billing period, including participant validity endings that
+still hold meter assignments, appear under <strong>Community notices</strong>. Tariff
+coverage, metering gaps, unassigned readings and setup state are already
+covered by readiness steps or setup guidance.</p>
+<h2 id="participant-view-my-invoices">Participant View: My Invoices<a class="headerlink" href="#participant-view-my-invoices" title="Permanent link">&para;</a></h2>
+<p>Participants open <strong>My invoices</strong> (<code>/me/invoices</code>) in the sidebar to see the
+invoices issued to them — invoice number, period, total, status, and a link to
+the details. Every issued invoice is listed, whether or not its PDF has been
+generated yet; the PDF button appears only on rows that have a document.
+Participants with several communities see which community issued each invoice.
+The list is read-only; the deep link <code>/billing/invoices/{id}</code> shows a
+participant only their own invoice (enforced by the backend), and its return
+link leads back to <strong>My invoices</strong>.</p>
+<p><img alt="Participant My Invoices" src="../screenshots/08c-my-invoices.png" /></p>
+<h2 id="invoice-lifecycle">Invoice Lifecycle<a class="headerlink" href="#invoice-lifecycle" title="Permanent link">&para;</a></h2>
+<p>Invoices progress through a controlled workflow:</p>
+<div class="highlight"><pre><span></span><code>Draft → Approved → Sent → Paid
+</code></pre></div>
+<ul>
+<li><strong>Draft</strong> — just generated; can be reviewed, approved, regenerated or deleted.</li>
+<li><strong>Approved</strong> — locked; can be emailed or marked as sent. Its amounts can no
+  longer change.</li>
+<li><strong>Sent</strong> — emailed (or marked as sent); can be resent or marked paid.</li>
+<li><strong>Paid</strong> — fully settled; only its PDF can still be regenerated.</li>
+<li><strong>Cancelled</strong> — removed from the active workflow; can be deleted or generated
+  again. A cancelled invoice does not count as generated for its period: its
+  period card still asks you to generate a replacement. Cancelling is available
+  through the API only — there is no cancel button in the UI.</li>
+</ul>
+<p>Only admins can delete an invoice that is approved, sent or paid.</p>
+<h2 id="billing-hub-invoices--emails--statements">Billing Hub (Invoices · Emails · Statements)<a class="headerlink" href="#billing-hub-invoices--emails--statements" title="Permanent link">&para;</a></h2>
+<p>The sidebar entry <strong>Billing</strong> (<code>/billing/invoices</code>) opens the invoice-first
+billing hub. Its tabs are routes — each is directly linkable:</p>
+<ul>
+<li><strong>Invoices</strong> (<code>/billing/invoices</code>) — the period-based invoice view (below).</li>
+<li><strong>Emails</strong> (<code>/billing/emails</code>) — delivery status of approved, sent, and paid
+  invoices: the latest email status per invoice, a filter by status, a
+  failed-email banner, <strong>View history</strong> for the actual attempt log, and an
+  inline <strong>Retry</strong> per failed latest attempt.</li>
+<li><strong>Statements</strong> (<code>/billing/statements</code>) — the yearly whole-ZEV annual-statement
+  ZIP downloads (see
+  <a href="#annual-statements-and-tax-overviews-billing--reports">Annual Statements and Tax Overviews</a>).</li>
+</ul>
+<p>The per-period work cards live on <strong>Overview</strong>. The running period is separated
+as <strong>Collecting data</strong> and never exposes readiness actions. Ended periods with
+open work remain visible as cards; fully completed ended periods are collapsed.
+The primary action follows the backend-selected next step. <strong>Open invoices</strong>
+deep-links into Billing with that exact period preselected
+(<code>/billing/invoices?period_start=…&amp;period_end=…</code>). Periods from an earlier
+billing interval keep their exact entries after a switch, so a January monthly
+invoice stays reachable next to its Jan–Mar quarter.</p>
+<p>The former <code>/billing/periods</code> bookmark redirects to Overview (see the
+Manager Overview screenshot in <a href="../01-getting-started/">Getting Started</a>).</p>
+<p>The card action opens the workflow that needs attention, such as metering
+quality or tariffs. <strong>Open invoices</strong> opens that period's invoices.</p>
+<p><img alt="Email delivery and retries" src="../screenshots/08e-billing-emails.png" /></p>
+<p>After a retry is accepted, the tab shows it as pending while the worker
+starts. It updates automatically when the next delivery attempt is recorded.
+Invoice rows themselves keep only the latest delivery-state badge; detailed
+attempts and errors are kept in the Emails tab's history panel.</p>
+<p><img alt="Annual statement downloads" src="../screenshots/08f-billing-statements.png" /></p>
+<h2 id="period-based-invoice-view">Period-Based Invoice View<a class="headerlink" href="#period-based-invoice-view" title="Permanent link">&para;</a></h2>
+<p>The <strong>Invoices</strong> tab shows one billing period at a time. There are no status filters — you navigate between periods instead.</p>
+<h3 id="period-navigation">Period Navigation<a class="headerlink" href="#period-navigation" title="Permanent link">&para;</a></h3>
+<p>The toolbar at the top of the page displays:</p>
+<ul>
+<li>The <strong>ZEV name</strong> and the <strong>period date range</strong> (e.g. <code>01.01.2026 → 31.01.2026</code>).</li>
+<li>The ZEV's <strong>billing interval</strong> (<code>monthly</code>, <code>quarterly</code>, <code>semi_annual</code>, or <code>annual</code>).</li>
+<li><strong>← Prev Period</strong> and <strong>Next Period →</strong> buttons to step through periods.</li>
+</ul>
+<p>The period is automatically set based on the selected ZEV's billing interval.</p>
+<p><strong>How the period is chosen and kept consistent:</strong></p>
+<ul>
+<li><strong>Default:</strong> the most recent <strong>completed</strong> billing period (nothing older is
+  silently implied — you can move further back with <strong>Prev</strong>).</li>
+<li><strong>New community:</strong> with no completed period yet, the page opens on the
+  community's <strong>first aligned period</strong> instead of an empty one.</li>
+<li><strong>Deep links:</strong> opening a link that carries a period (<code>?period_start=…&amp;
+  period_end=…</code> — from an Overview period card, an attention item, or your own
+  bookmark) shows that <strong>exact period</strong>, including historical periods from an
+  earlier billing interval after a switch. Ranges that would start before the
+  community existed are ignored and fall back to the default.</li>
+<li><strong>Boundary:</strong> <strong>Prev</strong> stops at the community's earliest billable period;
+  the preset menu offers nothing older. After switching billing intervals,
+  already settled periods (fully paid under the previous interval) stay
+  closed and link to the invoice that already settles them instead of
+  offering Generate, while partly overlapping locked invoices surface as a
+  generation conflict with a link to the blocking invoices.</li>
+</ul>
+<p><img alt="Invoice period overview" src="../screenshots/08-invoices.png" /></p>
+<h3 id="period-overview-table">Period Overview Table<a class="headerlink" href="#period-overview-table" title="Permanent link">&para;</a></h3>
+<p>Each row in the table represents one <strong>participant</strong> who had active metering-point assignments during the period. A participant whose assignment has since ended keeps their row while they still hold an invoice for the period, so email/payment actions on that invoice stay reachable. Columns:</p>
+<table>
+<thead>
+<tr>
+<th>Column</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Participant</strong></td>
+<td>Name and email address.</td>
+</tr>
+<tr>
+<td><strong>Metering Data</strong></td>
+<td>Green "complete" badge if all assigned metering points have daily readings for the full period. Red "missing" badge otherwise, with a count of points with data vs. total and a list of missing meter IDs with the number of missing days each.</td>
+</tr>
+<tr>
+<td><strong>Invoice</strong></td>
+<td>The invoice number, or "Not created" if no invoice exists yet.</td>
+</tr>
+<tr>
+<td><strong>Status</strong></td>
+<td>Badge showing the invoice status (<code>Draft</code>, <code>Approved</code>, <code>Sent</code>, <code>Paid</code>, <code>Cancelled</code>), or a neutral "Not created" badge.</td>
+</tr>
+<tr>
+<td><strong>Email</strong></td>
+<td>Latest email delivery status badge (<code>pending</code>, <code>sent</code>, <code>failed</code>). Open <strong>Billing → Emails</strong> for attempt history, errors, and retry.</td>
+</tr>
+<tr>
+<td><strong>Total</strong></td>
+<td>Invoice total in CHF.</td>
+</tr>
+<tr>
+<td><strong>PDF</strong></td>
+<td><strong>Generate PDF</strong> button (or <strong>Open PDF</strong> + <strong>Regenerate</strong> if a PDF already exists).</td>
+</tr>
+<tr>
+<td><strong>Actions</strong></td>
+<td>Per-invoice action buttons (see below).</td>
+</tr>
+</tbody>
+</table>
+<h3 id="empty-state">Empty State<a class="headerlink" href="#empty-state" title="Permanent link">&para;</a></h3>
+<p>If no participants with active assignments exist for the period, the page shows links to:</p>
+<ul>
+<li><strong>Participants</strong> — to add or check participant records.</li>
+<li><strong>Metering Points</strong> — to check metering-point assignments.</li>
+<li><strong>Tariffs</strong> — to configure pricing.</li>
+</ul>
+<h2 id="row-and-batch-actions">Row and Batch Actions<a class="headerlink" href="#row-and-batch-actions" title="Permanent link">&para;</a></h2>
+<p>Each row shows its next step as a button — <strong>Generate invoice</strong>, <strong>Approve</strong>,
+<strong>Send Email</strong> or <strong>Mark Paid</strong>, depending on the status — and puts the rest
+under <strong>More</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>Status</th>
+<th>Button</th>
+<th>Under <strong>More</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><em>(none)</em> / Cancelled</td>
+<td><strong>Generate invoice</strong> / <strong>Generate again</strong></td>
+<td>Delete (cancelled)</td>
+</tr>
+<tr>
+<td>Draft</td>
+<td><strong>Approve</strong></td>
+<td>Regenerate invoice, Generate/Regenerate PDF, Delete</td>
+</tr>
+<tr>
+<td>Approved</td>
+<td><strong>Send Email</strong></td>
+<td>Mark as Sent, Generate/Regenerate PDF</td>
+</tr>
+<tr>
+<td>Sent</td>
+<td><strong>Mark Paid</strong></td>
+<td>Resend Email, Generate/Regenerate PDF</td>
+</tr>
+<tr>
+<td>Paid</td>
+<td>—</td>
+<td>Generate/Regenerate PDF</td>
+</tr>
+</tbody>
+</table>
+<p>Admins also see <strong>Delete</strong> for approved, sent and paid invoices.</p>
+<p>The <strong>Batch actions</strong> toolbar above the table acts on the whole period at once:
+<strong>Generate all</strong>, <strong>Approve all</strong>, <strong>Send all</strong>, <strong>Regenerate all PDFs</strong> and
+<strong>Download all PDFs</strong>. The recommended next batch step names how many
+invoices it touches (for example <em>Approve 4 invoices</em>).</p>
+<h2 id="generating-invoices">Generating Invoices<a class="headerlink" href="#generating-invoices" title="Permanent link">&para;</a></h2>
+<ol>
+<li>Navigate to the desired billing period.</li>
+<li>Review the <strong>Metering Data</strong> column — ensure data is complete for the participants you want to invoice.</li>
+<li>Click <strong>Generate invoice</strong> on a participant's row, or <strong>Generate all</strong> in the
+   batch toolbar. Generating all runs in the background; the table fills in as
+   the invoices are created.</li>
+</ol>
+<p>The system calculates energy allocation and applies tariffs, creating a <strong>Draft</strong> invoice.</p>
+<h3 id="regenerating-an-existing-invoice">Regenerating an Existing Invoice<a class="headerlink" href="#regenerating-an-existing-invoice" title="Permanent link">&para;</a></h3>
+<p>While an invoice is a <strong>Draft</strong>, <strong>More → Regenerate invoice</strong> replaces it with a
+freshly calculated one. Use this after correcting metering data or tariff
+configuration. Approved, sent and paid invoices are locked and cannot be
+regenerated.</p>
+<blockquote>
+<p><strong>Tip:</strong> You can generate invoices even when metering data is incomplete, but totals may be inaccurate. It is best to resolve missing data first.</p>
+</blockquote>
+<h2 id="reviewing-invoices">Reviewing Invoices<a class="headerlink" href="#reviewing-invoices" title="Permanent link">&para;</a></h2>
+<p>Click <strong>Open details</strong> on a row to view a read-only invoice detail page.</p>
+<h3 id="invoice-detail-page">Invoice Detail Page<a class="headerlink" href="#invoice-detail-page" title="Permanent link">&para;</a></h3>
+<p><img alt="Invoice detail page" src="../screenshots/08b-invoice-detail.png" /></p>
+<p>The detail page shows:</p>
+<ul>
+<li><strong>Status card</strong> — current invoice status as a badge.</li>
+<li><strong>Total CHF</strong> — the final invoiced amount.</li>
+<li><strong>Subtotal CHF</strong> — amount before VAT.</li>
+<li><strong>VAT CHF</strong> — the VAT portion.</li>
+</ul>
+<p><strong>Energy totals:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Metric</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Local kWh</td>
+<td>Energy consumed from local (solar) production.</td>
+</tr>
+<tr>
+<td>Grid kWh</td>
+<td>Energy drawn from the external grid.</td>
+</tr>
+<tr>
+<td>Feed-in kWh</td>
+<td>Energy fed back into the grid.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>The invoice document</strong> — the stored PDF itself is embedded below the summary cards in a full document viewer (the same file the participant receives by email). It contains the line items, grouped by <strong>tariff category</strong> (e.g. Energy, Fee),
+with each line's type, description, quantity (kWh), unit price (CHF), and
+total, plus a subtotal per group. If no PDF has been generated yet, the page shows a <strong>Generate PDF</strong> button instead (owners/admins only — a participant sees a plain document-unavailable message, since the API rejects their generation attempt); the viewer appears once the document exists.</p>
+<blockquote>
+<p><strong>Note:</strong> Invoices cannot be edited directly. If a correction is needed on a
+draft, fix the underlying data (metering readings or tariff prices) and
+regenerate it.</p>
+</blockquote>
+<h2 id="approving-invoices">Approving Invoices<a class="headerlink" href="#approving-invoices" title="Permanent link">&para;</a></h2>
+<p>Approval locks an invoice and signals that it has been reviewed.</p>
+<ol>
+<li>Find the draft invoice in the period overview.</li>
+<li>Click <strong>Approve</strong> on its row (or <strong>Approve all</strong> for every draft in the period).</li>
+</ol>
+<p>The status changes from <code>Draft</code> to <code>Approved</code>. Only draft invoices can be approved.</p>
+<h2 id="generating-and-managing-pdfs">Generating and Managing PDFs<a class="headerlink" href="#generating-and-managing-pdfs" title="Permanent link">&para;</a></h2>
+<p>PDF generation is a separate step from invoice creation.</p>
+<ul>
+<li><strong>Generate PDF</strong> — creates the PDF for an invoice that does not yet have one.</li>
+<li><strong>Regenerate</strong> — replaces an existing PDF (e.g. after the HTML template was updated).</li>
+<li><strong>Open PDF</strong> — opens the generated PDF in a new browser tab.</li>
+</ul>
+<p>These actions appear in the <strong>PDF</strong> column and under <strong>More</strong> for any invoice
+that exists. <strong>Download all PDFs</strong> in the batch toolbar downloads the period's
+documents together.</p>
+<h2 id="participant-access-links">Participant Access Links<a class="headerlink" href="#participant-access-links" title="Permanent link">&para;</a></h2>
+<p>Only relevant if you turned on <strong>Participant QR code on the invoice</strong> — see <a href="../02-zev-setup/#participant-access-from-the-invoice">ZEV Setup → Participant Access from the Invoice</a>. It is off by default.</p>
+<p>When it is on, every invoice you generate carries a QR code on its insights page that opens that one invoice without an account. The invoice detail page then shows a <strong>Participant access link</strong> card with:</p>
+<ul>
+<li><strong>Printed since</strong> — when the link was first minted, which is when the invoice first got a PDF.</li>
+<li><strong>Last opened</strong> — the last time somebody scanned it, or <strong>Never opened</strong>. Recorded at most once per hour, so it answers "has this been read at all?" rather than "how often". This is a useful thing to check before chasing a payment.</li>
+<li><strong>Revoke link</strong> — the only way to stop a printed link.</li>
+</ul>
+<h3 id="revoking-a-link">Revoking a link<a class="headerlink" href="#revoking-a-link" title="Permanent link">&para;</a></h3>
+<p>The link <strong>never expires</strong>, so revoking is the control. Revoke when an invoice was sent to the wrong address, or a participant tells you their copy went astray.</p>
+<p>Revoking is per invoice: it kills the QR on that invoice and touches nothing else, including the participant's other invoices.</p>
+<p>What it costs: the code on the copy already in the post stops working for good. The next time you generate that invoice's PDF it gets a fresh code, but a reprint will not match the sheet somebody is already holding. If the participant needs access again, send them the regenerated PDF.</p>
+<p>Revoking is recorded in the audit log, as is every first open of a link in a given hour.</p>
+<h2 id="sending-invoices-by-email">Sending Invoices by Email<a class="headerlink" href="#sending-invoices-by-email" title="Permanent link">&para;</a></h2>
+<p>Once an invoice is approved, you can email it to the participant.</p>
+<ol>
+<li>Click <strong>Send Email</strong> on an approved invoice's row (or <strong>Send all</strong>).</li>
+<li>The system queues the email and watches for the delivery result.</li>
+<li>While it waits, the button shows <strong>Sending…</strong> and is disabled.</li>
+<li>The <strong>Email</strong> column updates automatically when the email is delivered or fails.</li>
+</ol>
+<p>For a <code>Sent</code> invoice, <strong>More → Resend Email</strong> sends another copy.</p>
+<p>If you delivered the invoice some other way (printed, handed over), use
+<strong>More → Mark as Sent</strong> on the approved invoice instead: it moves to <code>Sent</code>
+without an email.</p>
+<h3 id="email-history">Email History<a class="headerlink" href="#email-history" title="Permanent link">&para;</a></h3>
+<p>The <strong>Email</strong> column shows only the latest delivery status. Every attempt, with
+recipient, status and error, is in <strong>Billing → Emails</strong> under <strong>View
+history</strong>, where a failed latest attempt also has a <strong>Retry</strong> button.</p>
+<p>Email sending is asynchronous via Celery with automatic retries. For delivery mechanics, retry behavior, and troubleshooting failed emails, see <a href="../10-email-configuration/">Email Configuration</a>.</p>
+<h2 id="marking-invoices-as-paid">Marking Invoices as Paid<a class="headerlink" href="#marking-invoices-as-paid" title="Permanent link">&para;</a></h2>
+<p>When a participant has paid:</p>
+<ol>
+<li>Click <strong>Mark Paid</strong> on the row (shown for <code>Sent</code> invoices).</li>
+</ol>
+<p>The status changes to <code>Paid</code>. There is no additional confirmation dialog or payment-detail input — it is a single-click action.</p>
+<h2 id="deleting-invoices">Deleting Invoices<a class="headerlink" href="#deleting-invoices" title="Permanent link">&para;</a></h2>
+<p>Invoices can be deleted to clean up incorrect or test data.</p>
+<ol>
+<li>Open <strong>More</strong> on the row and click <strong>Delete</strong>.</li>
+<li>Confirm in the deletion dialog.</li>
+</ol>
+<p><strong>Delete visibility rules:</strong></p>
+<ul>
+<li><strong>Draft</strong> or <strong>Cancelled</strong> invoices — <strong>More → Delete</strong> is available to ZEV owners.</li>
+<li><strong>Any status</strong> — admins can always delete.</li>
+</ul>
+<p>Deletion is permanent; the invoice is removed from the database.</p>
+<h2 id="annual-statements-and-tax-overviews-billing--reports">Annual Statements and Tax Overviews (Billing + Reports)<a class="headerlink" href="#annual-statements-and-tax-overviews-billing--reports" title="Permanent link">&para;</a></h2>
+<p>Select a year at the top of the page. The default is the last completed year.</p>
+<p><strong>Admins and ZEV owners:</strong> Open <strong>Billing → Statements</strong> (<code>/billing/statements</code>)
+to prepare a ZIP of the selected ZEV's annual statements. Download it when
+ready. You can return after reloading; links expire after 24 hours. Partial
+exports include an <code>omitted.txt</code> listing statements that could not be generated.
+The ZEV tax overview is also available under <strong>Reports</strong> (<code>/reports</code>).</p>
+<p><img alt="Reports page" src="../screenshots/23-reports.png" /></p>
+<p><strong>Participants:</strong> Open <strong>Annual statement</strong> (<code>/me/statement</code>) to read your own
+statement or select the <strong>Tax Overview</strong> tab. Use <strong>Download PDF</strong> to save the
+document. <strong>Open in new tab</strong> shows the same PDF. Select <strong>Retry</strong> if generation
+fails, or reload the page for fresh documents. The tax overview shows producers'
+net local-energy revenue and feed-in compensation.</p>
+<p><img alt="Participant annual documents with embedded statement" src="../screenshots/23b-participant-annual-statement.png" /></p>
+<p>These documents use your consumption, invoices, and savings. They become
+available after billing. The selected community appears above the page title.</p>
+<h2 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">&para;</a></h2>
+<h3 id="no-participants-appear-in-the-period-overview">No participants appear in the period overview<a class="headerlink" href="#no-participants-appear-in-the-period-overview" title="Permanent link">&para;</a></h3>
+<p><strong>Causes:</strong></p>
+<ul>
+<li>No active participants with metering-point assignments overlapping the selected period.</li>
+<li>The wrong ZEV is selected (check the community name above the page title).</li>
+</ul>
+<p><strong>Fix:</strong></p>
+<ol>
+<li>Check the ZEV switcher at the top of the sidebar (or the community name above the page title).</li>
+<li>Verify that <a href="../03-participant-management/">Participants</a> exist and have <a href="../04-metering-points/">metering-point assignments</a> covering the period.</li>
+</ol>
+<h3 id="invoice-totals-look-wrong">Invoice totals look wrong<a class="headerlink" href="#invoice-totals-look-wrong" title="Permanent link">&para;</a></h3>
+<ol>
+<li>Verify <a href="../07-tariff-configuration/">tariff prices</a> are correct for the period.</li>
+<li>Check <a href="../06-metering-analysis/">metering data</a> completeness — missing readings lead to under-counted energy.</li>
+<li>Review the <a href="../08-billing-allocation-explained/">billing allocation logic</a> to understand how local vs. grid energy is split.</li>
+<li>If needed, fix the data and regenerate the invoice while it is still a draft.</li>
+</ol>
+<h3 id="email-not-received-by-participant">Email not received by participant<a class="headerlink" href="#email-not-received-by-participant" title="Permanent link">&para;</a></h3>
+<ol>
+<li>Check the participant's email address in <a href="../03-participant-management/">Participants</a>.</li>
+<li>Open <strong>Billing → Emails</strong> and <strong>View history</strong> to check delivery status and error messages.</li>
+<li>Click <strong>Retry</strong> on a failed latest attempt.</li>
+<li>Review <a href="../10-email-configuration/">Email Configuration</a> for SMTP environment variable issues.</li>
+</ol>
+<h2 id="best-practices">Best Practices<a class="headerlink" href="#best-practices" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>Check metering completeness</strong> before generating invoices — the Metering Data column shows exactly which meters are missing data and how many days are affected.</li>
+<li><strong>Approve after review</strong> — open the invoice detail page and check the embedded invoice document (line items and totals) before approving.</li>
+<li><strong>Generate PDFs before sending</strong> — while not strictly required, generating the PDF first lets you review the document before emailing.</li>
+<li><strong>Approve only when final</strong> — once approved, an invoice can no longer be
+  regenerated. Correct data and tariffs while it is still a draft.</li>
+</ul>
+<h2 id="next-steps">Next Steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>Configure email delivery:</strong> <a href="../10-email-configuration/">Email Configuration</a></li>
+<li><strong>Understand billing logic:</strong> <a href="../08-billing-allocation-explained/">Billing &amp; Allocation Explained</a></li>
+<li><strong>Manage tariffs:</strong> <a href="../07-tariff-configuration/">Tariff Configuration</a></li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="Footer" >
+        
+          
+          <a href="../08-billing-allocation-explained/" class="md-footer__link md-footer__link--prev" aria-label="Previous: How Allocation and Billing Works">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Previous
+              </span>
+              <div class="md-ellipsis">
+                How Allocation and Billing Works
+              </div>
+            </div>
+          </a>
+        
+        
+          
+          <a href="../10-email-configuration/" class="md-footer__link md-footer__link--next" aria-label="Next: Email Configuration">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Next
+              </span>
+              <div class="md-ellipsis">
+                Email Configuration
+              </div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"/></svg>
+            </div>
+          </a>
+        
+      </nav>
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      OpenZEV · AGPL-3.0
+    </div>
+  
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://github.com/splattner/openzev" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.sections", "navigation.top", "navigation.footer", "search.suggest", "search.highlight", "content.code.copy", "content.action.edit", "toc.follow"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+        <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>
