@@ -23,7 +23,7 @@ from invoices.contract_translations import CONTRACT_TRANSLATIONS
 from invoices.models import ContractIssue
 from invoices.test_helpers import make_participant, make_user, make_zev
 from invoices.template_context import build_sample_contract_context
-from tariffs.models import BillingMode, EnergyType, TariffPeriod
+from tariffs.models import BillingMode, EnergyType, PeriodType, TariffPeriod
 from testing.factories import TariffFactory, assignment_for, flat_tariff
 from testing.helpers import clear_vat_rates
 from zev.models import MeteringPoint, MeteringPointAssignment, MeteringPointType, VatMode, Zev
@@ -257,15 +257,18 @@ class ContractPdfTariffRuleTests(TestCase):
                            notes="EKZ Standardprodukt der Grundversorgung"):
         # Grid base of 22.50 Rp/kWh: 80% of it gives the 18.00 Rp/kWh headline.
         flat_tariff(self.zev, energy_type=EnergyType.GRID, price="0.22500")
-        return TariffFactory(
+        tariff = TariffFactory(
             zev=self.zev,
             billing_mode=BillingMode.PERCENTAGE_OF_ENERGY,
             energy_type=EnergyType.LOCAL,
-            percentage=Decimal("80.00"),
             valid_from=date(2026, 1, 1),
             valid_to=valid_to,
             notes=notes,
         )
+        TariffPeriod.objects.create(
+            tariff=tariff, period_type=PeriodType.FLAT, percentage=Decimal("80.00"),
+        )
+        return tariff
 
     def _context(self, today=date(2026, 4, 15)):
         with patch("invoices.contract_pdf.timezone.localdate") as mocked_localdate:
@@ -324,12 +327,14 @@ class ContractPdfTariffRuleTests(TestCase):
         self.assertNotIn("Referenzprodukt:", markup)
 
     def test_percentage_tariff_without_grid_base_shows_bare_percentage_without_unit(self):
-        TariffFactory(
+        no_base_tariff = TariffFactory(
             zev=self.zev,
             billing_mode=BillingMode.PERCENTAGE_OF_ENERGY,
             energy_type=EnergyType.LOCAL,
-            percentage=Decimal("80.00"),
             valid_from=date(2026, 1, 1),
+        )
+        TariffPeriod.objects.create(
+            tariff=no_base_tariff, period_type=PeriodType.FLAT, percentage=Decimal("80.00"),
         )
         row = self._context()["local_tariff_rows"][0]
 
@@ -345,6 +350,33 @@ class ContractPdfTariffRuleTests(TestCase):
 
         self.assertIsNone(context["local_tariff_rows"][0]["valid_to"])
         self.assertEqual(context["local_tariff_rows"][0]["validity"], "ab 01.01.2026")
+
+    def test_a_two_band_percentage_tariff_prints_one_row_per_band(self):
+        """SPEC-2026-percentage-tariff-bands §5.4: the contract lists each
+        band, the same way it already does for a multi-band energy tariff."""
+        from datetime import time
+
+        flat_tariff(self.zev, energy_type=EnergyType.GRID, price="0.20000")
+        tariff = TariffFactory(
+            zev=self.zev, name="Two-band surcharge",
+            billing_mode=BillingMode.PERCENTAGE_OF_ENERGY,
+            energy_type=EnergyType.LOCAL, valid_from=date(2026, 1, 1),
+        )
+        TariffPeriod.objects.create(
+            tariff=tariff, period_type=PeriodType.HIGH, percentage=Decimal("90.00"),
+            time_from=time(10, 0), time_to=time(16, 0),
+        )
+        TariffPeriod.objects.create(
+            tariff=tariff, period_type=PeriodType.LOW, percentage=Decimal("60.00"),
+            time_from=time(16, 0), time_to=time(10, 0),
+        )
+
+        rows = [r for r in self._context()["local_tariff_rows"] if r["name"] == "Two-band surcharge"]
+
+        self.assertEqual(len(rows), 2)
+        rates = {r["rate_rp"] for r in rows}
+        # 90% of 20 Rp. = 18.00; 60% of 20 Rp. = 12.00
+        self.assertEqual(rates, {"18.00", "12.00"})
 
     def test_no_local_tariff_prints_no_rule_and_placeholder_amount(self):
         context = self._context()

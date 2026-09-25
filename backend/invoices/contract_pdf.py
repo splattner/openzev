@@ -15,7 +15,7 @@ from .band_labels import band_description
 from .contract_translations import CONTRACT_TRANSLATIONS
 from .dates import format_date_value
 from .pdf_render import render_pdf
-from .tariff_pricing import display_grid_base_summary
+from .tariff_pricing import display_grid_base_summary, percentage_band_rows
 
 from tariffs.models import BillingMode, EnergyType, PeriodType
 from zev.models import MeteringPointType
@@ -87,40 +87,48 @@ def _build_local_tariff_display(zev, tr: dict, date_pattern: str, as_of: date) -
         }
 
         if tariff.billing_mode == BillingMode.PERCENTAGE_OF_ENERGY:
-            pct = Decimal(str(tariff.percentage or 0))
-            has_effective_price = grid_base.has_effective_price
-            if has_effective_price:
-                effective_chf = grid_sum_chf * (pct / Decimal("100"))
-                effective_rp = effective_chf * Decimal("100")
-                grid_rp = grid_sum_chf * Decimal("100")
-                description = (
-                    f"{float(pct):.2f}% × {float(grid_rp):.2f} {rp_unit}"
-                    f" ({tr['tariff_pct_prefix'].strip('% ')})"
-                )
-            else:
-                description = f"{float(pct):.2f}% {tr['tariff_pct_prefix']}"
-
-            if has_effective_price:
-                rate_rp = f"{float(effective_rp):.2f}"
-            elif grid_sum_chf is None:
-                rate_rp = tr["tariff_none"]
-            else:
-                rate_rp = f"{float(pct):.2f}%"
-
             note_key = {
                 "complete": "tariff_dynamic_average_note",
                 "partial": "tariff_dynamic_partial_note",
                 "unavailable": "tariff_dynamic_unavailable_note",
             }.get(grid_base.dynamic_status)
+            rate_note = tr[note_key] if note_key else ""
 
-            rows.append({
-                **base_row,
-                "rate_rp": rate_rp,
-                "rate_description": description,
-                "pct": f"{float(pct):.2f}",
-                "unit": tr["tariff_rp_unit"] if has_effective_price else "",
-                "rate_note": tr[note_key] if note_key else "",
-            })
+            # One row per band (§5.4). A lone flat band has nothing to
+            # distinguish it from, so it prints exactly the pre-band formula;
+            # a named or timed band, or a tariff with several, is prefixed
+            # with its own label so the rows can be told apart.
+            for band in percentage_band_rows(tariff, grid_base, tr, tr):
+                pct = band["pct"]
+                redundant = band["label"] == tr["tariff_flat"] and not band["recurrence"]
+                prefix = "" if redundant else f"{band['label']}: "
+
+                if band["effective_chf"] is not None:
+                    effective_rp = band["effective_chf"] * Decimal("100")
+                    grid_rp = grid_sum_chf * Decimal("100")
+                    description = (
+                        f"{prefix}{float(pct):.2f}% × {float(grid_rp):.2f} {rp_unit}"
+                        f" ({tr['tariff_pct_prefix'].strip('% ')})"
+                    )
+                    rate_rp = f"{float(effective_rp):.2f}"
+                    unit = tr["tariff_rp_unit"]
+                elif grid_sum_chf is None:
+                    description = f"{prefix}{float(pct):.2f}% {tr['tariff_pct_prefix']}"
+                    rate_rp = tr["tariff_none"]
+                    unit = ""
+                else:
+                    description = f"{prefix}{float(pct):.2f}% {tr['tariff_pct_prefix']}"
+                    rate_rp = f"{float(pct):.2f}%"
+                    unit = ""
+
+                rows.append({
+                    **base_row,
+                    "rate_rp": rate_rp,
+                    "rate_description": description,
+                    "pct": f"{float(pct):.2f}",
+                    "unit": unit,
+                    "rate_note": rate_note,
+                })
             continue
 
         periods = list(tariff.periods.all())

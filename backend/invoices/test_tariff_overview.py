@@ -19,7 +19,7 @@ from django.test import TestCase
 from rest_framework.test import APIClient
 
 from accounts.models import UserRole
-from tariffs.models import BillingMode, EnergyType, SplitKey, Tariff, TariffCategory, TariffPeriod
+from tariffs.models import BillingMode, EnergyType, PeriodType, SplitKey, Tariff, TariffCategory, TariffPeriod
 from testing.helpers import authenticate as auth, make_user
 from zev.models import VatMode
 
@@ -294,10 +294,13 @@ class TariffOverviewContentTests(TariffOverviewTestCase):
         )
         grid = self._energy_tariff(name="Grid", energy_type=EnergyType.GRID)
         _flat_period(grid, "0.29500")
-        Tariff.objects.create(
+        pct = Tariff.objects.create(
             zev=self.zev, name="Pct", category=TariffCategory.ENERGY,
             billing_mode=BillingMode.PERCENTAGE_OF_ENERGY, energy_type=EnergyType.LOCAL,
-            percentage=Decimal("65.00"), valid_from=date(2026, 1, 1),
+            valid_from=date(2026, 1, 1),
+        )
+        TariffPeriod.objects.create(
+            tariff=pct, period_type=PeriodType.FLAT, percentage=Decimal("65.00"),
         )
 
         ctx = _build_template_context(self.zev, date(2026, 6, 1), "valid")
@@ -358,11 +361,15 @@ class TariffOverviewContentTests(TariffOverviewTestCase):
             )
 
     def _local_pct(self, percentage="65.00"):
-        return Tariff.objects.create(
+        tariff = Tariff.objects.create(
             zev=self.zev, name="Local pct", category=TariffCategory.ENERGY,
             billing_mode=BillingMode.PERCENTAGE_OF_ENERGY, energy_type=EnergyType.LOCAL,
-            percentage=Decimal(percentage), valid_from=date(2026, 1, 1),
+            valid_from=date(2026, 1, 1),
         )
+        TariffPeriod.objects.create(
+            tariff=tariff, period_type=PeriodType.FLAT, percentage=Decimal(percentage),
+        )
+        return tariff
 
     def _pct_row(self, as_of=date(2026, 6, 1)):
         ctx = _build_template_context(self.zev, as_of, "valid")
@@ -428,10 +435,13 @@ class TariffOverviewContentTests(TariffOverviewTestCase):
             tariff=grid, period_type="low", price_chf_per_kwh=Decimal("0.10000"),
             time_from=time(22, 0), time_to=time(23, 59, 59),
         )
-        Tariff.objects.create(
+        multi_pct = Tariff.objects.create(
             zev=self.zev, name="Local pct", category=TariffCategory.ENERGY,
             billing_mode=BillingMode.PERCENTAGE_OF_ENERGY, energy_type=EnergyType.LOCAL,
-            percentage=Decimal("18.00"), valid_from=date(2026, 1, 1),
+            valid_from=date(2026, 1, 1),
+        )
+        TariffPeriod.objects.create(
+            tariff=multi_pct, period_type=PeriodType.FLAT, percentage=Decimal("18.00"),
         )
 
         ctx = _build_template_context(self.zev, date(2026, 6, 1), "valid")
@@ -443,6 +453,49 @@ class TariffOverviewContentTests(TariffOverviewTestCase):
         self.assertEqual(overview_row["footnote"], "multiband_base")
         self.assertEqual(len(ctx["footnotes"]), 1)
         self.assertEqual(ctx["footnotes"][0][1], TARIFF_OVERVIEW_TRANSLATIONS["de"]["footnote_multiband_base"])
+
+    def test_a_two_band_percentage_tariff_prints_one_row_per_band(self):
+        """SPEC-2026-percentage-tariff-bands §5.4: one row per band, not the
+        averaged formula a single number would otherwise force."""
+        from datetime import time
+
+        grid = self._energy_tariff(name="Grid", energy_type=EnergyType.GRID)
+        _flat_period(grid, "0.20000")
+        pct = Tariff.objects.create(
+            zev=self.zev, name="Local pct bands", category=TariffCategory.ENERGY,
+            billing_mode=BillingMode.PERCENTAGE_OF_ENERGY, energy_type=EnergyType.LOCAL,
+            valid_from=date(2026, 1, 1),
+        )
+        TariffPeriod.objects.create(
+            tariff=pct, period_type=PeriodType.HIGH, percentage=Decimal("90.00"),
+            time_from=time(10, 0), time_to=time(16, 0),
+        )
+        TariffPeriod.objects.create(
+            tariff=pct, period_type=PeriodType.LOW, percentage=Decimal("60.00"),
+            time_from=time(16, 0), time_to=time(10, 0),
+        )
+
+        ctx = _build_template_context(self.zev, date(2026, 6, 1), "valid")
+        row = next(t for group in ctx["groups"] for t in group["tariffs"] if t["name"] == "Local pct bands")
+
+        self.assertEqual(len(row["price_rows"]), 2)
+        self.assertIsNone(row["inline_price"])
+        amounts = {r["amount"] for r in row["price_rows"]}
+        # 90% of 20 Rp. = 18.00; 60% of 20 Rp. = 12.00
+        self.assertEqual(amounts, {"18.00", "12.00"})
+
+    def test_a_single_flat_band_percentage_row_matches_the_pre_band_row(self):
+        """A percentage tariff with exactly one flat band still prints the
+        pre-band single row, with no band-label prefix."""
+        grid = self._energy_tariff(name="Grid", energy_type=EnergyType.GRID)
+        _flat_period(grid, "0.20000")
+        self._local_pct("65.00")
+
+        ctx = _build_template_context(self.zev, date(2026, 6, 1), "valid")
+        row = next(t for group in ctx["groups"] for t in group["tariffs"] if t["name"] == "Local pct")
+
+        self.assertEqual(len(row["price_rows"]), 1)
+        self.assertEqual(row["price_rows"][0]["label"], "65.00 % × 20.00 Rp./kWh")
 
 
 class TariffOverviewDynamicTariffTests(TariffOverviewTestCase):
@@ -470,11 +523,15 @@ class TariffOverviewDynamicTariffTests(TariffOverviewTestCase):
         )
 
     def _local_pct(self, percentage="65.00"):
-        return Tariff.objects.create(
+        tariff = Tariff.objects.create(
             zev=self.zev, name="Local pct", category=TariffCategory.ENERGY,
             billing_mode=BillingMode.PERCENTAGE_OF_ENERGY, energy_type=EnergyType.LOCAL,
-            percentage=Decimal(percentage), valid_from=date(2026, 1, 1),
+            valid_from=date(2026, 1, 1),
         )
+        TariffPeriod.objects.create(
+            tariff=tariff, period_type=PeriodType.FLAT, percentage=Decimal(percentage),
+        )
+        return tariff
 
     def _pct_row(self, as_of=date(2026, 6, 1)):
         ctx = _build_template_context(self.zev, as_of, "valid")

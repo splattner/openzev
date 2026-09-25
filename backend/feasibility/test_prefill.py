@@ -170,12 +170,15 @@ class TestTariffPrefill:
         )
         factories.TariffPeriodFactory(tariff=grid_fee, price_chf_per_kwh=Decimal("0.10000"))
         # A levy priced as a percentage of the grid energy base (like the demo ZEV).
-        factories.TariffFactory(
+        levy = factories.TariffFactory(
             zev=zev,
             category=TariffCategory.LEVIES,
             energy_type=EnergyType.GRID,
             billing_mode=BillingMode.PERCENTAGE_OF_ENERGY,
-            percentage=Decimal("20.00"),
+        )
+        factories.TariffPeriodFactory(
+            tariff=levy, period_type=PeriodType.FLAT,
+            price_chf_per_kwh=None, percentage=Decimal("20.00"),
         )
 
         prefill = build_prefill(zev)
@@ -207,12 +210,15 @@ class TestTariffPrefill:
             zev=zev, category=TariffCategory.ENERGY, energy_type=EnergyType.GRID
         )
         factories.TariffPeriodFactory(tariff=grid_energy, price_chf_per_kwh=Decimal("0.30000"))
-        factories.TariffFactory(
+        local_pct = factories.TariffFactory(
             zev=zev,
             category=TariffCategory.ENERGY,
             energy_type=EnergyType.LOCAL,
             billing_mode=BillingMode.PERCENTAGE_OF_ENERGY,
-            percentage=Decimal("60.00"),
+        )
+        factories.TariffPeriodFactory(
+            tariff=local_pct, period_type=PeriodType.FLAT,
+            price_chf_per_kwh=None, percentage=Decimal("60.00"),
         )
 
         prefill = build_prefill(zev)
@@ -223,12 +229,15 @@ class TestTariffPrefill:
         # A local percentage tariff with no grid energy tariff to anchor it
         # can't be resolved, so the internal price stays None (default kept).
         zev = factories.ZevFactory()
-        factories.TariffFactory(
+        local_pct = factories.TariffFactory(
             zev=zev,
             category=TariffCategory.ENERGY,
             energy_type=EnergyType.LOCAL,
             billing_mode=BillingMode.PERCENTAGE_OF_ENERGY,
-            percentage=Decimal("60.00"),
+        )
+        factories.TariffPeriodFactory(
+            tariff=local_pct, period_type=PeriodType.FLAT,
+            price_chf_per_kwh=None, percentage=Decimal("60.00"),
         )
 
         prefill = build_prefill(zev)
@@ -238,12 +247,15 @@ class TestTariffPrefill:
         # A percentage-of-energy tariff has nothing to anchor to without a flat
         # grid energy base, so retail can't be determined and stays None.
         zev = factories.ZevFactory()
-        factories.TariffFactory(
+        grid_pct = factories.TariffFactory(
             zev=zev,
             category=TariffCategory.ENERGY,
             energy_type=EnergyType.GRID,
             billing_mode=BillingMode.PERCENTAGE_OF_ENERGY,
-            percentage=Decimal("50.00"),
+        )
+        factories.TariffPeriodFactory(
+            tariff=grid_pct, period_type=PeriodType.FLAT,
+            price_chf_per_kwh=None, percentage=Decimal("50.00"),
         )
 
         prefill = build_prefill(zev)

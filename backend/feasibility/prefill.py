@@ -47,6 +47,7 @@ from allocation.validity import active_on
 from allocation.split import local_pool_kwh
 from metering.models import MeterReading, ReadingDirection
 from tariffs.models import BillingMode, EnergyType, Tariff, TariffCategory
+from tariffs.periods import average_percentage
 from zev.models import MeteringPoint, MeteringPointType, Participant, Zev
 
 from . import defaults
@@ -115,7 +116,12 @@ def _flat_energy_price_sum(
 def _percentage_of_energy_sum(
     zev: Zev, *, energy_type: str, today: dt.date, categories: list[str] | None = None
 ) -> Decimal:
-    """Summed percentages across active percentage-of-energy tariffs (0 if none)."""
+    """Summed percentages across active percentage-of-energy tariffs (0 if none).
+
+    Each tariff's own percentage is its time-weighted band average
+    (``tariffs.periods.average_percentage``) rather than a single stored
+    value, since a percentage tariff can now carry several time-of-use bands.
+    """
     qs = active_on(
         Tariff.objects.filter(
             zev=zev,
@@ -123,11 +129,11 @@ def _percentage_of_energy_sum(
             billing_mode=BillingMode.PERCENTAGE_OF_ENERGY,
         ),
         today,
-    )
+    ).prefetch_related("periods")
 
     if categories is not None:
         qs = qs.filter(category__in=categories)
-    return sum((tariff.percentage or Decimal("0") for tariff in qs), Decimal("0"))
+    return sum((average_percentage(tariff) for tariff in qs), Decimal("0"))
 
 
 def _all_in_retail_price(zev: Zev, today: dt.date) -> Decimal | None:
