@@ -22,7 +22,7 @@ import pytest
 
 from metering.models import MeterReading, ReadingDirection
 from tariffs.dynamic.models import DynamicPricePoint, DynamicTariffSource
-from tariffs.models import BillingMode, EnergyType, Tariff, TariffCategory
+from tariffs.models import BillingMode, EnergyType, PeriodType, Tariff, TariffCategory, TariffPeriod
 from testing import factories
 
 from .engine import (
@@ -354,8 +354,9 @@ class TestDynamicInvoiceGeneration:
             billing_mode=BillingMode.PERCENTAGE_OF_ENERGY, energy_type=EnergyType.GRID,
             valid_from=date(2026, 1, 1),
         )
-        levy.percentage = Decimal("50")
-        levy.save()
+        TariffPeriod.objects.create(
+            tariff=levy, period_type=PeriodType.FLAT, percentage=Decimal("50"),
+        )
         MeterReading.objects.create(
             metering_point=mp, timestamp=datetime(2026, 1, 15, 10, 0, tzinfo=UTC),
             energy_kwh=Decimal("10.0"), direction=ReadingDirection.IN,

@@ -355,7 +355,7 @@ def _uncovered_tariff_days(
         pct_active = [
             t
             for t in pct_tariffs
-            if t.percentage and _tariff_active_on(t, day)
+            if _tariff_active_on(t, day) and len(t.periods.all()) > 0
         ]
         # A percentage tariff prices its own type through the grid rate: when
         # the grid is priced it covers its type, otherwise the grid itself

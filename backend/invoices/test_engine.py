@@ -343,14 +343,16 @@ class InvoiceEngineTests(TestCase):
         )
         TariffPeriod.objects.create(tariff=levy, period_type=PeriodType.FLAT, price_chf_per_kwh=Decimal("0.02"))
 
-        Tariff.objects.create(
+        surcharge = Tariff.objects.create(
             zev=self.zev,
             name="Surcharge 50%",
             category=TariffCategory.GRID_FEES,
             billing_mode=BillingMode.PERCENTAGE_OF_ENERGY,
             energy_type=EnergyType.LOCAL,  # applies to local kWh, priced as % of GRID base
-            percentage=Decimal("50.00"),
             valid_from=date(2026, 1, 1),
+        )
+        TariffPeriod.objects.create(
+            tariff=surcharge, period_type=PeriodType.FLAT, percentage=Decimal("50.00"),
         )
 
         MeterReading.objects.create(

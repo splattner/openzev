@@ -13,7 +13,7 @@ from decimal import Decimal
 
 import pytest
 
-from tariffs.models import BillingMode, EnergyType, TariffCategory
+from tariffs.models import BillingMode, EnergyType, PeriodType, TariffCategory
 from testing import factories
 
 from .engine import ItemAccumulator, TariffResolver
@@ -32,13 +32,22 @@ def energy_tariff(zev, *, energy_type=EnergyType.GRID, valid_from=date(2026, 1, 
 
 
 def percentage_tariff(zev, *, percentage="25", energy_type=EnergyType.LOCAL):
+    """A percentage-of-energy tariff with one flat band, or none at all.
+
+    ``percentage=None`` leaves the tariff without any band — the equivalent of
+    the old "unconfigured" state, now that the percentage lives on a band
+    rather than on the tariff itself.
+    """
     tariff = factories.TariffFactory(
         zev=zev, category=TariffCategory.LEVIES,
         billing_mode=BillingMode.PERCENTAGE_OF_ENERGY,
         energy_type=energy_type, valid_from=date(2026, 1, 1),
     )
-    tariff.percentage = Decimal(percentage) if percentage is not None else None
-    tariff.save()
+    if percentage is not None:
+        factories.TariffPeriodFactory(
+            tariff=tariff, period_type=PeriodType.FLAT,
+            price_chf_per_kwh=None, percentage=Decimal(percentage),
+        )
     return tariff
 
 
