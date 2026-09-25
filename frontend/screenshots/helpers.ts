@@ -143,7 +143,13 @@ export async function impersonateDemoParticipant(page: Page): Promise<boolean> {
   // The app detects impersonation from the JWT claim (impersonated_by) returned by
   // /auth/me/, so no localStorage injection is needed.
   await page.addInitScript(() => {
-    localStorage.setItem('openzev.sidebarCollapsed', 'false')
+    // PDF frames also run init scripts but can have no localStorage.
+    if (window.top !== window) return
+    try {
+      localStorage.setItem('openzev.sidebarCollapsed', 'false')
+    } catch {
+      // Storage may be unavailable.
+    }
   })
 
   return true

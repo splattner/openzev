@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { useEffect, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Link, useLocation, useParams } from 'react-router-dom'
 import { PageSkeleton } from '../components/PageSkeleton'
 import { useTranslation } from 'react-i18next'
@@ -15,48 +15,7 @@ import { useAuth } from '../lib/auth'
 import { PdfPreview } from '../components/PdfPreview'
 import { InvoiceAccessLinkCard } from '../features/invoices/InvoiceAccessLinkCard'
 
-/** Authenticated blob-fetch of the stored PDF artifact → object URL.
- * Fetches from the API endpoint (not /media/) so auth + 401-refresh works
- * everywhere, including Helm/prod where DEBUG=False has no static() serving. */
-function useInvoicePdfUrl(invoiceId: string | undefined, hasPdf: boolean): {
-    url: string | null
-    loading: boolean
-    error: boolean
-} {
-    const [url, setUrl] = useState<string | null>(null)
-    const [loading, setLoading] = useState(false)
-    const [error, setError] = useState(false)
-
-    useEffect(() => {
-        if (!invoiceId || !hasPdf) {
-            setUrl(null)
-            return
-        }
-        let objectUrl: string | null = null
-        let cancelled = false
-        setLoading(true)
-        setError(false)
-        void fetchInvoicePdfBlob(invoiceId)
-            .then((blob) => {
-                if (cancelled) return
-                if (blob.type !== 'application/pdf') throw new Error('Not a PDF')
-                objectUrl = URL.createObjectURL(blob)
-                setUrl(objectUrl)
-            })
-            .catch(() => {
-                if (!cancelled) setError(true)
-            })
-            .finally(() => {
-                if (!cancelled) setLoading(false)
-            })
-        return () => {
-            cancelled = true
-            if (objectUrl) URL.revokeObjectURL(objectUrl)
-        }
-    }, [invoiceId, hasPdf])
-
-    return { url, loading, error }
-}
+import { usePdfObjectUrl } from '../lib/usePdfObjectUrl'
 
 export function InvoiceDetailPage() {
     const { t } = useTranslation()
@@ -80,7 +39,16 @@ export function InvoiceDetailPage() {
     // Whether the invoice has a stored PDF artifact (drives the "PDF exists?" branch).
     const pdfExists = invoiceQuery.data?.pdf_url != null
 
-    const { url: pdfObjectUrl, loading: pdfLoading, error: pdfError } = useInvoicePdfUrl(invoiceId, pdfExists)
+    // Keep the fetcher stable across renders to avoid repeated PDF requests.
+    const pdfFetcher = useMemo(
+        () => (invoiceId ? (signal: AbortSignal) => fetchInvoicePdfBlob(invoiceId, signal) : null),
+        [invoiceId],
+    )
+    const openPdfInNewTab = useMemo(
+        () => (invoiceId ? () => fetchInvoicePdfBlob(invoiceId) : undefined),
+        [invoiceId],
+    )
+    const { url: pdfObjectUrl, loading: pdfLoading, error: pdfError } = usePdfObjectUrl(pdfFetcher, pdfExists)
 
     if (invoiceQuery.isLoading) {
         return <PageSkeleton variant="page" />
@@ -188,7 +156,7 @@ export function InvoiceDetailPage() {
                     ) : pdfLoading ? (
                         <PageSkeleton variant="card" />
                     ) : (
-                        <PdfPreview src={pdfObjectUrl} title={t('pages.invoiceDetail.title', { number: inv.invoice_number })} />
+                        <PdfPreview src={pdfObjectUrl} title={t('pages.invoiceDetail.title', { number: inv.invoice_number })} openInNewTabFetcher={openPdfInNewTab} />
                     )
                 ) : (
                     <div className="card" style={{ display: 'flex', gap: '1rem', alignItems: 'center', justifyContent: 'space-between' }}>

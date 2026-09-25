@@ -40,6 +40,11 @@ describe('reports i18n', () => {
     it('has pages.reports.* moved from dashboard in all locales', () => {
         for (const locale of [en, de, fr, itLocale] as any[]) {
             expect(locale.pages.reports).toBeTruthy()
+            expect(locale.pages.reports.participantDescription).toBeTruthy()
+            expect(locale.pages.reports.preparingDocument).toBeTruthy()
+            expect(locale.pages.reports.documentTitle).toBeTruthy()
+            expect(locale.pages.reports.documentTabs).toBeTruthy()
+            expect(locale.pdf.download).toBeTruthy()
             expect(locale.pages.reports.annualStatement).toBeTruthy()
             expect(locale.pages.reports.annualStatement.title).toBeTruthy()
             expect(locale.pages.reports.financialSummary).toBeTruthy()
@@ -49,6 +54,12 @@ describe('reports i18n', () => {
             // dead nested year/downloading keys should be gone (shared top-level used)
             expect((locale.pages.reports.annualStatement as any).year).toBeUndefined()
             expect((locale.pages.reports.annualStatement as any).downloading).toBeUndefined()
+            expect((locale.pages.reports.annualStatement as any).showPreview).toBeUndefined()
+            expect((locale.pages.reports.annualStatement as any).hidePreview).toBeUndefined()
+            expect((locale.pages.reports.annualStatement as any).previewTitle).toBeUndefined()
+            expect((locale.pages.reports.annualStatement as any).preparingPreview).toBeUndefined()
+            expect((locale.pages.reports.annualStatement as any).previewError).toBeUndefined()
+            expect((locale.pages.reports.annualStatement as any).download).toBeUndefined()
             expect((locale.pages.reports.financialSummary as any).year).toBeUndefined()
             expect((locale.pages.reports.financialSummary as any).downloading).toBeUndefined()
         }

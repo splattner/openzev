@@ -300,24 +300,26 @@ Deletion is permanent; the invoice is removed from the database.
 
 ## Annual Statements and Tax Overviews (Billing + Reports)
 
-Yearly document downloads are split by role:
+Select a year at the top of the page. The default is the last completed year.
 
-- **Admin or ZEV owner** — sidebar **Billing → Statements** (`/billing/statements`):
-  the whole-ZEV annual-statement **ZIP archive** and the yearly **tax overview**
-  PDF for the selected ZEV, with the shared year selector.
-  The **Reports** page (`/reports`) contains the ZEV-level tax overview and
-  describes the analytics views that will be added there.
-- **Participant** — sidebar **Annual statement** (`/me/statement`): your own
-  annual statement as a **PDF**, plus the **tax overview** PDF if you are a
-  producer.
+**Admins and ZEV owners:** Open **Billing → Statements** (`/billing/statements`)
+to prepare a ZIP of the selected ZEV's annual statements. Download it when
+ready. You can return after reloading; links expire after 24 hours. Partial
+exports include an `omitted.txt` listing statements that could not be generated.
+The ZEV tax overview is also available under **Reports** (`/reports`).
 
 ![Reports page](screenshots/23-reports.png)
 
-- Pick a **year** in the selector at the top (defaults to the last completed year) — all downloads on the page use that year.
-- **Annual Statement ZIP** — as **admin or ZEV owner** (sidebar **Billing → Statements**): all participants' statements of the selected ZEV as one **ZIP archive**. Click **Prepare Annual Statements (ZIP)**: the archive is generated in the background, and the card offers **Download All (ZIP)** once it is ready — for a large ZEV this takes a while, and you can reload the page and return later. If some statements could not be generated, the card shows how many were omitted and lists them in an `omitted.txt` file inside the archive. Download links expire after 24 hours; prepare a new export to get current data. As **participant** (sidebar **Annual statement**, `/me/statement`): your own statement as a **PDF** (immediate download).
-- **Tax Overview** — yearly tax overview for producers (net local-energy revenue and feed-in compensation) as a **PDF**.
+**Participants:** Open **Annual statement** (`/me/statement`) to read your own
+statement or select the **Tax Overview** tab. Use **Download PDF** to save the
+document. **Open in new tab** shows the same PDF. Select **Retry** if generation
+fails, or reload the page for fresh documents. The tax overview shows producers'
+net local-energy revenue and feed-in compensation.
 
-Each page shows the currently selected community above the page title. Documents are only available once a ZEV is selected (owners) or once billing has run (participants).
+![Participant annual documents with embedded statement](screenshots/23b-participant-annual-statement.png)
+
+These documents use your consumption, invoices, and savings. They become
+available after billing. The selected community appears above the page title.
 
 ## Troubleshooting
 

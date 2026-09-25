@@ -309,14 +309,23 @@ status, and downloads the artifact when it completes (§8.1, ADR 0017).
 
 | Method | URL | Permission | Frontend usage |
 |---|---|---|---|
-| `GET` | `/invoices/invoices/annual-statement/` | Authenticated (participant sees own, admin/owner ZEV-scoped) | Participant "My annual statement" card: `downloadAnnualStatement({year})` (no `zev_id`, backend scopes by participant) |
-| `GET` | `/invoices/invoices/financial-summary/` | Authenticated (optional `zev_id` / `participant_id`) | Both roles: `downloadFinancialSummary({year, zev_id?})` — `zev_id` supplied for admin/owner, omitted for participant |
+| `GET` | `/invoices/invoices/annual-statement/` | Authenticated (participant sees own, admin/owner ZEV-scoped) | `downloadAnnualStatement({year}, signal?)` (no `zev_id`, backend scopes by participant) behind the participant Annual Statement tab; owners/admins supply `participant_id` + `zev_id`, which this page does not do |
+| `GET` | `/invoices/invoices/financial-summary/` | Authenticated (optional `zev_id` / `participant_id`) | `downloadFinancialSummary({year}, signal?)` behind the participant Tax Overview tab; manager card passes `zev_id` |
 
-Role branches mirror the former dashboard behavior. The old synchronous
-`GET /invoices/invoices/annual-statements-zip/` endpoint is gone. Participant self-service
-resolves to the shared self-service membership
+`ParticipantYearDocuments` shows Annual Statement (generated on entry) and Tax
+Overview (generated on first selection) under one year selector. Download saves
+the displayed blob as `annual-statement-YYYY.pdf` or
+`financial-summary-YYYY.pdf`; Open in new tab uses the same blob. Revisiting a
+tab retains its loading, ready, or error state; Retry refetches that document.
+Changing year fetches only the active tab, and changing user clears both.
+Reloading generates fresh PDFs. `PdfPreview` opens a new tab before awaiting
+an invoice PDF fetch to preserve popup permission. Browser aborts do not stop
+server rendering.
+
+The old synchronous `GET /invoices/invoices/annual-statements-zip/` endpoint is
+gone. Participant self-service resolves to the shared membership
 (`zev.services.own_participant_for_user`) — the same record named by
-`zev_name` on `GET /auth/me/` — so the label and the downloaded document
+`zev_name` on `GET /auth/me/` — so the label and the generated document
 always agree, including for multi-membership users.
 
 **Whole-ZEV annual-statement ZIP — export jobs** (`/api/v1/exports/`):
@@ -1050,6 +1059,7 @@ the cockpit readiness and attention caches.
   invoice (`pages.invoices.viewCoveringInvoice`).
 - Template field definitions come from the backend catalogs. `frontend/src/lib/emailTemplateFields.ts` owns only `EMAIL_TEMPLATE_KEYS`/`EmailTemplateKey`, the four-key frontend route contract. `frontend/src/components/FieldReference.tsx` is shared by `ZevEmailTemplateFields`, `AdminEmailTemplatesPage`, and `AdminPdfTemplatesPage`; it renders API-provided groups (without the backend-only `sample_path`), examples, search, usage badges, and click-to-insert behavior. Insertion calculates state changes and restores the caret after controlled React updates rather than writing `element.value` directly. `frontend/tests/templates-hub.test.ts` covers the seven-tab hub and cross-category routing; `field-reference.test.ts`, `email-template-parity.test.ts`, and `dead-i18n-keys.test.ts` pin token helpers, syntax-aware counting, key/tab parity, backend description-key translations, and catalog-key reachability.
 - Annual-statement export card (admin/owner): prepare → poll → download with partial, failed and expired states. Polling stops on ZEV/year switch, and a create response that resolves after the user switched ZEV/year is discarded (the old selection's job is never shown under the new one); a failed job shows the backend's safe `error_message` when there is one; a single transient poll error is tolerated (only consecutive errors or a long wall-clock backstop end the poll); a failed download surfaces an error instead of crashing; an in-flight or completed export is restored after a reload (`AnnualStatementsExportCard`)
+- PDF tests: `use-pdf-object-url.test.ts` covers replacement, abort, failure, and cleanup; `participant-documents.test.ts` covers tabs, year and user changes, retries, and blob reuse. `pdf-preview.test.ts`, `api-reports.test.ts`, and `invoice-pdf-preview.test.ts` cover the shared viewer and API calls. Manager and export flows remain in `reports-page.test.ts` and `annual-statements-export.test.ts`.
 - Build and type checks (`npm run build`)
 
 ### Manual verification
@@ -1058,6 +1068,8 @@ the cockpit readiness and attention caches.
 - Attempt invalid transitions (approve paid, cancel paid) and verify rejection
 - Simulate email failure and verify retry + history correctness
 - Prepare a whole-ZEV annual-statement export and confirm unrelated API requests stay responsive while it renders; download it after completion
+- Verify invoice Open in new tab with normal popup blocking enabled and a delayed PDF response.
+- Check participant document tabs, year changes, Retry, blob reuse, and user changes. Confirm manager views expose no participant documents.
 - Verify QR-Rechnung renders with valid IBAN + addresses
 - Verify QR section is absent when addresses are incomplete
 
@@ -1080,6 +1092,7 @@ the cockpit readiness and attention caches.
 - [ ] Contract PDF template is hot-updatable by admin only via the same mechanism (§5.7)
 - [ ] Annual statement PDF template is hot-updatable by admin only via the same mechanism (§5.7)
 - [ ] Template preview renders submitted content with sample data for all three template types (§5.7)
+- [x] Participant annual-statement preview is scoped to the authenticated participant + selected year, never reuses a stale object URL, and keeps loading/error/viewer states mutually exclusive (§5.4)
 - [ ] Whole-ZEV annual statements are prepared asynchronously: the UI polls until the archive is ready, then downloads; partial failures show omission counts, total failure shows an error with retry (§5.4, §8.1)
 - [ ] Completed export artifacts expire after the retention window and downloads of expired artifacts return `410` (§8.1, ADR 0017)
 - [ ] Reset-to-default DELETE reverts to on-disk file without modifying it (§5.7)

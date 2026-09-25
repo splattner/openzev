@@ -87,14 +87,16 @@ export async function downloadAllPdfs(payload: {
   return data as Blob
 }
 
+/** Fetch one annual-statement PDF blob; the caller decides whether to preview or save it. */
 export async function downloadAnnualStatement(params: {
   year: number
   participant_id?: string
   zev_id?: string
-}): Promise<Blob> {
+}, signal?: AbortSignal): Promise<Blob> {
   const { data } = await api.get('/invoices/invoices/annual-statement/', {
     params,
     responseType: 'blob',
+    signal,
   })
   return data as Blob
 }
@@ -103,10 +105,11 @@ export async function downloadFinancialSummary(params: {
   year: number
   zev_id?: string
   participant_id?: string
-}): Promise<Blob> {
+}, signal?: AbortSignal): Promise<Blob> {
   const { data } = await api.get('/invoices/invoices/financial-summary/', {
     params,
     responseType: 'blob',
+    signal,
   })
   return data as Blob
 }
@@ -150,9 +153,10 @@ export async function revokeInvoiceAccessLink(invoiceId: string): Promise<Invoic
 }
 
 /** Fetch the authenticated PDF blob via the API (not /media/). */
-export async function fetchInvoicePdfBlob(invoiceId: string): Promise<Blob> {
+export async function fetchInvoicePdfBlob(invoiceId: string, signal?: AbortSignal): Promise<Blob> {
   const response = await api.get<Blob>(`/invoices/invoices/${invoiceId}/pdf/`, {
     responseType: 'blob',
+    signal,
   })
   return response.data
 }

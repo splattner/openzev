@@ -4240,3 +4240,53 @@ input.recurrence-chip-input {
     min-height: 0;
   }
 }
+
+/* ── Participant annual documents ─────────────────────────────────────── */
+
+.participant-document-year {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.participant-document-year select {
+  width: auto;
+}
+
+.pdf-preview-actions {
+  padding: 0.75rem;
+}
+
+/* Hold the viewer height while generating. */
+.yearly-document-skeleton {
+  min-height: 72vh;
+}
+
+/* Fit both tabs at narrow widths. */
+#yearly-documents-preview .app-tabs-list {
+  gap: 0.5rem;
+}
+
+#yearly-documents-preview .app-tabs-tab {
+  padding: 0.75rem 0.5rem;
+}
+
+@media (max-width: 30rem) {
+  #yearly-documents-preview .app-tabs-list {
+    gap: 0.25rem;
+  }
+
+  #yearly-documents-preview .app-tabs-tab {
+    padding: 0.6rem 0.5rem;
+    font-size: 0.95rem;
+  }
+}
+
+.yearly-document-status:focus {
+  outline: none;
+}
+
+.yearly-document-status:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}

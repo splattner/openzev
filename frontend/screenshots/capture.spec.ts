@@ -441,4 +441,17 @@ test.describe('User Guide Screenshots', () => {
     await page.waitForSelector('.card', { timeout: 10_000 })
     await screenshotFull(page, '23-reports')
   })
+
+  test('23b-participant-annual-statement', async ({ page }) => {
+    const ok = await impersonateDemoParticipant(page)
+    if (!ok) {
+      test.skip()
+      return
+    }
+    await navigateTo(page, '/me/statement')
+    await page.waitForSelector('#yearly-documents-preview iframe[title]', { timeout: 30_000 })
+    await assertPdfPainted(page)
+    await closePdfSidebar(page)
+    await screenshotFull(page, '23b-participant-annual-statement')
+  })
 })

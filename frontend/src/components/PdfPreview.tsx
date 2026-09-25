@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 
 interface PdfPreviewProps {
@@ -5,33 +6,60 @@ interface PdfPreviewProps {
   src: string | null
   title?: string
   height?: string
+  /** Blob for an independent new tab. Without it, the link uses `src`. */
+  openInNewTabFetcher?: () => Promise<Blob>
+  actions?: ReactNode
 }
 
-/**
- * Embeds a real PDF (object URL) in an iframe inside a paper-style frame.
- *
- * The caller owns fetch + revoke: create the URL with `URL.createObjectURL(blob)`
- * and revoke it on unmount. All document embeds must blob-fetch — an iframe
- * `src` cannot attach an `Authorization` header, and attachment-disposition
- * endpoints would download instead of rendering.
- */
-export function PdfPreview({ src, title, height = '72vh' }: PdfPreviewProps) {
+/** Displays a caller-owned PDF object URL; the caller revokes it. */
+export function PdfPreview({ src, title, height = '72vh', openInNewTabFetcher, actions }: PdfPreviewProps) {
   const { t } = useTranslation()
+
+  const openIndependentTab = async (event: React.MouseEvent<HTMLAnchorElement>) => {
+    if (!openInNewTabFetcher || !src) return
+
+    // Open before awaiting the fetch to retain the click's popup permission.
+    const newTab = window.open('', '_blank')
+    if (!newTab) return
+    event.preventDefault()
+    newTab.opener = null
+
+    try {
+      const blob = await openInNewTabFetcher()
+      const url = URL.createObjectURL(blob)
+      newTab.location.replace(url)
+      setTimeout(() => URL.revokeObjectURL(url), 60000)
+    } catch {
+      newTab.location.replace(src)
+    }
+  }
+
+  const newTabLink = (
+    <a href={src ?? undefined} target="_blank" rel="noreferrer" onClick={openIndependentTab}>
+      {t('pdf.openInNewTab')}
+    </a>
+  )
 
   return (
     <div className="pdf-frame">
       {src ? (
         <>
+          {actions ? (
+            <div className="actions-row actions-row-wrap pdf-preview-actions">
+              {actions}
+              {newTabLink}
+            </div>
+          ) : null}
           <iframe
             src={src}
             title={title ?? t('pdf.previewTitle')}
             style={{ width: '100%', height, border: 0, display: 'block' }}
           />
-          <p className="muted" style={{ padding: '0.5rem 0.75rem', margin: 0 }}>
-            <a href={src} target="_blank" rel="noreferrer">
-              {t('pdf.openInNewTab')}
-            </a>
-          </p>
+          {actions ? null : (
+            <p className="muted" style={{ padding: '0.5rem 0.75rem', margin: 0 }}>
+              {newTabLink}
+            </p>
+          )}
         </>
       ) : (
         <div style={{ padding: '2rem', textAlign: 'center' }}>

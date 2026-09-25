@@ -79,6 +79,8 @@ vi.mock('../src/lib/api/invoices', () => ({
     }),
     fetchInvoicePdfBlob: () => Promise.reject(new Error('no pdf')),
     generateInvoicePdf: () => Promise.resolve({}),
+    downloadAnnualStatement: () => Promise.resolve(new Blob(['pdf'], { type: 'application/pdf' })),
+    downloadFinancialSummary: () => Promise.resolve(new Blob(['pdf'], { type: 'application/pdf' })),
 }))
 
 vi.mock('../src/lib/api/zev', () => ({
@@ -235,12 +237,16 @@ describe('community eyebrow', { timeout: 30000 }, () => {
     beforeEach(() => {
         document.body.innerHTML = ''
         vi.clearAllMocks()
+        // The statement page embeds its annual documents on mount.
+        vi.spyOn(URL, 'createObjectURL').mockImplementation(() => 'blob:eyebrow-1')
+        vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined)
     })
 
     afterEach(() => {
         mounted.forEach((cleanup) => cleanup())
         mounted.clear()
         document.body.innerHTML = ''
+        vi.restoreAllMocks()
     })
 
     it('invoice detail shows the invoice community, not the global selection', async () => {
