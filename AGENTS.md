@@ -11,7 +11,7 @@ This file gives coding agents the minimum project-specific context needed to wor
 - `docker-compose.dev.yml` — the development stack (backend with live reload, Vite dev server with HMR, Celery worker + beat, Postgres, Redis); this is the one used day to day
 - `docker-compose.yml` — production-like local stack (built frontend behind nginx)
 - `docs/specs/`, `docs/adr/` — feature specs and architecture decisions
-- `docs/user-guide/` — end-user documentation
+- `docs/user-guide/` — end-user documentation, also published at https://www.openzev.ch/docs/ (MkDocs Material, `mkdocs.yml`); preview with `pip install -r scripts/site/requirements-docs.txt && mkdocs serve`, and `mkdocs build --strict` must pass (CI checks it)
 - `docs/release-notes/` — hand-written release notes for minor/major releases
 - `docs/site/` — the public landing page (German at the root, plus `fr/`, `it/`, `en/`), **generated**: edit `scripts/site/template.html` and `scripts/site/lang/*.json`, run `python scripts/site/build.py`, and commit the output (the publish workflow checks it is current)
 

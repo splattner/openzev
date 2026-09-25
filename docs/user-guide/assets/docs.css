@@ -1,0 +1,39 @@
+/* Brand colours for the published user guide, matching docs/site/assets/site.css. */
+@import url("https://fonts.googleapis.com/css2?family=Archivo:wght@600;700&display=swap");
+
+[data-md-color-scheme="default"] {
+  --md-primary-fg-color: #143828;
+  --md-primary-fg-color--light: #1f5c3a;
+  --md-primary-fg-color--dark: #0d2b1d;
+  --md-primary-bg-color: #ffffff;
+  --md-accent-fg-color: #2f7a4d;
+  --md-typeset-a-color: #1f5c3a;
+  --md-default-bg-color: #f8faf7;
+}
+
+[data-md-color-scheme="slate"] {
+  --md-primary-fg-color: #0d2b1d;
+  --md-primary-fg-color--light: #1f5c3a;
+  --md-primary-fg-color--dark: #091a14;
+  --md-primary-bg-color: #e9f1ec;
+  --md-accent-fg-color: #a7d63a;
+  --md-typeset-a-color: #9ec3ac;
+  --md-default-bg-color: #0b1410;
+}
+
+.md-header__topic:first-child,
+.md-typeset h1,
+.md-typeset h2 {
+  font-family: "Archivo", var(--md-text-font-family);
+  font-weight: 700;
+}
+
+.md-typeset h1 {
+  color: var(--md-default-fg-color);
+}
+
+/* Screenshots are wide app captures: keep them readable and framed. */
+.md-typeset img {
+  border: 1px solid var(--md-default-fg-color--lightest);
+  border-radius: 8px;
+}

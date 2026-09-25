@@ -126,7 +126,7 @@ Step-by-step import flow with mapping, preview, and validation feedback.
 
 ## User Documentation
 
-All end-user documentation has been moved to `docs/user-guide/` and organized by workflow.
+All end-user documentation lives in `docs/user-guide/`, organized by workflow, and is published at <https://www.openzev.ch/docs/>.
 
 - User guide index: [docs/user-guide/README.md](docs/user-guide/README.md)
 - Energy allocation and billing details: [docs/user-guide/08-billing-allocation-explained.md](docs/user-guide/08-billing-allocation-explained.md)
