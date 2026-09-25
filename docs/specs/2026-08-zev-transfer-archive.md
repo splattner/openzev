@@ -107,13 +107,22 @@ commit — a failed audit must not cause a duplicate import on client retry).
 
 ## 6. Archive format (`backend/zev/transfer/schema.py`)
 
-`FORMAT_VERSION = 3`, `SUPPORTED_FORMAT_VERSIONS = {1, 2, 3}`. Version 3 adds
-the opt-in `invoice_pdfs` section (issued invoice documents — see below).
-Version 2 adds `enabled` and the explicit `empty_on_not_found` setting to
-source descriptors, plus frozen invoice-to-source evidence. The earlier
-provider-neutral fields (`api_version`, `request_mode`, `query_tariff_type`,
-`supports_range`) already existed in version 1. Older importers must reject a
-newer version rather than lose configuration, provenance or documents.
+`FORMAT_VERSION = 4`, `SUPPORTED_FORMAT_VERSIONS = {1, 2, 3, 4}`. Version 4
+(SPEC-2026-percentage-tariff-bands §5.6) moves the percentage of a
+`percentage_of_energy` tariff off the tariff itself and onto its periods:
+`TARIFF_FIELDS` drops `percentage`, `TARIFF_PERIOD_FIELDS` gains it. Importing
+an archive older than version 4, `_import_tariffs` reads the legacy top-level
+`percentage` straight from the raw JSON (`_pick` only ever reads the
+listed field names, so this one field is a deliberate exception) and creates
+one flat `TariffPeriod` band from it; any periods the older archive carried
+alongside a percentage tariff are dropped with a warning, because they were
+never billed under that mode. Version 3 adds the opt-in `invoice_pdfs`
+section (issued invoice documents — see below). Version 2 adds `enabled` and
+the explicit `empty_on_not_found` setting to source descriptors, plus frozen
+invoice-to-source evidence. The earlier provider-neutral fields
+(`api_version`, `request_mode`, `query_tariff_type`, `supports_range`)
+already existed in version 1. Older importers must reject a newer version
+rather than lose configuration, provenance or documents.
 The current importer continues to accept version 1 static archives and legacy
 adapter-based dynamic descriptors. A version this instance does not read is
 refused outright (`ArchiveError`, a `ValueError` subclass).
@@ -424,10 +433,18 @@ without a file says so; import accepts repeated-sections fields; export accepts
 repeated-sections query params; inspect returns the manifest without creating
 anything; inspect refuses a non-archive.
 
-### Backend — `backend/zev/test_transfer_invoice_pdfs.py` (format version 3)
+**`PercentageBandArchiveTests`** (SPEC-2026-percentage-tariff-bands §5.6, format
+version 4): a percentage tariff with two bands round-trips both bands'
+percentages, with `price_chf_per_kwh` null on both; a format-version-3 archive
+carrying a legacy top-level `percentage` imports as one flat band, with a
+collector warning that any archived periods on it were dropped; a
+format-version-3 percentage tariff with no `percentage` at all imports with no
+band.
 
-`FormatVersionTests`: `FORMAT_VERSION == 3`; `SUPPORTED_FORMAT_VERSIONS ==
-{1, 2, 3}`; `invoice_pdfs` is a known section depending on `invoices`.
+### Backend — `backend/zev/test_transfer_invoice_pdfs.py` (format version 4)
+
+`FormatVersionTests`: `FORMAT_VERSION == 4`; `SUPPORTED_FORMAT_VERSIONS ==
+{1, 2, 3, 4}`; `invoice_pdfs` is a known section depending on `invoices`.
 `MemberNamingTests`: `pdf_member_name` is deterministic and collision-safe
 (same construction as reading member names), stays under `invoices/pdf/`.
 `RoundTripTests`: a PDF travels when `invoice_pdfs` is selected and does not

@@ -95,7 +95,7 @@ For larger or risky changes, consult or create specs and ADRs:
 - **Reference specs** document reusable cross-cutting patterns that should guide future work even when no baseline feature spec changes directly:
   - `2026-04-frontend-management-page-design.md` — reference spec for frontend CRUD / management-page cleanup, action hierarchy, page grouping, icons, i18n discipline, and responsive layouts
 
-- **Completed feature specs** describe shipped capabilities with their own implementation spec (`2026-08-shared-metering-points.md`, `2026-09-vse-tariff-import.md`, `2026-09-tariff-overview-pdf.md`, `2026-09-participant-invoice-access.md`, `2026-09-dynamic-tariffs.md`, `2026-09-bfe-reference-market-price.md`). Update the linked spec when the capability changes; they are not baselines.
+- **Completed feature specs** describe shipped capabilities with their own implementation spec (`2026-08-shared-metering-points.md`, `2026-09-vse-tariff-import.md`, `2026-09-tariff-overview-pdf.md`, `2026-09-participant-invoice-access.md`, `2026-09-dynamic-tariffs.md`, `2026-09-bfe-reference-market-price.md`, `2026-09-percentage-tariff-bands.md`). Update the linked spec when the capability changes; they are not baselines.
 
 - When you create or modify a spec, link it in your PR using `.github/PULL_REQUEST_TEMPLATE.md`.
 

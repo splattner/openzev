@@ -38,15 +38,16 @@ Each tariff has:
    > version** rather than editing or creating a second tariff — see
    > [Tariff Versions](#tariff-versions).
 
-4. Configure pricing: the fixed amount for a fee, the percentage for a
-   percentage tariff, or — for a per-kWh tariff — a
-   [dynamic price source](#dynamic-tariffs) if it has one
+4. Configure pricing: the fixed amount for a fee, the **initial percentage**
+   for a percentage tariff (the tariff starts with one flat band at that
+   percentage — you can split it into time-of-use bands afterwards, see
+   [Percentage of Energy Tariff](#percentage-of-energy-tariff)), or — for a
+   per-kWh tariff — a [dynamic price source](#dynamic-tariffs) if it has one
 
 5. Click **Save Tariff**
 
-6. For a per-kWh tariff with fixed prices, add its prices as
-   [Tariff Periods](#tariff-periods) — a tariff without a period prices
-   nothing
+6. For a per-kWh or percentage tariff with fixed bands, add its prices as
+   [Tariff Periods](#tariff-periods) — a tariff without a band prices nothing
 
 ## Importing Tariffs from Your Grid Operator
 
@@ -384,18 +385,35 @@ Instead of setting a price, you set a **percentage** (0–100%). During billing,
 **Configuration:**
 - **Billing Mode** — Select `Percentage of energy tariffs`
 - **Energy Type** — `Local Energy`, `Grid Energy`, or `Feed-in` (determines which energy stream the tariff applies to)
-- **Percentage** — The percentage value (e.g., 50%)
+- **Initial percentage** — The percentage value to start with (e.g., 50%), only asked when creating the tariff
 
-> **Note:** Percentage tariffs do not have HT/NT periods. The effective price is derived automatically from the grid energy tariff rates at each timestamp.
+Saving creates the tariff with one flat percentage band. Like a per-kWh
+tariff, a percentage tariff can be split into several **time-of-use bands** —
+open its entry and use **Add Period** to add a High/Low or named band, this
+time entering a **percentage** instead of a CHF/kWh price. A local-energy
+surcharge that is cheaper at midday and dearer in the morning and evening, for
+example, can be modelled as two bands (10:00–16:00 at 60%, the rest of the day
+at 90%) instead of a single flat percentage — see
+[Tariff Periods](#tariff-periods) for how bands, weekdays and months combine;
+everything there applies to a percentage tariff's bands exactly as it does to
+a per-kWh tariff's.
 
 Example:
 ```
 Percentage Tariff "Local Energy 50%"
 ├─ Energy type: Local Energy
-├─ Percentage: 50%
+├─ Band: Flat, 50%
 ├─ Effective price: 50% of grid energy rate
 │   (if Grid HT = CHF 0.28/kWh → Local = CHF 0.14/kWh)
 │   (if Grid NT = CHF 0.18/kWh → Local = CHF 0.09/kWh)
+```
+
+Example with time-of-use bands:
+```
+Percentage Tariff "Local Solar Surcharge"
+├─ Energy type: Local Energy
+├─ Band: High, 10:00–16:00, 60%
+├─ Band: Low, other hours, 90%
 ```
 
 This is useful when you want to set local energy prices as a fraction of the grid energy rate, so that price changes to the grid tariff are automatically reflected.
@@ -481,8 +499,11 @@ across the participants. It appears on invoices as a credit line.
 ## Tariff Periods
 
 **Tariff periods** hold a per-kWh tariff's prices. There are no default
-periods: a new per-kWh tariff has none until you add one. Each period has a
-type:
+periods: a new per-kWh tariff has none until you add one. A [percentage
+tariff](#percentage-of-energy-tariff) uses the same periods and the same
+**Add Period** dialog, entering a **percentage** instead of a **CHF/kWh**
+price — everything below about period types, time windows, weekdays and
+months applies to it unchanged. Each period has a type:
 
 | Period type | Use for |
 | --- | --- |
@@ -499,7 +520,7 @@ To add one:
    - **Time from** / **Time to** — HH:MM (24-hour format)
    - **Weekdays** and **Months** the period applies to (all selected means
      every day / all year)
-   - **CHF/kWh**
+   - **CHF/kWh** (per-kWh tariff), or **Percentage** (percentage tariff)
 4. Click **Save Tariff Period**
 
 > **Crossing midnight:** If end time < start time, period wraps (e.g., 22:00–06:00).
@@ -590,10 +611,11 @@ its price moved over time.
 - HT and NT are **separate lines**, so you can see the spread widen or narrow.
 - **Uncovered stretches are shaded red** and the line breaks: nothing was billed
   there. This is the same problem the gap badge reports, shown on a timeline.
-- For a **percentage tariff** the chart shows the *effective* price it worked out
-  to, derived from the grid tariffs in force at each point — so it moves when
-  those move, even in months this tariff itself did not change. A note under the
-  title says so.
+- For a **percentage tariff** the chart shows one line per band, each the
+  *effective* price it worked out to, derived from the grid tariffs in force
+  at each point — so it moves when those move, even in months this tariff
+  itself did not change. A note under the title says so. A tariff with a
+  single flat band still shows one line, exactly as before bands existed.
 
 ### Renaming
 
@@ -752,11 +774,13 @@ Metering) — the same grouping and order as an invoice's line items.
   wording as the participation contract (HT/NT, a seasonal band's month
   range, or a plain band's time window) — the two documents describe a
   tariff the same way.
-- A **percentage-of-energy tariff** prints its formula (e.g. `18.00 % ×
-  29.50 Rp./kWh`), computed from the same grid tariffs the participation
-  contract uses. If the grid tariff it is based on has more than one price
-  band, a footnote explains that the figure shown is the tariff's base rate,
-  not what any single reading is actually billed at.
+- A **percentage-of-energy tariff** prints one row per band — a tariff with
+  a single flat band prints one formula (e.g. `18.00 % × 29.50 Rp./kWh`), and
+  a tariff with several time-of-use bands prints one row per band, each
+  named the same way a per-kWh band is. Each is computed from the same grid
+  tariffs the participation contract uses. If the grid tariff it is based on
+  has more than one price band, a footnote explains that the figure shown is
+  the tariff's base rate, not what any single reading is actually billed at.
 - A **shared fee** states how it is split (equally, or by weight) — the
   figure printed is what the whole community pays, not one participant's
   share.

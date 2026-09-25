@@ -1,7 +1,7 @@
 # Feature Spec: Time-of-use bands for percentage-of-energy tariffs
 
 - Spec ID: SPEC-2026-percentage-tariff-bands
-- Status: Approved
+- Status: Completed
 - Scope: Minor
 - Type: Feature
 - Owners: Sebastian Plattner
@@ -328,10 +328,10 @@ Order matters: each step leaves the backend test suite green.
 
 ## 9. Acceptance criteria
 
-- [ ] A percentage-of-energy tariff can hold several bands, each with its own percentage, time window, weekdays and months.
-- [ ] The engine applies the matching band's percentage at each timestamp, for consumer charges and producer credits.
-- [ ] Existing single-percentage tariffs bill exactly as before (migration to one flat band), and issued invoices are untouched.
-- [ ] Band itemisation splits percentage tariffs per band. Unitemised multi-band lines show the blended `Ø` percentage.
-- [ ] Contract PDF, tariff overview PDF, drawer and chart show one entry per band, and a single flat band looks exactly as before.
-- [ ] The transfer archive round-trips bands (v4) and still imports v1–v3.
-- [ ] Baseline specs and the user guide are updated.
+- [x] A percentage-of-energy tariff can hold several bands, each with its own percentage, time window, weekdays and months.
+- [x] The engine applies the matching band's percentage at each timestamp, for consumer charges and producer credits.
+- [x] Existing single-percentage tariffs bill exactly as before (migration to one flat band), and issued invoices are untouched.
+- [x] Band itemisation splits percentage tariffs per band. Unitemised multi-band lines show the blended `Ø` percentage.
+- [x] Contract PDF, tariff overview PDF, drawer and chart show one entry per band, and a single flat band looks exactly as before.
+- [x] The transfer archive round-trips bands (v4) and still imports v1–v3.
+- [x] Baseline specs and the user guide are updated.
