@@ -1,0 +1,36 @@
+name: Docs Check
+
+# PR Quality skips prose-only changes, so the user guide gets its own check:
+# the same strict MkDocs build publish-site.yml runs, which fails on a broken
+# link or anchor between chapters before it reaches www.openzev.ch/docs/.
+
+on:
+    pull_request:
+        branches: [main]
+        paths:
+            - "docs/user-guide/**"
+            - "mkdocs.yml"
+            - "scripts/site/**"
+            - ".github/workflows/docs-check.yml"
+
+permissions:
+    contents: read
+
+jobs:
+    build-docs:
+        name: Build the user guide
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout
+              uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+            - name: Setup Python
+              uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+              with:
+                  python-version: "3.14"
+
+            - name: Build
+              run: |
+                  set -euo pipefail
+                  pip install -r scripts/site/requirements-docs.txt
+                  mkdocs build --strict

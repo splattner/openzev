@@ -4,6 +4,7 @@
   "nav_features": "Fonctionnalités",
   "nav_screens": "Captures d’écran",
   "nav_quickstart": "Démarrage rapide",
+  "nav_docs": "Documentation",
 
   "hero_eyebrow": "Open source · RCP &amp; vRCP suisses · <span class=\"nowrap\">auto-hébergé</span> · AGPL-3.0",
   "hero_title": "Des données de compteur au quart d’heure à la <em>facture payée</em>.",

@@ -4,6 +4,7 @@
   "nav_features": "Features",
   "nav_screens": "Screenshots",
   "nav_quickstart": "Quick start",
+  "nav_docs": "Docs",
 
   "hero_eyebrow": "Open source · Swiss ZEV &amp; vZEV · <span class=\"nowrap\">self-hosted</span> · AGPL-3.0",
   "hero_title": "From quarter-hourly meter data to a <em>paid invoice</em>.",

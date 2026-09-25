@@ -17,7 +17,7 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 OUT = HERE.parent.parent / "docs" / "site"
-BASE = "https://splattner.github.io/openzev/"
+BASE = "https://www.openzev.ch/"
 
 DEFAULT = "de"
 LANGS = {  # code -> (switcher label, og:locale)

@@ -1,0 +1,128 @@
+# The user guide, published at https://www.openzev.ch/docs/ by
+# .github/workflows/publish-site.yml. The chapters stay plain Markdown in
+# docs/user-guide/ so they also read on GitHub; this file only adds the site.
+#
+#   pip install -r scripts/site/requirements-docs.txt
+#   mkdocs serve            # preview on http://127.0.0.1:8000/docs/
+#   mkdocs build --strict   # what CI runs
+site_name: OpenZEV Documentation
+site_url: https://www.openzev.ch/docs/
+site_description: User guide for OpenZEV, open source billing software for Swiss ZEV and vZEV energy communities.
+repo_url: https://github.com/splattner/openzev
+repo_name: splattner/openzev
+edit_uri: edit/main/docs/user-guide/
+copyright: OpenZEV · AGPL-3.0
+
+docs_dir: docs/user-guide
+site_dir: build/site-docs
+
+theme:
+  name: material
+  language: en
+  logo: assets/favicon.svg
+  favicon: assets/favicon.svg
+  font:
+    text: Inter
+    code: IBM Plex Mono
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+  features:
+    - navigation.sections
+    - navigation.top
+    - navigation.footer
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.action.edit
+    - toc.follow
+
+extra_css:
+  - assets/docs.css
+
+extra_javascript:
+  - https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
+
+extra:
+  homepage: https://www.openzev.ch/
+  generator: false
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/splattner/openzev
+
+hooks:
+  - scripts/site/docs_hooks.py
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - tables
+  - toc:
+      permalink: true
+      # GitHub-compatible anchors, so the links between chapters work both on
+      # GitHub and here (the default slugify collapses "--" and breaks them).
+      slugify: !!python/object/apply:pymdownx.slugs.slugify
+        kwds:
+          case: lower
+  # GitHub renders a list straight after a paragraph line and nests with
+  # two spaces; Python-Markdown needs a blank line and four. The chapters are
+  # written for GitHub, so make the site read them the same way.
+  - mdx_breakless_lists
+  - mdx_truly_sane_lists:
+      nested_indent: 2
+      truly_sane: true
+  - pymdownx.arithmatex:
+      generic: true
+  - pymdownx.highlight
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+
+validation:
+  omitted_files: warn
+  absolute_links: warn
+  unrecognized_links: warn
+  anchors: warn
+
+nav:
+  - Home: README.md
+  - Getting Started:
+      - Getting Started: 01-getting-started.md
+      - Roles and Permissions: 11-roles-and-permissions.md
+  - Planning:
+      - vZEV Feasibility Calculator: 13-feasibility-calculator.md
+  - Setting Up Your ZEV:
+      - ZEV Setup and Configuration: 02-zev-setup.md
+      - Managing Participants: 03-participant-management.md
+      - Metering Points: 04-metering-points.md
+  - Operations:
+      - Metering Imports: 05-metering-import.md
+      - Metering Analysis: 06-metering-analysis.md
+      - Tariff Configuration: 07-tariff-configuration.md
+  - Billing and Invoicing:
+      - How Allocation and Billing Works: 08-billing-allocation-explained.md
+      - Invoice Management: 09-invoice-management.md
+      - Email Configuration: 10-email-configuration.md
+  - Administration:
+      - Platform Administration: 14-admin-console.md
+      - ZEV Export and Import: 17-zev-transfer.md
+      - Backups: 18-backups.md
+  - Automation:
+      - API Keys: 16-api-keys.md
+  - Reference:
+      - Troubleshooting: 12-troubleshooting.md
+      - Glossary: 15-glossary.md

@@ -26,6 +26,17 @@
       "groupName": "backend-python"
     },
     {
+      "matchManagers": ["pip_requirements"],
+      "matchFileNames": ["scripts/site/requirements-docs.txt"],
+      "groupName": "docs-site"
+    },
+    {
+      "description": "Material for MkDocs does not support MkDocs 2.0 (plugin and theme systems were removed).",
+      "matchManagers": ["pip_requirements"],
+      "matchPackageNames": ["mkdocs"],
+      "allowedVersions": "<2.0.0"
+    },
+    {
       "matchUpdateTypes": ["major"],
       "labels": ["dependencies", "major"]
     },
