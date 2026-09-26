@@ -1,5 +1,24 @@
 # Changelog
 
+## [1.19.0](https://github.com/splattner/openzev/compare/v1.18.3...v1.19.0) (2026-09-26)
+
+
+### Features
+
+* **invoices:** add catalog-backed template editors ([#822](https://github.com/splattner/openzev/issues/822)) ([fda792e](https://github.com/splattner/openzev/commit/fda792efb7669c1bbf1109fc4866a71f4b4dd2fd))
+* **reports:** embed participant annual documents ([#831](https://github.com/splattner/openzev/issues/831)) ([5ba50a9](https://github.com/splattner/openzev/commit/5ba50a9f60100724fdd547187da8e8bca2af21fc))
+* **site:** publish the user guide at www.openzev.ch/docs ([#833](https://github.com/splattner/openzev/issues/833)) ([d73433f](https://github.com/splattner/openzev/commit/d73433fb3ef64d54650e2e79e32894fc6e646185))
+* **tariffs:** time-of-use bands for percentage-of-energy tariffs ([#838](https://github.com/splattner/openzev/issues/838)) ([109c0ac](https://github.com/splattner/openzev/commit/109c0ac5633ff4e28844e3fe49894ce069a10041))
+
+
+### Bug Fixes
+
+* **frontend:** keyboard-operable shell dropdowns, shared tooltip style ([#823](https://github.com/splattner/openzev/issues/823)) ([acda8e5](https://github.com/splattner/openzev/commit/acda8e5084b5366a690b6a46707cd52f0586d178))
+* **metering:** drop the redundant scope card from the chart page ([#828](https://github.com/splattner/openzev/issues/828)) ([bc735ad](https://github.com/splattner/openzev/commit/bc735adff25e0f70d9604a096bde859c49c9100d))
+* **metering:** scope import deletion audit events to their ZEV ([#827](https://github.com/splattner/openzev/issues/827)) ([3cfa1c4](https://github.com/splattner/openzev/commit/3cfa1c45364ea9a46737432f3431c043e05152d8))
+* **screenshots:** fit admin invoices capture to table height ([#824](https://github.com/splattner/openzev/issues/824)) ([c0ee4a7](https://github.com/splattner/openzev/commit/c0ee4a77fa13a802dff57aa471fb7f3b3d770b46))
+* **tariffs:** match tariff bands whose window crosses midnight ([#839](https://github.com/splattner/openzev/issues/839)) ([616f56b](https://github.com/splattner/openzev/commit/616f56bd5197484681a34d6b4d74cd646e5d6928)), closes [#837](https://github.com/splattner/openzev/issues/837)
+
 ## [1.18.3](https://github.com/splattner/openzev/compare/v1.18.2...v1.18.3) (2026-09-24)
 
 
