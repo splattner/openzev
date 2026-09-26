@@ -2761,7 +2761,7 @@ open its entry and use <strong>Add Period</strong> to add a High/Low or named ba
 time entering a <strong>percentage</strong> instead of a CHF/kWh price. A local-energy
 surcharge that is cheaper at midday and dearer in the morning and evening, for
 example, can be modelled as three bands (00:00–10:00 at 90%, 10:00–16:00 at
-60%, 16:00–23:59 at 90%) instead of a single flat percentage — see
+60%, 16:00–00:00 at 90%) instead of a single flat percentage — see
 <a href="#tariff-periods">Tariff Periods</a> for how bands, weekdays and months combine;
 everything there applies to a percentage tariff's bands exactly as it does to
 a per-kWh tariff's.</p>
@@ -2778,7 +2778,7 @@ a per-kWh tariff's.</p>
 ├─ Energy type: Local Energy
 ├─ Band "Morning": 00:00–10:00, 90%
 ├─ Band "Midday":  10:00–16:00, 60%
-├─ Band "Evening": 16:00–23:59, 90%
+├─ Band "Evening": 16:00–00:00, 90%
 </code></pre></div></p>
 <blockquote>
 <p><strong>Cover the whole day.</strong> Every band needs its own time window, and the
@@ -2911,7 +2911,12 @@ months applies to it unchanged. Each period has a type:</p>
 <li>Click <strong>Save Tariff Period</strong></li>
 </ol>
 <blockquote>
-<p><strong>Crossing midnight:</strong> If end time &lt; start time, period wraps (e.g., 22:00–06:00).</p>
+<p><strong>Crossing midnight:</strong> If the end time is not after the start time, the
+period wraps past midnight: 22:00–06:00 covers the night, and an end time of
+00:00 means the end of the day (16:00–00:00 is the evening). The weekdays
+you select refer to the day of each hour itself, so a Monday–Friday
+22:00–06:00 period covers Friday night up to midnight and the early hours of
+Monday to Friday, but not Saturday morning.</p>
 </blockquote>
 <h2 id="multi-tariff-configuration">Multi-Tariff Configuration<a class="headerlink" href="#multi-tariff-configuration" title="Permanent link">&para;</a></h2>
 <p>Most ZEVs use multiple tariffs simultaneously:</p>
