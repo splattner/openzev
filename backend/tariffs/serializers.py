@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from django.core.exceptions import ValidationError as DjangoValidationError
+from django.db import transaction
 from .dynamic.adapters import DynamicApiVersion
 from .dynamic.models import DynamicTariffSource
 from .dynamic.services import tariff_has_dynamic_billing_evidence
@@ -46,10 +47,28 @@ class TariffPeriodSerializer(serializers.ModelSerializer):
         tariff = attrs.get("tariff") or getattr(self.instance, "tariff", None)
         if tariff is not None and getattr(tariff, "dynamic_source_id", None):
             raise serializers.ValidationError("This tariff is priced from a fetched series; price bands do not apply.")
-        if tariff and tariff.billing_mode != BillingMode.ENERGY:
+        if tariff and tariff.billing_mode not in (BillingMode.ENERGY, BillingMode.PERCENTAGE_OF_ENERGY):
             raise serializers.ValidationError("Tariff periods are only supported for energy-based tariffs.")
         if tariff:
             self._reject_flat_beside_timed_bands(tariff, attrs)
+            # The §4.1 per-mode rules (a price band needs a price and no
+            # percentage, a percentage band the reverse) live on
+            # TariffPeriod.clean(); running it here turns them into field
+            # errors the form can point at, instead of a DB constraint error.
+            candidate = TariffPeriod(
+                tariff=tariff,
+                price_chf_per_kwh=attrs.get(
+                    "price_chf_per_kwh", getattr(self.instance, "price_chf_per_kwh", None)
+                ),
+                percentage=attrs.get("percentage", getattr(self.instance, "percentage", None)),
+                months=attrs.get("months", getattr(self.instance, "months", "")),
+            )
+            try:
+                candidate.clean()
+            except DjangoValidationError as exc:
+                if hasattr(exc, "message_dict"):
+                    raise serializers.ValidationError(exc.message_dict)
+                raise serializers.ValidationError(exc.messages)
         return attrs
 
     class Meta:
@@ -62,6 +81,15 @@ class TariffSerializer(serializers.ModelSerializer):
     periods = TariffPeriodSerializer(many=True, read_only=True)
     dynamic_price_summary = serializers.SerializerMethodField()
     percentage_base_summary = serializers.SerializerMethodField()
+    # Write-only, create-only: a percentage tariff has no price of its own any
+    # more, only bands. This lets the create form still ask for one number —
+    # "what percentage to start at" — without asking the user to open the band
+    # editor before the tariff even exists. Optional: a percentage tariff
+    # without bands is valid (readiness flags it, same as an energy tariff
+    # with none), just like before bands existed.
+    initial_percentage = serializers.DecimalField(
+        max_digits=5, decimal_places=2, min_value=0, write_only=True, required=False,
+    )
 
     def get_percentage_base_summary(self, obj):
         if obj.billing_mode != BillingMode.PERCENTAGE_OF_ENERGY:
@@ -130,22 +158,28 @@ class TariffSerializer(serializers.ModelSerializer):
         billing_mode = attrs.get("billing_mode") or getattr(self.instance, "billing_mode", BillingMode.ENERGY)
         energy_type = attrs.get("energy_type") if "energy_type" in attrs else getattr(self.instance, "energy_type", None)
         fixed_price_chf = attrs.get("fixed_price_chf") if "fixed_price_chf" in attrs else getattr(self.instance, "fixed_price_chf", None)
-        percentage = attrs.get("percentage") if "percentage" in attrs else getattr(self.instance, "percentage", None)
         dynamic_source = attrs.get("dynamic_source") if "dynamic_source" in attrs else getattr(self.instance, "dynamic_source_id", None)
+
+        if "initial_percentage" in attrs:
+            if self.instance is not None:
+                raise serializers.ValidationError({
+                    "initial_percentage": "Add bands from the tariff's own page to change an existing tariff."
+                })
+            if billing_mode != BillingMode.PERCENTAGE_OF_ENERGY:
+                raise serializers.ValidationError({
+                    "initial_percentage": "Only a percentage-of-energy tariff takes an initial percentage."
+                })
 
         if billing_mode == BillingMode.ENERGY:
             if not energy_type:
                 raise serializers.ValidationError({"energy_type": "Energy tariffs require an energy type."})
             attrs["fixed_price_chf"] = None
-            attrs["percentage"] = None
             if energy_type != EnergyType.FEED_IN or not dynamic_source:
                 attrs["minimum_price_chf_per_kwh"] = None
 
         elif billing_mode == BillingMode.PERCENTAGE_OF_ENERGY:
             if not energy_type:
                 raise serializers.ValidationError({"energy_type": "Percentage-of-energy tariffs require an energy type."})
-            if percentage in (None, ""):
-                raise serializers.ValidationError({"percentage": "Percentage-of-energy tariffs require a percentage value."})
             attrs["fixed_price_chf"] = None
             attrs["minimum_price_chf_per_kwh"] = None
 
@@ -154,18 +188,23 @@ class TariffSerializer(serializers.ModelSerializer):
             if fixed_price_chf in (None, ""):
                 raise serializers.ValidationError({"fixed_price_chf": "Fixed-fee tariffs require a price."})
             attrs["energy_type"] = None
-            attrs["percentage"] = None
             attrs["minimum_price_chf_per_kwh"] = None
 
         return attrs
 
     def create(self, validated_data):
+        initial_percentage = validated_data.pop("initial_percentage", None)
         tariff = Tariff(**validated_data)
         try:
             tariff.full_clean()
         except DjangoValidationError as exc:
             self._raise_validation_error_from_model(exc)
-        tariff.save()
+        with transaction.atomic():
+            tariff.save()
+            if initial_percentage is not None:
+                TariffPeriod.objects.create(
+                    tariff=tariff, period_type=PeriodType.FLAT, percentage=initial_percentage,
+                )
         return tariff
 
     def update(self, instance, validated_data):

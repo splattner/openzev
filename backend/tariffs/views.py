@@ -74,12 +74,16 @@ def _parse_required_date(raw, field: str):
 
 
 def _apply_price_overrides(tariff, data: dict) -> None:
-    """Carry an explicit ``fixed_price_chf`` / ``percentage`` onto a copied tariff.
+    """Carry an explicit ``fixed_price_chf`` / ``minimum_price_chf_per_kwh`` onto a copied tariff.
 
     Absent keys leave the copied value in place; a new version that only shifts
-    its validity window should not have to restate its price.
+    its validity window should not have to restate its price. A percentage
+    tariff has no price of its own any more — only its bands do, which
+    ``_copy_or_replace_periods`` carries over — so ``percentage`` is no longer
+    read here even if a caller still sends it (``request.data`` is read
+    explicitly by this view, so DRF's own key-dropping does not apply).
     """
-    for field in ('fixed_price_chf', 'percentage', 'minimum_price_chf_per_kwh'):
+    for field in ('fixed_price_chf', 'minimum_price_chf_per_kwh'):
         if field in data:
             setattr(tariff, field, data[field])
 
@@ -104,6 +108,7 @@ def _copy_or_replace_periods(source, target, periods_data) -> None:
                 period_type=period.period_type,
                 label=period.label,
                 price_chf_per_kwh=period.price_chf_per_kwh,
+                percentage=period.percentage,
                 time_from=period.time_from,
                 time_to=period.time_to,
                 weekdays=period.weekdays,
@@ -293,7 +298,6 @@ class TariffViewSet(AuditedUpdateMixin, ZevScopedQuerySetMixin, viewsets.ModelVi
                 energy_type=source.energy_type,
                 split_key=source.split_key,
                 fixed_price_chf=source.fixed_price_chf,
-                percentage=source.percentage,
                 notes=source.notes,
                 valid_from=valid_from,
                 valid_to=window.valid_to,
@@ -358,7 +362,6 @@ class TariffViewSet(AuditedUpdateMixin, ZevScopedQuerySetMixin, viewsets.ModelVi
                 energy_type=source.energy_type,
                 split_key=source.split_key,
                 fixed_price_chf=source.fixed_price_chf,
-                percentage=source.percentage,
                 notes=source.notes,
                 valid_from=valid_from,
                 valid_to=source.valid_to,

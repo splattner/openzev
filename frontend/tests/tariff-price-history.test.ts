@@ -12,6 +12,17 @@ function period(period_type: TariffPeriod['period_type'], price: string): Tariff
   return { id: `${period_type}-${price}`, tariff: 't', period_type, price_chf_per_kwh: price }
 }
 
+function pctPeriod(
+  period_type: TariffPeriod['period_type'],
+  percentage: string,
+  overrides: Partial<TariffPeriod> = {},
+): TariffPeriod {
+  return {
+    id: `${period_type}-${percentage}`, tariff: 't', period_type,
+    price_chf_per_kwh: null, percentage, ...overrides,
+  }
+}
+
 function version(
   valid_from: string,
   valid_to: string | null,
@@ -216,9 +227,13 @@ describe('buildPriceHistory — percentage of energy', () => {
     }),
   ], { name: 'Grid', energy_type: 'grid' })
 
+  // A single flat band (§8.5): the pre-band shape, migrated from a bare
+  // `percentage` field. It keys the same 'flat' band an energy tariff with
+  // one band would, not the old single 'effective' key — bands are told
+  // apart exactly as an energy tariff's are (§5.7).
   const pctSeries = series([
     version('2025-01-01', null, {
-      name: 'Local', billing_mode: 'percentage_of_energy', percentage: '50.00', periods: [],
+      name: 'Local', billing_mode: 'percentage_of_energy', periods: [pctPeriod('flat', '50.00')],
     }),
   ], { name: 'Local', billing_mode: 'percentage_of_energy', version_count: 1 })
 
@@ -226,9 +241,9 @@ describe('buildPriceHistory — percentage of energy', () => {
     const history = buildPriceHistory(pctSeries, [pctSeries, gridSeries], TODAY)
 
     expect(history.unit).toBe('chf_per_kwh')
-    expect(history.bands).toEqual(['effective'])
+    expect(history.bands).toEqual(['flat'])
     expect(history.derived).toBe(true)
-    expect(history.points.map((point) => [point.date, point.values.effective])).toEqual([
+    expect(history.points.map((point) => [point.date, point.values.flat])).toEqual([
       ['2025-01-01', 0.1],
       ['2026-01-01', 0.15],
       [TODAY, 0.15],
@@ -237,7 +252,7 @@ describe('buildPriceHistory — percentage of energy', () => {
 
   it('steps when the grid price changes even though the percentage never did', () => {
     const history = buildPriceHistory(pctSeries, [pctSeries, gridSeries], TODAY)
-    const values = history.points.map((point) => point.values.effective)
+    const values = history.points.map((point) => point.values.flat)
 
     expect(new Set(values).size).toBeGreaterThan(1)
   })
@@ -252,7 +267,7 @@ describe('buildPriceHistory — percentage of energy', () => {
     const history = buildPriceHistory(pctSeries, [pctSeries, gridSeries, secondGrid], TODAY)
 
     // 2025: (0.20 + 0.10) x 50% = 0.15
-    expect(history.points[0].values.effective).toBe(0.15)
+    expect(history.points[0].values.flat).toBe(0.15)
   })
 
   it('prefers the flat band, then HT, when a grid version has several', () => {
@@ -266,7 +281,7 @@ describe('buildPriceHistory — percentage of energy', () => {
     const history = buildPriceHistory(pctSeries, [pctSeries, htNtGrid], TODAY)
 
     // HT is used when no flat band exists: 0.28 x 50% = 0.14
-    expect(history.points[0].values.effective).toBe(0.14)
+    expect(history.points[0].values.flat).toBe(0.14)
   })
 
   it('reports the percentage and base in a note for the tooltip', () => {
@@ -278,7 +293,7 @@ describe('buildPriceHistory — percentage of energy', () => {
   it('yields zero rather than crashing when no grid tariff exists', () => {
     const history = buildPriceHistory(pctSeries, [pctSeries], TODAY)
 
-    expect(history.points.every((point) => point.values.effective === 0)).toBe(true)
+    expect(history.points.every((point) => point.values.flat === 0)).toBe(true)
   })
 
   it('shades stretches where the price is zero because nothing backs it', () => {
@@ -302,9 +317,66 @@ describe('buildPriceHistory — percentage of energy', () => {
     ], { name: 'Grid', energy_type: 'grid' })
 
     const history = buildPriceHistory(pctSeries, [pctSeries, gappyGrid], TODAY)
-    const zeroPoint = history.points.find((point) => point.values.effective === 0)
+    const zeroPoint = history.points.find((point) => point.values.flat === 0)
 
     expect(zeroPoint?.date).toBe('2025-07-01')
     expect(history.gaps.some((gap) => gap.from === ms('2025-07-01'))).toBe(true)
+  })
+
+  it('has no bands, rendered as a single gap line, when none are configured yet', () => {
+    const bandless = series([
+      version('2025-01-01', null, {
+        name: 'Local', billing_mode: 'percentage_of_energy', periods: [],
+      }),
+    ], { name: 'Local', billing_mode: 'percentage_of_energy', version_count: 1 })
+
+    const history = buildPriceHistory(bandless, [bandless, gridSeries], TODAY)
+
+    expect(history.bands).toEqual(['effective'])
+    expect(history.points.every((point) => point.values.effective === null)).toBe(true)
+  })
+
+  it('plots one line per band, at the same rules a multi-band energy tariff uses', () => {
+    // 60% for 10:00-16:00 and 90% otherwise (the manual test scenario from
+    // the spec) is two HT/NT-shaped bands, not one — the window itself is not
+    // asserted here, only that each band gets its own derived line.
+    const twoBandSeries = series([
+      version('2025-01-01', null, {
+        name: 'Local', billing_mode: 'percentage_of_energy',
+        periods: [
+          pctPeriod('high', '90.00', { time_from: '10:00', time_to: '16:00' }),
+          pctPeriod('low', '60.00', { time_from: '16:00', time_to: '23:59:59' }),
+        ],
+      }),
+    ], { name: 'Local', billing_mode: 'percentage_of_energy', version_count: 1 })
+
+    const history = buildPriceHistory(twoBandSeries, [twoBandSeries, gridSeries], TODAY)
+
+    expect(history.bands).toEqual(['high', 'low'])
+    // 2025 grid base is 0.20: 90% -> 0.18, 60% -> 0.12.
+    expect(history.points[0].values.high).toBe(0.18)
+    expect(history.points[0].values.low).toBe(0.12)
+    // A point with several active bands carries no single note.
+    expect(history.points[0].note).toBeUndefined()
+  })
+
+  it('keys three or more bands positionally, exactly like an energy tariff', () => {
+    const threeBandSeries = series([
+      version('2025-01-01', null, {
+        name: 'Local', billing_mode: 'percentage_of_energy',
+        periods: [
+          pctPeriod('band', '90.00', { time_from: '06:00', time_to: '10:00' }),
+          pctPeriod('band', '60.00', { time_from: '10:00', time_to: '18:00' }),
+          pctPeriod('band', '95.00', { time_from: '18:00', time_to: '23:59:59' }),
+        ],
+      }),
+    ], { name: 'Local', billing_mode: 'percentage_of_energy', version_count: 1 })
+
+    const history = buildPriceHistory(threeBandSeries, [threeBandSeries, gridSeries], TODAY)
+
+    expect(history.bands).toEqual(['band-0', 'band-1', 'band-2'])
+    expect(history.points[0].values['band-0']).toBe(0.18)
+    expect(history.points[0].values['band-1']).toBe(0.12)
+    expect(history.points[0].values['band-2']).toBe(0.19)
   })
 })

@@ -46,12 +46,21 @@ def dynamic_tariff(zev, source, **overrides) -> Tariff:
 
 
 def static_tariff(zev, **overrides) -> Tariff:
+    # A ``percentage`` kwarg is not a Tariff field any more (it lives on a
+    # band); pulled out here so every existing call site can keep asking for
+    # one and get a single flat band with it, same as before bands existed.
+    percentage = overrides.pop("percentage", None)
     defaults = {
         "zev": zev, "name": "Grid", "category": TariffCategory.ENERGY,
         "billing_mode": BillingMode.ENERGY, "energy_type": EnergyType.GRID,
         "valid_from": date(2026, 1, 1),
     }
-    return Tariff.objects.create(**{**defaults, **overrides})
+    tariff = Tariff.objects.create(**{**defaults, **overrides})
+    if percentage is not None:
+        TariffPeriod.objects.create(
+            tariff=tariff, period_type=PeriodType.FLAT, percentage=Decimal(str(percentage)),
+        )
+    return tariff
 
 
 def store(source, valid_from: datetime, price: str, *, minutes=15):

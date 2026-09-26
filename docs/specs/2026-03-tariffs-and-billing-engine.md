@@ -62,7 +62,6 @@ re-implement the engine from scratch.
 | `billing_mode` | `BillingMode` | Determines how quantity and price are computed (see §5) |
 | `energy_type` | `EnergyType` (nullable) | `local`, `grid`, or `feed_in`; required when `billing_mode ∈ {energy, percentage_of_energy}` |
 | `fixed_price_chf` | `Decimal(10,2)` (nullable) | Unit price for fixed-fee modes; may be negative for credits |
-| `percentage` | `Decimal(5,2)` (nullable) | Used only with `percentage_of_energy` mode |
 | `valid_from` | `DateField` | First day this tariff is active (inclusive) |
 | `valid_to` | `DateField` (nullable) | Last day this tariff is active (inclusive); `NULL` = open-ended |
 | `notes` | `TextField` | Free text |
@@ -187,7 +186,8 @@ Only what this spec's own algorithm needs to know:
 | `tariff` | FK → `Tariff` | Parent tariff |
 | `period_type` | `PeriodType` | `flat`, `high` (HT), `low` (NT), or `band` (see §3.2c) |
 | `label` | `CharField(60)` | Name for a `band`; blank falls back to its window. Unused by the other types |
-| `price_chf_per_kwh` | `Decimal(8,5)` | Price in CHF per kWh |
+| `price_chf_per_kwh` | `Decimal(8,5)` (nullable) | Price in CHF per kWh. Required on a band of an `energy` tariff, and must be null on a `percentage_of_energy` tariff |
+| `percentage` | `Decimal(5,2)` (nullable) | Percentage of the grid base price, for a band of a `percentage_of_energy` tariff (see SPEC-2026-percentage-tariff-bands). Required there, and must be null on an `energy` tariff |
 | `time_from` | `TimeField` (nullable) | Start of the window (required for every type but `flat`) |
 | `time_to` | `TimeField` (nullable) | End of the window (exclusive) |
 | `weekdays` | `CharField(20)` | Comma-separated weekday numbers `0`–`6` (Mon–Sun); blank = all days |
@@ -196,6 +196,10 @@ Only what this spec's own algorithm needs to know:
 Both masks are validated on write (`validate_weekday_list`, `validate_month_list`
 in `tariffs/models.py`): the engine parses them with a bare `int()`, so a stray
 value has to be refused at entry rather than discovered at invoice time.
+
+**Exactly one of `price_chf_per_kwh`/`percentage` is set**, enforced by a DB
+`CheckConstraint` (`tariffperiod_exactly_one_price`) in addition to
+`TariffPeriod.clean()` — see SPEC-2026-percentage-tariff-bands §4.1.
 
 **Ordering** is `["period_type", F("time_from").asc(nulls_first=True), "id"]`,
 so a tariff's bands read down the day. The null placement is stated rather than
@@ -399,7 +403,7 @@ Full mapping table, the constructs that are refused, and the fetch guards:
 | Mode | Quantity source | Unit price source | Unit |
 |---|---|---|---|
 | `energy` | kWh from timestamp allocation | `TariffPeriod.price_chf_per_kwh` (HT/NT aware) | `kWh` |
-| `percentage_of_energy` | kWh from timestamp allocation | `sum(grid ENERGY tariff prices at ts) × (percentage / 100)` | `kWh` |
+| `percentage_of_energy` | kWh from timestamp allocation | `sum(grid ENERGY tariff prices at ts) × (TariffPeriod.percentage / 100)` (band resolved per timestamp, HT/NT aware like `energy`) | `kWh` |
 | `monthly_fee` | Number of billable months | `fixed_price_chf` | `month` |
 | `yearly_fee` | Number of billable months | `fixed_price_chf / 12` | `month` |
 | `per_metering_point_monthly_fee` | Sum of metering-point-months | `fixed_price_chf` | `month` |
@@ -587,13 +591,19 @@ For each `(energy_type, quantity)` in `{(local, r_local), (grid, r_grid)}` where
 
 #### 4.4.2 Percentage-of-energy tariffs (`billing_mode = percentage_of_energy`)
 
-These tariffs price energy as a percentage of the **grid base price sum**.
+These tariffs price energy as a percentage of the **grid base price sum**. The
+percentage is not a single value on the tariff: like an energy tariff, a
+percentage tariff carries `TariffPeriod` bands, each with its own percentage,
+time window, weekdays and months, resolved by the **same** band resolution
+rule as §3.2/§3.2b/§3.2c — see SPEC-2026-percentage-tariff-bands for the full
+design (data model, migration from the single-percentage shape, engine,
+documents, transfer archive, frontend).
 
 1. **Grid base price sum** = sum of `price_chf_per_kwh` at `ts` for all tariffs where `billing_mode = energy` AND `energy_type = grid` AND active at `_utc_date(ts)`.
-2. For each percentage tariff with a non-zero `percentage` active at `_utc_date(ts)` whose `energy_type` matches (zero-percent tariffs produce no line and do not resolve the grid base):
-   - `effective_price = grid_base_price_sum × (tariff.percentage / 100)`
-   - Accumulate: `quantity` kWh at `quantity × effective_price` CHF.
-   - Also track `base_total = quantity × grid_base_price_sum` (used for description rendering).
+2. For each percentage tariff with at least one band, resolve the band at `ts` (`TariffResolver.percentage_at`, delegating to `invoices.engine._resolve_tariff_band` / `tariffs.periods.resolve_band`). When the resolved band's percentage is non-zero and the tariff's `energy_type` matches (a zero-percent band produces no line and does not resolve the grid base):
+   - `effective_price = grid_base_price_sum × (band.percentage / 100)`
+   - Accumulate: `quantity` kWh at `quantity × effective_price` CHF, keyed by the resolved band so §4.7a can itemise it like an energy band.
+   - Also track `base_total = quantity × grid_base_price_sum` (used for description rendering and `effective_percentage`, the blended rate an unitemised multi-band line actually billed at).
 
 #### 4.4.3 Dynamic tariffs (`Tariff.dynamic_source` set)
 
@@ -945,9 +955,12 @@ name is written into the line's `description` rather than stored as a foreign
 key, following the rule that an invoice records what was charged rather than
 referencing the pricing structure that produced it.
 
-Percentage-of-energy tariffs are not split: their price derives from the grid
-base rather than from a band of their own. Fixed fees are per-month and have
-no band.
+Percentage-of-energy tariffs are split exactly like energy tariffs (since
+SPEC-2026-percentage-tariff-bands): each is now itself a band, so a tariff
+with several percentage bands bills each one as its own line when the setting
+is on. Unitemised, a multi-band percentage line shows the blended average
+percentage (`effective_percentage`, §4.4.2) rather than the flat one. Fixed
+fees are per-month and have no band.
 
 Existing invoices are untouched; the setting applies to invoices generated
 after it is changed.
@@ -1068,7 +1081,7 @@ Descriptions are **localized** using the ZEV's `invoice_language` (de/fr/it/en).
 | Billing mode | Description format |
 |---|---|
 | `energy` | `"{tariff.name}"`, or `"{tariff.name} – {band}"` when the line is band-itemised (§4.7a); a dynamic line appends a localized consumption-weighted effective-rate explanation |
-| `percentage_of_energy` | `"{tariff.name} ({pct}%)"` or `"{tariff.name} ({pct}% of CHF {base_rate}/kWh)"` when base rate is known |
+| `percentage_of_energy` | Band-itemised: `"{tariff.name} – {band} ({pct}%)"` using that band's own percentage. Not itemised, every non-zero band sharing one percentage (a 0 % band bills nothing and is ignored): `"{tariff.name} ({pct}%)"`, unchanged. Not itemised, non-zero bands differing: `"{tariff.name} (Ø {pct}%)"` using the blended `effective_percentage`. Each adds `" of CHF {base_rate}/kWh"` inside the parens when the base rate is known (see SPEC-2026-percentage-tariff-bands §5.2) |
 | `monthly_fee` | `"{tariff.name} ({n} Monat/Monate)"` |
 | `yearly_fee` | `"{tariff.name} ({n} monatliche Rate(n) der Jahresgebühr)"` |
 | `per_metering_point_monthly_fee` | `"{tariff.name} ({n} Messpunkt-Monat(e))"` |
@@ -1262,7 +1275,10 @@ a member of.
 **Setup (extends §8.1):**
 - Additional grid-fee tariff: 0.05 CHF/kWh (energy mode, grid)
 - Additional levy tariff: 0.02 CHF/kWh (energy mode, grid)
-- Percentage tariff: 50%, energy_type = local
+- Percentage tariff: one flat band at 50%, energy_type = local (a percentage
+  tariff can carry several time-of-use bands instead — see
+  SPEC-2026-percentage-tariff-bands — but a single flat band bills exactly as
+  shown here)
 
 ```
 Grid base price sum = 0.25 + 0.05 + 0.02 = 0.32 CHF/kWh
@@ -1460,6 +1476,18 @@ community energy to a single participant.
 | Test case | Validates |
 |---|---|
 | `ZevVatModeTests` | default `not_registered`; `clean()` requires a number for `registered` and forbids one otherwise; PATCH to `inclusive` accepted, PATCH to `registered` without a number rejected |
+
+### Backend — percentage-of-energy bands
+
+`tariffs/test_percentage_bands.py` and `invoices/test_percentage_bands_engine.py` cover the
+data model, migration, serializers, `average_percentage`/`resolve_band`, and engine pricing/
+itemisation/preflight for percentage bands introduced by SPEC-2026-percentage-tariff-bands.
+Every other test file that used to construct a percentage tariff via `Tariff.percentage`
+(`invoices/test_engine.py`, `test_readiness.py`, `test_contract_context.py`,
+`test_tariff_overview.py`, `test_dynamic_pricing.py`, `test_dynamic_tariff_pricing.py`,
+`test_dynamic_evidence.py`, `tariffs/test_dynamic_source_link_api.py`, `tariffs/test_tariffs.py`,
+`feasibility/test_prefill.py`, `zev/tests.py`, `zev/test_transfer.py`) was migrated to a flat
+`TariffPeriod` band instead, with no change to any asserted billed amount.
 
 ### Frontend
 

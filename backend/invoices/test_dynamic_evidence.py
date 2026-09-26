@@ -20,7 +20,7 @@ from tariffs.dynamic.fetch import BilledPriceChanged, PriceSeriesConflict, store
 from tariffs.dynamic.models import DynamicTariffSource
 from tariffs.dynamic.services import clear_source_points
 from tariffs.dynamic.vse_v1 import PricePoint
-from tariffs.models import BillingMode, EnergyType, Tariff
+from tariffs.models import EnergyType, Tariff, TariffCategory
 from testing import factories
 
 from .engine import (
@@ -324,11 +324,11 @@ def test_bulk_preflight_checks_dynamic_grid_price_used_by_a_percentage_tariff():
         zev=participant.zev, dynamic_source=source,
         energy_type=EnergyType.GRID, valid_from=date(2026, 1, 1),
     )
-    factories.TariffFactory(
-        zev=participant.zev,
-        billing_mode=BillingMode.PERCENTAGE_OF_ENERGY,
+    factories.percentage_tariff(
+        participant.zev,
+        category=TariffCategory.ENERGY,
         energy_type=EnergyType.LOCAL,
-        percentage=Decimal("10"),
+        percentage="10",
         valid_from=date(2026, 1, 1),
     )
     timestamp = datetime(2026, 1, 15, 10, tzinfo=timezone.utc)
@@ -364,11 +364,11 @@ def test_bulk_preflight_ignores_dynamic_grid_base_for_zero_percentage_tariff():
         zev=participant.zev, dynamic_source=source,
         energy_type=EnergyType.GRID, valid_from=date(2026, 1, 1),
     )
-    factories.TariffFactory(
-        zev=participant.zev,
-        billing_mode=BillingMode.PERCENTAGE_OF_ENERGY,
+    factories.percentage_tariff(
+        participant.zev,
+        category=TariffCategory.ENERGY,
         energy_type=EnergyType.LOCAL,
-        percentage=Decimal("0"),
+        percentage="0",
         valid_from=date(2026, 1, 1),
     )
     timestamp = datetime(2026, 1, 15, 10, tzinfo=timezone.utc)

@@ -38,7 +38,10 @@ class TestPickingASourceThroughTheTariffApi:
         factories.TariffFactory(zev=zev, dynamic_source=source, energy_type="grid", valid_from=date(2026, 1, 1))
         percentage = factories.TariffFactory(
             zev=zev, name="Local", billing_mode="percentage_of_energy", energy_type="local",
-            percentage=50, valid_from=date(2026, 1, 1), valid_to=date(2026, 6, 30),
+            valid_from=date(2026, 1, 1), valid_to=date(2026, 6, 30),
+        )
+        factories.TariffPeriodFactory(
+            tariff=percentage, period_type="flat", price_chf_per_kwh=None, percentage=Decimal("50"),
         )
         for month, day, price in [(6, 30, "0.1"), (9, 12, "0.9")]:
             start = datetime(2026, month, day, tzinfo=timezone.utc)

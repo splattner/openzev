@@ -24,7 +24,8 @@ type TariffPeriodFormModalProps = {
   onSubmit: (payload: TariffPeriodInput) => void
   initialPeriod?: TariffPeriod
   defaultTariffId?: string
-  energyTariffs: Tariff[]
+  /** Energy and percentage-of-energy tariffs: the only two modes that take bands. */
+  tariffs: Tariff[]
   isPending?: boolean
 }
 
@@ -35,7 +36,7 @@ export function TariffPeriodFormModal({
   onSubmit,
   initialPeriod,
   defaultTariffId,
-  energyTariffs,
+  tariffs,
   isPending = false,
 }: TariffPeriodFormModalProps) {
   const { t } = useTranslation()
@@ -47,14 +48,18 @@ export function TariffPeriodFormModal({
 
   useEffect(() => {
     if (initialPeriod) {
-      form.reset(mapTariffPeriodToFormValues(initialPeriod))
+      const owner = tariffs.find((tariff) => tariff.id === initialPeriod.tariff)
+      form.reset(mapTariffPeriodToFormValues(initialPeriod, owner?.billing_mode ?? 'energy'))
       return
     }
 
+    const owner = tariffs.find((tariff) => tariff.id === defaultTariffId)
     form.reset({
       ...defaultTariffPeriodFormValues,
       tariff: defaultTariffId ?? defaultTariffPeriodFormValues.tariff,
+      billing_mode: owner?.billing_mode ?? 'energy',
     })
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- tariffs is looked up, not watched
   }, [defaultTariffId, form, initialPeriod, isOpen])
 
   // useWatch rather than form.watch(): the latter returns a fresh function on
@@ -62,6 +67,18 @@ export function TariffPeriodFormModal({
   const periodType = useWatch({ control: form.control, name: 'period_type' })
   const weekdays = useWatch({ control: form.control, name: 'weekdays' })
   const months = useWatch({ control: form.control, name: 'months' })
+  const selectedTariffId = useWatch({ control: form.control, name: 'tariff' })
+  const billingMode = useWatch({ control: form.control, name: 'billing_mode' })
+  const isPercentage = billingMode === 'percentage_of_energy'
+
+  // Switching the tariff dropdown to a different billing mode switches which
+  // price field applies — mirroring what happens when the modal opens for a
+  // specific tariff (the effect above).
+  useEffect(() => {
+    const owner = tariffs.find((tariff) => tariff.id === selectedTariffId)
+    if (owner) form.setValue('billing_mode', owner.billing_mode)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- tariffs is looked up, not watched
+  }, [selectedTariffId, form])
 
   function submit(values: TariffPeriodFormValues) {
     onSubmit(mapTariffPeriodFormValuesToInput(values))
@@ -74,7 +91,7 @@ export function TariffPeriodFormModal({
           <span>{t('pages.tariffs.form.tariff')}</span>
           <select {...form.register('tariff')} required>
             <option value="">{t('pages.tariffs.form.selectTariff')}</option>
-            {energyTariffs.map((tariff) => (
+            {tariffs.map((tariff) => (
               <option key={tariff.id} value={tariff.id}>{tariff.name}</option>
             ))}
           </select>
@@ -96,10 +113,17 @@ export function TariffPeriodFormModal({
             <small className="muted">{t('pages.tariffs.form.bandLabelHint')}</small>
           </label>
         )}
-        <label>
-          <span>{t('pages.tariffs.form.pricePerKwh')}</span>
-          <input type="number" step="0.00001" {...form.register('price_chf_per_kwh')} required />
-        </label>
+        {isPercentage ? (
+          <label>
+            <span>{t('pages.tariffs.form.percentage')}</span>
+            <input type="number" step="0.01" min="0" {...form.register('percentage')} required />
+          </label>
+        ) : (
+          <label>
+            <span>{t('pages.tariffs.form.pricePerKwh')}</span>
+            <input type="number" step="0.00001" {...form.register('price_chf_per_kwh')} required />
+          </label>
+        )}
         <label>
           <span>{t('pages.tariffs.form.timeFrom')}</span>
           <input type="time" {...form.register('time_from')} />
@@ -135,6 +159,7 @@ export function TariffPeriodFormModal({
           <div className="error-banner" style={{ gridColumn: '1 / -1' }}>
             {form.formState.errors.tariff?.message
               || form.formState.errors.price_chf_per_kwh?.message
+              || form.formState.errors.percentage?.message
               || t('common.error')}
           </div>
         )}

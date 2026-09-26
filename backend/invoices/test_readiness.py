@@ -1217,8 +1217,9 @@ class DynamicTariffPricingCoverageTests(ReadinessTestCase):
             billing_mode=BillingMode.PERCENTAGE_OF_ENERGY, energy_type=EnergyType.GRID,
             valid_from=date(2026, 1, 1),
         )
-        pct.percentage = Decimal("50")
-        pct.save()
+        TariffPeriod.objects.create(
+            tariff=pct, period_type=PeriodType.FLAT, percentage=Decimal("50"),
+        )
 
         steps = self._steps_by_key(
             compute_readiness(self.zev, date(2026, 1, 1), date(2026, 1, 31))
@@ -1512,15 +1513,17 @@ class TariffPercentageCoverageTests(ReadinessTestCase):
     def test_expired_percentage_tariff_leaves_its_energy_type_uncovered(self):
         self.tariff.energy_type = EnergyType.GRID
         self.tariff.save()
-        Tariff.objects.create(
+        expired_pct = Tariff.objects.create(
             zev=self.zev,
             name="Local percent (expired)",
             category=TariffCategory.ENERGY,
             billing_mode=BillingMode.PERCENTAGE_OF_ENERGY,
             energy_type=EnergyType.LOCAL,
-            percentage=Decimal("80"),
             valid_from=date(2026, 1, 1),
             valid_to=date(2026, 7, 31),
+        )
+        TariffPeriod.objects.create(
+            tariff=expired_pct, period_type=PeriodType.FLAT, percentage=Decimal("80"),
         )
         step = self._tariffs_step(date(2026, 8, 1), date(2026, 8, 31))
         self.assertEqual(step["status"], "warn")
@@ -1536,14 +1539,16 @@ class TariffPercentageCoverageTests(ReadinessTestCase):
         self.tariff.valid_to = date(2026, 7, 31)
         self.tariff.save()
         self._grid_direct()
-        Tariff.objects.create(
+        local_pct = Tariff.objects.create(
             zev=self.zev,
             name="Local percent",
             category=TariffCategory.ENERGY,
             billing_mode=BillingMode.PERCENTAGE_OF_ENERGY,
             energy_type=EnergyType.LOCAL,
-            percentage=Decimal("80"),
             valid_from=date(2026, 8, 1),
+        )
+        TariffPeriod.objects.create(
+            tariff=local_pct, period_type=PeriodType.FLAT, percentage=Decimal("80"),
         )
         step = self._tariffs_step(date(2026, 8, 1), date(2026, 8, 31))
         self.assertEqual(step["status"], "ok")

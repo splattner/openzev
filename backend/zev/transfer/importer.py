@@ -44,7 +44,7 @@ from metering.models import ImportLog, ImportSource, MeterReading, ReadingDirect
 from tariffs.dynamic.adapters import DynamicApiVersion
 from tariffs.dynamic.models import DynamicTariffSource, FetchStatus
 from tariffs.dynamic.protocol import V2_PRODUCT_REQUIRED
-from tariffs.models import Tariff, TariffPeriod
+from tariffs.models import BillingMode, PeriodType, Tariff, TariffPeriod
 from zev.models import MeteringPoint, MeteringPointAssignment, Participant, VatMode, Zev
 
 logger = logging.getLogger(__name__)
@@ -492,7 +492,7 @@ def _dynamic_source_for(raw, collector):
     return source
 
 
-def _import_tariffs(archive, zev, collector):
+def _import_tariffs(archive, zev, collector, *, format_version):
     count = 0
     for position, raw in enumerate(_load_json(archive, SECTION_FILES[SECTION_TARIFFS]), start=1):
         fields = _pick(raw, TARIFF_FIELDS, position, SECTION_TARIFFS)
@@ -509,11 +509,35 @@ def _import_tariffs(archive, zev, collector):
                 tariff = Tariff.objects.create(
                     zev=zev, dynamic_source=dynamic_source, **fields
                 )
-                for raw_period in raw.get("periods") or []:
-                    period_fields = _pick(raw_period, TARIFF_PERIOD_FIELDS, position, SECTION_TARIFFS)
-                    period = TariffPeriod(tariff=tariff, **period_fields)
+                # Before v4, the percentage lived on the tariff itself, not on
+                # a period. ``_pick`` only ever reads the fields listed in
+                # TARIFF_FIELDS/TARIFF_PERIOD_FIELDS, so this legacy top-level
+                # key has to be read from ``raw`` directly. Any periods an
+                # older archive did carry alongside it were never billed (the
+                # engine ignored bands on a percentage tariff), so they are
+                # dropped with a warning rather than imported unbilled.
+                legacy_percentage = raw.get("percentage") if format_version < 4 else None
+                if (
+                    legacy_percentage is not None
+                    and fields.get("billing_mode") == BillingMode.PERCENTAGE_OF_ENERGY
+                ):
+                    if raw.get("periods"):
+                        collector.warn(
+                            f'Tariff "{label}" carried price bands from before percentage bands '
+                            "existed; they were never billed and were not imported. A single flat "
+                            "band with the archive's percentage was created instead."
+                        )
+                    period = TariffPeriod(
+                        tariff=tariff, period_type=PeriodType.FLAT, percentage=legacy_percentage,
+                    )
                     period.full_clean(exclude=["tariff"])
                     period.save()
+                else:
+                    for raw_period in raw.get("periods") or []:
+                        period_fields = _pick(raw_period, TARIFF_PERIOD_FIELDS, position, SECTION_TARIFFS)
+                        period = TariffPeriod(tariff=tariff, **period_fields)
+                        period.full_clean(exclude=["tariff"])
+                        period.save()
         except (DjangoValidationError, ValueError, TypeError) as exc:
             collector.add(SECTION_TARIFFS, position, label, exc)
             continue
@@ -885,7 +909,9 @@ def _run_import(archive, manifest, sections, *, owner, name_override, collector,
         summary["counts"]["assignments"] = assignment_count
 
     if SECTION_TARIFFS in sections:
-        summary["counts"][SECTION_TARIFFS] = _import_tariffs(archive, zev, collector)
+        summary["counts"][SECTION_TARIFFS] = _import_tariffs(
+            archive, zev, collector, format_version=manifest.get("format_version"),
+        )
 
     if SECTION_READINGS in sections:
         imported = _import_readings(archive, points_by_meter_id, collector, batch_id=batch_id)

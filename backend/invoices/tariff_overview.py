@@ -32,6 +32,7 @@ from .tariff_pricing import (
     GridBaseSummary,
     display_grid_base_summary,
     grid_base_is_multiband,
+    percentage_band_rows,
 )
 from tariffs.dynamic.pricing import summarize_dynamic_tariff
 
@@ -146,8 +147,8 @@ def _price_rows_for_energy_tariff(
 
 
 def _price_row_for_percentage_tariff(
-    tariff, tr: dict, grid_base: GridBaseSummary, multiband_base: bool,
-) -> dict:
+    tariff, tr: dict, band_tr: dict, grid_base: GridBaseSummary, multiband_base: bool,
+) -> list[dict]:
     # A base can be approximate for two different reasons — the underlying
     # grid tariff has several time bands, or it is a fluctuating dynamic
     # price — and they need different footnote text. A base is rarely both at
@@ -156,34 +157,46 @@ def _price_row_for_percentage_tariff(
     footnote = DYNAMIC_FOOTNOTE.get(
         grid_base.dynamic_status, "multiband_base" if multiband_base else None
     )
-    pct = Decimal(str(tariff.percentage or 0))
     grid_sum_chf = grid_base.price_chf_per_kwh
     has_effective_price = grid_base.has_effective_price
-    if has_effective_price:
-        effective_rp = grid_sum_chf * (pct / Decimal("100")) * Decimal("100")
-        grid_rp = grid_sum_chf * Decimal("100")
-        return {
-            "label": f"{float(pct):.2f} % × {float(grid_rp):.2f} {tr['unit_rp']}",
-            "recurrence": "",
-            "amount": f"{float(effective_rp):.2f}",
-            "unit": tr["unit_rp"],
-            "footnote": footnote,
-        }
-    if grid_sum_chf is None:
-        return {
-            "label": f"{float(pct):.2f} {tr['unit_percent']}",
-            "recurrence": "",
-            "amount": tr["tariff_none"],
-            "unit": "",
-            "footnote": footnote,
-        }
-    return {
-        "label": f"{float(pct):.2f} {tr['unit_percent']}",
-        "recurrence": "",
-        "amount": f"{float(pct):.2f}",
-        "unit": tr["unit_percent"],
-        "footnote": footnote,
-    }
+
+    rows = []
+    for band in percentage_band_rows(tariff, grid_base, band_tr):
+        pct = band["pct"]
+        # A lone flat band has nothing to distinguish it from — same principle
+        # as `_label_is_redundant` for an energy tariff — so it prints exactly
+        # today's formula with no band prefix. A named or timed band, or a
+        # tariff with several bands, prints its band first so the two numbers
+        # can be told apart.
+        redundant = band["label"] == band_tr["tariff_flat"] and not band["recurrence"]
+        prefix = "" if redundant else f"{band['label']} · "
+        if has_effective_price:
+            effective_rp = band["effective_chf"] * Decimal("100")
+            grid_rp = grid_sum_chf * Decimal("100")
+            rows.append({
+                "label": f"{prefix}{float(pct):.2f} % × {float(grid_rp):.2f} {tr['unit_rp']}",
+                "recurrence": band["recurrence"],
+                "amount": f"{float(effective_rp):.2f}",
+                "unit": tr["unit_rp"],
+                "footnote": footnote,
+            })
+        elif grid_sum_chf is None:
+            rows.append({
+                "label": f"{prefix}{float(pct):.2f} {tr['unit_percent']}",
+                "recurrence": band["recurrence"],
+                "amount": tr["tariff_none"],
+                "unit": "",
+                "footnote": footnote,
+            })
+        else:
+            rows.append({
+                "label": f"{prefix}{float(pct):.2f} {tr['unit_percent']}",
+                "recurrence": band["recurrence"],
+                "amount": f"{float(pct):.2f}",
+                "unit": tr["unit_percent"],
+                "footnote": footnote,
+            })
+    return rows
 
 
 def _price_row_for_fee_tariff(tariff, tr: dict) -> dict:
@@ -239,9 +252,13 @@ def _build_tariff_row(
             # than emit a header with an empty table underneath.
             return None
     elif tariff.billing_mode == BillingMode.PERCENTAGE_OF_ENERGY:
-        price_rows = [
-            _price_row_for_percentage_tariff(tariff, tr, grid_base, multiband_base)
-        ]
+        price_rows = _price_row_for_percentage_tariff(
+            tariff, tr, band_tr, grid_base, multiband_base
+        )
+        if not price_rows:
+            # A percentage tariff with no bands yet has nothing to print
+            # either — same as an energy tariff with none.
+            return None
     else:
         price_rows = [_price_row_for_fee_tariff(tariff, tr)]
 

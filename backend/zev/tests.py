@@ -2191,7 +2191,7 @@ class SeedDemoTariffVersionTests(TestCase):
 		versions = self._versions("Levies on Grid Energy")
 		self.assertEqual(versions[0].billing_mode, BillingMode.PERCENTAGE_OF_ENERGY)
 		self.assertEqual(
-			[version.percentage for version in versions],
+			[version.periods.get().percentage for version in versions],
 			[Decimal("15.00"), Decimal("16.50"), Decimal("18.00")],
 		)
 

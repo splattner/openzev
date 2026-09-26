@@ -140,7 +140,7 @@ start time, then id), which is what makes a multi-band tariff read down the day.
 | `billing_mode` | Rows produced | Unit | Precision |
 |---|---|---|---|
 | `energy` | One per `TariffPeriod` | `Rp./kWh` | 2 dp (`price × 100`) |
-| `percentage_of_energy` | One | `Rp./kWh`, or `%` when no grid base exists | 2 dp |
+| `percentage_of_energy` | One per `TariffPeriod` band (SPEC-2026-percentage-tariff-bands §5.4; a single flat band prints exactly the pre-band single row) | `Rp./kWh`, or `%` when no grid base exists | 2 dp |
 | `monthly_fee` | One | `CHF/Mt.` | 2 dp |
 | `yearly_fee` | One | `CHF/Jahr` | 2 dp |
 | `per_metering_point_monthly_fee` | One | `CHF/Mt.` | 2 dp, label names *per metering point* |
@@ -501,7 +501,7 @@ enforces them across all four locales.
 | `test_scope_all_includes_superseded_versions` | Both versions' prices in the text |
 | `test_unknown_scope_is_400` | |
 
-**`TariffOverviewContentTests`** (9 tests, via `PdfReader.extract_text()`):
+**`TariffOverviewContentTests`** (11 tests, via `PdfReader.extract_text()`):
 
 | Test | Asserts |
 |---|---|
@@ -516,6 +516,8 @@ enforces them across all four locales.
 | `test_percentage_base_spans_every_grid_category` | A grid sheet split across `ENERGY`/`GRID_FEES`/`LEVIES` gives 18.78, not the 8.84 an `ENERGY`-only base yields |
 | `test_percentage_row_matches_the_contract_across_grid_categories` | The parity above, on that same multi-category sheet — the single-tariff case agrees under either predicate and cannot see the divergence |
 | `test_multiband_grid_base_adds_the_footnote` | Footnote text present; absent for a single-band base |
+| `test_a_two_band_percentage_tariff_prints_one_row_per_band` | An HT/NT-shaped pair of percentage bands (90%/60%) prints two rows, each at that band's own effective rate, not an average (SPEC-2026-percentage-tariff-bands §5.4) |
+| `test_a_single_flat_band_percentage_row_matches_the_pre_band_row` | A single flat percentage band still prints exactly the pre-band formula row, with no band-label prefix |
 
 **`TariffOverviewVatTests`** (3 tests):
 

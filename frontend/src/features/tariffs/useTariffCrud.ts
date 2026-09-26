@@ -24,7 +24,7 @@ type TariffCrudParams = {
   selectedZevId?: string
   tariffs: Tariff[]
   periods: TariffPeriod[]
-  energyTariffs: Tariff[]
+  bandableTariffs: Tariff[]
   tariffNameById: Map<string, string>
   queryClient: QueryClient
   pushToast: (message: string, tone?: 'success' | 'error') => void
@@ -32,15 +32,15 @@ type TariffCrudParams = {
   t: (key: string, options?: Record<string, unknown>) => string
 }
 
-export function resolvePeriodModalTariffId(energyTariffs: Tariff[], tariffId?: string): string | undefined {
-  return tariffId ?? energyTariffs[0]?.id
+export function resolvePeriodModalTariffId(bandableTariffs: Tariff[], tariffId?: string): string | undefined {
+  return tariffId ?? bandableTariffs[0]?.id
 }
 
 export function useTariffCrud({
   selectedZevId,
   tariffs,
   periods,
-  energyTariffs,
+  bandableTariffs,
   tariffNameById,
   queryClient,
   pushToast,
@@ -158,7 +158,7 @@ export function useTariffCrud({
   }
 
   function openCreatePeriodModal(tariffId?: string) {
-    const defaultTariffId = resolvePeriodModalTariffId(energyTariffs, tariffId)
+    const defaultTariffId = resolvePeriodModalTariffId(bandableTariffs, tariffId)
 
     if (!defaultTariffId) {
       pushToast(t('pages.tariffs.messages.createEnergyTariffFirst'), 'error')

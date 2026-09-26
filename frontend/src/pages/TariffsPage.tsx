@@ -155,6 +155,13 @@ export function TariffsPage() {
         return tariffs.filter((tariff) => tariff.billing_mode === 'energy')
     }, [tariffs])
 
+    // Energy and percentage-of-energy tariffs are the two modes that take
+    // bands (§4.1); the period modal's tariff picker and its "nothing to add
+    // a band to yet" fallback both need the broader list.
+    const bandableTariffs = useMemo(() => {
+        return tariffs.filter((tariff) => tariff.billing_mode === 'energy' || tariff.billing_mode === 'percentage_of_energy')
+    }, [tariffs])
+
     const tariffsWithPeriodsCount = useMemo(
         () => tariffs.filter((tariff) => (periodsByTariff.get(tariff.id)?.length ?? 0) > 0).length,
         [tariffs, periodsByTariff],
@@ -210,7 +217,7 @@ export function TariffsPage() {
         selectedZevId,
         tariffs,
         periods,
-        energyTariffs,
+        bandableTariffs,
         tariffNameById,
         queryClient,
         pushToast,
@@ -306,7 +313,7 @@ export function TariffsPage() {
                 onSubmit={submitPeriod}
                 initialPeriod={editingPeriod}
                 defaultTariffId={periodModalTariffId}
-                energyTariffs={energyTariffs}
+                tariffs={bandableTariffs}
                 isPending={periodPending}
             />
 

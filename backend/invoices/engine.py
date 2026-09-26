@@ -36,8 +36,8 @@ from allocation.windows import AssignmentWindows
 from zev.models import AllocationMode, Zev, Participant, MeteringPoint, MeteringPointAssignment, VatMode
 from tariffs.dynamic.models import DynamicPricePoint
 from tariffs.dynamic.evidence import lock_sources, record_invoice_evidence
-from tariffs.models import BillingMode, EnergyType, PeriodType, SplitKey, Tariff, TariffCategory, TariffPeriod
-from tariffs.periods import months_of, weekdays_of
+from tariffs.models import BillingMode, EnergyType, SplitKey, Tariff, TariffCategory, TariffPeriod
+from tariffs.periods import resolve_band
 from metering.models import MeterReading, ReadingDirection
 from .band_labels import band_description, translations_for as band_translations_for
 from .models import Invoice, InvoiceItem, InvoiceStatus
@@ -367,7 +367,7 @@ def preflight_dynamic_prices(zev, period_start, period_end):
     """
     tariffs = list(active_during(
         Tariff.objects.filter(zev=zev), period_start, period_end,
-    ).select_related("dynamic_source"))
+    ).select_related("dynamic_source").prefetch_related("periods"))
     dynamic_tariffs = [tariff for tariff in tariffs if tariff.dynamic_source_id]
     for tariff in dynamic_tariffs:
         _validate_dynamic_tariff(tariff)
@@ -379,12 +379,18 @@ def preflight_dynamic_prices(zev, period_start, period_end):
         tariff for tariff in tariffs
         if tariff.billing_mode == BillingMode.PERCENTAGE_OF_ENERGY
         and tariff.energy_type in {EnergyType.LOCAL, EnergyType.GRID}
-        and tariff.percentage
+        and len(tariff.periods.all()) > 0
     ]
+    def _bills_nonzero_percentage_at(tariff, timestamp) -> bool:
+        band = _resolve_tariff_band(tariff, timestamp)
+        return band is not None and bool(band.percentage)
+
     grid_base_required = {
         timestamp for timestamp, energy_types in requirements.items()
         if any(
-            tariff.energy_type in energy_types and _tariff_is_active(tariff, _utc_date(timestamp))
+            tariff.energy_type in energy_types
+            and _tariff_is_active(tariff, _utc_date(timestamp))
+            and _bills_nonzero_percentage_at(tariff, timestamp)
             for tariff in percentage_tariffs
         )
     }
@@ -467,7 +473,7 @@ class TariffResolver:
         for tariff in tariffs:
             if tariff.billing_mode == BillingMode.ENERGY:
                 self._energy.setdefault(tariff.energy_type, []).append(tariff)
-            elif tariff.billing_mode == BillingMode.PERCENTAGE_OF_ENERGY and tariff.percentage:
+            elif tariff.billing_mode == BillingMode.PERCENTAGE_OF_ENERGY and len(tariff.periods.all()) > 0:
                 self._percentage.setdefault(tariff.energy_type, []).append(tariff)
         self._active_cache: dict[tuple[str, str, date], list[Tariff]] = {}
         self._context = generation_context
@@ -517,6 +523,17 @@ class TariffResolver:
             return price, None
         period = _resolve_tariff_band(tariff, ts)
         return (period.price_chf_per_kwh if period is not None else Decimal("0")), period
+
+    def percentage_at(self, tariff: Tariff, ts: datetime) -> tuple[Decimal, "TariffPeriod | None"]:
+        """The percentage-of-energy tariff's band percentage at ``ts``, and the band.
+
+        Resolved through the same ``_resolve_tariff_band`` funnel as
+        ``price_at`` — a percentage tariff is bucketed by band exactly like an
+        energy tariff (§5.1), there is no separate rule for it. ``(0, None)``
+        for a tariff with no band.
+        """
+        period = _resolve_tariff_band(tariff, ts)
+        return (period.percentage if period is not None else Decimal("0")), period
 
 
 class ItemAccumulator:
@@ -608,40 +625,12 @@ def _resolve_tariff_band(tariff: Tariff, ts: datetime):
     """The band that prices ``tariff`` at ``ts``, or None when it has none.
 
     This is the live static-price seam: ``TariffResolver`` uses the returned
-    band both for its value and for invoice-line itemisation. The resolution
-    order therefore stays in one place.
+    band both for its value and for invoice-line itemisation. The actual
+    resolution rule lives in ``tariffs.periods.resolve_band`` — shared with
+    ``average_percentage`` — so it stays in exactly one place regardless of
+    billing mode.
     """
-    periods = list(tariff.periods.all())
-    if not periods:
-        return None
-
-    # The month is checked before anything else, the flat case included: a
-    # winter-only flat band that short-circuited on period_type would bill its
-    # winter price in July. Bands with no months set match every month, which
-    # is every band that predates seasonal support.
-    in_season = [period for period in periods if ts.month in months_of(period)]
-
-    # Any number of timed bands is fine here: a band is matched by its window,
-    # not by its name, so three or five of them resolve exactly as two do.
-    # A flat band short-circuits without looking at the window, which is only
-    # safe because a flat band may not share its months with a timed one
-    # (TariffPeriodSerializer._reject_flat_beside_timed_bands).
-    t_time = ts.time()
-    weekday = ts.weekday()  # 0 = Monday
-    for period in in_season:
-        if period.period_type == PeriodType.FLAT:
-            return period
-        if period.time_from and period.time_to:
-            if weekday in weekdays_of(period) and period.time_from <= t_time < period.time_to:
-                return period
-
-    # Nothing matched the hour, so the bands leave part of the day unpriced.
-    # The rule is "the day's first band in this season": TariffPeriod.Meta
-    # orders by start time with nulls placed explicitly, so this is the same
-    # band on every database rather than whatever the backend happened to
-    # return first. Preferring an in-season band matters once seasons exist —
-    # billing a January night at the summer rate would be the worse guess.
-    return (in_season or periods)[0]
+    return resolve_band(tariff.periods.all(), ts)
 
 
 def _active_vat_rate(period_end: date) -> Decimal:
@@ -1040,6 +1029,7 @@ DESCRIPTION_TRANSLATIONS: dict[str, dict] = {
         "pct_of": "von CHF",
         "community_marker": "Gemeinschaftsanteil",
         "dynamic_effective_rate": "verbrauchsgewichteter dynamischer Durchschnittspreis",
+        "pct_average_prefix": "Ø",
     },
     "fr": {
         "yearly_fee_sg": "mensualité de la redevance annuelle",
@@ -1057,6 +1047,7 @@ DESCRIPTION_TRANSLATIONS: dict[str, dict] = {
         "pct_of": "de CHF",
         "community_marker": "Part communautaire",
         "dynamic_effective_rate": "prix dynamique moyen pondéré par la consommation",
+        "pct_average_prefix": "Ø",
     },
     "it": {
         "yearly_fee_sg": "rata mensile della tariffa annuale",
@@ -1074,6 +1065,7 @@ DESCRIPTION_TRANSLATIONS: dict[str, dict] = {
         "pct_of": "di CHF",
         "community_marker": "Quota comunitaria",
         "dynamic_effective_rate": "prezzo dinamico medio ponderato per il consumo",
+        "pct_average_prefix": "Ø",
     },
     "en": {
         "yearly_fee_sg": "monthly installment of annual fee",
@@ -1091,6 +1083,7 @@ DESCRIPTION_TRANSLATIONS: dict[str, dict] = {
         "pct_of": "of CHF",
         "community_marker": "Community share",
         "dynamic_effective_rate": "consumption-weighted dynamic average rate",
+        "pct_average_prefix": "Ø",
     },
 }
 
@@ -1119,6 +1112,7 @@ def _build_description(
     base_rate: Decimal | None = None,
     bucket: str = "default",
     period=None,
+    effective_percentage: Decimal | None = None,
 ) -> str:
     t = DESCRIPTION_TRANSLATIONS.get(lang, DESCRIPTION_TRANSLATIONS["de"])
     # ``period`` is set only on a line the ZEV chose to itemise by band. The
@@ -1147,14 +1141,37 @@ def _build_description(
             named = f"{tariff.name} – {band}" if band else tariff.name
         return f"{named} ({marker})" if community else named
     if tariff.billing_mode == BillingMode.PERCENTAGE_OF_ENERGY:
-        pct = tariff.percentage or Decimal("0")
+        # Itemised by band: the band's own percentage, named like an energy
+        # band (dash, no averaging — there is only one band's worth of
+        # quantity in this line). Not itemised: the tariff's single
+        # percentage when every band it billed shares one, else the blended
+        # (Ø) percentage `effective_percentage` carries. A 0% band bills
+        # nothing and adds no quantity to the line, so it does not count: a
+        # 0%/90% tariff's line is billed at exactly 90%, not at an average.
+        if period is not None:
+            pct = period.percentage or Decimal("0")
+            avg_prefix = ""
+        else:
+            band_percentages = {
+                p.percentage for p in tariff.periods.all() if p.percentage
+            }
+            if len(band_percentages) <= 1:
+                pct = next(iter(band_percentages), Decimal("0"))
+                avg_prefix = ""
+            else:
+                pct = effective_percentage if effective_percentage is not None else Decimal("0")
+                avg_prefix = f"{t['pct_average_prefix']} "
         # Format: remove trailing zeros (50.00 → 50, 33.50 → 33.5)
         pct_str = f"{pct:f}".rstrip("0").rstrip(".")
         suffix = f", {marker}" if community else ""
+        if period is not None:
+            named = f"{tariff.name} – {band}"
+        else:
+            named = tariff.name
         if base_rate is not None:
             base_str = f"{base_rate:f}".rstrip("0").rstrip(".")
-            return f"{tariff.name} ({pct_str}% {t['pct_of']} {base_str}/kWh{suffix})"
-        return f"{tariff.name} ({pct_str}%{suffix})"
+            return f"{named} ({avg_prefix}{pct_str}% {t['pct_of']} {base_str}/kWh{suffix})"
+        return f"{named} ({avg_prefix}{pct_str}%{suffix})"
 
     months = int(quantity)
 
@@ -1438,6 +1455,17 @@ def _build_item_payloads(
                 else Decimal("0")
             )
             raw_base_total = entry.get("base_total", Decimal("0"))
+            # The blended percentage a multi-band, unitemised percentage line
+            # actually billed at — derived from what was billed before
+            # grossing, not from the (VAT-inclusive) rounded total, so it
+            # reads as the tariff's own rate rather than a VAT artefact.
+            effective_percentage = (
+                (abs(Decimal(entry["total"])) / raw_base_total * Decimal("100")).quantize(
+                    Decimal("0.01"), rounding=ROUND_HALF_UP
+                )
+                if raw_base_total and entry["tariff"].billing_mode == BillingMode.PERCENTAGE_OF_ENERGY
+                else None
+            )
             payloads.append({
                 "tariff": entry["tariff"],
                 "quantity": quantity.quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP),
@@ -1447,6 +1475,7 @@ def _build_item_payloads(
                 "base_rate": (raw_base_total / quantity).quantize(Decimal("0.00001"), rounding=ROUND_HALF_UP) if quantity and raw_base_total else None,
                 "bucket": entry["bucket"],
                 "period": entry.get("period"),
+                "effective_percentage": effective_percentage,
             })
 
     return (
@@ -1485,8 +1514,15 @@ def _price_energy(acc, tariffs, energy_type, quantity, ts, day, *, sign, bucket=
             bucket=bucket,
             period=period,
         )
-    pct_tariffs = tariffs.percentage(energy_type, day)
-    if not pct_tariffs:
+    # A 0% band at ts produces nothing and does not resolve the grid base, just
+    # as a 0% tariff did before bands existed — so the base is only computed
+    # once at least one band actually charges something at this timestamp.
+    pct_prices = []
+    for tariff in tariffs.percentage(energy_type, day):
+        pct, period = tariffs.percentage_at(tariff, ts)
+        if pct:
+            pct_prices.append((tariff, pct, period))
+    if not pct_prices:
         return
     # A dynamic grid tariff flows into the percentage base through the same
     # funnel a direct energy line uses, so a levy charged as a % of the grid
@@ -1495,8 +1531,8 @@ def _price_energy(acc, tariffs, energy_type, quantity, ts, day, *, sign, bucket=
         tariffs.price_at(t, ts)[0]
         for t in tariffs.energy(EnergyType.GRID, day)
     )
-    for tariff in pct_tariffs:
-        effective_price = grid_base * (tariff.percentage / Decimal("100"))
+    for tariff, pct, period in pct_prices:
+        effective_price = grid_base * (pct / Decimal("100"))
         acc.add(
             tariff=tariff,
             quantity=quantity,
@@ -1505,6 +1541,7 @@ def _price_energy(acc, tariffs, energy_type, quantity, ts, day, *, sign, bucket=
             # base_total is a magnitude for the printed base rate, not a credit.
             base_total=quantity * grid_base,
             bucket=bucket,
+            period=period,
         )
 
 
@@ -1824,6 +1861,7 @@ def generate_invoice(
                 tariff, period_start, period_end, payload["quantity"], lang,
                 base_rate=payload.get("base_rate"), bucket=payload["bucket"],
                 period=payload.get("period"),
+                effective_percentage=payload.get("effective_percentage"),
             ),
             quantity_kwh=payload["quantity"],
             unit=payload["unit"],

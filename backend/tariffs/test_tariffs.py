@@ -59,7 +59,9 @@ class TariffActionTests(TestCase):
             "Tariff periods are only supported for energy-based tariffs.",
         )
 
-    def test_periods_are_rejected_for_percentage_tariffs(self):
+    def test_periods_with_a_percentage_are_accepted_for_percentage_tariffs(self):
+        """SPEC-2026-percentage-tariff-bands §4.1, §5.5: a percentage-of-energy
+        tariff takes bands too, keyed by ``percentage`` rather than a price."""
         owner = self.make_owner("tariff_percentage_owner")
         zev = Zev.objects.create(name="Percentage ZEV", owner=owner, zev_type="vzev")
         tariff = Tariff.objects.create(
@@ -68,7 +70,33 @@ class TariffActionTests(TestCase):
             category=TariffCategory.ENERGY,
             billing_mode=BillingMode.PERCENTAGE_OF_ENERGY,
             energy_type=EnergyType.LOCAL,
-            percentage=Decimal("7.50"),
+            valid_from="2026-01-01",
+        )
+        client = self.make_client(owner)
+
+        response = client.post(
+            "/api/v1/tariffs/periods/",
+            {
+                "tariff": str(tariff.id),
+                "period_type": PeriodType.FLAT,
+                "percentage": "7.50",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertEqual(response.data["percentage"], "7.50")
+        self.assertIsNone(response.data["price_chf_per_kwh"])
+
+    def test_a_price_band_is_rejected_on_a_percentage_tariff(self):
+        owner = self.make_owner("tariff_percentage_price_owner")
+        zev = Zev.objects.create(name="Percentage ZEV 2", owner=owner, zev_type="vzev")
+        tariff = Tariff.objects.create(
+            zev=zev,
+            name="Percentage tariff 2",
+            category=TariffCategory.ENERGY,
+            billing_mode=BillingMode.PERCENTAGE_OF_ENERGY,
+            energy_type=EnergyType.LOCAL,
             valid_from="2026-01-01",
         )
         client = self.make_client(owner)
@@ -85,8 +113,12 @@ class TariffActionTests(TestCase):
 
         self.assertEqual(response.status_code, 400)
         self.assertEqual(
-            response.data["non_field_errors"][0],
-            "Tariff periods are only supported for energy-based tariffs.",
+            response.data["percentage"][0],
+            "A percentage band needs a percentage.",
+        )
+        self.assertEqual(
+            response.data["price_chf_per_kwh"][0],
+            "A percentage band takes a percentage, not a price.",
         )
 
     def test_energy_tariff_period_accepts_time_and_weekday_fields(self):

@@ -127,11 +127,11 @@ export function buildPriceHistory(
     const gaps = series.gaps.map((gap) => ({ from: ms(gap.start), to: ms(gap.end) }))
 
     if (series.billing_mode === 'percentage_of_energy') {
-        const points = percentagePoints(versions, allSeries, today)
+        const { bands, bandLabels, points } = percentagePoints(versions, allSeries, today)
         return {
             unit: 'chf_per_kwh',
-            bands: ['effective'],
-            bandLabels: {},
+            bands,
+            bandLabels,
             derived: true,
             // A percentage tariff with no grid tariff behind it prices at zero —
             // the engine's base sum is zero, so it genuinely bills nothing. That
@@ -160,25 +160,7 @@ export function buildPriceHistory(
     // without knowing seasons exist; a tariff with no seasonal band is handed
     // through untouched.
     const segments = versions.flatMap((version) => seasonalSegments(version, today))
-
-    const named = BAND_ORDER.filter(
-        (band) => segments.some((version) => version.periods.some((period) => period.period_type === band)),
-    )
-    // A tariff with three or more prices has no named bands, so each gets a
-    // series of its own keyed by position. Position is meaningful because the
-    // backend orders bands by start time: `band-0` is the same band of the day
-    // in every version, which is what makes a line across versions honest.
-    const bandCount = Math.max(
-        0, ...segments.map((version) => plainBands(version).length),
-    )
-    const positional = Array.from({ length: bandCount }, (_, index) => `band-${index}` as BandKey)
-    const bands: BandKey[] = [...named, ...positional]
-
-    const bandLabels: Partial<Record<BandKey, string>> = {}
-    positional.forEach((key, index) => {
-        const sample = segments.map((version) => plainBands(version)[index]).find(Boolean)
-        if (sample) bandLabels[key] = bandName(sample, bandWindow(sample) ?? key)
-    })
+    const { named, positional, bands, bandLabels } = bandKeysFor(segments)
 
     const points = assemble(segments, bands, today, (version) => {
         const values: Partial<Record<BandKey, number | null>> = {}
@@ -201,6 +183,40 @@ export function buildPriceHistory(
         gaps,
         points,
     }
+}
+
+/**
+ * Named (`flat`/`high`/`low`) and positional (`band-N`) keys for a set of
+ * segments, shared by energy and percentage tariffs alike (§5.7): a
+ * percentage tariff's bands recur exactly like an energy tariff's, so they
+ * are told apart the same way.
+ */
+function bandKeysFor(segments: TariffVersion[]): {
+    named: BandKey[]
+    positional: BandKey[]
+    bands: BandKey[]
+    bandLabels: Partial<Record<BandKey, string>>
+} {
+    const named = BAND_ORDER.filter(
+        (band) => segments.some((segment) => segment.periods.some((period) => period.period_type === band)),
+    )
+    // A tariff with three or more prices has no named bands, so each gets a
+    // series of its own keyed by position. Position is meaningful because the
+    // backend orders bands by start time: `band-0` is the same band of the day
+    // in every version, which is what makes a line across versions honest.
+    const bandCount = Math.max(
+        0, ...segments.map((segment) => plainBands(segment).length),
+    )
+    const positional = Array.from({ length: bandCount }, (_, index) => `band-${index}` as BandKey)
+    const bands: BandKey[] = [...named, ...positional]
+
+    const bandLabels: Partial<Record<BandKey, string>> = {}
+    positional.forEach((key, index) => {
+        const sample = segments.map((segment) => plainBands(segment)[index]).find(Boolean)
+        if (sample) bandLabels[key] = bandName(sample, bandWindow(sample) ?? key)
+    })
+
+    return { named, positional, bands, bandLabels }
 }
 
 /** The unnamed bands of a version, in the start-time order the backend stores. */
@@ -283,7 +299,13 @@ function zeroBaseStretches(points: PriceHistoryPoint[]): Array<{ from: number, t
     points.forEach((point, index) => {
         const next = points[index + 1]
         if (!next) return
-        if (point.values.effective === 0) {
+        const values = Object.values(point.values)
+        const defined = values.filter((value) => value !== null)
+        // Every band is a fraction of the same grid base, so a base of zero
+        // sends every one of them to zero at once — checking that none is
+        // still positive is equivalent to (and, with several bands, simpler
+        // than) checking each band's own value individually.
+        if (defined.length > 0 && defined.every((value) => value === 0)) {
             stretches.push({ from: point.t, to: next.t })
         }
     })
@@ -334,22 +356,32 @@ function assemble(
 }
 
 /**
- * Effective CHF/kWh for a percentage tariff, stepping at every boundary of
- * *either* timeline: the percentage can change, and so can the grid tariffs it
- * is a fraction of.
+ * Effective CHF/kWh for each of a percentage tariff's bands, stepping at every
+ * boundary of *any* relevant timeline: a band's own season, the percentage
+ * tariff's own version timeline, and the grid tariffs it is a fraction of.
+ *
+ * Bands are resolved exactly as an energy tariff's are (§5.7): seasonal
+ * segmentation first, then named (`flat`/`high`/`low`) and positional
+ * (`band-N`) keys from the resulting segments.
  */
 function percentagePoints(
     versions: TariffVersion[], allSeries: TariffSeries[], today: string,
-): PriceHistoryPoint[] {
+): { bands: BandKey[], bandLabels: Partial<Record<BandKey, string>>, points: PriceHistoryPoint[] } {
+    const segments = versions.flatMap((version) => seasonalSegments(version, today))
+    const { named, positional, bands: bandKeys, bandLabels } = bandKeysFor(segments)
+    // No bands configured yet: one line that is a gap throughout, rather than
+    // fabricating a percentage nothing was ever billed at.
+    const bands = bandKeys.length ? bandKeys : (['effective'] as BandKey[])
+
     const gridSeries = allSeries.filter(
         (series) => series.billing_mode === 'energy' && series.energy_type === 'grid',
     )
     const boundaries = new Set<string>()
-    versions.forEach((version) => {
-        boundaries.add(version.valid_from)
-        // The day after a version ends is a boundary too, so a gap in the
+    segments.forEach((segment) => {
+        boundaries.add(segment.valid_from)
+        // The day after a segment ends is a boundary too, so a gap in the
         // percentage tariff's own timeline breaks the line.
-        if (version.valid_to) boundaries.add(isoFromMs(ms(version.valid_to) + DAY_MS))
+        if (segment.valid_to) boundaries.add(isoFromMs(ms(segment.valid_to) + DAY_MS))
     })
     gridSeries.forEach((series) => series.versions.forEach((version) => {
         boundaries.add(version.valid_from)
@@ -363,18 +395,33 @@ function percentagePoints(
         .sort()
     if (first !== undefined && !relevant.includes(end)) relevant.push(end)
 
-    return relevant.map((day) => {
-        const version = versionOn(versions, day)
-        if (!version) {
-            return { t: ms(day), date: day, values: { effective: null } }
+    const points = relevant.map((day) => {
+        const segment = versionOn(segments, day)
+        if (!segment) {
+            return { t: ms(day), date: day, values: Object.fromEntries(bands.map((band) => [band, null])) }
         }
-        const percentage = num(version.percentage) ?? 0
         const base = gridBaseOn(allSeries, day)
-        return {
-            t: ms(day),
-            date: day,
-            values: { effective: Number(((base * percentage) / 100).toFixed(5)) },
-            note: `${percentage}% × ${base.toFixed(5)}`,
+        const values: Partial<Record<BandKey, number | null>> = Object.fromEntries(
+            bands.map((band) => [band, null]),
+        )
+        let note: string | undefined
+        const valueOf = (period: TariffPeriod | undefined): number | null => {
+            if (!period) return null
+            const pct = num(period.percentage) ?? 0
+            // A single-band tariff has one figure worth explaining in the
+            // tooltip; with several bands active the point carries no one
+            // note, since a point can hold only one.
+            if (bands.length === 1) note = `${pct}% × ${base.toFixed(5)}`
+            return Number(((base * pct) / 100).toFixed(5))
         }
+        named.forEach((band) => {
+            values[band] = valueOf(segment.periods.find((entry) => entry.period_type === band))
+        })
+        positional.forEach((key, index) => {
+            values[key] = valueOf(plainBands(segment)[index])
+        })
+        return { t: ms(day), date: day, values, note }
     })
+
+    return { bands, bandLabels, points }
 }

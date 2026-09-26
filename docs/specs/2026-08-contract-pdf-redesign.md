@@ -155,13 +155,17 @@ invoice PDF uses, so both documents print identical date formats.
 
 `_build_local_tariff_display(zev, tr, date_pattern, as_of)` returns display rows for
 active local tariff (`billing_mode` `ENERGY` or `PERCENTAGE_OF_ENERGY`,
-`energy_type` `LOCAL`, active on the document's `as_of` date):
+`energy_type` `LOCAL`, active on the document's `as_of` date). A percentage
+tariff yields **one row per band** (`invoices.tariff_pricing.percentage_band_rows`,
+SPEC-2026-percentage-tariff-bands §5.4) exactly as a multi-band energy tariff
+already does; a single flat band still yields exactly the one row described
+below, with no band-label prefix:
 
 | Key | Type | Meaning |
 |---|---|---|
 | `name` | `str` | Tariff name |
 | `rate_rp` | `str` | Effective price in Rp/kWh (`f"{rp:.2f}"`), `f"{pct:.2f}%"` when no static grid base exists, or `tr["tariff_none"]` when a dynamic base is unavailable |
-| `rate_description` | `str` | `tariff_flat`, `tariff_ht`, `tariff_nt`, or a percentage formula like `80.00% × 22.50 Rp./kWh (% des Netzpreises)` |
+| `rate_description` | `str` | `tariff_flat`, `tariff_ht`, `tariff_nt`, or a percentage formula like `80.00% × 22.50 Rp./kWh (% des Netzpreises)`; a named or timed band, or any band beyond a lone flat one, is prefixed with its own band label (`"{label}: {formula}"`) so several rows can be told apart |
 | `pct` | `str \| None` | Rendered percentage (`f"{pct:.2f}"`) for percentage tariffs, else `None` — drives the green-box rule line and the clause-5 rule |
 | `unit` | `str` | `tr["tariff_rp_unit"]`; empty when a percentage tariff has no active grid base price, so the green box renders the bare percentage without a unit |
 | `valid_from` / `valid_to` | `str \| None` | Validity dates formatted with `date_pattern`; `valid_to` is `None` when the tariff is open-ended |
@@ -533,11 +537,12 @@ contracts never do. The existing sample keys already include
 | `test_vat_rate_display_empty_when_liable_without_active_rate` | `vat_number` without an active rate → `""` |
 | `test_document_id_is_short_and_stable` | `CTR-` prefix, 12 chars total |
 
-**`ContractPdfTariffRuleTests`** (7 tests):
+**`ContractPdfTariffRuleTests`** (8 tests):
 
 | Test | Asserts |
 |---|---|
 | `test_percentage_tariff_row_carries_pct_price_validity_and_notes` | Percentage row carries `pct` `"80.00"`, effective `rate_rp` `"18.00"` (80% of the 22.50 Rp/kWh grid base), `validity` `"01.01.2026 – 31.12.2026"` and the tariff `notes` |
+| `test_a_two_band_percentage_tariff_prints_one_row_per_band` | A percentage tariff with an HT/NT-shaped pair of bands (90%/60%) yields two rows, one per band, each at that band's own effective rate (SPEC-2026-percentage-tariff-bands §5.4) |
 | `test_percentage_tariff_prints_formula_rule_reference_and_green_box_line` | `tariff_rule` contains the rendered percentage and the reference product; markup shows the rule paragraph, `tariff_pct_line`, the reference-product line and the validity column |
 | `test_flat_tariff_falls_back_to_fixed_rate_clause_without_pct_line` | Flat tariff → `tariff_rule` is `clause_tariff_rule_flat`, no `pct`, no `tariff_pct_line`, no reference-product line in markup |
 | `test_percentage_tariff_without_grid_base_shows_bare_percentage_without_unit` | No active grid tariff → `rate_rp` `"80.00%"` with empty `unit`; markup renders the bare percentage in the green box |

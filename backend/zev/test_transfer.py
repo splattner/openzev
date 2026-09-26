@@ -789,6 +789,90 @@ class RejectedArchiveTests(TestCase):
         self.assertFalse(Zev.objects.filter(owner=self.importer).exists())
 
 
+class PercentageBandArchiveTests(TestCase):
+    """SPEC-2026-percentage-tariff-bands §5.6: format version 4 carries a
+    percentage band's percentage on ``TariffPeriod``; older archives carried
+    it on the tariff itself."""
+
+    def setUp(self):
+        self.owner = make_user("pct_archive_owner", UserRole.ZEV_OWNER)
+
+    def _zev_with_percentage_bands(self):
+        zev = Zev.objects.create(name="Percentage Archive ZEV", owner=self.owner)
+        tariff = Tariff.objects.create(
+            zev=zev, name="Local Surcharge", category=TariffCategory.LEVIES,
+            billing_mode=BillingMode.PERCENTAGE_OF_ENERGY, energy_type=EnergyType.LOCAL,
+            valid_from=date(2026, 1, 1),
+        )
+        TariffPeriod.objects.create(
+            tariff=tariff, period_type=PeriodType.HIGH, percentage=Decimal("90.00"),
+            time_from=time(10, 0), time_to=time(16, 0),
+        )
+        TariffPeriod.objects.create(
+            tariff=tariff, period_type=PeriodType.LOW, percentage=Decimal("60.00"),
+            time_from=time(16, 0), time_to=time(10, 0),
+        )
+        return zev
+
+    def test_v4_round_trips_band_percentages(self):
+        zev = self._zev_with_percentage_bands()
+        raw = export_and_clear(zev, ["zev", "tariffs"])
+
+        result = import_archive(io.BytesIO(raw), owner=self.owner)
+
+        imported = Zev.objects.get(pk=result["zev_id"])
+        tariff = imported.tariffs.get(name="Local Surcharge")
+        periods = list(tariff.periods.all())
+        self.assertEqual(sorted(p.percentage for p in periods), [Decimal("60.00"), Decimal("90.00")])
+        self.assertTrue(all(p.price_chf_per_kwh is None for p in periods))
+
+    def test_a_v3_archive_with_a_top_level_percentage_imports_as_a_flat_band(self):
+        zev = self._zev_with_percentage_bands()
+        raw = export_and_clear(zev, ["zev", "tariffs"])
+
+        with zipfile.ZipFile(io.BytesIO(raw)) as archive:
+            manifest = json.loads(archive.read(MANIFEST_NAME))
+            tariffs = json.loads(archive.read("tariffs.json"))
+        manifest["format_version"] = 3
+        entry = next(t for t in tariffs if t["name"] == "Local Surcharge")
+        # A v3 archive carried the percentage on the tariff, and any archived
+        # periods were never billed under this mode.
+        entry["percentage"] = "42.00"
+        raw = rewrite_archive(raw, replace={MANIFEST_NAME: manifest, "tariffs.json": tariffs})
+
+        result = import_archive(io.BytesIO(raw), owner=self.owner)
+
+        imported = Zev.objects.get(pk=result["zev_id"])
+        tariff = imported.tariffs.get(name="Local Surcharge")
+        periods = list(tariff.periods.all())
+        self.assertEqual(len(periods), 1)
+        self.assertEqual(periods[0].period_type, PeriodType.FLAT)
+        self.assertEqual(periods[0].percentage, Decimal("42.00"))
+        self.assertIsNone(periods[0].price_chf_per_kwh)
+        self.assertTrue(
+            any("carried price bands from before percentage bands" in w for w in result["warnings"])
+        )
+
+    def test_a_v3_archive_without_a_percentage_imports_no_band(self):
+        zev = Zev.objects.create(name="Percentage Archive ZEV 2", owner=self.owner)
+        Tariff.objects.create(
+            zev=zev, name="Empty Surcharge", category=TariffCategory.LEVIES,
+            billing_mode=BillingMode.PERCENTAGE_OF_ENERGY, energy_type=EnergyType.LOCAL,
+            valid_from=date(2026, 1, 1),
+        )
+        raw = export_and_clear(zev, ["zev", "tariffs"])
+        with zipfile.ZipFile(io.BytesIO(raw)) as archive:
+            manifest = json.loads(archive.read(MANIFEST_NAME))
+        manifest["format_version"] = 3
+        raw = rewrite_archive(raw, replace={MANIFEST_NAME: manifest})
+
+        result = import_archive(io.BytesIO(raw), owner=self.owner)
+
+        imported = Zev.objects.get(pk=result["zev_id"])
+        tariff = imported.tariffs.get(name="Empty Surcharge")
+        self.assertEqual(tariff.periods.count(), 0)
+
+
 class DynamicTariffTransferTests(TestCase):
     """A dynamic tariff's price source has to survive the move.
 

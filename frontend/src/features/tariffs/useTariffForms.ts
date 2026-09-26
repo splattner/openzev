@@ -8,7 +8,8 @@ export type TariffFormValues = {
   billing_mode: TariffInput['billing_mode']
   energy_type: NonNullable<TariffInput['energy_type']>
   fixed_price_chf: string
-  percentage: string
+  /** Create-only: the percentage of the one flat band a new tariff starts with. */
+  initial_percentage: string
   split_key: NonNullable<TariffInput['split_key']>
   valid_from: string
   valid_to: string
@@ -17,13 +18,18 @@ export type TariffFormValues = {
   dynamic_source: string
   /** Floor under a fetched feed-in series; `''` for none. */
   minimum_price_chf_per_kwh: string
+  /** Internal only, never sent to the API: whether this is a create form. */
+  is_new: boolean
 }
 
 export type TariffPeriodFormValues = {
   tariff: string
+  /** The selected tariff's billing mode: decides `price_chf_per_kwh` vs `percentage` below. */
+  billing_mode: TariffInput['billing_mode']
   period_type: TariffPeriodInput['period_type']
   label: string
   price_chf_per_kwh: string
+  percentage: string
   time_from: string
   time_to: string
   weekdays: string
@@ -46,13 +52,14 @@ export const tariffFormSchema = z
     ]),
     energy_type: z.enum(['local', 'grid', 'feed_in']),
     fixed_price_chf: z.string(),
-    percentage: z.string(),
+    initial_percentage: z.string(),
     split_key: z.enum(['equal', 'weight']),
     valid_from: z.string().trim().min(1),
     valid_to: z.string(),
     notes: z.string(),
     dynamic_source: z.string(),
     minimum_price_chf_per_kwh: z.string(),
+    is_new: z.boolean(),
   })
   .superRefine((values, ctx) => {
     const isEnergyBased = values.billing_mode === 'energy' || values.billing_mode === 'percentage_of_energy'
@@ -76,18 +83,21 @@ export const tariffFormSchema = z
       })
     }
 
-    if (values.billing_mode === 'percentage_of_energy') {
-      if (!values.percentage) {
+    // The initial percentage only exists on create (§5.5): once the tariff
+    // exists, its bands — including the first one — are managed from the
+    // drawer, and this field is hidden and irrelevant.
+    if (values.billing_mode === 'percentage_of_energy' && values.is_new) {
+      if (!values.initial_percentage) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
-          path: ['percentage'],
+          path: ['initial_percentage'],
           message: 'Percentage is required.',
         })
       }
-      if (values.percentage && Number.isNaN(Number(values.percentage))) {
+      if (values.initial_percentage && Number.isNaN(Number(values.initial_percentage))) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
-          path: ['percentage'],
+          path: ['initial_percentage'],
           message: 'Percentage must be a number.',
         })
       }
@@ -111,16 +121,48 @@ export const tariffFormSchema = z
     }
   })
 
-export const tariffPeriodFormSchema = z.object({
-  tariff: z.string().trim().min(1),
-  period_type: z.enum(['flat', 'high', 'low', 'band']),
-  label: z.string(),
-  price_chf_per_kwh: z.string().trim().min(1),
-  time_from: z.string(),
-  time_to: z.string(),
-  weekdays: z.string(),
-  months: z.string(),
-})
+export const tariffPeriodFormSchema = z
+  .object({
+    tariff: z.string().trim().min(1),
+    billing_mode: z.enum([
+      'energy',
+      'monthly_fee',
+      'yearly_fee',
+      'per_metering_point_monthly_fee',
+      'per_metering_point_yearly_fee',
+      'shared_monthly_fee',
+      'shared_yearly_fee',
+      'percentage_of_energy',
+    ]),
+    period_type: z.enum(['flat', 'high', 'low', 'band']),
+    label: z.string(),
+    price_chf_per_kwh: z.string(),
+    percentage: z.string(),
+    time_from: z.string(),
+    time_to: z.string(),
+    weekdays: z.string(),
+    months: z.string(),
+  })
+  .superRefine((values, ctx) => {
+    // A band carries a price or a percentage, never both — the same §4.1
+    // rule the backend enforces, checked here too so the field can be
+    // required without the server round trip.
+    if (values.billing_mode === 'percentage_of_energy') {
+      if (!values.percentage.trim()) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['percentage'],
+          message: 'Percentage is required.',
+        })
+      }
+    } else if (!values.price_chf_per_kwh.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['price_chf_per_kwh'],
+        message: 'Price is required.',
+      })
+    }
+  })
 
 export const defaultTariffFormValues: TariffFormValues = {
   name: '',
@@ -128,20 +170,23 @@ export const defaultTariffFormValues: TariffFormValues = {
   billing_mode: 'energy',
   energy_type: 'local',
   fixed_price_chf: '',
-  percentage: '',
+  initial_percentage: '',
   split_key: 'equal',
   valid_from: todayLocalIso(),
   valid_to: '',
   notes: '',
   dynamic_source: '',
   minimum_price_chf_per_kwh: '',
+  is_new: true,
 }
 
 export const defaultTariffPeriodFormValues: TariffPeriodFormValues = {
   tariff: '',
+  billing_mode: 'energy',
   period_type: 'flat',
   label: '',
   price_chf_per_kwh: '',
+  percentage: '',
   time_from: '',
   time_to: '',
   weekdays: '',
@@ -155,7 +200,9 @@ export function mapTariffToFormValues(tariff: Tariff): TariffFormValues {
     billing_mode: tariff.billing_mode,
     energy_type: tariff.energy_type || 'local',
     fixed_price_chf: tariff.fixed_price_chf ? String(tariff.fixed_price_chf) : '',
-    percentage: tariff.percentage ? String(tariff.percentage) : '',
+    // Write-only and create-only: an existing tariff never carries it back,
+    // and editing one never sends it (bands are managed from the drawer).
+    initial_percentage: '',
     split_key: tariff.split_key || 'equal',
     valid_from: tariff.valid_from,
     valid_to: tariff.valid_to || '',
@@ -164,6 +211,7 @@ export function mapTariffToFormValues(tariff: Tariff): TariffFormValues {
     minimum_price_chf_per_kwh: tariff.minimum_price_chf_per_kwh
       ? String(tariff.minimum_price_chf_per_kwh)
       : '',
+    is_new: false,
   }
 }
 
@@ -178,7 +226,11 @@ export function mapTariffFormValuesToInput(values: TariffFormValues, zevId: stri
     billing_mode: values.billing_mode,
     energy_type: isEnergyBased ? values.energy_type : null,
     fixed_price_chf: isEnergyBased ? null : (values.fixed_price_chf || null),
-    percentage: values.billing_mode === 'percentage_of_energy' ? (values.percentage || null) : null,
+    // Create-only (§5.5): sending it on update is rejected by the API, so it
+    // is only ever included while creating a new percentage tariff.
+    ...(values.is_new && values.billing_mode === 'percentage_of_energy'
+      ? { initial_percentage: values.initial_percentage || null }
+      : {}),
     split_key: isShared ? values.split_key : 'equal',
     valid_from: values.valid_from,
     valid_to: values.valid_to || null,
@@ -196,12 +248,17 @@ export function mapTariffFormValuesToInput(values: TariffFormValues, zevId: stri
   }
 }
 
-export function mapTariffPeriodToFormValues(period: TariffPeriod): TariffPeriodFormValues {
+export function mapTariffPeriodToFormValues(
+  period: TariffPeriod,
+  billingMode: TariffInput['billing_mode'],
+): TariffPeriodFormValues {
   return {
     tariff: period.tariff,
+    billing_mode: billingMode,
     period_type: period.period_type,
     label: period.label ?? '',
-    price_chf_per_kwh: String(period.price_chf_per_kwh),
+    price_chf_per_kwh: period.price_chf_per_kwh != null ? String(period.price_chf_per_kwh) : '',
+    percentage: period.percentage != null ? String(period.percentage) : '',
     time_from: period.time_from || '',
     time_to: period.time_to || '',
     weekdays: period.weekdays || '',
@@ -210,13 +267,15 @@ export function mapTariffPeriodToFormValues(period: TariffPeriod): TariffPeriodF
 }
 
 export function mapTariffPeriodFormValuesToInput(values: TariffPeriodFormValues): TariffPeriodInput {
+  const isPercentage = values.billing_mode === 'percentage_of_energy'
   return {
     tariff: values.tariff,
     period_type: values.period_type,
     // Only a `band` is named by hand; the others name themselves, and a label
     // left behind by a type change would surface on the contract.
     label: values.period_type === 'band' ? values.label : '',
-    price_chf_per_kwh: values.price_chf_per_kwh,
+    price_chf_per_kwh: isPercentage ? null : values.price_chf_per_kwh,
+    percentage: isPercentage ? values.percentage : null,
     time_from: values.time_from || null,
     time_to: values.time_to || null,
     weekdays: values.weekdays,

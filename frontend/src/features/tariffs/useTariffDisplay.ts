@@ -14,6 +14,26 @@ export const VALIDITY_BADGE_CLASS: Record<ValidityState, string> = {
     expired: 'badge badge-neutral',
 }
 
+/** The band percentages of a percentage-of-energy version, as numbers. */
+export function percentageValues(version: TariffVersion): number[] {
+    return (version.periods ?? [])
+        .map((period) => period.percentage)
+        .filter((value): value is string => value != null)
+        .map(Number)
+}
+
+/**
+ * `"60%"` when every band shares one percentage, else `"60–90%"`. `null`
+ * without any bands (§5.7): the series summary and its effective-price
+ * tooltip use the same range, computed once here for both.
+ */
+export function percentageRangeLabel(values: number[]): string | null {
+    if (!values.length) return null
+    const min = Math.min(...values)
+    const max = Math.max(...values)
+    return min === max ? `${min}%` : `${min}–${max}%`
+}
+
 /**
  * Pricing/validity display logic shared by the tariff card list and the
  * detail drawer, so the two views can never drift into describing the same
@@ -83,7 +103,7 @@ export function useTariffDisplay(settings: AppSettings, today: string) {
                 : t('pages.tariffs.noPeriods')
         }
         if (series.billing_mode === 'percentage_of_energy') {
-            return `${version.percentage ?? '0'}%`
+            return percentageRangeLabel(percentageValues(version)) ?? t('pages.tariffs.noPeriods')
         }
         return `CHF ${version.fixed_price_chf || '0.00'}`
     }
@@ -93,11 +113,20 @@ export function useTariffDisplay(settings: AppSettings, today: string) {
         const energy = t(`pages.tariffs.energyTypes.${series.energy_type || 'local'}`)
         if (series.billing_mode === 'energy') return energy
         if (series.billing_mode !== 'percentage_of_energy') return `CHF ${version.fixed_price_chf || '0.00'}`
-        const label = `${version.percentage ?? '0'}% · ${energy}`
+        const values = percentageValues(version)
+        const pctLabel = percentageRangeLabel(values)
+        if (pctLabel === null) return `${t('pages.tariffs.noPeriods')} · ${energy}`
+        const label = `${pctLabel} · ${energy}`
         const base = version.percentage_base_summary
         if (base?.price_chf_per_kwh != null) {
-            const price = (Number(base.price_chf_per_kwh) * Number(version.percentage ?? 0) / 100).toFixed(3)
-            return `${label} · ${t('pages.tariffs.approxPrice', { price })}`
+            const basePrice = Number(base.price_chf_per_kwh)
+            const min = Math.min(...values)
+            const max = Math.max(...values)
+            const priceKey = min === max ? 'pages.tariffs.approxPrice' : 'pages.tariffs.approxPriceRange'
+            const priceParams = min === max
+                ? { price: (basePrice * min / 100).toFixed(3) }
+                : { min: (basePrice * min / 100).toFixed(3), max: (basePrice * max / 100).toFixed(3) }
+            return `${label} · ${t(priceKey, priceParams)}`
         }
         if (base?.dynamic_status === 'unavailable') return `${label} · ${t('pages.tariffs.dynamicBaseUnavailable')}`
         return label
@@ -113,14 +142,24 @@ export function useTariffDisplay(settings: AppSettings, today: string) {
             return t('pages.tariffs.dynamicPriceUnavailableTooltip')
         }
         if (series.billing_mode !== 'percentage_of_energy') return undefined
+        const values = percentageValues(version)
+        if (!values.length) return undefined
         const base = version.percentage_base_summary
         if (base?.dynamic_status === 'unavailable') return t('pages.tariffs.dynamicBaseUnavailableTooltip')
         if (base?.price_chf_per_kwh != null) {
             const basePrice = Number(base.price_chf_per_kwh)
-            const explanation = t('pages.tariffs.approxPriceTooltip', {
-                percentage: version.percentage ?? '0', basePrice: basePrice.toFixed(3),
-                effectivePrice: (basePrice * Number(version.percentage ?? 0) / 100).toFixed(3),
-            })
+            const min = Math.min(...values)
+            const max = Math.max(...values)
+            const explanation = min === max
+                ? t('pages.tariffs.approxPriceTooltip', {
+                    percentage: String(min), basePrice: basePrice.toFixed(3),
+                    effectivePrice: (basePrice * min / 100).toFixed(3),
+                })
+                : t('pages.tariffs.approxPriceTooltipRange', {
+                    min: String(min), max: String(max), basePrice: basePrice.toFixed(3),
+                    effectiveMin: (basePrice * min / 100).toFixed(3),
+                    effectiveMax: (basePrice * max / 100).toFixed(3),
+                })
             if (base.dynamic_status === 'partial') return `${explanation} ${t('pages.tariffs.dynamicAveragePartialTooltip')}`
             if (base.dynamic_status === 'complete') return `${explanation} ${t('pages.tariffs.dynamicAverageTooltip')}`
             return explanation

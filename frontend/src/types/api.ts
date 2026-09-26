@@ -581,7 +581,6 @@ export interface Tariff {
     billing_mode: TariffBillingMode
     energy_type?: 'local' | 'grid' | 'feed_in' | null
     fixed_price_chf?: string | null
-    percentage?: string | null
     split_key: 'equal' | 'weight'
     valid_from: string
     valid_to?: string | null
@@ -610,7 +609,12 @@ export interface TariffInput {
     billing_mode: TariffBillingMode
     energy_type?: 'local' | 'grid' | 'feed_in' | null
     fixed_price_chf?: string | null
-    percentage?: string | null
+    /**
+     * Create-only, percentage-of-energy mode only: creates one flat band in
+     * the same request. Ignored (and rejected) on update — bands are managed
+     * from the tariff's own drawer once it exists.
+     */
+    initial_percentage?: string | null
     split_key?: 'equal' | 'weight'
     valid_from: string
     valid_to?: string | null
@@ -728,7 +732,10 @@ export interface TariffPeriod {
     period_type: TariffPeriodType
     /** Name for a `band`; blank falls back to its time window. */
     label?: string
-    price_chf_per_kwh: string
+    /** Required on a band of an energy tariff; null on a percentage tariff. */
+    price_chf_per_kwh: string | null
+    /** Required on a band of a percentage-of-energy tariff; null otherwise. */
+    percentage?: string | null
     time_from?: string | null
     time_to?: string | null
     weekdays?: string
@@ -772,7 +779,6 @@ export interface TariffSeries {
 export interface TariffVersionInput {
     valid_from: string
     fixed_price_chf?: string | null
-    percentage?: string | null
     minimum_price_chf_per_kwh?: string | null
     periods?: Array<Omit<TariffPeriodInput, 'tariff'>>
 }
@@ -781,7 +787,8 @@ export interface TariffPeriodInput {
     tariff: string
     period_type: TariffPeriodType
     label?: string
-    price_chf_per_kwh: string
+    price_chf_per_kwh?: string | null
+    percentage?: string | null
     time_from?: string | null
     time_to?: string | null
     weekdays?: string

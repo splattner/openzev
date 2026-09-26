@@ -261,10 +261,15 @@ export function TariffFormModal({
         )}
 
         {billingMode === 'percentage_of_energy' ? (
-          <label>
-            <span>{t('pages.tariffs.form.percentage')}</span>
-            <input type="number" step="0.01" min="0" max="100" {...form.register('percentage')} required />
-          </label>
+          // Editing a version already has bands to manage in the drawer, so
+          // the field is create-only (§5.7) — it just seeds the first one.
+          !isVersion && (
+            <label>
+              <span>{t('pages.tariffs.form.initialPercentage')}</span>
+              <input type="number" step="0.01" min="0" {...form.register('initial_percentage')} required />
+              <small className="muted">{t('pages.tariffs.form.initialPercentageHint')}</small>
+            </label>
+          )
         ) : billingMode !== 'energy' ? (
           <label>
             <span>{t(FIXED_PRICE_LABELS[billingMode] ?? 'pages.tariffs.form.monthlyFee')}</span>
@@ -322,7 +327,7 @@ export function TariffFormModal({
           <div className="error-banner" style={{ gridColumn: '1 / -1' }}>
             {form.formState.errors.name?.message
               || form.formState.errors.energy_type?.message
-              || form.formState.errors.percentage?.message
+              || form.formState.errors.initial_percentage?.message
               || form.formState.errors.fixed_price_chf?.message
               || t('common.error')}
           </div>

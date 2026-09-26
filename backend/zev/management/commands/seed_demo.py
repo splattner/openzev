@@ -182,9 +182,13 @@ SECOND_DEMO_TARIFF_SPECS = [
         "category": TariffCategory.LEVIES,
         "billing_mode": BillingMode.PERCENTAGE_OF_ENERGY,
         "energy_type": EnergyType.GRID,
-        "percentage": Decimal("18.00"),
         "notes": "Levy priced as a percentage of the grid base tariff.",
-        "periods": [],
+        "periods": [
+            {
+                "period_type": PeriodType.FLAT,
+                "percentage": Decimal("18.00"),
+            }
+        ],
     },
     {
         "name": "Grid Connection Fee",
@@ -1481,15 +1485,19 @@ class Command(BaseCommand):
                 "category": TariffCategory.LEVIES,
                 "billing_mode": BillingMode.PERCENTAGE_OF_ENERGY,
                 "energy_type": EnergyType.GRID,
-                "percentage": Decimal("18.00"),
                 "notes": "Sample levy priced as a percentage of the grid base tariff.",
-                "periods": [],
+                "periods": [
+                    {
+                        "period_type": PeriodType.FLAT,
+                        "percentage": Decimal("18.00"),
+                    }
+                ],
                 # A percentage version carries no price of its own, so its chart
                 # is the *derived* effective price — it moves both when the
                 # percentage changes and when the grid tariffs it references do.
                 "price_history": [
-                    {"percentage": Decimal("15.00")},
-                    {"percentage": Decimal("16.50")},
+                    {"prices": [Decimal("15.00")]},
+                    {"prices": [Decimal("16.50")]},
                 ],
             },
             {
@@ -1557,18 +1565,29 @@ class Command(BaseCommand):
             billing_mode=spec["billing_mode"],
             energy_type=spec.get("energy_type"),
             fixed_price_chf=prices.get("fixed_price_chf", spec.get("fixed_price_chf")),
-            percentage=prices.get("percentage", spec.get("percentage")),
             notes=spec.get("notes", ""),
             valid_from=valid_from,
             valid_to=valid_to,
         )
 
+        # A percentage-of-energy tariff's bands carry a percentage, not a
+        # price; every other billing mode's bands carry a price. ``prices``
+        # overrides the band's own value by position, same as before bands
+        # existed for percentage tariffs too.
+        is_percentage = spec["billing_mode"] == BillingMode.PERCENTAGE_OF_ENERGY
         band_prices = prices.get("prices")
         for band, period in enumerate(spec["periods"]):
+            if band_prices:
+                value = band_prices[band]
+            elif is_percentage:
+                value = period["percentage"]
+            else:
+                value = period["price_chf_per_kwh"]
             TariffPeriod.objects.create(
                 tariff=tariff,
                 period_type=period["period_type"],
-                price_chf_per_kwh=band_prices[band] if band_prices else period["price_chf_per_kwh"],
+                price_chf_per_kwh=None if is_percentage else value,
+                percentage=value if is_percentage else None,
                 time_from=period.get("time_from"),
                 time_to=period.get("time_to"),
                 weekdays=period.get("weekdays", ""),

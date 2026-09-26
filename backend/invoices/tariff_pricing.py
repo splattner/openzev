@@ -8,6 +8,8 @@ from django.utils import timezone
 from tariffs.dynamic.pricing import summarize_dynamic_tariff, summarize_requests
 from tariffs.models import BillingMode, EnergyType, PeriodType
 
+from .band_labels import band_description, band_recurrence
+
 
 @dataclass(frozen=True)
 class GridBaseSummary:
@@ -89,6 +91,35 @@ def prepare_tariff_display_summaries(tariffs, *, as_of: date):
                 "dynamic_status": base.dynamic_status,
                 "reference_date": reference.isoformat(),
             }
+
+
+def percentage_band_rows(tariff, grid_base: GridBaseSummary, band_tr: dict) -> list[dict]:
+    """One row per band of a percentage-of-energy tariff, for a document.
+
+    Shared by the tariff overview and the contract PDF so both print the same
+    band the same way rather than each computing its own percentage row. In
+    ``Meta.ordering`` (the tariff's own band order, not sorted by anything
+    document-specific). ``effective_chf`` is the band's percentage applied to
+    the representative grid base, or ``None`` when that base is not knowable
+    (no static grid tariff, or an unavailable dynamic one) — mirroring
+    ``GridBaseSummary.has_effective_price``.
+    """
+    rows = []
+    for period in tariff.periods.all():
+        pct = Decimal(str(period.percentage or 0))
+        effective_chf = (
+            grid_base.price_chf_per_kwh * pct / Decimal("100")
+            if grid_base.has_effective_price
+            else None
+        )
+        rows.append({
+            "period": period,
+            "label": band_description(period, band_tr),
+            "recurrence": band_recurrence(period, band_tr),
+            "pct": pct,
+            "effective_chf": effective_chf,
+        })
+    return rows
 
 
 def grid_base_is_multiband(grid_tariffs) -> bool:
