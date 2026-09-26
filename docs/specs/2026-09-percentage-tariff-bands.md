@@ -117,7 +117,7 @@ Percentage bands are resolved by the **same** function as energy bands,
 `invoices.engine._resolve_tariff_band(tariff, ts)`, with no special case:
 
 - Month first, then a flat band short-circuits. Otherwise the timed band whose
-  weekdays contain `ts.weekday()` and whose `time_from <= ts.time() < time_to`.
+  weekdays contain `ts.weekday()` and whose window contains `ts.time()` (`in_window`, which wraps windows past midnight since #837).
 - If nothing matched: the first in-season band (by `Meta.ordering`), else the
   first band.
 - A flat band may not share months with a timed band (existing

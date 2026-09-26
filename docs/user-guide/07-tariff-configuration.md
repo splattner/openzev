@@ -393,7 +393,7 @@ open its entry and use **Add Period** to add a High/Low or named band, this
 time entering a **percentage** instead of a CHF/kWh price. A local-energy
 surcharge that is cheaper at midday and dearer in the morning and evening, for
 example, can be modelled as three bands (00:00–10:00 at 90%, 10:00–16:00 at
-60%, 16:00–23:59 at 90%) instead of a single flat percentage — see
+60%, 16:00–00:00 at 90%) instead of a single flat percentage — see
 [Tariff Periods](#tariff-periods) for how bands, weekdays and months combine;
 everything there applies to a percentage tariff's bands exactly as it does to
 a per-kWh tariff's.
@@ -414,7 +414,7 @@ Percentage Tariff "Local Solar Surcharge"
 ├─ Energy type: Local Energy
 ├─ Band "Morning": 00:00–10:00, 90%
 ├─ Band "Midday":  10:00–16:00, 60%
-├─ Band "Evening": 16:00–23:59, 90%
+├─ Band "Evening": 16:00–00:00, 90%
 ```
 
 > **Cover the whole day.** Every band needs its own time window, and the
@@ -529,7 +529,12 @@ To add one:
    - **CHF/kWh** (per-kWh tariff), or **Percentage** (percentage tariff)
 4. Click **Save Tariff Period**
 
-> **Crossing midnight:** If end time < start time, period wraps (e.g., 22:00–06:00).
+> **Crossing midnight:** If the end time is not after the start time, the
+> period wraps past midnight: 22:00–06:00 covers the night, and an end time of
+> 00:00 means the end of the day (16:00–00:00 is the evening). The weekdays
+> you select refer to the day of each hour itself, so a Monday–Friday
+> 22:00–06:00 period covers Friday night up to midnight and the early hours of
+> Monday to Friday, but not Saturday morning.
 
 ## Multi-Tariff Configuration
 
