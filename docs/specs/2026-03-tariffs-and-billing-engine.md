@@ -189,7 +189,7 @@ Only what this spec's own algorithm needs to know:
 | `price_chf_per_kwh` | `Decimal(8,5)` (nullable) | Price in CHF per kWh. Required on a band of an `energy` tariff, and must be null on a `percentage_of_energy` tariff |
 | `percentage` | `Decimal(5,2)` (nullable) | Percentage of the grid base price, for a band of a `percentage_of_energy` tariff (see SPEC-2026-percentage-tariff-bands). Required there, and must be null on an `energy` tariff |
 | `time_from` | `TimeField` (nullable) | Start of the window (required for every type but `flat`) |
-| `time_to` | `TimeField` (nullable) | End of the window (exclusive) |
+| `time_to` | `TimeField` (nullable) | End of the window (exclusive). An end not after `time_from` wraps past midnight (see matching rule 3) |
 | `weekdays` | `CharField(20)` | Comma-separated weekday numbers `0`–`6` (Mon–Sun); blank = all days |
 | `months` | `CharField(40)` | Comma-separated month numbers `1`–`12`; blank = all months |
 
@@ -212,14 +212,22 @@ reads through `OrderBy` expressions to the column they sort on).
 The frontend sorts again for display, by season first
 (`features/tariffs/recurrence.ts`, `seasonSortKey`).
 
-**Period matching rules** (evaluated per-timestamp, `invoices/engine.py:_get_tariff_price`):
+**Period matching rules** (evaluated per-timestamp, `tariffs.periods.resolve_band`, which `invoices/engine.py:_resolve_tariff_band` delegates to):
 
 1. Restrict to periods whose `months` contain the timestamp's month. A blank
    mask matches every month, so every period predating seasonal support
    qualifies unchanged.
 2. Among those, if a `flat` period exists → use its price; ignore time/weekday.
 3. For every other period: extract the timestamp's **time** and **weekday**.
-   Match periods where `time_from ≤ time < time_to` and weekday ∈ allowed weekdays.
+   Match periods where the time is in the window (`tariffs.periods.in_window`)
+   and weekday ∈ allowed weekdays. A window with `time_from < time_to` matches
+   `time_from ≤ time < time_to`. Otherwise it **wraps past midnight** and
+   matches `time ≥ time_from or time < time_to`: `22:00–06:00` is the night,
+   an end of `00:00` means the end of the day (`16:00–00:00` is the evening),
+   and equal ends cover the whole day. The weekday is always the timestamp's
+   own, so a weekday-only `22:00–06:00` band covers Friday 22:00–24:00 and
+   Friday 00:00–06:00, not Saturday morning. Before #837 such windows matched
+   nothing and silently fell through to step 4.
    The number of such periods is irrelevant — a band is matched by its window,
    never by its name, so three or five resolve exactly as two do.
 4. **Fallback:** when no period matches the hour, the day's **first band in this
@@ -343,7 +351,11 @@ by label, by window, and the named types keeping their own; the flat-beside-time
 refusal in both directions, allowed across seasons, several timed bands together,
 and editing a band not colliding with itself; a new version carrying band labels.
 `backend/invoices/test_contract_context.py::ContractPdfSeasonalTariffTests`
-covers a three-band contract printing every band. Frontend:
+covers a three-band contract printing every band.
+`backend/tariffs/test_midnight_bands.py` (8, #837): `in_window` for ordinary,
+wrapping, end-at-midnight and whole-day windows; an HT/NT tariff with NT
+22:00–06:00 billing night hours at NT and day hours at HT; the weekday being the
+timestamp's own; and a stored night band resolved through the engine. Frontend:
 `frontend/tests/tariff-bands.test.ts` (11) covers band naming and the chart
 giving each unnamed band its own labelled series while leaving HT/NT and flat
 tariffs as they were.

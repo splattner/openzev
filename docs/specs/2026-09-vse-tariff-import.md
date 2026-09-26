@@ -237,7 +237,9 @@ Other band handling:
   unmatched; readings are 15-minute or hourly, so no reading ever falls there,
   and one that did would fall back to the tariff's first period.
 - A window written backwards (`22:00`–`06:00`) wraps past midnight and is split
-  into two rows. One row spanning midnight would match nothing at all.
+  into two rows (`22:00`–`23:59`, `00:00`–`06:00`). Since #837 the engine also
+  matches a single wrapping row, so the split is no longer required. It is kept
+  because it is equivalent, and existing imports already look that way.
 - `weekdays` map to `TariffPeriod.weekdays` (`"0,1,…"`, Mon–Sun). All seven is
   stored as blank, which is what the engine already reads as "every day".
 - Hours no band covers produce a warning naming the effect: they bill at the

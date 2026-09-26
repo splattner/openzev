@@ -102,6 +102,25 @@ def hhmm(value) -> str:
 _FLAT_PERIOD_TYPE = "flat"
 
 
+def in_window(t, start, end) -> bool:
+    """Whether the time of day ``t`` falls in the window ``[start, end)``.
+
+    A window whose end is not after its start wraps past midnight: 22:00–06:00
+    is the night, and an end of 00:00 means the end of the day, so 16:00–00:00
+    is the evening. Equal ends cover the whole day, which is how the VSE/AES
+    standard writes a constant price (00:00–00:00). Before #837 such windows
+    never matched, and every hour they were meant for billed at the fallback
+    band instead.
+
+    The weekday is always the timestamp's own: a Friday 22:00–06:00 band
+    covers Friday 22:00–24:00 and Friday 00:00–06:00, not Saturday morning.
+    That is exactly what the VSE importer's two split rows already meant.
+    """
+    if start < end:
+        return start <= t < end
+    return t >= start or t < end
+
+
 def resolve_band(periods, ts: datetime):
     """The band among ``periods`` that prices a tariff at ``ts``, or ``None``.
 
@@ -128,7 +147,7 @@ def resolve_band(periods, ts: datetime):
         if period.period_type == _FLAT_PERIOD_TYPE:
             return period
         if period.time_from and period.time_to:
-            if weekday in weekdays_of(period) and period.time_from <= t_time < period.time_to:
+            if weekday in weekdays_of(period) and in_window(t_time, period.time_from, period.time_to):
                 return period
 
     # Nothing matched the hour: the day's first band in this season, else the
