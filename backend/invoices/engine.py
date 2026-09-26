@@ -1145,13 +1145,15 @@ def _build_description(
         # band (dash, no averaging — there is only one band's worth of
         # quantity in this line). Not itemised: the tariff's single
         # percentage when every band it billed shares one, else the blended
-        # (Ø) percentage `effective_percentage` carries.
+        # (Ø) percentage `effective_percentage` carries. A 0% band bills
+        # nothing and adds no quantity to the line, so it does not count: a
+        # 0%/90% tariff's line is billed at exactly 90%, not at an average.
         if period is not None:
             pct = period.percentage or Decimal("0")
             avg_prefix = ""
         else:
             band_percentages = {
-                p.percentage for p in tariff.periods.all() if p.percentage is not None
+                p.percentage for p in tariff.periods.all() if p.percentage
             }
             if len(band_percentages) <= 1:
                 pct = next(iter(band_percentages), Decimal("0"))

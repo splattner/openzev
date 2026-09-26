@@ -242,3 +242,35 @@ class TestBandItemisation:
         # blended: (10*0.12 + 10*0.18) / 20 base of 0.20*20=4.00 -> effective 75.00%
         assert "Ø" in items[0].description
         assert "75%" in items[0].description
+
+    def test_itemisation_off_ignores_zero_bands_when_naming_the_percentage(self):
+        participant, consumption, _production = _participant_with_meters(itemize_tariff_bands=False)
+        _grid_tariff(participant.zev, "0.20000")
+        tariff = Tariff.objects.create(
+            zev=participant.zev, name="Midday Free", category=TariffCategory.LEVIES,
+            billing_mode=BillingMode.PERCENTAGE_OF_ENERGY, energy_type=EnergyType.GRID,
+            valid_from=date(2026, 1, 1),
+        )
+        TariffPeriod.objects.create(
+            tariff=tariff, period_type=PeriodType.BAND, percentage=Decimal("90.00"),
+            time_from=time(0, 0), time_to=time(10, 0),
+        )
+        TariffPeriod.objects.create(
+            tariff=tariff, period_type=PeriodType.BAND, percentage=Decimal("0.00"),
+            time_from=time(10, 0), time_to=time(16, 0),
+        )
+        TariffPeriod.objects.create(
+            tariff=tariff, period_type=PeriodType.BAND, percentage=Decimal("90.00"),
+            time_from=time(16, 0), time_to=time(23, 59, 59),
+        )
+        _read(consumption, 12, "10.0")  # 0% band: no quantity on the line
+        _read(consumption, 20, "10.0")  # 90% band
+
+        invoice = generate_invoice(participant, date(2026, 1, 1), date(2026, 1, 31))
+        items = list(invoice.items.filter(description__startswith=tariff.name))
+
+        # Only the 90% hours reach the line, so it is billed at exactly 90%
+        # and must not read as an average.
+        assert len(items) == 1
+        assert "Ø" not in items[0].description
+        assert "90%" in items[0].description

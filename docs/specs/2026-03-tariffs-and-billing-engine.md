@@ -1081,7 +1081,7 @@ Descriptions are **localized** using the ZEV's `invoice_language` (de/fr/it/en).
 | Billing mode | Description format |
 |---|---|
 | `energy` | `"{tariff.name}"`, or `"{tariff.name} – {band}"` when the line is band-itemised (§4.7a); a dynamic line appends a localized consumption-weighted effective-rate explanation |
-| `percentage_of_energy` | Band-itemised: `"{tariff.name} – {band} ({pct}%)"` using that band's own percentage. Not itemised, every resolved band sharing one percentage: `"{tariff.name} ({pct}%)"`, unchanged. Not itemised, bands differing: `"{tariff.name} (Ø {pct}%)"` using the blended `effective_percentage`. Each adds `" of CHF {base_rate}/kWh"` inside the parens when the base rate is known (see SPEC-2026-percentage-tariff-bands §5.2) |
+| `percentage_of_energy` | Band-itemised: `"{tariff.name} – {band} ({pct}%)"` using that band's own percentage. Not itemised, every non-zero band sharing one percentage (a 0 % band bills nothing and is ignored): `"{tariff.name} ({pct}%)"`, unchanged. Not itemised, non-zero bands differing: `"{tariff.name} (Ø {pct}%)"` using the blended `effective_percentage`. Each adds `" of CHF {base_rate}/kWh"` inside the parens when the base rate is known (see SPEC-2026-percentage-tariff-bands §5.2) |
 | `monthly_fee` | `"{tariff.name} ({n} Monat/Monate)"` |
 | `yearly_fee` | `"{tariff.name} ({n} monatliche Rate(n) der Jahresgebühr)"` |
 | `per_metering_point_monthly_fee` | `"{tariff.name} ({n} Messpunkt-Monat(e))"` |

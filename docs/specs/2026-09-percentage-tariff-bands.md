@@ -171,8 +171,8 @@ tariff.
 | Line | Percentage printed | Format |
 |---|---|---|
 | itemised by band (`period` set) | `period.percentage` | `"{name} – {band} ({pct}% {pct_of} {base}/kWh{suffix})"`, where `band` comes from `band_description` and the dash follows the energy-line convention |
-| not itemised, all bands of the tariff share one percentage | that percentage | unchanged: `"{name} ({pct}% {pct_of} {base}/kWh{suffix})"` |
-| not itemised, bands differ | `effective_percentage` | `"{name} (Ø {pct}% {pct_of} {base}/kWh{suffix})"` |
+| not itemised, all non-zero bands of the tariff share one percentage (0 % bands bill nothing and add no quantity, so they are ignored) | that percentage | unchanged: `"{name} ({pct}% {pct_of} {base}/kWh{suffix})"` |
+| not itemised, non-zero bands differ | `effective_percentage` | `"{name} (Ø {pct}% {pct_of} {base}/kWh{suffix})"` |
 
 Without a known base rate the same three rows drop the ` {pct_of} {base}/kWh`
 part, as today. Percentages are formatted as today, with trailing zeros stripped.
@@ -188,7 +188,7 @@ missing `percentage` today.
 
 ### 5.4 Documents
 
-Shared helper **`invoices.tariff_pricing.percentage_band_rows(tariff, grid_base, tr, band_tr)`**
+Shared helper **`invoices.tariff_pricing.percentage_band_rows(tariff, grid_base, band_tr)`**
 returns one dict per band of the tariff, in `Meta.ordering`:
 `{"period": period, "label": band_description(period, band_tr), "recurrence": band_recurrence(period, band_tr), "pct": Decimal, "effective_chf": Decimal | None}`.
 `effective_chf = grid_base.price_chf_per_kwh × pct / 100` when
@@ -285,6 +285,7 @@ label, and the "≈ CHF …/kWh" effective hint, in `de`, `fr`, `it` and `en`.
 - a 0 % band at ts produces no line and does not require the grid base (dynamic grid gap at that ts → no error)
 - itemisation on: two lines named after their bands, and each line's rounded totals add up to the group total
 - itemisation off, bands differ: one line with `Ø` and the blended percentage
+- itemisation off, bands 0 % and 90 %: one line at `90%`, without `Ø`
 - single flat band: description identical to today's format
 - `preflight_dynamic_prices` does not require the grid base at timestamps where every percentage band is 0 %
 

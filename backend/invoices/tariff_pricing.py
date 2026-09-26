@@ -93,7 +93,7 @@ def prepare_tariff_display_summaries(tariffs, *, as_of: date):
             }
 
 
-def percentage_band_rows(tariff, grid_base: GridBaseSummary, tr: dict, band_tr: dict) -> list[dict]:
+def percentage_band_rows(tariff, grid_base: GridBaseSummary, band_tr: dict) -> list[dict]:
     """One row per band of a percentage-of-energy tariff, for a document.
 
     Shared by the tariff overview and the contract PDF so both print the same

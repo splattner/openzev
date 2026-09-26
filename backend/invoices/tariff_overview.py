@@ -161,7 +161,7 @@ def _price_row_for_percentage_tariff(
     has_effective_price = grid_base.has_effective_price
 
     rows = []
-    for band in percentage_band_rows(tariff, grid_base, tr, band_tr):
+    for band in percentage_band_rows(tariff, grid_base, band_tr):
         pct = band["pct"]
         # A lone flat band has nothing to distinguish it from — same principle
         # as `_label_is_redundant` for an energy tariff — so it prints exactly

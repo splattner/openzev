@@ -392,8 +392,8 @@ tariff, a percentage tariff can be split into several **time-of-use bands** —
 open its entry and use **Add Period** to add a High/Low or named band, this
 time entering a **percentage** instead of a CHF/kWh price. A local-energy
 surcharge that is cheaper at midday and dearer in the morning and evening, for
-example, can be modelled as two bands (10:00–16:00 at 60%, the rest of the day
-at 90%) instead of a single flat percentage — see
+example, can be modelled as three bands (00:00–10:00 at 90%, 10:00–16:00 at
+60%, 16:00–23:59 at 90%) instead of a single flat percentage — see
 [Tariff Periods](#tariff-periods) for how bands, weekdays and months combine;
 everything there applies to a percentage tariff's bands exactly as it does to
 a per-kWh tariff's.
@@ -412,9 +412,15 @@ Example with time-of-use bands:
 ```
 Percentage Tariff "Local Solar Surcharge"
 ├─ Energy type: Local Energy
-├─ Band: High, 10:00–16:00, 60%
-├─ Band: Low, other hours, 90%
+├─ Band "Morning": 00:00–10:00, 90%
+├─ Band "Midday":  10:00–16:00, 60%
+├─ Band "Evening": 16:00–23:59, 90%
 ```
+
+> **Cover the whole day.** Every band needs its own time window, and the
+> windows should together cover all 24 hours. A band without a window
+> ("the rest of the day") never matches: an hour no band covers is billed at
+> the tariff's first band instead, which is usually not what you meant.
 
 This is useful when you want to set local energy prices as a fraction of the grid energy rate, so that price changes to the grid tariff are automatically reflected.
 

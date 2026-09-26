@@ -98,7 +98,7 @@ def _build_local_tariff_display(zev, tr: dict, date_pattern: str, as_of: date) -
             # distinguish it from, so it prints exactly the pre-band formula;
             # a named or timed band, or a tariff with several, is prefixed
             # with its own label so the rows can be told apart.
-            for band in percentage_band_rows(tariff, grid_base, tr, tr):
+            for band in percentage_band_rows(tariff, grid_base, tr):
                 pct = band["pct"]
                 redundant = band["label"] == tr["tariff_flat"] and not band["recurrence"]
                 prefix = "" if redundant else f"{band['label']}: "
