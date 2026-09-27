@@ -1,6 +1,6 @@
 # Changelog
 
-## [1.19.0](https://github.com/splattner/openzev/compare/v1.18.3...v1.19.0) (2026-09-26)
+## [1.19.0](https://github.com/splattner/openzev/compare/v1.18.3...v1.19.0) (2026-09-27)
 
 
 ### Features
