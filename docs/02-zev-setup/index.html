@@ -1952,8 +1952,13 @@ it off under <strong>Platform → System Settings → Functions</strong>).</p>
   <a href="../17-zev-transfer/">ZEV Export and Import</a>)</li>
 </ul>
 <p><img alt="ZEV settings" src="../screenshots/06-zev-settings.png" /></p>
-<p>Each tab has its own <strong>Save</strong> button, and saving on any tab saves the whole
-form.</p>
+<p>One save bar serves every tab: <strong>Unsaved changes</strong> with <strong>Save changes</strong> /
+<strong>Discard changes</strong>. Switching tabs keeps your edits. Saving checks all
+settings; if another tab has an invalid field, the page opens it and focuses
+the field. If the server rejects a field, its error appears beside the control
+and focus returns to that control once saving finishes. Your edits remain
+available to correct and retry. Switching communities asks for confirmation
+while edits are unsaved. Save or discard before navigating to another page.</p>
 <h3 id="general-tab">General tab<a class="headerlink" href="#general-tab" title="Permanent link">&para;</a></h3>
 <h4 id="general-zev-settings">General ZEV Settings<a class="headerlink" href="#general-zev-settings" title="Permanent link">&para;</a></h4>
 <table>
@@ -2208,12 +2213,19 @@ is still a draft) if you want it in the new shape.</p>
 <p>From the page, <strong>Send me a sign-in link</strong> emails a one-time link to the address you have on file for that participant, which opens the ordinary participant portal. The requester never gets to say where it goes — the invoice identifies them — and nobody sets a password at any point.</p>
 <h3 id="email-templates">Email Templates<a class="headerlink" href="#email-templates" title="Permanent link">&para;</a></h3>
 <p><strong>ZEV Owners</strong> can customize invoice email templates in <strong>ZEV Settings → Documents &amp; emails</strong>:</p>
+<p><img alt="Document and email settings" src="../screenshots/06c-zev-documents-settings.png" /></p>
 <ul>
 <li><strong>Subject line</strong> — Email subject sent with invoices</li>
 <li><strong>Email body</strong> — Message body sent with invoice PDF attachment</li>
 </ul>
 <p>Both fields support variable placeholders such as <code>{invoice_number}</code>, <code>{zev_name}</code>, <code>{participant_name}</code>, <code>{period_start}</code>, <code>{period_end}</code>, and <code>{total_chf}</code>. See <a href="../10-email-configuration/#email-templates">Email Configuration → Email Templates</a> for the full variable reference.</p>
-<p>Leave fields blank to use the admin's global invoice-email template when one is customized, or the shipped default otherwise. If a template contains an invalid placeholder, the system falls back to defaults automatically.</p>
+<p>Subject and body are independent: each shows the platform text with
+<strong>Using platform default</strong>, or your own text with <strong>Customized for this ZEV</strong>.
+<strong>Customize</strong> starts the editor from the platform text (or blank if it cannot
+be loaded); <strong>Use platform default</strong> clears one field. Like any edit, both take
+effect on <strong>Save changes</strong> only. Text matching today's platform default still
+counts as a customization once saved.</p>
+<p>If a template contains an invalid placeholder, the system falls back to defaults automatically.</p>
 <p>For more details on email delivery, see <a href="../10-email-configuration/">Email Configuration</a>. For system-wide default email templates managed by admins, see <a href="../14-admin-console/#email-templates">Platform → Templates → Email templates</a>.</p>
 <h2 id="access-control">Access Control<a class="headerlink" href="#access-control" title="Permanent link">&para;</a></h2>
 <p>ZEV access is controlled via <strong>role assignments</strong>:</p>
