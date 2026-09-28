@@ -26,21 +26,57 @@ interface EnergyFlowChartProps {
 const VIEW_W = 960
 const PAD_TOP = 28
 const PAD_BOTTOM = 44
-const PAD_LEFT = 140
-const PAD_RIGHT = 140
 const BAR_W = 14
 const MIN_NODE_H = 6
 const OUTER_GAP = 10
 const INNER_GAP = 56
 
-const COL_USABLE = VIEW_W - PAD_LEFT - PAD_RIGHT - BAR_W
-const COL_X = [
-    PAD_LEFT,
-    Math.round(PAD_LEFT + COL_USABLE / 4),
-    Math.round(PAD_LEFT + (COL_USABLE * 2) / 4),
-    Math.round(PAD_LEFT + (COL_USABLE * 3) / 4),
-    PAD_LEFT + COL_USABLE,
-]
+// Side gutters hold the participant labels; they grow with the longest label
+// up to MAX_SIDE_PAD, beyond which names wrap onto a second line.
+const MIN_SIDE_PAD = 140
+const MAX_SIDE_PAD = 210
+const LABEL_GAP = 8
+const LABEL_FONT = 11
+const LABEL_LINE_H = 13
+const LABEL_MAX_LINES = 2
+// Rough average glyph width for the UI sans font; errs on the wide side.
+const CHAR_W = LABEL_FONT * 0.6
+
+function textWidth(text: string): number {
+    return text.length * CHAR_W
+}
+
+function sidePad(labels: string[]): number {
+    const widest = labels.reduce((w, l) => Math.max(w, textWidth(l)), 0)
+    return Math.round(Math.min(MAX_SIDE_PAD, Math.max(MIN_SIDE_PAD, widest + LABEL_GAP + 6)))
+}
+
+/** Greedy word wrap into at most LABEL_MAX_LINES lines; overflow ends in an ellipsis. */
+function wrapLabel(label: string, maxWidth: number): string[] {
+    const maxChars = Math.max(4, Math.floor(maxWidth / CHAR_W))
+    const words = label.trim().split(/\s+/).flatMap(w => {
+        const parts: string[] = []
+        for (let i = 0; i < w.length; i += maxChars) parts.push(w.slice(i, i + maxChars))
+        return parts
+    })
+    const lines: string[] = []
+    let current = ''
+    for (const w of words) {
+        const next = current ? `${current} ${w}` : w
+        if (next.length <= maxChars) {
+            current = next
+        } else {
+            if (current) lines.push(current)
+            current = w
+        }
+    }
+    if (current) lines.push(current)
+    if (lines.length <= LABEL_MAX_LINES) return lines
+    const kept = lines.slice(0, LABEL_MAX_LINES)
+    const last = kept[LABEL_MAX_LINES - 1]
+    kept[LABEL_MAX_LINES - 1] = `${last.slice(0, maxChars - 1).trimEnd()}…`
+    return kept
+}
 
 interface SNode {
     id: string
@@ -51,6 +87,7 @@ interface SNode {
     y: number
     h: number
     pct?: string
+    lines: string[]
 }
 
 interface SLink {
@@ -218,6 +255,13 @@ export function EnergyFlowChart({ totals, participantStats, highlightParticipant
         const allCols = [col0, col1, col2, col3, col4]
         if (allCols.every(c => c.length === 0)) return null
 
+        // --- Horizontal layout: side gutters sized to the participant labels ---
+        const padLeft = sidePad(col0.map(n => n.label))
+        const padRight = sidePad(col4.map(n => n.label))
+        const colUsable = VIEW_W - padLeft - padRight - BAR_W
+        const colX = [0, 1, 2, 3, 4].map(i => Math.round(padLeft + (colUsable * i) / 4))
+        const labelWidth = (pad: number) => pad - LABEL_GAP - 4
+
         // --- Compute unified scale so flow thickness is consistent ---
         const maxNodes = Math.max(...allCols.map(c => c.length))
         const viewH = Math.max(280, Math.min(550, maxNodes * 56 + PAD_TOP + PAD_BOTTOM))
@@ -244,7 +288,10 @@ export function EnergyFlowChart({ totals, participantStats, highlightParticipant
             let y = PAD_TOP + (usableH - totalH) / 2
             return defs.map(def => {
                 const h = Math.max(MIN_NODE_H, def.value * scale)
-                const node: SNode = { ...def, y, h }
+                const lines = def.col === 0
+                    ? wrapLabel(def.label, labelWidth(padLeft))
+                    : def.col === 4 ? wrapLabel(def.label, labelWidth(padRight)) : [def.label]
+                const node: SNode = { ...def, y, h, lines }
                 y += h + gap
                 return node
             })
@@ -307,15 +354,15 @@ export function EnergyFlowChart({ totals, participantStats, highlightParticipant
             const ty = tgtIn[lk.targetId]
             srcOut[lk.sourceId] += th
             tgtIn[lk.targetId] += th
-            return { ...lk, sy, ty, th, sx: COL_X[src.col] + BAR_W, tx: COL_X[tgt.col] }
+            return { ...lk, sy, ty, th, sx: colX[src.col] + BAR_W, tx: colX[tgt.col] }
         })
 
-        return { nodes, links, viewH }
+        return { nodes, links, viewH, colX }
     }, [totals, participantStats, highlightParticipantId, t])
 
     if (!data) return <p className="muted">{t('pages.dashboard.noData')}</p>
 
-    const { nodes, links, viewH } = data
+    const { nodes, links, viewH, colX } = data
     const anyHover = hoverNode !== null || hoverLink !== null
 
     const isLinkHit = (lk: SLink) => {
@@ -391,7 +438,12 @@ export function EnergyFlowChart({ totals, participantStats, highlightParticipant
                 const isLeft = n.col === 0
                 const isRight = n.col === 4
                 const isMid = n.col >= 1 && n.col <= 3
-                const x = COL_X[n.col]
+                const x = colX[n.col]
+                // Center the name lines plus the kWh line on the bar
+                const cy = n.y + n.h / 2
+                const extra = ((n.lines.length - 1) * LABEL_LINE_H) / 2
+                const nameY = (i: number) => cy - 6 - extra + i * LABEL_LINE_H
+                const valueY = cy + 7 + extra
 
                 return (
                     <g
@@ -400,21 +452,23 @@ export function EnergyFlowChart({ totals, participantStats, highlightParticipant
                         onMouseEnter={() => setHoverNode(n.id)}
                         onMouseLeave={() => setHoverNode(null)}
                     >
+                        {(isLeft || isRight) && <title>{`${n.label}: ${formatKwh(n.value)} kWh`}</title>}
                         <rect x={x} y={n.y} width={BAR_W} height={n.h} fill={n.color} rx={2} />
 
-                        {isLeft && (
-                            <>
-                                <text className="sankey-participant-label" x={x - 8} y={n.y + n.h / 2 - 6} textAnchor="end" dominantBaseline="central" fontSize={11} fill={CHART_INK}>{n.label}</text>
-                                <text x={x - 8} y={n.y + n.h / 2 + 7} textAnchor="end" dominantBaseline="central" fontSize={10} fill={CHART_MUTED}>{formatKwh(n.value)} kWh</text>
-                            </>
-                        )}
-
-                        {isRight && (
-                            <>
-                                <text className="sankey-participant-label" x={x + BAR_W + 8} y={n.y + n.h / 2 - 6} textAnchor="start" dominantBaseline="central" fontSize={11} fill={CHART_INK}>{n.label}</text>
-                                <text x={x + BAR_W + 8} y={n.y + n.h / 2 + 7} textAnchor="start" dominantBaseline="central" fontSize={10} fill={CHART_MUTED}>{formatKwh(n.value)} kWh</text>
-                            </>
-                        )}
+                        {(isLeft || isRight) && (() => {
+                            const tx = isLeft ? x - LABEL_GAP : x + BAR_W + LABEL_GAP
+                            const anchor = isLeft ? 'end' : 'start'
+                            return (
+                                <>
+                                    <text className="sankey-participant-label" x={tx} textAnchor={anchor} dominantBaseline="central" fontSize={LABEL_FONT} fill={CHART_INK}>
+                                        {n.lines.map((line, i) => (
+                                            <tspan key={i} x={tx} y={nameY(i)}>{line}</tspan>
+                                        ))}
+                                    </text>
+                                    <text x={tx} y={valueY} textAnchor={anchor} dominantBaseline="central" fontSize={10} fill={CHART_MUTED}>{formatKwh(n.value)} kWh</text>
+                                </>
+                            )
+                        })()}
 
                         {isMid && (
                             <>
