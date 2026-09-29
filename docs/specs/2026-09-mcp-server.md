@@ -35,7 +35,7 @@ more — and every tool call is traceable in the audit log.
 | Protocol | JSON-RPC 2.0: `initialize`, `notifications/initialized`, `ping`, `tools/list`, `tools/call`; batches |
 | Auth | Existing API keys via `Authorization: Api-Key ozv_…` or `Authorization: Bearer ozv_…`; roles `admin`, `zev_owner` |
 | Feature flag | `mcp_server_enabled`, default off; `404` while off |
-| Tools | 9 read-only tools (§6) built on in-process sub-requests to existing REST GET endpoints |
+| Tools | 10 read-only tools (§6) built on in-process sub-requests to existing REST GET endpoints |
 | Audit | `AuditEventSource.MCP`; one `mcp.tool.call` event per `tools/call` |
 | Throttling | One API-key throttle hit per MCP HTTP request; sub-requests are not throttled again |
 | Docs | New user-guide chapter `19-ai-assistants.md`; `mkdocs.yml` nav; baseline spec updates (§11) |
@@ -388,6 +388,31 @@ Aggregated consumption, production and self-consumption.
   `participant_id`/`participant_name` echo `selected_participant_id`/`selected_participant_name`
   from the payload.
 
+### 6.6a `consumption_profile`
+
+A participant's average day: 24 hourly averages split into ZEV (local) energy and grid import.
+
+- Input: `zev_id`, `participant_id`, `date_from`, `date_to` (all required; span ≤ 400 days,
+  checked at run time as a `ToolError` like §6.6). `participant_id` is required because the
+  endpoint only computes a profile for a named participant when called by an admin or owner.
+- Sub-request: `GET /api/v1/metering/readings/hourly-profile/?zev_id&participant_id&date_from&date_to`
+  (`meterreading-hourly-profile`). A foreign ZEV (`403`) or a participant outside the ZEV (`404`)
+  comes back as a tool error with the view's message.
+- Output:
+  ```json
+  {"zev_id", "participant_id", "date_from", "date_to",
+   "profile": [{"hour": 0-23, "from_zev_kwh", "from_grid_kwh", "total_kwh"}] | null,
+   "average_daily_kwh", "average_daily_from_zev_kwh", "local_share_pct", "peak_hour",
+   "note"?: "…"}
+  ```
+  `profile` rows pass `hour`/`from_zev_kwh`/`from_grid_kwh` through from
+  `metering.analytics.compute_hourly_profile` (already averaged per day over the range) and add
+  `total_kwh`. `average_daily_*` are the sums over the 24 rows; `local_share_pct` is
+  `from_zev / total` (`null` when total is 0); `peak_hour` is the hour with the largest
+  `total_kwh` (`null` when total is 0). When the endpoint answers `hourly_profile: null`
+  (no readings), the tool returns `profile: null` with a `note` instead of 24 zero rows. `hour`
+  is passed through exactly as the endpoint (and the dashboard chart) computes it.
+
 ### 6.7 `data_gaps`
 
 Which metering points have missing readings.
@@ -426,6 +451,7 @@ method other than `GET`:
 | `find_invoices`, `explain_invoice` | `invoice-list`, `invoice-detail` |
 | `import_triage` | `importlog-list` |
 | `consumption_summary` | `meterreading-dashboard-summary` |
+| `consumption_profile` | `meterreading-hourly-profile` |
 | `data_gaps` | `meterreading-data-quality-status` |
 | `audit_query` | `audit-event-list` |
 
@@ -516,16 +542,16 @@ No new env vars.
 
 ## 10. Tests (`backend/mcp_server/tests/`)
 
-67 tests across four modules (`backend/mcp_server/tests/__init__.py` makes it a package;
+73 tests across four modules (`backend/mcp_server/tests/__init__.py` makes it a package;
 fixtures live in `backend/mcp_server/tests/conftest.py` — an autouse `mcp_server_enabled`
 fixture, `admin_mcp_client`/`owner_mcp_client`, and `rpc`/`call_tool` request helpers built
 on `APIClient`).
 
 | Module | Count | Classes | Covers |
 |---|---|---|---|
-| `test_transport.py` | 28 | `TestFeatureFlagGate`, `TestMethodNotAllowed`, `TestAuthentication`, `TestRole`, `TestOrigin`, `TestBodyParsing`, `TestBatch`, `TestInitialize`, `TestPing`, `TestToolsList`, `TestToolsCall` | flag off → 404 (unauthenticated and with a valid key); `GET`/`DELETE` → 405 (authenticated); no auth → 401 with `WWW-Authenticate`; cookie JWT alone → 401; `Api-Key` and `Bearer` both accepted; revoked/expired key → 401; participant → 403; admin/owner → 200; untrusted `Origin` → 403, no `Origin` passes, trusted `Origin` passes; malformed JSON → `-32700`/400; non-object message → `-32600`; unknown method → `-32601`; batch (mixed request + notification), batch > 10 → `-32600`, notification-only → 202 with empty body; `initialize` version negotiation (requested-and-supported, and fallback for unsupported); `ping`; `tools/list` returns exactly the 9 tools, all `readOnlyHint: true`; unknown tool and invalid arguments → `-32602` with `data.errors` |
+| `test_transport.py` | 28 | `TestFeatureFlagGate`, `TestMethodNotAllowed`, `TestAuthentication`, `TestRole`, `TestOrigin`, `TestBodyParsing`, `TestBatch`, `TestInitialize`, `TestPing`, `TestToolsList`, `TestToolsCall` | flag off → 404 (unauthenticated and with a valid key); `GET`/`DELETE` → 405 (authenticated); no auth → 401 with `WWW-Authenticate`; cookie JWT alone → 401; `Api-Key` and `Bearer` both accepted; revoked/expired key → 401; participant → 403; admin/owner → 200; untrusted `Origin` → 403, no `Origin` passes, trusted `Origin` passes; malformed JSON → `-32700`/400; non-object message → `-32600`; unknown method → `-32601`; batch (mixed request + notification), batch > 10 → `-32600`, notification-only → 202 with empty body; `initialize` version negotiation (requested-and-supported, and fallback for unsupported); `ping`; `tools/list` returns exactly the 10 tools, all `readOnlyHint: true`; unknown tool and invalid arguments → `-32602` with `data.errors` |
 | `test_dispatch.py` | 5 | `TestAllowList`, `TestForcedAuth`, `TestThrottleSkip` | non-allow-listed URL raises `DispatchError`; an allow-listed URL succeeds; a sub-request resolves data as the forced user (proves `_force_auth_user`/`_force_auth_token` took effect); `ApiKeyRateThrottle.get_cache_key` returns `None` when `mcp_subrequest` is set and a real cache key otherwise |
-| `test_tools.py` | 28 | `TestListZevs`, `TestListParticipants`, `TestPeriodReadiness`, `TestFindInvoices`, `TestExplainInvoice`, `TestImportTriage`, `TestConsumptionSummary`, `TestDataGaps`, `TestAuditQuery` | one class per tool: happy-path shape; owner cannot see another owner's ZEV/invoice (`isError` with the view's own message, e.g. "Permission denied.", no data leaked); admin sees any ZEV; invalid arguments → `-32602`; caps/truncation (`find_invoices`, `import_triage`); `explain_invoice` previous-invoice selection skips a cancelled invoice and picks the correct prior period, and `compare_previous: false` skips the lookup; `import_triage` extracts meter ids from error text and respects `only_problems`; `consumption_summary` span > 400 days is a `ToolError` (`isError: true`, not `-32602` — see §6.6); `data_gaps` marks a meter with zero readings fully incomplete; `list_participants` returns assignments and none of the contact fields, filters by `query` and `active_on` (and `include_inactive`), caps with `truncated`/`total`, and gives an owner naming another owner's ZEV a tool error with no participant data; `find_invoices` `participant_id` narrows server-side |
+| `test_tools.py` | 34 | `TestListZevs`, `TestListParticipants`, `TestPeriodReadiness`, `TestFindInvoices`, `TestExplainInvoice`, `TestImportTriage`, `TestConsumptionSummary`, `TestConsumptionProfile`, `TestDataGaps`, `TestAuditQuery` | one class per tool: happy-path shape; owner cannot see another owner's ZEV/invoice (`isError` with the view's own message, e.g. "Permission denied.", no data leaked); admin sees any ZEV; invalid arguments → `-32602`; caps/truncation (`find_invoices`, `import_triage`); `explain_invoice` previous-invoice selection skips a cancelled invoice and picks the correct prior period, and `compare_previous: false` skips the lookup; `import_triage` extracts meter ids from error text and respects `only_problems`; `consumption_summary` span > 400 days is a `ToolError` (`isError: true`, not `-32602` — see §6.6); `data_gaps` marks a meter with zero readings fully incomplete; `list_participants` returns assignments and none of the contact fields, filters by `query` and `active_on` (and `include_inactive`), caps with `truncated`/`total`, and gives an owner naming another owner's ZEV a tool error with no participant data; `find_invoices` `participant_id` narrows server-side; `consumption_profile` returns 24 rows with the correct peak hour, daily average and local share, `profile: null` plus a note without readings, `-32602` without `participant_id`, a tool error for a participant of another ZEV or another owner's ZEV, and a `ToolError` for a span over 400 days |
 | `test_audit.py` | 6 | `TestToolCallAudit` | successful call recorded with `source = mcp`, `mcp.Tool`/tool-name target, `api_key_prefix`/`duration_ms`/`subrequests` in metadata; `zev_id` argument attaches the `Zev` row only when it is visible to the caller (an owner naming another owner's ZEV gets `zev = null` **and** `status = denied`, not a leak); a failed tool call is recorded `failed` or `denied`; `tools/list` and `initialize` write no `mcp.tool.call` event |
 
 `accounts/test_throttling.py` gains `McpSubrequestThrottleTests` (1 test,

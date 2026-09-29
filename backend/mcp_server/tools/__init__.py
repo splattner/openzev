@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from .audit_query import AuditQueryTool
 from .base import Tool, ToolContext, ToolError
+from .consumption_profile import ConsumptionProfileTool
 from .consumption_summary import ConsumptionSummaryTool
 from .data_gaps import DataGapsTool
 from .explain_invoice import ExplainInvoiceTool
@@ -27,6 +28,7 @@ TOOLS: dict[str, Tool] = {
         ExplainInvoiceTool(),
         ImportTriageTool(),
         ConsumptionSummaryTool(),
+        ConsumptionProfileTool(),
         DataGapsTool(),
         AuditQueryTool(),
     )

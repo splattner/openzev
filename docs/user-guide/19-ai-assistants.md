@@ -87,7 +87,7 @@ a header credential: `Authorization: Bearer ozv_3f9a1c04b7e2_kR8vN2pQ...`.
 
 ## What you can ask
 
-Once connected, the assistant has nine tools. You do not need to know their
+Once connected, the assistant has ten tools. You do not need to know their
 names — asking a normal question is enough — but knowing what exists helps
 you phrase a better question:
 
@@ -100,6 +100,7 @@ you phrase a better question:
 | `explain_invoice` | Break one invoice down into its line items, and compare it with the participant's previous invoice |
 | `import_triage` | What happened in recent metering imports, and what went wrong? |
 | `consumption_summary` | Aggregated consumption, production and self-consumption over a date range |
+| `consumption_profile` | A participant's average day: how much they use in each hour, and how much of it comes from the ZEV's own solar |
 | `data_gaps` | Which metering points are missing readings, and where? |
 | `audit_query` | Who did what, and when? |
 
@@ -112,6 +113,7 @@ Example questions:
 - "Explain invoice OZV-00013 — why did it go up from last quarter?"
 - "What errors came up in yesterday's metering import?"
 - "How much energy did ZEV Sonnenhof self-consume in August, by day?"
+- "When in the day does Anna Muster use the most electricity, and how much of that is covered by solar?"
 - "Which metering points have gaps in the last 30 days?"
 - "Who approved invoices for ZEV Sonnenhof last week?"
 

@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime, timezone
 from decimal import Decimal
 
 import pytest
 
 from invoices.models import InvoiceStatus
-from metering.models import ImportLog, ImportSource
+from metering.models import ImportLog, ImportSource, MeterReading, ReadingDirection, ReadingResolution
 from testing.factories import (
     InvoiceFactory,
     InvoiceItemFactory,
@@ -351,6 +351,75 @@ class TestConsumptionSummary:
         assert result["totals"]["consumed_kwh"] == 0.0
         assert result["totals"]["self_consumption_pct"] is None
         assert result["series"] == []
+
+
+class TestConsumptionProfile:
+    @staticmethod
+    def _participant_with_reading(zev, kwh="10.0000"):
+        participant = ParticipantFactory(zev=zev, valid_from=date(2026, 1, 1))
+        meter = MeteringPointFactory(zev=zev, meter_type="consumption")
+        MeteringPointAssignmentFactory(metering_point=meter, participant=participant, valid_from=date(2026, 1, 1))
+        MeterReading.objects.create(
+            metering_point=meter, timestamp=datetime(2026, 1, 10, 18, 0, tzinfo=timezone.utc),
+            energy_kwh=kwh, direction=ReadingDirection.IN, resolution=ReadingResolution.FIFTEEN_MIN,
+        )
+        return participant
+
+    def _args(self, zev, participant, **extra):
+        return {"zev_id": str(zev.id), "participant_id": str(participant.id),
+                "date_from": "2026-01-01", "date_to": "2026-01-10", **extra}
+
+    def test_profile_shape_peak_and_daily_average(self, owner_mcp_client, owner_user):
+        zev = ZevFactory(owner=owner_user)
+        participant = self._participant_with_reading(zev)
+
+        result = _structured(call_tool(owner_mcp_client, "consumption_profile", self._args(zev, participant)))
+
+        assert len(result["profile"]) == 24
+        assert set(result["profile"][0]) == {"hour", "from_zev_kwh", "from_grid_kwh", "total_kwh"}
+        # One 10 kWh reading averaged over the 10-day range, all from the grid
+        # (the ZEV has no production).
+        assert result["peak_hour"] == 18
+        assert result["profile"][18]["total_kwh"] == 1.0
+        assert result["average_daily_kwh"] == 1.0
+        assert result["local_share_pct"] == 0.0
+
+    def test_no_readings_returns_null_profile_with_note(self, owner_mcp_client, owner_user):
+        zev = ZevFactory(owner=owner_user)
+        participant = ParticipantFactory(zev=zev, valid_from=date(2026, 1, 1))
+
+        result = _structured(call_tool(owner_mcp_client, "consumption_profile", self._args(zev, participant)))
+        assert result["profile"] is None
+        assert "note" in result
+
+    def test_participant_is_required(self, owner_mcp_client, owner_user):
+        zev = ZevFactory(owner=owner_user)
+        response = call_tool(owner_mcp_client, "consumption_profile", {
+            "zev_id": str(zev.id), "date_from": "2026-01-01", "date_to": "2026-01-10",
+        })
+        assert response.json()["error"]["code"] == -32602
+
+    def test_participant_from_another_zev_is_an_error(self, owner_mcp_client, owner_user):
+        zev = ZevFactory(owner=owner_user)
+        other_participant = self._participant_with_reading(ZevFactory(owner=owner_user))
+
+        response = call_tool(owner_mcp_client, "consumption_profile", self._args(zev, other_participant))
+        assert _is_error(response) is True
+
+    def test_owner_cannot_read_another_owners_zev(self, owner_mcp_client):
+        zev = ZevFactory()
+        participant = self._participant_with_reading(zev)
+
+        response = call_tool(owner_mcp_client, "consumption_profile", self._args(zev, participant))
+        assert _is_error(response) is True
+        assert "profile" not in str(response.json()["result"].get("structuredContent", {}))
+
+    def test_span_over_400_days_is_rejected(self, owner_mcp_client, owner_user):
+        zev = ZevFactory(owner=owner_user)
+        participant = ParticipantFactory(zev=zev)
+        response = call_tool(owner_mcp_client, "consumption_profile",
+                             self._args(zev, participant, date_from="2025-01-01", date_to="2026-06-01"))
+        assert _is_error(response) is True
 
 
 class TestDataGaps:
