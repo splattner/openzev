@@ -2243,6 +2243,33 @@ python3<span class="w"> </span>-c<span class="w"> </span><span class="s2">"impor
 <p>Store a copy of all three keys outside the server. Losing
 <code>MFA_ENCRYPTION_KEYS</code> makes enrolled authenticator apps unusable, and losing
 <code>BACKUP_ENCRYPTION_KEYS</code> makes encrypted backups unreadable.</p>
+<p>What each key protects, and what losing it costs:</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Protects</th>
+<th>If lost</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>BACKUP_ENCRYPTION_KEYS</code></td>
+<td>Backup archives <strong>and stored destination credentials</strong></td>
+<td>Encrypted backups and stored S3 secrets needing that key cannot be opened. Keep old keys while retained archives or stored secrets still depend on them; new backups alone do not re-encrypt stored credentials. See <a href="../18-backups/">Backups</a>.</td>
+</tr>
+<tr>
+<td><code>MFA_ENCRYPTION_KEYS</code></td>
+<td>Two-factor (TOTP) secrets</td>
+<td>Authenticator access is affected; it is not the key that opens a backup archive. It is needed when recovering those devices.</td>
+</tr>
+<tr>
+<td><code>SECRET_KEY</code></td>
+<td>Signing and authentication state</td>
+<td>Replacing it can invalidate sessions and tokens; it does not make the backed-up business data undecryptable.</td>
+</tr>
+</tbody>
+</table>
 <p>The backend checks this configuration every time it starts. If a required
 value is missing or still points at a development host, the database
 migration step stops with an error such as <code>accounts.E003</code> (hosts),
