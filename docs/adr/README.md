@@ -10,7 +10,7 @@ This directory captures key architectural decisions for OpenZEV.
 - [0004: Asynchronous invoice email delivery with audit logs](0004-async-invoice-email-delivery.md)
 - [0005: Metering import with preview-first validation and safe write modes](0005-metering-import-preview-and-safe-write.md)
 - [0006: Invoice lifecycle state machine and regeneration locking](0006-invoice-lifecycle-and-locking.md)
-- [0007: Timezone policy for storage, queries, and display](0007-timezone-policy.md)
+- [0007: Timezone policy for storage, queries, and display](0007-timezone-policy.md) (superseded by 0026)
 - [0008: Security model and audit logging scope](0008-security-and-audit-logging.md)
 - [0009: Remove direct MeteringPoint participant FK](0009-remove-direct-meteringpoint-participant-fk.md)
 - [0010: Centralized audit event stream for high-risk operational workflows](0010-centralized-audit-event-stream.md)
@@ -28,6 +28,7 @@ This directory captures key architectural decisions for OpenZEV.
 - [0022: Sessions are revoked with a per-account version counter, not a token blacklist](0022-session-revocation-by-version-counter.md)
 - [0023: Backup archives preserve primary keys and restore in place, unlike transfer archives](0023-backup-archives-preserve-keys.md)
 - [0024: Backup artifacts are encrypted under a dedicated, optional key](0024-backup-encryption-key.md)
+- [0026: Readings are UTC instants; every calendar question is answered in Swiss civil time](0026-swiss-civil-time-for-billing.md) (supersedes 0007)
 
 ## Conventions
 

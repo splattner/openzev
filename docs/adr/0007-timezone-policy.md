@@ -1,7 +1,8 @@
 # ADR 0007: Timezone policy for storage, queries, and display
 
-- Status: Accepted
+- Status: Superseded
 - Date: 2026-03-24
+- Superseded by: [ADR 0026](0026-swiss-civil-time-for-billing.md)
 
 ## Context
 
