@@ -1952,13 +1952,9 @@ it off under <strong>Platform → System Settings → Functions</strong>).</p>
   <a href="../17-zev-transfer/">ZEV Export and Import</a>)</li>
 </ul>
 <p><img alt="ZEV settings" src="../screenshots/06-zev-settings.png" /></p>
-<p>One save bar serves every tab: <strong>Unsaved changes</strong> with <strong>Save changes</strong> /
-<strong>Discard changes</strong>. Switching tabs keeps your edits. Saving checks all
-settings; if another tab has an invalid field, the page opens it and focuses
-the field. If the server rejects a field, its error appears beside the control
-and focus returns to that control once saving finishes. Your edits remain
-available to correct and retry. Switching communities asks for confirmation
-while edits are unsaved. Save or discard before navigating to another page.</p>
+<p>One save bar serves every tab. Switching tabs keeps your edits; <strong>Save changes</strong>
+checks all settings and opens the first invalid field. Switching communities
+or leaving settings asks for confirmation while edits are unsaved.</p>
 <h3 id="general-tab">General tab<a class="headerlink" href="#general-tab" title="Permanent link">&para;</a></h3>
 <h4 id="general-zev-settings">General ZEV Settings<a class="headerlink" href="#general-zev-settings" title="Permanent link">&para;</a></h4>
 <table>
@@ -2219,12 +2215,10 @@ is still a draft) if you want it in the new shape.</p>
 <li><strong>Email body</strong> — Message body sent with invoice PDF attachment</li>
 </ul>
 <p>Both fields support variable placeholders such as <code>{invoice_number}</code>, <code>{zev_name}</code>, <code>{participant_name}</code>, <code>{period_start}</code>, <code>{period_end}</code>, and <code>{total_chf}</code>. See <a href="../10-email-configuration/#email-templates">Email Configuration → Email Templates</a> for the full variable reference.</p>
-<p>Subject and body are independent: each shows the platform text with
-<strong>Using platform default</strong>, or your own text with <strong>Customized for this ZEV</strong>.
-<strong>Customize</strong> starts the editor from the platform text (or blank if it cannot
-be loaded); <strong>Use platform default</strong> clears one field. Like any edit, both take
-effect on <strong>Save changes</strong> only. Text matching today's platform default still
-counts as a customization once saved.</p>
+<p>Subject and body can inherit the platform template or use your own text
+independently. Their badges show the saved choice; <strong>Unsaved changes</strong> marks a
+staged edit. <strong>Use platform default</strong> takes effect after <strong>Save changes</strong>. See
+<a href="../10-email-configuration/#email-templates">Email Configuration</a> for details.</p>
 <p>If a template contains an invalid placeholder, the system falls back to defaults automatically.</p>
 <p>For more details on email delivery, see <a href="../10-email-configuration/">Email Configuration</a>. For system-wide default email templates managed by admins, see <a href="../14-admin-console/#email-templates">Platform → Templates → Email templates</a>.</p>
 <h2 id="access-control">Access Control<a class="headerlink" href="#access-control" title="Permanent link">&para;</a></h2>

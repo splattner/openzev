@@ -2570,6 +2570,8 @@ active for an invoice period, VAT defaults to <strong>0%</strong> in every mode.
 <li>Edit the template used for invoice PDF rendering (tabs for the invoice, participant contract, and annual statement templates)</li>
 <li>The <strong>Available Fields</strong> panel lists supported fields with preview examples. In source view, search by token or description and click a token to insert it at the caret. Shift-click keeps the caret in its original position. Loop tags insert a ready-to-fill block.</li>
 <li><strong>Preview</strong> shows a real, sample-data PDF rendered through the same pipeline as issued documents; a source toggle reveals the raw template markup</li>
+<li><strong>Built-in default</strong> means no platform override is saved; <strong>Customized</strong> means an override is saved. <strong>Unsaved changes</strong> describes edits in the current editor separately.</li>
+<li><strong>Reset to built-in default</strong> appears for a saved override. Confirming removes it immediately and replaces current edits with the current shipped template. Canceling keeps the editor as it is.</li>
 <li>Template changes affect future PDF renders. Existing stored PDFs remain
   unchanged until <strong>regenerated</strong> — individual invoices can be regenerated, and
   administrators can regenerate PDFs for an entire billing period.</li>
@@ -2611,7 +2613,7 @@ active for an invoice period, VAT defaults to <strong>0%</strong> in every mode.
 of anything else you send — it exists only to carry <code>{link_url}</code>. If your edit
 uses a placeholder that does not exist, OpenZEV sends the shipped default
 instead, so the link always works even when the wording is not yours.</p>
-<p>Administrators can edit the default subject and body for each template. These defaults are used unless a ZEV owner has set a custom template for their ZEV.</p>
+<p>Administrators can edit the default subject and body for each template. ZEV owners can override the invoice-email subject and body independently for their community.</p>
 <h3 id="accessing-email-templates">Accessing Email Templates<a class="headerlink" href="#accessing-email-templates" title="Permanent link">&para;</a></h3>
 <ol>
 <li>Navigate to <strong>Platform → Templates → Email templates</strong></li>
@@ -2703,10 +2705,12 @@ instead, so the link always works even when the wording is not yours.</p>
 </tr>
 </tbody>
 </table>
+<p>If saving fails, the editor keeps your changes and shows the server’s validation
+message when available, so you can correct the template and retry.</p>
 <h3 id="customization-indicator">Customization Indicator<a class="headerlink" href="#customization-indicator" title="Permanent link">&para;</a></h3>
-<p>When a template has been edited, a <strong>Customized</strong> badge appears next to the template title. This helps you see at a glance which templates have been changed from the built-in defaults.</p>
+<p>Each editor shows <strong>Built-in default</strong> when no platform override is saved or <strong>Customized</strong> when one is saved. <strong>Unsaved changes</strong> marks local edits; typing alone does not change the saved source.</p>
 <h3 id="resetting-to-default">Resetting to Default<a class="headerlink" href="#resetting-to-default" title="Permanent link">&para;</a></h3>
-<p>If a template has been customized, a <strong>Reset to Default</strong> button appears alongside the Save button. Clicking it restores the original built-in template for that email type.</p>
+<p>If a template has a saved override, <strong>Reset to built-in default</strong> appears alongside Save. A confirmation names the selected template. Confirming removes that platform override immediately, discards current edits, and loads the current built-in text. It does not clear a ZEV's own invoice-email overrides or change messages already sent.</p>
 <p>Templates that have not been customized do not show the reset button.</p>
 <h2 id="invoice-management">Invoice Management<a class="headerlink" href="#invoice-management" title="Permanent link">&para;</a></h2>
 <p>Admins can view and manage all invoices across all ZEVs in <strong>Platform → Overview → Invoices</strong> (<code>/admin/invoices</code>).</p>

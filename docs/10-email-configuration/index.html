@@ -1969,10 +1969,13 @@ including their placeholders.</p>
 </tr>
 </tbody>
 </table>
-<p>Subject and body resolve independently: each either shows the platform
-invoice-email default (possibly an admin customization) or keeps its own
-text — switch with <strong>Customize</strong> / <strong>Use platform default</strong>. Resetting only
-stages the change — <strong>Save changes</strong> persists it.</p>
+<p>Subject and body can be customized independently. <strong>Customize</strong> starts from the
+platform text; <strong>Use platform default</strong> stages a reset of that field. The badge
+shows its saved source, while <strong>Unsaved changes</strong> marks a staged edit. Click
+<strong>Save changes</strong> to apply it. Later platform edits reach inherited fields; a
+saved ZEV override takes precedence even when its text matches the platform text.
+You can clear the editor and type replacement text without reopening it.
+<strong>Discard changes</strong> restores the saved text or inherited preview.</p>
 <h3 id="template-variables">Template Variables<a class="headerlink" href="#template-variables" title="Permanent link">&para;</a></h3>
 <p>Use placeholders to personalize emails:</p>
 <table>
