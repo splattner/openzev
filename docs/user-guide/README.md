@@ -38,6 +38,7 @@ Welcome to the OpenZEV user documentation. This guide covers everything you need
 ## Automation
 
 - **[API Keys](16-api-keys.md)** — Long-lived credentials for calling the API from a script
+- **[AI Assistants (MCP)](19-ai-assistants.md)** — Connect Claude Code, Claude Desktop, Cursor or n8n to ask questions about your own OpenZEV data
 
 ## Reference
 

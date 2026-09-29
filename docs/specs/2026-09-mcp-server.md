@@ -1,7 +1,7 @@
 # Feature Spec: MCP server for AI assistants (iteration 1, read-only)
 
 - Spec ID: SPEC-2026-mcp-server
-- Status: In Progress
+- Status: Completed
 - Scope: Major
 - Type: Feature
 - Owners: Sebastian Plattner
@@ -113,8 +113,8 @@ No other model changes. No new tables.
 | Method | Behaviour |
 |---|---|
 | `POST` | One JSON-RPC request, notification, or batch (array). |
-| `GET` | `405` (`Allow: POST`) — no SSE stream in stateless mode. |
-| `DELETE` | `405` — no sessions to terminate. |
+| `GET` | `405` (`Allow: POST`) for an authenticated caller — no SSE stream in stateless mode. An *unauthenticated* `GET` (or `DELETE`) answers `401` instead of `405`: like every other DRF view in this codebase, the authentication/permission pipeline (`APIView.initial`) runs before the method-not-allowed check, so a caller with no credentials never learns from the HTTP status alone that only `POST` is accepted. |
+| `DELETE` | `405` (authenticated) / `401` (unauthenticated) — no sessions to terminate. |
 
 Order of checks on every request:
 
@@ -154,7 +154,11 @@ Tool descriptor: `name`, `title`, `description`, `inputSchema` (JSON Schema, `ty
 `additionalProperties: false`), `outputSchema` omitted in iteration 1,
 `annotations: {"readOnlyHint": true, "openWorldHint": false}`.
 
-The app version comes from the same source the admin system-health endpoint uses.
+The app version is `settings.OPENZEV_VERSION` (empty string by default; falls back to
+`"dev"` in the `initialize` response when unset) — the same setting `backups/archive.py`
+records in a backup manifest as `openzev_version`. There is no dedicated admin
+system-health endpoint in this codebase; that was a misstatement in an earlier draft
+of this spec.
 
 ### 5.4 Errors
 
@@ -165,6 +169,7 @@ The app version comes from the same source the admin system-health endpoint uses
 | Unknown method | `-32601` |
 | Unknown tool / invalid arguments (schema) | `-32602 Invalid params`, `data.errors` lists field messages |
 | Tool ran, sub-request answered 4xx | **Tool result** with `isError: true`, `content[0].text` = the view's error message (e.g. `"ZEV not found."`, `"Permission denied."`) — per MCP, tool-level failures are results, not protocol errors, so the model can react |
+| Tool ran, a business rule was violated (e.g. `consumption_summary`'s 400-day span cap, §6.6) | Same shape as the row above — a `ToolError` raised by the tool's own `run()`, not a JSON Schema violation, so it is `isError: true` rather than `-32602` |
 | Unexpected exception in a tool | `isError: true`, generic text `"Internal error while running <tool>."`; logged with traceback; audit status `failed` |
 | HTTP-level 401/403/404 (§5.1) | Plain DRF error body, not JSON-RPC |
 
@@ -197,29 +202,42 @@ Find the ZEVs the caller can see.
 
 - Input: `{}` (no arguments).
 - Sub-request: `GET /api/v1/zev/zevs/` (all pages, cap 100).
-- Output: `{"zevs": [{"id", "name", "billing_interval", "start_date", "is_disabled", "participant_count"?}]}`
-  — only fields the list endpoint already returns; `participant_count` only if present.
+- Output: `{"zevs": [{"id", "name", "billing_interval", "start_date", "is_disabled"}], "truncated"?, "total"?}`
+  — `is_disabled` is derived from the serializer's `disabled_at` (`is_disabled = disabled_at is not None`);
+  `ZevSerializer` has no `participant_count` field, so it is not offered (computing it would mean the tool
+  querying the ORM itself, which ADR 0025 rules out).
 
 ### 6.2 `period_readiness`
 
 Can a billing period be billed, and what is blocking it.
 
 - Input: `zev_id` (uuid, required); `period_start`, `period_end` (date, optional, both or
-  neither). Without a period the cockpit period is used.
+  neither — enforced with JSON Schema `dependentRequired`, so "one but not the other" is a
+  `-32602` before any sub-request runs). Without a period the cockpit period is used.
 - Sub-requests: `GET /api/v1/invoices/invoices/readiness/?zev_id=…[&period_start&period_end]`;
   `GET /api/v1/invoices/invoices/attention/?zev_id=…`.
 - Output:
   ```json
   {
-    "zev_id": "…", "period": {"start": "…", "end": "…"} | null,
-    "overall_status": "<from payload>",
-    "steps": [{"key", "status", "count", "total"?, "failed"?, "detail"?}],
-    "blocking": ["<step key>: <detail>", …],
-    "attention": [<attention item, UI link fields removed>]  // cap 20
+    "zev_id": "…", "period": {"start": "…", "end": "…", "interval": "…"} | null,
+    "next_action": "<from payload, e.g. \"approve\", \"none\">",
+    "steps": [{"key", "status", "count", "total"?, "failed"?, "detail"?, "detail_data"?}],
+    "blocking": ["<step key>: <detail or status>", …],
+    "attention": [<attention item, UI link fields removed>],  // cap 20
+    "attention_truncated"?: true,
+    "setup"?: {…}, "awaiting_first_period"?: true, "caught_up"?: true
   }
   ```
-  `blocking` lists steps whose status is not the payload's "done/ok" value. Drop `link` and
-  other UI-routing fields. `period: null` responses pass their reason through.
+  The readiness payload has no `overall_status` field — the equivalent is `next_action`
+  (`invoices.readiness._select_next_action`: `"none"` or one of `fix_metering`, `fix_assignments`,
+  `fix_tariffs`, `generate`, `review_generation_conflicts`, `approve`, `send`, `track_payments`),
+  passed through unchanged. `blocking` lists steps whose `status` is `"warn"` or `"todo"` (the two
+  "not done yet" values in `invoices.readiness.StepResult` — the other two are `"ok"` and `"done"`),
+  formatted as `"<key>: <detail>"` (falling back to the bare status if the step carries no `detail`).
+  `link` is dropped from every step and every attention item; `assignment_link`/`billing_settings_link`
+  are dropped from `setup` the same way. `period: null` responses pass their reason through as extra
+  top-level keys (`setup`, `awaiting_first_period`, `caught_up`) exactly as the underlying endpoint
+  returns them, minus the same link fields.
 
 ### 6.3 `find_invoices`
 
@@ -229,12 +247,19 @@ Locate invoices before explaining one.
   substring of participant name); `period_start`/`period_end` (date, optional — invoices whose
   period overlaps); `status` (enum of `InvoiceStatus` values, optional); `limit` (1–50,
   default 20).
-- Sub-requests: `GET /api/v1/invoices/invoices/?zev_id=…[&status=…]` paging until `limit`
-  matches or the list ends (hard cap 10 pages). Filtering by participant name and period is
-  done on the returned rows **unless** the list endpoint gains narrow-only filters for them —
-  add `participant_id` / `period_from` / `period_to` query filters to `InvoiceViewSet` if that
-  is simpler; document them in the invoice-lifecycle baseline spec.
+- Sub-requests: `GET /api/v1/invoices/invoices/?zev_id=…[&status=…&period_from=…&period_to=…]`
+  paging until `limit` matches or the list ends (hard cap 10 pages). `period_start`/`period_end`
+  arguments map onto the `period_from`/`period_to` narrow-only filters added to `InvoiceViewSet`
+  for this tool (documented in `2026-03-invoice-lifecycle-and-communication.md` §5.1).
+  `participant_query` has no server-side equivalent (it is a case-insensitive substring, not an
+  exact id) and is applied to the returned rows: when it is given, the tool fetches without a
+  `limit` (still capped at 10 pages) so the name filter sees the full candidate set before
+  `limit` truncates the result.
 - Output: `{"invoices": [{"id", "invoice_number", "participant_id", "participant_name", "period_start", "period_end", "status", "total_chf"}], "total"?, "truncated"?}`.
+  `participant_id` is the raw `InvoiceListSerializer.participant` relation field stringified
+  (the un-rendered sub-response leaves FK fields as `uuid.UUID` instances, not strings — every
+  tool that reads a relation field converts it explicitly rather than relying on the eventual
+  HTTP JSON renderer to do it).
 
 ### 6.4 `explain_invoice`
 
@@ -242,9 +267,11 @@ Break down one invoice and compare it with the same participant's previous invoi
 
 - Input: `invoice_id` (uuid, required); `compare_previous` (bool, default true).
 - Sub-requests: `GET /api/v1/invoices/invoices/<id>/`; for the comparison, the invoice list
-  filtered to the same ZEV (and participant, if a filter exists) to find the most recent
-  invoice of the same participant with `period_end < this.period_start` and status not
-  `cancelled`, then `GET /api/v1/invoices/invoices/<prev_id>/`.
+  filtered to the same ZEV and participant (`zev_id`, `participant_id`, `period_to` = this
+  invoice's `period_start`) — relying on `Invoice.Meta.ordering = ["-period_end", ...]` to put
+  the most recent candidate first — skipping the current invoice, any row with
+  `status == "cancelled"`, and any row whose `period_end >= this.period_start`, then
+  `GET /api/v1/invoices/invoices/<prev_id>/` for the first survivor.
 - Output:
   ```json
   {
@@ -268,8 +295,11 @@ Summarise recent imports and what went wrong.
 
 - Input: `zev_id` (uuid, optional); `since` (date, optional, default 30 days ago); `only_problems`
   (bool, default true: logs with errors or warnings or skipped rows); `limit` (1–20, default 10).
-- Sub-request: `GET /api/v1/metering/import-logs/` (with `zev_id` if the endpoint supports it,
-  otherwise filter rows), newest first, paging until enough rows (hard cap 5 pages).
+- Sub-request: `GET /api/v1/metering/import-logs/` — `ImportLogViewSet` has **no** `zev_id`
+  query filter, so `zev_id`/`since`/`only_problems` are all applied to the returned rows
+  (already newest-first, `ImportLog.Meta.ordering`), paging until enough rows (hard cap 5 pages).
+  `row["zev"]` is the raw FK value (a `uuid.UUID`, not a string) and is stringified before
+  comparing against the `zev_id` argument.
 - Output:
   ```json
   {"imports": [{"id", "created_at", "zev_name", "source", "filename", "imported_by",
@@ -278,22 +308,49 @@ Summarise recent imports and what went wrong.
                 "errors": ["…"],          // first 10, deduplicated by message
                 "warnings": ["…"],        // first 10
                 "metering_points": ["<meter ids mentioned in errors/warnings>"]}],
-   "totals": {"imports", "with_errors", "with_warnings", "rows_skipped"}}
+   "totals": {"imports", "with_errors", "with_warnings", "rows_skipped"},
+   "truncated"?: true}
   ```
+  `imported_by` is `ImportLogSerializer.imported_by_display` (the human-readable name, not the
+  user id). `error_count`/`warning_count` are `len(errors)`/`len(warnings)` — `ImportLogSerializer`
+  has no such fields. `metering_points` is extracted from the error/warning text with a regex for
+  meter-id-shaped tokens (upper-case alphanumeric segments joined by at least two dashes); it is a
+  best-effort read of free text, not a structured field the importer emits. `totals` are computed
+  over every row matching the filters, before the `limit` cap — the ZEV-wide error/warning
+  counts stay meaningful even when `imports` itself is truncated.
 
 ### 6.6 `consumption_summary`
 
 Aggregated consumption, production and self-consumption.
 
-- Input: `zev_id` (uuid, required); `date_from`, `date_to` (date, required, span ≤ 400 days);
-  `bucket` (`day` | `month`, default `month`; `hour` not offered); `participant_id` (uuid,
-  optional).
+- Input: `zev_id` (uuid, required); `date_from`, `date_to` (date, required); `bucket`
+  (`day` | `month`, default `month`; `hour` not offered); `participant_id` (uuid, optional).
+  The span (`date_to - date_from`, inclusive) is validated at *run time*, not by the JSON
+  Schema (dates aren't arithmetic-comparable in JSON Schema): a span over 400 days, or
+  `date_to` before `date_from`, is a `ToolError` (`isError: true`), not a `-32602` schema
+  error.
 - Sub-request: `GET /api/v1/metering/readings/dashboard-summary/?zev_id&date_from&date_to&bucket[&participant_id]`.
-- Output: the dashboard summary's totals (consumption, production, local/self-consumption,
-  grid import, feed-in, self-consumption rate, self-sufficiency) plus a `series` list of at most
-  `31` day buckets or `14` month buckets (`truncated` otherwise), with UI-only fields removed.
-  Derived ratios are only included if the payload already carries them or they follow directly
-  from its totals (`self_consumption_pct = local / production`, `self_sufficiency_pct = local / consumption`).
+- Output:
+  ```json
+  {
+    "zev_id", "date_from", "date_to", "bucket",
+    "totals": {"consumed_kwh", "produced_kwh", "imported_kwh", "exported_kwh",
+               "self_consumed_kwh", "self_consumption_pct", "self_sufficiency_pct"},
+    "series": [{"bucket", "consumed_kwh", "produced_kwh", "imported_kwh", "exported_kwh"}],
+    "participant_id"?, "participant_name"?, "truncated"?
+  }
+  ```
+  `owner_dashboard_summary` (`metering/analytics.py`) returns `totals`/`timeline` keyed by
+  `consumed_kwh`/`produced_kwh`/`imported_kwh`/`exported_kwh` — there is no `local_kwh` or
+  `self_consumption_rate` field on the endpoint itself, so the tool derives them:
+  `self_consumed_kwh = consumed_kwh - imported_kwh`,
+  `self_consumption_pct = 100 * self_consumed_kwh / produced_kwh` (`null` if `produced_kwh` is 0),
+  `self_sufficiency_pct = 100 * self_consumed_kwh / consumed_kwh` (`null` if `consumed_kwh` is 0).
+  `series` is the payload's `timeline`, capped at 31 entries for `bucket=day` or 14 for
+  `bucket=month` (`truncated: true` if the cap bit). When `participant_id` is given, the
+  endpoint's own totals/timeline are already scoped to that participant (not the whole ZEV);
+  `participant_id`/`participant_name` echo `selected_participant_id`/`selected_participant_name`
+  from the payload.
 
 ### 6.7 `data_gaps`
 
@@ -303,6 +360,9 @@ Which metering points have missing readings.
   endpoint: last 30 days); `only_incomplete` (bool, default true).
 - Sub-request: `GET /api/v1/metering/readings/data-quality-status/?zev_id&date_from&date_to`.
 - Output: `{"metering_points": [{"id", "meter_id", "participant"?, "completeness_pct", "missing_days", "gaps": [{"from", "to"}]}], "truncated"?}` — cap 50 points and 10 gaps each.
+  `completeness_pct` is the endpoint's `data_completeness`; `missing_days = total_days - days_with_data`;
+  `gaps[].from`/`.to` are the endpoint's `gaps[].start_date`/`.end_date`. `only_incomplete` filters
+  the returned rows to `data_completeness < 100` (the endpoint has no such filter of its own).
 
 ### 6.8 `audit_query`
 
@@ -340,10 +400,30 @@ The allow-list is keyed by resolved URL name, not by path string.
 @dataclass
 class SubResponse:
     status: int
-    data: Any          # parsed JSON (response.data)
+    data: Any          # response.data, un-rendered (see the note on relation fields below)
 
-def dispatch_get(outer_request, path: str, params: dict) -> SubResponse
+def dispatch_get(outer_request, path: str, params: dict | None, *,
+                  allowed_url_names: frozenset[str], api_key, user,
+                  on_dispatch=None) -> SubResponse
 ```
+
+`allowed_url_names`, `api_key` and `user` are explicit keyword arguments rather than read off
+`outer_request` — the caller (a tool, through `ToolContext.get`/`get_all`) already has its own
+allow-list and the resolved `request.user`/`request.auth` from the outer MCP call, and passing
+them explicitly keeps `dispatch_get` free of any assumption about what kind of object
+`outer_request` is (raw `HttpRequest` or wrapped DRF `Request` — both work; only `outer_request`'s
+`META`/`audit_request_id`/`audit_ip_address`/`audit_user_agent` are read from it). `on_dispatch` is
+an optional no-arg callback invoked once per actual sub-request (used by `ToolContext` to count
+`subrequests` for the audit event, §8).
+
+**Un-rendered `.data` and relation fields.** Because `response.data` is read before DRF renders
+it to JSON, a `ForeignKey`/`PrimaryKeyRelatedField` value (e.g. `Invoice.zev`, `Invoice.participant`,
+`ImportLog.zev`) is a raw `uuid.UUID` instance, not the string the real HTTP response would carry —
+only fields DRF serializes explicitly as strings (a model's own `UUIDField` primary key, any
+`DateField`/`DateTimeField`) are already strings in `.data`. Every tool that reads a relation field
+converts it with `str(...)` before comparing or forwarding it as a sub-request parameter; the final
+JSON-RPC response is unaffected either way, since `rest_framework.utils.encoders.JSONEncoder`
+converts `UUID`/`Decimal` when the outer view's `Response` is eventually rendered.
 
 1. Build a Django `HttpRequest` via `django.test.RequestFactory`-equivalent construction
    (plain `HttpRequest` with `method="GET"`, `path`, `GET = QueryDict` of `params`, `META`
@@ -399,16 +479,26 @@ No new env vars.
 
 ## 10. Tests (`backend/mcp_server/tests/`)
 
-| Module | Covers |
-|---|---|
-| `test_transport.py` | flag off → 404 (even unauthenticated); GET/DELETE → 405; no auth → 401 with `WWW-Authenticate`; cookie JWT only → 401; participant key → 403; `Api-Key` and `Bearer` both accepted; revoked/expired key → 401; foreign `Origin` → 403; parse error; invalid request; unknown method; batch (mixed request + notification); batch > 10; notification-only → 202; `initialize` version negotiation; `ping`; `tools/list` returns the 8 tools with `readOnlyHint` |
-| `test_dispatch.py` | non-allow-listed URL refused; non-GET refused; sub-request sees forced user and `audit_source = mcp`; one throttle hit per MCP call regardless of sub-requests |
-| `test_tools.py` | per tool: happy path shape; owner cannot see another owner's ZEV (`isError` with the view's message, no data leaked); admin sees any ZEV; invalid arguments → `-32602`; caps/truncation (`find_invoices`, `import_triage`, `data_gaps`, `audit_query`); `explain_invoice` previous-invoice selection skips cancelled and later invoices; `consumption_summary` span > 400 days rejected |
-| `test_audit.py` | `mcp.tool.call` event recorded with source `mcp`, zev, key prefix, status success/failed/denied; no event for `tools/list` |
+61 tests across four modules (`backend/mcp_server/tests/__init__.py` makes it a package;
+fixtures live in `backend/mcp_server/tests/conftest.py` — an autouse `mcp_server_enabled`
+fixture, `admin_mcp_client`/`owner_mcp_client`, and `rpc`/`call_tool` request helpers built
+on `APIClient`).
 
-Existing `accounts/test_throttling.py` / `test_api_keys.py` gain a case for the
-`mcp_subrequest` throttle skip. Final test names and counts are filled in here after
-implementation.
+| Module | Count | Classes | Covers |
+|---|---|---|---|
+| `test_transport.py` | 28 | `TestFeatureFlagGate`, `TestMethodNotAllowed`, `TestAuthentication`, `TestRole`, `TestOrigin`, `TestBodyParsing`, `TestBatch`, `TestInitialize`, `TestPing`, `TestToolsList`, `TestToolsCall` | flag off → 404 (unauthenticated and with a valid key); `GET`/`DELETE` → 405 (authenticated); no auth → 401 with `WWW-Authenticate`; cookie JWT alone → 401; `Api-Key` and `Bearer` both accepted; revoked/expired key → 401; participant → 403; admin/owner → 200; untrusted `Origin` → 403, no `Origin` passes, trusted `Origin` passes; malformed JSON → `-32700`/400; non-object message → `-32600`; unknown method → `-32601`; batch (mixed request + notification), batch > 10 → `-32600`, notification-only → 202 with empty body; `initialize` version negotiation (requested-and-supported, and fallback for unsupported); `ping`; `tools/list` returns exactly the 8 tools, all `readOnlyHint: true`; unknown tool and invalid arguments → `-32602` with `data.errors` |
+| `test_dispatch.py` | 5 | `TestAllowList`, `TestForcedAuth`, `TestThrottleSkip` | non-allow-listed URL raises `DispatchError`; an allow-listed URL succeeds; a sub-request resolves data as the forced user (proves `_force_auth_user`/`_force_auth_token` took effect); `ApiKeyRateThrottle.get_cache_key` returns `None` when `mcp_subrequest` is set and a real cache key otherwise |
+| `test_tools.py` | 22 | `TestListZevs`, `TestPeriodReadiness`, `TestFindInvoices`, `TestExplainInvoice`, `TestImportTriage`, `TestConsumptionSummary`, `TestDataGaps`, `TestAuditQuery` | one class per tool: happy-path shape; owner cannot see another owner's ZEV/invoice (`isError` with the view's own message, e.g. "Permission denied.", no data leaked); admin sees any ZEV; invalid arguments → `-32602`; caps/truncation (`find_invoices`, `import_triage`); `explain_invoice` previous-invoice selection skips a cancelled invoice and picks the correct prior period, and `compare_previous: false` skips the lookup; `import_triage` extracts meter ids from error text and respects `only_problems`; `consumption_summary` span > 400 days is a `ToolError` (`isError: true`, not `-32602` — see §6.6); `data_gaps` marks a meter with zero readings fully incomplete |
+| `test_audit.py` | 6 | `TestToolCallAudit` | successful call recorded with `source = mcp`, `mcp.Tool`/tool-name target, `api_key_prefix`/`duration_ms`/`subrequests` in metadata; `zev_id` argument attaches the `Zev` row only when it is visible to the caller (an owner naming another owner's ZEV gets `zev = null` **and** `status = denied`, not a leak); a failed tool call is recorded `failed` or `denied`; `tools/list` and `initialize` write no `mcp.tool.call` event |
+
+`accounts/test_throttling.py` gains `McpSubrequestThrottleTests` (1 test,
+`test_one_mcp_call_costs_one_throttle_hit_regardless_of_fan_out`): with a 2-request budget,
+two `period_readiness` calls (two sub-requests each) both succeed and a third is throttled —
+proving the sub-requests inside a call never count on their own.
+
+`invoices/test_invoice_list_filter.py` gains `InvoiceParticipantAndPeriodFilterTests` (7
+tests) for the `participant_id`/`period_from`/`period_to` narrow-only filters added to
+`InvoiceViewSet` for `find_invoices`/`explain_invoice` (§6.3/§6.4).
 
 ## 11. Documentation and spec updates
 

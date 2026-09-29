@@ -123,6 +123,7 @@ nav:
       - Backups: 18-backups.md
   - Automation:
       - API Keys: 16-api-keys.md
+      - AI Assistants (MCP): 19-ai-assistants.md
   - Reference:
       - Troubleshooting: 12-troubleshooting.md
       - Glossary: 15-glossary.md

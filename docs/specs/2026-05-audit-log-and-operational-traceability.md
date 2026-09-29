@@ -140,7 +140,7 @@ The audit service resolves `zev` in this priority order:
 | `status` | `CharField(20)` | `success` | `success`, `failed`, `denied`, `queued`, `started` |
 | `request_id` | `CharField(64)` nullable | `null` | Correlates all events in one request/job |
 | `correlation_id` | `CharField(64)` nullable | `null` | Optional cross-request correlation for async follow-up |
-| `source` | `CharField(20)` | `api` | `api`, `api_key`, `celery`, `system`, `management_command` |
+| `source` | `CharField(20)` | `api` | `api`, `api_key`, `invoice_link`, `onboarding_link`, `celery`, `system`, `management_command`, `mcp` |
 | `ip_address` | `GenericIPAddressField` nullable | `null` | Request-derived; blank for system tasks |
 | `user_agent` | `TextField` | `""` | Request-derived; may be truncated to 500 chars before save |
 | `summary` | `CharField(500)` | required | Human-readable event summary for list UI |
@@ -561,7 +561,7 @@ export interface AuditEvent {
   status: AuditEventStatus
   request_id: string | null
   correlation_id: string | null
-  source: 'api' | 'api_key' | 'celery' | 'system' | 'management_command'
+  source: 'api' | 'celery' | 'system' | 'management_command' | 'mcp'
   ip_address: string | null
   user_agent: string
   summary: string

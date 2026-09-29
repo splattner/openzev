@@ -397,6 +397,7 @@ The backend and frontend both read the same feature flag state.
 | `zev_self_registration_enabled` | `true` | Allows ZEV owner self-registration from the login page |
 | `feasibility_calculator_enabled` | `false` | Shows the [feasibility calculator](13-feasibility-calculator.md) to admins and ZEV owners |
 | `participant_geocoding_enabled` | `false` | Looks up participant buildings on OpenStreetMap for the [participant map](03-participant-management.md#map); sends addresses to the public Nominatim service |
+| `mcp_server_enabled` | `false` | Lets AI assistants read OpenZEV data through the [MCP endpoint](19-ai-assistants.md) using a user's API key; answers are sent to the assistant's LLM provider |
 
 ### How State Is Resolved
 

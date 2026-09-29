@@ -76,6 +76,10 @@ The full endpoint list, with request and response shapes, is at `/api/docs/` on
 your installation. The **Authorize** button there accepts an API key, so you can
 try calls from the browser.
 
+An API key is also what an AI assistant uses to read your OpenZEV data — see
+[Connecting an AI Assistant](19-ai-assistants.md) if you want to ask Claude,
+Cursor or n8n questions about a ZEV instead of calling the API by hand.
+
 ## What a key can and cannot do
 
 A key **acts with your permissions**. A participant's key sees only that

@@ -421,6 +421,12 @@ Helper `accounts.jwt_utils.make_jwt_for_user(user, *, impersonated_by=None) -> d
 **Session version check:** `CookieJWTAuthentication.get_user` refuses an access token whose `sv` (a missing claim reads as `0`) differs from `user.session_version` (`401`, code `session_revoked`) — see §5.6b. That check, and token validation generally, applies to an `Authorization: Bearer` header as before; an invalid, expired or signed-out **`openzev_access` cookie** is instead treated as no credentials (the browser sends it unprompted), so public `AllowAny` endpoints — the login page's `registration-enabled/` and `oauth/providers/` — keep answering `200`, while protected views answer `401` and drive the client's refresh.
 **MFA policy enforcement:** `CookieJWTAuthentication.authenticate` also refuses (`403`) an unsafe request from an account whose role requires two-factor authentication and is past its grace period with no factor enrolled, with a short exemption list for self-service security actions and every admin action on another account excluded — see `2026-09-two-factor-authentication.md` §7.3a. Not reached by `ApiKeyAuthentication` at all.
 
+### 5.1b API key authentication
+
+`accounts.authentication.ApiKeyAuthentication` (`backend/accounts/authentication.py`) accepts `Authorization: Api-Key ozv_<prefix>_<secret>` on every REST endpoint except the default-deny `accounts` app surface (`ACCOUNTS_API_KEY_ALLOWLIST`; see the module docstring). A key inherits its owner's role permissions, is refused on unsafe methods when `read_only=True`, and marks the request `audit_source = "api_key"`.
+
+`mcp_server.authentication.McpApiKeyAuthentication` (`backend/mcp_server/authentication.py`) subclasses it for the MCP endpoint (`POST /api/v1/mcp/` only — SPEC-2026-mcp-server): it also accepts `Authorization: Bearer ozv_…` (many MCP clients cannot send a custom scheme), skips the `accounts` allow-list and the read-only-by-method check (the endpoint is always `POST`; each MCP tool declares its own `read_only`), and marks the request `audit_source = "mcp"` instead of `"api_key"`. Only `admin` and `zev_owner` may authenticate there; cookies/JWT are not accepted on that endpoint at all.
+
 ### 5.1a Last-login tracking
 
 `User.last_login` (Django's own `AbstractUser` field; no migration) is stamped
