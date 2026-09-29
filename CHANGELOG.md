@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.20.0](https://github.com/splattner/openzev/compare/v1.19.0...v1.20.0) (2026-09-29)
+
+
+### Features
+
+* **mcp:** add a read-only MCP server for AI assistants ([#850](https://github.com/splattner/openzev/issues/850)) ([b502180](https://github.com/splattner/openzev/commit/b502180e10e0eb208086638c3d48dafd9209addf))
+* **templates:** clarify saved defaults and inheritance ([#846](https://github.com/splattner/openzev/issues/846)) ([6fabef3](https://github.com/splattner/openzev/commit/6fabef35a0e2107137bc96a048080e5b38caa91d))
+* **zev:** clarify settings saves and email defaults ([#844](https://github.com/splattner/openzev/issues/844)) ([fea3e7b](https://github.com/splattner/openzev/commit/fea3e7b8ff6df34d5042d7f73860d259fdd8b2d2))
+
+
+### Bug Fixes
+
+* **backups:** require encryption by default in production ([#848](https://github.com/splattner/openzev/issues/848)) ([ab4f113](https://github.com/splattner/openzev/commit/ab4f113108e1f5b4aa07902a9d92d46b0f383e22))
+* **dashboard:** keep long participant names readable in the energy flow chart ([#847](https://github.com/splattner/openzev/issues/847)) ([4348650](https://github.com/splattner/openzev/commit/4348650df3b0ef7080e3804dce629747d1f85c05))
+* **dev:** allow per-worktree CORS origins in dev compose ([#842](https://github.com/splattner/openzev/issues/842)) ([da4ced8](https://github.com/splattner/openzev/commit/da4ced8db7c61c940057237e484b1adbf92e2aab))
+
 ## [1.19.0](https://github.com/splattner/openzev/compare/v1.18.3...v1.19.0) (2026-09-26)
 
 
