@@ -20,6 +20,7 @@ urlpatterns = [
     path("api/v1/exports/", include("exports.urls")),
     path("api/v1/backups/", include("backups.urls")),
     path("api/v1/feasibility/", include("feasibility.urls")),
+    path("api/v1/mcp/", include("mcp_server.urls")),
     # OpenAPI schema & docs
     path("api/schema/", SpectacularAPIView.as_view(), name="schema"),
     path("api/docs/", SpectacularSwaggerView.as_view(url_name="schema"), name="swagger-ui"),

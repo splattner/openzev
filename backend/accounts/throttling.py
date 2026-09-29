@@ -18,6 +18,16 @@ class ApiKeyRateThrottle(SimpleRateThrottle):
     def get_cache_key(self, request, view):
         from .models import ApiKey
 
+        # An MCP tool's in-process sub-request (mcp_server/dispatch.py) is
+        # forced-authenticated with the same API key that already paid for one
+        # throttle hit on the outer MCP call. Without this, a tool that fans
+        # out to several REST views would spend the caller's whole hourly
+        # budget on a single question. ``mcp_subrequest`` is only ever set on
+        # the raw ``HttpRequest`` built by the dispatcher, never by a real
+        # client, so this cannot be used to bypass throttling from outside.
+        if getattr(request, "mcp_subrequest", False):
+            return None
+
         api_key = getattr(request, "auth", None)
         if not isinstance(api_key, ApiKey):
             return None

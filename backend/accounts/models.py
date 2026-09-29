@@ -461,6 +461,7 @@ class FeatureFlag(models.Model):
     ZEV_SELF_REGISTRATION_ENABLED = "zev_self_registration_enabled"
     FEASIBILITY_CALCULATOR_ENABLED = "feasibility_calculator_enabled"
     PARTICIPANT_GEOCODING_ENABLED = "participant_geocoding_enabled"
+    MCP_SERVER_ENABLED = "mcp_server_enabled"
 
     name = models.CharField(max_length=100, unique=True)
     description = models.CharField(max_length=255, blank=True, default="")
@@ -669,5 +670,14 @@ FeatureFlag.register(
         "Send participant addresses to the public OpenStreetMap Nominatim API to look up "
         "building footprints for the participant map (ADR 0012). Off by default because it "
         "transfers address data to a third-party service."
+    ),
+)
+FeatureFlag.register(
+    FeatureFlag.MCP_SERVER_ENABLED,
+    default=False,
+    description=(
+        "Allow AI assistants to read OpenZEV data through the MCP endpoint (/api/v1/mcp/) "
+        "using a user's API key. Answers are sent to the assistant's LLM provider, "
+        "which may be a third party outside Switzerland."
     ),
 )

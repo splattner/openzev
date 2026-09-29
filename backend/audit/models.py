@@ -41,6 +41,9 @@ class AuditEventSource(models.TextChoices):
     CELERY = "celery", "Celery"
     SYSTEM = "system", "System"
     MANAGEMENT_COMMAND = "management_command", "Management command"
+    # A request made by an AI assistant through the MCP endpoint
+    # (/api/v1/mcp/), including its in-process sub-requests to REST views.
+    MCP = "mcp", "MCP"
 
 
 class AuditEvent(models.Model):

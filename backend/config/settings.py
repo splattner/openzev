@@ -57,6 +57,7 @@ INSTALLED_APPS = [
     "allocation",
     "exports",
     "backups",
+    "mcp_server",
 ]
 
 MIDDLEWARE = [

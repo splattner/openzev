@@ -176,6 +176,56 @@ class UploadEndpointThrottleTests(TestCase):
         self.assertEqual(client.post(IMPORT_CSV, format="multipart").status_code, 429)
 
 
+class McpSubrequestThrottleTests(TestCase):
+    """A tool's in-process sub-requests (mcp_server/dispatch.py) must not
+    each cost their own throttle hit — SPEC-2026-mcp-server §7: "one MCP
+    call costs one throttle hit regardless of fan-out." Exercised through
+    the real endpoint with ``period_readiness``, which makes two sub-requests
+    per call (readiness + attention).
+    """
+
+    MCP_URL = "/api/v1/mcp/"
+
+    def setUp(self):
+        cache.clear()
+        from accounts.models import FeatureFlag
+
+        FeatureFlag.objects.update_or_create(
+            name=FeatureFlag.MCP_SERVER_ENABLED, defaults={"enabled": True}
+        )
+        self.admin = make_user("throttle_mcp_admin", UserRole.ADMIN)
+        from testing.factories import ZevFactory
+
+        self.zev = ZevFactory(owner=self.admin)
+
+    def tearDown(self):
+        cache.clear()
+
+    def _call(self, client, call_id):
+        return client.post(
+            self.MCP_URL,
+            {
+                "jsonrpc": "2.0",
+                "id": call_id,
+                "method": "tools/call",
+                "params": {"name": "period_readiness", "arguments": {"zev_id": str(self.zev.id)}},
+            },
+            format="json",
+        )
+
+    @mock.patch.object(ApiKeyRateThrottle, "THROTTLE_RATES", {"api_key": "2/hour"})
+    def test_one_mcp_call_costs_one_throttle_hit_regardless_of_fan_out(self):
+        client = APIClient()
+        full_key = create_api_key(self.admin)[1]
+        client.credentials(HTTP_AUTHORIZATION=f"Bearer {full_key}")
+
+        # Budget is 2; each call makes 2 sub-requests. If a sub-request
+        # counted too, the very first call would already exhaust it.
+        self.assertNotEqual(self._call(client, 1).status_code, 429)
+        self.assertNotEqual(self._call(client, 2).status_code, 429)
+        self.assertEqual(self._call(client, 3).status_code, 429)
+
+
 @mock.patch.object(AuthLoginThrottle, "THROTTLE_RATES", {"auth_login": "2/hour"})
 class ForwardedForThrottleTests(TestCase):
     """X-Forwarded-For must not let a client mint fresh throttle buckets."""
