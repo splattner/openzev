@@ -1,6 +1,7 @@
 """Invoice PDF SVG chart builders — energy flow, comparison, and hourly profile."""
 
 from allocation.read_model import ParticipantSharesByDate
+from allocation.validity import civil_date, wall_clock
 from allocation.windows import AssignmentWindows
 
 from .pdf_stats import _compute_period_participant_stats
@@ -517,7 +518,6 @@ def _build_hourly_profile_chart_svg(
 
     Returns None when sub-daily metering data is not available or all values are zero.
     """
-    import datetime as _dt
 
     from decimal import Decimal as _Dec
     from allocation.read_model import (
@@ -607,13 +607,13 @@ def _build_hourly_profile_chart_svg(
         if resolution is None:
             continue
         if resolution.allocation_mode == AllocationMode.COMMUNITY:
-            day = ts.astimezone(_dt.timezone.utc).date()
+            day = civil_date(ts)
             share = shares_by_date.get(day, {}).get(participant.id, _Dec("0"))
         else:
             share = _Dec("1") if resolution.holder_id == participant.id else _Dec("0")
         if share == 0:
             continue
-        hour = ts.hour
+        hour = wall_clock(ts).hour
         p_kwh = reading.energy_kwh * share
         zev_cons = zev_cons_by_ts.get(ts, _Dec("0"))
         zev_prod = zev_prod_by_ts.get(ts, _Dec("0"))

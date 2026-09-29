@@ -3,6 +3,7 @@
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 from unittest import mock
+from zoneinfo import ZoneInfo
 
 from django.db import IntegrityError, connection
 from django.test import TestCase
@@ -16,6 +17,8 @@ from metering.models import ImportLog, MeterReading, ReadingDirection
 from metering.testing import preview_csv, upload_csv
 from testing.helpers import authenticate as auth, make_user
 from zev.models import MeteringPoint, MeteringPointAssignment, MeteringPointType, Participant, Zev
+
+ZURICH = ZoneInfo("Europe/Zurich")
 
 
 class CsvImportTests(TestCase):
@@ -111,7 +114,7 @@ class CsvImportTests(TestCase):
         # survivors, and the rolled-back fast path leaks no counter.
         csv_bytes = b"meter_id,date,v1,v2\nCH-IMPORT-1,2026-01-20,1.0000,2.0000\n"
         real_create = MeterReading.objects.create
-        colliding_ts = datetime(2026, 1, 20, tzinfo=timezone.utc) + timedelta(minutes=15)
+        colliding_ts = datetime(2026, 1, 20, tzinfo=ZURICH) + timedelta(minutes=15)
 
         def flaky_create(*args, **kwargs):
             if kwargs.get("timestamp") == colliding_ts:
@@ -180,7 +183,7 @@ class CsvImportTests(TestCase):
         # One daily row of 96 existing slots reports 96 existing readings
         # (not 1 row), matching the rows_overwritten an overwrite import
         # reports for the same file.
-        day_start = datetime(2026, 1, 20, 0, 0, tzinfo=timezone.utc)
+        day_start = datetime(2026, 1, 20, 0, 0, tzinfo=ZURICH)
         for slot in range(96):
             MeterReading.objects.create(
                 metering_point=self.metering_point,
@@ -393,8 +396,8 @@ class CsvImportTests(TestCase):
         self.assertEqual(resp.data["rows_imported"], 2)
         readings = list(MeterReading.objects.filter(metering_point=self.metering_point).order_by("timestamp"))
         self.assertEqual([reading.timestamp for reading in readings], [
-            datetime(2026, 1, 7, 0, 0, tzinfo=timezone.utc),
-            datetime(2026, 1, 7, 0, 15, tzinfo=timezone.utc),
+            datetime(2026, 1, 7, 0, 0, tzinfo=ZURICH),
+            datetime(2026, 1, 7, 0, 15, tzinfo=ZURICH),
         ])
         self.assertEqual([reading.energy_kwh for reading in readings], [Decimal("1.0000"), Decimal("2.0000")])
 
@@ -969,7 +972,7 @@ class CsvImportTests(TestCase):
         # the missing slot instead of skipping the entire row.
         MeterReading.objects.create(
             metering_point=self.metering_point,
-            timestamp=datetime(2026, 1, 7, 0, 0, tzinfo=timezone.utc),
+            timestamp=datetime(2026, 1, 7, 0, 0, tzinfo=ZURICH),
             energy_kwh=Decimal("9.0000"),
             direction="in",
         )
@@ -999,7 +1002,7 @@ class CsvImportTests(TestCase):
     def test_daily_fully_duplicate_row_is_skipped_with_error(self):
         MeterReading.objects.create(
             metering_point=self.metering_point,
-            timestamp=datetime(2026, 1, 7, 0, 0, tzinfo=timezone.utc),
+            timestamp=datetime(2026, 1, 7, 0, 0, tzinfo=ZURICH),
             energy_kwh=Decimal("1.0000"),
             direction="in",
         )
@@ -1114,7 +1117,7 @@ class CsvImportTests(TestCase):
     def test_daily_preview_fully_duplicate_row_reports_skip_notice(self):
         MeterReading.objects.create(
             metering_point=self.metering_point,
-            timestamp=datetime(2026, 1, 7, 0, 0, tzinfo=timezone.utc),
+            timestamp=datetime(2026, 1, 7, 0, 0, tzinfo=ZURICH),
             energy_kwh=Decimal("1.0000"),
             direction="in",
         )
@@ -1139,7 +1142,7 @@ class CsvImportTests(TestCase):
     def test_daily_overwrite_preview_allows_duplicates_without_writing(self):
         reading = MeterReading.objects.create(
             metering_point=self.metering_point,
-            timestamp=datetime(2026, 1, 7, tzinfo=timezone.utc),
+            timestamp=datetime(2026, 1, 7, tzinfo=ZURICH),
             energy_kwh=Decimal("1.0000"),
             direction="in",
         )
@@ -1223,7 +1226,7 @@ class CsvImportTests(TestCase):
         self.assertEqual(second.data["rows_imported"], 2)
         self.assertEqual(second.data["rows_skipped"], 0)
         self.assertEqual(second.data["errors"], [])
-        day = datetime(2026, 7, 1, tzinfo=timezone.utc)
+        day = datetime(2026, 7, 1, tzinfo=ZURICH)
         self.assertEqual(
             MeterReading.objects.get(timestamp=day, direction=ReadingDirection.IN).energy_kwh,
             Decimal("0.0970"),

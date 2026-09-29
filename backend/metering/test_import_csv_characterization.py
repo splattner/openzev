@@ -15,6 +15,7 @@ distinction). Those assertions are deliberate, not incidental.
 import io
 from datetime import datetime, timezone
 from decimal import Decimal
+from zoneinfo import ZoneInfo
 
 import openpyxl
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -26,6 +27,8 @@ from metering.models import MeterReading
 from metering.testing import preview_csv, upload_csv
 from testing.helpers import authenticate as auth
 from zev.models import MeteringPoint, MeteringPointType, Zev
+
+ZURICH = ZoneInfo("Europe/Zurich")
 
 XLSX_CONTENT_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
@@ -110,7 +113,7 @@ class CsvImportCharacterizationTests(TestCase):
             self._timestamps(), [datetime(2026, 2, 1, 0, 0, tzinfo=timezone.utc)]
         )
 
-    def test_xlsx_native_datetime_cell_is_assumed_utc(self):
+    def test_xlsx_native_datetime_cell_is_read_as_swiss_time(self):
         resp = self._upload_xlsx(
             "dt.xlsx",
             [
@@ -122,7 +125,7 @@ class CsvImportCharacterizationTests(TestCase):
         self.assertEqual(resp.status_code, 201)
         self.assertEqual(resp.data["rows_imported"], 1)
         self.assertEqual(
-            self._timestamps(), [datetime(2026, 2, 2, 5, 30, tzinfo=timezone.utc)]
+            self._timestamps(), [datetime(2026, 2, 2, 5, 30, tzinfo=ZURICH)]
         )
 
     def test_xlsx_trailing_empty_rows_are_excluded_from_rows_total(self):
@@ -172,7 +175,7 @@ class CsvImportCharacterizationTests(TestCase):
         self.assertEqual(resp.status_code, 201)
         self.assertEqual(resp.data["rows_imported"], 1)
         self.assertEqual(
-            self._timestamps(), [datetime(2026, 2, 6, 0, 0, tzinfo=timezone.utc)]
+            self._timestamps(), [datetime(2026, 2, 6, 0, 0, tzinfo=ZURICH)]
         )
 
     def test_xlsx_text_date_cell_with_timestamp_format(self):
@@ -192,7 +195,7 @@ class CsvImportCharacterizationTests(TestCase):
         self.assertEqual(resp.status_code, 201)
         self.assertEqual(resp.data["rows_imported"], 1)
         self.assertEqual(
-            self._timestamps(), [datetime(2026, 2, 7, 0, 0, tzinfo=timezone.utc)]
+            self._timestamps(), [datetime(2026, 2, 7, 0, 0, tzinfo=ZURICH)]
         )
 
     # ── B. timestamp_format: the actual production path ──────────────────────
@@ -222,10 +225,10 @@ class CsvImportCharacterizationTests(TestCase):
         self.assertEqual(
             self._timestamps(),
             [
-                datetime(2026, 3, 7, 0, 0, tzinfo=timezone.utc),
-                datetime(2026, 3, 7, 0, 15, tzinfo=timezone.utc),
-                datetime(2026, 3, 7, 0, 30, tzinfo=timezone.utc),
-                datetime(2026, 3, 7, 0, 45, tzinfo=timezone.utc),
+                datetime(2026, 3, 7, 0, 0, tzinfo=ZURICH),
+                datetime(2026, 3, 7, 0, 15, tzinfo=ZURICH),
+                datetime(2026, 3, 7, 0, 30, tzinfo=ZURICH),
+                datetime(2026, 3, 7, 0, 45, tzinfo=ZURICH),
             ],
         )
         energies = list(
@@ -238,7 +241,7 @@ class CsvImportCharacterizationTests(TestCase):
             [Decimal("1.0000"), Decimal("2.0000"), Decimal("3.0000"), Decimal("4.0000")],
         )
 
-    def test_standard_profile_with_timestamp_format_forces_utc(self):
+    def test_standard_profile_with_timestamp_format_reads_swiss_time(self):
         csv_bytes = (
             b"meter_id,timestamp,energy_kwh\n"
             b"CH-IMPORT-1,08.03.2026 13:45,1.5000\n"
@@ -250,7 +253,7 @@ class CsvImportCharacterizationTests(TestCase):
         self.assertEqual(resp.status_code, 201)
         self.assertEqual(resp.data["rows_imported"], 1)
         self.assertEqual(
-            self._timestamps(), [datetime(2026, 3, 8, 13, 45, tzinfo=timezone.utc)]
+            self._timestamps(), [datetime(2026, 3, 8, 13, 45, tzinfo=ZURICH)]
         )
 
     def test_timestamp_format_mismatch_is_skipped_not_a_server_error(self):
@@ -282,7 +285,7 @@ class CsvImportCharacterizationTests(TestCase):
 
         self.assertEqual(resp.data["rows_imported"], 1)
         self.assertEqual(
-            self._timestamps(), [datetime(2026, 4, 7, 0, 0, tzinfo=timezone.utc)]
+            self._timestamps(), [datetime(2026, 4, 7, 0, 0, tzinfo=ZURICH)]
         )
 
     def test_daily_profile_parses_slashed_date_day_first(self):
@@ -290,7 +293,7 @@ class CsvImportCharacterizationTests(TestCase):
 
         self.assertEqual(resp.data["rows_imported"], 1)
         self.assertEqual(
-            self._timestamps(), [datetime(2026, 4, 7, 0, 0, tzinfo=timezone.utc)]
+            self._timestamps(), [datetime(2026, 4, 7, 0, 0, tzinfo=ZURICH)]
         )
 
     def test_preview_daily_profile_falls_back_to_raw_string_for_unparsable_date(self):
@@ -306,24 +309,24 @@ class CsvImportCharacterizationTests(TestCase):
 
     # ── D. Standard timestamps ───────────────────────────────────────────────
 
-    def test_naive_timestamp_is_assumed_utc(self):
+    def test_naive_timestamp_is_read_as_swiss_time(self):
         resp = upload_csv(self.client,
             "naive.csv",
             b"meter_id,timestamp,energy_kwh\nCH-IMPORT-1,2026-05-01 05:00:00,1.0000\n", zev_id=str(self.zev.id))
 
         self.assertEqual(resp.data["rows_imported"], 1)
         self.assertEqual(
-            self._timestamps(), [datetime(2026, 5, 1, 5, 0, tzinfo=timezone.utc)]
+            self._timestamps(), [datetime(2026, 5, 1, 5, 0, tzinfo=ZURICH)]
         )
 
-    def test_date_only_timestamp_becomes_midnight_utc(self):
+    def test_date_only_timestamp_becomes_swiss_midnight(self):
         resp = upload_csv(self.client,
             "dateonly.csv",
             b"meter_id,timestamp,energy_kwh\nCH-IMPORT-1,2026-05-02,1.0000\n", zev_id=str(self.zev.id))
 
         self.assertEqual(resp.data["rows_imported"], 1)
         self.assertEqual(
-            self._timestamps(), [datetime(2026, 5, 2, 0, 0, tzinfo=timezone.utc)]
+            self._timestamps(), [datetime(2026, 5, 2, 0, 0, tzinfo=ZURICH)]
         )
 
     def test_unparsable_timestamp_is_skipped_and_reported(self):
@@ -490,7 +493,7 @@ class CsvImportCharacterizationTests(TestCase):
         self.assertEqual(resp.status_code, 201)
         self.assertEqual(resp.data["rows_imported"], 1)
         self.assertEqual(
-            self._timestamps(), [datetime(2026, 2, 2, 5, 30, tzinfo=timezone.utc)]
+            self._timestamps(), [datetime(2026, 2, 2, 5, 30, tzinfo=ZURICH)]
         )
 
     def test_xlsx_native_date_cell_with_timestamp_format_for_daily_profile(self):
@@ -510,7 +513,7 @@ class CsvImportCharacterizationTests(TestCase):
         self.assertEqual(resp.status_code, 201)
         self.assertEqual(resp.data["rows_imported"], 1)
         self.assertEqual(
-            self._timestamps(), [datetime(2026, 2, 7, 0, 0, tzinfo=timezone.utc)]
+            self._timestamps(), [datetime(2026, 2, 7, 0, 0, tzinfo=ZURICH)]
         )
 
     def test_csv_errors_carry_meter_id(self):

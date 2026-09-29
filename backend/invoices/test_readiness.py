@@ -15,6 +15,7 @@ that enough periods have elapsed since a hard-coded start date.
 """
 
 from datetime import date, datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 from decimal import Decimal
 
 from django.test import TestCase
@@ -41,6 +42,9 @@ from zev.models import MeteringPoint, MeteringPointAssignment, MeteringPointType
 # A fixed "today" so tests do not depend on the wall clock or the calendar
 # month the suite happens to run in.
 FROZEN_TODAY = date(2026, 9, 15)
+
+# Price series cover Swiss civil days (ADR 0026).
+ZURICH = ZoneInfo("Europe/Zurich")
 
 
 def _fill_readings(mp, start: date, end: date):
@@ -1142,7 +1146,7 @@ class DynamicTariffPricingCoverageTests(ReadinessTestCase):
     def test_a_fully_covered_dynamic_tariff_is_ok(self):
         tariff, source = _dynamic_tariff(self.zev)
         _store_series(
-            source, datetime(2026, 1, 1, tzinfo=timezone.utc), datetime(2026, 2, 1, tzinfo=timezone.utc),
+            source, datetime(2026, 1, 1, tzinfo=ZURICH), datetime(2026, 2, 1, tzinfo=ZURICH),
         )
 
         steps = self._steps_by_key(
@@ -1180,10 +1184,10 @@ class DynamicTariffPricingCoverageTests(ReadinessTestCase):
     def test_a_gap_in_the_middle_of_the_series_is_reported_not_the_whole_period(self):
         tariff, source = _dynamic_tariff(self.zev)
         _store_series(
-            source, datetime(2026, 1, 1, tzinfo=timezone.utc), datetime(2026, 1, 10, tzinfo=timezone.utc),
+            source, datetime(2026, 1, 1, tzinfo=ZURICH), datetime(2026, 1, 10, tzinfo=ZURICH),
         )
         _store_series(
-            source, datetime(2026, 1, 15, tzinfo=timezone.utc), datetime(2026, 2, 1, tzinfo=timezone.utc),
+            source, datetime(2026, 1, 15, tzinfo=ZURICH), datetime(2026, 2, 1, tzinfo=ZURICH),
         )
 
         steps = self._steps_by_key(
@@ -1233,7 +1237,7 @@ class DynamicTariffPricingCoverageTests(ReadinessTestCase):
         # exactly like tariffs.dynamic.fetch.coverage_gaps.
         tariff, source = _dynamic_tariff(self.zev, valid_from=date(2026, 3, 1))
         _store_series(
-            source, datetime(2026, 3, 1, tzinfo=timezone.utc), datetime(2026, 4, 1, tzinfo=timezone.utc),
+            source, datetime(2026, 3, 1, tzinfo=ZURICH), datetime(2026, 4, 1, tzinfo=ZURICH),
         )
 
         steps = self._steps_by_key(
@@ -1258,7 +1262,7 @@ class DynamicTariffPricingCoverageTests(ReadinessTestCase):
         )
         _tariff, source = _dynamic_tariff(self.zev, valid_from=date(2026, 1, 16), label="Grid")
         _store_series(
-            source, datetime(2026, 1, 16, tzinfo=timezone.utc), datetime(2026, 2, 1, tzinfo=timezone.utc),
+            source, datetime(2026, 1, 16, tzinfo=ZURICH), datetime(2026, 2, 1, tzinfo=ZURICH),
         )
 
         steps = self._steps_by_key(

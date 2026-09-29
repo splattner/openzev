@@ -14,7 +14,8 @@ import re
 import uuid
 import zipfile
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 from decimal import Decimal, InvalidOperation
 
 import openpyxl
@@ -57,6 +58,169 @@ DEFAULT_COLUMN_MAP = {
 
 class ImportFileError(ValueError):
     """The uploaded file could not be read at all (bad format, encoding or delimiter)."""
+
+
+# Zones an offset-less timestamp may be declared in (ADR 0026). Swiss sources
+# export Swiss local time; UTC is for the few that export UTC without saying so.
+TIMESTAMP_TIMEZONES = {"Europe/Zurich": ZoneInfo("Europe/Zurich"), "UTC": timezone.utc}
+DEFAULT_TIMESTAMP_TIMEZONE = "Europe/Zurich"
+
+
+class NonexistentLocalTime(ValueError):
+    """A wall-clock time inside the spring DST gap (02:00–02:59 on the switch day)."""
+
+
+@dataclass(frozen=True)
+class DstGapSkip:
+    """A zero-energy row at a non-existent local time: skipped with a warning."""
+
+    day: date
+
+
+@dataclass(frozen=True)
+class DayWindow:
+    """A daily-profile row's civil day and its [start, end) as UTC instants."""
+
+    day: date
+    start: datetime
+    end: datetime
+
+
+class TimestampReader:
+    """Reads one file's timestamps into UTC instants (ADR 0026).
+
+    A value with an offset is converted as written. An offset-less value is a
+    wall-clock time in the declared zone. In Europe/Zurich the autumn DST hour
+    occurs twice: per series (meter and direction), in file order, the first
+    occurrence is summer time and the second winter time. The spring hour does
+    not exist at all and raises ``NonexistentLocalTime``.
+
+    The repeated-hour rule keeps state, so every pass over a file (prefetch,
+    preview, import) uses a fresh reader and visits the rows in file order.
+    """
+
+    def __init__(self, timestamp_format=None, zone_name=DEFAULT_TIMESTAMP_TIMEZONE):
+        self.timestamp_format = timestamp_format
+        self.zone = TIMESTAMP_TIMEZONES[zone_name]
+        self._occurrences: dict = {}
+
+    @property
+    def is_local(self):
+        return self.zone is not timezone.utc
+
+    def parse(self, raw_value):
+        """Aware UTC datetime for a value with an offset; naive wall clock otherwise."""
+        if isinstance(raw_value, datetime):
+            return raw_value.astimezone(timezone.utc) if raw_value.tzinfo else raw_value
+        text = "" if raw_value is None else str(raw_value).strip()
+        try:
+            if self.timestamp_format:
+                parsed = datetime.strptime(text, self.timestamp_format)
+            else:
+                parsed = _parse_flexible(text)
+        except (ValueError, TypeError, OverflowError):
+            preview = text[:100] + ("…" if len(text) > 100 else "")
+            raise ValueError(f"Invalid timestamp value '{preview}'.") from None
+        return parsed.astimezone(timezone.utc) if parsed.tzinfo else parsed
+
+    def resolve(self, parsed, series_key=None):
+        """The UTC instant for a value from ``parse``."""
+        if parsed.tzinfo is not None:
+            return parsed
+        if not self.is_local:
+            return parsed.replace(tzinfo=timezone.utc)
+        summer = parsed.replace(tzinfo=self.zone, fold=0)
+        instant = summer.astimezone(timezone.utc)
+        if instant.astimezone(self.zone).replace(tzinfo=None) != parsed:
+            raise NonexistentLocalTime(parsed)
+        winter = parsed.replace(tzinfo=self.zone, fold=1)
+        if summer.utcoffset() != winter.utcoffset():
+            key = (series_key, parsed)
+            seen = self._occurrences.get(key, 0)
+            self._occurrences[key] = seen + 1
+            if seen:
+                return winter.astimezone(timezone.utc)
+        return instant
+
+    def day_window(self, raw_day):
+        """The civil day a daily-profile row covers."""
+        if isinstance(raw_day, datetime):
+            day = raw_day.date()
+        else:
+            text = "" if raw_day is None else str(raw_day).strip()
+            try:
+                if self.timestamp_format:
+                    day = datetime.strptime(text, self.timestamp_format).date()
+                else:
+                    # Preserve unambiguous ISO dates; fall back to day-first parsing for
+                    # European CSV exports such as 07.01.2026 or 07/01/2026.
+                    iso_like = text[:10].count("-") == 2 and text[:4].isdigit()
+                    day = _parse_flexible(text, dayfirst=not iso_like).date()
+            except (ValueError, TypeError, OverflowError):
+                preview = text[:100] + ("…" if len(text) > 100 else "")
+                raise ValueError(f"Invalid date value '{preview}'.") from None
+        next_day = day + timedelta(days=1)
+        start = datetime(day.year, day.month, day.day, tzinfo=self.zone)
+        end = datetime(next_day.year, next_day.month, next_day.day, tzinfo=self.zone)
+        return DayWindow(day, start.astimezone(timezone.utc), end.astimezone(timezone.utc))
+
+
+def _coerce_timestamp_timezone(value):
+    """Validate the declared zone for offset-less timestamps; default Europe/Zurich."""
+    name = DEFAULT_TIMESTAMP_TIMEZONE if value in (None, "") else str(value).strip()
+    if name not in TIMESTAMP_TIMEZONES:
+        raise ImportFileError(f"timestamp_timezone must be one of {', '.join(TIMESTAMP_TIMEZONES)}.")
+    return name
+
+
+def _day_length_error(window, slots, provided):
+    length = window.end - window.start
+    kind = ""
+    if length < timedelta(hours=24):
+        kind = " (DST start)"
+    elif length > timedelta(hours=24):
+        kind = " (DST end)"
+    return (
+        f"{window.day.isoformat()} has {slots} intervals in Swiss time{kind}, "
+        f"but the row has {provided} values."
+    )
+
+
+def _fit_daily_values(values, window, interval_minutes, local):
+    """The row's values for the slots its civil day really has.
+
+    Returns ``(values, error)``. A Swiss day has 92, 96 or 100 quarter-hours.
+    Surplus trailing empty columns are dropped (a 100-column file on an
+    ordinary day); on the spring DST day a row that still lists the missing
+    02:00 hour may leave it empty or zero, and it is dropped. A 25-hour day
+    needs all its values. Rows shorter than an ordinary day are kept as they
+    are — partial days are allowed. UTC files keep their values unchanged.
+    """
+    if not local:
+        return values, None
+    interval = timedelta(minutes=interval_minutes)
+    length = window.end - window.start
+    if length % interval:
+        return values, None
+    slots = length // interval
+    provided = len(values)
+    if provided > slots:
+        fitted = list(values)
+        while len(fitted) > slots and fitted[-1] is None:
+            fitted.pop()
+        hour = timedelta(hours=1)
+        if len(fitted) > slots and length < timedelta(hours=24) and not hour % interval:
+            per_hour = hour // interval
+            first = 2 * per_hour
+            missing = fitted[first:first + per_hour]
+            if len(fitted) - slots == per_hour and all(v is None or v == 0 for v in missing):
+                fitted = fitted[:first] + fitted[first + per_hour:]
+        if len(fitted) > slots:
+            return None, _day_length_error(window, slots, provided)
+        return fitted, None
+    if slots > provided >= timedelta(hours=24) // interval:
+        return None, _day_length_error(window, slots, provided)
+    return values, None
 
 
 @dataclass
@@ -263,43 +427,28 @@ def _parse_flexible(text, *, dayfirst=False):
 
 
 def _parse_datetime_utc(raw_value):
+    """Parse a timestamp that is UTC unless it says otherwise (transfer archives)."""
     parsed = _parse_flexible(str(raw_value).strip())
     if parsed.tzinfo is None:
         return parsed.replace(tzinfo=timezone.utc)
     return parsed.astimezone(timezone.utc)
 
 
-def _parse_row_timestamp(raw_value, timestamp_format):
-    """Parse a standard-profile timestamp cell to an aware UTC datetime."""
-    if isinstance(raw_value, datetime):
-        if raw_value.tzinfo is None:
-            return raw_value.replace(tzinfo=timezone.utc)
-        return raw_value.astimezone(timezone.utc)
-    text = "" if raw_value is None else str(raw_value).strip()
-    try:
-        if timestamp_format:
-            parsed = datetime.strptime(text, timestamp_format)
-            if parsed.tzinfo is None:
-                return parsed.replace(tzinfo=timezone.utc)
-            return parsed.astimezone(timezone.utc)
-        return _parse_datetime_utc(raw_value)
-    except (ValueError, TypeError, OverflowError):
-        preview = text[:100] + ("…" if len(text) > 100 else "")
-        raise ValueError(f"Invalid timestamp value '{preview}'.") from None
-
-
-def _interpret_standard_row(row, *, resolved_cols, timestamp_format, meter_type):
+def _interpret_standard_row(row, *, resolved_cols, reader, meter_type, series_key=None):
     """Shared standard-row interpretation for preview and import.
 
     Returns ``(timestamp, direction, energy, error)`` — error is None on
-    success, otherwise the exact user-facing message both paths report, so
-    preview and import agree on every standard row by construction.
+    success, a ``DstGapSkip`` for a zero-energy row inside the spring DST gap,
+    otherwise the exact user-facing message both paths report, so preview and
+    import agree on every standard row by construction. ``series_key`` (the
+    meter id) scopes the autumn repeated-hour rule, together with the
+    direction.
     """
     raw_ts = row[resolved_cols["timestamp"]]
     if _is_missing(raw_ts):
         return None, None, None, "Missing timestamp value."
     try:
-        ts = _parse_row_timestamp(raw_ts, timestamp_format)
+        parsed = reader.parse(raw_ts)
     except (ValueError, TypeError, OverflowError) as exc:
         return None, None, None, str(exc)
     try:
@@ -310,6 +459,12 @@ def _interpret_standard_row(row, *, resolved_cols, timestamp_format, meter_type)
     if direction_error is not None:
         return None, None, None, direction_error
     direction, energy = _infer_direction_and_energy(meter_type, energy_raw, explicit_direction)
+    try:
+        ts = reader.resolve(parsed, (series_key, direction))
+    except NonexistentLocalTime:
+        if energy == 0:
+            return None, direction, energy, DstGapSkip(parsed.date())
+        return None, None, None, f"Timestamp {str(raw_ts).strip()[:100]} does not exist in Swiss time (DST start)."
     return ts, direction, energy, None
 
 
@@ -478,24 +633,6 @@ def _check_timestamp_format(timestamp_format):
     return None
 
 
-def _build_day_start(raw_day, timestamp_format):
-    if isinstance(raw_day, datetime):
-        return datetime(raw_day.year, raw_day.month, raw_day.day, tzinfo=timezone.utc)
-    text = "" if raw_day is None else str(raw_day).strip()
-    try:
-        if timestamp_format:
-            day_dt = datetime.strptime(text, timestamp_format)
-        else:
-            # Preserve unambiguous ISO dates; fall back to day-first parsing for
-            # European CSV exports such as 07.01.2026 or 07/01/2026.
-            iso_like = text[:10].count("-") == 2 and text[:4].isdigit()
-            day_dt = _parse_flexible(text, dayfirst=not iso_like)
-    except (ValueError, TypeError, OverflowError):
-        preview = text[:100] + ("…" if len(text) > 100 else "")
-        raise ValueError(f"Invalid date value '{preview}'.") from None
-    return datetime(day_dt.year, day_dt.month, day_dt.day, tzinfo=timezone.utc)
-
-
 def _coerce_values_count(values_count):
     """Bounds the per-row slot loop."""
     try:
@@ -540,18 +677,18 @@ def _upsert_reading(mp, ts, direction, energy, batch_id, overwrite_existing):
     return created
 
 
-def _contiguous_day_ranges(day_starts):
-    """Coalesce distinct UTC day starts into half-open [start, end) ranges."""
-    sorted_days = sorted(day_starts)
+def _contiguous_day_ranges(windows):
+    """Coalesce day windows into half-open [start, end) ranges.
+
+    Adjacent civil days share a boundary (one day's end is the next day's
+    start), so contiguous blocks merge whatever each day's length.
+    """
     ranges = []
-    range_start = range_end = sorted_days[0]
-    for day in sorted_days[1:]:
-        if day == range_end + timedelta(days=1):
-            range_end = day
+    for window in sorted(windows, key=lambda w: w.start):
+        if ranges and window.start <= ranges[-1][1]:
+            ranges[-1] = (ranges[-1][0], max(ranges[-1][1], window.end))
         else:
-            ranges.append((range_start, range_end + timedelta(days=1)))
-            range_start = range_end = day
-    ranges.append((range_start, range_end + timedelta(days=1)))
+            ranges.append((window.start, window.end))
     return ranges
 
 
@@ -613,14 +750,14 @@ def _fetch_existing_daily_set(mp_ids, min_start, max_end):
     return set(rows)
 
 
-def _prefetch_daily_existing(table, resolved_cols, meter_lookup, timestamp_format):
+def _prefetch_daily_existing(table, resolved_cols, meter_lookup, reader):
     """Fetch existing daily readings in one query per contiguous file-day block.
 
     Sparse files must not turn their earliest/latest dates into a large range
     query. Rows with unresolvable meters or dates are skipped here; the main
     loop reports them individually.
     """
-    day_starts = set()
+    windows = set()
     mp_ids = set()
     for row in table.rows:
         try:
@@ -635,21 +772,21 @@ def _prefetch_daily_existing(table, resolved_cols, meter_lookup, timestamp_forma
         if mp is None:
             continue
         try:
-            day_start = _build_day_start(raw_day, timestamp_format)
+            window = reader.day_window(raw_day)
         except (ValueError, TypeError, OverflowError):
             continue
         mp_ids.add(mp.id)
-        day_starts.add(day_start)
-    if not mp_ids or not day_starts:
+        windows.add(window)
+    if not mp_ids or not windows:
         return set()
 
     existing = set()
-    for start, end in _contiguous_day_ranges(day_starts):
+    for start, end in _contiguous_day_ranges(windows):
         existing.update(_fetch_existing_daily_set(mp_ids, start, end))
     return existing
 
 
-def _prefetch_standard_existing(table, resolved_cols, meter_lookup, timestamp_format):
+def _prefetch_standard_existing(table, resolved_cols, meter_lookup, reader):
     """Fetch existing standard readings for one upload in bounded queries.
 
     Standard rows carry exact timestamps, so candidates are matched with
@@ -675,8 +812,9 @@ def _prefetch_standard_existing(table, resolved_cols, meter_lookup, timestamp_fo
         ts, direction, _, error = _interpret_standard_row(
             row,
             resolved_cols=resolved_cols,
-            timestamp_format=timestamp_format,
+            reader=reader,
             meter_type=mp.meter_type,
+            series_key=meter_id,
         )
         if error is not None:
             continue
@@ -713,12 +851,14 @@ def preview_csv(
     values_count=96,
     max_rows=30,
     overwrite_existing=False,
+    timestamp_timezone=DEFAULT_TIMESTAMP_TIMEZONE,
 ):
     col = {**DEFAULT_COLUMN_MAP, **(column_map or {})}
     has_header = _to_bool(has_header, default=True)
     overwrite_existing = _to_bool(overwrite_existing, default=False)
     interval_minutes = _coerce_interval_minutes(interval_minutes)
     values_count = _coerce_values_count(values_count)
+    timestamp_timezone = _coerce_timestamp_timezone(timestamp_timezone)
     table = _read_table(file, has_header=has_header, delimiter=delimiter)
 
     required_keys = ["meter_id", "timestamp", "energy_kwh"] if format_profile == "standard" else ["meter_id", "timestamp", "energy_start"]
@@ -731,6 +871,8 @@ def preview_csv(
             "summary": {"existing_metering_points": 0, "missing_metering_points": 0, "rows_previewed": 0, "rows_skipped_existing": 0, "readings_existing": 0},
             "missing_meter_ids": [],
             "errors": [{"row": None, "error": error} for error in (column_error, format_error) if error],
+            "timestamp_timezone": timestamp_timezone,
+            "rows_skipped_dst_gap": 0,
         }
 
     meter_lookup = {mp.meter_id: mp for mp in _meter_queryset_for_user(user, zev)}
@@ -744,7 +886,9 @@ def preview_csv(
     # Also backs intra-file duplicate detection so preview agrees with import.
     preexisting_daily: set = set()
     if format_profile == "daily_15min":
-        preexisting_daily = _prefetch_daily_existing(table, resolved_cols, meter_lookup, timestamp_format)
+        preexisting_daily = _prefetch_daily_existing(
+            table, resolved_cols, meter_lookup, TimestampReader(timestamp_format, timestamp_timezone),
+        )
     # Day-level index for the existing_data flag: any reading that day with an
     # overlapping direction warns, even when no exact slot collides (e.g. an
     # hourly 06:00 reading vs a midnight daily slot). Exact-slot sets above
@@ -758,8 +902,12 @@ def preview_csv(
     # detection so preview agrees with import for both profiles.
     preexisting_standard: set = set()
     if format_profile == "standard":
-        preexisting_standard = _prefetch_standard_existing(table, resolved_cols, meter_lookup, timestamp_format)
+        preexisting_standard = _prefetch_standard_existing(
+            table, resolved_cols, meter_lookup, TimestampReader(timestamp_format, timestamp_timezone),
+        )
     preview_written_standard: set = set()
+    reader = TimestampReader(timestamp_format, timestamp_timezone)
+    dst_gap_skipped = 0
 
     skipped_existing = 0
     # Exact reading keys already present (database or earlier in this file).
@@ -775,7 +923,7 @@ def preview_csv(
         raw_timestamp = row[resolved_cols["timestamp"]]
         meter_id = None
         mp = None
-        day_start = None
+        window = None
         # Directions this row would import, surfaced in the preview so a
         # misconfigured direction column is visible before the write.
         row_directions: list = []
@@ -807,7 +955,7 @@ def preview_csv(
                     add_error(errors, _csv_error(row_number, meter_id, "Missing date value for daily profile."))
             elif deep:
                 try:
-                    day_start = _build_day_start(raw_timestamp, timestamp_format)
+                    window = reader.day_window(raw_timestamp)
                 except (ValueError, TypeError, OverflowError) as exc:
                     add_error(errors, _csv_error(row_number, meter_id, str(exc)))
                 else:
@@ -829,13 +977,14 @@ def preview_csv(
                         )
                         row_directions = sorted(day_directions)
                         if mp is not None and day_directions:
-                            day_end = day_start + timedelta(days=1)
                             preview_existing_data = any(
-                                day_start <= ts < day_end
+                                window.start <= ts < window.end
                                 for direction in day_directions
                                 for ts in preexisting_by_mp_dir.get((mp.id, direction), ())
                             )
                     values, row_error = _parse_daily_values(row, start_pos, values_count, table.width)
+                    if row_error is None and not all(v is None for v in values):
+                        values, row_error = _fit_daily_values(values, window, interval_minutes, reader.is_local)
                     if row_error is not None:
                         add_error(errors, _csv_error(row_number, meter_id, row_error))
                     elif all(v is None for v in values):
@@ -850,7 +999,7 @@ def preview_csv(
                             if value is None:
                                 continue
                             direction, _ = _infer_direction_and_energy(probe_type, value, explicit_direction)
-                            ts = day_start + timedelta(minutes=interval_minutes * slot)
+                            ts = window.start + timedelta(minutes=interval_minutes * slot)
                             slot_keys.append((mp.id, ts, direction))
                         duplicates = sum(
                             1 for key in slot_keys if key in preexisting_daily or key in preview_written
@@ -874,10 +1023,14 @@ def preview_csv(
             ts, direction, _, row_error = _interpret_standard_row(
                 row,
                 resolved_cols=resolved_cols,
-                timestamp_format=timestamp_format,
+                reader=reader,
                 meter_type=probe_type,
+                series_key=meter_id,
             )
-            if row_error is not None:
+            if isinstance(row_error, DstGapSkip):
+                # Not an error: the import skips it with a warning.
+                dst_gap_skipped += 1
+            elif row_error is not None:
                 add_error(errors, _csv_error(row_number, meter_id, row_error))
             else:
                 row_directions = [direction]
@@ -895,15 +1048,12 @@ def preview_csv(
             exists = mp is not None
             if format_profile == "daily_15min":
                 date_value = None
-                candidate_day = day_start
                 if not _is_missing(raw_timestamp):
                     try:
-                        if candidate_day is None:
-                            candidate_day = _build_day_start(raw_timestamp, timestamp_format)
-                        date_value = candidate_day.date().isoformat()
+                        candidate = window or TimestampReader(timestamp_format, timestamp_timezone).day_window(raw_timestamp)
+                        date_value = candidate.day.isoformat()
                     except (ValueError, TypeError, OverflowError):
                         date_value = str(raw_timestamp)
-                        candidate_day = None
                 preview_rows.append(
                     {
                         "row": row_number,
@@ -949,6 +1099,8 @@ def preview_csv(
         },
         "missing_meter_ids": sorted(missing_ids)[:MAX_REPORTED_ERRORS],
         "errors": errors,
+        "timestamp_timezone": timestamp_timezone,
+        "rows_skipped_dst_gap": dst_gap_skipped,
     }
 
 
@@ -965,6 +1117,7 @@ def import_csv(
     interval_minutes=15,
     values_count=96,
     overwrite_existing=False,
+    timestamp_timezone=DEFAULT_TIMESTAMP_TIMEZONE,
 ):
     """Import metering readings from a CSV or Excel file and return an ImportLog instance.
 
@@ -982,6 +1135,7 @@ def import_csv(
     overwrite_existing = _to_bool(overwrite_existing, default=False)
     interval_minutes = _coerce_interval_minutes(interval_minutes)
     values_count = _coerce_values_count(values_count)
+    timestamp_timezone = _coerce_timestamp_timezone(timestamp_timezone)
     table = _read_table(file, has_header=has_header, delimiter=delimiter)
     filename = getattr(file, "name", "upload")
 
@@ -996,6 +1150,7 @@ def import_csv(
                 source=ImportSource.CSV,
                 filename=filename,
                 rows_total=len(table.rows),
+                timestamp_timezone=timestamp_timezone,
             )
             resolved_cols, column_error = _resolve_columns(table, col, required_keys)
             format_error = _check_timestamp_format(timestamp_format)
@@ -1013,6 +1168,7 @@ def import_csv(
                 batch_id,
                 resolved_cols,
                 timestamp_format,
+                timestamp_timezone,
                 has_header,
                 format_profile,
                 interval_minutes,
@@ -1039,6 +1195,7 @@ def import_csv(
             rows_skipped=len(table.rows),
             errors=[{"row": None, "error": f"Import failed: {exc}"}],
             warnings=[],
+            timestamp_timezone=timestamp_timezone,
         )
         raise ImportFileError(f"Import failed: {exc}") from exc
 
@@ -1051,6 +1208,7 @@ def _import_table_rows(
     batch_id,
     resolved_cols,
     timestamp_format,
+    timestamp_timezone,
     has_header,
     format_profile,
     interval_minutes,
@@ -1070,7 +1228,12 @@ def _import_table_rows(
     preexisting_daily: set = set()
     written_daily: set = set()
     if format_profile == "daily_15min" and not overwrite_existing:
-        preexisting_daily = _prefetch_daily_existing(table, resolved_cols, meter_lookup, timestamp_format)
+        preexisting_daily = _prefetch_daily_existing(
+            table, resolved_cols, meter_lookup, TimestampReader(timestamp_format, timestamp_timezone),
+        )
+    reader = TimestampReader(timestamp_format, timestamp_timezone)
+    # Zero-energy rows inside the spring DST gap, per civil day.
+    dst_gap_skipped: dict = {}
 
     for idx, row in enumerate(table.rows):
         row_number = idx + (2 if has_header else 1)
@@ -1107,7 +1270,7 @@ def _import_table_rows(
                     add_error(errors, _csv_error(row_number, meter_id, "Missing date value for daily profile."))
                     continue
 
-                day_start = _build_day_start(raw_day, timestamp_format)
+                window = reader.day_window(raw_day)
                 start_pos = resolved_cols["energy_start"]
 
                 # Shared validation with preview_csv: missing columns and
@@ -1115,6 +1278,8 @@ def _import_table_rows(
                 # readings are skipped per slot so gap-filling keeps working
                 # without overwrite.
                 values, row_error = _parse_daily_values(row, start_pos, values_count, table.width)
+                if row_error is None and not all(value is None for value in values):
+                    values, row_error = _fit_daily_values(values, window, interval_minutes, reader.is_local)
                 if row_error is not None:
                     skipped += 1
                     add_error(errors, _csv_error(row_number, meter_id, row_error))
@@ -1136,7 +1301,7 @@ def _import_table_rows(
                         slots.append(None)
                         continue
                     direction, energy = _infer_direction_and_energy(mp.meter_type, value, explicit_direction)
-                    ts = day_start + timedelta(minutes=interval_minutes * slot)
+                    ts = window.start + timedelta(minutes=interval_minutes * slot)
                     if not overwrite_existing and (
                         (mp.id, ts, direction) in preexisting_daily
                         or (mp.id, ts, direction) in written_daily
@@ -1243,9 +1408,14 @@ def _import_table_rows(
             ts, direction, energy, row_error = _interpret_standard_row(
                 row,
                 resolved_cols=resolved_cols,
-                timestamp_format=timestamp_format,
+                reader=reader,
                 meter_type=mp.meter_type,
+                series_key=meter_id,
             )
+            if isinstance(row_error, DstGapSkip):
+                skipped += 1
+                dst_gap_skipped[row_error.day] = dst_gap_skipped.get(row_error.day, 0) + 1
+                continue
             if row_error is not None:
                 skipped += 1
                 add_error(errors, _csv_error(row_number, meter_id, row_error))
@@ -1288,6 +1458,14 @@ def _import_table_rows(
     warnings: list[dict] = []
     if overwritten > 0:
         warnings.append({"row": None, "warning": f"Overwrote {overwritten} existing readings."})
+    for day, count in sorted(dst_gap_skipped.items()):
+        warnings.append({
+            "row": None,
+            "warning": (
+                f"Skipped {count} rows at {day.isoformat()} 02:00–02:59: "
+                "that hour does not exist in Swiss time (DST start)."
+            ),
+        })
     log.errors = errors
     log.warnings = warnings
     log.save()

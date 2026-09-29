@@ -226,8 +226,9 @@ class TestEvidenceProtection:
         factories.InvoiceFactory(
             zev=tariff.zev, period_start="2026-02-01", period_end="2026-02-28", status="sent",
         )
-        start = datetime(2026, 1, 31, 23, 45, tzinfo=UTC)
-        end = datetime(2026, 2, 1, 0, 0, tzinfo=UTC)
+        # The invoice starts at Swiss midnight on 1 February (ADR 0026).
+        start = datetime(2026, 1, 31, 22, 45, tzinfo=UTC)
+        end = datetime(2026, 1, 31, 23, 0, tzinfo=UTC)
         store_points(source, [PricePoint(start, end, Decimal("0.1"))])
 
         assert store_points(source, [PricePoint(start, end, Decimal("0.2"))]) == 1

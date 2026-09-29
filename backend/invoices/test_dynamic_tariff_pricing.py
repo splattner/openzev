@@ -7,6 +7,7 @@ must not silently disagree.
 """
 
 from datetime import date, datetime, time, timedelta, timezone
+from zoneinfo import ZoneInfo
 from decimal import Decimal
 
 import pytest
@@ -26,6 +27,7 @@ from .tariff_pricing import (
 pytestmark = pytest.mark.django_db
 
 UTC = timezone.utc
+ZURICH = ZoneInfo("Europe/Zurich")
 
 
 def make_source(**overrides) -> DynamicTariffSource:
@@ -118,13 +120,14 @@ class TestDynamicAverageChfPerKwh:
             tariff, as_of=date(2026, 1, 1), days=1
         ).status == "unavailable"
 
-        store(source, datetime(2026, 1, 1, 0, tzinfo=UTC), "0.20000", minutes=60)
+        # The window is the Swiss civil day (ADR 0026).
+        store(source, datetime(2026, 1, 1, 0, tzinfo=ZURICH), "0.20000", minutes=60)
         assert summarize_dynamic_tariff(
             tariff, as_of=date(2026, 1, 1), days=1
         ).status == "partial"
 
         source.points.all().delete()
-        store(source, datetime(2026, 1, 1, 0, tzinfo=UTC), "0.20000", minutes=24 * 60)
+        store(source, datetime(2026, 1, 1, 0, tzinfo=ZURICH), "0.20000", minutes=24 * 60)
         assert summarize_dynamic_tariff(
             tariff, as_of=date(2026, 1, 1), days=1
         ).status == "complete"
@@ -156,7 +159,8 @@ class TestDynamicAverageChfPerKwh:
 
         assert summary.status == "complete"
         assert summary.average_chf_per_kwh == Decimal("0.03896")
-        assert summary.reference_to == date(2026, 6, 29)
+        # The quarter ends at Swiss midnight, so 30 June is covered whole.
+        assert summary.reference_to == date(2026, 6, 30)
 
     def test_a_vse_source_still_reports_a_stalled_series_as_unavailable(self):
         # The same anchoring must not apply to a continuously published

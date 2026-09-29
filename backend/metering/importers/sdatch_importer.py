@@ -12,6 +12,8 @@ from decimal import Decimal
 
 from lxml import etree
 
+from allocation.validity import business_tz
+
 from zev.models import MeteringPoint
 from metering.models import MeterReading, ImportLog, ImportSource
 from metering.importers.limits import MAX_UPLOAD_BYTES, add_error, mb
@@ -20,9 +22,17 @@ MAX_SDAT_BYTES = MAX_UPLOAD_BYTES
 
 
 def _parse_ts(value: str) -> datetime:
-    """Parse ISO 8601 datetime string to UTC datetime."""
+    """Parse an ISO 8601 datetime string to a UTC datetime.
+
+    SDAT-CH timestamps carry ``Z`` or an offset. One without is read as Swiss
+    local time explicitly (ADR 0026) — a bare ``astimezone()`` would silently
+    use the process timezone instead.
+    """
     value = value.replace("Z", "+00:00")
-    return datetime.fromisoformat(value).astimezone(timezone.utc)
+    parsed = datetime.fromisoformat(value)
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=business_tz())
+    return parsed.astimezone(timezone.utc)
 
 
 def import_sdatch(file, zev, user):
@@ -40,6 +50,7 @@ def import_sdatch(file, zev, user):
         imported_by=user,
         source=ImportSource.SDATCH,
         filename=filename,
+        timestamp_timezone=str(business_tz()),
     )
 
     # App-level size cap (nginx enforces 413 earlier).

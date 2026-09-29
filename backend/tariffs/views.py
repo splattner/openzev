@@ -15,6 +15,7 @@ from django.db.models.functions import Coalesce
 from django.utils import timezone
 from django.utils.dateparse import parse_date
 from accounts.permissions import IsZevOwnerOrAdmin
+from allocation.validity import period_window
 from .dynamic.fetch import coverage_gaps
 from .dynamic.storage import PriceSeriesConflict
 from .dynamic.evidence import lock_sources
@@ -28,7 +29,6 @@ from .dynamic.services import (
     create_or_reuse_source,
     recheck_source_capabilities,
     tariff_has_dynamic_billing_evidence,
-    local_civil_day_window,
 )
 from .importers.remote import TariffFetchError
 from .dynamic.vse_v1 import DynamicTariffResponseError
@@ -700,7 +700,7 @@ class DynamicTariffSourceViewSet(viewsets.ReadOnlyModelViewSet):
         if (date_to - date_from).days >= max_days:
             raise DRFValidationError({"date_to": [f"Price history is limited to {max_days} days."]})
 
-        window_start, window_end = local_civil_day_window(date_from, date_to)
+        window_start, window_end = period_window(date_from, date_to)
         points = source.points.filter(
             valid_to__gt=window_start, valid_from__lt=window_end
         ).order_by("valid_from")

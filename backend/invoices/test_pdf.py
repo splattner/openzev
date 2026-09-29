@@ -2,6 +2,7 @@ import io
 import re
 from datetime import date, datetime
 from datetime import timezone as dt_timezone
+from zoneinfo import ZoneInfo
 from decimal import Decimal
 from unittest.mock import MagicMock, patch
 
@@ -391,8 +392,8 @@ class InvoicePdfQrTests(TestCase):
 
         self.assertTrue(context["inline_qr_payment"])
 
-    def test_hourly_profile_buckets_by_stored_hour_not_localtime(self):
-        """Readings are stored as wall-clock UTC; bucket by ts.hour directly."""
+    def test_hourly_profile_buckets_by_swiss_hour(self):
+        """Readings are UTC instants; the profile buckets by the Swiss hour (ADR 0026)."""
         from metering.models import MeterReading, ReadingDirection, ReadingResolution
         from zev.models import MeteringPoint, MeteringPointAssignment, MeteringPointType
 
@@ -424,8 +425,8 @@ class InvoicePdfQrTests(TestCase):
             valid_from=date(2026, 1, 1),
         )
 
-        # 23:30 UTC — stored as wall-clock 23:30, should bucket into hour 23
-        ts_utc = datetime(2026, 1, 15, 23, 30, tzinfo=dt_timezone.utc)
+        # 22:30 UTC is 23:30 in Zurich (CET), so it buckets into hour 23.
+        ts_utc = datetime(2026, 1, 15, 22, 30, tzinfo=dt_timezone.utc)
         MeterReading.objects.create(
             metering_point=mp,
             timestamp=ts_utc,
@@ -444,8 +445,8 @@ class InvoicePdfQrTests(TestCase):
         chart = _build_hourly_profile_chart_svg(invoice, INVOICE_TRANSLATIONS["de"])
 
         self.assertIsNotNone(chart)
-        # The 23:30 UTC reading must land in the hour-23 bucket (stored hour),
-        # and no other hour may have a bar.
+        # The reading must land in the hour-23 bucket (Swiss hour), and no
+        # other hour may have a bar.
         hours_with_bars = set(re.findall(r'data-hour="(\d+)"', chart))
         self.assertEqual(hours_with_bars, {"23"})
 
@@ -482,8 +483,8 @@ class InvoicePdfQrTests(TestCase):
             valid_from=date(2026, 1, 1),
         )
         # One reading before the assignment (must be skipped), one after.
-        early = datetime(2026, 1, 15, 10, 0, tzinfo=dt_timezone.utc)
-        late = datetime(2026, 1, 20, 10, 0, tzinfo=dt_timezone.utc)
+        early = datetime(2026, 1, 15, 10, 0, tzinfo=ZoneInfo("Europe/Zurich"))
+        late = datetime(2026, 1, 20, 10, 0, tzinfo=ZoneInfo("Europe/Zurich"))
         for ts in (early, late):
             MeterReading.objects.create(
                 metering_point=mp, timestamp=ts, energy_kwh=Decimal("5.0000"),
@@ -537,7 +538,7 @@ class InvoicePdfQrTests(TestCase):
         )
         MeterReading.objects.create(
             metering_point=community_mp,
-            timestamp=datetime(2026, 1, 15, 9, 0, tzinfo=dt_timezone.utc),
+            timestamp=datetime(2026, 1, 15, 9, 0, tzinfo=ZoneInfo("Europe/Zurich")),
             energy_kwh=Decimal("5.0000"), direction=ReadingDirection.IN,
             resolution=ReadingResolution.HOURLY,
         )
@@ -547,8 +548,8 @@ class InvoicePdfQrTests(TestCase):
         self.assertIsNotNone(chart)
         self.assertIn('data-hour="9"', chart)
 
-    def test_period_window_uses_utc_not_local_tz(self):
-        """pdf_stats and pdf_charts must query the same UTC range as the engine."""
+    def test_period_window_uses_swiss_civil_days(self):
+        """pdf_stats and pdf_charts query the engine's range: Swiss midnights, as UTC."""
         from allocation.validity import period_window
 
         period_start = date(2026, 4, 1)
@@ -557,8 +558,8 @@ class InvoicePdfQrTests(TestCase):
         start_dt, end_dt = period_window(period_start, period_end)
 
         self.assertEqual(start_dt.tzinfo, dt_timezone.utc)
-        self.assertEqual(start_dt, datetime(2026, 4, 1, 0, 0, tzinfo=dt_timezone.utc))
-        self.assertEqual(end_dt, datetime(2026, 7, 1, 0, 0, tzinfo=dt_timezone.utc))
+        self.assertEqual(start_dt, datetime(2026, 3, 31, 22, 0, tzinfo=dt_timezone.utc))
+        self.assertEqual(end_dt, datetime(2026, 6, 30, 22, 0, tzinfo=dt_timezone.utc))
 
     def test_sample_invoice_context_has_all_template_keys(self):
         invoice = self._invoice()

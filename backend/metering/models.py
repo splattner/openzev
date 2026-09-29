@@ -76,6 +76,15 @@ class ImportLog(models.Model):
     rows_skipped = models.IntegerField(default=0)
     errors = models.JSONField(default=list)
     warnings = models.JSONField(default=list)
+    timestamp_timezone = models.CharField(
+        max_length=40,
+        blank=True,
+        default="",
+        help_text=(
+            "Zone offset-less timestamps in this batch were read in (Europe/Zurich or UTC). "
+            "Empty for imports before ADR 0026, which read them as UTC."
+        ),
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

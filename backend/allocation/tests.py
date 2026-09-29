@@ -13,6 +13,7 @@ arithmetic.
 
 import datetime
 from decimal import Decimal
+from zoneinfo import ZoneInfo
 
 import pytest
 
@@ -293,7 +294,8 @@ def test_proportional_share_rejects_participant_above_total():
 # AssignmentWindows
 # ---------------------------------------------------------------------------
 
-TS = datetime.datetime(2026, 6, 20, 12, 0, tzinfo=datetime.timezone.utc)
+# Swiss wall-clock time: assignment days are civil days (ADR 0026).
+TS = datetime.datetime(2026, 6, 20, 12, 0, tzinfo=ZoneInfo("Europe/Zurich"))
 
 
 def test_participant_at_resolves_the_holder_on_the_boundary_day():
@@ -359,32 +361,30 @@ def test_is_held_by_matches_only_the_current_holder():
     assert windows.is_held_by(11, "mp9", TS) is False
 
 
-def test_matching_uses_the_utc_civil_date_of_the_timestamp():
-    """Assignment validity is matched on the UTC civil date of the timestamp.
-    A reading at 22:30 UTC on 15 June (already 00:30 on 16 June in Zurich
-    CEST) still belongs to the 15 June holder, keeping the attribution day
-    aligned with the period and tariff day. ``participant_at`` defensively
-    converts to UTC via ``astimezone``, so even a non-UTC datetime resolves
-    to the correct UTC date instead of silently shifting the civil date."""
+def test_matching_uses_the_swiss_civil_date_of_the_timestamp():
+    """Assignment validity is matched on the Swiss civil date of the
+    timestamp (ADR 0026). A reading at 22:30 UTC on 15 June is 00:30 on
+    16 June in Zurich (CEST), so it belongs to the 16 June holder — the same
+    day the billing period and the tariff use. The instant decides, not the
+    zone it happens to be expressed in."""
     windows = AssignmentWindows([
         ("mp1", datetime.date(2026, 6, 15), datetime.date(2026, 6, 15), 11, "personal", 1),
         ("mp1", datetime.date(2026, 6, 16), None, 22, "personal", 2),
     ])
     tz_utc = datetime.timezone.utc
-    tz_zurich = datetime.timezone(datetime.timedelta(hours=2))  # CEST in June
+    tz_cest = datetime.timezone(datetime.timedelta(hours=2))
 
-    before = datetime.datetime(2026, 6, 14, 23, 30, tzinfo=tz_utc)
-    midnight = datetime.datetime(2026, 6, 15, 0, 30, tzinfo=tz_utc)
-    late_evening_utc = datetime.datetime(2026, 6, 15, 22, 30, tzinfo=tz_utc)
-    same_moment_in_zurich = datetime.datetime(2026, 6, 16, 0, 30, tzinfo=tz_zurich)
+    before = datetime.datetime(2026, 6, 14, 21, 30, tzinfo=tz_utc)  # 14 Jun 23:30 CEST
+    first = datetime.datetime(2026, 6, 14, 22, 30, tzinfo=tz_utc)  # 15 Jun 00:30 CEST
+    last = datetime.datetime(2026, 6, 15, 21, 30, tzinfo=tz_utc)  # 15 Jun 23:30 CEST
+    next_day = datetime.datetime(2026, 6, 15, 22, 30, tzinfo=tz_utc)  # 16 Jun 00:30 CEST
+    same_instant_in_cest = datetime.datetime(2026, 6, 16, 0, 30, tzinfo=tz_cest)
 
     assert windows.participant_at("mp1", before) is None
-    assert windows.participant_at("mp1", midnight) == 11
-    assert windows.participant_at("mp1", late_evening_utc) == 11
-    # The same instant expressed in Zurich local time (civil date 16 June)
-    # still resolves to the UTC date (15 June) thanks to the defensive
-    # astimezone(utc) conversion — participant 11, not 22.
-    assert windows.participant_at("mp1", same_moment_in_zurich) == 11
+    assert windows.participant_at("mp1", first) == 11
+    assert windows.participant_at("mp1", last) == 11
+    assert windows.participant_at("mp1", next_day) == 22
+    assert windows.participant_at("mp1", same_instant_in_cest) == 22
 
 
 def test_allocation_failures_share_a_common_base():

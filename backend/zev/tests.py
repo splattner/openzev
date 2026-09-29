@@ -2,6 +2,7 @@ from datetime import date, datetime, time, timedelta, timezone
 from decimal import Decimal
 from io import StringIO
 from unittest import mock
+from zoneinfo import ZoneInfo
 
 from django.core.management import call_command
 from django.test import TestCase
@@ -42,6 +43,8 @@ from zev.models import (
 
 
 from testing.helpers import authenticate as auth, clear_vat_rates, make_user
+
+ZURICH = ZoneInfo("Europe/Zurich")
 
 
 def _seed_sparse_window_readings(*, start_date, end_date, meters, sample_days=(1, 15)):
@@ -1602,17 +1605,17 @@ class SeedDemoHourlyHistoryTests(TestCase):
 			readings.filter(resolution=ReadingResolution.HOURLY).count(),
 			readings.count(),
 		)
-		self.assertEqual(readings.first().timestamp, datetime(2025, 1, 1, 0, 0, tzinfo=timezone.utc))
-		self.assertEqual(readings.last().timestamp, datetime(2025, 1, 2, 23, 0, tzinfo=timezone.utc))
+		self.assertEqual(readings.first().timestamp, datetime(2025, 1, 1, 0, 0, tzinfo=ZURICH))
+		self.assertEqual(readings.last().timestamp, datetime(2025, 1, 2, 23, 0, tzinfo=ZURICH))
 
 	def test_an_hourly_row_sums_the_four_quarter_samples_it_replaces(self):
 		self._seed(date(2025, 1, 1), date(2025, 1, 2))
 		row = MeterReading.objects.get(
 			metering_point=self.meter,
-			timestamp=datetime(2025, 1, 1, 13, 0, tzinfo=timezone.utc),
+			timestamp=datetime(2025, 1, 1, 13, 0, tzinfo=ZURICH),
 		)
 		total = sum(
-			float(self.command._consumer_one_kwh(datetime(2025, 1, 1, 13, minute, tzinfo=timezone.utc), 0))
+			float(self.command._consumer_one_kwh(datetime(2025, 1, 1, 13, minute, tzinfo=ZURICH), 0))
 			for minute in (0, 15, 30, 45)
 		)
 		self.assertEqual(row.energy_kwh, Decimal(str(round(total, 4))))
@@ -1661,13 +1664,13 @@ class SeedDemoReadingResolutionTests(TestCase):
 		self.assertEqual(readings.filter(resolution=ReadingResolution.FIFTEEN_MIN).count(), 14 * 96)
 		self.assertTrue(
 			readings.filter(
-				timestamp=datetime(2026, 1, 6, 23, 0, tzinfo=timezone.utc),
+				timestamp=datetime(2026, 1, 6, 23, 0, tzinfo=ZURICH),
 				resolution=ReadingResolution.HOURLY,
 			).exists()
 		)
 		self.assertTrue(
 			readings.filter(
-				timestamp=datetime(2026, 1, 7, 0, 0, tzinfo=timezone.utc),
+				timestamp=datetime(2026, 1, 7, 0, 0, tzinfo=ZURICH),
 				resolution=ReadingResolution.FIFTEEN_MIN,
 			).exists()
 		)
@@ -1676,12 +1679,12 @@ class SeedDemoReadingResolutionTests(TestCase):
 		self._seed_window(date(2026, 1, 1), date(2026, 1, 20))
 		row = MeterReading.objects.get(
 			metering_point=self.meter,
-			timestamp=datetime(2026, 1, 6, 23, 0, tzinfo=timezone.utc),
+			timestamp=datetime(2026, 1, 6, 23, 0, tzinfo=ZURICH),
 		)
 		total = sum(
 			float(
 				self.command._consumer_one_kwh(
-					datetime(2026, 1, 6, 23, minute, tzinfo=timezone.utc), 5
+					datetime(2026, 1, 6, 23, minute, tzinfo=ZURICH), 5
 				)
 			)
 			for minute in (0, 15, 30, 45)

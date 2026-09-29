@@ -1,8 +1,8 @@
 import uuid
 from functools import partial
-from datetime import date as date_type, datetime, timedelta, timezone as dt_timezone
+from datetime import date as date_type, timedelta, timezone as dt_timezone
 
-from allocation.validity import period_end_exclusive_dt, period_start_dt, period_window
+from allocation.validity import business_tz, period_end_exclusive_dt, period_start_dt, period_window
 from django.db import transaction
 from django.db.models import Count, Exists, OuterRef, Q, Sum
 from django.db.models.functions import TruncDate, TruncDay, TruncHour, TruncMonth
@@ -112,6 +112,20 @@ def _audit_import_zev_rejection(request, *, action_type, target_type, summary, e
     )
 
 
+def _bucket_trunc(bucket):
+    """The ORM truncation for a chart bucket (ADR 0026).
+
+    Day and month buckets are civil days and months, so they truncate in the
+    business timezone. Hour buckets truncate in UTC: Zurich's offset is a whole
+    number of hours, so the boundaries are the same, and UTC keeps the two
+    02:00 hours of the autumn DST change apart instead of merging them.
+    """
+    if bucket == "hour":
+        return partial(TruncHour, tzinfo=dt_timezone.utc)
+    trunc_cls = {"month": TruncMonth}.get(bucket, TruncDay)
+    return partial(trunc_cls, tzinfo=business_tz())
+
+
 class MeterReadingViewSet(ZevScopedQuerySetMixin, viewsets.ModelViewSet):
     serializer_class = MeterReadingSerializer
     permission_classes = [IsAuthenticated, IsZevOwnerOrAdmin]
@@ -125,7 +139,7 @@ class MeterReadingViewSet(ZevScopedQuerySetMixin, viewsets.ModelViewSet):
 
         # Match ownership and both bounds on the same assignment. EXISTS
         # avoids multiplying aggregate sums when a holder returns to a meter.
-        qs = qs.alias(reading_day=TruncDate("timestamp", tzinfo=dt_timezone.utc))
+        qs = qs.alias(reading_day=TruncDate("timestamp", tzinfo=business_tz()))
         reading_day = OuterRef("reading_day")
         assignments = MeteringPointAssignment.objects.filter(
             metering_point_id=OuterRef("metering_point_id"),
@@ -168,7 +182,7 @@ class MeterReadingViewSet(ZevScopedQuerySetMixin, viewsets.ModelViewSet):
         date_to = _validated_date(request.query_params.get("date_to"), "date_to")
         bucket = request.query_params.get("bucket", "day")
 
-        trunc_fn = {"day": TruncDay, "hour": TruncHour, "month": TruncMonth}.get(bucket, TruncDay)
+        trunc_fn = _bucket_trunc(bucket)
 
         # get_queryset() -> scope_queryset() already narrows by ?zev_id= (and
         # validates it), so a bare zev_id here — no metering_point — leaves
@@ -183,7 +197,7 @@ class MeterReadingViewSet(ZevScopedQuerySetMixin, viewsets.ModelViewSet):
             qs = qs.filter(timestamp__lt=period_end_exclusive_dt(date_to))
 
         rows = (
-            qs.annotate(bucket=trunc_fn("timestamp", tzinfo=dt_timezone.utc))
+            qs.annotate(bucket=trunc_fn("timestamp"))
             .values("bucket", "direction")
             .annotate(total_kwh=Sum("energy_kwh"))
             .order_by("bucket")
@@ -243,7 +257,7 @@ class MeterReadingViewSet(ZevScopedQuerySetMixin, viewsets.ModelViewSet):
                 for reading in readings
             ])
 
-        # ── Summary mode: one aggregated row per UTC day ───────────────────────
+        # ── Summary mode: one aggregated row per civil day ─────────────────────
         date_from = _validated_date(request.query_params.get("date_from"), "date_from")
         date_to = _validated_date(request.query_params.get("date_to"), "date_to")
         if date_from:
@@ -252,7 +266,7 @@ class MeterReadingViewSet(ZevScopedQuerySetMixin, viewsets.ModelViewSet):
             qs = qs.filter(timestamp__lt=period_end_exclusive_dt(date_to))
 
         rows = (
-            qs.annotate(day=TruncDay("timestamp", tzinfo=dt_timezone.utc))
+            qs.annotate(day=TruncDay("timestamp", tzinfo=business_tz()))
             .values("day", "direction")
             .annotate(total_kwh=Sum("energy_kwh"), reading_count=Count("id"))
             .order_by("day")
@@ -281,11 +295,7 @@ class MeterReadingViewSet(ZevScopedQuerySetMixin, viewsets.ModelViewSet):
         bucket = request.query_params.get("bucket", "day")
         zev_id = request.query_params.get("zev_id")
         selected_participant_id = request.query_params.get("participant_id")
-        # Bucket in UTC like the period bounds below and the other metering
-        # endpoints (ADR 0007); the default (Europe/Zurich) would push the last
-        # two hours of every period day into the next day's bucket.
-        trunc_cls = {"day": TruncDay, "hour": TruncHour, "month": TruncMonth}.get(bucket, TruncDay)
-        trunc_fn = partial(trunc_cls, tzinfo=dt_timezone.utc)
+        trunc_fn = _bucket_trunc(bucket)
 
         qs = self.get_queryset()
         if date_from:
@@ -533,22 +543,21 @@ class ImportLogViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.
                 return Response({"error": "date_to must be on or after date_from."}, status=status.HTTP_400_BAD_REQUEST)
             if date_to == date_type.max:
                 return Response({"error": "date_to must be before 9999-12-31."}, status=status.HTTP_400_BAD_REQUEST)
-            # UTC days, matching the frontend visible-count computation.
-            start = datetime.combine(date_from, datetime.min.time(), tzinfo=dt_timezone.utc)
-            end = datetime.combine(date_to + timedelta(days=1), datetime.min.time(), tzinfo=dt_timezone.utc)
+            # Civil days, matching the frontend visible-count computation.
+            start, end = period_window(date_from, date_to)
             queryset = queryset.filter(created_at__gte=start, created_at__lt=end)
         elif mode != "all":
             return Response({"error": "Unsupported deletion mode."}, status=status.HTTP_400_BAD_REQUEST)
 
         result, by_zev = self._delete_import_logs(queryset)
         result["mode"] = mode
-        result["timezone"] = "UTC"
+        result["timezone"] = str(business_tz())
         request_metadata = {
             "mode": mode,
             "zev_id": zev_id,
             "date_from": str(request.data.get("date_from") or ""),
             "date_to": str(request.data.get("date_to") or ""),
-            "timezone": "UTC",
+            "timezone": str(business_tz()),
         }
         # One event per affected ZEV, so each owner sees the deletion in their
         # own scoped audit log. Attribution comes only from the deleted logs,
@@ -634,6 +643,7 @@ class ImportView(viewsets.ViewSet):
         timestamp_format = request.data.get("timestamp_format") or None
         interval_minutes = request.data.get("interval_minutes", 15)
         values_count = request.data.get("values_count", 96)
+        timestamp_timezone = request.data.get("timestamp_timezone") or None
 
         try:
             payload = preview_csv(
@@ -648,6 +658,7 @@ class ImportView(viewsets.ViewSet):
                 interval_minutes=interval_minutes,
                 values_count=values_count,
                 overwrite_existing=request.data.get("overwrite_existing", False),
+                timestamp_timezone=timestamp_timezone,
             )
         except ImportFileError as exc:
             record_audit_event(
@@ -685,6 +696,7 @@ class ImportView(viewsets.ViewSet):
                 # The preview succeeded, so both values are int-coercible.
                 "interval_minutes": int(interval_minutes),
                 "values_count": int(values_count),
+                "timestamp_timezone": payload["timestamp_timezone"],
             },
         )
         return Response(payload)
@@ -728,6 +740,7 @@ class ImportView(viewsets.ViewSet):
             timestamp_format = request.data.get("timestamp_format") or None
             interval_minutes = request.data.get("interval_minutes", 15)
             values_count = request.data.get("values_count", 96)
+            timestamp_timezone = request.data.get("timestamp_timezone") or None
             overwrite_existing_raw = request.data.get("overwrite_existing", "false")
             overwrite_existing = str(overwrite_existing_raw).strip().lower() in {"1", "true", "yes", "on"}
 
@@ -744,6 +757,7 @@ class ImportView(viewsets.ViewSet):
                     interval_minutes=interval_minutes,
                     values_count=values_count,
                     overwrite_existing=overwrite_existing,
+                    timestamp_timezone=timestamp_timezone,
                 )
             except ImportFileError as exc:
                 record_audit_event(
@@ -795,6 +809,7 @@ class ImportView(viewsets.ViewSet):
                 "rows_total": log.rows_total,
                 "rows_imported": log.rows_imported,
                 "rows_skipped": log.rows_skipped,
+                "timestamp_timezone": log.timestamp_timezone,
             },
         )
 

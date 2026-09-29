@@ -10,7 +10,7 @@ from datetime import date as date_type
 
 from django.db.models import OuterRef, Subquery
 
-from allocation.validity import active_during, period_window
+from allocation.validity import active_during, civil_date, period_window
 from zev.models import Participant, MeteringPointAssignment
 from metering.models import MeterReading
 from .models import EmailLog, Invoice, InvoiceStatus
@@ -106,7 +106,7 @@ def compute_period_overview(*, zev, period_start: date_type, period_end: date_ty
         timestamp__gte=period_start_dt,
         timestamp__lt=period_end_exclusive_dt,
     ).values_list("metering_point_id", "timestamp"):
-        readings_by_metering_point.setdefault(metering_point_id, set()).add(timestamp.date())
+        readings_by_metering_point.setdefault(metering_point_id, set()).add(civil_date(timestamp))
 
     for participant in participants:
         assignments = assignments_by_participant[participant.id]

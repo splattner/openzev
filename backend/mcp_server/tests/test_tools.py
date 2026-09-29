@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime, timezone
+from zoneinfo import ZoneInfo
 from decimal import Decimal
 
 import pytest
@@ -436,7 +437,7 @@ class TestConsumptionProfile:
         meter = MeteringPointFactory(zev=zev, meter_type="consumption")
         MeteringPointAssignmentFactory(metering_point=meter, participant=participant, valid_from=date(2026, 1, 1))
         MeterReading.objects.create(
-            metering_point=meter, timestamp=datetime(2026, 1, 10, 18, 0, tzinfo=timezone.utc),
+            metering_point=meter, timestamp=datetime(2026, 1, 10, 18, 0, tzinfo=ZoneInfo("Europe/Zurich")),
             energy_kwh=kwh, direction=ReadingDirection.IN, resolution=ReadingResolution.FIFTEEN_MIN,
         )
         return participant

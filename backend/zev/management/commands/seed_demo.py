@@ -20,7 +20,7 @@ from django.db import transaction
 from django.db.models import Sum
 
 from accounts.models import FeatureFlag, VatRate
-from allocation.validity import active_during
+from allocation.validity import active_during, business_tz, civil_date, period_start_dt, period_window, wall_clock
 from audit.models import AuditActionCategory, AuditEvent, AuditEventStatus
 from audit.services import record_audit_event
 from invoices.contract_pdf import issue_contract_pdf
@@ -48,7 +48,6 @@ from zev.models import (
 )
 
 
-UTC = dt_timezone.utc
 
 # The tail of the seed window keeps 15-minute rows (see ``_seed_meter_readings``);
 # everything older is hourly so the dataset stays small enough to re-seed fast.
@@ -991,10 +990,9 @@ class Command(BaseCommand):
         gap_start = gap_end - timedelta(days=days - 1)
         if gap_start <= after:
             return None, None
+        window_start, window_end = period_window(gap_start, gap_end)
         MeterReading.objects.filter(
-            metering_point=meter,
-            timestamp__gte=datetime.combine(gap_start, time.min, tzinfo=UTC),
-            timestamp__lt=datetime.combine(gap_end + timedelta(days=1), time.min, tzinfo=UTC),
+            metering_point=meter, timestamp__gte=window_start, timestamp__lt=window_end,
         ).delete()
         return gap_start, gap_end
 
@@ -1040,6 +1038,7 @@ class Command(BaseCommand):
             imported_by=owner,
             source=ImportSource.CSV,
             filename=f"openzev-demo-{csv_start:%Y-%m}.csv",
+            timestamp_timezone=str(business_tz()),
             rows_total=0,
             rows_imported=0,
             rows_skipped=0,
@@ -1047,8 +1046,8 @@ class Command(BaseCommand):
         )
         imported_rows = MeterReading.objects.filter(
             metering_point=csv_meter,
-            timestamp__gte=datetime.combine(csv_start, time.min, tzinfo=UTC),
-            timestamp__lt=datetime.combine(next_first, time.min, tzinfo=UTC),
+            timestamp__gte=period_start_dt(csv_start),
+            timestamp__lt=period_start_dt(next_first),
         ).update(import_source=ImportSource.CSV, import_batch=import_log.batch_id)
         import_log.rows_total = imported_rows
         import_log.rows_imported = imported_rows
@@ -1061,6 +1060,7 @@ class Command(BaseCommand):
             imported_by=owner,
             source=ImportSource.SDATCH,
             filename=f"zev-sonnenfirma-sdat-{second_closed_start:%Y-%m}.xml",
+            timestamp_timezone=str(business_tz()),
             rows_total=992,
             rows_imported=980,
             rows_skipped=12,
@@ -1153,11 +1153,11 @@ class Command(BaseCommand):
         # so a custom historical ``--end-date`` yields a consistent timeline.
         cap = min(end_date, date.today())
         csv_import_at = datetime.combine(
-            min(csv_start + timedelta(days=6), cap), time(12, 0), tzinfo=UTC
+            min(csv_start + timedelta(days=6), cap), time(12, 0), tzinfo=business_tz()
         )
 
         def at_noon(day: date) -> datetime:
-            return datetime.combine(day, time(12, 0), tzinfo=UTC)
+            return datetime.combine(day, time(12, 0), tzinfo=business_tz())
 
         def anchored(offset_days: int) -> datetime:
             """A date relative to the flagship's billed period end, capped at today."""
@@ -1626,7 +1626,7 @@ class Command(BaseCommand):
         if closed:
             for invoice in invoices:
                 invoice.status = InvoiceStatus.PAID
-                invoice.sent_at = datetime.combine(period_end, time.min, tzinfo=UTC)
+                invoice.sent_at = period_start_dt(period_end)
                 invoice.save(update_fields=["status", "sent_at"])
             if len(invoices) > 1:
                 invoices[-1].status = InvoiceStatus.CANCELLED
@@ -1639,7 +1639,7 @@ class Command(BaseCommand):
             invoices[1].save(update_fields=["status"])
         if len(invoices) > 2:
             invoices[2].status = InvoiceStatus.SENT
-            invoices[2].sent_at = datetime.combine(period_end, time.min, tzinfo=UTC)
+            invoices[2].sent_at = period_start_dt(period_end)
             invoices[2].save(update_fields=["status", "sent_at"])
 
         return invoices
@@ -1672,10 +1672,9 @@ class Command(BaseCommand):
                 period_end < skip_period[0] or period_start > skip_period[1]
             ):
                 continue
+            window_start, window_end = period_window(period_start, period_end)
             if not MeterReading.objects.filter(
-                metering_point__zev=zev,
-                timestamp__gte=datetime.combine(period_start, time.min, tzinfo=UTC),
-                timestamp__lt=datetime.combine(period_end + timedelta(days=1), time.min, tzinfo=UTC),
+                metering_point__zev=zev, timestamp__gte=window_start, timestamp__lt=window_end,
             ).exists():
                 continue
             invoices, failures = generate_invoices_for_zev(zev, period_start, period_end)
@@ -1686,7 +1685,7 @@ class Command(BaseCommand):
                 )
             for invoice in invoices:
                 invoice.status = InvoiceStatus.PAID
-                invoice.sent_at = datetime.combine(period_end, time.min, tzinfo=UTC)
+                invoice.sent_at = period_start_dt(period_end)
                 invoice.save(update_fields=["status", "sent_at"])
             seeded.extend(invoices)
         return seeded
@@ -1753,29 +1752,30 @@ class Command(BaseCommand):
                 MeterReading.objects.bulk_create(readings, batch_size=5000)
                 readings.clear()
 
-        day = history_start
-        while day < stop_date:
-            day_index = (day - history_start).days
-            for hour in range(24):
-                hour_start = datetime.combine(day, time(hour), tzinfo=UTC)
-                for meter, direction, profile in meters:
-                    total = sum(
-                        float(profile(hour_start + timedelta(minutes=15 * quarter), day_index))
-                        for quarter in range(4)
+        # Real UTC hours across Swiss civil days (23/24/25 of them); the
+        # profiles read the Swiss wall clock (ADR 0026).
+        hour_start = period_start_dt(history_start)
+        stop = period_start_dt(stop_date)
+        while hour_start < stop:
+            day_index = (civil_date(hour_start) - history_start).days
+            for meter, direction, profile in meters:
+                total = sum(
+                    float(profile(wall_clock(hour_start + timedelta(minutes=15 * quarter)), day_index))
+                    for quarter in range(4)
+                )
+                readings.append(
+                    MeterReading(
+                        metering_point=meter,
+                        timestamp=hour_start,
+                        energy_kwh=Decimal(str(round(total, 4))),
+                        direction=direction,
+                        resolution=ReadingResolution.HOURLY,
+                        import_source=ImportSource.MANUAL,
                     )
-                    readings.append(
-                        MeterReading(
-                            metering_point=meter,
-                            timestamp=hour_start,
-                            energy_kwh=Decimal(str(round(total, 4))),
-                            direction=direction,
-                            resolution=ReadingResolution.HOURLY,
-                            import_source=ImportSource.MANUAL,
-                        )
-                    )
+                )
             if len(readings) >= 5000:
                 flush()
-            day += timedelta(days=1)
+            hour_start += timedelta(hours=1)
         flush()
 
     def _seed_meter_readings(
@@ -1818,13 +1818,14 @@ class Command(BaseCommand):
                 readings.clear()
 
         for timestamp in self._iter_quarters(fine_from, end_date):
-            day_index = (timestamp.date() - start_date).days
+            day_index = (civil_date(timestamp) - start_date).days
+            local = wall_clock(timestamp)
             for meter, direction, profile in meters:
                 readings.append(
                     MeterReading(
                         metering_point=meter,
                         timestamp=timestamp,
-                        energy_kwh=profile(timestamp, day_index),
+                        energy_kwh=profile(local, day_index),
                         direction=direction,
                         resolution=ReadingResolution.FIFTEEN_MIN,
                         import_source=ImportSource.MANUAL,
@@ -1836,8 +1837,8 @@ class Command(BaseCommand):
         return fine_from
 
     def _iter_quarters(self, start_date: date, end_date: date):
-        current = datetime.combine(start_date, time.min, tzinfo=UTC)
-        stop = datetime.combine(end_date + timedelta(days=1), time.min, tzinfo=UTC)
+        """Real UTC quarter-hours covering the Swiss civil days, DST included."""
+        current, stop = period_window(start_date, end_date)
         while current < stop:
             yield current
             current += timedelta(minutes=15)

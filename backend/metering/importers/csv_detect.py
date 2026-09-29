@@ -15,6 +15,7 @@ from datetime import date, datetime
 from decimal import InvalidOperation
 
 from .csv_importer import (
+    DEFAULT_TIMESTAMP_TIMEZONE,
     _OBIS_RE,
     _check_timestamp_format,
     _is_missing,
@@ -334,6 +335,9 @@ def _result(delimiter, *, has_header=True, format_profile="standard", timestamp_
             "timestamp_format": timestamp_format,
             "interval_minutes": interval_minutes,
             "values_count": values_count,
+            # Content never says which zone offset-less values are in; the
+            # wizard prefills the default and the user confirms it.
+            "timestamp_timezone": DEFAULT_TIMESTAMP_TIMEZONE,
             "column_map": column_map or {
                 "meter_id": None,
                 "timestamp": None,

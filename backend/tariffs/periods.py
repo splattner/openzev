@@ -17,6 +17,8 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 from decimal import ROUND_HALF_UP, Decimal
 
+from allocation.validity import wall_clock
+
 ALL_MONTHS = frozenset(range(1, 13))
 ALL_WEEKDAYS = frozenset(range(7))  # 0 = Monday, matching datetime.weekday()
 
@@ -129,7 +131,12 @@ def resolve_band(periods, ts: datetime):
     tariff's price is resolved in exactly one place regardless of billing
     mode. ``periods`` is any iterable of ``TariffPeriod``-like rows (already
     fetched, not re-queried).
+
+    Months, weekdays and hours describe the Swiss wall clock, so an aware
+    ``ts`` (what the ORM returns, in UTC) is read in the business timezone
+    first (ADR 0026). A naive ``ts`` is taken as a wall clock already.
     """
+    ts = wall_clock(ts)
     periods = list(periods)
     if not periods:
         return None

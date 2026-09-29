@@ -12,24 +12,21 @@ validation, so at most one window can match a given timestamp. As a guard
 against direct-DB edits or migration errors, the constructor fails fast on
 overlaps instead of resolving them silently.
 
-Matching is done on the *UTC civil date* of the reading's timestamp
-(``ts.astimezone(timezone.utc).date()``), not on a local-timezone date. This is deliberate and
-consistent with the rest of the system: periods, tariff validity, and daily
-completeness are all matched on UTC dates (ADR 0007 — "all metering timestamps
-are stored and queried in UTC"). A Zurich-local date would make the
-attribution day disagree with the period day and tariff day for readings near
-midnight; moving the whole system to local civil dates would be a separate,
-cross-cutting decision.
+Matching is done on the *civil date* of the reading's timestamp in the
+business timezone (``allocation.validity.civil_date``), the same day periods,
+tariff validity and daily completeness use (ADR 0026). A reading at 23:30
+Swiss time belongs to that Swiss day, whatever its UTC date.
 """
 
 import itertools
 from dataclasses import dataclass
-from datetime import date, datetime, timezone
+from datetime import date, datetime
 from typing import Any
 
 from django.db.models import Q
 
 from allocation.errors import OverlappingAssignmentWindowsError
+from allocation.validity import civil_date
 from zev.models import MeteringPointAssignment
 
 
@@ -141,16 +138,14 @@ class AssignmentWindows:
     def participant_at(self, metering_point_id, ts: datetime):
         """Participant id holding ``metering_point_id`` at ``ts``, or ``None``.
 
-        The window is matched on the UTC civil date of the timestamp:
-        assignment validity is date-granular, so a reading at 00:30 UTC on the
-        day an assignment starts already belongs to the new holder. ``ts`` is
-        always UTC in this codebase (ADR 0007); the explicit
-        ``astimezone(timezone.utc)`` is a defensive guard so a non-UTC
-        datetime cannot silently shift the civil date. Literal holder
+        The window is matched on the civil date of the timestamp in the
+        business timezone: assignment validity is date-granular, so a reading
+        at 00:30 Swiss time on the day an assignment starts already belongs to
+        the new holder (ADR 0026). Literal holder
         semantics — unaffected by ``allocation_mode``; see ``assignment_at``
         for a mode-aware resolution.
         """
-        day = ts.astimezone(timezone.utc).date()
+        day = civil_date(ts)
         return self.participant_on(metering_point_id, day)
 
     def assignment_at(self, metering_point_id, ts: datetime) -> AssignmentResolution | None:
@@ -162,7 +157,7 @@ class AssignmentWindows:
         "community-allocated" (a valid assignment whose costs are
         distributed) instead of conflating the two under a bare ``None``.
         """
-        day = ts.astimezone(timezone.utc).date()
+        day = civil_date(ts)
         window = self._window_on(metering_point_id, day)
         if window is None:
             return None

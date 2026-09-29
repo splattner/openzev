@@ -7,6 +7,7 @@ high-tariff and low-tariff window.
 """
 
 from datetime import date, datetime, time, timezone
+from zoneinfo import ZoneInfo
 from decimal import Decimal
 
 import pytest
@@ -25,6 +26,8 @@ from testing import factories
 from .engine import _resolve_tariff_band, generate_invoice
 
 pytestmark = pytest.mark.django_db
+
+ZURICH = ZoneInfo("Europe/Zurich")
 
 
 def _ht_nt_tariff(zev, *, energy_type=EnergyType.GRID, category=TariffCategory.ENERGY):
@@ -183,16 +186,16 @@ class TestHtNtInvoiceGeneration:
         # GRID energy tariff with HT/NT split (no local production → all grid).
         _ht_nt_tariff(zev, energy_type=EnergyType.GRID)
 
-        # 10 kWh at 10:00 (HT @ 0.30) and 10 kWh at 23:00 (NT @ 0.10).
+        # 10 kWh at 10:00 (HT @ 0.30) and 10 kWh at 23:00 (NT @ 0.10), Swiss time.
         MeterReading.objects.create(
             metering_point=consumption_mp,
-            timestamp=datetime(2026, 1, 15, 10, 0, tzinfo=timezone.utc),
+            timestamp=datetime(2026, 1, 15, 10, 0, tzinfo=ZURICH),
             energy_kwh=Decimal("10.0"),
             direction=ReadingDirection.IN,
         )
         MeterReading.objects.create(
             metering_point=consumption_mp,
-            timestamp=datetime(2026, 1, 15, 23, 0, tzinfo=timezone.utc),
+            timestamp=datetime(2026, 1, 15, 23, 0, tzinfo=ZURICH),
             energy_kwh=Decimal("10.0"),
             direction=ReadingDirection.IN,
         )

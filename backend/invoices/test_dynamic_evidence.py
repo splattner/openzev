@@ -237,7 +237,8 @@ def test_billed_ranges_merge_duplicates_without_protecting_gaps():
     evidence.evidence_to = datetime(2026, 2, 15, tzinfo=timezone.utc)
     evidence.save()
     ranges = billed_ranges(source)
-    assert ranges == [(datetime(2026, 1, 1, tzinfo=timezone.utc), evidence.evidence_to)]
+    # January's evidence starts at Swiss midnight on 1 January (ADR 0026).
+    assert ranges == [(datetime(2025, 12, 31, 23, tzinfo=timezone.utc), evidence.evidence_to)]
     assert _overlaps_billed(evidence.evidence_from, evidence.evidence_to, ranges)
     assert not _overlaps_billed(
         evidence.evidence_to, evidence.evidence_to + timedelta(days=1), ranges
@@ -425,15 +426,16 @@ def test_migration_flushes_full_and_final_evidence_batches():
 
 
 @pytest.mark.django_db
-def test_tariff_evidence_guard_uses_utc_billing_days_not_local_history_days():
+def test_tariff_evidence_guard_uses_civil_billing_days():
+    """Evidence windows and the guard both use Swiss civil days (ADR 0026):
+    evidence for 15 January protects that day and not the next."""
+    from allocation.validity import period_window
     from tariffs.dynamic.services import tariff_has_dynamic_billing_evidence
 
     participant, _tariff, source, _point = setup_billing()
     invoice = generate_invoice(participant, date(2026, 1, 1), date(2026, 1, 31))
-    invoice.dynamic_evidence.update(
-        evidence_from=datetime(2026, 1, 15, tzinfo=timezone.utc),
-        evidence_to=datetime(2026, 1, 16, tzinfo=timezone.utc),
-    )
+    evidence_from, evidence_to = period_window(date(2026, 1, 15), date(2026, 1, 15))
+    invoice.dynamic_evidence.update(evidence_from=evidence_from, evidence_to=evidence_to)
     for day, protected in [(15, True), (16, False)]:
         assert tariff_has_dynamic_billing_evidence(
             zev_id=participant.zev_id,

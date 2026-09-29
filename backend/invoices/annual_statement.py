@@ -7,7 +7,7 @@ Produces a year-end summary document for a participant showing:
 - Savings compared to grid tariff
 - Energy self-sufficiency ratio
 """
-from datetime import date, datetime, timezone as dt_timezone
+from datetime import date
 from decimal import Decimal, ROUND_HALF_UP
 
 from accounts.models import AppSettings
@@ -18,7 +18,7 @@ from allocation.read_model import (
     community_totals_by_timestamp,
     eligible_participant_shares,
 )
-from allocation.validity import active_during
+from allocation.validity import active_during, civil_date, period_window
 from allocation.split import split_consumption
 from allocation.windows import AssignmentWindows
 from .pdf_render import render_pdf
@@ -209,8 +209,7 @@ def _compute_monthly_data(
 
     year_start = date(year, 1, 1)
     year_end = date(year, 12, 31)
-    year_start_dt = datetime(year, 1, 1, tzinfo=dt_timezone.utc)
-    year_end_dt = datetime(year + 1, 1, 1, tzinfo=dt_timezone.utc)
+    year_start_dt, year_end_dt = period_window(year_start, year_end)
 
     # This participant's own assignments, plus every community-allocated
     # assignment in the ZEV regardless of who literally holds it — a meter
@@ -297,7 +296,7 @@ def _compute_monthly_data(
         if resolution is None:
             return Decimal("0")
         if resolution.allocation_mode == AllocationMode.COMMUNITY:
-            day = ts.astimezone(dt_timezone.utc).date()
+            day = civil_date(ts)
             return shares_by_date.get(day, {}).get(participant.id, Decimal("0"))
         return Decimal("1") if resolution.holder_id == participant.id else Decimal("0")
 

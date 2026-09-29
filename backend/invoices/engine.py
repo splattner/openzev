@@ -11,7 +11,7 @@ Algorithm:
 import bisect
 import logging
 from dataclasses import dataclass, field
-from datetime import date, datetime, timezone as tz, timedelta
+from datetime import date, datetime, timedelta
 from decimal import Decimal, ROUND_HALF_UP
 from typing import Iterable, NamedTuple
 from uuid import UUID
@@ -30,7 +30,7 @@ from allocation.read_model import (
     community_totals_by_timestamp,
     iter_allocated_readings,
 )
-from allocation.validity import active_during, period_window
+from allocation.validity import active_during, civil_date, period_window
 from allocation.split import split_consumption, split_production
 from allocation.windows import AssignmentWindows
 from zev.models import AllocationMode, Zev, Participant, MeteringPoint, MeteringPointAssignment, VatMode
@@ -333,7 +333,7 @@ def _billable_energy_types_by_timestamp(zev, period_start, period_end):
             with_split=False,
         )
         for reading in readings:
-            day = _utc_date(reading.timestamp)
+            day = civil_date(reading.timestamp)
             if reading.allocation_mode == AllocationMode.PERSONAL:
                 if reading.holder_id not in participant_ids:
                     continue
@@ -389,7 +389,7 @@ def preflight_dynamic_prices(zev, period_start, period_end):
         timestamp for timestamp, energy_types in requirements.items()
         if any(
             tariff.energy_type in energy_types
-            and _tariff_is_active(tariff, _utc_date(timestamp))
+            and _tariff_is_active(tariff, civil_date(timestamp))
             and _bills_nonzero_percentage_at(tariff, timestamp)
             for tariff in percentage_tariffs
         )
@@ -403,7 +403,7 @@ def preflight_dynamic_prices(zev, period_start, period_end):
                 tariff.dynamic_source_id, start=start, end=end,
             )
         for timestamp, energy_types in sorted(requirements.items()):
-            if not _tariff_is_active(tariff, _utc_date(timestamp)):
+            if not _tariff_is_active(tariff, civil_date(timestamp)):
                 continue
             directly_priced = tariff.energy_type in energy_types
             percentage_base = (
@@ -1485,18 +1485,6 @@ def _build_item_payloads(
     )
 
 
-def _utc_date(ts: datetime) -> date:
-    """UTC civil date of a reading timestamp.
-
-    Assignment matching, tariff lookup, and completeness all key on this
-    (ADR 0007). Importers write UTC-aware timestamps; a naive datetime is
-    taken as UTC (bare ``astimezone`` would assume the host timezone).
-    """
-    if ts.tzinfo is None:
-        ts = ts.replace(tzinfo=tz.utc)
-    return ts.astimezone(tz.utc).date()
-
-
 def _is_zero_chf(total: Decimal) -> bool:
     """Whether ``total`` renders as CHF 0.00 under §5 rounding."""
     return total.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP) == 0
@@ -1638,7 +1626,7 @@ def generate_invoice(
         local_kwh_acc += r_local
         grid_kwh_acc += r_grid
 
-        day = _utc_date(ts)
+        day = civil_date(ts)
 
         for energy_type, quantity in ((EnergyType.LOCAL, r_local), (EnergyType.GRID, r_grid)):
             if quantity <= 0:
@@ -1671,7 +1659,7 @@ def generate_invoice(
 
         exported_kwh_acc += exported_kwh
 
-        day = _utc_date(ts)
+        day = civil_date(ts)
 
         if local_sold_kwh > 0:
             _price_energy(
@@ -1713,7 +1701,7 @@ def generate_invoice(
             continue
         if resolution.allocation_mode != AllocationMode.COMMUNITY:
             continue  # personal window — billed in the personal loop above
-        day = _utc_date(ts)
+        day = civil_date(ts)
         if not _overlaps(participant.valid_from, participant.valid_to, day, day):
             continue  # a mid-period joiner/leaver pays no share outside their own membership
         weight_sum = readings.weight_sum_by_date.get(day)
@@ -1752,7 +1740,7 @@ def generate_invoice(
             continue
         if resolution.allocation_mode != AllocationMode.COMMUNITY:
             continue
-        day = _utc_date(ts)
+        day = civil_date(ts)
         if not _overlaps(participant.valid_from, participant.valid_to, day, day):
             continue
         weight_sum = readings.weight_sum_by_date.get(day)

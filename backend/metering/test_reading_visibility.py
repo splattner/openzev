@@ -1,6 +1,7 @@
-"""Participant raw/chart access follows the meter's UTC assignment windows (#570)."""
+"""Participant raw/chart access follows the meter's assignment windows on Swiss civil days (#570, ADR 0026)."""
 
-from datetime import date, datetime, timezone
+from datetime import date, datetime
+from zoneinfo import ZoneInfo
 from decimal import Decimal
 from types import SimpleNamespace
 
@@ -54,7 +55,8 @@ def add_readings(meter, timestamp):
     for direction, energy in (("in", "1.25"), ("out", "0.75")):
         MeterReading.objects.create(
             metering_point=meter,
-            timestamp=datetime.fromisoformat(timestamp).replace(tzinfo=timezone.utc),
+            # Swiss wall-clock time: the days below are civil days.
+            timestamp=datetime.fromisoformat(timestamp).replace(tzinfo=ZoneInfo("Europe/Zurich")),
             direction=direction,
             energy_kwh=Decimal(energy),
         )
@@ -75,9 +77,9 @@ def history():
             metering_point=meter, participant=participant, valid_from=start, valid_to=end,
         )
     for timestamp in (
-        "2026-01-09T23:45:00",  # Zurich is already on the holder's first day.
+        "2026-01-09T23:45:00",  # The last quarter-hour before the holder's first day.
         "2026-01-10T00:00:00",
-        "2026-01-15T23:45:00",  # Still the holder's last UTC day.
+        "2026-01-15T23:45:00",  # Still the holder's last day.
         "2026-01-16T00:00:00",
         "2026-01-21T12:00:00",  # No assignment covers this gap.
         "2026-02-01T00:00:00",

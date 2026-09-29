@@ -5,7 +5,7 @@ from bisect import bisect_left, bisect_right
 from datetime import date, timedelta
 from decimal import Decimal, ROUND_HALF_UP
 
-from allocation.validity import period_end_exclusive_dt, period_window
+from allocation.validity import civil_date, period_end_exclusive_dt, period_window
 from django.db.models import Q
 
 from .adapters import DynamicApiVersion
@@ -92,12 +92,12 @@ def _summarize_rows(rows, *, start, end, reference_from, reference_to, floor=Non
 def _last_fully_covered_day(covers_to) -> date:
     """The newest civil day the stored series prices from end to end.
 
-    A period-published series ends on a local month boundary, which is 22:00
-    or 23:00 UTC — so the UTC day holding that instant is only priced for part
-    of itself, and anchoring on it would report an otherwise complete window
-    as partial. Stepping back one day lands on the last whole one.
+    The civil day holding the series' last instant is the candidate; it
+    counts only if the series reaches that day's end (a series may stop
+    mid-day). A period-published series ends on a local month boundary,
+    which is exactly a civil-day end (ADR 0026).
     """
-    day = (covers_to - timedelta(microseconds=1)).date()
+    day = civil_date(covers_to - timedelta(microseconds=1))
     return day if period_end_exclusive_dt(day) <= covers_to else day - timedelta(days=1)
 
 

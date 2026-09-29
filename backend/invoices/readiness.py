@@ -13,7 +13,7 @@ from datetime import date, timedelta
 from django.db.models import Exists, F, OuterRef, Q, Subquery, Window
 from django.db.models.functions import RowNumber
 
-from allocation.validity import period_window
+from allocation.validity import civil_date, period_window
 from metering.models import MeterReading
 from tariffs.dynamic.fetch import coverage_gaps
 from tariffs.dynamic.models import DynamicTariffSource
@@ -300,8 +300,8 @@ def _dynamic_uncovered_days_by_source(
     for source in DynamicTariffSource.objects.filter(pk__in=source_ids):
         uncovered: set[date] = set()
         for gap_start, gap_end in coverage_gaps(source, span_start, span_end):
-            day = gap_start.date()
-            last_day = (gap_end - timedelta(microseconds=1)).date()
+            day = civil_date(gap_start)
+            last_day = civil_date(gap_end - timedelta(microseconds=1))
             while day <= last_day:
                 uncovered.add(day)
                 day += timedelta(days=1)
@@ -527,7 +527,7 @@ def _load_bulk(zev, span_start: date, span_end: date) -> BulkData:
             timestamp__lt=end_dt,
         ).values_list("metering_point_id", "timestamp")
         for mp_id, ts in reading_rows.iterator():
-            day = ts.date()
+            day = civil_date(ts)
             counts = readings.setdefault(mp_id, {})
             counts[day] = counts.get(day, 0) + 1
     tariffs = _load_energy_tariffs(zev)

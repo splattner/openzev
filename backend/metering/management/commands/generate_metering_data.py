@@ -23,12 +23,13 @@ Examples:
 import math
 import random
 import uuid
-from datetime import datetime, timedelta, timezone as tz
+from datetime import datetime, timedelta
 from decimal import Decimal
 
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 
+from allocation.validity import period_window, wall_clock
 from metering.models import MeterReading, ReadingDirection, ReadingResolution
 from zev.models import MeteringPoint
 
@@ -152,13 +153,15 @@ class Command(BaseCommand):
                 raise CommandError(f"Metering point '{meter_id}' not found.")
 
         try:
-            start_dt = datetime.strptime(options["start"], "%Y-%m-%d").replace(tzinfo=tz.utc)
+            start_day = datetime.strptime(options["start"], "%Y-%m-%d").date()
         except ValueError:
             raise CommandError("Invalid date format. Use YYYY-MM-DD.")
 
         interval_min = INTERVAL_MINUTES[interval]
         resolution = ReadingResolution.FIFTEEN_MIN if interval_min == 15 else ReadingResolution.HOURLY
-        end_dt = start_dt + timedelta(days=days)
+        # Swiss civil days as real UTC instants; the curves read the Swiss
+        # wall clock (ADR 0026).
+        start_dt, end_dt = period_window(start_day, start_day + timedelta(days=days - 1))
         delta = timedelta(minutes=interval_min)
 
         # Auto-scale peak kWh based on interval duration
@@ -189,9 +192,10 @@ class Command(BaseCommand):
         count = 0
 
         while current < end_dt:
-            hour = current.hour + current.minute / 60.0
-            weekday = current.weekday()
-            day_of_year = current.timetuple().tm_yday
+            local = wall_clock(current)
+            hour = local.hour + local.minute / 60.0
+            weekday = local.weekday()
+            day_of_year = local.timetuple().tm_yday
 
             if net_metering:
                 # Simulate grid connection meter: compute net = consumption - production
@@ -252,7 +256,7 @@ class Command(BaseCommand):
 
         self.stdout.write(f"\nMetering point: {mp.meter_id} ({mp.id})")
         self.stdout.write(f"Type: {data_type}" + (" (net metering)" if net_metering else ""))
-        self.stdout.write(f"Period: {start_dt.date()} → {end_dt.date()} ({days} days)")
+        self.stdout.write(f"Period: {start_day} → {start_day + timedelta(days=days - 1)} ({days} days)")
         self.stdout.write(f"Interval: {interval} ({interval_min} min)")
         self.stdout.write(f"Readings to create: {count}")
         if total_in > 0:

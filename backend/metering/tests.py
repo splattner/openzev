@@ -1,5 +1,6 @@
 from datetime import date, datetime, timezone
 from decimal import Decimal
+from zoneinfo import ZoneInfo
 
 from django.test import TestCase
 from rest_framework.test import APIClient
@@ -10,6 +11,8 @@ from zev.models import AllocationMode, Zev, Participant, MeteringPoint, Metering
 
 
 from testing.helpers import authenticate as auth, make_user
+
+ZURICH = ZoneInfo("Europe/Zurich")
 
 
 class DashboardSummaryAlignmentTests(TestCase):
@@ -172,16 +175,20 @@ class DashboardSummaryAlignmentTests(TestCase):
 		self.assertAlmostEqual(float(unfiltered.data["totals"]["consumed_kwh"]), 40.0, places=6)
 
 
-class DashboardUtcBucketingTests(TestCase):
-	"""Buckets follow the UTC period bounds (ADR 0007), not Europe/Zurich."""
+class DashboardCivilDayBucketingTests(TestCase):
+	"""Day buckets are Swiss civil days, like the period bounds (ADR 0026)."""
 
 	def setUp(self):
 		self.client = APIClient()
 		self.owner = make_user("bucket_owner", UserRole.ZEV_OWNER)
 		self.zev = Zev.objects.create(name="Bucket ZEV", owner=self.owner, zev_type="vzev", invoice_prefix="B")
 		self.mp = MeteringPoint.objects.create(zev=self.zev, meter_id="CH-B-1", meter_type=MeteringPointType.CONSUMPTION)
-		# 23:45 UTC on the last period day is already the next day in Europe/Zurich.
-		for ts in (datetime(2026, 8, 31, 12, 0, tzinfo=timezone.utc), datetime(2026, 8, 31, 23, 45, tzinfo=timezone.utc)):
+		# 23:45 Swiss time is still the last period day; 00:00 is the next one.
+		for ts in (
+			datetime(2026, 8, 31, 12, 0, tzinfo=ZURICH),
+			datetime(2026, 8, 31, 23, 45, tzinfo=ZURICH),
+			datetime(2026, 9, 1, 0, 0, tzinfo=ZURICH),
+		):
 			MeterReading.objects.create(
 				metering_point=self.mp,
 				timestamp=ts,
@@ -190,7 +197,7 @@ class DashboardUtcBucketingTests(TestCase):
 				resolution=ReadingResolution.FIFTEEN_MIN,
 			)
 
-	def test_late_evening_utc_reading_stays_in_its_utc_day_bucket(self):
+	def test_late_evening_reading_stays_in_its_civil_day_bucket(self):
 		auth(self.client, self.owner)
 		resp = self.client.get(
 			"/api/v1/metering/readings/dashboard-summary/",
@@ -200,7 +207,7 @@ class DashboardUtcBucketingTests(TestCase):
 		self.assertEqual(resp.status_code, 200)
 		self.assertEqual(len(resp.data["timeline"]), 1)
 		bucket = resp.data["timeline"][0]
-		self.assertEqual(bucket["bucket"], "2026-08-31T00:00:00+00:00")
+		self.assertEqual(bucket["bucket"], "2026-08-31T00:00:00+02:00")
 		self.assertAlmostEqual(bucket["consumed_kwh"], 2.0, places=6)
 
 
@@ -247,20 +254,20 @@ class DashboardMidPeriodTransferTests(TestCase):
 		# Alice: 10 kWh consumed + 10 kWh produced on Jan 10
 		MeterReading.objects.create(
 			metering_point=self.consumption_mp,
-			timestamp=datetime(2026, 1, 10, 0, 0, tzinfo=timezone.utc),
+			timestamp=datetime(2026, 1, 10, 0, 0, tzinfo=ZURICH),
 			energy_kwh=Decimal("10.0000"), direction=ReadingDirection.IN,
 			resolution=ReadingResolution.FIFTEEN_MIN,
 		)
 		MeterReading.objects.create(
 			metering_point=self.production_mp,
-			timestamp=datetime(2026, 1, 10, 0, 0, tzinfo=timezone.utc),
+			timestamp=datetime(2026, 1, 10, 0, 0, tzinfo=ZURICH),
 			energy_kwh=Decimal("10.0000"), direction=ReadingDirection.OUT,
 			resolution=ReadingResolution.FIFTEEN_MIN,
 		)
 		# Bob: 20 kWh consumed on Jan 20 (production stays 0)
 		MeterReading.objects.create(
 			metering_point=self.consumption_mp,
-			timestamp=datetime(2026, 1, 20, 0, 0, tzinfo=timezone.utc),
+			timestamp=datetime(2026, 1, 20, 0, 0, tzinfo=ZURICH),
 			energy_kwh=Decimal("20.0000"), direction=ReadingDirection.IN,
 			resolution=ReadingResolution.FIFTEEN_MIN,
 		)
@@ -1022,10 +1029,10 @@ class ChartDataEndpointTests(TestCase):
 		self.assertAlmostEqual(resp.data[0]["in_kwh"], 4.0)
 		self.assertAlmostEqual(resp.data[0]["out_kwh"], 0.0)
 
-	def test_daily_bucket_uses_the_same_utc_day_as_raw_data(self):
+	def test_daily_bucket_uses_the_same_civil_day_as_raw_data(self):
 		MeterReading.objects.create(
 			metering_point=self.mp,
-			timestamp=datetime(2026, 1, 1, 23, 30, tzinfo=timezone.utc),
+			timestamp=datetime(2026, 1, 1, 23, 30, tzinfo=ZURICH),
 			energy_kwh=Decimal("1.0000"),
 			direction=ReadingDirection.IN,
 		)
@@ -1042,17 +1049,17 @@ class ChartDataEndpointTests(TestCase):
 		self.assertEqual(chart_resp.status_code, 200)
 		self.assertEqual(raw_resp.status_code, 200)
 		self.assertEqual(chart_resp.data, [{
-			"bucket": "2026-01-01T00:00:00+00:00",
+			"bucket": "2026-01-01T00:00:00+01:00",
 			"in_kwh": 1.0,
 			"out_kwh": 0.0,
 		}])
 		self.assertEqual(raw_resp.data[0]["date"], "2026-01-01")
 		self.assertEqual(chart_resp.data[0]["in_kwh"], raw_resp.data[0]["in_kwh"])
 
-	def test_month_bucket_does_not_cross_the_utc_month_boundary(self):
+	def test_month_bucket_does_not_cross_the_civil_month_boundary(self):
 		MeterReading.objects.create(
 			metering_point=self.mp,
-			timestamp=datetime(2026, 1, 31, 23, 30, tzinfo=timezone.utc),
+			timestamp=datetime(2026, 1, 31, 23, 30, tzinfo=ZURICH),
 			energy_kwh=Decimal("1.0000"),
 			direction=ReadingDirection.IN,
 		)
@@ -1070,7 +1077,7 @@ class ChartDataEndpointTests(TestCase):
 
 		self.assertEqual(resp.status_code, 200)
 		self.assertEqual(resp.data, [{
-			"bucket": "2026-01-01T00:00:00+00:00",
+			"bucket": "2026-01-01T00:00:00+01:00",
 			"in_kwh": 1.0,
 			"out_kwh": 0.0,
 		}])
@@ -1296,7 +1303,7 @@ class SharedMeteringDashboardTests(TestCase):
 		)
 		MeterReading.objects.create(
 			metering_point=self.community_mp,
-			timestamp=datetime(2026, 1, 1, 12, 0, tzinfo=timezone.utc),
+			timestamp=datetime(2026, 1, 1, 12, 0, tzinfo=ZURICH),
 			energy_kwh=Decimal("8.0000"), direction=ReadingDirection.IN,
 			resolution=ReadingResolution.FIFTEEN_MIN,
 		)

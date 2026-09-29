@@ -80,7 +80,7 @@ def parse_timestamp(raw: object, *, label: str) -> datetime:
 
     A naive timestamp is refused rather than assumed: guessing a zone for a
     price that will be multiplied by metered energy is how an invoice silently
-    shifts by an hour twice a year. ADR 0007 keeps everything in UTC internally.
+    shifts by an hour twice a year. Prices are stored as UTC instants (ADR 0026).
     """
     if not isinstance(raw, str) or not raw.strip():
         raise DynamicTariffResponseError(f"{label} is missing.")

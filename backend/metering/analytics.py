@@ -6,7 +6,7 @@ dicts that views can hand straight to Response().  No HTTP or permission logic
 lives here, which makes the calculations independently unit-testable.
 """
 from collections import defaultdict
-from datetime import date as date_type, timedelta, timezone as dt_timezone
+from datetime import date as date_type, timedelta
 from decimal import Decimal, ROUND_HALF_UP
 
 from django.db.models import Max, Min, Sum
@@ -17,7 +17,7 @@ from allocation.read_model import (
     community_totals_by_timestamp,
     eligible_participant_shares,
 )
-from allocation.validity import active_during, period_window
+from allocation.validity import active_during, civil_date, period_window, wall_clock
 from allocation.split import split_consumption, split_production
 from allocation.windows import AssignmentWindows
 from zev.models import (
@@ -94,7 +94,7 @@ def _distribute_reading(windows, mp_to_zev, shares_by_zev, metering_point_id, ts
         return []
     if resolution.allocation_mode == AllocationMode.COMMUNITY:
         zev_id = mp_to_zev.get(metering_point_id)
-        day = ts.astimezone(dt_timezone.utc).date()
+        day = civil_date(ts)
         return list(shares_by_zev.get(zev_id, {}).get(day, {}).items())
     return [(resolution.holder_id, Decimal("1"))]
 
@@ -683,7 +683,7 @@ def compute_hourly_profile(selected_zev_id, participant_ids, start_dt, end_dt, p
         )
         if my_share == 0:
             continue
-        hour = ts.hour
+        hour = wall_clock(ts).hour
         p_kwh = reading.energy_kwh * my_share
         zev_cons = zev_cons_by_ts.get(ts, Decimal("0"))
         zev_prod = zev_prod_by_ts.get(ts, Decimal("0"))
@@ -787,7 +787,7 @@ def compute_data_quality_status(metering_points, date_from, date_to):
         days_with_data = set()
         readings_per_day = defaultdict(int)
         for ts in readings_ts:
-            day = ts.astimezone(dt_timezone.utc).date()
+            day = civil_date(ts)
             days_with_data.add(day)
             readings_per_day[day] += 1
 

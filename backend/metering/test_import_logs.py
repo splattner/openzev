@@ -99,7 +99,8 @@ class ImportLogDeletionTests(TestCase):
             options = {}
         else:
             content = b"meter_id,timestamp,v1,v2\nCH-DELETE-1,2026-02-10,2.0,3.0\n"
-            options = {"col_energy_start": "v1", "values_count": 2}
+            # The seeded reading sits at UTC midnight; a UTC file lands on it.
+            options = {"col_energy_start": "v1", "values_count": 2, "timestamp_timezone": "UTC"}
         response = upload_csv(
             self.client, "overwrite.csv", content, zev_id=str(self.zev.pk),
             format_profile=profile, overwrite_existing="true", **options,

@@ -7,7 +7,8 @@ rate. These tests pin both shapes, and the rule that joins them: whichever
 way a tariff is presented, it costs the same.
 """
 
-from datetime import date, datetime, time, timezone
+from datetime import date, datetime, time
+from zoneinfo import ZoneInfo
 from decimal import Decimal
 
 import pytest
@@ -81,7 +82,7 @@ def _participant_with_meter(**zev_kwargs):
 def _read(mp, hour, kwh):
     MeterReading.objects.create(
         metering_point=mp,
-        timestamp=datetime(2026, 1, 15, hour, 0, tzinfo=timezone.utc),
+        timestamp=datetime(2026, 1, 15, hour, 0, tzinfo=ZoneInfo("Europe/Zurich")),
         energy_kwh=Decimal(kwh),
         direction=ReadingDirection.IN,
     )

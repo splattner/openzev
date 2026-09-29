@@ -1,6 +1,5 @@
 """Invoice PDF statistics — savings, period stats, and energy summary computations."""
 
-import datetime as _dt
 from decimal import Decimal
 
 from allocation.read_model import (
@@ -11,7 +10,7 @@ from allocation.read_model import (
     eligible_participant_shares,
     iter_allocated_readings,
 )
-from allocation.validity import period_window
+from allocation.validity import civil_date, period_window
 from allocation.windows import AssignmentWindows
 from metering.analytics import _participant_names
 
@@ -152,7 +151,7 @@ def _compute_period_participant_stats(
         if reading.holder_id is None:
             continue
         if reading.allocation_mode == "community":
-            day = reading.timestamp.astimezone(_dt.timezone.utc).date()
+            day = civil_date(reading.timestamp)
             for pid, share in shares_by_date.get(day, {}).items():
                 entry = _entry(str(pid))
                 entry["total_consumed_kwh"] += reading.energy_kwh * share
@@ -178,7 +177,7 @@ def _compute_period_participant_stats(
         if reading.holder_id is None:
             continue
         if reading.allocation_mode == "community":
-            day = reading.timestamp.astimezone(_dt.timezone.utc).date()
+            day = civil_date(reading.timestamp)
             for pid, share in shares_by_date.get(day, {}).items():
                 _entry(str(pid))["total_produced_kwh"] += reading.energy_kwh * share
             continue
