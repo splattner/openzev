@@ -10,13 +10,13 @@
       
       
       
-        <link rel="canonical" href="https://www.openzev.ch/docs/16-api-keys/">
+        <link rel="canonical" href="https://www.openzev.ch/docs/19-ai-assistants/">
       
       
-        <link rel="prev" href="../18-backups/">
+        <link rel="prev" href="../16-api-keys/">
       
       
-        <link rel="next" href="../19-ai-assistants/">
+        <link rel="next" href="../12-troubleshooting/">
       
       
         
@@ -27,7 +27,7 @@
     
     
       
-        <title>API Keys - OpenZEV Documentation</title>
+        <title>AI Assistants (MCP) - OpenZEV Documentation</title>
       
     
     
@@ -80,7 +80,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#api-keys" class="md-skip">
+        <a href="#connecting-an-ai-assistant" class="md-skip">
           Skip to content
         </a>
       
@@ -115,7 +115,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              API Keys
+              AI Assistants (MCP)
             
           </span>
         </div>
@@ -1114,6 +1114,34 @@
                 
   
   
+  
+  
+    <li class="md-nav__item">
+      <a href="../16-api-keys/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Keys
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
     
   
   
@@ -1133,7 +1161,7 @@
   <span class="md-ellipsis">
     
   
-    API Keys
+    AI Assistants (MCP)
   
 
     
@@ -1151,7 +1179,7 @@
   <span class="md-ellipsis">
     
   
-    API Keys
+    AI Assistants (MCP)
   
 
     
@@ -1177,10 +1205,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#creating-a-key" class="md-nav__link">
+  <a href="#privacy-note" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Creating a key
+        Privacy note
       
     </span>
   </a>
@@ -1188,10 +1216,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#using-a-key" class="md-nav__link">
+  <a href="#enabling-it" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Using a key
+        Enabling it
       
     </span>
   </a>
@@ -1199,22 +1227,33 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#what-a-key-can-and-cannot-do" class="md-nav__link">
+  <a href="#creating-a-key-for-the-assistant" class="md-nav__link">
     <span class="md-ellipsis">
       
-        What a key can and cannot do
+        Creating a key for the assistant
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="What a key can and cannot do">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#connecting-a-client" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Connecting a client
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Connecting a client">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#read-only-keys" class="md-nav__link">
+  <a href="#claude-code" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Read-only keys
+        Claude Code
       
     </span>
   </a>
@@ -1222,10 +1261,21 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#endpoints-closed-to-keys" class="md-nav__link">
+  <a href="#generic-mcp-client-configuration" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Endpoints closed to keys
+        Generic MCP client configuration
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#n8n" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        n8n
       
     </span>
   </a>
@@ -1238,10 +1288,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#rate-limits" class="md-nav__link">
+  <a href="#what-you-can-ask" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Rate limits
+        What you can ask
       
     </span>
   </a>
@@ -1249,10 +1299,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#expiry" class="md-nav__link">
+  <a href="#limits" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Expiry
+        Limits
       
     </span>
   </a>
@@ -1260,41 +1310,13 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#revoking-a-key" class="md-nav__link">
+  <a href="#revoking-access" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Revoking a key
+        Revoking access
       
     </span>
   </a>
-  
-    <nav class="md-nav" aria-label="Revoking a key">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#an-administrator-can-revoke-your-key" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        An administrator can revoke your key
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#changing-your-password-does-not-revoke-your-keys" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Changing your password does not revoke your keys
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
@@ -1320,49 +1342,10 @@
   
 </li>
       
-        <li class="md-nav__item">
-  <a href="#security-notes" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Security notes
-      
-    </span>
-  </a>
-  
-</li>
-      
     </ul>
   
 </nav>
       
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../19-ai-assistants/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    AI Assistants (MCP)
-  
-
-    
-  </span>
-  
-  
-
-      </a>
     </li>
   
 
@@ -1517,10 +1500,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#creating-a-key" class="md-nav__link">
+  <a href="#privacy-note" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Creating a key
+        Privacy note
       
     </span>
   </a>
@@ -1528,10 +1511,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#using-a-key" class="md-nav__link">
+  <a href="#enabling-it" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Using a key
+        Enabling it
       
     </span>
   </a>
@@ -1539,22 +1522,33 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#what-a-key-can-and-cannot-do" class="md-nav__link">
+  <a href="#creating-a-key-for-the-assistant" class="md-nav__link">
     <span class="md-ellipsis">
       
-        What a key can and cannot do
+        Creating a key for the assistant
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="What a key can and cannot do">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#connecting-a-client" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Connecting a client
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Connecting a client">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#read-only-keys" class="md-nav__link">
+  <a href="#claude-code" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Read-only keys
+        Claude Code
       
     </span>
   </a>
@@ -1562,10 +1556,21 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#endpoints-closed-to-keys" class="md-nav__link">
+  <a href="#generic-mcp-client-configuration" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Endpoints closed to keys
+        Generic MCP client configuration
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#n8n" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        n8n
       
     </span>
   </a>
@@ -1578,10 +1583,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#rate-limits" class="md-nav__link">
+  <a href="#what-you-can-ask" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Rate limits
+        What you can ask
       
     </span>
   </a>
@@ -1589,10 +1594,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#expiry" class="md-nav__link">
+  <a href="#limits" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Expiry
+        Limits
       
     </span>
   </a>
@@ -1600,41 +1605,13 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#revoking-a-key" class="md-nav__link">
+  <a href="#revoking-access" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Revoking a key
+        Revoking access
       
     </span>
   </a>
-  
-    <nav class="md-nav" aria-label="Revoking a key">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#an-administrator-can-revoke-your-key" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        An administrator can revoke your key
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#changing-your-password-does-not-revoke-your-keys" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Changing your password does not revoke your keys
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
@@ -1660,17 +1637,6 @@
   
 </li>
       
-        <li class="md-nav__item">
-  <a href="#security-notes" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Security notes
-      
-    </span>
-  </a>
-  
-</li>
-      
     </ul>
   
 </nav>
@@ -1688,7 +1654,7 @@
 
 
   
-    <a href="https://github.com/splattner/openzev/edit/main/docs/user-guide/16-api-keys.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+    <a href="https://github.com/splattner/openzev/edit/main/docs/user-guide/19-ai-assistants.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
       
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4zm10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1z"/></svg>
     </a>
@@ -1696,180 +1662,170 @@
   
 
 
-<h1 id="api-keys">API Keys<a class="headerlink" href="#api-keys" title="Permanent link">&para;</a></h1>
-<p>API keys let you call the OpenZEV API from a script — pull consumption data into
-a spreadsheet, feed a dashboard, or automate a step of your billing run — without
-storing your password anywhere.</p>
-<p>You can sign in to the API with your normal credentials, but the access token
-expires after an hour and refreshing it rotates the token, so every script would
-have to implement the refresh dance. An API key does not expire on that
-timescale, can be revoked on its own without touching your password, and shows
-up in the audit log under its own name.</p>
-<h2 id="creating-a-key">Creating a key<a class="headerlink" href="#creating-a-key" title="Permanent link">&para;</a></h2>
-<p><img alt="Account API keys tab" src="../screenshots/16c-account-api-keys.png" /></p>
+<h1 id="connecting-an-ai-assistant">Connecting an AI Assistant<a class="headerlink" href="#connecting-an-ai-assistant" title="Permanent link">&para;</a></h1>
+<p>OpenZEV can answer questions about your own data through an AI assistant —
+Claude Code, Claude Desktop, Cursor, n8n, or any other client that speaks the
+<a href="https://modelcontextprotocol.io">Model Context Protocol</a> (MCP). Instead of
+clicking through the readiness cockpit, invoice detail, import logs and audit
+log yourself, you ask in plain language: <em>"Is Q2 ready to bill for ZEV
+Sonnenhof?"</em>, <em>"Why is this invoice higher than last quarter?"</em>, <em>"What went
+wrong in yesterday's import?"</em></p>
+<p>The assistant sees exactly what your account can see in the API — nothing
+more — and every question it asks OpenZEV is recorded in the audit log.</p>
+<h2 id="privacy-note">Privacy note<a class="headerlink" href="#privacy-note" title="Permanent link">&para;</a></h2>
+<p>Enabling this feature lets the signed-in user send OpenZEV data — participant
+names, consumption figures, invoice amounts, audit history — to whichever LLM
+provider the assistant uses, which is very likely a third party outside
+Switzerland. Only enable it if that is acceptable for your community, and only
+give a key to an assistant you trust with that data.</p>
+<p>The MCP endpoint is <strong>read-only</strong> in this release: no tool can create,
+change, approve, send or delete anything.</p>
+<h2 id="enabling-it">Enabling it<a class="headerlink" href="#enabling-it" title="Permanent link">&para;</a></h2>
+<p>An administrator must turn the feature on first — it is off by default:</p>
+<ol>
+<li>Open <strong>Platform → System Settings → Functions</strong>.</li>
+<li>Enable <code>mcp_server_enabled</code>.</li>
+</ol>
+<p>While the flag is off, the MCP endpoint does not exist as far as any caller
+can tell (<code>404</code>, whether or not they are signed in).</p>
+<h2 id="creating-a-key-for-the-assistant">Creating a key for the assistant<a class="headerlink" href="#creating-a-key-for-the-assistant" title="Permanent link">&para;</a></h2>
+<p>The assistant authenticates the same way a script does — see
+<a href="../16-api-keys/">API Keys</a> for the full picture. For an assistant:</p>
 <ol>
 <li>Open <strong>Account → API keys</strong>.</li>
 <li>Choose <strong>New API key</strong>.</li>
-<li>Give it a name describing what will use it — <code>nightly consumption export</code>
-   beats <code>key 1</code> when you are deciding six months later whether it is still
-   needed.</li>
-<li>Pick an expiry. The default is one year.</li>
-<li>Tick <strong>Read-only key</strong> if the script only reads (see below).</li>
-<li>Choose <strong>Create key</strong>.</li>
+<li>Give it a name that says what it's for — <code>claude-code-mcp</code> beats <code>key 3</code>.</li>
+<li>Tick <strong>Read-only key</strong>. Every tool in this release only reads, so a
+   read-only key loses nothing and keeps the credential's blast radius small
+   if it ever leaks.</li>
+<li>Choose <strong>Create key</strong> and copy the value shown — it is not shown again.</li>
 </ol>
-<p>The key is shown <strong>once</strong>:</p>
-<div class="highlight"><pre><span></span><code>ozv_3f9a1c04b7e2_kR8vN2pQ...
+<p>Only <code>admin</code> and <code>zev_owner</code> accounts can use the MCP endpoint. A
+participant's key is refused with <code>403</code>.</p>
+<h2 id="connecting-a-client">Connecting a client<a class="headerlink" href="#connecting-a-client" title="Permanent link">&para;</a></h2>
+<p>The endpoint is <code>https://&lt;your-openzev-host&gt;/api/v1/mcp/</code>, speaking MCP's
+<em>Streamable HTTP</em> transport. Send the key as a bearer token.</p>
+<h3 id="claude-code">Claude Code<a class="headerlink" href="#claude-code" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code>claude<span class="w"> </span>mcp<span class="w"> </span>add<span class="w"> </span>--transport<span class="w"> </span>http<span class="w"> </span>openzev<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>https://your-openzev.example.com/api/v1/mcp/<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--header<span class="w"> </span><span class="s2">"Authorization: Bearer ozv_3f9a1c04b7e2_kR8vN2pQ..."</span>
 </code></pre></div>
-<p>Copy it now. OpenZEV stores only a hash, so there is no way to show it again —
-if you lose it, revoke the key and create a new one.</p>
-<h2 id="using-a-key">Using a key<a class="headerlink" href="#using-a-key" title="Permanent link">&para;</a></h2>
-<p>Send it in the <code>Authorization</code> header with the <code>Api-Key</code> scheme:</p>
-<div class="highlight"><pre><span></span><code>curl<span class="w"> </span>-H<span class="w"> </span><span class="s2">"Authorization: Api-Key ozv_3f9a1c04b7e2_kR8vN2pQ..."</span><span class="w"> </span><span class="se">\</span>
-<span class="w">     </span>https://your-openzev.example.com/api/v1/zev/zevs/
+<h3 id="generic-mcp-client-configuration">Generic MCP client configuration<a class="headerlink" href="#generic-mcp-client-configuration" title="Permanent link">&para;</a></h3>
+<p>Most desktop clients (Claude Desktop via a local HTTP-to-stdio bridge, Cursor,
+…) take a JSON block naming the server:</p>
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">"mcpServers"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">"openzev"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">"url"</span><span class="p">:</span><span class="w"> </span><span class="s2">"https://your-openzev.example.com/api/v1/mcp/"</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">"headers"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="nt">"Authorization"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Bearer ozv_3f9a1c04b7e2_kR8vN2pQ..."</span>
+<span class="w">      </span><span class="p">}</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">  </span><span class="p">}</span>
+<span class="p">}</span>
 </code></pre></div>
-<p>A full working example — the ZEVs you can see, and the invoices for one of them:</p>
-<div class="highlight"><pre><span></span><code><span class="ch">#!/usr/bin/env bash</span>
-<span class="nb">set</span><span class="w"> </span>-euo<span class="w"> </span>pipefail
-
-<span class="nv">OPENZEV_URL</span><span class="o">=</span><span class="s2">"https://your-openzev.example.com"</span>
-<span class="nv">OPENZEV_KEY</span><span class="o">=</span><span class="s2">"ozv_3f9a1c04b7e2_kR8vN2pQ..."</span>
-
-api<span class="o">()</span><span class="w"> </span><span class="o">{</span>
-<span class="w">  </span>curl<span class="w"> </span>-sS<span class="w"> </span>-H<span class="w"> </span><span class="s2">"Authorization: Api-Key </span><span class="si">${</span><span class="nv">OPENZEV_KEY</span><span class="si">}</span><span class="s2">"</span><span class="w"> </span><span class="s2">"</span><span class="si">${</span><span class="nv">OPENZEV_URL</span><span class="si">}</span><span class="s2">/api/v1/</span><span class="nv">$1</span><span class="s2">"</span>
-<span class="o">}</span>
-
-<span class="c1"># Which ZEVs can this key see?</span>
-api<span class="w"> </span><span class="s2">"zev/zevs/"</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>jq<span class="w"> </span>-r<span class="w"> </span><span class="s1">'.results[] | "\(.id)  \(.name)"'</span>
-
-<span class="c1"># Invoices, narrowed to one ZEV</span>
-<span class="nv">ZEV_ID</span><span class="o">=</span><span class="k">$(</span>api<span class="w"> </span><span class="s2">"zev/zevs/"</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>jq<span class="w"> </span>-r<span class="w"> </span><span class="s1">'.results[0].id'</span><span class="k">)</span>
-api<span class="w"> </span><span class="s2">"invoices/invoices/"</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span><span class="p">|</span><span class="w"> </span>jq<span class="w"> </span>-r<span class="w"> </span>--arg<span class="w"> </span>zev<span class="w"> </span><span class="s2">"</span><span class="nv">$ZEV_ID</span><span class="s2">"</span><span class="w"> </span><span class="se">\</span>
-<span class="w">      </span><span class="s1">'.results[] | select(.zev == $zev) | "\(.invoice_number)  \(.status)  CHF \(.total_chf)"'</span>
-</code></pre></div>
-<p>Note the filtering happens in <code>jq</code>, not in the query string. The list endpoints
-return everything your account can see and <strong>ignore unknown query parameters</strong>
-rather than rejecting them — so <code>?zev_id=...</code> looks like it works and silently
-returns unfiltered results. Filter client-side, or narrow by paging.</p>
-<p>Responses are paginated at 50 items (<code>count</code>, <code>next</code>, <code>previous</code>, <code>results</code>);
-follow <code>next</code> if you expect more.</p>
-<p>The full endpoint list, with request and response shapes, is at <code>/api/docs/</code> on
-your installation. The <strong>Authorize</strong> button there accepts an API key, so you can
-try calls from the browser.</p>
-<p>An API key is also what an AI assistant uses to read your OpenZEV data — see
-<a href="../19-ai-assistants/">Connecting an AI Assistant</a> if you want to ask Claude,
-Cursor or n8n questions about a ZEV instead of calling the API by hand.</p>
-<h2 id="what-a-key-can-and-cannot-do">What a key can and cannot do<a class="headerlink" href="#what-a-key-can-and-cannot-do" title="Permanent link">&para;</a></h2>
-<p>A key <strong>acts with your permissions</strong>. A participant's key sees only that
-participant's data; a ZEV owner's key sees their ZEVs. Creating a key never
-grants access you did not already have.</p>
-<h3 id="read-only-keys">Read-only keys<a class="headerlink" href="#read-only-keys" title="Permanent link">&para;</a></h3>
-<p>A read-only key is refused on <code>POST</code>, <code>PUT</code>, <code>PATCH</code> and <code>DELETE</code> — it returns
-<code>403</code> with <code>This API key is read-only.</code></p>
-<p><strong>Read-only is not the same as harmless.</strong> A read-only key can still read
-everything your account can see: participant names, addresses, email addresses
-and consumption profiles. Treat it as a data-export credential, and give it the
-same care you would give the exported file.</p>
-<h3 id="endpoints-closed-to-keys">Endpoints closed to keys<a class="headerlink" href="#endpoints-closed-to-keys" title="Permanent link">&para;</a></h3>
-<p>Some endpoints refuse key authentication regardless of your role, returning
-<code>403</code> with <code>This endpoint cannot be used with an API key. Sign in instead.</code>:</p>
+<h3 id="n8n">n8n<a class="headerlink" href="#n8n" title="Permanent link">&para;</a></h3>
+<p>Add an <strong>MCP Client</strong> node, set its <strong>Endpoint</strong> to
+<code>https://your-openzev.example.com/api/v1/mcp/</code>, and set <strong>Authentication</strong> to
+a header credential: <code>Authorization: Bearer ozv_3f9a1c04b7e2_kR8vN2pQ...</code>.</p>
+<h2 id="what-you-can-ask">What you can ask<a class="headerlink" href="#what-you-can-ask" title="Permanent link">&para;</a></h2>
+<p>Once connected, the assistant has ten tools. You do not need to know their
+names — asking a normal question is enough — but knowing what exists helps
+you phrase a better question:</p>
 <table>
 <thead>
 <tr>
-<th>Endpoint</th>
-<th>Why</th>
+<th>Tool</th>
+<th>Answers</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><code>auth/token/refresh/</code></td>
-<td>A key must not be upgradeable into a browser session</td>
+<td><code>list_zevs</code></td>
+<td>Which ZEVs can I see? (call this first to get a ZEV's id)</td>
 </tr>
 <tr>
-<td><code>auth/me/change-password/</code>, <code>auth/me/set-initial-password/</code></td>
-<td>Otherwise a leaked key locks the real owner out</td>
+<td><code>list_participants</code></td>
+<td>Who is in this ZEV, since when, and which metering points are they assigned to? (names and dates only — no email, phone, address or IBAN)</td>
 </tr>
 <tr>
-<td><code>auth/me/</code> (PATCH), <code>auth/me/email-change/</code></td>
-<td>Moving the account email moves password recovery with it</td>
+<td><code>period_readiness</code></td>
+<td>Can this billing period be invoiced, and what is blocking it?</td>
 </tr>
 <tr>
-<td><code>auth/me/sessions/revoke/</code>, <code>auth/users/&lt;id&gt;/revoke-sessions/</code></td>
-<td>A key must not be able to sign its owner out</td>
+<td><code>find_invoices</code></td>
+<td>Which invoices match this participant / period / status?</td>
 </tr>
 <tr>
-<td><code>auth/users/</code> writes, <code>auth/users/&lt;id&gt;/impersonate/</code></td>
-<td>An admin's key must not be able to become somebody else</td>
+<td><code>explain_invoice</code></td>
+<td>Break one invoice down into its line items, and compare it with the participant's previous invoice</td>
 </tr>
 <tr>
-<td><code>auth/me/api-keys/</code></td>
-<td>A key that can issue keys makes revoking a leaked one pointless</td>
+<td><code>import_triage</code></td>
+<td>What happened in recent metering imports, and what went wrong?</td>
+</tr>
+<tr>
+<td><code>consumption_summary</code></td>
+<td>Consumption, production and self-consumption over a date range, by month, day or hour (hour for up to a week); for the whole ZEV it also shows each participant's consumption and how much of it came from the ZEV</td>
+</tr>
+<tr>
+<td><code>consumption_profile</code></td>
+<td>A participant's average day: how much they use in each hour, and how much of it comes from the ZEV's own solar</td>
+</tr>
+<tr>
+<td><code>data_gaps</code></td>
+<td>Which metering points are missing readings, and where?</td>
+</tr>
+<tr>
+<td><code>audit_query</code></td>
+<td>Who did what, and when?</td>
 </tr>
 </tbody>
 </table>
-<p>The rule behind the list: a key may not touch credentials or sessions. That is
-what keeps a leaked key a revocable credential rather than a permanent account
-takeover.</p>
-<p>Reading is still open where it is useful — <code>GET auth/me/</code> works for any key.
-<code>GET auth/users/</code> is the instance-wide user list and is restricted to admin
-keys; a non-admin key is refused there.</p>
-<h2 id="rate-limits">Rate limits<a class="headerlink" href="#rate-limits" title="Permanent link">&para;</a></h2>
-<p>Key-authenticated requests are limited to <strong>600 requests per hour per key</strong>
-(configurable by your administrator via <code>API_KEY_THROTTLE_RATE</code>). Exceeding it
-returns <code>429 Request was throttled.</code></p>
-<p>The limit is per key, not per account, so one busy script cannot starve another.
-Browser sessions are not throttled by this limit; the login, registration,
-refresh, verification and OAuth login/exchange endpoints carry their own
-per-IP limits (see <code>AUTH_*_THROTTLE_RATE</code> settings).</p>
-<p>Rejected responses normally carry a <code>Retry-After</code> header with the seconds to
-wait — but <strong>not always</strong>: once you are well past the limit the header is
-omitted. Retry logic should treat it as optional and fall back to a default
-backoff rather than reading it unconditionally.</p>
-<h2 id="expiry">Expiry<a class="headerlink" href="#expiry" title="Permanent link">&para;</a></h2>
-<p>Every key shows its expiry in the list, and is flagged <strong>Expires soon</strong> for the
-last 14 days. A key past its expiry is refused with <code>401</code> exactly as a revoked
-one is.</p>
-<p>There is no automatic renewal: create a new key, switch the script over, then
-revoke the old one. Doing it in that order means no gap.</p>
-<h2 id="revoking-a-key">Revoking a key<a class="headerlink" href="#revoking-a-key" title="Permanent link">&para;</a></h2>
-<p>Choose <strong>Revoke</strong> next to the key. It takes effect on the <strong>next request</strong> —
-nothing is cached, so there is no window in which a revoked key still works.</p>
-<p>Revoke a key when:</p>
+<p>Example questions:</p>
 <ul>
-<li>the script using it is retired</li>
-<li>it may have been exposed — committed to a repository, pasted into a ticket, or
-  sent over chat</li>
-<li>somebody with access to it leaves</li>
+<li>"List the ZEVs I have access to."</li>
+<li>"Is the current period ready to bill for ZEV Sonnenhof?"</li>
+<li>"Who are the current participants of ZEV Sonnenhof, and which meters do they have?"</li>
+<li>"Find Anna Muster's invoices from this year."</li>
+<li>"Explain invoice OZV-00013 — why did it go up from last quarter?"</li>
+<li>"What errors came up in yesterday's metering import?"</li>
+<li>"How much energy did ZEV Sonnenhof self-consume in August, by day?"</li>
+<li>"Which participants used the most electricity last quarter, and how much of it was solar?"</li>
+<li>"When in the day does Anna Muster use the most electricity, and how much of that is covered by solar?"</li>
+<li>"Which metering points have gaps in the last 30 days?"</li>
+<li>"Who approved invoices for ZEV Sonnenhof last week?"</li>
 </ul>
-<p>Revocation cannot be undone. Any script still using the key starts failing with
-<code>401</code> immediately, so make sure you know what uses it first — the <strong>last used</strong>
-column is the quickest way to tell whether anything still does.</p>
-<h3 id="an-administrator-can-revoke-your-key">An administrator can revoke your key<a class="headerlink" href="#an-administrator-can-revoke-your-key" title="Permanent link">&para;</a></h3>
-<p>Administrators see every key in the system under <strong>Platform → Accounts → API
-keys</strong> (<code>/admin/accounts/api-keys</code>),
-with its owner, prefix, scope, last use and expiry — and can revoke any of them.
-This exists for offboarding and for responding to a leak: a key has to be
-killable by someone other than the person who lost it.</p>
-<p>What an administrator <strong>cannot</strong> do is create a key in your name. Keys are only
-ever issued to the person signed in, under Account → Profile. A durable
-credential minted in somebody else's name would outlive the admin's session and
-bill every action it took to its supposed owner, so no such path exists.</p>
-<p>Every administrator revocation is recorded in the audit log naming both the key
-and the administrator who revoked it.</p>
-<h3 id="changing-your-password-does-not-revoke-your-keys">Changing your password does not revoke your keys<a class="headerlink" href="#changing-your-password-does-not-revoke-your-keys" title="Permanent link">&para;</a></h3>
-<p>Changing your password signs out your other browser sessions, but keys are
-separate credentials. That is deliberate: a routine password rotation should not
-silently break every automation you have. It also means that if you are changing
-your password <strong>because you think your account was compromised</strong>, you should
-revoke your keys as well — changing the password alone does not lock an attacker
-out of them.</p>
+<h2 id="limits">Limits<a class="headerlink" href="#limits" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>Read-only.</strong> No tool changes anything. A future release may add write
+  tools (approving or sending invoices) with an explicit confirmation step.</li>
+<li><strong>No raw meter data.</strong> Consumption is aggregated into monthly, daily or
+  (for up to a week) hourly buckets; the underlying 15-minute readings are not
+  exposed through MCP.</li>
+<li><strong>Scoped to your account.</strong> An assistant connected with a ZEV owner's key
+  sees only that owner's ZEVs — the same tenant isolation that protects the
+  REST API protects MCP, because MCP tools call the same REST endpoints
+  internally.</li>
+<li><strong>Bearer-token clients only, for now.</strong> The endpoint accepts a static API
+  key, not an OAuth login. Connectors that only support OAuth (such as
+  claude.ai's custom connectors) cannot connect yet.</li>
+<li><strong>Lists are capped.</strong> A question that would return hundreds of rows comes
+  back truncated with a note saying so — narrow the question (a shorter date
+  range, a specific participant) rather than asking for everything at once.</li>
+</ul>
+<h2 id="revoking-access">Revoking access<a class="headerlink" href="#revoking-access" title="Permanent link">&para;</a></h2>
+<p>Revoke the key the same way you would revoke any other API key: <strong>Account →
+API keys → Revoke</strong>. It takes effect on the assistant's next request. See
+<a href="../16-api-keys/#revoking-a-key">Revoking a key</a> for the full picture,
+including how an administrator can revoke it on your behalf.</p>
 <h2 id="audit-trail">Audit trail<a class="headerlink" href="#audit-trail" title="Permanent link">&para;</a></h2>
-<p>Actions taken with a key are recorded in the audit log with the source
-<strong>API key</strong> and the key's name, so an entry reads as "the nightly export did
-this", not just "you did this". This is what makes the blast radius of a leaked
-key reconstructable.</p>
-<p>Revoked keys keep their row in the database — that is what lets an audit entry
-from six months ago still resolve to a name — but they disappear from your list.</p>
+<p>Every tool call the assistant makes is recorded in the audit log as an
+<code>mcp.tool.call</code> event, naming the tool, the arguments, the key that was used
+(by its prefix), and the ZEV it concerned (when the question named one you can
+see). The event details show source <code>mcp</code>. To see exactly what an assistant
+looked at, filter the audit log by action type <code>mcp.tool.call</code> — or ask the
+assistant itself, since <code>audit_query</code> can answer that question too.</p>
 <h2 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
@@ -1880,38 +1836,27 @@ from six months ago still resolve to a name — but they disappear from your lis
 </thead>
 <tbody>
 <tr>
-<td><code>401 Invalid or expired API key.</code></td>
-<td>Wrong, revoked, expired, or truncated key; or the owning account was deactivated. The message is deliberately identical in each case.</td>
+<td><code>404</code> on the endpoint</td>
+<td><code>mcp_server_enabled</code> is off — ask an administrator to enable it. The endpoint answers <code>404</code> to everyone while the flag is off, so this is the first thing to check.</td>
 </tr>
 <tr>
-<td><code>403 This API key is read-only.</code></td>
-<td>The key was created read-only and the request is not a <code>GET</code>/<code>HEAD</code>/<code>OPTIONS</code>. Create a new key without the flag.</td>
+<td><code>401</code></td>
+<td>Missing, wrong, revoked or expired key. Same causes as any other API key — see <a href="../16-api-keys/#troubleshooting">API Keys → Troubleshooting</a>.</td>
 </tr>
 <tr>
-<td><code>403 This endpoint cannot be used with an API key.</code></td>
-<td>See <a href="#endpoints-closed-to-keys">Endpoints closed to keys</a>.</td>
+<td><code>403</code></td>
+<td>You are signed in as a participant, or your key's account role changed. Only <code>admin</code> and <code>zev_owner</code> can use MCP.</td>
 </tr>
 <tr>
-<td><code>429 Request was throttled.</code></td>
-<td>Over the hourly limit. Wait for <code>Retry-After</code>, or slow the script down.</td>
+<td>The assistant says a tool failed with "Permission denied" or "not found"</td>
+<td>You (or the assistant) named a ZEV or invoice your account cannot see. This is the same scoping the REST API enforces — it is not a bug.</td>
 </tr>
 <tr>
-<td><code>401</code> on a key that worked yesterday</td>
-<td>Check the expiry in the key list; an expired key is refused exactly like a revoked one.</td>
+<td>Answers feel stale</td>
+<td>Ask the assistant to call the tool again — MCP calls always read live data, there is no caching layer of its own.</td>
 </tr>
 </tbody>
 </table>
-<h2 id="security-notes">Security notes<a class="headerlink" href="#security-notes" title="Permanent link">&para;</a></h2>
-<ul>
-<li><strong>Treat a key like a password.</strong> Put it in an environment variable or a secret
-  store, never in a committed file. The <code>ozv_</code> prefix exists so that secret
-  scanners can recognise a leaked key.</li>
-<li><strong>One key per use.</strong> Separate keys mean you can revoke the compromised one
-  without breaking anything else, and the audit log tells you which script did
-  what.</li>
-<li><strong>Prefer read-only</strong> whenever the script only reads.</li>
-<li><strong>Set an expiry.</strong> A key nobody remembers is a key nobody revokes.</li>
-</ul>
 
 
 
@@ -1947,7 +1892,7 @@ from six months ago still resolve to a name — but they disappear from your lis
       <nav class="md-footer__inner md-grid" aria-label="Footer" >
         
           
-          <a href="../18-backups/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Backups">
+          <a href="../16-api-keys/" class="md-footer__link md-footer__link--prev" aria-label="Previous: API Keys">
             <div class="md-footer__button md-icon">
               
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
@@ -1957,20 +1902,20 @@ from six months ago still resolve to a name — but they disappear from your lis
                 Previous
               </span>
               <div class="md-ellipsis">
-                Backups
+                API Keys
               </div>
             </div>
           </a>
         
         
           
-          <a href="../19-ai-assistants/" class="md-footer__link md-footer__link--next" aria-label="Next: AI Assistants (MCP)">
+          <a href="../12-troubleshooting/" class="md-footer__link md-footer__link--next" aria-label="Next: Troubleshooting">
             <div class="md-footer__title">
               <span class="md-footer__direction">
                 Next
               </span>
               <div class="md-ellipsis">
-                AI Assistants (MCP)
+                Troubleshooting
               </div>
             </div>
             <div class="md-footer__button md-icon">
